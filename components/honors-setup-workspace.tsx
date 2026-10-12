@@ -3,7 +3,8 @@
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, X } from "lucide-react";
+import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, UsersRound, X } from "lucide-react";
+import { clubClassLevelLabels, clubClassLevels } from "@/modules/club-rosters/domain";
 import { honorOfferingSpanLabels, offeringPlacementPatch, sessionEditPatch } from "@/modules/honors/domain";
 import { honorSetChange, honorsNeedConfirmationMessage } from "@/modules/honors/offering-honors";
 import { HonorMultiSelect } from "@/components/honor-multi-select";
@@ -20,6 +21,8 @@ type ApiResult = Partial<EventHonorSetup> & {
   plan?: HonorCopyPlan;
   setup?: EventHonorSetup;
   message?: string;
+  /** After adding or raising a class level or prerequisite: how many enrolled youth don't meet it (#832). */
+  requirementImpact?: { offeringId: string; unmet: number };
   issues?: Array<{ message?: string }>;
 };
 
@@ -56,6 +59,9 @@ export function HonorsSetupWorkspace({
   // The honors chosen for the class being added, and for the one being edited (#812); the first is the primary.
   const [newHonorIds, setNewHonorIds] = useState<string[]>([]);
   const [editHonorIds, setEditHonorIds] = useState<string[]>([]);
+  // The honors a youth must have completed first (#832), for the class being added and the one being edited.
+  const [newPrerequisiteIds, setNewPrerequisiteIds] = useState<string[]>([]);
+  const [editPrerequisiteIds, setEditPrerequisiteIds] = useState<string[]>([]);
   const [editSpan, setEditSpan] = useState<"SINGLE_SESSION" | "ALL_SESSIONS">("SINGLE_SESSION");
   const [editingSession, setEditingSession] = useState<SetupSession | null>(null);
   const [copySource, setCopySource] = useState(otherEvents[0]?.id ?? "");
@@ -120,7 +126,10 @@ export function HonorsSetupWorkspace({
       }
       const next = result.setup ?? (result.sessions && result.offerings ? result as EventHonorSetup : null);
       if (next) setSetup({ locations: next.locations, sessions: next.sessions, offerings: next.offerings });
-      if (success) setNotice(success);
+      const unmet = result.requirementImpact?.unmet ?? 0;
+      if (success) {
+        setNotice(unmet > 0 ? `${success} ${unmet === 1 ? "1 enrolled youth doesn't" : `${unmet} enrolled youth don't`} meet this; they keep ${unmet === 1 ? "their seat" : "their seats"}.` : success);
+      }
       return result;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The change could not be saved.");
@@ -219,9 +228,12 @@ export function HonorsSetupWorkspace({
     const details = {
       capacity: Number(form.get("capacity") ?? 0),
       minimumAge: optionalNumber(form.get("minimumAge")),
+      minimumClassLevel: String(form.get("minimumClassLevel") ?? "") || null,
+      prerequisiteHonorIds: editing ? editPrerequisiteIds : newPrerequisiteIds,
       perClubLimit: optionalNumber(form.get("perClubLimit")),
       teacherName: String(form.get("teacherName") ?? ""),
-      location: String(form.get("location") ?? ""),
+      // A class in a room has its location text kept in step with the room: the form doesn't send it (#834).
+      ...(editing?.roomId ? {} : { location: String(form.get("location") ?? "") }),
       additionalCostCents: dollarsToCents(form.get("additionalCost")),
       requirementNote: String(form.get("requirementNote") ?? ""),
       // Only an all-sessions class has its own site; a single-session class is at its session's.
@@ -259,6 +271,7 @@ export function HonorsSetupWorkspace({
     if (result) {
       setEditing(null);
       setNewHonorIds([]);
+      setNewPrerequisiteIds([]);
       formElement.reset();
     }
   }
@@ -330,7 +343,7 @@ export function HonorsSetupWorkspace({
   async function writeBackCompletions() {
     const result = await call(`${base}/completions`, "POST", undefined, "") as (ApiResult & { written?: number; alreadyRecorded?: number; skipped?: number }) | null;
     if (result && typeof result.written === "number") {
-      setNotice(`Wrote ${result.written} completion${result.written === 1 ? "" : "s"} into members' honor records. ${result.alreadyRecorded ?? 0} already recorded. ${result.skipped ?? 0} skipped (not checked in, or not on the enrolling club's roster).`);
+      setNotice(`Wrote ${result.written} completion${result.written === 1 ? "" : "s"} into members' honor records. ${result.alreadyRecorded ?? 0} already recorded. ${result.skipped ?? 0} skipped (not checked in, not on the enrolling club's roster, or an instructor marked them not completed).`);
     }
   }
 
@@ -348,8 +361,14 @@ export function HonorsSetupWorkspace({
         </div>
         <div className="intro-actions">
           <span className="count-badge">{totalSeats} youth seats</span>
+          <Link className="secondary-button" href={`/more/honors/schedule?event=${encodeURIComponent(eventId)}`}>
+            <CalendarRange aria-hidden="true" size={15} /> Schedule board
+          </Link>
           <Link className="secondary-button" href={`/more/honors/rosters?event=${encodeURIComponent(eventId)}`}>
             <ClipboardList aria-hidden="true" size={15} /> Rosters
+          </Link>
+          <Link className="secondary-button" href={`/more/honors/instructors?event=${encodeURIComponent(eventId)}`}>
+            <UsersRound aria-hidden="true" size={15} /> Instructors
           </Link>
         </div>
       </div>
@@ -576,6 +595,16 @@ export function HonorsSetupWorkspace({
             <input defaultValue={editing?.minimumAge ?? ""} max={99} min={0} name="minimumAge" type="number" />
           </label>
           <label>
+            Minimum class level (optional)
+            <select defaultValue={editing?.minimumClassLevel ?? ""} name="minimumClassLevel">
+              <option value="">No minimum</option>
+              {clubClassLevels.map((level) => (
+                <option key={level} value={level}>{clubClassLevelLabels[level]} and up</option>
+              ))}
+            </select>
+            <small className="field-help">Checked against the class level the director sets on the club roster. If it is missing, the director confirms.</small>
+          </label>
+          <label>
             Per-club limit (optional)
             <input defaultValue={editing?.perClubLimit ?? ""} max={1000} min={1} name="perClubLimit" type="number" />
           </label>
@@ -585,7 +614,8 @@ export function HonorsSetupWorkspace({
           </label>
           <label>
             Location (optional)
-            <input defaultValue={editing?.location ?? ""} maxLength={120} name="location" />
+            <input defaultValue={editing?.location ?? ""} maxLength={120} name="location" readOnly={Boolean(editing?.roomId)} />
+            {editing?.roomId && <span className="field-help">This class is placed in a room on the schedule board. Change its room there.</span>}
           </label>
           <label>
             Additional cost in dollars (optional)
@@ -595,6 +625,12 @@ export function HonorsSetupWorkspace({
             Special requirement (optional)
             <input defaultValue={editing?.requirementNote ?? ""} maxLength={200} name="requirementNote" placeholder="Bring a flashlight" />
           </label>
+        </div>
+        <div className="form-grid two-column">
+          {editing
+            ? <HonorMultiSelect kind="prerequisite" label="Prerequisite honors (optional)" onChange={setEditPrerequisiteIds} options={[...catalog, ...editing.prerequisiteHonors.filter((honor) => !catalog.some((entry) => entry.id === honor.id))]} value={editPrerequisiteIds} />
+            : <HonorMultiSelect kind="prerequisite" label="Prerequisite honors (optional)" onChange={setNewPrerequisiteIds} options={catalog} value={newPrerequisiteIds} />}
+          <p className="field-help">Youth must have these honors completed on their honor record to take the class. If no record is found, the director confirms.</p>
         </div>
         {catalog.length === 0 && !editing && (
           <p className="field-help">The honor catalog is empty. A system administrator adds honors under System management → Honor catalog.</p>
@@ -630,6 +666,7 @@ export function HonorsSetupWorkspace({
                   <th>Honors</th>
                   <th>Youth seats taken</th>
                   <th>Min. age</th>
+                  <th>Requires</th>
                   <th>Per club</th>
                   <th>Teacher</th>
                   <th>Location</th>
@@ -651,6 +688,14 @@ export function HonorsSetupWorkspace({
                       {offering.enrolled > offering.seatsTaken && <><br /><small>+{offering.enrolled - offering.seatsTaken} without a seat</small></>}
                     </td>
                     <td data-label="Min. age">{offering.minimumAge ?? "—"}</td>
+                    <td data-label="Requires">
+                      {offering.minimumClassLevel === null && offering.prerequisiteHonors.length === 0 ? "—" : (
+                        <>
+                          {offering.minimumClassLevel !== null && <div>{clubClassLevelLabels[offering.minimumClassLevel]} and up</div>}
+                          {offering.prerequisiteHonors.map((honor) => <div key={honor.id}><small>Needs <span translate="no">{honor.name}</span></small></div>)}
+                        </>
+                      )}
+                    </td>
                     <td data-label="Per club">{offering.perClubLimit ?? "—"}</td>
                     <td data-label="Teacher" translate="no">{offering.teacherName || "—"}</td>
                     <td data-label="Location">{offering.location || "—"}</td>
@@ -664,7 +709,7 @@ export function HonorsSetupWorkspace({
                         aria-label={`Edit ${offering.honorName}`}
                         className="secondary-button"
                         disabled={saving}
-                        onClick={() => { setEditing(offering); setEditHonorIds(offering.honorIds); setEditSpan(offering.span); setNotice(""); setError(""); }}
+                        onClick={() => { setEditing(offering); setEditHonorIds(offering.honorIds); setEditPrerequisiteIds(offering.prerequisiteHonorIds); setEditSpan(offering.span); setNotice(""); setError(""); }}
                         type="button"
                       >
                         <Pencil aria-hidden="true" size={13} />

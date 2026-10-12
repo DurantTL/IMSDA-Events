@@ -109,7 +109,9 @@ export const staffPageTitles = {
   eventModules: "Event modules",
   systemManagement: "System management",
   honorsRosters: "Honors Weekend rosters",
+  honorsInstructors: "Honors Weekend instructors",
   honors: "Honors Weekend classes",
+  honorsSchedule: "Honors Weekend schedule board",
   clubPacket: "Club packet",
   checkInBook: "Check-in book",
   clubReports: "Camporee club reports",
@@ -145,6 +147,8 @@ type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", 
  */
 const subpageRules: readonly SubpageRule[] = [
   ["/more/honors/rosters", "prefix", staffPageTitles.honorsRosters],
+  ["/more/honors/schedule", "prefix", staffPageTitles.honorsSchedule],
+  ["/more/honors/instructors", "prefix", staffPageTitles.honorsInstructors],
   ["/more/honors", "prefix", staffPageTitles.honors],
   ["/more/reports/clubs/team-form", "prefix", staffPageTitles.teamForm],
   ["/more/reports/clubs/packet", "prefix", staffPageTitles.clubPacket],
