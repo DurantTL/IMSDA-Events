@@ -1600,6 +1600,32 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     if (page.url() !== peopleBefore) await page.goto(peopleBefore, { waitUntil: "load" });
   }
 
+  // Scanner name search (#889): open the scanner, search a first name several registrations share, and the pick list
+  // (names, Open buttons) fits the phone and the camera button is still there. Nothing is checked in.
+  if (spec.name === "staff-check-in") {
+    const checkInBefore = page.url();
+    try {
+      await page.locator("button.scan-card:visible").first().click({ timeout: 5000 });
+      await page.locator('[role="dialog"] .check-in-manual-form input').first().fill("Lisa", { timeout: 5000 });
+      await page.locator('[role="dialog"] .check-in-manual-form button[type="submit"]').first().click({ timeout: 5000 });
+      await page.locator("#check-in-candidates-title").first().waitFor({ state: "visible", timeout: 10000 });
+      const stateName = `${spec.name} (scanner name search)`;
+      const fit = await page.evaluate(dialogFitInPage);
+      dialogsOpened += fit.count;
+      for (const problem of fit.problems) record("dialog-too-tall", stateName, width, problem);
+      const open = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
+      if (open.scrollWidth > open.innerWidth) record("horizontal-scroll", stateName, width, `page is ${open.scrollWidth}px wide in a ${open.innerWidth}px window; sticking out: ${open.overflowers.join("; ") || "(nothing identified)"}`);
+      for (const target of open.smallTargets) record("small-tap-target", stateName, width, target);
+      if ((await page.locator('[role="dialog"] button:has-text("Start camera"):visible').count()) === 0) record("dialog-open-failed", stateName, width, "the camera button is missing after a name search");
+      if (takeShots) await page.screenshot({ path: `${prefix}-scanner-name-search.jpg`, type: "jpeg", quality: 60 });
+    } catch (error) {
+      record("dialog-open-failed", `${spec.name} (scanner name search)`, width, (error as Error).message.split("\n")[0] ?? "failed");
+    }
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(100);
+    if (page.url() !== checkInBefore) await page.goto(checkInBefore, { waitUntil: "load" });
+  }
+
   // Retry failed (#860): the review is open (scope picker, counts, skip reasons, confirm) and fits the screen.
   if (spec.name === "staff-communications-deliveries") {
     const deliveriesBefore = page.url();

@@ -174,3 +174,56 @@ export function arrivalMatchesSearch(
   const words = [...nameWords, ...joinedNames, ...clubWords];
   return queryWords.every((word) => words.some((candidate) => candidate.startsWith(word)));
 }
+
+/** People the scanner's pick list shows at once; a longer match list asks staff to narrow the search. */
+export const scannerLookupListLimit = 8;
+
+export type ScannerLookupPerson = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  attendeeType: string;
+  checkedIn: boolean;
+  confirmationCode: string;
+};
+
+export type ScannerLookupMatches = {
+  /** Distinct registrations (confirmation codes) any match belongs to. */
+  confirmationCodes: string[];
+  /** Matching people, in roster order, capped at `scannerLookupListLimit`. */
+  people: ScannerLookupPerson[];
+  /** True when more people matched than `people` holds. */
+  truncated: boolean;
+};
+
+/**
+ * The scanner's manual lookup (#889) runs the same search as the check-in
+ * workspace (`arrivalMatchesSearch`) over the same server-projected arrivals,
+ * so it can show staff nothing the desk does not already show them: name,
+ * attendee type, checked-in state and confirmation code. A single matching
+ * registration opens directly; several are offered as a short list.
+ */
+export function findScannerLookupMatches(
+  arrivals: readonly ScannerLookupPerson[],
+  query: string,
+  clubNameByCode: Readonly<Record<string, { organizationName: string } | undefined>> = {},
+): ScannerLookupMatches {
+  if (!query.trim()) return { confirmationCodes: [], people: [], truncated: false };
+  const matched = arrivals.filter((arrival) => arrivalMatchesSearch(
+    arrival,
+    query,
+    clubNameByCode[arrival.confirmationCode]?.organizationName,
+  ));
+  return {
+    confirmationCodes: [...new Set(matched.map((arrival) => arrival.confirmationCode))],
+    people: matched.slice(0, scannerLookupListLimit).map((arrival) => ({
+      id: arrival.id,
+      firstName: arrival.firstName,
+      lastName: arrival.lastName,
+      attendeeType: arrival.attendeeType,
+      checkedIn: arrival.checkedIn,
+      confirmationCode: arrival.confirmationCode,
+    })),
+    truncated: matched.length > scannerLookupListLimit,
+  };
+}

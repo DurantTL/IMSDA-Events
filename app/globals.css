@@ -1559,9 +1559,7 @@ select:focus-visible {
   padding: 10px 11px;
   font: inherit;
   font-size: max(var(--type-body-floor, 0px), 0.77rem);
-  letter-spacing: 0.04em;
   outline: 0;
-  text-transform: uppercase;
 }
 .check-in-manual-form input:focus {
   border-color: var(--imsda-purple);
