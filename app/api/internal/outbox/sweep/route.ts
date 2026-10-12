@@ -8,6 +8,7 @@ import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitli
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
+import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -61,6 +62,13 @@ async function postHandler(request: Request) {
       logError("The calendar feed refresh failed after a successful outbox sweep", error);
       return null;
     });
+    // Pay on Square links (#327): withdraw expired or stale ones and retry any deletion Square has
+    // not confirmed. Square has no link expiry of its own, so this is what makes expiry real.
+    // Its failure must not make a successful sweep look failed.
+    const hostedLinks = await sweepHostedCheckouts().catch((error) => {
+      logError("The Pay on Square link sweep failed after a successful outbox sweep", error);
+      return null;
+    });
     // Honors Weekend class waitlists (#831): offers that ran out pass to the next youth in line, each director
     // emailed once for a new offer. Its failure must not make a successful sweep look failed.
     const classWaitlists = await sweepClassWaitlists().catch((error) => {
@@ -80,6 +88,7 @@ async function postHandler(request: Request) {
       },
       communityRetention,
       calendarFeeds,
+      hostedLinks,
       classWaitlists,
       locationWaitlistDigest: locationWaitlistDigest && {
         status: locationWaitlistDigest.status,
