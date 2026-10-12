@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getSweepHeartbeat: vi.fn(),
   getPlatformSettings: vi.fn(),
   readdir: vi.fn(),
+  getBackupStatus: vi.fn<() => Promise<unknown>>(async () => { throw new Error("backup log unavailable in this test"); }),
   redirect: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
@@ -27,12 +28,15 @@ vi.mock("@/lib/logger", async (importOriginal) => ({ ...(await importOriginal<ty
 vi.mock("@/lib/env", () => ({ getServerEnv: mocks.getServerEnv }));
 vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: () => ({ deliveryConfigured: true }) }));
 vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ getSweepHeartbeat: mocks.getSweepHeartbeat }));
+vi.mock("@/modules/operations/backup-status-repository", () => ({ getBackupStatus: mocks.getBackupStatus }));
 vi.mock("@/modules/system-admin/platform-settings", () => ({ getPlatformSettings: mocks.getPlatformSettings }));
 vi.mock("node:fs/promises", async (importOriginal) => ({ ...(await importOriginal<typeof import("node:fs/promises")>()), readdir: mocks.readdir }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
 import SystemReadinessPage from "@/app/(workspace)/admin/readiness/page";
 import { POST, GET } from "@/app/api/admin/system-readiness/route";
+import { assessBackupStatus, type BackupRunRecord, type BackupRunSummary } from "@/modules/operations/backup-status";
+import { getAutomaticBackupEvidence, type BackupEvidence } from "@/modules/system-admin/readiness-backup";
 import {
   automaticBackupKeys,
   evaluateAutomaticChecks,
@@ -129,13 +133,92 @@ describe("automatic readiness checks", () => {
     expect(row(rows, "square-environment").summary).toContain("not unlocked");
   });
 
-  it("keeps backups manual until the seam returns evidence", () => {
+  it("keeps backups manual only when there is no evidence at all", () => {
     expect(evaluateBackupItems(null, now)).toEqual([]);
     expect(automaticBackupKeys(null).size).toBe(0);
-    const evidence = { lastBackupAt: new Date("2026-10-16T02:00:00.000Z"), lastRestoreTestAt: null };
-    const rows = evaluateBackupItems(evidence, now);
-    expect(rows.map((candidate) => candidate.status)).toEqual(["ok", "attention"]);
-    expect([...automaticBackupKeys(evidence)].sort()).toEqual(["backup-offsite", "restore-rehearsal"]);
+    expect([...automaticBackupKeys({ readable: false })].sort()).toEqual(["backup-offsite", "restore-rehearsal"]);
+  });
+});
+
+describe("automatic backup rows (#895)", () => {
+  const record = (hours: number, overrides: Partial<BackupRunRecord> = {}): BackupRunRecord => {
+    const finishedAt = new Date(now.getTime() - hours * 3_600_000);
+    return { startedAt: new Date(finishedAt.getTime() - 240_000), finishedAt, ok: true, dumpBytes: 5000, assetsBytes: 700, offsiteOk: true, ...overrides };
+  };
+  const evidence = (summary: Partial<BackupRunSummary>, at = now): BackupEvidence => ({
+    readable: true,
+    status: assessBackupStatus(
+      { latest: null, latestSuccess: null, latestOffsiteSuccess: null, latestRehearsal: null, latestRehearsalSuccess: null, migrationFinishedAt: new Date("2026-10-01T00:00:00.000Z"), ...summary },
+      at,
+    ),
+  });
+  const healthy = () => {
+    const backup = record(10);
+    const rehearsal = record(48);
+    return evidence({ latest: backup, latestSuccess: backup, latestOffsiteSuccess: backup, latestRehearsal: rehearsal, latestRehearsalSuccess: rehearsal });
+  };
+
+  it("shows fresh backup and restore test as ok, with dates and yes/no", () => {
+    const rows = evaluateBackupItems(healthy(), now);
+    expect(rows.map((candidate) => candidate.status)).toEqual(["ok", "ok"]);
+    expect(rows[0].summary).toContain("2026-10-16");
+    expect(rows[0].summary).toContain("Reached the offsite copy: yes");
+    expect(rows[1].summary).toContain("2026-10-14");
+  });
+
+  it("agrees with the health status rules: stale, failing, never and missing offsite are attention", () => {
+    const stale = record(40);
+    expect(evaluateBackupItems(evidence({ latest: stale, latestSuccess: stale, latestOffsiteSuccess: stale }), now)[0]).toMatchObject({ status: "attention" });
+
+    const failed = record(1, { ok: false });
+    const good = record(10);
+    expect(evaluateBackupItems(evidence({ latest: failed, latestSuccess: good, latestOffsiteSuccess: good }), now)[0]).toMatchObject({ status: "attention" });
+
+    const noOffsite = record(10, { offsiteOk: false });
+    const row = evaluateBackupItems(evidence({ latest: noOffsite, latestSuccess: noOffsite }), now)[0];
+    expect(row.status).toBe("attention");
+    expect(row.summary).toContain("Reached the offsite copy: no");
+
+    // Never run, shortly after the table was created: health says "never", which is attention here, not ok.
+    const fresh = evidence({ migrationFinishedAt: new Date(now.getTime() - 3_600_000) });
+    const never = evaluateBackupItems(fresh, now);
+    expect(never.map((candidate) => candidate.status)).toEqual(["attention", "attention"]);
+    expect(never[0].summary).toContain("No backup has run yet");
+    expect(never[1].summary).toContain("No restore test has run yet");
+  });
+
+  it("flags a restore test that is overdue or failed", () => {
+    const backup = record(10);
+    const old = record(24 * 9);
+    expect(evaluateBackupItems(evidence({ latest: backup, latestSuccess: backup, latestOffsiteSuccess: backup, latestRehearsal: old, latestRehearsalSuccess: old }), now)[1]).toMatchObject({ status: "attention" });
+    const failed = record(2, { ok: false });
+    const row = evaluateBackupItems(evidence({ latest: backup, latestSuccess: backup, latestOffsiteSuccess: backup, latestRehearsal: failed, latestRehearsalSuccess: record(48) }), now)[1];
+    expect(row.status).toBe("attention");
+    expect(row.summary).toContain("failed");
+  });
+
+  it("shows unknown rows when the backup log cannot be read", () => {
+    expect(evaluateBackupItems({ readable: false }, now).map((candidate) => candidate.status)).toEqual(["unknown", "unknown"]);
+  });
+
+  it("never shows locations or secrets in any row", () => {
+    const leaky = healthy();
+    if (!leaky.readable) throw new Error("unreachable");
+    // Even if a location sneaked into the assessed status, the rows only render the fields they name.
+    Object.assign(leaky.status, { bucket: "synthetic-bucket-name", path: "/srv/backups/synthetic", host: "backup.synthetic.example", accessKey: "SYNTHETICKEY123" });
+    const text = JSON.stringify([...evaluateBackupItems(leaky, now), ...evaluateBackupItems({ readable: false }, now)]);
+    for (const needle of ["synthetic-bucket-name", "/srv/backups", "backup.synthetic.example", "SYNTHETICKEY123", "s3://", "http"]) {
+      expect(text).not.toContain(needle);
+    }
+  });
+
+  it("the seam returns unreadable evidence instead of throwing when the log read fails", async () => {
+    mocks.getBackupStatus.mockRejectedValueOnce(new Error("connection to db.internal.example refused"));
+    await expect(getAutomaticBackupEvidence(now)).resolves.toEqual({ readable: false });
+    const ok = healthy();
+    if (!ok.readable) throw new Error("unreachable");
+    mocks.getBackupStatus.mockResolvedValueOnce(ok.status);
+    await expect(getAutomaticBackupEvidence(now)).resolves.toMatchObject({ readable: true });
   });
 });
 

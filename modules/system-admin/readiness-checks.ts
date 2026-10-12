@@ -67,28 +67,49 @@ export function pendingMigrationNames(shipped: readonly string[], rows: readonly
 }
 
 /**
- * Backup items are manual until `getAutomaticBackupEvidence` returns something. When it does, the two backup rows
- * move here and the manual versions are hidden by the caller (see `automaticBackupKeys`).
+ * The two backup rows, from the same assessment `/api/health` uses (`assessBackupStatus`), so the two never
+ * disagree. Dates and yes/no only. A backup that has never run is attention, not ok. When the backup log could not
+ * be read the rows say so ("unknown") instead of falling back to a manual tick that could hide a problem.
  */
 export function evaluateBackupItems(backup: BackupEvidence | null, now: Date): AutomaticReadinessRow[] {
   if (!backup) return [];
-  const backupFresh = backup.lastBackupAt !== null && now.getTime() - backup.lastBackupAt.getTime() <= 2 * DAY_MS;
-  const restoreFresh = backup.lastRestoreTestAt !== null && now.getTime() - backup.lastRestoreTestAt.getTime() <= 14 * DAY_MS;
+  if (!backup.readable) {
+    return [
+      { key: "backup-offsite", title: "Last successful backup", status: "unknown", summary: "The backup log could not be read.", people: [] },
+      { key: "restore-rehearsal", title: "Last restore test", status: "unknown", summary: "The backup log could not be read.", people: [] },
+    ];
+  }
+  const s = backup.status;
+  const day = (iso: string) => iso.slice(0, 10);
+  const when = (iso: string) => `${day(iso)} (${age(new Date(iso), now)})`;
+
+  let backupSummary: string;
+  if (!s.lastSuccessAt) {
+    backupSummary = s.status === "never" ? "No backup has run yet." : "No successful backup is recorded.";
+  } else {
+    backupSummary = `Last successful backup ${when(s.lastSuccessAt)}.`;
+    if (s.stale) backupSummary += " That is overdue.";
+  }
+  if (s.status === "failing") backupSummary += " The latest run failed.";
+  if (s.lastSuccessAt) {
+    const offsite = s.offsiteOk === true ? "yes" : s.offsiteOk === false ? "no" : "not recorded";
+    backupSummary += ` Reached the offsite copy: ${offsite}.`;
+  }
+  const backupAttention = s.status !== "ok" || s.stale || s.offsiteOk === false || s.offsiteStopped;
+
+  let restoreSummary: string;
+  if (!s.lastRehearsalSuccessAt) {
+    restoreSummary = s.lastRehearsalAt ? "No successful restore test is recorded." : "No restore test has run yet.";
+  } else {
+    restoreSummary = `Last successful restore test ${when(s.lastRehearsalSuccessAt)}.`;
+    if (s.rehearsalOverdue) restoreSummary += " That is overdue.";
+  }
+  if (s.lastRehearsalOk === false) restoreSummary += " The latest restore test failed.";
+  const restoreAttention = !s.lastRehearsalSuccessAt || s.rehearsalOverdue || s.lastRehearsalOk === false;
+
   return [
-    {
-      key: "backup-offsite",
-      title: "Last successful backup",
-      status: backupFresh ? "ok" : "attention",
-      summary: backup.lastBackupAt ? `Last successful backup ${age(backup.lastBackupAt, now)}.` : "No successful backup is recorded.",
-      people: [],
-    },
-    {
-      key: "restore-rehearsal",
-      title: "Last restore test",
-      status: restoreFresh ? "ok" : "attention",
-      summary: backup.lastRestoreTestAt ? `Last restore test ${age(backup.lastRestoreTestAt, now)}.` : "No restore test is recorded.",
-      people: [],
-    },
+    { key: "backup-offsite", title: "Last successful backup", status: backupAttention ? "attention" : "ok", summary: backupSummary, people: [] },
+    { key: "restore-rehearsal", title: "Last restore test", status: restoreAttention ? "attention" : "ok", summary: restoreSummary, people: [] },
   ];
 }
 
