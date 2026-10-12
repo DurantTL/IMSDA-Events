@@ -3,9 +3,10 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { evaluateEventRegistrationPhase, hasEventEnded, registrationClosedMessage } from "@/modules/events/lifecycle";
 import {
   chooseLocationFirstMessage,
+  classChangesClosedMessage,
+  classChangesOpen,
   differentLocationMessage,
   eventHasActiveLocations,
   offeringSiteId,
@@ -13,9 +14,16 @@ import {
 } from "@/modules/honors/locations";
 import {
   consumesClassSeat,
+  hasClassRequirements,
+  countUnmetByChange,
+  requirementGaps,
+  requirementResolution,
   selectionProblem,
+  type RequirementWaivers,
   type SelectableOffering,
 } from "@/modules/honors/enrollment-domain";
+import type { ClubClassLevel } from "@/modules/club-rosters/domain";
+import { completedHonorsByPerson } from "@/modules/honors/completed-honors";
 import { compareOfferingRows, offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import { picksByAttendeeId } from "@/modules/honors/registration-picks";
 
@@ -35,7 +43,12 @@ export class ClassSelectionError extends Error {
       | "LOCATION_REQUIRED"
       | "CLASS_FULL"
       | "CLUB_LIMIT_REACHED"
-      | "SELECTION_CONFLICT",
+      | "SELECTION_CONFLICT"
+      // The class waitlist (#831).
+      | "WAITLIST_NOT_NEEDED"
+      | "ALREADY_WAITING"
+      | "OFFER_NOT_FOUND"
+      | "OFFER_EXPIRED",
     message: string,
   ) {
     super(message);
@@ -43,7 +56,7 @@ export class ClassSelectionError extends Error {
   }
 }
 
-type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" };
+export type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" };
 
 /**
  * Whose seats these are (#650). A club holds seats as its club; a "Group"
@@ -52,20 +65,74 @@ type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number
  */
 export type SeatOwner = { kind: "club"; organizationId: string } | { kind: "group"; registrationId: string };
 
+/**
+ * What the class rules need to know about roster members (#832): the director-set
+ * class level on the roster and which of `honorIds` (the event's prerequisite
+ * honors) the member's honor record shows completed. Only the latest non-voided entry per honor counts (a completion later corrected to in progress doesn't).
+ * Nothing else from the record is read.
+ */
+export async function loadMemberRequirements(client: Prisma.TransactionClient, memberIds: readonly string[], honorIds: readonly string[]) {
+  const result = new Map<string, { classLevel: ClubClassLevel | null; completedHonorIds: string[] }>();
+  if (memberIds.length === 0) return result;
+  const members = await client.clubRosterMember.findMany({
+    where: { id: { in: [...memberIds] } },
+    select: { id: true, classLevel: true, personId: true },
+  });
+  const personIds = members.map((member) => member.personId).filter((id): id is string => Boolean(id));
+  const completedByPerson = await completedHonorsByPerson(client, personIds, honorIds);
+  for (const member of members) {
+    result.set(member.id, { classLevel: member.classLevel, completedHonorIds: member.personId ? [...(completedByPerson.get(member.personId) ?? [])] : [] });
+  }
+  return result;
+}
+
+/**
+ * How many youth currently holding a seat in the class don't meet what an edit introduced (#832): the raised level, and
+ * the added prerequisite honors, nothing already in force. They keep their seats. A count only, never names. A guest or
+ * group person has no level or record, so counts as not meeting it.
+ */
+export async function countEnrolledYouthNotMeeting(
+  client: Prisma.TransactionClient,
+  offeringId: string,
+  eventId: string,
+  change: { raisedLevel: ClubClassLevel | null; addedPrerequisiteIds: readonly string[] },
+) {
+  const enrollments = await client.honorEnrollment.findMany({
+    where: { offeringId, offering: { eventId }, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
+    select: { registrationAttendee: { select: { profileSnapshot: true } } },
+  });
+  const memberIds = enrollments
+    .map((row) => (row.registrationAttendee.profileSnapshot as Snapshot).clubRosterMemberId)
+    .filter((id): id is string => Boolean(id));
+  const byMember = await loadMemberRequirements(client, memberIds, change.addedPrerequisiteIds);
+  const people = enrollments.map((row) => {
+    const memberId = (row.registrationAttendee.profileSnapshot as Snapshot).clubRosterMemberId;
+    const known = memberId ? byMember.get(memberId) : undefined;
+    return { classLevel: known?.classLevel ?? null, completedHonorIds: known?.completedHonorIds ?? [] };
+  });
+  return countUnmetByChange(people, { raisedLevel: change.raisedLevel, addedPrerequisites: change.addedPrerequisiteIds.map((id) => ({ id, name: "" })) });
+}
+
+/** Honors any class of the event requires first (#832). */
+export async function eventPrerequisiteHonorIds(client: Prisma.TransactionClient, eventId: string) {
+  const rows = await client.honorOfferingPrerequisite.findMany({ where: { offering: { eventId } }, select: { honorId: true }, distinct: ["honorId"] });
+  return rows.map((row) => row.honorId);
+}
+
 const registrationForLoading = {
   id: true,
   status: true,
   locationId: true,
-  location: { select: { id: true, name: true } },
+  location: { select: { id: true, name: true, firstDay: true, lastDay: true, registrationClosesOn: true } },
   attendees: {
     orderBy: { position: "asc" as const },
     select: { id: true, profileSnapshot: true },
   },
 } satisfies Prisma.RegistrationSelect;
 
-const eventForLoading = { id: true, isPublished: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true } satisfies Prisma.EventSelect;
+const eventForLoading = { id: true, isPublished: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true, honorWaitlistOfferHours: true } satisfies Prisma.EventSelect;
 
-async function loadRegistration(client: Prisma.TransactionClient, owner: SeatOwner, eventId: string) {
+export async function loadRegistration(client: Prisma.TransactionClient, owner: SeatOwner, eventId: string) {
   // Class picking works on a club's one registration (#809: an event with several teams per club cannot have classes).
   const clubRegistration = owner.kind === "club"
     ? await client.clubEventRegistration.findUnique({
@@ -90,6 +157,9 @@ async function loadRegistration(client: Prisma.TransactionClient, owner: SeatOwn
     select: { id: true, attendeeType: true },
   });
   const typeByMember = new Map(members.map((member) => [member.id, member.attendeeType]));
+  const requirementsByMember = memberIds.length > 0
+    ? await loadMemberRequirements(client, memberIds, await eventPrerequisiteHonorIds(client, eventId))
+    : new Map<string, { classLevel: ClubClassLevel | null; completedHonorIds: string[] }>();
   const attendees = clubRegistration.registration.attendees.map((attendee) => {
     const snapshot = attendee.profileSnapshot as Snapshot;
     const attendeeType = snapshot.clubRosterMemberId ? typeByMember.get(snapshot.clubRosterMemberId) ?? null : snapshot.temporaryAttendeeType ?? null;
@@ -100,6 +170,9 @@ async function loadRegistration(client: Prisma.TransactionClient, owner: SeatOwn
       ageOnEventDate: typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null,
       attendeeType,
       consumesSeat: consumesClassSeat(attendeeType),
+      // Level and honor records come from the roster member; a guest or group person has none (#832).
+      classLevel: snapshot.clubRosterMemberId ? requirementsByMember.get(snapshot.clubRosterMemberId)?.classLevel ?? null : null,
+      completedHonorIds: snapshot.clubRosterMemberId ? requirementsByMember.get(snapshot.clubRosterMemberId)?.completedHonorIds ?? [] : [],
     };
   });
   // With active locations on the event, classes are per site, so the club must have picked one (#589).
@@ -113,7 +186,7 @@ async function loadRegistration(client: Prisma.TransactionClient, owner: SeatOwn
   };
 }
 
-async function loadOfferings(client: Prisma.TransactionClient, eventId: string) {
+export async function loadOfferings(client: Prisma.TransactionClient, eventId: string) {
   const offerings = await client.honorOffering.findMany({
     where: { eventId },
     select: {
@@ -124,6 +197,8 @@ async function loadOfferings(client: Prisma.TransactionClient, eventId: string) 
       site: { select: { name: true } },
       capacity: true,
       minimumAge: true,
+      minimumClassLevel: true,
+      prerequisites: { select: { honor: { select: { id: true, name: true } } } },
       perClubLimit: true,
       teacherName: true,
       location: true,
@@ -149,6 +224,9 @@ async function loadOfferings(client: Prisma.TransactionClient, eventId: string) 
     sessionOrder: offering.session?.sortOrder ?? -1,
     capacity: offering.capacity,
     minimumAge: offering.minimumAge,
+    minimumClassLevel: offering.minimumClassLevel,
+    // Sorted by name so the picker reads the same every time (#832).
+    prerequisiteHonors: offering.prerequisites.map((row) => row.honor).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
     perClubLimit: offering.perClubLimit,
     teacherName: offering.teacherName,
     location: offering.location,
@@ -166,14 +244,29 @@ function ownerSeats(owner: SeatOwner | null): Prisma.HonorEnrollmentWhereInput {
   return owner.kind === "club" ? { organizationId: owner.organizationId } : { registrationId: owner.registrationId };
 }
 
-async function seatCounts(client: Prisma.TransactionClient, eventId: string, owner: SeatOwner | null) {
-  const [all, club] = await Promise.all([
+/** Offers on a class waitlist that haven't run out (#831): each holds one seat for its youth until the director accepts or it passes on. */
+export function liveWaitlistOffer(now: Date) {
+  return { status: "OFFERED", offerExpiresAt: { gt: now }, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } satisfies Prisma.HonorClassWaitlistEntryWhereInput;
+}
+
+async function seatCounts(client: Prisma.TransactionClient, eventId: string, owner: SeatOwner | null, now: Date) {
+  const [all, club, offers, clubOffers] = await Promise.all([
     client.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...seatHoldingEnrollment }, _count: { _all: true } }),
     client.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...ownerSeats(owner), ...seatHoldingEnrollment }, _count: { _all: true } }),
+    client.honorClassWaitlistEntry.groupBy({ by: ["offeringId"], where: { eventId, ...liveWaitlistOffer(now) }, _count: { _all: true } }),
+    owner?.kind === "club"
+      ? client.honorClassWaitlistEntry.groupBy({ by: ["offeringId"], where: { eventId, organizationId: owner.organizationId, ...liveWaitlistOffer(now) }, _count: { _all: true } })
+      : Promise.resolve([]),
   ]);
   return {
+    /** Seats held by enrolled youth. */
     taken: new Map(all.map((row) => [row.offeringId, row._count._all])),
+    /** This owner's seats only: waitlist spots and offers never count toward a per-club limit (#831). */
     clubTaken: new Map(club.map((row) => [row.offeringId, row._count._all])),
+    /** Seats held back for live waitlist offers (#831); a class is full when seats plus these reach its capacity. */
+    reserved: new Map(offers.map((row) => [row.offeringId, row._count._all])),
+    /** This club's live offers: seats it is about to hold, so a direct pick can't use up the club's limit around them (#831). */
+    clubReserved: new Map(clubOffers.map((row) => [row.offeringId, row._count._all])),
   };
 }
 
@@ -193,7 +286,7 @@ async function getOwnerClassSelectionWorkspace(owner: SeatOwner, eventId: string
   const locationId = registration.location?.id ?? null;
   const [allOfferings, counts, enrollments, allSessions] = await Promise.all([
     loadOfferings(prisma, eventId),
-    seatCounts(prisma, eventId, owner),
+    seatCounts(prisma, eventId, owner, now),
     prisma.honorEnrollment.findMany({
       where: { registrationId: registration.registrationId },
       select: { registrationAttendeeId: true, offeringId: true },
@@ -212,7 +305,7 @@ async function getOwnerClassSelectionWorkspace(owner: SeatOwner, eventId: string
     (selections[enrollment.registrationAttendeeId] ??= []).push(enrollment.offeringId);
   }
   return {
-    open: evaluateEventRegistrationPhase(registration.event, now) === "OPEN",
+    open: classChangesOpen(registration.event, registration.location, now),
     registrationClosesOn: registration.event.registrationClosesOn,
     location: registration.location,
     locationRequired: registration.locationRequired,
@@ -221,10 +314,15 @@ async function getOwnerClassSelectionWorkspace(owner: SeatOwner, eventId: string
     attendees: registration.attendees,
     offerings: offerings.map((offering) => ({
       ...offering,
-      seatsTaken: counts.taken.get(offering.id) ?? 0,
+      // A seat held for a live waitlist offer is not available to anyone else (#831).
+      seatsTaken: (counts.taken.get(offering.id) ?? 0) + (counts.reserved.get(offering.id) ?? 0),
       clubSeatsTaken: counts.clubTaken.get(offering.id) ?? 0,
     })),
     selections,
+    // This club's places on class waitlists and offers to accept (#831); a group registration has none.
+    waitlist: owner.kind === "club"
+      ? await (await import("@/modules/honors/waitlist-repository")).getClubWaitlistView(prisma, { organizationId: owner.organizationId, registrationId: registration.registrationId, event: registration.event, location: registration.location, now })
+      : null,
   };
 }
 
@@ -242,14 +340,27 @@ function isSerializationFailure(error: unknown) {
 /** Never an attendee account credited for a staff action (#442): `userId` (with `actAsId`) for a staff "act as" director. */
 export type ClassSelectionActor = { accountId: string } | { userId: string; actAsId: string };
 
+/**
+ * How a save asks past a class's level or prerequisite-honor rules (#832), keyed
+ * by registration attendee id. `confirmations`: the class ids the director
+ * confirmed the person meets, for a missing level or honor record. `overrides`:
+ * class id to the reason staff placed the person anyway; only staff acting as the
+ * director may use them. Both are recorded on the enrollment and audited.
+ */
+export type RequirementWaiverInput = {
+  confirmations?: Record<string, string[]>;
+  overrides?: Record<string, Record<string, string>>;
+};
+
 export async function setClassSelections(
   organizationId: string,
   eventId: string,
   actor: ClassSelectionActor,
   selections: Record<string, string[]>,
   now = new Date(),
+  waivers: RequirementWaiverInput = {},
 ) {
-  return setOwnerClassSelections({ kind: "club", organizationId }, eventId, actor, selections, now);
+  return setOwnerClassSelections({ kind: "club", organizationId }, eventId, actor, selections, now, waivers);
 }
 
 /**
@@ -266,7 +377,10 @@ export async function setGroupClassSelections(
   selections: Record<string, string[]>,
   now = new Date(),
 ) {
-  return setOwnerClassSelections({ kind: "group", registrationId }, eventId, actor, selections, now);
+  // No director or roster stands behind a group's people, so nobody can confirm a level or honor record for them:
+  // a class with a level or prerequisite is open to a group only when the person is shown to meet it (never today).
+  // Staff override works only when acting as a club director, so there is no placement path for a group person yet (#832).
+  return setOwnerClassSelections({ kind: "group", registrationId }, eventId, actor, selections, now, {});
 }
 
 async function setOwnerClassSelections(
@@ -275,19 +389,23 @@ async function setOwnerClassSelections(
   actor: ClassSelectionActor | GroupClassActor,
   selections: Record<string, string[]>,
   now: Date,
+  waivers: RequirementWaiverInput,
 ) {
   const prisma = getPrisma();
+  const overridesGiven = Object.values(waivers.overrides ?? {}).some((byClass) => Object.keys(byClass).length > 0);
+  if (overridesGiven && !("userId" in actor)) {
+    throw new ClassSelectionError("SELECTION_INVALID", "Only staff can place someone who doesn't meet a class requirement.");
+  }
   for (let attempt = 0; ; attempt += 1) {
+    // Offers the waitlist made in this save (#831), emailed once it commits.
+    let waitlistMessageIds: string[] = [];
     try {
       await prisma.$transaction(async (tx) => {
+        waitlistMessageIds = [];
         const registration = await loadRegistration(tx, owner, eventId);
-        if (evaluateEventRegistrationPhase(registration.event, now) !== "OPEN") {
-          throw new ClassSelectionError(
-            "DEADLINE_PASSED",
-            hasEventEnded(registration.event, now)
-              ? registrationClosedMessage
-              : `Class choices closed${registration.event.registrationClosesOn ? ` after ${registration.event.registrationClosesOn}` : ""}.`,
-          );
+        // The site's own close when it has one, else the event's: the same deadline the class waitlist uses (#831).
+        if (!classChangesOpen(registration.event, registration.location, now)) {
+          throw new ClassSelectionError("DEADLINE_PASSED", classChangesClosedMessage(registration.event, registration.location, now));
         }
         if (registration.locationRequired) {
           throw new ClassSelectionError("LOCATION_REQUIRED", chooseLocationFirstMessage);
@@ -304,8 +422,10 @@ async function setOwnerClassSelections(
           select: { id: true, registrationAttendeeId: true, offeringId: true },
         });
 
-        const toCreate: Array<{ attendeeId: string; offeringId: string; consumesSeat: boolean }> = [];
+        const toCreate: Array<{ attendeeId: string; offeringId: string; consumesSeat: boolean; levelConfirmed: boolean; prerequisitesConfirmed: boolean; overrideReason: string | null }> = [];
         const toDelete: string[] = [];
+        // Classes that lose a seat in this save: their waitlists get the seat (#831).
+        const freedOfferingIds = new Set<string>();
         for (const [attendeeId, offeringIds] of Object.entries(selections)) {
           const attendee = attendeesById.get(attendeeId);
           if (!attendee) throw new ClassSelectionError("ATTENDEE_NOT_FOUND", owner.kind === "club" ? "That person isn't on your club's registration." : "That person isn't on your group's registration.");
@@ -319,22 +439,71 @@ async function setOwnerClassSelections(
               `${attendee.firstName} ${attendee.lastName}: ${differentLocationMessage(wrongSite.honorName, registration.location?.name ?? null)}`.trim(),
             );
           }
-          const problem = selectionProblem(attendee, offeringIds, offeringsById, currentIds);
+          const attendeeWaivers: RequirementWaivers = {
+            confirmed: new Set(waivers.confirmations?.[attendeeId] ?? []),
+            overrides: new Map(Object.entries(waivers.overrides?.[attendeeId] ?? {})),
+          };
+          const problem = selectionProblem(attendee, offeringIds, offeringsById, currentIds, attendeeWaivers);
           if (problem) {
             throw new ClassSelectionError("SELECTION_INVALID", `${attendee.firstName} ${attendee.lastName}: ${problem}`.trim());
           }
           const wanted = new Set(offeringIds);
-          toDelete.push(...current.filter((enrollment) => !wanted.has(enrollment.offeringId)).map((enrollment) => enrollment.id));
+          const dropped = current.filter((enrollment) => !wanted.has(enrollment.offeringId));
+          toDelete.push(...dropped.map((enrollment) => enrollment.id));
+          for (const enrollment of dropped) freedOfferingIds.add(enrollment.offeringId);
           for (const offeringId of offeringIds) {
-            if (!currentIds.has(offeringId)) toCreate.push({ attendeeId, offeringId, consumesSeat: attendee.consumesSeat });
+            if (currentIds.has(offeringId)) continue;
+            // How the person got past a level or prerequisite rule, if they did, is recorded with the seat (#832).
+            const resolution = requirementResolution(attendee, offeringsById.get(offeringId)!, attendeeWaivers);
+            toCreate.push({
+              attendeeId,
+              offeringId,
+              consumesSeat: attendee.consumesSeat,
+              levelConfirmed: resolution.levelConfirmed,
+              prerequisitesConfirmed: resolution.prerequisitesConfirmed,
+              overrideReason: resolution.overrideReason,
+            });
           }
         }
 
         const gaining = [...new Set(toCreate.filter((row) => row.consumesSeat).map((row) => row.offeringId))].sort();
-        if (gaining.length > 0) {
-          // Lock the classes gaining seats, in a fixed order, so concurrent
-          // saves for the same class queue up instead of both reading "one left".
-          await tx.$queryRaw`SELECT id FROM "HonorOffering" WHERE id IN (${Prisma.join(gaining)}) ORDER BY id FOR UPDATE`;
+        // This club's places on class waitlists (#831): a seat opened or a class picked here can change who is offered what.
+        const openEntries = owner.kind === "club"
+          ? await tx.honorClassWaitlistEntry.findMany({
+            where: { registrationId: registration.registrationId, status: { in: ["WAITING", "OFFERED"] } },
+            select: { id: true, registrationAttendeeId: true, offeringId: true, status: true },
+          })
+          : [];
+        // Lock every class this save gains, frees or has a waitlist place in, in one fixed order, so concurrent
+        // saves for the same class queue up instead of both reading "one left", and a waitlist offer can't be
+        // made against a seat another save is taking.
+        const lockIds = [...new Set([...gaining, ...freedOfferingIds, ...openEntries.map((entry) => entry.offeringId)])].sort();
+        if (lockIds.length > 0) {
+          await tx.$queryRaw`SELECT id FROM "HonorOffering" WHERE id IN (${Prisma.join(lockIds)}) ORDER BY id FOR UPDATE`;
+        }
+        // A class with a line gives its free seats to the line first, so a direct pick never jumps ahead of it:
+        // offers that ran out lapse and their seats go to the next youth (#831). The person's own live offer still holds its seat here.
+        // Only classes that have a line need any of this, so a save with no waitlist involved does no extra work.
+        const lines = lockIds.length > 0
+          ? new Set((await tx.honorClassWaitlistEntry.findMany({
+            where: { offeringId: { in: lockIds }, status: { in: ["WAITING", "OFFERED"] } },
+            select: { offeringId: true },
+            distinct: ["offeringId"],
+          })).map((row) => row.offeringId))
+          : new Set<string>();
+        const waitlistModule = lines.size > 0 ? await import("@/modules/honors/waitlist-repository") : null;
+        const gainingWithLine = gaining.filter((id) => lines.has(id));
+        // Picking a class the person is waiting on, or holds an offer for, settles that place (#831). Such a place keeps its turn
+        // in the line but is not offered and emailed a seat the same save takes for it.
+        const takenEntries = openEntries.filter((entry) => toCreate.some((row) => row.attendeeId === entry.registrationAttendeeId && row.offeringId === entry.offeringId));
+        if (waitlistModule && gainingWithLine.length > 0) {
+          waitlistMessageIds.push(...(await waitlistModule.promoteClassWaitlists(tx, eventId, gainingWithLine, now, new Set(takenEntries.map((entry) => entry.id)))).messageIds);
+        }
+        if (takenEntries.length > 0) {
+          await tx.honorClassWaitlistEntry.updateMany({
+            where: { id: { in: takenEntries.map((entry) => entry.id) }, status: { in: ["WAITING", "OFFERED"] } },
+            data: { status: "ACCEPTED", resolvedAt: now, resolution: "Took a seat in the class" },
+          });
         }
         if (toDelete.length > 0) await tx.honorEnrollment.deleteMany({ where: { id: { in: toDelete } } });
         if (toCreate.length > 0) {
@@ -347,22 +516,38 @@ async function setOwnerClassSelections(
               // A group's seats name no club (#650).
               organizationId: owner.kind === "club" ? owner.organizationId : null,
               consumesSeat: row.consumesSeat,
+              levelConfirmedByDirector: row.levelConfirmed,
+              prerequisitesConfirmedByDirector: row.prerequisitesConfirmed,
+              requirementOverrideReason: row.overrideReason,
+              requirementOverriddenByUserId: row.overrideReason && "userId" in actor ? actor.userId : null,
             })),
           });
         }
 
-        const counts = await seatCounts(tx, eventId, owner);
+        // An offer held for someone else keeps its seat: it counts with the seats taken (#831).
+        const counts = await seatCounts(tx, eventId, owner, now);
         for (const offeringId of gaining) {
           const offering = offeringsById.get(offeringId)!;
-          if ((counts.taken.get(offeringId) ?? 0) > offering.capacity) {
+          if ((counts.taken.get(offeringId) ?? 0) + (counts.reserved.get(offeringId) ?? 0) > offering.capacity) {
             throw new ClassSelectionError("CLASS_FULL", `${offering.honorName} is full. Choose another class.`);
           }
-          if (offering.perClubLimit !== null && (counts.clubTaken.get(offeringId) ?? 0) > offering.perClubLimit) {
+          if (offering.perClubLimit !== null && (counts.clubTaken.get(offeringId) ?? 0) + (counts.clubReserved.get(offeringId) ?? 0) > offering.perClubLimit) {
             throw new ClassSelectionError(
               "CLUB_LIMIT_REACHED",
               `${offering.honorName} allows ${offering.perClubLimit} youth per ${owner.kind === "club" ? "club" : "group"}.`,
             );
           }
+        }
+
+        // Seats this save freed go to the next youth in line, and an offer this club's youth can no longer take
+        // (they now hold a class in that session) passes on (#831). Same transaction, so nothing can be overfilled.
+        if (waitlistModule) {
+          waitlistMessageIds.push(...(await waitlistModule.settleWaitlistAfterSave(tx, {
+            eventId,
+            registrationId: registration.registrationId,
+            freedOfferingIds: [...freedOfferingIds],
+            now,
+          })).messageIds);
         }
 
         await writeAuditLog({
@@ -380,9 +565,38 @@ async function setOwnerClassSelections(
             added: toCreate.length,
             removed: toDelete.length,
             people: Object.keys(selections).length,
+            // Director confirmations of a missing class level or honor record, by person and class (#832).
+            ...(toCreate.some((row) => row.levelConfirmed || row.prerequisitesConfirmed)
+              ? {
+                requirementsConfirmed: toCreate
+                  .filter((row) => row.levelConfirmed || row.prerequisitesConfirmed)
+                  .map((row) => ({ registrationAttendeeId: row.attendeeId, offeringId: row.offeringId, level: row.levelConfirmed, prerequisites: row.prerequisitesConfirmed })),
+              }
+              : {}),
           },
         }, tx);
+        // Each placement past a rule by staff gets its own entry with the reason (#832).
+        for (const row of toCreate.filter((candidate) => candidate.overrideReason)) {
+          await writeAuditLog({
+            eventId,
+            ...("userId" in actor ? { actorUserId: actor.userId } : {}),
+            action: "HONOR_CLASS_REQUIREMENT_OVERRIDDEN",
+            entityType: "Registration",
+            entityId: registration.registrationId,
+            summary: "Staff placed someone in a class without meeting its class level or prerequisite honors.",
+            metadata: {
+              ...(owner.kind === "club" ? { organizationId: owner.organizationId } : { group: true }),
+              ...("actAsId" in actor ? { actAsId: actor.actAsId } : {}),
+              registrationAttendeeId: row.attendeeId,
+              offeringId: row.offeringId,
+              reason: row.overrideReason,
+              unmet: requirementGaps(attendeesById.get(row.attendeeId)!, offeringsById.get(row.offeringId)!).map((gap) => gap.kind),
+            },
+          }, tx);
+        }
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      // The offer emails go out after the save commits, one to each director; a failure leaves them queued (#831).
+      if (waitlistMessageIds.length > 0) await (await import("@/modules/honors/waitlist-repository")).deliverWaitlistOfferMessages(waitlistMessageIds);
       return getOwnerClassSelectionWorkspace(owner, eventId, now);
     } catch (error) {
       if (!isSerializationFailure(error)) throw error;
@@ -413,7 +627,7 @@ export async function getRegistrationHonorsCatalog(
   const [offerings, counts, sessions] = await Promise.all([
     loadOfferings(prisma, eventId),
     // A group not yet registered holds no seats, so it has no club count (#650).
-    seatCounts(prisma, eventId, organizationId ? { kind: "club", organizationId } : null),
+    seatCounts(prisma, eventId, organizationId ? { kind: "club", organizationId } : null, new Date()),
     prisma.honorSession.findMany({
       where: { eventId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { name: "asc" }],
@@ -421,13 +635,23 @@ export async function getRegistrationHonorsCatalog(
     }),
   ]);
   const visible = (siteId: string | null) => knownLocationId === undefined || sessionVisibleAtLocation(siteId, knownLocationId);
+  // The club's roster levels and completed prerequisite honors, so the registration step can show what a class asks of
+  // each person (#832). Only when some class asks anything; the server checks again when the picks are saved.
+  const prerequisiteHonorIds = [...new Set(offerings.filter((offering) => offering.isActive).flatMap((offering) => offering.prerequisiteHonors.map((honor) => honor.id)))];
+  const anyRequirement = offerings.some((offering) => offering.isActive && hasClassRequirements(offering));
+  const memberRequirements: Record<string, { classLevel: ClubClassLevel | null; completedHonorIds: string[] }> = {};
+  if (organizationId && anyRequirement) {
+    const rosterIds = (await prisma.clubRosterMember.findMany({ where: { organizationId, status: "ACTIVE" }, select: { id: true } })).map((member) => member.id);
+    for (const [memberId, value] of await loadMemberRequirements(prisma, rosterIds, prerequisiteHonorIds)) memberRequirements[memberId] = value;
+  }
   return {
+    memberRequirements,
     sessions: sessions.filter((session) => visible(session.locationId)),
     offerings: offerings
       .filter((offering) => offering.isActive && visible(offering.siteId))
       .map((offering) => ({
         ...offering,
-        seatsTaken: counts.taken.get(offering.id) ?? 0,
+        seatsTaken: (counts.taken.get(offering.id) ?? 0) + (counts.reserved.get(offering.id) ?? 0),
         clubSeatsTaken: counts.clubTaken.get(offering.id) ?? 0,
       })),
   };
@@ -462,6 +686,8 @@ export async function saveRegistrationHonorPicks(
   actor: ClassSelectionActor,
   picks: Record<string, string[]>,
   now = new Date(),
+  /** Classes the director confirmed the person meets, keyed like `picks` (#832). Staff overrides aren't taken at registration. */
+  confirmations: Record<string, string[]> = {},
 ) {
   if (Object.values(picks).every((ids) => ids.length === 0)) return { saved: 0 };
   const prisma = getPrisma();
@@ -478,6 +704,10 @@ export async function saveRegistrationHonorPicks(
     }),
   );
   if (unknown.length > 0) throw new ClassSelectionError("ATTENDEE_NOT_FOUND", "That person isn't on your club's registration.");
-  await setClassSelections(organizationId, eventId, actor, mapped, now);
+  const mappedConfirmations = picksByAttendeeId(confirmations, clubRegistration.registration.attendees.map((attendee) => {
+    const snapshot = attendee.profileSnapshot as { clubRosterMemberId?: string; clubGuestId?: string };
+    return { id: attendee.id, clubRosterMemberId: snapshot.clubRosterMemberId ?? null, clubGuestId: snapshot.clubGuestId ?? null };
+  })).mapped;
+  await setClassSelections(organizationId, eventId, actor, mapped, now, { confirmations: mappedConfirmations });
   return { saved: Object.values(mapped).reduce((total, ids) => total + ids.length, 0) };
 }
