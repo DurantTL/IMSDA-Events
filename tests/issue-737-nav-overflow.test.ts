@@ -71,6 +71,13 @@ describe("phone tab for child routes (#737)", () => {
     expect(tabsFor(["MANAGE_CHECK_IN", "MANAGE_COMMUNICATIONS", "VIEW_SENSITIVE_DATA"])).toHaveLength(5);
   });
 
+  it("lights Payments on /finance and its child pages, and More on Promo codes for a finance viewer (#890)", () => {
+    expect(mobileActiveTabHref("/finance", "/finance/invoices")).toBe("/finance");
+    expect(mobileActiveTabHref("/more/promo-codes", "/more/promo-codes")).toBe("/more");
+    const finance = orderedSidebarItems(new Set<EventPermission>(["MANAGE_FINANCE"]), true);
+    expect(finance.some((item) => item.href === "/more")).toBe(true);
+  });
+
   it("leaves real tabs alone", () => {
     for (const href of mobileNavigationOrder) expect(mobileActiveTabHref(href)).toBe(href);
   });

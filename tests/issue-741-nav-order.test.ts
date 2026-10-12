@@ -193,13 +193,13 @@ describe("phone tabs (#741 slice 4)", () => {
     expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
     expect(mobileNavigationLabels["/people"]).toBe("People");
     expect(navigation.find((item) => item.href === "/people")?.label).toBe("Registrations");
-    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "People", "Check-in", "Payments", "Emails", "More"]);
-    expect(phoneTabs(systemAdmin).labels).toEqual(["Home", "People", "Check-in", "Payments", "Emails", "More"]);
+    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
+    expect(phoneTabs(systemAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
   });
 
   it("hides tabs the viewer may not open, keeping the order", () => {
     expect(phoneTabs({ permissions: rolePermissions.CHECK_IN_STAFF }).labels).toEqual(["Home", "People", "Check-in", "More"]);
-    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "People", "Payments", "More"]);
+    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "People", "Pay", "More"]);
     expect(phoneTabs({ permissions: rolePermissions.COMMUNICATIONS_MANAGER }).labels).toEqual(["Home", "Emails", "More"]);
     expect(phoneTabs({ permissions: rolePermissions.READ_ONLY_STAFF }).labels).toEqual(["Home"]);
   });
@@ -213,7 +213,7 @@ describe("phone tabs (#741 slice 4)", () => {
   it("keeps a real tab selected on its own page and children", () => {
     expect(phoneTabs({ ...eventAdmin, pathname: "/people/abc" }).active).toEqual(["People"]);
     expect(phoneTabs({ ...eventAdmin, pathname: "/check-in" }).active).toEqual(["Check-in"]);
-    expect(phoneTabs({ ...eventAdmin, pathname: "/finance" }).active).toEqual(["Payments"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/finance/invoices" }).active).toEqual(["Pay"]);
     expect(mobileActiveTabHref("/more/health")).toBe("/more");
   });
 });

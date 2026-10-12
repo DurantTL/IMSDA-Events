@@ -331,10 +331,10 @@ describe("application shell navigation", () => {
     );
 
     const mobileNav = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
-    // Home, People, Check-in, Emails, More (#711: Payments and Promo codes moved
-    // into More) — unaffected by the sidebar's Events/People/Finance/… grouping or by the new
+    // Home, People, Check-in, Pay, Emails, More (#711, #890: the system admin holds
+    // MANAGE_FINANCE so Payments is a tab; Promo codes stay in More) — unaffected by the sidebar's Events/People/Finance/… grouping or by the new
     // Clubs and churches / System entries (neither ever appears in the mobile bar).
-    const order = ["/overview?", "/people?", "/check-in?", "/communications?", "/more?"];
+    const order = ["/overview?", "/people?", "/check-in?", "/finance?", "/communications?", "/more?"];
     let lastIndex = -1;
     for (const href of order) {
       const index = mobileNav.indexOf(`href="${href}`);
@@ -343,7 +343,7 @@ describe("application shell navigation", () => {
     }
     expect(mobileNav).not.toContain("/admin/organizations");
     expect(mobileNav).not.toContain('href="/admin"');
-    expect(mobileNav).not.toContain('href="/finance');
+    expect(mobileNav).toContain('aria-label="Payments"');
     expect(mobileNav).not.toContain("/more/promo-codes");
   });
 

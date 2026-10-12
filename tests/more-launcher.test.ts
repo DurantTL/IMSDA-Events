@@ -59,7 +59,7 @@ describe("launcher grouping", () => {
   it("leaves out the groups with nothing the viewer may open (finance staff: no Setup, no People & access)", () => {
     const groups = launcherGroups(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }));
     expect(groups.map((group) => group.group)).toEqual(["content-sales", "reports"]);
-    expect(keysOf(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }))).toEqual(["payments", "promo-codes", "health"]);
+    expect(keysOf(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }))).toEqual(["promo-codes", "health"]);
   });
 
   it("is empty for staff whose only permission opens no More destination", () => {
@@ -87,7 +87,7 @@ describe("launcher grouping", () => {
 });
 
 describe("phone More keeps every universal tool", () => {
-  const universal = ["event-settings", "attendee-configuration", "tags", "registration-builder", "payments", "promo-codes", "staff", "imports", "reports", "health", "club-forms"];
+  const universal = ["event-settings", "attendee-configuration", "tags", "registration-builder", "promo-codes", "staff", "imports", "reports", "health", "club-forms"];
 
   it("lists each existing universal tool alongside the enabled modules, with every module off", () => {
     const keys = keysOf(cardsFor({ enabled: ["public-content"], isSystemAdmin: true }));
@@ -322,7 +322,7 @@ describe("launcher in the shell", () => {
     expect(nav).toContain('aria-haspopup="dialog"');
     expect(nav).toContain('aria-expanded="false"');
     const tabs = markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    expect(tabs.match(/<a /g)).toHaveLength(5);
+    expect(tabs.match(/<a /g)).toHaveLength(6);
     expect(tabs.lastIndexOf("/more?event=event_1")).toBeGreaterThan(tabs.lastIndexOf("/communications?event=event_1"));
     expect(tabs).toContain('aria-haspopup="dialog"');
   });

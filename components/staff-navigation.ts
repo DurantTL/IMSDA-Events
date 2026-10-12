@@ -278,7 +278,8 @@ export function requiredPermissionFor(href: string): EventPermission | undefined
  * a 360px screen. Payments (#890) is a sixth tab, drawn only for staff whose
  * `MANAGE_FINANCE` permission makes the item visible, so everyone else still
  * sees five. At check-in a balance or adjustment is a tap away instead of two.
- * The "payments" More card stays as a second route; Promo codes stay in More.
+ * Payments therefore has no More card (it would duplicate the tab); Promo codes
+ * stay in More, so finance staff still have a More tab.
  */
 export const mobileNavigationOrder = [
   "/overview",
@@ -314,7 +315,8 @@ export const mobileNavigationLabels: Readonly<Record<string, string>> = {
   "/overview": "Home",
   "/people": "People",
   "/check-in": "Check-in",
-  "/finance": "Payments",
+  // Short so six equal tabs fit at 360px; the tab carries aria-label/title "Payments".
+  "/finance": "Pay",
   "/communications": "Emails",
   "/more": "More",
 };
@@ -361,7 +363,7 @@ export function canShowMoreLauncher({
 
 /**
  * The phone "More" directory (#475): every staff destination that isn't one
- * of the six bottom tabs, grouped the way the mobile review asked for
+ * of the phone bottom tabs (Payments is one of them for finance staff), grouped the way the mobile review asked for
  * (Setup, Content & sales, People & access, Reports) — a different grouping
  * from the sidebar's, matched to how staff described the tasks they look
  * for on a phone. `buildMoreDirectoryCards` is a pure function of the
@@ -439,7 +441,6 @@ export function buildMoreDirectoryCards({
   const has = (permission: EventPermission) => granted.has(permission);
   const attendeeConfigurationPermission = requiredPermissionFor("/more/attendee-configuration");
   const tagsPermission = requiredPermissionFor("/more/tags");
-  const paymentsPermission = requiredPermissionFor("/finance");
 
   const cards: MoreDirectoryCard[] = [
     { key: "event-settings", group: "setup", allowed: has("CONFIGURE_EVENT"), href: `/more/event-settings${eventQuery}`, icon: Settings2, title: "Event settings", description: "Edit dates, location, capacity, registration availability, and publishing.", cta: "Open settings" },
@@ -451,7 +452,6 @@ export function buildMoreDirectoryCards({
     { key: "program-assignments", group: "setup", allowed: canManageProgramAssignments(permissions), href: `/more/program-assignments${eventQuery}`, icon: ListChecks, title: "Seminar assignments", description: "Turn attendee rankings and room limits into reviewed, printable session rosters.", cta: "Preview assignments" },
     { key: "event-content", group: "content-sales", allowed: has("CONFIGURE_EVENT"), href: `/more/event-content${eventQuery}`, icon: FileText, title: "Public content", description: "Speaker bios, seminar descriptions, lodging, schedules, and downloads shown publicly.", cta: "Edit page" },
     { key: "merchandise", group: "content-sales", allowed: has("CONFIGURE_EVENT"), href: `/more/merchandise${eventQuery}`, icon: ShoppingBag, title: "Merchandise", description: "Add products, set artwork and pricing, and control what's available at registration.", cta: "Open merchandise" },
-    { key: "payments", group: "content-sales", allowed: Boolean(paymentsPermission && has(paymentsPermission)), href: `/finance${eventQuery}`, icon: WalletCards, title: "Payments", description: "Review balances, record payments, and follow up on what is owed.", cta: "Open payments" },
     { key: "promo-codes", group: "content-sales", allowed: has("MANAGE_FINANCE"), href: `/more/promo-codes${eventQuery}`, icon: TicketPercent, title: "Promo codes", description: "Create bounded registration discounts, schedule dates, and review use limits.", cta: "Manage discounts" },
     { key: "community", group: "content-sales", allowed: has("MANAGE_COMMUNICATIONS"), href: `/community${eventQuery}`, icon: MessagesSquare, title: "Attendee community", description: "Open or pause discussion, review attendee reports, and moderate posts and replies.", cta: "Moderate community" },
     { key: "staff", group: "people-access", allowed: has("MANAGE_STAFF"), href: `/staff${eventQuery}`, icon: UserCog, title: "Staff", description: "Add staff and choose what each person can do for this event.", cta: "Manage team" },
