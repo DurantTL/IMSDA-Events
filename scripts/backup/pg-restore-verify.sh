@@ -28,6 +28,10 @@
 #   REHEARSAL_ALLOW_EMPTY true to accept empty Registration/Person (development)
 #   RESTORE_SCRATCH_DB    scratch database name (default imsda_events_restore_check)
 #   BACKUP_FILE           restore this dump instead of the newest one
+#   RESTORE_KEEP_SCRATCH  "true" leaves the scratch database in place so the
+#                         encryption key backup can be tested against it
+#                         (npm run key:restore-check). Drop it yourself after.
+#                         Server mode only (RESTORE_MODE=server).
 set -eu
 
 MODE="${RESTORE_MODE:-}"
@@ -35,6 +39,12 @@ if [ -z "${MODE}" ]; then
   if command -v initdb >/dev/null 2>&1; then MODE=private; else MODE=server; fi
 fi
 case "${MODE}" in private | server) ;; *) echo "[restore-verify] bad RESTORE_MODE" >&2; exit 2 ;; esac
+if [ "${MODE}" = "private" ] && [ "${RESTORE_KEEP_SCRATCH:-}" = "true" ]; then
+  # The private server is deleted when the script ends, so there is nothing to
+  # keep. The key test needs the scratch database on the real server.
+  echo "[restore-verify] RESTORE_KEEP_SCRATCH=true needs RESTORE_MODE=server." >&2
+  exit 2
+fi
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 LIVE_DB="${PGDATABASE:-imsda_events}"
@@ -73,6 +83,9 @@ as_postgres() { ${RUN_AS} "$@"; }
 
 WORK=""
 STARTED=0
+# Set once the rehearsal has passed; a failed rehearsal always drops its scratch
+# database, even with RESTORE_KEEP_SCRATCH=true.
+RESTORE_SUCCEEDED=false
 cleanup() {
   if [ "${MODE}" = "private" ]; then
     if [ "${STARTED}" -eq 1 ]; then
@@ -80,6 +93,11 @@ cleanup() {
     fi
     [ -z "${WORK}" ] || rm -rf "${WORK}"
   else
+    if [ "${RESTORE_KEEP_SCRATCH:-}" = "true" ] && [ "${RESTORE_SUCCEEDED}" = "true" ]; then
+      echo "[restore-verify] KEEPING scratch database ${SCRATCH_DB} for the key test. Drop it afterwards:" >&2
+      echo "[restore-verify]   psql --dbname=postgres --command 'DROP DATABASE \"${SCRATCH_DB}\";'" >&2
+      return
+    fi
     psql --dbname=postgres --quiet --command "DROP DATABASE IF EXISTS \"${SCRATCH_DB}\";" >/dev/null 2>&1 || true
   fi
 }
@@ -157,4 +175,5 @@ for table in Registration RegistrationAttendee Payment Person; do
   fi
 done
 
+RESTORE_SUCCEEDED=true
 echo "[restore-verify] $(date -u +%FT%TZ) restore rehearsal succeeded for ${DUMP}"
