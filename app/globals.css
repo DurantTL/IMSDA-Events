@@ -9228,6 +9228,11 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .activity-row code { grid-column: 2; justify-self: start; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
 }
 
+/* The scanner's close button is a full-size tap target on a phone (#889). */
+@media screen and ((max-width: 768px) or (pointer: coarse)) {
+  :root .check-in-scanner-modal .modal-head .icon-button { min-width: 44px; min-height: 44px; }
+}
+
 /* Touch and click targets (#738). Screen only, and only the small controls
    the issue names: the filter select, export and download controls, check-in
    queue and review actions, and club event actions. Buttons in general are left
@@ -9242,8 +9247,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 @media screen and ((max-width: 768px) or (pointer: coarse)) {
   :root :is(.filter-field select, .report-download, .report-record-link, .roster-csv-actions > a, .roster-csv-actions > button,
     .club-event-action, .check-in-queue-actions button, .check-in-review-list article > button) { min-height: var(--target-touch); }
-  /* The scanner's close button is a full-size tap target on a phone (#889). */
-  :root .check-in-scanner-modal .modal-head .icon-button { min-width: var(--target-touch); min-height: var(--target-touch); }
 }
 
 /* ==========================================================================
