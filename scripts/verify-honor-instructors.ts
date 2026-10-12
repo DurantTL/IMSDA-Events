@@ -437,7 +437,8 @@ async function main() {
   assert(audits.length >= 6, "each mark call is audited");
   const auditText = JSON.stringify(audits);
   assert(!auditText.includes("Kid") && !auditText.includes("Sample") && !auditText.includes(secrets.email), "audit rows hold no names");
-  assert(audits.every((row) => (row.metadata as { actorAttendeeAccountId?: string }).actorAttendeeAccountId === accountA.id && row.eventId === eventId), "and name the instructor's account and the event");
+  assert(audits.every((row) => [accountA.id, accountB.id].includes((row.metadata as { actorAttendeeAccountId?: string }).actorAttendeeAccountId ?? "") && row.eventId === eventId), "and name the instructor's account and the event");
+  assert(audits.filter((row) => (row.metadata as { actorAttendeeAccountId?: string }).actorAttendeeAccountId === accountB.id).length === 2, "including Ben's two marks made without a current check");
   console.log("ok  marks are audited with ids and counts only");
 
   // ---------------------------------------------------------------- staff change classes, then remove
