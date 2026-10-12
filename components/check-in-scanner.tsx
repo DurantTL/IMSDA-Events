@@ -37,6 +37,7 @@ import {
 } from "@/components/check-in-qr-decoding";
 import {
   findScannerLookupMatches,
+  looksLikeConfirmationCode,
   type ScannerLookupMatches,
   type ScannerLookupPerson,
 } from "@/modules/checkin/domain";
@@ -133,6 +134,7 @@ export function CheckInScanner({
   clubsByConfirmationCode = {},
   savedQueueUnreadable = false,
   arrivals = [],
+  locationName,
 }: {
   eventId: string;
   onConfirmCheckIn: (
@@ -152,6 +154,8 @@ export function CheckInScanner({
    * check-in workspace search over these, so it shows no more than the desk does.
    */
   arrivals?: readonly ScannerLookupPerson[];
+  /** The location the desk is filtered to (#413); named when a name search finds no one. */
+  locationName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [cameraState, setCameraState] = useState<CameraState>("idle");
@@ -159,6 +163,11 @@ export function CheckInScanner({
   const [resolution, setResolution] = useState<PassResolution | null>(null);
   // Several people matched the typed name (#889): staff pick one; nothing opens until they do.
   const [candidates, setCandidates] = useState<ScannerLookupMatches | null>(null);
+  const candidatesHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Move focus to the list's heading so a screen reader hears that several people matched.
+  useEffect(() => {
+    if (candidates) candidatesHeadingRef.current?.focus();
+  }, [candidates]);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -258,7 +267,6 @@ export function CheckInScanner({
   ) {
     setLookupBusy(true);
     setResolution(null);
-    setCandidates(null);
     setError("");
     setNotice("");
     try {
@@ -280,6 +288,7 @@ export function CheckInScanner({
           payload?.message ?? "The attendee pass could not be found.",
         );
       }
+      setCandidates(null);
       setResolution(payload.resolution);
     } catch (caught) {
       setError(
@@ -435,7 +444,14 @@ export function CheckInScanner({
       setCandidates(matches);
       return;
     }
-    // One registration matched (or none on the desk's list): the server resolves the code
+    if (matches.confirmationCodes.length === 0 && !looksLikeConfirmationCode(query)) {
+      setResolution(null);
+      setCandidates(null);
+      setNotice("");
+      setError(`No one on this desk's list matches that name.${locationName ? ` The list is filtered to ${locationName}.` : ""}`);
+      return;
+    }
+    // One registration matched (or the query looks like a code): the server resolves the code
     // with the same permission check and eligibility rules a scan uses.
     void resolveLookup("confirmation", matches.confirmationCodes[0] ?? query);
   }
@@ -702,7 +718,7 @@ export function CheckInScanner({
                 <div className="check-in-review-heading">
                   <span><Search size={20} aria-hidden="true" /></span>
                   <div>
-                    <h3 id="check-in-candidates-title">Several people match</h3>
+                    <h3 id="check-in-candidates-title" ref={candidatesHeadingRef} tabIndex={-1}>Several people match</h3>
                     <p>
                       Pick the right person to open their registration.
                       {candidates.truncated && " Only the first few are shown; type more of the name to narrow the list."}

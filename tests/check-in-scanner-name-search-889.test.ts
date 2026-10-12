@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   findScannerLookupMatches,
+  looksLikeConfirmationCode,
   scannerLookupListLimit,
 } from "@/modules/checkin/domain";
 
@@ -58,7 +59,34 @@ describe("scanner manual lookup (#889)", () => {
   });
 });
 
+describe("scanner exact code and no-match rules (#889)", () => {
+  it("opens an exact code directly even when it prefixes another code", () => {
+    const list = [person("p1", "Ann", "Lake", "WL-12"), person("p2", "Bo", "Dunn", "WL-123")];
+    expect(findScannerLookupMatches(list, "wl-12").confirmationCodes).toEqual(["WL-12"]);
+    expect(findScannerLookupMatches(list, "WL-1").confirmationCodes).toEqual(["WL-12", "WL-123"]);
+  });
+
+  it("tells a code from a name the way the workspace search does", () => {
+    expect(looksLikeConfirmationCode("WR26-1001")).toBe(true);
+    expect(looksLikeConfirmationCode("Rivera")).toBe(false);
+  });
+});
+
 describe("scanner wiring (#889)", () => {
+  const source = readFileSync(path.join(process.cwd(), "components/check-in-scanner.tsx"), "utf8");
+
+  it("only asks the server for a code-like query when the desk list has no match", () => {
+    expect(source).toContain("!looksLikeConfirmationCode(query)");
+    expect(source).toContain("No one on this desk's list matches that name.");
+  });
+
+  it("keeps the pick list until a lookup succeeds and focuses its heading", () => {
+    const resolve = source.slice(source.indexOf("async function resolveLookup"), source.indexOf("async function handleScannedText"));
+    expect(resolve.match(/setCandidates\(null\)/g)).toHaveLength(1);
+    expect(resolve.indexOf("setCandidates(null)")).toBeGreaterThan(resolve.indexOf("throw new Error"));
+    expect(source).toContain("candidatesHeadingRef.current?.focus()");
+  });
+
   const scanner = readFileSync(path.join(process.cwd(), "components/check-in-scanner.tsx"), "utf8");
   const workspace = readFileSync(path.join(process.cwd(), "components/check-in-workspace.tsx"), "utf8");
 
