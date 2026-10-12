@@ -34,7 +34,7 @@ export type ReadinessFacts = {
     senderDeliverable: boolean;
   };
   square: { environment: "sandbox" | "production"; productionUnlocked: boolean };
-  backup: BackupEvidence | null;
+  backup: BackupEvidence;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,10 +69,9 @@ export function pendingMigrationNames(shipped: readonly string[], rows: readonly
 /**
  * The two backup rows, from the same assessment `/api/health` uses (`assessBackupStatus`), so the two never
  * disagree. Dates and yes/no only. A backup that has never run is attention, not ok. When the backup log could not
- * be read the rows say so ("unknown") instead of falling back to a manual tick that could hide a problem.
+ * be read the rows say so ("unknown") and the manual ticks stay visible (unreadable is not evidence).
  */
-export function evaluateBackupItems(backup: BackupEvidence | null, now: Date): AutomaticReadinessRow[] {
-  if (!backup) return [];
+export function evaluateBackupItems(backup: BackupEvidence, now: Date): AutomaticReadinessRow[] {
   if (!backup.readable) {
     return [
       { key: "backup-offsite", title: "Last successful backup", status: "unknown", summary: "The backup log could not be read.", people: [] },
@@ -90,12 +89,20 @@ export function evaluateBackupItems(backup: BackupEvidence | null, now: Date): A
     backupSummary = `Last successful backup ${when(s.lastSuccessAt)}.`;
     if (s.stale) backupSummary += " That is overdue.";
   }
-  if (s.status === "failing") backupSummary += " The latest run failed.";
+  if (s.lastRunOk === false) backupSummary += " The latest run failed.";
+  let neverOffsite = false;
   if (s.lastSuccessAt) {
     const offsite = s.offsiteOk === true ? "yes" : s.offsiteOk === false ? "no" : "not recorded";
-    backupSummary += ` Reached the offsite copy: ${offsite}.`;
+    backupSummary += ` Latest run reached the offsite copy: ${offsite}.`;
+    if (s.offsiteStopped && s.lastOffsiteSuccessAt) {
+      backupSummary += ` Offsite copies have stopped (last ${day(s.lastOffsiteSuccessAt)}).`;
+    }
+    if (s.offsiteOk === null && !s.lastOffsiteSuccessAt) {
+      neverOffsite = true;
+      backupSummary += " No offsite copy has been recorded.";
+    }
   }
-  const backupAttention = s.status !== "ok" || s.stale || s.offsiteOk === false || s.offsiteStopped;
+  const backupAttention = s.status !== "ok" || s.stale || s.lastRunOk === false || s.offsiteOk === false || s.offsiteStopped || neverOffsite;
 
   let restoreSummary: string;
   if (!s.lastRehearsalSuccessAt) {
@@ -199,6 +206,7 @@ export function evaluateAutomaticChecks(facts: ReadinessFacts, now: Date): Autom
 }
 
 /** Manual items that an automatic row has taken over, so they are not listed twice. */
-export function automaticBackupKeys(backup: BackupEvidence | null): ReadonlySet<string> {
-  return new Set<string>(backup ? BACKUP_ITEM_KEYS : []);
+/** Manual backup items are hidden only when the log was actually read. */
+export function automaticBackupKeys(backup: BackupEvidence): ReadonlySet<string> {
+  return new Set<string>(backup.readable ? BACKUP_ITEM_KEYS : []);
 }
