@@ -509,7 +509,7 @@ export type InstructorMarkInput =
   | { action: "SET"; enrollmentId: string; attended?: boolean; completed?: boolean };
 
 export type InstructorMarkResult = {
-  view: Extract<InstructorRosterView, { status: "OK" }>;
+  view: Omit<Extract<InstructorRosterView, { status: "OK" }>, "sterlingWarning">;
   changed: number;
   /** People skipped because their completion is already in the honor record (staff void it instead). */
   locked: number;
@@ -607,7 +607,7 @@ export async function markInstructorClass(accountId: string, offeringId: string,
     ? await prisma.honorEnrollment.findMany({ where: { offeringId, registration: ACTIVE_REGISTRATION }, select: rosterEnrollmentSelect })
     : afterMarks;
   return {
-    view: { status: "OK", header: classHeader(assignment, now), rows: rosterRows(finalEnrollments), sterlingWarning: await sterlingWarningFor(assignment, now) },
+    view: { status: "OK", header: classHeader(assignment, now), rows: rosterRows(finalEnrollments) },
     changed: outcome.changed,
     locked: outcome.locked,
     writeBack,

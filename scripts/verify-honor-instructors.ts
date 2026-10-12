@@ -6,8 +6,8 @@
  * only (nothing from the registration's answers, contact, health, guardian or
  * birth-date fields reaches them); another instructor's class, an unassigned
  * class, another event's class and an unknown class all look the same (not
- * assigned); a Sterling Volunteers check that isn't current blocks a roster
- * and its marks; one-click and per-person marks; Completed also marks
+ * assigned); a Sterling Volunteers check that isn't current shows a warning
+ * and never blocks a roster or its marks; one-click and per-person marks; Completed also marks
  * attended and writes the honor record through the existing write-back (once,
  * even under races), attributed to the instructor's account; a recorded
  * completion is locked for the instructor and staff can void it; the edit
@@ -21,6 +21,7 @@ import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import { matchableName } from "../modules/background-checks/domain";
 import { clubYearFor } from "../modules/club-rosters/domain";
+import { INSTRUCTOR_ROSTER_ROW_KEYS } from "../modules/honors/instructor-domain";
 
 loadEnvConfig(process.cwd());
 // Fictitious values so account email counts as set up (nothing is ever delivered: messages stay queued locally).
@@ -216,11 +217,13 @@ async function main() {
   await addEntry("Ben", "Instructorb", accountB.email, past, 2);
   const warned = await repo.getInstructorRoster(accountB.id, o2.id, now);
   assert(warned.status === "OK" && warned.rows.length === 1 && warned.sterlingWarning?.includes("Sterling Volunteers check"), "an expired check still shows the roster, with the Sterling Volunteers warning");
-  assert(!JSON.stringify(warned.rows).includes("sterling"), "and the warning is not part of the rows");
-  const warnedMark = await repo.markInstructorClass(accountB.id, o2.id, { action: "ALL_COMPLETED" }, now);
-  assert(warnedMark.changed === 1 && warnedMark.view.sterlingWarning !== null, "marking works without a current check");
+  assert(warned.rows.every((row) => JSON.stringify(Object.keys(row).sort()) === JSON.stringify([...INSTRUCTOR_ROSTER_ROW_KEYS].sort())), "and the rows carry exactly the instructor roster fields");
+  // ALL_ATTENDED, not ALL_COMPLETED: Completed writes the honor record, which CLEAR can't undo.
+  const warnedMark = await repo.markInstructorClass(accountB.id, o2.id, { action: "ALL_ATTENDED" }, now);
+  assert(warnedMark.changed === 1, "marking works without a current check");
   assert(await prisma.honorEnrollmentMark.count({ where: { enrollmentId: b1.enrollmentId } }) === 1, "and the mark is written");
   await repo.markInstructorClass(accountB.id, o2.id, { action: "CLEAR" }, now);
+  assert(await prisma.honorEnrollmentMark.count({ where: { enrollmentId: b1.enrollmentId } }) === 0, "and clearing leaves no mark");
   assert((await repo.listHonorInstructors(eventId)).instructors.find((row) => row.id === invitedB.instructorId)?.sterlingCurrent === false, "staff see that Ben has no current check");
   assert((await repo.listHonorInstructors(eventId)).instructors.find((row) => row.id === invitedA.instructorId)?.sterlingCurrent === true, "and that Ina does");
   await prisma.backgroundCheckEntry.update({ where: { id: `${P}_entry_2` }, data: { expiresOn: future } });

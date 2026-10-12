@@ -138,6 +138,7 @@ async function main() {
   assert.ok(warnedText.includes("Sterling Volunteers check") && warnedText.includes("Kidthree"), "the API shows the warning and the roster");
   noSecrets(warnedText, "the warned roster");
   const warnedPage = await (await call(page(o2.id), ben)).text();
+  noSecrets(warnedPage, "the warned page");
   assert.ok(warnedPage.includes("Sterling Volunteers check") && warnedPage.includes("Kidthree"), "the page shows the warning and the roster");
   assert.equal((await call(`${api(o2.id)}/marks`, ben, { method: "POST", body: JSON.stringify({ action: "ALL_ATTENDED" }) })).status, 200, "and marking works");
 
