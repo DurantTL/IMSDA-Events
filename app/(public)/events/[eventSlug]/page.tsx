@@ -21,6 +21,7 @@ import {
   EventHeroBanner,
   publicEventAssetUrl,
 } from "@/components/event-content-blocks";
+import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { EventEmbedFullLoad } from "@/components/event-embed-full-load";
 import { sanitizedHtmlBySection } from "@/modules/events/content-html";
 import { ClubDirectorSignInNotice } from "@/components/club-director-sign-in-notice";
@@ -327,6 +328,8 @@ export default async function PublicEventPage({
               </article>
             </div>
           )}
+
+          <EventRefundPolicy policy={landing.event.refundPolicy} />
 
           {proseSections.map((section, sectionIndex) => (
             <section

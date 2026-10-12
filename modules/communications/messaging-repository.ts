@@ -3442,6 +3442,7 @@ export async function enqueuePublicRegistrationMessages(
       where: { id: input.event.id },
       select: {
         supportContact: true,
+        refundPolicy: true,
         billingMode: true,
         paymentInstructionVersions: {
           orderBy: { versionNumber: "desc" },
@@ -3539,6 +3540,8 @@ export async function enqueuePublicRegistrationMessages(
       organization: responsibleOrganization,
       billingContact: billingContactName,
       perPersonNotice: isDeferredOrganizationBilling && !billedToGroup ? churchBilledNotice : null,
+      // The confirmation shows the event's refund policy (#891); empty adds nothing.
+      refundPolicy: eventDetails?.refundPolicy,
     }),
     ...buildRegistrationCheckinTokens({
       confirmationCode: input.registration.confirmationCode,

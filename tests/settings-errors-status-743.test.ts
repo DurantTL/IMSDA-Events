@@ -61,6 +61,7 @@ const baseFields = {
   tagline: null,
   subtitle: null,
   helpEmail: null,
+  refundPolicy: null,
   hotelName: null,
   hotelBookingUrl: null,
   hotelPhone: null,

@@ -1,5 +1,6 @@
 "use client";
 
+import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
@@ -177,6 +178,8 @@ type PublicEvent = {
   billingMode: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE";
   /** A person under this age on the event's start date is a minor (#131). */
   ageOfMajority?: number;
+  /** Staff-authored refund policy (#891), shown on the review step before submitting. */
+  refundPolicy?: string | null;
 };
 
 type PublicForm = {
@@ -3354,6 +3357,10 @@ export function PublicRegistrationForm({
               />
             )}
           </nav>
+
+          {currentStep.isReview && !joiningWaitlist && (
+            <EventRefundPolicy policy={event.refundPolicy} headingLevel={3} />
+          )}
 
           {currentStep.isReview && (
             <section className="public-registration-submit-card">

@@ -119,6 +119,8 @@ export const eventSettingsInputSchema = z.object({
     (value) => value === undefined || value === null || z.email().safeParse(value).success,
     "Enter a valid help email address.",
   ),
+  // Refund policy shown to registrants (#891). Plain text only; absent on update keeps the stored value.
+  refundPolicy: optionalNullableText(4_000),
   // Lodging for this event. Rendered into messages through
   // {{hotel_information}} and omitted entirely when the name is blank, so an
   // event that books no room block never carries another event's hotel.
