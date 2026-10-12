@@ -131,6 +131,7 @@ export type SourceEventDetails = {
   tagline: string | null;
   subtitle: string | null;
   helpEmail: string | null;
+  refundPolicy: string | null;
   calendarCategory: string | null;
   showOnCalendar: boolean;
   hotelName: string | null;
@@ -454,6 +455,7 @@ export function sanitizeSourceForClone(
     tagline: optionalText("eventDetails", "Tagline", config.eventDetails.tagline),
     subtitle: optionalText("eventDetails", "Subtitle", config.eventDetails.subtitle),
     helpEmail: optionalText("eventDetails", "Help email", config.eventDetails.helpEmail),
+    refundPolicy: optionalText("eventDetails", "Refund policy", config.eventDetails.refundPolicy ?? null),
     hotelName: optionalText("eventDetails", "Lodging name", config.eventDetails.hotelName),
     hotelPhone: optionalText("eventDetails", "Lodging phone", config.eventDetails.hotelPhone),
     hotelGroupName: optionalText("eventDetails", "Lodging group name", config.eventDetails.hotelGroupName),

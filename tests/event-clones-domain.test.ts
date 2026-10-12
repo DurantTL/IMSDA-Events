@@ -27,7 +27,7 @@ function config(overrides: Partial<SourceConfiguration> = {}): SourceConfigurati
   return {
     event: { id: "event-src", name: "Annual 2027", slug: "annual-2027", startsOn: "2027-05-05", endsOn: "2027-05-07", isPublished: true },
     eventDetails: {
-      location: "Synthetic Lodge", timezone: "America/Denver", publicInfoUrl: null, supportContact: null, tagline: null, subtitle: null, helpEmail: null, calendarCategory: null, showOnCalendar: false,
+      location: "Synthetic Lodge", timezone: "America/Denver", publicInfoUrl: null, supportContact: null, tagline: null, subtitle: null, helpEmail: null, refundPolicy: null, calendarCategory: null, showOnCalendar: false,
       hotelName: null, hotelBookingUrl: null, hotelPhone: null, hotelGroupName: null, hotelRate: null, hotelInstructions: null,
       audience: "GENERAL", billingMode: "ATTENDEE_PAY",
     },
@@ -362,15 +362,21 @@ describe("event info card fields in a clone (#651)", () => {
     expect(row).toMatchObject({ additionalCostCents: 500, requirementNote: "Bring ID" });
   });
 
+  it("carries the refund policy into the copy (#891)", () => {
+    const policy = "Refunds until October 1.\n\nNo refunds after the event starts.";
+    const result = sanitizeSourceForClone({ ...config(), eventDetails: { ...config().eventDetails, refundPolicy: policy } }, appOrigins);
+    expect(result.config.eventDetails.refundPolicy).toBe(policy);
+  });
+
   it("tolerates a source that predates the new columns", () => {
     const base = config();
     const oldDetails: Record<string, unknown> = { ...base.eventDetails };
-    for (const key of ["tagline", "subtitle", "helpEmail"]) delete oldDetails[key];
+    for (const key of ["tagline", "subtitle", "helpEmail", "refundPolicy"]) delete oldDetails[key];
     const oldOffering: Record<string, unknown> = { ...base.honorOfferings[0]! };
     for (const key of ["additionalCostCents", "requirementNote"]) delete oldOffering[key];
     const source = { ...base, eventDetails: oldDetails, honorOfferings: [oldOffering] } as unknown as typeof base;
     const result = sanitizeSourceForClone(source, appOrigins);
-    expect(result.config.eventDetails).toMatchObject({ tagline: null, subtitle: null, helpEmail: null });
+    expect(result.config.eventDetails).toMatchObject({ tagline: null, subtitle: null, helpEmail: null, refundPolicy: null });
     expect(result.config.honorOfferings[0]!.requirementNote).toBe("");
     expect(buildClonePlan(result.config, fingerprint).review.honorOfferings[0]).toMatchObject({ additionalCostCents: null, requirementNote: "" });
   });
