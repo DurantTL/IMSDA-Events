@@ -6,6 +6,7 @@ import {
 import { refreshDueCalendarFeeds } from "@/modules/calendar/feeds";
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
+import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
@@ -68,6 +69,12 @@ async function postHandler(request: Request) {
       logError("The Pay on Square link sweep failed after a successful outbox sweep", error);
       return null;
     });
+    // Honors Weekend class waitlists (#831): offers that ran out pass to the next youth in line, each director
+    // emailed once for a new offer. Its failure must not make a successful sweep look failed.
+    const classWaitlists = await sweepClassWaitlists().catch((error) => {
+      logError("The class waitlist sweep failed after a successful outbox sweep", error);
+      return null;
+    });
     return Response.json({
       sweptEventCount: result.sweptEventIds.length,
       sweptAccountMessages: result.sweptAccountMessages,
@@ -82,6 +89,7 @@ async function postHandler(request: Request) {
       communityRetention,
       calendarFeeds,
       hostedLinks,
+      classWaitlists,
       locationWaitlistDigest: locationWaitlistDigest && {
         status: locationWaitlistDigest.status,
         changesCovered: locationWaitlistDigest.changesCovered,

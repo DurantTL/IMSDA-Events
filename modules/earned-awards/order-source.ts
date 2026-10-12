@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { completedHonorsByPerson } from "@/modules/honors/completed-honors";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/domain";
 import {
@@ -63,7 +64,14 @@ const OPEN_STATUSES = ["NEEDED", "ORDERED", "RECEIVED"] as const;
 const byName = (a: { lastName: string; firstName: string }, b: { lastName: string; firstName: string }) =>
   a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
 
-export type AwardMember = { personId: string; firstName: string; lastName: string; classLabel: string };
+export type AwardMember = {
+  personId: string;
+  firstName: string;
+  lastName: string;
+  classLabel: string;
+  /** Recorded class completions, by class level to the calendar date (`YYYY-MM-DD`). Class levels and dates only. */
+  completed?: Partial<Record<ClubClassLevel, string>>;
+};
 
 /** The date of an event in the conference's time zone, as the calendar date its patches were earned. */
 function eventDate(startsAt: Date) {
@@ -624,32 +632,6 @@ async function activeRules(db: Db, only?: { ruleId: string }): Promise<LoadedRul
   }));
 }
 
-/**
- * Each person's completed honors (#486): only a person-and-honor's *latest*
- * entry counts, same as the Honors page and the honor order source, so an
- * honor corrected back to in progress no longer counts.
- */
-async function completedHonorsByPerson(db: Db, personIds: readonly string[], honorIds: readonly string[]) {
-  const completed = new Map<string, Set<string>>();
-  if (personIds.length === 0 || honorIds.length === 0) return completed;
-  const entries = await db.memberHonorEntry.findMany({
-    where: { personId: { in: [...personIds] }, honorId: { in: [...honorIds] }, void: null },
-    orderBy: { seq: "desc" },
-    select: { personId: true, honorId: true, status: true },
-  });
-  const seen = new Set<string>();
-  for (const entry of entries) {
-    const key = `${entry.personId}\u0000${entry.honorId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (entry.status !== "COMPLETED") continue;
-    const set = completed.get(entry.personId) ?? new Set<string>();
-    set.add(entry.honorId);
-    completed.set(entry.personId, set);
-  }
-  return completed;
-}
-
 export type MasterAwardPerson = { personId: string; firstName: string; lastName: string };
 
 export type MasterAwardProgressRow = {
@@ -871,7 +853,7 @@ export async function loadEarnedAwardsWorkspace(
 ): Promise<EarnedAwardsWorkspaceData> {
   if (forEditing) await removeDepartedMemberNeeds(organizationId, now);
   const prisma = getPrisma();
-  const [needs, awardedCount, catalogRows, roster, insignia, patches, masterAwards] = await Promise.all([
+  const [needs, awardedCount, catalogRows, roster, completionRows, insignia, patches, masterAwards] = await Promise.all([
     prisma.clubOrderNeed.findMany({
       where: { organizationId, sourceType: "AWARD", status: { in: [...OPEN_STATUSES] }, itemId: { not: null } },
       select: {
@@ -894,6 +876,9 @@ export async function loadEarnedAwardsWorkspace(
         select: { classLevel: true, person: { select: { id: true, firstName: true, lastName: true } } },
       })
       : Promise.resolve([]),
+    forEditing
+      ? prisma.memberClassCompletion.findMany({ where: { organizationId }, select: { personId: true, classLevel: true, completedOn: true } })
+      : Promise.resolve([]),
     forEditing ? listInsigniaSuggestions(organizationId, now) : Promise.resolve([]),
     forEditing ? listPatchSuggestions(organizationId, now) : Promise.resolve([]),
     loadMasterAwardProgress(organizationId, now),
@@ -912,11 +897,14 @@ export async function loadEarnedAwardsWorkspace(
       status: need.status as AwardNeedRow["status"],
     }))
     .sort((a, b) => byName(a, b) || a.itemName.localeCompare(b.itemName));
+  const completedBy = new Map<string, Partial<Record<ClubClassLevel, string>>>();
+  for (const row of completionRows) completedBy.set(row.personId, { ...completedBy.get(row.personId), [row.classLevel]: row.completedOn });
   const members = [...new Map(roster.flatMap((row) => (row.person ? [[row.person.id, {
     personId: row.person.id,
     firstName: row.person.firstName,
     lastName: row.person.lastName,
     classLabel: row.classLevel ? clubClassLevelLabels[row.classLevel] : "",
+    completed: completedBy.get(row.person.id) ?? {},
   }] as const] : []))).values()].sort(byName);
   return {
     catalog: catalogRows.map((row) => ({

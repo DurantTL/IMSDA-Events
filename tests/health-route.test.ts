@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dependencies = vi.hoisted(() => ({
   getPrisma: vi.fn(),
   getOutboxQueueHealth: vi.fn(),
   getReleaseIdentity: vi.fn(),
   getSweepHeartbeat: vi.fn(),
+  getBackupStatus: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -18,7 +19,11 @@ vi.mock("@/lib/release", () => ({
 vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({
   getSweepHeartbeat: dependencies.getSweepHeartbeat,
 }));
+vi.mock("@/modules/operations/backup-status-repository", () => ({
+  getBackupStatus: dependencies.getBackupStatus,
+}));
 
+import { resetServerEnvCache } from "@/lib/env";
 import { GET } from "@/app/api/health/route";
 
 const healthyQueue = {
@@ -39,11 +44,27 @@ const recentSweep = {
   ageMs: 60_000,
 };
 
+const healthyBackups = {
+  status: "ok" as const,
+  stale: false,
+  lastSuccessAt: "2026-10-09T03:00:00.000Z",
+  lastRunAt: "2026-10-09T03:00:00.000Z",
+  lastRunOk: true,
+  dumpBytes: 5000,
+  assetsBytes: 700,
+  offsiteOk: true,
+  lastOffsiteSuccessAt: "2026-10-09T03:00:00.000Z",
+  lastRehearsalAt: "2026-10-05T03:10:00.000Z",
+  lastRehearsalOk: true,
+  needsAttention: false,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   dependencies.getPrisma.mockReturnValue({ $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]) });
   dependencies.getOutboxQueueHealth.mockResolvedValue(healthyQueue);
   dependencies.getSweepHeartbeat.mockResolvedValue(recentSweep);
+  dependencies.getBackupStatus.mockResolvedValue(healthyBackups);
   dependencies.getReleaseIdentity.mockReturnValue({
     sha: "d27839dcabf253111bf4a014cb526db3b1c57469",
     buildId: "next-build-id",
@@ -55,7 +76,37 @@ function healthRequest() {
   return new Request("https://events.imsda.test/api/health");
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetServerEnvCache();
+});
+
 describe("health endpoint", () => {
+  it("shows how the encryption key is loaded and never its value", async () => {
+    const syntheticKey = "synthetic-health-key-0123456789-abcdefghijklmno";
+    resetServerEnvCache();
+    vi.stubEnv("SECRET_ENCRYPTION_KEY_FILE", "");
+    vi.stubEnv("SECRET_ENCRYPTION_KEY", syntheticKey);
+    const response = await GET(healthRequest());
+    const text = await response.text();
+    expect(JSON.parse(text).encryptionKey).toEqual({ configured: true, source: "env" });
+    expect(text).not.toContain(syntheticKey);
+
+    // Resolved once at startup: a later change is not re-read per request.
+    vi.stubEnv("SECRET_ENCRYPTION_KEY", "");
+    expect((await (await GET(healthRequest())).json()).encryptionKey).toEqual({ configured: true, source: "env" });
+
+    resetServerEnvCache();
+    vi.stubEnv("SECRET_ENCRYPTION_KEY_FILE", "/nonexistent/imsda-test-key");
+    const missing = await (await GET(healthRequest())).json();
+    expect(missing.encryptionKey).toEqual({ configured: false, source: "file" });
+
+    resetServerEnvCache();
+    vi.stubEnv("SECRET_ENCRYPTION_KEY_FILE", "");
+    const none = await (await GET(healthRequest())).json();
+    expect(none.encryptionKey).toEqual({ configured: false, source: null });
+  });
+
   it("reports ok when the database and the outbox are both healthy", async () => {
     const response = await GET(healthRequest());
 
@@ -156,6 +207,91 @@ describe("health endpoint", () => {
       status: "ok",
       services: { outboxSweep: "unknown" },
       outboxSweep: null,
+    });
+  });
+
+  it("shows the backup block without secrets and stays ok", async () => {
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.services.backups).toBe("ok");
+    // Public endpoint: no sizes or off-site detail.
+    expect(body.backups).toEqual({
+      status: "ok",
+      stale: false,
+      needsAttention: false,
+      lastSuccessAt: healthyBackups.lastSuccessAt,
+      lastRehearsalAt: healthyBackups.lastRehearsalAt,
+    });
+    expect(JSON.stringify(body)).not.toContain("dumpBytes");
+    expect(JSON.stringify(body)).not.toContain("offsite");
+  });
+
+  it("reports degraded, not 503, when the last backup is stale", async () => {
+    dependencies.getBackupStatus.mockResolvedValue({
+      ...healthyBackups,
+      status: "stale",
+      stale: true,
+      needsAttention: true,
+    });
+
+    const response = await GET(healthRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "degraded",
+      services: { backups: "stale" },
+      backups: { stale: true },
+    });
+  });
+
+  it("reports degraded when the off-site copy failed", async () => {
+    dependencies.getBackupStatus.mockResolvedValue({
+      ...healthyBackups,
+      offsiteOk: false,
+      needsAttention: true,
+    });
+
+    const response = await GET(healthRequest());
+
+    const body = await response.json();
+    expect(body.status).toBe("degraded");
+    expect(body.backups.needsAttention).toBe(true);
+    expect(body.backups).not.toHaveProperty("offsiteOk");
+  });
+
+  it("does not degrade before the first backup has reported", async () => {
+    dependencies.getBackupStatus.mockResolvedValue({
+      ...healthyBackups,
+      status: "never",
+      lastSuccessAt: null,
+      lastRunAt: null,
+      lastRunOk: null,
+      offsiteOk: null,
+      lastRehearsalAt: null,
+      lastRehearsalOk: null,
+    });
+
+    const response = await GET(healthRequest());
+
+    await expect(response.json()).resolves.toMatchObject({
+      status: "ok",
+      services: { backups: "never" },
+    });
+  });
+
+  it("marks backups unknown when their status cannot be read", async () => {
+    dependencies.getBackupStatus.mockRejectedValue(new Error("query failed"));
+
+    const response = await GET(healthRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "ok",
+      services: { backups: "unknown" },
+      backups: null,
     });
   });
 });

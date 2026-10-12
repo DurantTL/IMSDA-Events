@@ -374,6 +374,12 @@ enum AnnouncementPriority {
   URGENT
 }
 
+/// What an announcement opt-out covers (#838): one event's announcements, or every IMSDA Events announcement.
+enum EmailAnnouncementOptOutScope {
+  EVENT
+  ALL
+}
+
 enum CommunityPostStatus {
   PUBLISHED
   HIDDEN
@@ -598,6 +604,8 @@ enum MessageTemplateKey {
   NEW_CLUB_APPLICATION_DECLINED
   /// A system administrator invited someone to apply for a new club (#817). The body carries a sentinel; the link is minted at delivery.
   NEW_CLUB_APPLICATION_INVITE
+  /// A seat in a full Honors Weekend class was offered to a youth on its waitlist (#831): one email to that club's director. Not an event template.
+  HONOR_CLASS_WAITLIST_OFFER
 }
 
 enum MessageTemplateStatus {
@@ -774,6 +782,8 @@ model User {
   createdRosterExportFormats         ClubRosterExportFormat[]     @relation("ClubRosterExportFormatCreatedByUser")
 
   recordedMemberHonorEntries         MemberHonorEntry[]           @relation("MemberHonorEntryRecordedByUser")
+  honorEnrollmentOverrides           HonorEnrollment[]            @relation("HonorEnrollmentRequirementOverriddenBy")
+  honorClassWaitlistOverrides        HonorClassWaitlistEntry[]    @relation("HonorClassWaitlistOverriddenBy")
   voidedMemberHonorEntries           MemberHonorEntryVoid[]       @relation("MemberHonorEntryVoidedByUser")
   initiatedMemberTransfers           MemberTransfer[]             @relation("MemberTransferInitiatedByUser")
   resolvedMemberTransfers            MemberTransfer[]             @relation("MemberTransferResolvedByUser")
@@ -1017,6 +1027,7 @@ model AttendeeAccount {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
+  honorInstructorRoles         HonorInstructor[]
   credential                   AttendeeCredential?
   identities                   AttendeeIdentity[]
   sessions                     AttendeeSession[]
@@ -1265,6 +1276,26 @@ model SystemJobHeartbeat {
   updatedAt       DateTime  @updatedAt
 }
 
+/**
+ * One row per backup run or restore rehearsal, written by the backup container
+ * (scripts/backup/record-status.sh) and read by `/api/health`. Holds times,
+ * sizes and pass/fail only: no file names, paths, row contents or credentials.
+ * `kind` is BACKUP or REHEARSAL; `offsiteOk` is null when no off-site copy is
+ * configured (or for a rehearsal).
+ */
+model BackupRun {
+  id          Int       @id @default(autoincrement())
+  kind        String
+  startedAt   DateTime
+  finishedAt  DateTime
+  ok          Boolean
+  dumpBytes   BigInt?
+  assetsBytes BigInt?
+  offsiteOk   Boolean?
+
+  @@index([kind, finishedAt])
+}
+
 model RateLimitBucket {
   id              String   @id @default(cuid())
   policy          String
@@ -1447,6 +1478,8 @@ model Event {
   registrationClosesOn String?
   waitlistEnabled      Boolean            @default(false)
   autoPromoteWaitlist  Boolean            @default(true)
+  /// How many hours a club director has to accept a seat offered from an Honors Weekend class waitlist (#831); an offer not accepted in time passes to the next youth in line.
+  honorWaitlistOfferHours Int             @default(24)
   /// Whether this event collects a shirt size per attendee. Replaces a match on
   /// the event's name, which meant only one event could ever collect sizes and
   /// renaming it turned collection off without telling anyone.
@@ -1513,6 +1546,8 @@ model Event {
   refunds                             Refund[]
   checkIns                            CheckIn[]
   announcements                       Announcement[]
+  announcementOptOuts                 EmailAnnouncementOptOut[]
+  unsubscribeTokens                   EmailUnsubscribeToken[]
   auditLogs                           AuditLog[]
   importRuns                          ImportRun[]
   awardItems                          EventAwardItem[]
@@ -1534,7 +1569,9 @@ model Event {
   churchSponsorFinanceReviews           ChurchSponsorFinanceReview[]
   programAssignmentRuns               ProgramAssignmentRun[]
   honorSessions                       HonorSession[]
+  honorRooms                          HonorRoom[]
   honorOfferings                      HonorOffering[]
+  honorInstructors                    HonorInstructor[]
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
   groupRegistrations                  GroupEventRegistration[]
@@ -1558,6 +1595,7 @@ model Event {
   clubRegistrationDrafts              ClubRegistrationDraft[]
   clubAssignments                     ClubEventAssignment[]
   honorEnrollments                    HonorEnrollment[]
+  honorClassWaitlist                  HonorClassWaitlistEntry[]
   memberTransferRegistrationMoves     MemberTransferRegistrationMove[]
   registrationOperations              RegistrationOperation[]
   registrationPaymentChoiceOperations RegistrationPaymentChoiceOperation[]
@@ -1684,6 +1722,7 @@ model EventLocation {
   waitlistChanges LocationWaitlistChange[]
   honorSessions   HonorSession[]
   honorOfferings  HonorOffering[]
+  honorRooms      HonorRoom[]
 
   @@unique([eventId, normalizedName])
   @@index([eventId, isActive, sortOrder])
@@ -1927,6 +1966,7 @@ model Person {
   matchCandidatesAsA   PersonMatchCandidate[] @relation("PersonMatchCandidateAsA")
   matchCandidatesAsB   PersonMatchCandidate[] @relation("PersonMatchCandidateAsB")
   clubRosterMemberships ClubRosterMember[]
+  honorInstructorRoles  HonorInstructor[]
   backgroundCheckMatch  BackgroundCheckMatch?
   backgroundChecksPre527 BackgroundCheckPre527[] @ignore
   driverVerification    DriverVerification?
@@ -2168,6 +2208,7 @@ model Organization {
   registrationDrafts ClubRegistrationDraft[]
   eventAssignments   ClubEventAssignment[]
   honorEnrollments   HonorEnrollment[]
+  honorClassWaitlist HonorClassWaitlistEntry[]
   clubProfile        ClubProfile?
   clubInvites        ClubInvite[]
   newClubApplicationsAsChurch NewClubApplication[] @relation("NewClubApplicationChurch")
@@ -2648,6 +2689,7 @@ model Registration {
   lodgingRoommateRequestsFrom EventLodgingRoommateRequest[] @relation("LodgingRoommateFrom")
   lodgingRoommateRequestsTo   EventLodgingRoommateRequest[] @relation("LodgingRoommateTarget")
   honorEnrollments        HonorEnrollment[]
+  honorClassWaitlist      HonorClassWaitlistEntry[]
   adjustments             RegistrationAdjustment[]
   memberTransferMovesFrom MemberTransferRegistrationMove[] @relation("MemberTransferMoveFrom")
   memberTransferMovesTo   MemberTransferRegistrationMove[] @relation("MemberTransferMoveTo")
@@ -2845,6 +2887,7 @@ model RegistrationAttendee {
   notes                  StaffNote[]
   tagAssignments         AttendeeTagAssignment[]
   honorEnrollments       HonorEnrollment[]
+  honorClassWaitlist     HonorClassWaitlistEntry[]
   adjustments            RegistrationAdjustment[]
   memberTransferMoves    MemberTransferRegistrationMove[]
   lodgingAssignments     EventLodgingAssignment[]
@@ -3363,6 +3406,8 @@ model Announcement {
   publishedAt     DateTime?
   pinnedAt        DateTime?
   pinnedByUserId  String?
+  /// Reaches people who opted out of announcements (#838). Set by an event manager or above, audited.
+  isEssential     Boolean              @default(false)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -3373,6 +3418,44 @@ model Announcement {
 
   @@index([eventId, status, publishedAt])
   @@index([eventId, status, pinnedAt, publishedAt])
+}
+
+/// An email address that opted out of event announcements (#838). The preference lives on the normalised address,
+/// not on a registration or person, so it follows the address across registrations. Only announcements can be opted
+/// out of; confirmations, receipts, waitlist and transfer notices, balance reminders and safety notices always go.
+/// `scopeKey` is the event id for an EVENT row and "ALL" for a global one, so one row per address and scope is unique
+/// (a nullable event id would not be).
+model EmailAnnouncementOptOut {
+  id              String                       @id @default(cuid())
+  normalizedEmail String
+  scope           EmailAnnouncementOptOutScope
+  eventId         String?
+  scopeKey        String
+  /// How it was recorded: the unsubscribe page, or the one-click POST a mail client sends.
+  source          String
+  createdAt       DateTime                     @default(now())
+
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([normalizedEmail, scopeKey])
+  @@index([eventId, createdAt])
+  @@index([normalizedEmail])
+}
+
+/// The opaque unsubscribe link an announcement carries (#838). The link holds only a random-looking token; this row is
+/// what says which address and event it is for, so the address never appears in a URL, a request log or a header. Only
+/// the SHA-256 of the token is stored, so a copy of this table cannot be used to unsubscribe anyone. A token stays valid
+/// after the signing secret is rotated, because it is looked up, not re-derived.
+model EmailUnsubscribeToken {
+  id              String   @id @default(cuid())
+  tokenHash       String   @unique
+  normalizedEmail String
+  eventId         String
+  createdAt       DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 /// Event-level controls keep attendee discussion off until staff publish the
@@ -4125,6 +4208,7 @@ model Honor {
   offerings       HonorOffering[]
   /// Every class (offering) that teaches this honor (#812), primary or not.
   offeringHonors  HonorOfferingHonor[]
+  offeringPrerequisites HonorOfferingPrerequisite[]
   weekendCompletionLinks HonorWeekendCompletionLink[]
   memberEntries   MemberHonorEntry[]
   clubSupplyItems ClubSupplyItem[]
@@ -4398,6 +4482,32 @@ model HonorSession {
   @@index([locationId])
 }
 
+/// A room inside a site (#834), with a seat capacity. A class placed in the
+/// room (`HonorOffering.roomId`) can't have more seats than the room. Name
+/// uniqueness is two partial unique indexes the migration adds, like sessions:
+/// (eventId, normalizedName) WHERE locationId IS NULL and (eventId, locationId,
+/// normalizedName) WHERE locationId IS NOT NULL. The migration also adds the
+/// triggers that keep a class within its room's capacity.
+model HonorRoom {
+  id             String   @id @default(cuid())
+  eventId        String
+  /// The site the room is in; null when the event has no sites.
+  locationId     String?
+  name           String
+  normalizedName String
+  capacity       Int
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  site      EventLocation?  @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  offerings HonorOffering[]
+
+  @@index([eventId, locationId, sortOrder])
+  @@index([locationId])
+}
+
 /// A class taught at a site: in one session, or across all sessions. A class
 /// teaches one or more catalog honors (#812), listed in `honors`
 /// (`HonorOfferingHonor`); a person enrolled in the class is enrolled in each.
@@ -4419,9 +4529,17 @@ model HonorOffering {
   span         HonorOfferingSpan
   capacity     Int
   minimumAge   Int?
+  /// The lowest Investiture class level a youth may take this class at (#832),
+  /// compared with the member's current class level on the club roster. Null: no minimum.
+  minimumClassLevel ClubClassLevel?
   perClubLimit Int?
   teacherName  String            @default("")
   location     String            @default("")
+  /// The room the class is placed in on the schedule board (#834); null: not placed.
+  /// While set, `location` (the free-text room shown on grids) mirrors the room's name.
+  /// A partial unique index (roomId, sessionId) WHERE both set AND active keeps one class
+  /// per room per session; an all-sessions class is checked in the repository.
+  roomId       String?
   /// Extra cost of this class in cents (#651); null means none. Shown on the public class grid.
   additionalCostCents Int?
   /// A special requirement shown as a badge on the public class grid (#651), e.g. "Bring a flashlight".
@@ -4434,13 +4552,35 @@ model HonorOffering {
   honor       Honor             @relation(fields: [honorId], references: [id], onDelete: Restrict)
   session     HonorSession?     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   site        EventLocation?    @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  room        HonorRoom?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
   enrollments HonorEnrollment[]
   honors      HonorOfferingHonor[]
+  instructorClasses HonorInstructorClass[]
+  /// Honors a youth must have completed first (#832); every one is required.
+  prerequisites HonorOfferingPrerequisite[]
+  waitlist     HonorClassWaitlistEntry[]
 
   // "No honor twice in a session" and the all-sessions rules now live on
   // `HonorOfferingHonor`, one row per honor taught (#812).
   @@index([eventId, isActive])
   @@index([locationId])
+  @@index([honorId])
+  @@index([roomId])
+}
+
+/// An honor a youth must have completed before taking a class (#832), checked
+/// against the member's honor record (`MemberHonorEntry`). A class can have
+/// several; the youth needs all of them. Per class, not per honor taught.
+model HonorOfferingPrerequisite {
+  id         String   @id @default(cuid())
+  offeringId String
+  honorId    String
+  createdAt  DateTime @default(now())
+
+  offering HonorOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  honor    Honor         @relation(fields: [honorId], references: [id], onDelete: Restrict)
+
+  @@unique([offeringId, honorId])
   @@index([honorId])
 }
 
@@ -4951,6 +5091,16 @@ model HonorEnrollment {
   /// registration instead.
   organizationId         String?
   consumesSeat           Boolean
+  /// The director confirmed the youth meets the class's minimum level when the roster had no level (#832).
+  /// "ByDirector" also covers staff acting as the director (#442), who set it through the same screen.
+  levelConfirmedByDirector Boolean @default(false)
+  /// The director (or staff acting as the director) confirmed the youth completed the class's prerequisite honors when the honor record showed none (#832).
+  prerequisitesConfirmedByDirector Boolean @default(false)
+  /// Why staff placed the youth although a level or prerequisite rule was not met (#832). Null when no override was used.
+  requirementOverrideReason String?
+  /// The staff user who overrode; cleared if that user is deleted (the audit log keeps the entry).
+  requirementOverriddenByUserId String?
+  requirementOverriddenByUser User? @relation("HonorEnrollmentRequirementOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
   createdAt              DateTime @default(now())
 
   event                Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -4960,11 +5110,71 @@ model HonorEnrollment {
   organization         Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// One per honor the class teaches (#812), once written back.
   weekendCompletions   HonorWeekendCompletionLink[]
+  /// The class instructor's attendance and completion mark (#833), if any.
+  instructorMark       HonorEnrollmentMark?
 
   @@unique([registrationAttendeeId, offeringId])
   @@index([offeringId, consumesSeat])
   @@index([offeringId, organizationId, consumesSeat])
   @@index([registrationId])
+}
+
+enum HonorClassWaitlistStatus {
+  /// In line, in the order they joined.
+  WAITING
+  /// A seat is held for them until `offerExpiresAt`; the director accepts or the offer passes on.
+  OFFERED
+  /// The director accepted: the youth holds the seat (an enrollment).
+  ACCEPTED
+  /// The director turned the offer down; it passed to the next youth.
+  DECLINED
+  /// The offer was not accepted in time; it passed to the next youth.
+  EXPIRED
+  /// Taken off the list (the director, staff, or the registration or person left).
+  REMOVED
+}
+
+/// One youth's place on a full Honors Weekend class's waitlist (#831). A spot takes no seat and doesn't count toward a club's per-club limit; only a live offer reserves a seat (counted with the taken seats) and an accepted one becomes an `HonorEnrollment`.
+model HonorClassWaitlistEntry {
+  id                     String                   @id @default(cuid())
+  eventId                String
+  offeringId             String
+  registrationId         String
+  registrationAttendeeId String
+  /// The club that holds the registration; waitlists are for clubs only.
+  organizationId         String?
+  /// The order they joined, assigned by the database so two joins at once still have a strict order.
+  joinOrder              Int                      @default(autoincrement())
+  status                 HonorClassWaitlistStatus @default(WAITING)
+  /// How the youth got past the class's level or prerequisite rules when they joined, kept for acceptance (#832): the same facts an enrollment records.
+  levelConfirmedByDirector         Boolean        @default(false)
+  prerequisitesConfirmedByDirector Boolean        @default(false)
+  requirementOverrideReason        String?
+  requirementOverriddenByUserId    String?
+  joinedAt               DateTime                 @default(now())
+  offeredAt              DateTime?
+  offerExpiresAt         DateTime?
+  /// How many times a seat was offered (an offer released because of a conflict is offered again later).
+  offerCount             Int                      @default(0)
+  resolvedAt             DateTime?
+  /// A short fixed reason for the last change ("Offer expired", "Registration cancelled"); never free text from a person.
+  resolution             String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+
+  event                Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  offering             HonorOffering        @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  registration         Registration         @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  registrationAttendee RegistrationAttendee @relation(fields: [registrationAttendeeId], references: [id], onDelete: Cascade)
+  organization         Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requirementOverriddenByUser User?         @relation("HonorClassWaitlistOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
+
+  // One open entry (WAITING or OFFERED) per person and class is a partial unique index in the migration.
+  @@index([offeringId, status, joinOrder])
+  @@index([registrationId, status])
+  @@index([registrationAttendeeId])
+  @@index([status, offerExpiresAt])
+  @@index([eventId])
 }
 
 enum MemberHonorStatus {
@@ -7285,4 +7495,73 @@ model NewClubApplicationInvite {
   application NewClubApplication?
 
   @@index([email])
+}
+
+/// An Honors Weekend class instructor (#833): a person staff invited to teach
+/// one or more classes at one event. Instructors are attendee-account people,
+/// like club directors: staff invite by email, and the invited person accepts
+/// from their own signed-in account, whose verified email must be the invite's
+/// (no secret in the email). Accepting sets `attendeeAccountId`. Nothing else
+/// grants a roster: not the class's free-text teacher name, not a club role.
+/// One row per (event, email); the classes they teach are `HonorInstructorClass`.
+/// `personId` is the durable person the Sterling Volunteers check is matched to.
+model HonorInstructor {
+  id                String    @id @default(cuid())
+  eventId           String
+  personId          String
+  /// Lower-cased; the address the invite went to and the account must verify.
+  email             String
+  name              String
+  attendeeAccountId String?
+  createdByUserId   String?
+  sentAt            DateTime?
+  sentCount         Int       @default(0)
+  acceptedAt        DateTime?
+  revokedAt         DateTime?
+  revokedByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  person          Person           @relation(fields: [personId], references: [id], onDelete: Restrict)
+  attendeeAccount AttendeeAccount? @relation(fields: [attendeeAccountId], references: [id], onDelete: SetNull)
+  classes         HonorInstructorClass[]
+  marks           HonorEnrollmentMark[]
+
+  @@unique([eventId, email])
+  @@index([attendeeAccountId])
+  @@index([email])
+}
+
+/// One class an instructor teaches (#833). A class may have several instructors.
+model HonorInstructorClass {
+  id           String   @id @default(cuid())
+  instructorId String
+  offeringId   String
+  createdAt    DateTime @default(now())
+
+  instructor HonorInstructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  offering   HonorOffering   @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+
+  @@unique([instructorId, offeringId])
+  @@index([offeringId])
+}
+
+/// An instructor's mark on one class enrollment (#833): attended, and
+/// completed (which always includes attended; the migration's CHECK says so).
+/// Completed is what feeds the Honors Weekend write-back. Absence of a row
+/// means the instructor has made no decision for that person.
+model HonorEnrollmentMark {
+  id                   String   @id @default(cuid())
+  enrollmentId         String   @unique
+  attended             Boolean
+  completed            Boolean
+  markedByInstructorId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  enrollment         HonorEnrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  markedByInstructor HonorInstructor? @relation(fields: [markedByInstructorId], references: [id], onDelete: SetNull)
+
+  @@index([markedByInstructorId])
 }
