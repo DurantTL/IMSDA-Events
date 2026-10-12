@@ -966,9 +966,15 @@ chmod 0400 /root/keytest/backup-key
    container (compose) or anywhere with `pg_restore` and the dump:
 
 ```bash
-docker compose exec -e RESTORE_KEEP_SCRATCH=true -e RESTORE_SCRATCH_DB=imsda_events_keytest_restore_check \
+docker compose exec -e RESTORE_MODE=server -e RESTORE_KEEP_SCRATCH=true \
+  -e RESTORE_SCRATCH_DB=imsda_events_keytest_restore_check \
   backup sh /usr/local/bin/pg-restore-verify.sh
 ```
+
+   `RESTORE_MODE=server` is needed here: the nightly rehearsal restores into a
+   private, throwaway server inside the backup container, but the key test
+   needs the scratch database on the real database server so the app image can
+   reach it. It needs the backup user to have CREATEDB.
 
    Check it ends with `restore rehearsal succeeded` and non-zero row counts (a
    failed rehearsal always drops its scratch database; a successful one prints
@@ -1020,6 +1026,11 @@ shred -u /root/keytest/backup-key /root/keytest/db.env && rmdir /root/keytest
    too.
 
 ## Backups and restore rehearsals
+
+> Production (the manually started container) runs the backup scheduler as its
+> own `imsda-backup` container with an off-site copy to Cloudflare R2 and status
+> in `/api/health`: see `docs/BACKUPS.md`. The rest of this section describes
+> the Compose `backup` service.
 
 The `backup` service writes PostgreSQL custom-format dumps and
 `imsda-assets-*.tar.gz` upload archives to the `imsda_events_backups` volume,
