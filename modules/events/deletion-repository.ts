@@ -42,7 +42,8 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     registrations,
     attendees,
     payments,
-    realPayments,
+    succeededPayments,
+    openHeldCharges,
     invoices,
     honorEnrollments,
     locations,
@@ -63,6 +64,11 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     // (cash, checks, manual entries, production card payments) is real.
     db.payment.count({
       where: { eventId, status: "SUCCEEDED", NOT: { paymentAttempt: { is: { environment: "sandbox" } } } },
+    }),
+    // So is a production Square payment held as an exception awaiting its refund (#327): the money
+    // was taken, and the record holding the evidence must not be deleted with the event.
+    db.squareDuplicateCharge.count({
+      where: { eventId, status: "OPEN", environment: { not: "sandbox" } },
     }),
     // Organization-billed events invoice each club's submitted registration later.
     event.billingMode === "DEFERRED_ORGANIZATION_INVOICE"
@@ -98,7 +104,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     clubRegistrationDrafts,
     communityPosts,
     announcements,
-    realPayments,
+    realPayments: succeededPayments + openHeldCharges,
   };
   return { event, facts: { isPublished: event.isPublished, counts } satisfies EventDeletionFacts };
 }
@@ -294,10 +300,11 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   await tx.merchandiseCatalog.deleteMany({ where: inEvent });
 
   // 5. Honors: enrollments (RESTRICT their offering), offerings (RESTRICT
-  //    session and location), sessions.
+  //    session and location), sessions, rooms (#834).
   await tx.honorEnrollment.deleteMany({ where: inEvent });
   await tx.honorOffering.deleteMany({ where: inEvent });
   await tx.honorSession.deleteMany({ where: inEvent });
+  await tx.honorRoom.deleteMany({ where: inEvent });
 
   // 6. Append-only registration ledgers (RESTRICT registration and attendee).
   await tx.registrationOperation.deleteMany({ where: inEvent });

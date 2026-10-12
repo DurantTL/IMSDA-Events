@@ -21,7 +21,7 @@ function offering(id: string, honorName: string, sessionId: string | null, locat
     id, span: sessionId ? "SINGLE_SESSION" : "ALL_SESSIONS", sessionId,
     // An all-sessions class has its own site (#589); a single-session class takes its session's.
     locationId: sessionId ? null : locationId, site: !sessionId && locationName ? { name: locationName } : null,
-    capacity: 10, minimumAge: null, perClubLimit: null,
+    capacity: 10, minimumAge: null, minimumClassLevel: null, prerequisites: [], perClubLimit: null,
     teacherName: "", location: "", isActive: true, honors: [{ honor: { id: `honor-${id}`, name: honorName, code: id.toUpperCase(), isActive: true } }],
     session: sessionId ? { name: `Session ${sessionId}`, sortOrder: 0, locationId, location: locationName ? { name: locationName } : null } : null,
   };
@@ -56,6 +56,8 @@ function database(options: { registrationLocation: { id: string; name: string } 
     clubRosterMember: { findMany: vi.fn().mockResolvedValue([]) },
     eventLocation: { count: vi.fn().mockResolvedValue(options.eventHasLocations ? 2 : 0) },
     honorOffering: { findMany: vi.fn().mockResolvedValue(offerings) },
+    honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
+    honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue(sessions) },
     honorEnrollment: {
       groupBy: vi.fn().mockResolvedValue([]),
@@ -170,8 +172,9 @@ describe("the server keeps a club to its own site's classes (#589)", () => {
 });
 
 describe("changing a club's location with class picks (#589)", () => {
-  const client = (picks: number, locationName: string | null = "Camp Heritage 1") => ({
+  const client = (picks: number, locationName: string | null = "Camp Heritage 1", waitlistPlaces = 0) => ({
     honorEnrollment: { count: vi.fn().mockResolvedValue(picks) },
+    honorClassWaitlistEntry: { count: vi.fn().mockResolvedValue(waitlistPlaces) },
     eventLocation: { findUnique: vi.fn().mockResolvedValue(locationName ? { name: locationName } : null) },
   });
 
@@ -186,6 +189,18 @@ describe("changing a club's location with class picks (#589)", () => {
       },
     });
     expect(tx).not.toHaveProperty("honorEnrollment.deleteMany");
+  });
+
+  it("also refuses when the club has class waitlist places at the old site (#831)", async () => {
+    const tx = client(0, "Camp Heritage 1", 2);
+    expect(await locationChangeBlock(tx as never, "registration-1", "loc-hr")).toBe("Remove this club's class waitlist places at Camp Heritage 1 before changing location.");
+    expect(tx.honorClassWaitlistEntry.count).toHaveBeenCalledWith({
+      where: {
+        registrationId: "registration-1",
+        status: { in: ["WAITING", "OFFERED"] },
+        offering: { OR: [{ session: { locationId: "loc-hr" } }, { locationId: "loc-hr" }] },
+      },
+    });
   });
 
   it("allows the change when the club has no picks at the old site", async () => {

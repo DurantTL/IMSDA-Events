@@ -144,10 +144,12 @@ function fixture() {
     auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-1" }) },
     honorOffering: { findMany: vi.fn().mockResolvedValue([{
       // One seat: the youth takes it, and staff still join without one.
-      id: "knots", span: "SINGLE_SESSION", sessionId: "sabbath", capacity: 1, minimumAge: null, perClubLimit: null,
+      id: "knots", span: "SINGLE_SESSION", sessionId: "sabbath", capacity: 1, minimumAge: null, minimumClassLevel: null, prerequisites: [], perClubLimit: null,
       teacherName: "Fictional Teacher", location: "Pavilion", isActive: true,
       honors: [{ honor: { id: "honor-hw-demo-1", name: "Knot Tying", code: "HW-DEMO-1", isActive: true } }], session: { name: "Sabbath afternoon", sortOrder: 1 },
     }]) },
+    honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
+    honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue([{ id: "sabbath", name: "Sabbath afternoon", locationId: null }]) },
     honorEnrollment: {
       findMany: vi.fn(async () => enrollments.map(({ id, registrationAttendeeId, offeringId }) => ({ id, registrationAttendeeId, offeringId }))),
@@ -206,7 +208,7 @@ describe("Honors Weekend template, from club registration to class seats (#436)"
     await submitPublicRegistration("honors-weekend", "clubs", publicRegistrationInputSchema.parse({
       versionId: "version-1",
       idempotencyKey: "6b1d7c52-0f7e-4d5c-9a3e-1c2b3d4e5f60",
-      responses: { club_name: "Test Pathfinders", director_name: "Jamie Director", email: "director@example.test", phone: "555-0100" },
+      responses: { club_name: "Test Pathfinders", director_name: "Jamie Director", email: "director@example.test", phone: "515-555-0100" },
       attendees,
       website: "",
     }), now, { organizationId: "club-1", submittedByAccountId: "director-1", prepareAttendees: clubAttendeePreparer("club-1") });

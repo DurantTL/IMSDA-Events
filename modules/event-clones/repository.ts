@@ -75,6 +75,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
       hotelName: true, hotelBookingUrl: true, hotelPhone: true, hotelGroupName: true, hotelRate: true, hotelInstructions: true,
       audience: true, billingMode: true,
       waitlistEnabled: true, autoPromoteWaitlist: true, collectsShirtSizes: true, checksAdultBackgrounds: true,
+      hostedPaymentLinkEnabled: true,
     },
   });
   if (!event) return null;
@@ -107,7 +108,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
     }),
     await db.honorOffering.findMany({
       where: { eventId }, orderBy: [{ sessionId: "asc" }, { honorId: "asc" }],
-      include: { honors: offeringHonorsSelect, session: { select: { name: true } }, site: { select: { name: true, normalizedName: true } } },
+      include: { honors: offeringHonorsSelect, prerequisites: { select: { honorId: true } }, session: { select: { name: true } }, site: { select: { name: true, normalizedName: true } } },
     }),
     await db.merchandiseProduct.count({ where: { eventId } }),
     await db.eventPaymentInstructionVersion.count({ where: { eventId } }),
@@ -120,6 +121,10 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
     }),
   ];
 
+  const honorRooms = await db.honorRoom.findMany({
+    where: { eventId }, orderBy: [{ sortOrder: "asc" }, { normalizedName: "asc" }],
+    include: { site: { select: { normalizedName: true } } },
+  });
   const teamSettings = await db.eventTeamSettings.findUnique({ where: { eventId } });
   const currentForms = forms.filter((form) => form.status !== "ARCHIVED" && form.versions.length > 0);
   const currentTemplates = messageTemplates.filter((template) => template.versions.length > 0);
@@ -141,6 +146,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
     moduleToggles: {
       waitlistEnabled: event.waitlistEnabled, autoPromoteWaitlist: event.autoPromoteWaitlist,
       collectsShirtSizes: event.collectsShirtSizes, checksAdultBackgrounds: event.checksAdultBackgrounds,
+      hostedPaymentLinkEnabled: event.hostedPaymentLinkEnabled,
       community: community
         ? { isEnabled: community.isEnabled, allowNewPosts: community.allowNewPosts, allowReplies: community.allowReplies, conductText: community.conductText, retentionDays: community.retentionDays }
         : null,
@@ -194,11 +200,18 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
       id: session.id, name: session.name, normalizedName: session.normalizedName, sortOrder: session.sortOrder,
       locationName: session.location?.name ?? null, locationNormalizedName: session.location?.normalizedName ?? null,
     })),
+    honorRooms: honorRooms.map((room) => ({
+      id: room.id, name: room.name, normalizedName: room.normalizedName, capacity: room.capacity, sortOrder: room.sortOrder,
+      locationNormalizedName: room.site?.normalizedName ?? null,
+    })),
     honorOfferings: honorOfferings.map((offering) => ({
+      roomId: offering.roomId,
       id: offering.id, honorId: offering.honorId, honorIds: summarizeOfferingHonors(offering.honors).honorIds,
       honorName: summarizeOfferingHonors(offering.honors).honorName, sessionId: offering.sessionId,
       sessionName: offering.session?.name ?? null, span: offering.span, capacity: offering.capacity,
       minimumAge: offering.minimumAge, perClubLimit: offering.perClubLimit, teacherName: offering.teacherName,
+      // The minimum class level and prerequisite honors (#832) are carried over as they are; the catalog is shared by every event.
+      minimumClassLevel: offering.minimumClassLevel, prerequisiteHonorIds: offering.prerequisites.map((row) => row.honorId).sort(),
       location: offering.location, isActive: offering.isActive,
       additionalCostCents: offering.additionalCostCents, requirementNote: offering.requirementNote,
       // An all-sessions class's own site (#589), matched by name in the new event.
@@ -348,6 +361,7 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
           autoPromoteWaitlist: toggles?.waitlistEnabled ? toggles.autoPromoteWaitlist : false,
           collectsShirtSizes: toggles?.collectsShirtSizes ?? false,
           checksAdultBackgrounds: toggles?.checksAdultBackgrounds ?? false,
+          hostedPaymentLinkEnabled: toggles?.hostedPaymentLinkEnabled ?? false,
         },
       });
       await tx.eventMembership.create({ data: { eventId: event.id, userId: actorUserId, role: "EVENT_ADMIN", status: "ACTIVE" } });
@@ -535,12 +549,25 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
         // One statement, not one round trip per row: an event with a site-by-site honors program has
         // hundreds of rows, and a per-row loop held the transaction open until it timed out (#617).
         if (sessionRows.length > 0) await tx.honorSession.createMany({ data: sessionRows });
+        // Rooms follow their site by name, like sessions. A room whose site has no match is not copied (its classes
+        // are copied without a room), so a room is always at its class's site.
+        const roomIds = new Map<string, { id: string; locationId: string | null; capacity: number }>();
+        const roomRows: Prisma.HonorRoomCreateManyInput[] = [];
+        for (const room of config.honorRooms ?? []) {
+          const locationId = room.locationNormalizedName ? newLocations.get(room.locationNormalizedName) ?? null : null;
+          if (room.locationNormalizedName && !locationId) continue;
+          const newRoomId = randomUUID();
+          roomRows.push({ id: newRoomId, eventId: event.id, locationId, name: room.name, normalizedName: room.normalizedName, capacity: room.capacity, sortOrder: room.sortOrder });
+          roomIds.set(room.id, { id: newRoomId, locationId, capacity: room.capacity });
+        }
+        if (roomRows.length > 0) await tx.honorRoom.createMany({ data: roomRows });
         const reviewedOfferings = new Map(input.honorOfferingCapacities.map((entry) => [entry.offeringId, entry]));
         // The same slot rules as setup and copy, per site; a true duplicate is skipped and counted, never thrown.
         const slots: Array<{ honorIds: string[]; span: "SINGLE_SESSION" | "ALL_SESSIONS"; sessionId: string | null; locationId: string | null }> = [];
         const offeringRows: Prisma.HonorOfferingCreateManyInput[] = [];
         // A class that teaches several honors (#812) keeps them all; the primary's row comes from the trigger.
         const extraHonorRows: Prisma.HonorOfferingHonorCreateManyInput[] = [];
+        const prerequisiteRows: Prisma.HonorOfferingPrerequisiteCreateManyInput[] = [];
         let offeringsCopied = 0;
         let offeringsSkipped = 0;
         for (const offering of config.honorOfferings) {
@@ -560,23 +587,31 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
           if (classSlotConflict(slot, slots)) { offeringsSkipped += 1; continue; }
           slots.push(slot);
           const newOfferingId = randomUUID();
+          // The room carries over only while the class still fits it (the reviewed seats can have been raised) and
+          // is at the room's site; otherwise the class is copied without a room and staff place it on the board.
+          const reviewedCapacity = reviewedOfferings.get(offering.id)!.capacity;
+          const sourceRoom = offering.roomId ? roomIds.get(offering.roomId) ?? null : null;
+          const room = sourceRoom && sourceRoom.capacity >= reviewedCapacity && sourceRoom.locationId === slot.locationId ? sourceRoom : null;
           for (const [position, honorId] of honorIds.entries()) {
             if (position > 0) extraHonorRows.push({ offeringId: newOfferingId, honorId, eventId: event.id, position });
           }
           offeringRows.push({
             id: newOfferingId,
             eventId: event.id, honorId: honorIds[0]!,
-            sessionId, locationId,
-            span: offering.span, capacity: reviewedOfferings.get(offering.id)!.capacity,
+            sessionId, locationId, roomId: room?.id ?? null,
+            span: offering.span, capacity: reviewedCapacity,
             perClubLimit: reviewedOfferings.get(offering.id)!.perClubLimit,
             // Carried over as it is; shown in the preview.
             minimumAge: offering.minimumAge,
+            minimumClassLevel: offering.minimumClassLevel ?? null,
             teacherName: offering.teacherName, location: offering.location, isActive: offering.isActive,
             additionalCostCents: offering.additionalCostCents, requirementNote: offering.requirementNote,
           });
+          for (const honorId of offering.prerequisiteHonorIds ?? []) prerequisiteRows.push({ offeringId: newOfferingId, honorId });
           offeringsCopied += 1;
         }
         if (offeringRows.length > 0) await tx.honorOffering.createMany({ data: offeringRows });
+        if (prerequisiteRows.length > 0) await tx.honorOfferingPrerequisite.createMany({ data: prerequisiteRows });
         if (extraHonorRows.length > 0) await tx.honorOfferingHonor.createMany({ data: extraHonorRows });
         if (sessionsWithoutSite > 0) skipped.honorSessionsWithoutSite = sessionsWithoutSite;
         if (offeringsSkipped > 0) skipped.honorOfferingsDuplicate = offeringsSkipped;
