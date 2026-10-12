@@ -1378,16 +1378,16 @@ export function CommunicationsWorkspace({
                     <button className="secondary-button publish-button" type="button" disabled={saving || broadcastReviewLoading} onClick={() => void broadcastAnnouncement(announcement)}>
                       <Mail aria-hidden="true" size={16} /> Email active registrations
                     </button>
-                    {canMarkEssential && (
-                      <button className="text-button" type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
-                        {announcement.isEssential ? "Clear essential mark" : "Mark essential (reaches people who opted out)"}
-                      </button>
-                    )}
                     <button className="text-button" type="button" disabled={saving} onClick={() => startCorrection(announcement)}>
                       Send a correction
                     </button>
                     <p className="quiet-copy">Published announcements can&apos;t be edited. A correction creates a new draft; it needs its own publish and its own send review before anyone receives it.</p>
                   </>
+                )}
+                {canMarkEssential && announcement.status === "PUBLISHED" && (
+                  <button className="text-button" type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
+                    {announcement.isEssential ? "Clear essential mark" : "Mark essential (reaches people who opted out)"}
+                  </button>
                 )}
               </article>
             ))}

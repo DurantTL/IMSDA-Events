@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AccessDeniedError, requirePermission } from "@/modules/access/authorization";
+import { AccessDeniedError, effectivePermissions, requireEventMembership } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { setAnnouncementEssential } from "@/modules/communications/announcement-essential";
@@ -14,14 +14,14 @@ const essentialSchema = z.strictObject({ essential: z.boolean() });
  * change the essential mark (#897); everyone else is refused.
  */
 async function requireEssentialAccess(eventId: string) {
-  const session = await getCurrentSession();
-  try {
-    return await requirePermission(session, eventId, "MANAGE_COMMUNICATIONS", findActiveMembership);
-  } catch (error) {
-    // Only a missing permission falls through to the event-configuration check; sign-in and membership failures stand.
-    if (!(error instanceof AccessDeniedError) || error.code !== "PERMISSION_DENIED") throw error;
-    return requirePermission(session, eventId, "CONFIGURE_EVENT", findActiveMembership);
-  }
+  const access = await requireEventMembership(await getCurrentSession(), eventId, findActiveMembership);
+  const permissions = effectivePermissions(access.user, access.membership);
+  if (permissions.includes("MANAGE_COMMUNICATIONS") || permissions.includes("CONFIGURE_EVENT")) return access;
+  throw new AccessDeniedError(
+    "The MANAGE_COMMUNICATIONS or CONFIGURE_EVENT permission is required to mark an announcement essential.",
+    403,
+    "PERMISSION_DENIED",
+  );
 }
 
 /**

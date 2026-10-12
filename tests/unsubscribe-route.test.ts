@@ -3,17 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mocks = vi.hoisted(() => {
-  class MockAccessDeniedError extends Error {
-    constructor(message: string, public readonly status = 403, public readonly code = "PERMISSION_DENIED") {
-      super(message);
-    }
-  }
   return {
-    AccessDeniedError: MockAccessDeniedError,
     recordAnnouncementOptOut: vi.fn(),
     resolveUnsubscribeToken: vi.fn(),
     removeAnnouncementOptOuts: vi.fn(),
-    requirePermission: vi.fn(),
+    findActiveMembership: vi.fn(),
     getCurrentSession: vi.fn(),
     rejectCrossOriginRequest: vi.fn(),
     setAnnouncementEssential: vi.fn(),
@@ -25,13 +19,9 @@ vi.mock("@/modules/communications/email-preferences-repository", () => ({
   removeAnnouncementOptOuts: mocks.removeAnnouncementOptOuts,
   resolveUnsubscribeToken: mocks.resolveUnsubscribeToken,
 }));
-vi.mock("@/modules/access/authorization", () => ({
-  AccessDeniedError: mocks.AccessDeniedError,
-  requirePermission: mocks.requirePermission,
-}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
-vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/modules/communications/announcement-essential", () => ({ setAnnouncementEssential: mocks.setAnnouncementEssential }));
 
 import { GET, POST } from "@/app/api/public/unsubscribe/[token]/route";
@@ -147,58 +137,75 @@ describe("public unsubscribe endpoint (#838)", () => {
   });
 });
 
-describe("marking an announcement essential (#838)", () => {
+describe("marking an announcement essential (#838, #897)", () => {
   const params = { params: Promise.resolve({ eventId: "event-1", announcementId: "announcement-1" }) };
   const request = (body: unknown) => new Request("https://events.imsda.test/api/events/event-1/announcements/announcement-1/essential", {
     method: "PATCH",
     headers: { "content-type": "application/json", origin: "https://events.imsda.test" },
     body: JSON.stringify(body),
   });
+  // The real permission mapping runs; only the membership lookup is stubbed.
+  const asRole = (role: string | null, permissions: string[] = []) => {
+    mocks.findActiveMembership.mockResolvedValue(
+      role ? { eventId: "event-1", userId: "staff-1", role, status: "ACTIVE", permissions } : null,
+    );
+  };
 
   beforeEach(() => {
     mocks.rejectCrossOriginRequest.mockReturnValue(null);
-    mocks.getCurrentSession.mockResolvedValue({ user: { id: "manager-1" } });
-    mocks.requirePermission.mockResolvedValue({ user: { id: "manager-1" } });
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", email: "staff@example.test", displayName: "Staff" } });
     mocks.setAnnouncementEssential.mockResolvedValue({ id: "announcement-1", isEssential: true, changed: true });
   });
 
-  it("lets a communications manager (MANAGE_COMMUNICATIONS) mark and clear it, as the actor", async () => {
-    await PATCH(request({ essential: true }), params);
-    expect(mocks.requirePermission).toHaveBeenCalledTimes(1);
-    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_COMMUNICATIONS", expect.anything());
-    expect(mocks.setAnnouncementEssential).toHaveBeenCalledWith("event-1", "announcement-1", "manager-1", true);
+  it.each(["COMMUNICATIONS_MANAGER", "EVENT_ADMIN"])("lets a %s mark and clear it, as the actor", async (role) => {
+    asRole(role);
+    const marked = await PATCH(request({ essential: true }), params);
+    expect(marked.status).toBe(200);
+    expect(mocks.setAnnouncementEssential).toHaveBeenCalledWith("event-1", "announcement-1", "staff-1", true);
     mocks.setAnnouncementEssential.mockResolvedValue({ id: "announcement-1", isEssential: false, changed: true });
-    await PATCH(request({ essential: false }), params);
-    expect(mocks.setAnnouncementEssential).toHaveBeenLastCalledWith("event-1", "announcement-1", "manager-1", false);
+    const cleared = await PATCH(request({ essential: false }), params);
+    expect(cleared.status).toBe(200);
+    expect(mocks.setAnnouncementEssential).toHaveBeenLastCalledWith("event-1", "announcement-1", "staff-1", false);
   });
 
-  it("still lets an event manager with only CONFIGURE_EVENT do it", async () => {
-    mocks.requirePermission.mockImplementation(async (_s: unknown, _e: string, permission: string) => {
-      if (permission !== "CONFIGURE_EVENT") throw new mocks.AccessDeniedError("The MANAGE_COMMUNICATIONS permission is required for this event.");
-      return { user: { id: "manager-1" } };
-    });
-    const response = await PATCH(request({ essential: true }), params);
-    expect(response.status).toBe(200);
-    expect(mocks.setAnnouncementEssential).toHaveBeenCalledWith("event-1", "announcement-1", "manager-1", true);
+  it("lets staff holding only a CONFIGURE_EVENT grant do it", async () => {
+    asRole("READ_ONLY_STAFF", ["CONFIGURE_EVENT"]);
+    expect((await PATCH(request({ essential: true }), params)).status).toBe(200);
+    expect(mocks.setAnnouncementEssential).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses staff with neither permission, and changes nothing", async () => {
-    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("Your event role cannot do this."));
+  it.each(["REGISTRATION_MANAGER", "FINANCE_MANAGER", "CHECK_IN_STAFF", "READ_ONLY_STAFF"])("refuses a %s with 403 and changes nothing", async (role) => {
+    asRole(role);
     const response = await PATCH(request({ essential: true }), params);
     expect(response.status).toBe(403);
-    expect(mocks.requirePermission).toHaveBeenCalledTimes(2);
+    expect(await response.json()).toEqual(expect.objectContaining({ error: "PERMISSION_DENIED", message: expect.stringMatching(/MANAGE_COMMUNICATIONS.*CONFIGURE_EVENT/) }));
     expect(mocks.setAnnouncementEssential).not.toHaveBeenCalled();
   });
 
-  it("does not retry on a sign-in or membership failure", async () => {
-    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED"));
+  it("refuses someone not assigned to the event with EVENT_ACCESS_DENIED, and changes nothing", async () => {
+    asRole(null);
     const response = await PATCH(request({ essential: true }), params);
-    expect(response.status).toBe(401);
-    expect(mocks.requirePermission).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("EVENT_ACCESS_DENIED");
+    expect(mocks.setAnnouncementEssential).not.toHaveBeenCalled();
+  });
+
+  it("answers 401 with no session", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+    expect((await PATCH(request({ essential: true }), params)).status).toBe(401);
+    expect(mocks.setAnnouncementEssential).not.toHaveBeenCalled();
+  });
+
+  it("answers 500 on an unexpected error, with nothing changed", async () => {
+    mocks.findActiveMembership.mockRejectedValue(new Error("database unavailable"));
+    const response = await PATCH(request({ essential: true }), params);
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).toBe("ANNOUNCEMENT_ESSENTIAL_REQUEST_FAILED");
     expect(mocks.setAnnouncementEssential).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed body and an unknown announcement", async () => {
+    asRole("COMMUNICATIONS_MANAGER");
     expect((await PATCH(request({ essential: "yes" }), params)).status).toBe(400);
     mocks.setAnnouncementEssential.mockResolvedValue(null);
     expect((await PATCH(request({ essential: true }), params)).status).toBe(404);
