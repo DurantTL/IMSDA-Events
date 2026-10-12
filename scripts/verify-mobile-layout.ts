@@ -1619,7 +1619,8 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       if ((await page.locator('[role="dialog"] button:has-text("Start camera"):visible').count()) === 0) record("dialog-open-failed", stateName, width, "the camera button is missing after a name search");
       if (takeShots) await page.screenshot({ path: `${prefix}-scanner-name-search.jpg`, type: "jpeg", quality: 60 });
     } catch (error) {
-      record("dialog-open-failed", `${spec.name} (scanner name search)`, width, (error as Error).message.split("\n")[0] ?? "failed");
+      const seen = await page.locator('[role="dialog"]').first().innerText({ timeout: 1000 }).catch(() => "(no dialog)");
+      record("dialog-open-failed", `${spec.name} (scanner name search)`, width, `${(error as Error).message.split("\n")[0] ?? "failed"}; the scanner showed: ${seen.replace(/\s+/g, " ").slice(0, 300)}`);
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);

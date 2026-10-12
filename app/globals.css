@@ -9242,6 +9242,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 @media screen and ((max-width: 768px) or (pointer: coarse)) {
   :root :is(.filter-field select, .report-download, .report-record-link, .roster-csv-actions > a, .roster-csv-actions > button,
     .club-event-action, .check-in-queue-actions button, .check-in-review-list article > button) { min-height: var(--target-touch); }
+  /* The scanner's close button is a full-size tap target on a phone (#889). */
+  :root .check-in-scanner-modal .modal-head .icon-button { min-width: var(--target-touch); min-height: var(--target-touch); }
 }
 
 /* ==========================================================================
