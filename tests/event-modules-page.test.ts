@@ -203,9 +203,11 @@ describe("/more as the Event modules page", () => {
     signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: [] });
     const markup = await render();
     expect(markup).toContain('aria-label="All tools"');
-    for (const href of ["/more/event-settings", "/imports", "/finance", "/more/reports", "/more/club-forms", "/staff"]) {
+    for (const href of ["/more/event-settings", "/imports", "/more/reports", "/more/club-forms", "/staff"]) {
       expect(markup).toContain(`href="${href}?event=event_1"`);
     }
+    // Payments is a phone tab (#890), so the More page no longer links it.
+    expect(markup).not.toContain('href="/finance?event=event_1"');
   });
 });
 
