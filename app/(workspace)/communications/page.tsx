@@ -101,7 +101,7 @@ export default async function CommunicationsPage({
       initialAnnouncements={announcements}
       initialMessaging={messaging}
       canManage={canManage}
-      canMarkEssential={permissions.includes("CONFIGURE_EVENT")}
+      canMarkEssential={canManage || permissions.includes("CONFIGURE_EVENT")}
       announcementOptOuts={optOuts}
       initialView={initialView}
       openNew={openNew === "1"}

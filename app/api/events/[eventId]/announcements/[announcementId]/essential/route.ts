@@ -10,16 +10,29 @@ import { withRequestContext } from "@/lib/request-context";
 const essentialSchema = z.strictObject({ essential: z.boolean() });
 
 /**
- * Mark an announcement essential so it reaches people who opted out (#838). Event manager and above only: the
- * communications role can write and send announcements, but overriding someone's opt-out takes CONFIGURE_EVENT.
- * Audited with the actor.
+ * Staff who hold MANAGE_COMMUNICATIONS (the permission that writes and sends announcements) or CONFIGURE_EVENT may
+ * change the essential mark (#897); everyone else is refused.
+ */
+async function requireEssentialAccess(eventId: string) {
+  const session = await getCurrentSession();
+  try {
+    return await requirePermission(session, eventId, "MANAGE_COMMUNICATIONS", findActiveMembership);
+  } catch (error) {
+    // Only a missing permission falls through to the event-configuration check; sign-in and membership failures stand.
+    if (!(error instanceof AccessDeniedError) || error.code !== "PERMISSION_DENIED") throw error;
+    return requirePermission(session, eventId, "CONFIGURE_EVENT", findActiveMembership);
+  }
+}
+
+/**
+ * Mark an announcement essential so it reaches people who opted out (#838, #897). Audited with the actor.
  */
 async function patchHandler(request: Request, context: { params: Promise<{ eventId: string; announcementId: string }> }) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
     const { eventId, announcementId } = await context.params;
-    const access = await requirePermission(await getCurrentSession(), eventId, "CONFIGURE_EVENT", findActiveMembership);
+    const access = await requireEssentialAccess(eventId);
     const { essential } = essentialSchema.parse(await request.json());
     const result = await setAnnouncementEssential(eventId, announcementId, access.user.id, essential);
     if (!result) return Response.json({ error: "ANNOUNCEMENT_NOT_FOUND" }, { status: 404 });

@@ -2,7 +2,7 @@ import { getPrisma } from "@/lib/prisma";
 
 /**
  * Marks an announcement essential, or clears it (#838). An essential announcement reaches people who opted out of
- * announcements, so the route that calls this requires an event manager or above, and every change is audited with
+ * announcements, so the route that calls this requires MANAGE_COMMUNICATIONS or CONFIGURE_EVENT (#897), and every change is audited with
  * who made it. Delivery reads the mark when each message is sent, so a change applies to messages still queued (and to their retry copies) but never to mail already sent.
  */
 export async function setAnnouncementEssential(

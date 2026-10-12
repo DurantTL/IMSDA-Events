@@ -162,16 +162,39 @@ describe("marking an announcement essential (#838)", () => {
     mocks.setAnnouncementEssential.mockResolvedValue({ id: "announcement-1", isEssential: true, changed: true });
   });
 
-  it("requires event-manager access (CONFIGURE_EVENT), not just communications access", async () => {
+  it("lets a communications manager (MANAGE_COMMUNICATIONS) mark and clear it, as the actor", async () => {
     await PATCH(request({ essential: true }), params);
-    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "CONFIGURE_EVENT", expect.anything());
+    expect(mocks.requirePermission).toHaveBeenCalledTimes(1);
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_COMMUNICATIONS", expect.anything());
+    expect(mocks.setAnnouncementEssential).toHaveBeenCalledWith("event-1", "announcement-1", "manager-1", true);
+    mocks.setAnnouncementEssential.mockResolvedValue({ id: "announcement-1", isEssential: false, changed: true });
+    await PATCH(request({ essential: false }), params);
+    expect(mocks.setAnnouncementEssential).toHaveBeenLastCalledWith("event-1", "announcement-1", "manager-1", false);
+  });
+
+  it("still lets an event manager with only CONFIGURE_EVENT do it", async () => {
+    mocks.requirePermission.mockImplementation(async (_s: unknown, _e: string, permission: string) => {
+      if (permission !== "CONFIGURE_EVENT") throw new mocks.AccessDeniedError("The MANAGE_COMMUNICATIONS permission is required for this event.");
+      return { user: { id: "manager-1" } };
+    });
+    const response = await PATCH(request({ essential: true }), params);
+    expect(response.status).toBe(200);
     expect(mocks.setAnnouncementEssential).toHaveBeenCalledWith("event-1", "announcement-1", "manager-1", true);
   });
 
-  it("refuses someone without it, and changes nothing", async () => {
+  it("refuses staff with neither permission, and changes nothing", async () => {
     mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("Your event role cannot do this."));
     const response = await PATCH(request({ essential: true }), params);
     expect(response.status).toBe(403);
+    expect(mocks.requirePermission).toHaveBeenCalledTimes(2);
+    expect(mocks.setAnnouncementEssential).not.toHaveBeenCalled();
+  });
+
+  it("does not retry on a sign-in or membership failure", async () => {
+    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED"));
+    const response = await PATCH(request({ essential: true }), params);
+    expect(response.status).toBe(401);
+    expect(mocks.requirePermission).toHaveBeenCalledTimes(1);
     expect(mocks.setAnnouncementEssential).not.toHaveBeenCalled();
   });
 
