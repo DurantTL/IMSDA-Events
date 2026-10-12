@@ -234,8 +234,10 @@ function paymentInstructions(
  * not the arithmetic: a waitlist confirmation with a nonzero total must still
  * say "no payment is due", and a cancellation must not ask anyone to pay.
  */
-function isRegistrationConfirmation(key: TransactionalTemplateKey) {
-  return key === "REGISTRATION_CONFIRMATION_PAID"
+/** Confirmations, including a worker's, carry the refund policy (#891); every other message does not. */
+export function isRegistrationConfirmation(key: string) {
+  return key === "WORKER_CONFIRMATION"
+    || key === "REGISTRATION_CONFIRMATION_PAID"
     || key === "REGISTRATION_CONFIRMATION_UNPAID"
     || key === "REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED";
 }

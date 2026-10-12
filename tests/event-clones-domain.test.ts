@@ -362,6 +362,16 @@ describe("event info card fields in a clone (#651)", () => {
     expect(row).toMatchObject({ additionalCostCents: 500, requirementNote: "Bring ID" });
   });
 
+  it("scrubs a private manage link out of a copied refund policy (#891)", () => {
+    const link = "https://events.imsda.test/manage/MARKER-MANAGE-TOKEN";
+    const result = sanitizeSourceForClone(
+      { ...config(), eventDetails: { ...config().eventDetails, refundPolicy: `Refunds until Oct 1. Your page: ${link}` } },
+      appOrigins,
+    );
+    expect(result.config.eventDetails.refundPolicy).not.toContain("MARKER-MANAGE-TOKEN");
+    expect(result.findings.map((finding) => finding.location)).toContain("Refund policy");
+  });
+
   it("carries the refund policy into the copy (#891)", () => {
     const policy = "Refunds until October 1.\n\nNo refunds after the event starts.";
     const result = sanitizeSourceForClone({ ...config(), eventDetails: { ...config().eventDetails, refundPolicy: policy } }, appOrigins);

@@ -165,7 +165,8 @@ describe("payment status block", () => {
     expect(block).toContain("$9 per person. Your church is billed after the event.");
     // A church-billed registrant never sees a total (#621).
     expect(block).not.toContain("$9.00");
-    expect(block).toContain("Responsible organization: **Ankeny Son-Seekers**");
+    // Untrusted names are Markdown-escaped (#891); the text part drops the escapes again.
+    expect(block).toContain("Responsible organization: **Ankeny Son\\-Seekers**");
     expect(block).toContain("Billing contact: **Jane Doe**");
     expect(block).not.toContain("Balance due");
     expect(block).not.toContain("[Pay your balance]");

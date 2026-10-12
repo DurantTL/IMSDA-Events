@@ -341,13 +341,16 @@ async function assertSeededDatabase(prisma: PrismaClient) {
  * Long words and long addresses are here on purpose.
  */
 async function seedBlocksEvent(prisma: PrismaClient) {
+  // A refund policy (#891) with a long unbroken word and two paragraphs, so the public event page renders and wraps it.
+  const blocksRefundPolicy = "Refunds are available until October 1.\nAfter that, a fee of Supercalifragilisticexpialidocious-and-an-extremely-long-unbroken-synthetic-word applies.\n\nNo refunds are given after the event starts.";
   const { createEventAsset } = await import("../modules/events/asset-repository");
   const { replaceEventContent } = await import("../modules/events/content-repository");
   const { eventContentInputSchema } = await import("../modules/events/content-schemas");
   await prisma.event.upsert({
     where: { id: blocksEventId },
-    update: { isPublished: true },
+    update: { isPublished: true, refundPolicy: blocksRefundPolicy },
     create: {
+      refundPolicy: blocksRefundPolicy,
       id: blocksEventId, slug: blocksEventSlug, name: "Mobilecheck Blocks Weekend",
       startsAt: new Date("2027-03-05T15:00:00Z"), endsAt: new Date("2027-03-07T18:00:00Z"), timezone: "America/Chicago",
       isPublished: true, registrationOpensOn: "2026-10-01", registrationClosesOn: "2027-02-28",

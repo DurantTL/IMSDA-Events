@@ -3358,7 +3358,7 @@ export function PublicRegistrationForm({
             )}
           </nav>
 
-          {currentStep.isReview && !joiningWaitlist && (
+          {currentStep.isReview && !joiningWaitlist && !group?.waitlistNote && (
             <EventRefundPolicy policy={event.refundPolicy} headingLevel={3} />
           )}
 

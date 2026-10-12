@@ -1,4 +1,4 @@
-import { escapeMarkdown, plainTextFromEscapedMarkdown, renderEmailBodyHtml } from "@/modules/communications/email-html";
+import { escapeMarkdown, plainTextFromEscapedMarkdown, renderEmailBodyHtml, unescapeMarkdown } from "@/modules/communications/email-html";
 import { plainTextFromMessageSource } from "@/modules/communications/message-file-rules";
 
 export const MESSAGE_TEMPLATE_KEYS = [
@@ -155,7 +155,15 @@ const PLAIN_TEXT_FROM_ESCAPED_TOKENS: ReadonlySet<MessageTemplateToken> = new Se
   "seminar_preferences",
   "checkin_qr_images",
   "checkin_block",
+  // Not here: payment_status_block, which keeps its bold in the text part (below).
 ]);
+
+/**
+ * Blocks that mix their own Markdown with escaped staff or registrant text (the refund
+ * policy, the organization and billing-contact names). The text part drops the escapes
+ * and nothing else, so existing wording is unchanged.
+ */
+const UNESCAPE_ONLY_TOKENS: ReadonlySet<MessageTemplateToken> = new Set(["payment_status_block"]);
 
 export type MessageTemplateContext = Partial<
   Record<MessageTemplateToken, string | null | undefined>
@@ -860,7 +868,7 @@ export const MESSAGE_TEMPLATE_TOKEN_OPTIONS: readonly {
     key: "payment_status_block",
     label: "Payment status block",
     description:
-      "The paid, balance-due, complimentary, waitlisted, or promoted section for this registration's actual state.",
+      "The paid, balance-due, complimentary, waitlisted, or promoted section for this registration's actual state. In a confirmation it ends with the event's refund policy, when the event has one.",
   },
   {
     key: "checkin_block",
@@ -986,6 +994,10 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Readonly<
     "### Payment status",
     "",
     "**Paid in full — thank you.** We received $129.05 against a registration total of $129.05. No balance remains.",
+    "",
+    "### Refund policy",
+    "",
+    "Full refunds are available until October 1. After that, no refunds are given.",
   ].join("\n"),
   checkin_block: [
     "### At check-in",
@@ -1194,6 +1206,9 @@ export function renderTemplateText(
     // another {{token}} are never interpreted as replacement syntax or rendered twice.
     if (!options.escapeUntrustedMarkdown && PLAIN_TEXT_FROM_ESCAPED_TOKENS.has(knownToken)) {
       return plainTextFromEscapedMarkdown(value);
+    }
+    if (!options.escapeUntrustedMarkdown && UNESCAPE_ONLY_TOKENS.has(knownToken)) {
+      return unescapeMarkdown(value);
     }
     return options.escapeUntrustedMarkdown
       && !MARKDOWN_MESSAGE_TEMPLATE_TOKENS.has(knownToken)

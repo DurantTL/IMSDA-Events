@@ -225,8 +225,8 @@ function buildPaymentStatusSection(input: PaymentStatusBlockInput) {
       "",
       `**${clean(input.perPersonNotice) ?? "Your church is billed after the event."}**`,
     ];
-    if (organization) lines.push("", `Responsible organization: **${organization}**`);
-    if (billingContact) lines.push(`Billing contact: **${billingContact}**`);
+    if (organization) lines.push("", `Responsible organization: **${escapeMarkdown(organization)}**`);
+    if (billingContact) lines.push(`Billing contact: **${escapeMarkdown(billingContact)}**`);
     return lines.join("\n");
   }
 

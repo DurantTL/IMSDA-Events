@@ -381,7 +381,10 @@ export default async function PublicManagePage({
               </div>
             </dl>
             )}
-            <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
+            {/* Only for an active registration, like the confirmation email: not waitlisted or cancelled. */}
+            {(view.registration.status === "SUBMITTED" || view.registration.status === "CONFIRMED") && (
+              <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
+            )}
             {!view.perPerson && !view.isGroup && <PublicSquarePayment token={token} />}
           </section>
         </div>
