@@ -274,14 +274,17 @@ export function requiredPermissionFor(href: string): EventPermission | undefined
 }
 
 /**
- * The phone tab bar (#711): at most five tabs so each gets an equal, readable
- * share of a 360px screen. Payments and Promo codes moved into the phone More
- * directory (cards "payments" and "promo-codes"), gated by the same permission.
+ * The phone tab bar (#711): five tabs, so each gets an equal, readable share of
+ * a 360px screen. Payments (#890) is a sixth tab, drawn only for staff whose
+ * `MANAGE_FINANCE` permission makes the item visible, so everyone else still
+ * sees five. At check-in a balance or adjustment is a tap away instead of two.
+ * The "payments" More card stays as a second route; Promo codes stay in More.
  */
 export const mobileNavigationOrder = [
   "/overview",
   "/people",
   "/check-in",
+  "/finance",
   "/communications",
   "/more",
 ] as const;
@@ -311,6 +314,7 @@ export const mobileNavigationLabels: Readonly<Record<string, string>> = {
   "/overview": "Home",
   "/people": "People",
   "/check-in": "Check-in",
+  "/finance": "Payments",
   "/communications": "Emails",
   "/more": "More",
 };

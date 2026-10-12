@@ -23,8 +23,8 @@ describe("staff page names (#685)", () => {
   });
 
   it("keeps five phone tabs with short labels while the sidebar keeps full labels (#711)", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/communications", "/more"]);
-    expect(mobileNavigationOrder.map((href) => mobileNavigationLabels[href])).toEqual(["Home", "People", "Check-in", "Emails", "More"]);
+    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
+    expect(mobileNavigationOrder.map((href) => mobileNavigationLabels[href])).toEqual(["Home", "People", "Check-in", "Payments", "Emails", "More"]);
     for (const href of mobileNavigationOrder) {
       expect(navigation.find((item) => item.href === href)?.label).toBeTruthy();
     }

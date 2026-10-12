@@ -373,12 +373,11 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
       ),
     );
     const mobileNav = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
-    // At most five tabs (#711); Payments and Promo codes live in More.
+    // Five tabs (#711), plus Payments for finance staff (#890); Promo codes live in More.
     const hrefs = [...mobileNav.matchAll(/<a [^>]*href="([^"?]+)\?/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/overview", "/people", "/check-in", "/communications", "/more"]);
+    expect(hrefs).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
     const labels = [...mobileNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    expect(labels).toEqual(["Home", "People", "Check-in", "Emails", "More"]);
-    expect(mobileNav).not.toContain("/finance");
+    expect(labels).toEqual(["Home", "People", "Check-in", "Payments", "Emails", "More"]);
     expect(mobileNav).not.toContain("promo-codes");
   });
 
