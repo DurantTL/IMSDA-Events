@@ -214,27 +214,31 @@ async function main() {
   // Ben's check has expired; Ina's is current. Cal has none.
   await addEntry("Ina", "Instructora", accountA.email, future, 1);
   await addEntry("Ben", "Instructorb", accountB.email, past, 2);
-  const blocked = await repo.getInstructorRoster(accountB.id, o2.id, now);
-  assert(blocked.status === "STERLING_REQUIRED" && blocked.message.includes("Sterling Volunteers check"), "an expired check blocks the roster with the Sterling Volunteers message");
-  assert(!JSON.stringify(blocked).includes("Kidb1"), "and no names come with the message");
-  await expectCode(repo.markInstructorClass(accountB.id, o2.id, { action: "ALL_COMPLETED" }, now), "STERLING_REQUIRED", "marking without a current check");
-  assert(await prisma.honorEnrollmentMark.count({ where: { enrollmentId: b1.enrollmentId } }) === 0, "a blocked mark writes nothing");
+  const warned = await repo.getInstructorRoster(accountB.id, o2.id, now);
+  assert(warned.status === "OK" && warned.rows.length === 1 && warned.sterlingWarning?.includes("Sterling Volunteers check"), "an expired check still shows the roster, with the Sterling Volunteers warning");
+  assert(!JSON.stringify(warned.rows).includes("sterling"), "and the warning is not part of the rows");
+  const warnedMark = await repo.markInstructorClass(accountB.id, o2.id, { action: "ALL_COMPLETED" }, now);
+  assert(warnedMark.changed === 1 && warnedMark.view.sterlingWarning !== null, "marking works without a current check");
+  assert(await prisma.honorEnrollmentMark.count({ where: { enrollmentId: b1.enrollmentId } }) === 1, "and the mark is written");
+  await repo.markInstructorClass(accountB.id, o2.id, { action: "CLEAR" }, now);
   assert((await repo.listHonorInstructors(eventId)).instructors.find((row) => row.id === invitedB.instructorId)?.sterlingCurrent === false, "staff see that Ben has no current check");
   assert((await repo.listHonorInstructors(eventId)).instructors.find((row) => row.id === invitedA.instructorId)?.sterlingCurrent === true, "and that Ina does");
   await prisma.backgroundCheckEntry.update({ where: { id: `${P}_entry_2` }, data: { expiresOn: future } });
   // The match is cached or found at read time; the answer follows the list either way.
   const unblocked = await repo.getInstructorRoster(accountB.id, o2.id, now);
-  assert(unblocked.status === "OK" && unblocked.rows.length === 1, "once the check is current Ben sees his one-person roster");
+  assert(unblocked.status === "OK" && unblocked.rows.length === 1 && unblocked.sterlingWarning === null, "once the check is current Ben sees his one-person roster with no warning");
   await prisma.backgroundCheckEntry.update({ where: { id: `${P}_entry_2` }, data: { expiresOn: past } });
-  console.log("ok  a check that isn't current blocks the roster and marks with a clear message; a current one doesn't");
+  console.log("ok  a check that isn't current shows a warning and never blocks the roster or marks; a current one has no warning");
 
-  // A roster import's "!" (expiring soon) is not current for this one blocking gate; staff see the state.
+  // A roster import's "!" (expiring soon) is not current: a warning for the instructor, and staff see the state.
   await prisma.backgroundCheckEntry.update({ where: { id: `${P}_entry_1` }, data: { complianceStatus: "FLAGGED" } });
-  assert((await repo.getInstructorRoster(accountA.id, o1.id, now)).status === "STERLING_REQUIRED", "a flagged (\"!\") check does not open a roster");
+  const flaggedView = await repo.getInstructorRoster(accountA.id, o1.id, now);
+  assert(flaggedView.status === "OK" && flaggedView.sterlingWarning !== null, "a flagged (\"!\") check opens the roster with a warning");
   const flaggedRow = (await repo.listHonorInstructors(eventId)).instructors.find((row) => row.id === invitedA.instructorId);
   assert(flaggedRow?.sterlingCurrent === false && flaggedRow.sterlingState === "FLAGGED", "and staff see it as flagged");
   await prisma.backgroundCheckEntry.update({ where: { id: `${P}_entry_1` }, data: { complianceStatus: null } });
   assert((await repo.getInstructorRoster(accountA.id, o1.id, now)).status === "OK", "clearing the flag opens it again");
+  assert((await repo.getInstructorRoster(accountA.id, o1.id, now)).sterlingWarning === null, "and the warning goes");
 
   // An email that belongs to someone else in the system is refused, whatever name is typed for it.
   await expectCode(repo.inviteHonorInstructor(eventId, { firstName: "Other", lastName: "Person", email: `${P}-kid-a1@example.test`, offeringIds: [o1.id] }, staffUserId), "INSTRUCTOR_EMAIL_CONFLICT", "an email that belongs to a different person");

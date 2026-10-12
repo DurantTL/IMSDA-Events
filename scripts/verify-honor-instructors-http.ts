@@ -5,7 +5,7 @@
  * appears in either; another instructor's class, an unknown class, and a
  * signed-in non-instructor all get the same 404 on the page and the API, for
  * reading and for marking; without a current Sterling Volunteers check the page
- * and API show the message and no names; a signed-out caller is refused; a
+ * and API still show the roster, with a warning, and marking works; a signed-out caller is refused; a
  * cross-origin post is refused; every staff route refuses a caller with no staff
  * session. Uses fictitious rows it creates and removes.
  *
@@ -131,14 +131,15 @@ async function main() {
   assert.equal((await call(`${api(o1.id)}/marks`, ina)).status, 405, "no marking by GET");
   assert.equal(await prisma.honorEnrollmentMark.count({ where: { enrollmentId: e1.id, attended: true, completed: false } }), 1, "only the one valid mark landed");
 
-  // No current Sterling Volunteers check: the message, never a name.
-  const blocked = await call(api(o2.id), ben);
-  assert.equal(blocked.status, 403, "Ben has no current check");
-  const blockedText = await blocked.text();
-  assert.ok(blockedText.includes("Sterling Volunteers check") && !blockedText.includes("Kidthree"), "the API shows the message and no name");
-  const blockedPage = await (await call(page(o2.id), ben)).text();
-  assert.ok(blockedPage.includes("Sterling Volunteers check") && !blockedPage.includes("Kidthree"), "the page shows the message and no name");
-  assert.equal((await call(`${api(o2.id)}/marks`, ben, { method: "POST", body: JSON.stringify({ action: "ALL_ATTENDED" }) })).status, 403, "and marking is refused");
+  // No current Sterling Volunteers check: a warning, never a block.
+  const warned = await call(api(o2.id), ben);
+  assert.equal(warned.status, 200, "Ben has no current check and still gets his roster");
+  const warnedText = await warned.text();
+  assert.ok(warnedText.includes("Sterling Volunteers check") && warnedText.includes("Kidthree"), "the API shows the warning and the roster");
+  noSecrets(warnedText, "the warned roster");
+  const warnedPage = await (await call(page(o2.id), ben)).text();
+  assert.ok(warnedPage.includes("Sterling Volunteers check") && warnedPage.includes("Kidthree"), "the page shows the warning and the roster");
+  assert.equal((await call(`${api(o2.id)}/marks`, ben, { method: "POST", body: JSON.stringify({ action: "ALL_ATTENDED" }) })).status, 200, "and marking works");
 
   // Signed out, and staff routes with no staff session.
   assert.equal((await call(api(o1.id), null)).status, 401, "signed-out API");

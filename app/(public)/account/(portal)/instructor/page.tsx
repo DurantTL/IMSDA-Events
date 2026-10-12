@@ -5,7 +5,7 @@ import { ArrowRight, GraduationCap } from "lucide-react";
 import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
-import { STERLING_REQUIRED_MESSAGE } from "@/modules/honors/instructor-domain";
+import { STERLING_WARNING_MESSAGE } from "@/modules/honors/instructor-domain";
 import { listInstructorClasses, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
 
 export const metadata: Metadata = { title: "Your classes", robots: { index: false, follow: false, nocache: true } };
@@ -42,7 +42,7 @@ export default async function InstructorClassesPage() {
             <p className="public-manage-empty"><GraduationCap size={17} aria-hidden="true" /> You aren&apos;t teaching any classes yet. Conference staff invite instructors by email.</p>
           ) : (
             <>
-              {sterlingCurrent === false && <div className="inline-notice error" role="status">{STERLING_REQUIRED_MESSAGE}</div>}
+              {sterlingCurrent === false && <div className="inline-notice error" role="status">{STERLING_WARNING_MESSAGE}</div>}
               <ul className="public-manage-club-list">
                 {classes.map((item) => (
                   <li key={item.offeringId}>

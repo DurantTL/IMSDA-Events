@@ -5,8 +5,9 @@
  *
  * Decisions (Caleb, Oct 8, 2026): staff assign and invite instructors; an
  * instructor sees name and club only; Completed also marks attended; marks may
- * change until 14 days after the event ends; a current Sterling Volunteers
- * check is needed to see a roster.
+ * change until 14 days after the event ends. Revised (Caleb, Oct 12, 2026,
+ * #896): a Sterling Volunteers check that isn't current is a warning, never a
+ * block.
  */
 
 /** Marks may change until this many days after the event ends. */
@@ -32,18 +33,16 @@ export function instructorMarksOpen(eventEndsAt: Date, now: Date) {
   return now.getTime() <= instructorEditDeadline(eventEndsAt).getTime();
 }
 
-/** Shown in place of a roster when the instructor has no current Sterling Volunteers check. */
-export const STERLING_REQUIRED_MESSAGE =
-  "You need a current Sterling Volunteers check on file before you can see a class roster. "
-  + "If you believe yours is current, contact the conference office so it can be matched to you.";
+/** Shown to the instructor, above a roster they can still see and mark, when their Sterling Volunteers check isn't current. */
+export const STERLING_WARNING_MESSAGE =
+  "Your Sterling Volunteers check isn't current on file. You can still see your class roster and mark attendance. "
+  + "Please contact the conference office so it can be updated or matched to you.";
 
-/** The Sterling Volunteers states (`backgroundCheckState`) that let an instructor see a roster. */
 /**
- * The one rule for what lets an instructor see a roster (#833), kept in this single function so it is a one-line
- * change. For now: a roster import's "!" (FLAGGED) blocks; a Sterling check that is valid but expires within 60 days
- * is still a current check and does not (both pending the owner's confirmation).
+ * Whether a Sterling Volunteers check is current (#896). Only a warning hangs on this: it never hides a roster or
+ * stops a mark. A roster import's "!" (FLAGGED) counts as not current, so the office follows up.
  */
-export function sterlingAllowsRoster(state: "CURRENT" | "EXPIRED" | "MISSING" | "NOT_COMPLIANT" | "FLAGGED") {
+export function sterlingIsCurrent(state: "CURRENT" | "EXPIRED" | "MISSING" | "NOT_COMPLIANT" | "FLAGGED") {
   return state === "CURRENT";
 }
 
@@ -173,7 +172,7 @@ export function instructorInviteEmail(input: InstructorInviteInput) {
       `2. Use this email address: ${input.email}`,
       "3. On your account page, choose Accept next to the instructor invite.",
       "",
-      "Once you accept, you'll see only your own classes. To see a class roster you also need a current Sterling Volunteers check on file; the conference office will tell you if anything is missing.",
+      "Once you accept, you'll see only your own classes. If your Sterling Volunteers check isn't current on file you'll see a reminder to contact the conference office; you can still see your roster and mark attendance.",
       "",
       "If you weren't expecting this, you can ignore it. Nothing happens unless you accept.",
       "",

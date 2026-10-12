@@ -23,7 +23,7 @@ const statusTone = { INVITED: "gold", ACCEPTED: "green", REMOVED: "coral" } as c
 /**
  * Honors Weekend instructors (#833). Staff choose who teaches which class and
  * invite them by email. An instructor sees only their own classes' rosters
- * (name and club), and only with a current Sterling Volunteers check.
+ * (name and club), with a warning for the office when their Sterling Volunteers check isn't current.
  */
 export function HonorsInstructorsWorkspace({
   eventId,
@@ -95,7 +95,7 @@ export function HonorsInstructorsWorkspace({
           <p>
             Choose who teaches each class and invite them by email. After accepting from their own account, an instructor sees
             only their own classes: each person&apos;s name and club, nothing else. They can mark attendance and completion
-            until {INSTRUCTOR_EDIT_GRACE_DAYS} days after the event ends, and they need a current Sterling Volunteers check on file to see a roster.
+            until {INSTRUCTOR_EDIT_GRACE_DAYS} days after the event ends, and an instructor whose Sterling Volunteers check isn&apos;t current still sees the roster, with a warning; a &quot;!&quot; beside their name tells you to follow up.
             Completed honors go into members&apos; honor records; staff can void one from the honor record if it was a mistake.
           </p>
         </div>
@@ -137,7 +137,7 @@ export function HonorsInstructorsWorkspace({
             return (
               <li key={instructor.id}>
                 <span>
-                  <strong translate="no">{instructor.name}</strong>
+                  <strong translate="no">{instructor.name}{!instructor.sterlingCurrent && <span role="img" aria-label="Sterling Volunteers check not current" title="Sterling Volunteers check not current"> !</span>}</strong>
                   <small translate="no">{instructor.email}</small>
                 </span>
                 <span className={`status-chip ${statusTone[instructor.status]}`}>{statusLabels[instructor.status]}</span>
@@ -145,7 +145,7 @@ export function HonorsInstructorsWorkspace({
                   {instructor.sterlingCurrent
                     ? "Sterling Volunteers check current"
                     : instructor.sterlingState === "FLAGGED"
-                      ? "Sterling Volunteers check flagged \"!\" (expiring soon; not current for rosters)"
+                      ? "Sterling Volunteers check flagged \"!\" (expiring soon; not current)"
                       : "No current Sterling Volunteers check"}
                 </span>
                 <fieldset>
