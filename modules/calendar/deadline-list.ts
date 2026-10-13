@@ -27,6 +27,8 @@ export async function listUpcomingDeadlines(now = new Date()): Promise<DeadlineL
       OR: [{ endsOn: { gte: from } }, { repeatRule: { not: null } }],
     },
     select: { id: true, title: true, startsOn: true, endsOn: true, linkUrl: true, status: true, repeatRule: true, repeatExceptions: true },
+    // Soonest first, and bounded: 500 entries is far more than a 97-day window of conference deadlines.
+    orderBy: [{ endsOn: "asc" }, { id: "asc" }],
     take: 500,
   });
   const items: DeadlineListItem[] = [];

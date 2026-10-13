@@ -23,8 +23,8 @@ the whole word **due** or **deadline(s)**, in any case ("Registration Due", "Rep
 are due", "DUE: Points report", "Nomination Deadline"). These do **not** count:
 
 - "overdue", "dues" (not whole words), and
-- "due to" when it gives a cause for a change ("Office closed due to weather",
-  "Camporee postponed due to snow").
+- any "due to" phrase ("Office closed due to weather", "Due to Labor Day, office
+  closed", "No meetings due to holiday"). "Due at", "is due" and a plain "Due" still count.
 
 A feed whose default type is Closure keeps that default for everything it imports.
 
@@ -33,7 +33,7 @@ change of type (single or bulk) is recorded as `entryType` in the entry's
 `locallyEditedFields`, and a refresh never changes it after that, even when the
 title changes. Saving an entry without changing its type records nothing. "Reset to
 source" forgets the choice and reads the title again. A Closure is never moved by
-the rule. An item imported before this existed is marked by its next refresh.
+the rule. An item already on the calendar is **not** silently re-typed when this ships: the rule applies to newly imported items and to items whose title changes in the feed (or after reset to source). The refresh result and the import preview say how many items were marked as deadlines, so staff see what moved off the public calendar.
 
 ## Where Deadlines show
 
@@ -48,11 +48,13 @@ the rule. An item imported before this existed is marked by its next refresh.
 
 ## Reminder batches
 
-One `DeadlineReminderBatch` per deadline and reminder point (14 or 2 days before the
-due date); unique on (entry, point), so the same deadline and point is never
-prepared twice. Eligible deadlines are published, not hidden, not removed from their
+One `DeadlineReminderBatch` per deadline, reminder point (14 or 2 days before the
+due date) and due date; unique on (entry, point, due date), so the same deadline,
+point and date is never prepared twice. A sent or dismissed batch is final for that
+due date: if the date moves (even to next year) the point is prepared again for the
+new date. Eligible deadlines are published, not hidden, not removed from their
 feed, status SCHEDULED, one-off (a repeating deadline has no single due date, so
-it gets the list but no reminders), and not yet due.
+it gets the list but no reminders; the reminders tab and the entry editor say so), and not yet due.
 
 - **When:** a point is reached at conference midnight of `due - 14` / `due - 2`
   (calendar-date arithmetic, so daylight saving cannot move it). Only the latest
@@ -70,8 +72,11 @@ it gets the list but no reminders), and not yet due.
   Registrar, Reporter: all have portal access) and every lasting Area Coordinator
   (a system administrator's temporary "act as" grant is not one), on an active,
   verified, enabled account. One email per person. People who opted out of **all**
-  IMSDA Events announcements are left out and counted. Provider-level suppression
-  still applies at delivery, as for any message.
+  IMSDA Events announcements are left out and counted, and the opt-out is checked
+  again at delivery (a person who opts out after Send ends SUPPRESSED). Both go
+  through `deadlineRemindersHonourAnnouncementOptOut()` in
+  `email-preferences.ts`, the one switch if the owner decides reminders ignore
+  opt-outs. Provider-level suppression still applies at delivery.
 - **Approval (human gate):** a **system administrator** reviews the subject, text
   and recipient count in the calendar admin's **Deadline reminders** tab and clicks
   Send (or Don't send). This is the same gate as the calendar admin itself and the
@@ -86,7 +91,8 @@ it gets the list but no reminders), and not yet due.
 
 ## Copy
 
-Subject: `Deadline reminder: <title> (<Month D, YYYY>)`.
+The preview shows both the club and the Area Coordinator wording. Only an https
+link is included. Subject: `Deadline reminder: <title> (<Month D, YYYY>)`.
 
 > Hello <name>,
 >

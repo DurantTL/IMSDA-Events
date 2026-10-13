@@ -33,18 +33,20 @@ export const entryTypeEditMark = "entryType";
 
 const dueWord = /\bdue\b/i;
 const deadlineWord = /\bdeadlines?\b/i;
-// "Office closed due to weather" gives a cause, not a deadline.
-const causeOfChange = /\b(?:closed|closing|cancel+ed|cancel+ation|postponed|delayed|moved|rescheduled|changed|suspended|canceled)\b[^.]*\bdue\s+to\b/i;
+// "due to" gives a cause or a recipient ("Closed due to weather", "Due to Labor Day, office closed", "Reports due to the
+// conference office"): too often not a deadline, so any "due to" phrase is left alone for staff to mark.
+const dueTo = /\bdue\s+to\b/i;
 
 /**
  * Whether an imported title clearly says something is due: the whole word
  * "due" ("Registration Due", "Reports are due", "Due: Points report") or
  * "deadline"/"deadlines" ("Nomination Deadline"), in any case. These do not
- * count: "overdue", "dues" (a payment, not a date), and "due to" when it gives
- * a cause for a change ("Closed due to weather", "Postponed due to snow").
+ * count: "overdue", "dues" (a payment, not a date), and any "due to" phrase
+ * ("Closed due to weather", "Due to Labor Day, office closed", "No meetings due to
+ * holiday"). "Due at", "is due" and a plain "Due" still do.
  */
 export function titleSaysDue(title: string) {
-  if (causeOfChange.test(title)) return false;
+  if (dueTo.test(title)) return false;
   return dueWord.test(title) || deadlineWord.test(title);
 }
 
@@ -199,7 +201,8 @@ export function buildDeadlineReminderEmail(input: {
     `Just a friendly reminder from IMSDA Events: "${title}" ${when}.`,
     "",
   ];
-  if (input.linkUrl) lines.push(`More details: ${input.linkUrl}`, "");
+  // Only an https link goes in the email, the same as the portal list.
+  if (input.linkUrl && /^https:\/\//i.test(input.linkUrl)) lines.push(`More details: ${input.linkUrl}`, "");
   lines.push(
     where,
     input.portalUrl,

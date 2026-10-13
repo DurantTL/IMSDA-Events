@@ -94,16 +94,14 @@ export function planFeedSync(existing: StoredFeedEntry[], parsed: ImportedEntry[
     }
     const returning = row.sourceRemovedAt !== null;
     const hashChanged = hash !== row.sourceHash;
-    // The type follows the title on its own (#910) until staff choose it; a staff-edited title does not drive it.
+    // The type follows the title on its own (#910) until staff choose it, but only when the title changes in the
+    // feed (or after "reset to source", which clears the hash). An item already on the calendar is never silently
+    // re-typed just because the rule arrived: staff would see it vanish from the public calendar unannounced.
+    const titleChanged = !row.locallyEditedFields.includes("title") && entry.title !== row.title;
     const typeTitle = row.locallyEditedFields.includes("title") ? row.title : entry.title;
-    const typeChange = refreshedEntryType(row, typeTitle, defaults.defaultEntryType);
+    const typeChange = titleChanged || row.sourceHash === null ? refreshedEntryType(row, typeTitle, defaults.defaultEntryType) : null;
     if (!returning && !hashChanged && !relink) {
-      if (typeChange) {
-        // The item is unchanged, but the rule now reads it differently (for example an item imported before deadlines existed).
-        plan.updates.push({ id: row.id, title: row.title, kind: "UPDATE", changedFields: ["entryType"], patch: { entryType: typeChange } });
-      } else {
-        plan.unchanged += 1;
-      }
+      plan.unchanged += 1;
       continue;
     }
     const patch: FieldPatch = {};
@@ -151,9 +149,16 @@ export function planFeedSync(existing: StoredFeedEntry[], parsed: ImportedEntry[
   return plan;
 }
 
+/** How many items a plan makes Deadlines: new ones the title marks, and existing ones whose changed title now says due. */
+export function markedDeadlineCount(plan: FeedPlan) {
+  return plan.creates.filter((created) => created.data.entryType === "DEADLINE").length
+    + plan.updates.filter((update) => update.patch.entryType === "DEADLINE").length;
+}
+
 /** What the reviewer sees: counts and a row per change. */
 export type FeedPreview = {
-  counts: { create: number; update: number; revive: number; relink: number; remove: number; unchanged: number };
+  /** `markedDeadline`: items this import makes (or turns into) Deadlines by their title, which leaves them off the public calendar (#910). */
+  counts: { create: number; update: number; revive: number; relink: number; remove: number; unchanged: number; markedDeadline: number };
   rows: Array<{
     action: "CREATE" | "UPDATE" | "REVIVE" | "RELINK" | "REMOVE";
     title: string;
@@ -202,6 +207,7 @@ export function previewOfPlan(plan: FeedPlan, existing: StoredFeedEntry[], parse
       relink: visibleUpdates.filter((update) => update.kind === "RELINK").length,
       remove: plan.removals.length,
       unchanged: plan.unchanged,
+      markedDeadline: markedDeadlineCount(plan),
     },
     rows: rows.slice(0, previewRowLimit),
     warnings,

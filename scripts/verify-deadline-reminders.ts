@@ -127,13 +127,23 @@ async function main() {
   assert(quiet.create === 0 && quiet.update === 0 && quiet.remove === 0, `an unchanged refresh changes nothing, got ${JSON.stringify(quiet)}`);
   console.log("ok  imported 'due' items become Deadlines, and an unchanged refresh writes nothing");
 
-  // An item imported before deadlines existed (Standard, no staff mark) is marked by the next refresh.
+  // An item already on the calendar before deadlines existed (Standard, no staff mark) is NOT silently re-typed by a
+  // refresh; it is typed when its title changes in the feed, and the refresh reports what it marked.
   await prisma.calendarEntry.update({ where: { id: rows.a.id }, data: { entryType: "STANDARD" } });
-  const backfill = await sync();
-  assert(backfill.update === 1, `the backfill is one visible update, got ${backfill.update}`);
-  assert((await imported()).a.entryType === "DEADLINE", "the refresh marks an earlier import as a Deadline");
-  assert((await sync()).update === 0, "and only once");
-  console.log("ok  an item imported before deadlines existed is marked by the next refresh");
+  const untouched = await sync();
+  assert(untouched.update === 0 && untouched.markedDeadline === 0, `a refresh leaves an existing item's type alone, got ${JSON.stringify(untouched)}`);
+  assert((await imported()).a.entryType === "STANDARD", "the existing item stays Standard");
+  feedBody = ics([
+    { uid: "a@dlr.test", title: "DLR Spring Camporee Registration Due (extended)", day: "20261201" },
+    { uid: "b@dlr.test", title: "DLR All points and Investiture Reports are Due", day: "20261202" },
+    { uid: "c@dlr.test", title: "DLR Pathfinder and TLT of the Year Nominations Deadline", day: "20261203" },
+    { uid: "d@dlr.test", title: "DLR Fall Camporee", day: "20261204" },
+    { uid: "e@dlr.test", title: "DLR Office closed due to weather", day: "20261205" },
+  ]);
+  const retitled = await sync();
+  assert(retitled.markedDeadline === 1, `a changed title that says due is marked and counted, got ${JSON.stringify(retitled)}`);
+  assert((await imported()).a.entryType === "DEADLINE", "the retitled item is now a Deadline");
+  console.log("ok  an existing item is not silently re-typed; a changed title is, and the refresh counts it");
 
   // Staff clear Deadline on b, and make d a Deadline; neither is undone by a refresh, even when titles change.
   await updateCalendarEntry(rows.b.id, calendarEntryUpdateSchema.parse({ entryType: "STANDARD" }), adminId);
@@ -145,7 +155,7 @@ async function main() {
   await updateCalendarEntry(rows.c.id, calendarEntryUpdateSchema.parse({ entryType: "DEADLINE", location: "Somewhere" }), adminId);
   assert(!(await imported()).c.locallyEditedFields.includes("entryType"), "saving without changing the type does not mark it");
   feedBody = ics([
-    { uid: "a@dlr.test", title: "DLR Spring Camporee Registration Due", day: "20261201" },
+    { uid: "a@dlr.test", title: "DLR Spring Camporee Registration Due (extended)", day: "20261201" },
     { uid: "b@dlr.test", title: "DLR All points and Investiture Reports are Due (new date)", day: "20261202" },
     { uid: "c@dlr.test", title: "DLR Pathfinder and TLT of the Year Nominations", day: "20261203" },
     { uid: "d@dlr.test", title: "DLR Fall Camporee Registration Due", day: "20261204" },
@@ -219,7 +229,7 @@ async function main() {
       { id: clubInactive, type: "CLUB", name: "Dlr Club Inactive", normalizedName: "dlr club inactive", isActive: false },
     ],
   });
-  const accountKeys = ["dira", "depa", "regb", "repb", "both", "area", "revoked", "ended", "future", "inactiveclub", "disabled", "pending", "areatemp", "arearevoked", "optedout"];
+  const accountKeys = ["dira", "depa", "regb", "repb", "late", "both", "area", "revoked", "ended", "future", "inactiveclub", "disabled", "pending", "areatemp", "arearevoked", "optedout"];
   await prisma.attendeeAccount.createMany({
     data: accountKeys.map((key) => ({
       id: accountOf(key), email: emailOf(key), displayName: `Dlr ${key}`,
@@ -234,6 +244,7 @@ async function main() {
   await grant("regb", clubB, "REGISTRAR");
   await grant("repb", clubB, "REPORTER");
   await grant("both", clubA, "DIRECTOR");
+  await grant("late", clubB, "DIRECTOR");
   await grant("revoked", clubA, "DIRECTOR", { revokedAt: new Date("2026-02-01") });
   await grant("ended", clubA, "DIRECTOR", { effectiveTo: new Date("2026-03-01") });
   await grant("future", clubA, "DIRECTOR", { effectiveFrom: new Date("2027-06-01") });
@@ -250,7 +261,7 @@ async function main() {
     ],
   });
   await prisma.emailAnnouncementOptOut.create({ data: { normalizedEmail: emailOf("optedout"), scope: "ALL", scopeKey: "ALL", source: "verify" } });
-  const included = ["dira", "depa", "regb", "repb", "both", "area"].map(emailOf).sort();
+  const included = ["dira", "depa", "regb", "repb", "late", "both", "area"].map(emailOf).sort();
   const excluded = ["revoked", "ended", "future", "inactiveclub", "disabled", "pending", "areatemp", "arearevoked", "optedout"].map(emailOf);
 
   const baseline = await loadReminderRecipients(prisma, realNow);
@@ -348,9 +359,15 @@ async function main() {
   const sendAudit = await prisma.auditLog.findMany({ where: { entityType: "DeadlineReminderBatch", entityId: dueBatch.id, action: "DEADLINE_REMINDER_SENT" } });
   assert(sendAudit.length === 1 && sendAudit[0].actorUserId === adminId && !JSON.stringify(sendAudit[0]).includes(domain), "one audit row names the approver and holds no addresses");
   const mineIds = rowsSent.filter((row) => row.recipientEmail.endsWith(`@${domain}`)).map((row) => row.id);
+  // Someone opts out of all announcements after staff clicked Send, while the reminder waits in the queue.
+  await prisma.emailAnnouncementOptOut.create({ data: { normalizedEmail: emailOf("late"), scope: "ALL", scopeKey: "ALL", source: "verify" } });
   await deliver(mineIds);
-  assert(included.every((email) => delivered.includes(email)) && excluded.every((email) => !delivered.includes(email)), "delivery reaches the included addresses and no excluded one");
-  assert((await prisma.messageOutbox.findMany({ where: { id: { in: mineIds } } })).every((row) => row.status === "SENT"), "delivered rows are recorded as sent");
+  const deliveredTo = included.filter((email) => email !== emailOf("late"));
+  assert(deliveredTo.every((email) => delivered.includes(email)) && excluded.every((email) => !delivered.includes(email)), "delivery reaches the included addresses and no excluded one");
+  assert(!delivered.includes(emailOf("late")), "an opt-out recorded after Send is honoured at delivery");
+  const lateRow = await prisma.messageOutbox.findFirstOrThrow({ where: { id: { in: mineIds }, recipientEmail: emailOf("late") } });
+  assert(lateRow.status === "SUPPRESSED" && /deadline reminder was not sent/.test(lateRow.lastError ?? ""), `that row ends SUPPRESSED with the reason, got ${lateRow.status}`);
+  assert((await prisma.messageOutbox.findMany({ where: { id: { in: mineIds }, recipientEmail: { not: emailOf("late") } } })).every((row) => row.status === "SENT"), "the others are recorded as sent");
   console.log("ok  nothing is queued before approval; one send queues one email per eligible person and is audited");
 
   const again = await caught(sendReminderBatch(dueBatch.id, { fingerprint: view.fingerprint }, adminId, sameClock));
@@ -374,6 +391,16 @@ async function main() {
   await dismissReminderBatch(dismissed.id, adminId, sameClock);
   await reconcileDeadlineReminders(sameClock);
   assert(JSON.stringify(await mineOf(dismissEntry.id)) === JSON.stringify(["14:DISMISSED"]) && (await outboxOf(dismissed.id)).length === 0, "a dismissed batch stays dismissed and sends nothing");
+  // The deadline's date moves after the 14-day batch was sent: that point is prepared again for the new date; and the
+  // database key is per due date. A dismissed point is prepared again when the entry moves to next year.
+  await prisma.calendarEntry.update({ where: { id: second.id }, data: { startsOn: "2026-12-15", endsOn: "2026-12-15" } });
+  await reconcileDeadlineReminders(new Date("2026-12-02T18:00:00Z")); // the new 14-day point (Dec 1) has come
+  assert(JSON.stringify((await batchesOf(second.id)).map((batch) => `${batch.dueOn}:${batch.daysBefore}:${batch.status}`).sort()) === JSON.stringify(["2026-12-08:14:SENT", "2026-12-15:14:PENDING"]), `a moved deadline gets its point again after a sent batch, got ${JSON.stringify((await batchesOf(second.id)).map((batch) => `${batch.dueOn}:${batch.status}`))}`);
+  await prisma.calendarEntry.update({ where: { id: dismissEntry.id }, data: { startsOn: "2027-12-09", endsOn: "2027-12-09" } });
+  await reconcileDeadlineReminders(new Date("2027-11-26T18:00:00Z"));
+  assert(JSON.stringify((await batchesOf(dismissEntry.id)).map((batch) => `${batch.dueOn}:${batch.status}`).sort()) === JSON.stringify(["2026-12-09:DISMISSED", "2027-12-09:PENDING"]), "an entry moved to next year gets its dismissed point again");
+  const sameDate = await caught(prisma.deadlineReminderBatch.create({ data: { calendarEntryId: second.id, daysBefore: 14, title: second.title, dueOn: "2026-12-15" } }));
+  assert((sameDate as { code?: string } | null)?.code === "P2002", "the key is still per deadline, point and due date");
   // At the 2-day point the sent 14-day batch stays; a 2-day batch is prepared.
   await reconcileDeadlineReminders(new Date("2026-12-03T06:00:00Z"));
   assert(JSON.stringify(await mineOf(due.id)) === JSON.stringify(["14:SENT", "2:PENDING"]), `the 2-day batch follows a sent 14-day one, got ${JSON.stringify(await mineOf(due.id))}`);
@@ -404,25 +431,27 @@ async function main() {
   await edit({ startsOn: addDays(today, 60), endsOn: addDays(today, 60) });
   current = (await batchesOf(live.id))[0];
   assert(current.status === "WITHDRAWN", "a date moved far out withdraws it: its point is not reached");
+  const newest = async () => (await prisma.deadlineReminderBatch.findMany({ where: { calendarEntryId: live.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }))[0];
   await edit({ startsOn: addDays(today, 12), endsOn: addDays(today, 12) });
-  assert((await batchesOf(live.id)).length === 1 && (await batchesOf(live.id))[0].id === liveBatchId && (await batchesOf(live.id))[0].status === "PENDING", "moving it back prepares the same batch again, not a second one");
+  const moved = await batchesOf(live.id);
+  assert(moved.length === 2 && (await newest()).status === "PENDING" && (await newest()).dueOn === addDays(today, 12), "moving it back prepares the point for that date (a batch is per due date); the old date's stays withdrawn");
   await edit({ status: "CANCELLED" });
-  assert((await batchesOf(live.id))[0].status === "WITHDRAWN", "cancelling withdraws it");
+  assert((await newest()).status === "WITHDRAWN", "cancelling withdraws it");
   await edit({ status: "SCHEDULED" });
-  assert((await batchesOf(live.id))[0].status === "PENDING", "restoring it brings it back");
+  assert((await newest()).status === "PENDING", "restoring it brings it back");
   await prisma.calendarEntry.update({ where: { id: live.id }, data: { isHiddenLocally: true } });
   await reconcileDeadlineReminders();
-  assert((await batchesOf(live.id))[0].status === "WITHDRAWN", "hiding withdraws it");
+  assert((await newest()).status === "WITHDRAWN", "hiding withdraws it");
   await prisma.calendarEntry.update({ where: { id: live.id }, data: { isHiddenLocally: false } });
   await reconcileDeadlineReminders();
   await edit({ entryType: "STANDARD" });
-  assert((await batchesOf(live.id))[0].status === "WITHDRAWN", "clearing the Deadline type withdraws it");
+  assert((await newest()).status === "WITHDRAWN", "clearing the Deadline type withdraws it");
   await edit({ entryType: "DEADLINE" });
   const finalBatches = await batchesOf(live.id);
-  assert(finalBatches.length === 1 && finalBatches[0].status === "PENDING", "and marking it again brings back the one batch");
-  assert((await prisma.messageOutbox.count({ where: { idempotencyKey: { startsWith: `deadline-reminder:${liveBatchId}:` } } })) === 0, "through all of it nothing was queued");
-  const edited = await prisma.auditLog.count({ where: { entityType: "DeadlineReminderBatch", entityId: liveBatchId, action: { in: ["DEADLINE_REMINDER_UPDATED", "DEADLINE_REMINDER_WITHDRAWN", "DEADLINE_REMINDER_PREPARED"] } } });
-  assert(edited >= 6, `every change to the batch was audited, got ${edited}`);
+  assert(finalBatches.length === 2 && (await newest()).status === "PENDING" && finalBatches.filter((batch) => batch.status === "PENDING").length === 1, "and marking it again brings back the one waiting batch");
+  assert((await prisma.messageOutbox.count({ where: { idempotencyKey: { startsWith: "deadline-reminder:" }, metadata: { path: ["deadlineReminderBatchId"], equals: liveBatchId } } })) === 0, "through all of it nothing was queued");
+  const edited = await prisma.auditLog.count({ where: { entityType: "DeadlineReminderBatch", action: { in: ["DEADLINE_REMINDER_UPDATED", "DEADLINE_REMINDER_WITHDRAWN", "DEADLINE_REMINDER_PREPARED"] }, entityId: { in: finalBatches.map((batch) => batch.id) } } });
+  assert(edited >= 6, `every change to the batches was audited, got ${edited}`);
   console.log("ok  a changed, cancelled, hidden or un-marked deadline updates or withdraws its waiting batch");
 
   console.log("PASS deadline reminders verified against PostgreSQL");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planFeedSync, hashImportedFields, type FeedDefaults, type StoredFeedEntry } from "@/modules/calendar/feed-plan";
+import { markedDeadlineCount, planFeedSync, hashImportedFields, type FeedDefaults, type StoredFeedEntry } from "@/modules/calendar/feed-plan";
 import { importedFieldNames, parseIcsFeed, type ImportedEntry } from "@/modules/calendar/ics-import";
 
 /**
@@ -61,17 +61,26 @@ describe("a refresh and the type", () => {
   const entries = feed();
   const byUid = (uid: string) => entries.find((entry) => entry.uid === uid)!;
 
-  it("marks an item imported before deadlines existed, once, without touching anything else", () => {
+  it("does not silently re-type an item already on the calendar (imported before deadlines existed)", () => {
     const rows = [stored(byUid("a@d.test"))]; // Standard, though its title says it is due
     const plan = planFeedSync(rows, [byUid("a@d.test")], defaults);
-    expect(plan.updates).toHaveLength(1);
-    expect(plan.updates[0]).toMatchObject({ id: "row-a@d.test", changedFields: ["entryType"], patch: { entryType: "DEADLINE" } });
-    expect(plan.unchanged).toBe(0);
-    // Once applied, the next refresh writes nothing.
-    const applied = [stored(byUid("a@d.test"), { entryType: "DEADLINE" })];
-    const again = planFeedSync(applied, [byUid("a@d.test")], defaults);
-    expect(again.updates).toHaveLength(0);
-    expect(again.unchanged).toBe(1);
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.unchanged).toBe(1);
+    expect(markedDeadlineCount(plan)).toBe(0);
+  });
+
+  it("types it once its title changes in the feed, and counts what was marked", () => {
+    const rows = [stored(byUid("a@d.test"))];
+    const changed = { ...byUid("a@d.test"), title: "Spring Camporee Registration Due (extended)" };
+    const plan = planFeedSync(rows, [changed], defaults);
+    expect(plan.updates[0].patch.entryType).toBe("DEADLINE");
+    expect(markedDeadlineCount(plan)).toBe(1);
+    expect(markedDeadlineCount(planFeedSync([], feed(), defaults))).toBe(3);
+  });
+
+  it("re-reads the rule after reset to source (the hash is cleared)", () => {
+    const rows = [stored(byUid("a@d.test"), { sourceHash: null })];
+    expect(planFeedSync(rows, [byUid("a@d.test")], defaults).updates[0].patch.entryType).toBe("DEADLINE");
   });
 
   it("follows a changed title until staff choose the type", () => {

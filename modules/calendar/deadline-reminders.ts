@@ -15,6 +15,7 @@ import {
 } from "@/modules/calendar/deadlines";
 import { siteBaseUrl } from "@/modules/calendar/subscribe";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { deadlineRemindersHonourAnnouncementOptOut } from "@/modules/communications/email-preferences";
 
 /**
  * Deadline reminders (#910). Every published, visible, scheduled Deadline entry
@@ -117,7 +118,7 @@ export async function loadReminderRecipients(client: Db, now: Date): Promise<Rem
   for (const grant of areaGrants) add(grant.attendeeAccount, "AREA");
 
   const emails = [...byEmail.keys()];
-  const optOuts = emails.length === 0
+  const optOuts = emails.length === 0 || !deadlineRemindersHonourAnnouncementOptOut()
     ? []
     : await client.emailAnnouncementOptOut.findMany({
       where: { normalizedEmail: { in: emails }, scope: "ALL" },
@@ -235,9 +236,26 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
     for (const [entryId, point] of points) {
       const entry = known.get(entryId)!;
       const snapshot = { title: entry.title, dueOn: entry.endsOn, linkUrl: entry.linkUrl };
-      const batch = existing.find((candidate) => candidate.calendarEntryId === entryId && candidate.daysBefore === point);
-      if (!batch) {
+      const forPoint = existing.filter((candidate) => candidate.calendarEntryId === entryId && candidate.daysBefore === point);
+      // A batch is per due date: if the date moved, an earlier due date's SENT or DISMISSED batch is history and this
+      // date gets its own; a still-waiting batch for the old date simply moves along.
+      const target = forPoint.find((candidate) => candidate.dueOn === snapshot.dueOn);
+      const movable = target ? undefined : forPoint.find((candidate) => candidate.status === "PENDING");
+      let activeId: string;
+      if (movable) {
+        activeId = movable.id;
+        await tx.deadlineReminderBatch.update({ where: { id: movable.id }, data: snapshot });
+        result.updated += 1;
+        await writeAuditLog({
+          action: "DEADLINE_REMINDER_UPDATED",
+          entityType: "DeadlineReminderBatch",
+          entityId: movable.id,
+          summary: `Updated the ${point}-day reminder for "${entry.title}" to follow the deadline.`,
+          metadata: { daysBefore: point, previousDueOn: movable.dueOn, dueOn: entry.endsOn },
+        }, tx);
+      } else if (!target) {
         const created = await tx.deadlineReminderBatch.create({ data: { calendarEntryId: entryId, daysBefore: point, ...snapshot } });
+        activeId = created.id;
         result.prepared += 1;
         await writeAuditLog({
           action: "DEADLINE_REMINDER_PREPARED",
@@ -246,36 +264,40 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
           summary: `Prepared the ${point}-day reminder for "${entry.title}". It waits for staff to send it.`,
           metadata: { daysBefore: point, dueOn: entry.endsOn },
         }, tx);
-        continue;
-      }
-      if (batch.status === "PENDING") {
-        if (batch.title !== snapshot.title || batch.dueOn !== snapshot.dueOn || batch.linkUrl !== snapshot.linkUrl) {
-          await tx.deadlineReminderBatch.update({ where: { id: batch.id }, data: snapshot });
-          result.updated += 1;
+      } else {
+        activeId = target.id;
+        if (target.status === "PENDING") {
+          if (target.title !== snapshot.title || target.linkUrl !== snapshot.linkUrl) {
+            await tx.deadlineReminderBatch.update({ where: { id: target.id }, data: snapshot });
+            result.updated += 1;
+            await writeAuditLog({
+              action: "DEADLINE_REMINDER_UPDATED",
+              entityType: "DeadlineReminderBatch",
+              entityId: target.id,
+              summary: `Updated the ${point}-day reminder for "${entry.title}" to follow the deadline.`,
+              metadata: { daysBefore: point, dueOn: entry.endsOn },
+            }, tx);
+          }
+        } else if (target.status === "WITHDRAWN") {
+          // The deadline qualifies again (un-hidden, un-cancelled, moved back): the same batch is prepared once more.
+          await tx.deadlineReminderBatch.update({
+            where: { id: target.id },
+            data: { ...snapshot, status: "PENDING", statusReason: null, decidedAt: null, decidedByUserId: null, preparedAt: new Date() },
+          });
+          result.prepared += 1;
           await writeAuditLog({
-            action: "DEADLINE_REMINDER_UPDATED",
+            action: "DEADLINE_REMINDER_PREPARED",
             entityType: "DeadlineReminderBatch",
-            entityId: batch.id,
-            summary: `Updated the ${point}-day reminder for "${entry.title}" to follow the deadline.`,
-            metadata: { daysBefore: point, previousDueOn: batch.dueOn, dueOn: entry.endsOn },
+            entityId: target.id,
+            summary: `Prepared the ${point}-day reminder for "${entry.title}" again. It waits for staff to send it.`,
+            metadata: { daysBefore: point, dueOn: entry.endsOn, revived: true },
           }, tx);
         }
-      } else if (batch.status === "WITHDRAWN") {
-        // The deadline qualifies again (un-hidden, un-cancelled, moved back): the same batch is prepared once more.
-        await tx.deadlineReminderBatch.update({
-          where: { id: batch.id },
-          data: { ...snapshot, status: "PENDING", statusReason: null, decidedAt: null, decidedByUserId: null, preparedAt: new Date() },
-        });
-        result.prepared += 1;
-        await writeAuditLog({
-          action: "DEADLINE_REMINDER_PREPARED",
-          entityType: "DeadlineReminderBatch",
-          entityId: batch.id,
-          summary: `Prepared the ${point}-day reminder for "${entry.title}" again. It waits for staff to send it.`,
-          metadata: { daysBefore: point, dueOn: entry.endsOn, revived: true },
-        }, tx);
+        // SENT and DISMISSED are final for this due date: the same deadline, point and date are never prepared twice.
       }
-      // SENT and DISMISSED are final: the same deadline and point are never prepared twice.
+      for (const other of forPoint.filter((candidate) => candidate.id !== activeId && candidate.status === "PENDING")) {
+        await withdraw(other, "The due date moved; this reminder was replaced.");
+      }
     }
     return result;
   }, { timeout: 30_000, maxWait: 10_000 });
@@ -290,7 +312,9 @@ export type PendingReminderBatch = {
   linkUrl: string | null;
   preparedAt: string;
   subject: string;
+  /** The email as a club role holder reads it, and as an Area Coordinator reads it. */
   bodyText: string;
+  areaBodyText: string;
   recipientCount: number;
   clubRecipients: number;
   areaRecipients: number;
@@ -302,6 +326,8 @@ export type PendingReminders = {
   batches: PendingReminderBatch[];
   /** False when account email is not set up on this server, so Send would refuse. */
   emailConfigured: boolean;
+  /** Published Deadlines that repeat: listed for clubs but given no reminder emails. */
+  repeatingDeadlines: number;
 };
 
 function portalUrl(audience: ReminderAudience) {
@@ -324,15 +350,20 @@ function messageFor(batch: { title: string; dueOn: string; linkUrl: string | nul
 export async function listPendingReminderBatches(now = new Date()): Promise<PendingReminders> {
   const prisma = getPrisma();
   const today = calendarDateIn(now);
-  const [batches, audience] = await Promise.all([
+  const [batches, audience, repeatingDeadlines] = await Promise.all([
     prisma.deadlineReminderBatch.findMany({ where: { status: "PENDING" }, orderBy: [{ dueOn: "asc" }, { daysBefore: "asc" }, { id: "asc" }] }),
     loadReminderRecipients(prisma, now),
+    prisma.calendarEntry.count({
+      where: { entryType: "DEADLINE", repeatRule: { not: null }, isPublished: true, isHiddenLocally: false, sourceRemovedAt: null, status: { not: "CANCELLED" } },
+    }),
   ]);
   const emailConfigured = isAccountEmailConfigured();
   return {
     emailConfigured,
+    repeatingDeadlines,
     batches: batches.map((batch) => {
       const preview = messageFor(batch, { name: "[recipient name]", audience: "CLUB" }, today);
+      const areaPreview = messageFor(batch, { name: "[recipient name]", audience: "AREA" }, today);
       return {
         id: batch.id,
         title: batch.title,
@@ -343,6 +374,7 @@ export async function listPendingReminderBatches(now = new Date()): Promise<Pend
         preparedAt: batch.preparedAt.toISOString(),
         subject: preview.subject,
         bodyText: preview.bodyText,
+        areaBodyText: areaPreview.bodyText,
         recipientCount: audience.recipients.length,
         clubRecipients: audience.recipients.filter((recipient) => recipient.audience === "CLUB").length,
         areaRecipients: audience.recipients.filter((recipient) => recipient.audience === "AREA").length,
@@ -392,7 +424,8 @@ export async function sendReminderBatch(
       : null;
     const reason = ineligibleReason(entry ?? undefined, today);
     const point = entry && !reason ? reminderPointFor(entry.endsOn, today) : null;
-    if (reason || point !== batch.daysBefore) {
+    // A batch belongs to one due date: if it moved, this reminder is withdrawn (the next run prepares one for the new date).
+    if (reason || point !== batch.daysBefore || entry!.endsOn !== batch.dueOn) {
       await tx.deadlineReminderBatch.update({
         where: { id: batch.id },
         data: { status: "WITHDRAWN", statusReason: reason ?? "The due date moved; this reminder no longer applies.", decidedAt: now },
@@ -416,7 +449,7 @@ export async function sendReminderBatch(
       ...current,
       recipientEmails: audience.recipients.map((recipient) => recipient.email),
     });
-    if (batch.title !== current.title || batch.dueOn !== current.dueOn || batch.linkUrl !== current.linkUrl) {
+    if (batch.title !== current.title || batch.linkUrl !== current.linkUrl) {
       await tx.deadlineReminderBatch.update({ where: { id: batch.id }, data: current });
     }
     if (fingerprint !== approval.fingerprint) return { kind: "changed" as const };

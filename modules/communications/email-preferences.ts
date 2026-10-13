@@ -20,6 +20,17 @@ export type AnnouncementOptOutScope = "EVENT" | "ALL";
 
 export const ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY = "EVENT_ANNOUNCEMENT";
 
+/** The deadline reminder (#910): event-less mail to club role holders and Area Coordinators. */
+export const DEADLINE_REMINDER_TEMPLATE_KEY = "DEADLINE_REMINDER";
+
+/**
+ * Whether deadline reminders honour an opt-out of ALL IMSDA Events announcements, both when staff preview and send a
+ * batch and again at delivery. The one switch for that decision: return false here and reminders ignore opt-outs.
+ */
+export function deadlineRemindersHonourAnnouncementOptOut() {
+  return true;
+}
+
 /** Only these template keys can be opted out of. Everything else is sent regardless. */
 export function isOptOutEligibleTemplate(templateKey: string) {
   return templateKey === ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY;
@@ -70,6 +81,11 @@ export const ANNOUNCEMENT_OPT_OUT_REASON = {
   EVENT: "Opted out of this event's announcements",
   ALL: "Opted out of all IMSDA Events announcements",
 } as const satisfies Record<AnnouncementOptOutScope, string>;
+
+/** Why a deadline reminder was not sent, as recorded on the outbox row. */
+export function reminderOptOutSkipMessage(scope: AnnouncementOptOutScope) {
+  return `${ANNOUNCEMENT_OPT_OUT_REASON[scope]}; the deadline reminder was not sent.`;
+}
 
 /** Why a message was not sent, as recorded on the outbox row. */
 export function announcementOptOutSkipMessage(scope: AnnouncementOptOutScope) {

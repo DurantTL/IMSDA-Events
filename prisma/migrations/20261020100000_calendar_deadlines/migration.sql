@@ -29,8 +29,8 @@ CREATE TABLE "DeadlineReminderBatch" (
     CONSTRAINT "DeadlineReminderBatch_daysBefore_check" CHECK ("daysBefore" IN (14, 2))
 );
 
--- A deadline and reminder point are never prepared twice.
-CREATE UNIQUE INDEX "DeadlineReminderBatch_calendarEntryId_daysBefore_key" ON "DeadlineReminderBatch"("calendarEntryId", "daysBefore");
+-- A deadline, reminder point and due date are never prepared twice. A deadline whose due date moves gets its points prepared again for the new date.
+CREATE UNIQUE INDEX "DeadlineReminderBatch_calendarEntryId_daysBefore_dueOn_key" ON "DeadlineReminderBatch"("calendarEntryId", "daysBefore", "dueOn");
 
 CREATE INDEX "DeadlineReminderBatch_status_dueOn_idx" ON "DeadlineReminderBatch"("status", "dueOn");
 

@@ -47,6 +47,7 @@ vi.mock("@/lib/prisma", () => {
     calendarEntry: {
       findMany: async ({ where }: { where?: Record<string, unknown> }) => state.entries.filter((row) => matches(row, where)),
       findUnique: async ({ where }: { where: { id: string } }) => state.entries.find((row) => row.id === where.id) ?? null,
+      count: async () => state.entries.filter((row) => row.entryType === "DEADLINE" && row.repeatRule !== null).length,
     },
     deadlineReminderBatch: {
       findMany: async ({ where }: { where?: Record<string, unknown> }) => state.batches.filter((row) => matches(row, where)).map((row) => ({ ...row })),
@@ -55,8 +56,8 @@ vi.mock("@/lib/prisma", () => {
         return found ? { ...found } : null;
       },
       create: async ({ data }: { data: Record<string, unknown> }) => {
-        if (state.batches.some((row) => row.calendarEntryId === data.calendarEntryId && row.daysBefore === data.daysBefore)) {
-          throw new Error("Unique constraint failed on (calendarEntryId, daysBefore)");
+        if (state.batches.some((row) => row.calendarEntryId === data.calendarEntryId && row.daysBefore === data.daysBefore && row.dueOn === data.dueOn)) {
+          throw new Error("Unique constraint failed on (calendarEntryId, daysBefore, dueOn)");
         }
         const row = { id: `batch-${state.nextId++}`, status: "PENDING", statusReason: null, decidedAt: null, decidedByUserId: null, recipientCount: null, optedOutCount: null, preparedAt: new Date("2026-01-01T00:00:00Z"), ...data };
         state.batches.push(row);
@@ -211,15 +212,15 @@ describe("a pending batch follows its deadline before staff send it", () => {
     expect(state.batches).toHaveLength(1);
   });
 
-  it("is withdrawn when the date moves far enough that the point is not reached, and comes back when it is", async () => {
+  it("is withdrawn when the date moves far enough that the point is not reached, and the new date is prepared when it is", async () => {
     state.entries = [entry({ startsOn: "2027-02-01", endsOn: "2027-02-01" })];
     await reconcileDeadlineReminders(at("2026-11-26T18:00:00Z"));
     expect(pending()).toHaveLength(0);
     expect(state.batches[0].status).toBe("WITHDRAWN");
     await reconcileDeadlineReminders(at("2027-01-18T18:00:00Z")); // 14 days before Feb 1
     expect(pending()).toHaveLength(1);
-    expect(state.batches).toHaveLength(1); // the same row, prepared again
-    expect(state.batches[0]).toMatchObject({ status: "PENDING", dueOn: "2027-02-01", statusReason: null });
+    // A batch belongs to one due date: the old date's batch stays withdrawn and the new date gets its own.
+    expect(state.batches.map((row) => `${row.dueOn}:${row.status}`).sort()).toEqual(["2026-12-05:WITHDRAWN", "2027-02-01:PENDING"]);
   });
 
   it.each([
@@ -323,12 +324,26 @@ describe("the approval gate", () => {
     expect(state.batches[0].status).toBe("WITHDRAWN");
   });
 
-  it("refuses with a new date in the preview when the due date changed since", async () => {
+  it("withdraws instead of sending when the due date moved after the preview; the next run prepares one for the new date", async () => {
     const batch = await prepared();
     state.entries = [entry({ startsOn: "2026-12-08", endsOn: "2026-12-08" })];
-    await expect(sendReminderBatch(batch.id, { fingerprint: batch.fingerprint }, "admin-1", now)).rejects.toMatchObject({ code: "BATCH_CHANGED" });
+    await expect(sendReminderBatch(batch.id, { fingerprint: batch.fingerprint }, "admin-1", now)).rejects.toMatchObject({ code: "BATCH_WITHDRAWN" });
     expect(state.outbox).toHaveLength(0);
-    expect(state.batches[0].dueOn).toBe("2026-12-08");
+    expect(state.batches[0].status).toBe("WITHDRAWN");
+    await reconcileDeadlineReminders(now);
+    expect(state.batches.map((row) => `${row.dueOn}:${row.status}`).sort()).toEqual(["2026-12-05:WITHDRAWN", "2026-12-08:PENDING"]);
+  });
+
+  it("asks for confirmation data only once per batch: a repeating deadline is counted for the staff notice", async () => {
+    state.entries = [entry(), entry({ id: "repeats", repeatRule: "FREQ=MONTHLY" })];
+    expect((await listPendingReminderBatches(now)).repeatingDeadlines).toBe(1);
+  });
+
+  it("shows staff both the club and the Area Coordinator wording", async () => {
+    const batch = await prepared();
+    expect(batch.bodyText).toContain("club portal");
+    expect(batch.areaBodyText).toContain("clubs in your area");
+    expect(batch.areaBodyText).toContain("/account/area-clubs/overview");
   });
 
   it("refuses when account email is not set up, and when nobody would receive it", async () => {
@@ -354,6 +369,43 @@ describe("the approval gate", () => {
     expect(state.outbox).toHaveLength(0);
     await expect(dismissReminderBatch(batch.id, "admin-1", now)).rejects.toBeInstanceOf(DeadlineReminderError);
     await expect(sendReminderBatch("missing", { fingerprint: "0".repeat(64) }, "admin-1", now)).rejects.toMatchObject({ code: "BATCH_NOT_FOUND" });
+  });
+});
+
+describe("a deadline whose date moves after a reminder was decided (#910)", () => {
+  it("prepares the point again for the new date after a sent 14-day batch, and never twice for that date", async () => {
+    const now = at("2026-11-25T18:00:00Z");
+    await reconcileDeadlineReminders(now);
+    const first = (await listPendingReminderBatches(now)).batches[0];
+    await sendReminderBatch(first.id, { fingerprint: first.fingerprint }, "admin-1", now);
+    expect(state.batches[0]).toMatchObject({ status: "SENT", dueOn: "2026-12-05" });
+    // The deadline moves a week later: its 14-day point (Nov 29) has not come, so nothing yet.
+    state.entries = [entry({ startsOn: "2026-12-12", endsOn: "2026-12-12" })];
+    await reconcileDeadlineReminders(now);
+    expect(state.batches).toHaveLength(1);
+    // At the new 14-day point a fresh batch is prepared for the new date; the sent one is history.
+    const later = at("2026-11-29T18:00:00Z");
+    await Promise.all([reconcileDeadlineReminders(later), reconcileDeadlineReminders(later)]);
+    await reconcileDeadlineReminders(later);
+    expect(state.batches.map((row) => `${row.dueOn}:${row.daysBefore}:${row.status}`).sort()).toEqual(["2026-12-05:14:SENT", "2026-12-12:14:PENDING"]);
+    expect(state.outbox).toHaveLength(3);
+  });
+
+  it("prepares a dismissed point again when the entry moves to next year", async () => {
+    const now = at("2026-11-25T18:00:00Z");
+    await reconcileDeadlineReminders(now);
+    await dismissReminderBatch(state.batches[0].id as string, "admin-1", now);
+    state.entries = [entry({ startsOn: "2027-12-05", endsOn: "2027-12-05" })];
+    await reconcileDeadlineReminders(at("2027-11-21T18:00:00Z"));
+    expect(state.batches.map((row) => `${row.dueOn}:${row.daysBefore}:${row.status}`).sort()).toEqual(["2026-12-05:14:DISMISSED", "2027-12-05:14:PENDING"]);
+  });
+
+  it("moves a waiting batch along with its deadline instead of leaving two", async () => {
+    await reconcileDeadlineReminders(at("2026-11-25T18:00:00Z"));
+    state.entries = [entry({ startsOn: "2026-12-07", endsOn: "2026-12-07" })];
+    await reconcileDeadlineReminders(at("2026-11-26T18:00:00Z"));
+    expect(state.batches).toHaveLength(1);
+    expect(state.batches[0]).toMatchObject({ dueOn: "2026-12-07", status: "PENDING" });
   });
 });
 

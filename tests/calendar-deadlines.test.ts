@@ -27,7 +27,8 @@ describe("which imported titles are deadlines (#910)", () => {
     "DUE: Points report",
     "Camporee Registration Deadline",
     "Nomination deadlines",
-    "Honors due to the conference office by Friday",
+    "Reports due at noon",
+    "Forms are due Friday",
   ])("marks %j as a deadline", (title) => {
     expect(titleSaysDue(title)).toBe(true);
     expect(autoEntryType(title, "STANDARD")).toBe("DEADLINE");
@@ -42,6 +43,9 @@ describe("which imported titles are deadlines (#910)", () => {
     "Conference office closed due to weather",
     "Camporee postponed due to snow",
     "Event cancelled due to low enrollment",
+    "Due to Labor Day, office closed",
+    "No meetings due to holiday",
+    "Honors due to the conference office by Friday",
     "",
   ])("leaves %j an ordinary entry", (title) => {
     expect(titleSaysDue(title)).toBe(false);
@@ -183,6 +187,11 @@ describe("the reminder email (#910)", () => {
     expect(buildDeadlineReminderEmail({ ...base, today: "2026-12-03" }).bodyText).toContain("(in 2 days)");
     expect(buildDeadlineReminderEmail({ ...base, today: "2026-12-04" }).bodyText).toContain("(tomorrow)");
     expect(buildDeadlineReminderEmail({ ...base, today: "2026-12-05" }).bodyText).toContain("is due today, Saturday, December 5, 2026.");
+  });
+
+  it("includes only an https link", () => {
+    expect(buildDeadlineReminderEmail({ ...base, today: "2026-12-03", linkUrl: "http://example.test/register" }).bodyText).not.toContain("More details");
+    expect(buildDeadlineReminderEmail({ ...base, today: "2026-12-03", linkUrl: "javascript:alert(1)" }).bodyText).not.toContain("javascript");
   });
 
   it("includes the deadline's link when there is one", () => {

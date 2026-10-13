@@ -5559,8 +5559,9 @@ model CalendarEntry {
 
 /// One reminder for one deadline at one reminder point, 14 or 2 days before it is
 /// due (#910). Prepared automatically; emailed only after staff approve it. The
-/// unique key means a deadline and reminder point are never prepared twice, and a
-/// sent batch is final. `title`, `dueOn` and `linkUrl` follow the entry while the
+/// unique key means a deadline, reminder point and due date are never prepared
+/// twice, and a sent batch is final for that due date (a deadline that moves gets
+/// its points prepared again for the new date). `title`, `dueOn` and `linkUrl` follow the entry while the
 /// batch is pending and are frozen once it is decided.
 model DeadlineReminderBatch {
   id                String                 @id @default(cuid())
@@ -5584,7 +5585,7 @@ model DeadlineReminderBatch {
 
   calendarEntry CalendarEntry? @relation(fields: [calendarEntryId], references: [id], onDelete: SetNull)
 
-  @@unique([calendarEntryId, daysBefore])
+  @@unique([calendarEntryId, daysBefore, dueOn])
   @@index([status, dueOn])
 }
 

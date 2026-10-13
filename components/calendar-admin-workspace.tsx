@@ -108,7 +108,7 @@ export function CalendarAdminWorkspace({
   initialEntries,
   initialEvents,
   initialFeeds = [],
-  initialReminders = { batches: [], emailConfigured: true },
+  initialReminders = { batches: [], emailConfigured: true, repeatingDeadlines: 0 },
 }: {
   initialEntries: CalendarAdminEntry[];
   initialEvents: CalendarAdminEvent[];
@@ -628,6 +628,7 @@ function EntryForm({
   const [startsOn, setStartsOn] = useState(entry?.startsOn ?? "");
   const [repeat, setRepeat] = useState<RepeatDraft>(entry ? repeatToDraft(entry.repeat) : noRepeat);
   const [skipped, setSkipped] = useState<string[]>(entry?.repeatExceptions ?? []);
+  const [entryType, setEntryType] = useState<EntryBody["entryType"]>(entry?.entryType ?? "STANDARD");
   const editing = entry !== null;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -654,6 +655,7 @@ function EntryForm({
       setStartsOn("");
       setRepeat(noRepeat);
       setSkipped([]);
+      setEntryType("STANDARD");
       formElement.reset();
     }
   }
@@ -700,7 +702,7 @@ function EntryForm({
         </label>
         <label>
           Type
-          <select defaultValue={entry?.entryType ?? "STANDARD"} name="entryType">
+          <select name="entryType" onChange={(event) => setEntryType(event.target.value as EntryBody["entryType"])} value={entryType}>
             <option value="STANDARD">Conference date</option>
             <option value="CLOSURE">{closureLabel} (e.g. conference office closed)</option>
             <option value="DEADLINE">Deadline (clubs only, not on the public calendar)</option>
@@ -714,6 +716,9 @@ function EntryForm({
         </label>
       </div>
       <RepeatEditor draft={repeat} onChange={setRepeat} onSkippedChange={setSkipped} skipped={skipped} startsOn={startsOn} />
+      {entryType === "DEADLINE" && repeat.frequency !== "NEVER" && (
+        <p className="calendar-repeat-hint" role="note">Repeating deadlines are listed for clubs but don&apos;t get reminder emails.</p>
+      )}
       <label>
         Link for more information (optional)
         <input defaultValue={entry?.linkUrl ?? ""} maxLength={500} name="linkUrl" placeholder="https://" type="url" />

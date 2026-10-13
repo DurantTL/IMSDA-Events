@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Send, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatDateRange } from "@/modules/calendar/domain";
 import type { PendingReminderBatch, PendingReminders } from "@/modules/calendar/deadline-reminders";
 
@@ -23,6 +24,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [dismissTarget, setDismissTarget] = useState<PendingReminderBatch | null>(null);
 
   // The tab's badge follows the list as batches are sent or set aside.
   useEffect(() => { onCountChange?.(state.batches.length); }, [onCountChange, state.batches.length]);
@@ -30,7 +32,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
   async function refresh() {
     const response = await fetch("/api/admin/calendar/deadline-reminders");
     const result = await response.json().catch(() => ({})) as ApiResult;
-    if (response.ok && result.batches) setState({ batches: result.batches, emailConfigured: result.emailConfigured ?? false });
+    if (response.ok && result.batches) setState({ batches: result.batches, emailConfigured: result.emailConfigured ?? false, repeatingDeadlines: result.repeatingDeadlines ?? 0 });
   }
 
   async function act(batch: PendingReminderBatch, body: { action: "send"; fingerprint: string } | { action: "dismiss" }) {
@@ -75,6 +77,12 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
       {!state.emailConfigured && (
         <div className="inline-notice error" role="alert">Account email isn&apos;t set up on this server, so reminders can&apos;t be sent yet.</div>
       )}
+      {state.repeatingDeadlines > 0 && (
+        <div className="inline-notice" role="note">
+          Repeating deadlines are listed for clubs but don&apos;t get reminder emails.
+          {" "}{state.repeatingDeadlines === 1 ? "One deadline repeats." : `${state.repeatingDeadlines} deadlines repeat.`}
+        </div>
+      )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {state.batches.length === 0 ? (
@@ -99,7 +107,10 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
                   <details>
                     <summary>Preview the email</summary>
                     <p><strong>Subject:</strong> {batch.subject}</p>
+                    <p className="field-help">Club directors and other club roles ({batch.clubRecipients}) read:</p>
                     <pre className="deadline-reminder-preview">{batch.bodyText}</pre>
+                    <p className="field-help">Area Coordinators ({batch.areaRecipients}) read:</p>
+                    <pre className="deadline-reminder-preview">{batch.areaBodyText}</pre>
                   </details>
                 </div>
                 <div className="calendar-admin-actions">
@@ -111,7 +122,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
                   >
                     <Send aria-hidden="true" size={14} /> {busy ? "Sending…" : `Send to ${batch.recipientCount}`}
                   </button>
-                  <button className="secondary-button" disabled={busy} onClick={() => void act(batch, { action: "dismiss" })} type="button">
+                  <button className="secondary-button" disabled={busy} onClick={() => { setError(""); setDismissTarget(batch); }} type="button">
                     <X aria-hidden="true" size={14} /> Don&apos;t send
                   </button>
                 </div>
@@ -120,6 +131,21 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
           })}
         </ul>
       )}
+      <ConfirmDialog
+        busy={busyId !== null}
+        confirmLabel="Don't send it"
+        error={error}
+        onCancel={() => setDismissTarget(null)}
+        onConfirm={() => {
+          const target = dismissTarget;
+          if (!target) return;
+          void act(target, { action: "dismiss" }).then(() => setDismissTarget(null));
+        }}
+        open={dismissTarget !== null}
+        title={dismissTarget ? `Don't send the ${dismissTarget.daysBefore}-day reminder for "${dismissTarget.title}"?` : "Don't send?"}
+      >
+        <p>Nobody is emailed, and this reminder is not prepared again for this due date. If the due date moves, a new reminder is prepared for the new date.</p>
+      </ConfirmDialog>
     </section>
   );
 }
