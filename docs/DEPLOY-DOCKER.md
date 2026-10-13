@@ -357,7 +357,7 @@ cat > /etc/cron.d/imsda-xcloud-touch <<'EOF'
 # Keep the persistent xCloud runtime override files from being swept by
 # /root/xcloud-cleanup.sh's blanket "delete anything in .xcloud/ older than
 # 30 days" logic — see docs/DEPLOY-DOCKER.md for why these files must persist.
-0 5 * * * root touch /home/u_events/.xcloud/.env /home/u_events/.xcloud/.env.dburl /home/u_events/.xcloud/docker-compose.yml /home/u_events/.xcloud/docker-compose.env.yml 2>/dev/null
+0 5 * * * root touch -c /home/u_events/.xcloud/.env /home/u_events/.xcloud/.env.dburl /home/u_events/.xcloud/docker-compose.yml /home/u_events/.xcloud/docker-compose.env.yml 2>/dev/null
 EOF
 chmod 644 /etc/cron.d/imsda-xcloud-touch
 ```
@@ -367,9 +367,11 @@ restart needed. Verify with `cat /etc/cron.d/imsda-xcloud-touch` (expect 4
 lines: 3 comment lines + 1 cron line) or `cat -A` if a terminal seems to be
 wrapping the line and you want to confirm it wasn't actually truncated.
 
-If `docker-compose.yml` doesn't currently exist on the host (see the
-incident below), that particular path in the `touch` command is a harmless
-no-op until the file is restored — leave it in the list as-is.
+`touch -c` never creates a file. A plain `touch` re-creates a file the
+cleanup already deleted as an **empty** file, which hides the loss: an empty
+`.env` starts an app with no secrets, and it refuses to run. That is how the
+2026-10-13 outage began. If an earlier version of this job is installed,
+replace its line with the one above.
 
 ### When the Dockerfile-only site stops regenerating `docker-compose.yml` at all
 
