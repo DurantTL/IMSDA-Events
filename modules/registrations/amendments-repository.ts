@@ -38,7 +38,8 @@ import {
 } from "@/modules/promo-codes/domain";
 import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
 import { adjustmentTotalCents } from "@/modules/registrations/adjustments";
-import { syncFormMealSelections } from "@/modules/meals/selection-repository";
+import { cancelMealSelectionsForAttendees, syncFormMealSelections } from "@/modules/meals/selection-repository";
+import { MealError } from "@/modules/meals/errors";
 import { lockRegistrationLodging, recomputeChurchShare } from "@/modules/lodging/preferences-service";
 import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/modules/registrations/amendment-answers";
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
@@ -217,6 +218,13 @@ export type RegistrationAmendmentErrorCode =
   | "QUOTE_CHANGED"
   | "IDEMPOTENCY_KEY_REUSED"
   | "AMENDMENT_CONFLICT";
+
+/** A meal problem inside an amendment is a clear conflict (or "refund first"), never a 500. */
+function mealErrorToAmendment(error: unknown) {
+  if (!(error instanceof MealError)) return error;
+  const refundFirst = error.code === "TOTAL_BELOW_PAID" || error.code === "TOTAL_BELOW_ZERO";
+  return new RegistrationAmendmentError(refundFirst ? "PAYMENT_ADJUSTMENT_REQUIRED" : "AMENDMENT_CONFLICT", error.message);
+}
 
 export class RegistrationAmendmentError extends Error {
   constructor(
@@ -1515,7 +1523,20 @@ export async function amendRegistration(
           where: { registrationId, releasedAt: null },
           data: { releasedAt: now },
         });
+        // Meals (#210): a removed attendee's active meal selections are cancelled and credited at the price charged, before the
+        // attendee row goes. The credit posts to the registration as MEAL lines, so the final total below carries it.
+        let mealCreditCents = 0;
         if (prepared.removedAttendees.length > 0) {
+          try {
+            mealCreditCents = await cancelMealSelectionsForAttendees(tx, {
+              eventId,
+              registrationId,
+              attendeeIds: prepared.removedAttendees.map((attendee) => attendee.id),
+              actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
+            });
+          } catch (error) {
+            throw mealErrorToAmendment(error);
+          }
           try {
             await tx.registrationAttendee.deleteMany({
               where: {
@@ -1665,15 +1686,19 @@ export async function amendRegistration(
 
         // Meal tickets (#210): the form re-priced them above, so the meal selections follow the answers (history and
         // ledger entries only; the registration total is already the amended one).
-        await syncFormMealSelections(tx, {
-          eventId,
-          registrationId,
-          formVersionId: prepared.registration.publicFormSubmission!.formVersionId,
-          responses: prepared.prepared.registrationResponses,
-          lineItems: prepared.nextPricingSnapshot.lineItems,
-          previousResponses: prepared.currentRegistrationResponses,
-          actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
-        });
+        try {
+          await syncFormMealSelections(tx, {
+            eventId,
+            registrationId,
+            formVersionId: prepared.registration.publicFormSubmission!.formVersionId,
+            responses: prepared.prepared.registrationResponses,
+            lineItems: prepared.nextPricingSnapshot.lineItems,
+            previousResponses: prepared.currentRegistrationResponses,
+            actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
+          });
+        } catch (error) {
+          throw mealErrorToAmendment(error);
+        }
 
         if (serverOptions.inTransaction) await serverOptions.inTransaction(tx);
         // A team's registration keeps its event's team rules however it is changed, by a director or by staff (#809).
@@ -1690,7 +1715,7 @@ export async function amendRegistration(
         await tx.registration.update({
           where: { id: registrationId },
           data: {
-            totalAmount: prepared.finalTotalCents / 100,
+            totalAmount: Math.max(prepared.finalTotalCents + mealCreditCents, 0) / 100,
             ...(prepared.locationChange ? { locationId: prepared.locationChange.to } : {}),
           },
         });

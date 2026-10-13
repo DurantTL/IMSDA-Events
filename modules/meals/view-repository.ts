@@ -1,7 +1,9 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { mealTicketCsvHeader, mealTicketCsvRow, type MealTicketRow } from "@/modules/meals/domain";
+import { MealError } from "@/modules/meals/errors";
+import { loadTicketPrices } from "@/modules/meals/config-repository";
+import { mealPriceDrift, mealTicketCsvHeader, mealTicketCsvRow, type MealTicketRow } from "@/modules/meals/domain";
 import { toCsv } from "@/modules/reporting/csv";
 
 function record(value: unknown): Record<string, unknown> {
@@ -33,6 +35,17 @@ export async function loadMealView(eventId: string) {
       },
     }),
   ]);
+  // A form whose ticket prices differ from the ticket plan sells at a price the plan no longer has (#210).
+  const ticketPrices = await loadTicketPrices(prisma, eventId);
+  const forms = ticketPrices.size === 0 ? [] : await prisma.registrationForm.findMany({
+    where: { eventId, status: { not: "ARCHIVED" } },
+    select: { name: true, versions: { where: { status: { in: ["DRAFT", "PUBLISHED"] } }, select: { status: true, definition: true } } },
+  });
+  const formWarnings = forms.flatMap((form) => form.versions.flatMap((version) => {
+    const definition = record(version.definition) as { sections?: Array<{ fields?: Array<Record<string, unknown>> }> };
+    const keys = mealPriceDrift({ sections: (definition.sections ?? []).map((section) => ({ fields: (section.fields ?? []) as never[] })) }, ticketPrices);
+    return keys.length > 0 ? [{ formName: form.name, status: version.status as "DRAFT" | "PUBLISHED", fieldKeys: keys }] : [];
+  }));
   const pinned = new Map<string, number>();
   const totals = new Map<string, number>();
   for (const row of activeSelections) {
@@ -41,6 +54,7 @@ export async function loadMealView(eventId: string) {
     totals.set(key, (totals.get(key) ?? 0) + row.quantity);
   }
   return {
+    formWarnings,
     services: services.map((service) => ({
       id: service.id, name: service.name, mealType: service.mealType, serviceDate: service.serviceDate, startTime: service.startTime,
       endTime: service.endTime, location: service.location, ticketing: service.ticketing, capacity: service.capacity, status: service.status,
@@ -69,6 +83,8 @@ export type MealView = Awaited<ReturnType<typeof loadMealView>>;
 
 /** One registration's meal selections with their full change and ledger history, for Finance and registration detail. */
 export async function loadRegistrationMeals(eventId: string, registrationId: string) {
+  const registration = await getPrisma().registration.findFirst({ where: { id: registrationId, eventId }, select: { id: true } });
+  if (!registration) throw new MealError("REGISTRATION_NOT_FOUND", "That registration does not exist.");
   const selections = await getPrisma().eventMealSelection.findMany({
     where: { eventId, registrationId }, orderBy: { createdAt: "asc" },
     include: {

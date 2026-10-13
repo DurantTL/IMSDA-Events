@@ -6,6 +6,8 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AdjustmentError, postMealAdjustment } from "@/modules/registrations/adjustments";
 import {
   cancellationEntries,
+  countsTowardCapacity,
+  isLiveRegistrationStatus,
   chargeEntry,
   creditEntry,
   diffFormTickets,
@@ -73,12 +75,15 @@ async function actorFor(tx: Tx, userId: string | null, fallback = "Registration 
 
 type SelectionRow = Prisma.EventMealSelectionGetPayload<{ include: { attendee: { select: { attendeeTypeDefinitionId: true } } } }>;
 
-function view(selection: { status: string; quantity: number; unitPriceCents: number; planId: string; payer: string; mealType: string; serviceId: string | null; ageGroup: string; registrationId: string | null }) {
+function view(selection: { status: string; quantity: number; unitPriceCents: number; planId: string; payer: string; mealType: string; serviceId: string | null; ageGroup: string; registrationId: string | null; registrationAttendeeId?: string | null }) {
   return {
     status: selection.status, quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, planId: selection.planId, payer: selection.payer,
     mealType: selection.mealType, serviceId: selection.serviceId, ageGroup: selection.ageGroup, registrationId: selection.registrationId,
+    registrationAttendeeId: selection.registrationAttendeeId ?? null,
   };
 }
+
+
 
 async function loadServices(tx: Tx, eventId: string) {
   return tx.eventMealService.findMany({ where: { eventId }, select: { id: true, mealType: true, ticketing: true, status: true, name: true, serviceDate: true, capacity: true } });
@@ -118,7 +123,7 @@ async function lockService(tx: Tx, eventId: string, serviceId: string) {
 
 async function assertCapacity(tx: Tx, service: { id: string; name: string; capacity: number | null }, addQuantity: number) {
   if (service.capacity === null || addQuantity <= 0) return;
-  const taken = await tx.eventMealSelection.aggregate({ where: { serviceId: service.id, status: "ACTIVE" }, _sum: { quantity: true } });
+  const taken = await tx.eventMealSelection.aggregate({ where: { serviceId: service.id, ...countsTowardCapacity }, _sum: { quantity: true } });
   const used = taken._sum.quantity ?? 0;
   if (used + addQuantity > service.capacity) {
     throw new MealError("CAPACITY_FULL", `${service.name} has ${Math.max(0, service.capacity - used)} of ${service.capacity} meals left.`);
@@ -361,11 +366,17 @@ export async function changeMealQuantity(eventId: string, selectionId: string, a
   });
 }
 
-async function cancelCore(tx: Tx, eventId: string, actor: Actor, selection: SelectionRow, type: MealChangeType, reason: string) {
+/** The settlement for a credit: a registration that is no longer live (cancelled or waitlisted) is not posted to. */
+function settlementForStatus(selection: { registrationId: string | null; source: string }, registrationStatus: string | null): MealSettlement {
+  const base = settlementOf(selection);
+  return base === "REGISTRATION_ADJUSTMENT" && registrationStatus !== null && !isLiveRegistrationStatus(registrationStatus) ? "REGISTRATION_NOT_LIVE" : base;
+}
+
+async function cancelCore(tx: Tx, eventId: string, actor: Actor, selection: SelectionRow, type: MealChangeType, reason: string, settlement: MealSettlement = settlementOf(selection)) {
   const updated = await tx.eventMealSelection.update({ where: { id: selection.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
   const change = await recordChange(tx, eventId, actor, { selectionId: selection.id, type, reason, before: view(selection), after: view(updated) });
   await postEntries(tx, eventId, change.id, actor, cancellationEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer })
-    .map((draft) => ({ draft, selection, settlement: settlementOf(selection), reason })));
+    .map((draft) => ({ draft, selection, settlement, reason })));
   return updated;
 }
 
@@ -440,13 +451,14 @@ export async function substituteMealSelection(eventId: string, selectionId: stri
     if (service) await assertCapacity(tx, service, selection.quantity);
     const attendeeTypeId = selection.attendee?.attendeeTypeDefinitionId ?? null;
     const price = priceFor(plan, coverage, input.mealType, selection.ageGroup, attendeeTypeId);
-    await cancelCore(tx, eventId, actor, selection, "SUBSTITUTED", input.reason);
+    // Charge first, then credit: a paid registration whose net change is upward must never trip the below-paid check.
     await createSelection(tx, {
       eventId, actor, plan, registrationId: selection.registrationId, registrationAttendeeId: selection.registrationAttendeeId, mealType: input.mealType,
       service, ageGroup: selection.ageGroup, attendeeTypeCode: selection.attendeeTypeCode, quantity: selection.quantity, price, source: selection.source,
       settlement: settlementOf(selection), reason: input.reason, dietaryCategories: selection.dietaryCategories, orderLabel: selection.orderLabel,
       replacesSelectionId: selection.id,
     });
+    await cancelCore(tx, eventId, actor, selection, "SUBSTITUTED", input.reason);
     await writeAuditLog({
       eventId, actorUserId, action: "MEAL_SELECTION_SUBSTITUTED", entityType: "EventMealSelection", entityId: selectionId,
       summary: "Substituted a meal selection.", metadata: { toMealType: input.mealType, toServiceId: input.serviceId },
@@ -478,21 +490,31 @@ export async function entitleAttendeeToPlan(eventId: string, actorUserId: string
       const coverage = serviceCoverage(planShape(plan), planRows(plan), service as ServiceShape);
       if (!coverage) continue;
       await lockService(tx, eventId, service.id);
-      const existing = await tx.eventMealSelection.findFirst({
-        where: { registrationId: attendee.registrationId, registrationAttendeeId: attendee.id, mealType: service.mealType, serviceId: service.id, ageGroup: input.ageGroup, status: "ACTIVE" },
-        include: { attendee: { select: { attendeeTypeDefinitionId: true } } },
-      });
-      if (existing && existing.planId === plan.id) continue;
+      const slot = { registrationId: attendee.registrationId, registrationAttendeeId: attendee.id, mealType: service.mealType, serviceId: service.id, ageGroup: input.ageGroup, status: "ACTIVE" as const };
+      const include = { attendee: { select: { attendeeTypeDefinitionId: true } } };
+      const entitled = await tx.eventMealSelection.findFirst({ where: { ...slot, payer: "CONFERENCE" }, include });
+      if (entitled && entitled.planId === plan.id) continue;
+      const paid = await tx.eventMealSelection.findFirst({ where: { ...slot, payer: "ATTENDEE" }, include });
       const price = priceFor(plan, coverage, service.mealType, input.ageGroup, attendee.attendeeTypeDefinition?.id ?? null);
-      if (existing) {
-        await cancelCore(tx, eventId, actor, existing, "PLAN_CHANGED", input.reason);
-      } else {
+      if (entitled) await cancelCore(tx, eventId, actor, entitled, "PLAN_CHANGED", input.reason);
+      if (paid) {
+        // The conference pays for one meal: a paid order of one is replaced by the entitlement (credited in full); a paid
+        // order of several keeps the rest and is credited only for the one the entitlement now covers.
+        if (paid.quantity === 1) {
+          await cancelCore(tx, eventId, actor, paid, "PLAN_CHANGED", input.reason);
+        } else {
+          const reduced = await tx.eventMealSelection.update({ where: { id: paid.id }, data: { quantity: paid.quantity - 1 } });
+          const change = await recordChange(tx, eventId, actor, { selectionId: paid.id, type: "QUANTITY_CHANGED", reason: input.reason, before: view(paid), after: view(reduced) });
+          await postEntries(tx, eventId, change.id, actor, quantityChangeEntries({ quantity: paid.quantity, unitPriceCents: paid.unitPriceCents, payer: paid.payer }, paid.quantity - 1)
+            .map((draft) => ({ draft, selection: paid, settlement: settlementOf(paid), reason: input.reason })));
+        }
+      } else if (!entitled) {
         await assertCapacity(tx, service, 1);
       }
       const selection = await createSelection(tx, {
         eventId, actor, plan, registrationId: attendee.registrationId, registrationAttendeeId: attendee.id, mealType: service.mealType, service,
         ageGroup: input.ageGroup, attendeeTypeCode: attendee.attendeeTypeDefinition?.code ?? null, quantity: 1, price, source: "PLAN_ASSIGNMENT",
-        settlement: "REGISTRATION_ADJUSTMENT", reason: input.reason, replacesSelectionId: existing?.id ?? null,
+        settlement: "REGISTRATION_ADJUSTMENT", reason: input.reason, replacesSelectionId: paid?.quantity === 1 ? paid.id : entitled?.id ?? null,
       });
       created.push(selection.id);
     }
@@ -521,17 +543,46 @@ export async function cancelMealService(eventId: string, serviceId: string, acto
       where: { serviceId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, include: { attendee: { select: { attendeeTypeDefinitionId: true } } },
     });
     for (const selection of pinned) {
-      if (selection.registrationId) await lockRegistration(tx, eventId, selection.registrationId);
-      await cancelCore(tx, eventId, actor, selection, "SERVICE_CANCELLED", input.reason);
+      const registrationStatus = selection.registrationId ? await lockRegistration(tx, eventId, selection.registrationId) : null;
+      await cancelCore(tx, eventId, actor, selection, "SERVICE_CANCELLED", input.reason, settlementForStatus(selection, registrationStatus));
     }
     const updated = await tx.eventMealService.update({ where: { id: serviceId }, data: { status: "CANCELLED", cancelledAt: new Date(), cancelReason: input.reason } });
     await tx.eventMealServiceChange.create({ data: { eventId, serviceId, type: "CANCELLED", actorUserId, reason: input.reason, before: serviceSnapshot(service), after: serviceSnapshot(updated) } });
     await writeAuditLog({
       eventId, actorUserId, action: "MEAL_SERVICE_CANCELLED", entityType: "EventMealService", entityId: serviceId,
-      summary: `Cancelled the meal service ${service.name}.`, metadata: { reason: input.reason, selectionsCancelled: pinned.length },
+      summary: `Cancelled the meal service ${service.name}.`, metadata: { selectionsCancelled: pinned.length },
     }, tx);
     return { cancelledSelections: pinned.length };
   });
+}
+
+/**
+ * Cancels, and credits at the price charged, every active selection of attendees an amendment is removing (#210), inside
+ * the amendment's transaction and before the attendee row goes (their selections would otherwise be left charged with
+ * no attendee). Returns the cents of credit posted to the registration as MEAL adjustment lines (zero or negative), so the
+ * amendment can write the registration's final total with them in it. A credit that would take the registration below
+ * what it paid throws a MealError (TOTAL_BELOW_PAID): refund first.
+ */
+export async function cancelMealSelectionsForAttendees(tx: Tx, input: {
+  eventId: string; registrationId: string; attendeeIds: readonly string[]; actorUserId: string | null;
+}) {
+  if (input.attendeeIds.length === 0) return 0;
+  const rows = await tx.eventMealSelection.findMany({
+    where: { registrationId: input.registrationId, registrationAttendeeId: { in: [...input.attendeeIds] }, status: "ACTIVE" },
+    orderBy: { createdAt: "asc" }, include: { attendee: { select: { attendeeTypeDefinitionId: true } } },
+  });
+  if (rows.length === 0) return 0;
+  const actor = await actorFor(tx, input.actorUserId, "Registration amendment");
+  const registrationStatus = await lockRegistration(tx, input.eventId, input.registrationId);
+  let postedCents = 0;
+  for (const selection of rows) {
+    const settlement = settlementForStatus(selection, registrationStatus);
+    await cancelCore(tx, input.eventId, actor, selection, "CANCELLED", "The attendee was removed from the registration.", settlement);
+    if (settlement === "REGISTRATION_ADJUSTMENT") {
+      postedCents += cancellationEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer }).reduce((total, entry) => total + entry.amountCents, 0);
+    }
+  }
+  return postedCents;
 }
 
 // ---------------------------------------------------------------------------

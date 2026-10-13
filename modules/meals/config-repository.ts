@@ -4,6 +4,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
+  countsTowardCapacity,
   mealPlanInputSchema,
   mealPlanServiceInputSchema,
   mealPriceInputSchema,
@@ -74,7 +75,7 @@ export async function updateMealService(eventId: string, serviceId: string, acto
     if (!service) throw new MealError("SERVICE_NOT_FOUND", "That meal service does not exist.");
     if (service.status === "CANCELLED") throw new MealError("SERVICE_CANCELLED", "This meal service is cancelled. Reinstate it before editing it.");
     if (input.capacity !== null) {
-      const taken = await tx.eventMealSelection.aggregate({ where: { serviceId, status: "ACTIVE" }, _sum: { quantity: true } });
+      const taken = await tx.eventMealSelection.aggregate({ where: { serviceId, ...countsTowardCapacity }, _sum: { quantity: true } });
       if ((taken._sum.quantity ?? 0) > input.capacity) {
         throw new MealError("CAPACITY_FULL", `${taken._sum.quantity} meals are already selected for this service, more than the new capacity.`);
       }
@@ -108,7 +109,7 @@ export async function reinstateMealService(eventId: string, serviceId: string, a
     await tx.eventMealServiceChange.create({ data: { eventId, serviceId, type: "REINSTATED", actorUserId, reason: text, before: serviceSnapshot(service), after: serviceSnapshot(updated) } });
     await writeAuditLog({
       eventId, actorUserId, action: "MEAL_SERVICE_REINSTATED", entityType: "EventMealService", entityId: serviceId,
-      summary: `Reinstated the meal service ${service.name}.`, metadata: { reason: text },
+      summary: `Reinstated the meal service ${service.name}.`, metadata: { serviceId },
     }, tx);
   });
 }

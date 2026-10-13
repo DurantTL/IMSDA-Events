@@ -347,7 +347,8 @@ export function mealTicketFields<F extends FormFieldLike>(definition: FormDefini
 
 /**
  * The form with each bound ticket field's price taken from the meal plan, so the plan is the one place a ticket price
- * is set. A field whose plan has no price keeps what it had. The label's "— $7 each" follows the price.
+ * is set. A field whose plan has no price keeps what it had. The label's "— $7 each" follows the price. A late price is dropped
+ * from a bound field: the plan has one price per meal, so a form cannot carry a second, different one.
  */
 export function applyMealPricesToDefinition<F extends FormFieldLike, D extends FormDefinitionLike<F>>(definition: D, prices: ReadonlyMap<string, number>): D {
   return {
@@ -359,7 +360,7 @@ export function applyMealPricesToDefinition<F extends FormFieldLike, D extends F
         const cents = binding ? prices.get(`${binding.mealType}:${binding.ageGroup}`) : undefined;
         if (!binding || cents === undefined) return field;
         const label = LABEL_PRICE.test(field.label) ? field.label.replace(LABEL_PRICE, ` — ${money(cents).replace(/\.00$/, "")} each`) : field.label;
-        return { ...field, priceCents: cents, label };
+        return { ...field, priceCents: cents, label, latePricing: undefined };
       }),
     })),
   } as D;
@@ -370,7 +371,7 @@ export function mealPriceDrift<F extends FormFieldLike>(definition: FormDefiniti
   return mealTicketFields(definition).filter((field) => {
     const binding = mealTicketBinding(field.key)!;
     const cents = prices.get(`${binding.mealType}:${binding.ageGroup}`);
-    return cents !== undefined && field.priceCents !== cents;
+    return cents !== undefined && (field.priceCents !== cents || field.latePricing !== undefined);
   }).map((field) => field.key);
 }
 
@@ -447,3 +448,13 @@ export function mealTicketCsvRow(row: MealTicketRow): string[] {
     row.selectionId,
   ];
 }
+
+const liveStatuses = ["SUBMITTED", "CONFIRMED"];
+/** A registration still counts for meals (capacity, the café CSV, totals) while it is submitted or confirmed. */
+export const isLiveRegistrationStatus = (status: string) => liveStatuses.includes(status);
+
+/** Selections that count toward a service's capacity: walk-up orders and those of a submitted or confirmed registration. */
+export const countsTowardCapacity = {
+  status: "ACTIVE" as const,
+  OR: [{ registrationId: null }, { registration: { status: { in: ["SUBMITTED", "CONFIRMED"] as Array<"SUBMITTED" | "CONFIRMED"> } } }],
+};

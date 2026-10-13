@@ -272,7 +272,7 @@ async function resolveExistingClone(actorUserId: string, input: ConfirmEventClon
 /** What the result screen shows after a clone (#157), kept in the clone record's snapshot. */
 export type CloneResultSummary = {
   copiedCounts: Record<string, number>;
-  skipped: { forms: number; messageTemplates: number; assetLinks: number; privateLinks: number; honorSessionsWithoutSite?: number; honorOfferingsDuplicate?: number };
+  skipped: { forms: number; messageTemplates: number; assetLinks: number; privateLinks: number; honorSessionsWithoutSite?: number; honorOfferingsDuplicate?: number; mealPrices?: number };
   pricing: ClonePricingSummary;
   pricingMessage: string | null;
 };
@@ -431,6 +431,8 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
         const days = calendarDayDifference(config.event.startsOn, input.startsOn);
         const created = await createMealDefinitions(tx, event.id, shiftMealDefinitions(config.meals, days), actorUserId);
         copied.meals = created.services + created.plans;
+        // A price for an attendee type is copied only when the new event has a type with that code; say how many were not.
+        if (created.skippedPrices > 0) skipped.mealPrices = created.skippedPrices;
       }
 
       if (include.registrationForms) {

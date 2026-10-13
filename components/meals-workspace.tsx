@@ -28,8 +28,10 @@ function serviceLabel(service: Service) {
   return `${service.serviceDate} ${service.startTime}${service.endTime ? `–${service.endTime}` : ""}`;
 }
 
-export function MealsWorkspace({ eventId, eventName, initialView, canManageFinance, canExport }: {
-  eventId: string; eventName: string; initialView: MealView; canManageFinance: boolean; canExport: boolean;
+const reasonHint = "Do not enter allergy, medical or other personal details.";
+
+export function MealsWorkspace({ eventId, eventName, initialView, canConfigure, canManageFinance, canExport }: {
+  eventId: string; eventName: string; initialView: MealView; canConfigure: boolean; canManageFinance: boolean; canExport: boolean;
 }) {
   const [view, setView] = useState(initialView);
   const [error, setError] = useState("");
@@ -59,6 +61,10 @@ export function MealsWorkspace({ eventId, eventName, initialView, canManageFinan
     </div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
+    {view.formWarnings.map((warning) => <p className="form-error" role="alert" key={`${warning.formName}-${warning.status}`}>
+      The {warning.status === "PUBLISHED" ? "published" : "draft"} version of {warning.formName} sells meal tickets at prices that differ from the ticket plan ({warning.fieldKeys.length} field{warning.fieldKeys.length === 1 ? "" : "s"}).
+      Open the form in the registration builder, save it again to bring the prices up to date, run a test submission, and republish it. Until then registrants are charged the form&apos;s old prices.
+    </p>)}
 
     {view.services.length === 0 && view.plans.length === 0 ? <section className="panel">
       <h3>Start from Camp Meeting</h3>
@@ -82,9 +88,9 @@ export function MealsWorkspace({ eventId, eventName, initialView, canManageFinan
       <h3>Meal services</h3>
       {view.services.length === 0 ? <p>No meal services yet. Add one below.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
         <thead><tr><th scope="col">Service</th><th scope="col">When</th><th scope="col">Where</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
-        <tbody>{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} />)}</tbody>
+        <tbody>{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} canConfigure={canConfigure} />)}</tbody>
       </table></div>}
-      <ServiceForm title="Add a meal service" submitLabel="Add service" busy={busy} onSubmit={(input) => run(() => call(`${base}/services`, "POST", input), "Meal service added.")} />
+      {canConfigure ? <ServiceForm title="Add a meal service" submitLabel="Add service" busy={busy} onSubmit={(input) => run(() => call(`${base}/services`, "POST", input), "Meal service added.")} /> : <p>Only event administrators can add or edit meal services.</p>}
     </section>
 
     {view.plans.map((plan) => <PlanPanel key={plan.id} plan={plan} view={view} base={base} busy={busy} run={run} canManageFinance={canManageFinance} services={activeServices} />)}
@@ -124,7 +130,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, canManageFinan
           <td>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td>{order.quantity}</td>
           <td>{order.payer === "CONFERENCE" ? "Conference" : money(order.unitPriceCents)}</td><td>{order.source.toLowerCase().replace("_", " ")}</td><td>{order.status.toLowerCase()}</td>
           <td>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={() => {
-            const reason = window.prompt("Why is this order being cancelled?");
+            const reason = window.prompt(`Why is this order being cancelled? ${reasonHint}`);
             if (reason) void run(() => call(`${base}/selections/${order.id}`, "POST", { action: "cancel", reason }), "Order cancelled and credited.");
           }}>Cancel</button> : null}</td>
         </tr>)}</tbody>
@@ -133,8 +139,8 @@ export function MealsWorkspace({ eventId, eventName, initialView, canManageFinan
   </div>;
 }
 
-function ServiceRow({ service, base, busy, run, canManageFinance }: {
-  service: Service; base: string; busy: boolean; canManageFinance: boolean;
+function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }: {
+  service: Service; base: string; busy: boolean; canManageFinance: boolean; canConfigure: boolean;
   run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -146,13 +152,13 @@ function ServiceRow({ service, base, busy, run, canManageFinance }: {
       <td>{service.capacity === null ? "No limit" : `${service.pinnedQuantity} of ${service.capacity}`}</td>
       <td>{cancelled ? `Cancelled${service.cancelReason ? `: ${service.cancelReason}` : ""}` : "Active"}</td>
       <td>
-        {!cancelled ? <button type="button" disabled={busy} onClick={() => setEditing((value) => !value)}>{editing ? "Close" : "Edit"}</button> : null}
-        {!cancelled && canManageFinance ? <button type="button" disabled={busy} onClick={() => {
-          const reason = window.prompt("Why is this meal cancelled? Orders pinned to it are credited.");
+        {!cancelled && canConfigure ? <button type="button" disabled={busy} onClick={() => setEditing((value) => !value)}>{editing ? "Close" : "Edit"}</button> : null}
+        {!cancelled && canConfigure && canManageFinance ? <button type="button" disabled={busy} onClick={() => {
+          const reason = window.prompt(`Why is this meal cancelled? Orders pinned to it are credited. ${reasonHint}`);
           if (reason) void run(() => call(`${base}/services/${service.id}`, "POST", { action: "cancel", reason }), "Meal service cancelled.");
         }}>Cancel meal</button> : null}
-        {cancelled ? <button type="button" disabled={busy} onClick={() => {
-          const reason = window.prompt("Why is this meal being reinstated?");
+        {cancelled && canConfigure ? <button type="button" disabled={busy} onClick={() => {
+          const reason = window.prompt(`Why is this meal being reinstated? ${reasonHint}`);
           if (reason) void run(() => call(`${base}/services/${service.id}`, "POST", { action: "reinstate", reason }), "Meal service reinstated.");
         }}>Reinstate</button> : null}
       </td>
@@ -198,6 +204,23 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
   return <section className="panel">
     <h3>{plan.name} <small>({mealPayerLabels[plan.payer]}{plan.isDefaultTicketPlan ? ", sells form tickets" : ""}{plan.isActive ? "" : ", off"})</small></h3>
     {plan.description ? <p>{plan.description}</p> : null}
+    {canManageFinance ? <form onSubmit={(event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const isActive = form.get("isActive") === "on";
+      void run(() => call(`${base}/plans/${plan.id}`, "PUT", {
+        code: plan.code, name: String(form.get("name")), description: String(form.get("description") ?? ""), payer: plan.payer,
+        isDefaultTicketPlan: plan.payer === "ATTENDEE" && isActive && form.get("isDefaultTicketPlan") === "on",
+        includesAllServices: plan.includesAllServices, defaultEntitlement: plan.defaultEntitlement, isActive,
+      }), "Plan saved.");
+    }}>
+      <h4>Edit this plan</h4>
+      <label>Name <input name="name" required maxLength={80} defaultValue={plan.name} /></label>
+      <label>Description <input name="description" maxLength={500} defaultValue={plan.description} /></label>
+      <label><input name="isActive" type="checkbox" defaultChecked={plan.isActive} /> Plan is on</label>
+      {plan.payer === "ATTENDEE" ? <label><input name="isDefaultTicketPlan" type="checkbox" defaultChecked={plan.isDefaultTicketPlan} /> Sells the registration form&apos;s tickets (only one plan can)</label> : null}
+      <button type="submit" disabled={busy}>Save plan</button>
+    </form> : null}
     <p>{plan.includesAllServices ? `Covers every ticketed service (${plan.defaultEntitlement === "INCLUDED" ? "included, never charged to the attendee" : "paid tickets"}).` : "Covers only the services listed below."}</p>
     <div className="table-wrap"><table className="report-table report-table-auto">
       <caption>{plan.payer === "CONFERENCE" ? "Rate the conference is billed per meal used" : "Price per meal"}</caption>
@@ -275,7 +298,7 @@ function WalkUpForm({ services, plans, base, busy, run }: {
     <label>Plan <select name="planId">{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></label>
     <label>Age group <select name="ageGroup">{mealAgeGroups.map((group) => <option key={group} value={group}>{mealAgeGroupLabels[group]}</option>)}</select></label>
     <label>Quantity <input name="quantity" type="number" min={1} max={1000} defaultValue={1} required /></label>
-    <label>Label (optional, no personal or medical detail) <input name="orderLabel" maxLength={60} /></label>
+    <label>Label (optional). No allergy or medical details. <input name="orderLabel" maxLength={60} /></label>
     <button className="primary-button" type="submit" disabled={busy}>Record walk-up order</button>
   </form>;
 }

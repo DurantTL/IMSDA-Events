@@ -7677,6 +7677,8 @@ enum MealSettlement {
   REGISTRATION_ADJUSTMENT
   /// Paid or voided at the counter by staff (walk-up order); no registration.
   AT_COUNTER
+  /// The registration is cancelled or waitlisted, so nothing is posted to it; the credit is on the ledger only.
+  REGISTRATION_NOT_LIVE
 }
 
 /// One meal occurrence: a date, a serving window, a place and a capacity. Dates and times are event-local text

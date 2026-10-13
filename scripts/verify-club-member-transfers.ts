@@ -62,7 +62,13 @@ async function cleanup() {
   await prisma.honorClassWaitlistEntry.deleteMany({ where: { eventId } });
   await prisma.honorEnrollment.deleteMany({ where: { eventId } });
   await prisma.clubEventRegistration.deleteMany({ where: { eventId } });
-  await prisma.registration.deleteMany({ where: { eventId } });
+  await prisma.$transaction(async (tx) => {
+  // Meal rows are append-only (#210): they go only inside an event deletion, as the event deletion service does it.
+  await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+  await tx.eventMealSelectionChange.deleteMany({ where: { eventId } });
+  await tx.eventMealSelection.deleteMany({ where: { eventId } });
+});
+await prisma.registration.deleteMany({ where: { eventId } });
   await prisma.honorOffering.deleteMany({ where: { eventId } });
   await prisma.honorSession.deleteMany({ where: { eventId } });
   await prisma.event.deleteMany({ where: { id: eventId } });
@@ -260,6 +266,17 @@ async function main() {
   await prisma.honorEnrollment.delete({ where: { id: beaSeat.id } });
   await prisma.honorOffering.update({ where: { id: offering.id }, data: { perClubLimit: 5 } });
   console.log("ok  refused: draft destination, clamped total, below paid, below $0, per-club class limit; each left the move pending");
+
+  // Meals (#210): a person with an active meal selection is not moved until it is cancelled (their selections and ledger rows cannot follow).
+  const mealPlan = await prisma.eventMealPlan.create({ data: { eventId, code: "tickets", name: "Tickets", isDefaultTicketPlan: true } });
+  const mealSelection = await prisma.eventMealSelection.create({
+    data: { eventId, planId: mealPlan.id, mealType: "LUNCH", registrationId: regA.id, registrationAttendeeId: adaAttendee.id, ageGroup: "CHILD", quantity: 1, source: "STAFF", payer: "ATTENDEE", unitPriceCents: 0, pricingSnapshot: {} },
+  });
+  const mealBlocked = await repo.approveRegistrationMove(pendingMove.id, "", staff, now).then(() => null, (caught: unknown) => caught);
+  assert(mealBlocked && (mealBlocked as { code?: string }).code === "MOVE_BLOCKED" && /meal/i.test((mealBlocked as Error).message), `an active meal selection blocks the move with a clear message, got ${String(mealBlocked)}`);
+  assert((await prisma.memberTransferRegistrationMove.findUniqueOrThrow({ where: { id: pendingMove.id } })).status === "PENDING", "the blocked move stays pending");
+  await prisma.eventMealSelection.update({ where: { id: mealSelection.id }, data: { status: "CANCELLED", cancelledAt: now } });
+  console.log("ok  refused: an active meal selection; the move stays pending until it is cancelled");
 
   // A place on a full class's waitlist (#831), in a class where the receiving club is already at its per-club limit.
   const session2 = await prisma.honorSession.create({ data: { eventId, name: "Second session", normalizedName: "second session" } });

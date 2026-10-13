@@ -17,7 +17,7 @@ counts and preparation (#212) are not in these tables. Code is in `modules/meals
 | `EventMealSelectionChange` | Append-only: every creation, quantity change, plan change, substitution and cancellation, with actor, reason, selection before and after. |
 | `EventMealLedgerEntry` | Append-only meal charges and credits (`CHARGE` positive, `CREDIT` negative, at the price that was charged) with where the money went (`settlement`). |
 
-The migration (`20261018100000_meal_services_plans_selections`) is additive. It adds checks, partial unique indexes and
+The migration (`20261018110000_meal_services_plans_selections`) is additive. It adds checks, partial unique indexes and
 triggers (the ledger and both histories are append-only, a selection is never deleted, rows cannot cross events); rows go
 only with their event.
 

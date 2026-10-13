@@ -699,6 +699,7 @@ export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: stri
   };
   const pricing = clonePricingSummary(config);
 
+  const typePrices = (config.meals?.plans ?? []).reduce((total, plan) => total + plan.prices.filter((price) => price.attendeeTypeCode !== null).length, 0);
   const notes: Record<CloneDomainKey, string[]> = {
     eventDetails: privateLinkNote("eventDetails"),
     moduleToggles: [
@@ -732,7 +733,8 @@ export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: stri
         : []),
     ],
     meals: (config.meals?.services.length ?? 0) > 0 || (config.meals?.plans.length ?? 0) > 0
-      ? ["Services keep their names, times, and capacity; their dates move with the event's start date. Plans keep who pays and their prices as they are: review them before publishing. Orders and tickets are never copied, and a cancelled service is left behind."]
+      ? ["Services keep their names, times, and capacity; their dates move with the event's start date. Plans keep who pays and their prices as they are: review them before publishing. Orders and tickets are never copied, and a cancelled service is left behind.",
+        ...(typePrices > 0 ? [`${plural(typePrices, "price")} ${typePrices === 1 ? "is" : "are"} for an attendee type (including $0 complimentary roles): copied only when the new event has a type with the same code, so include attendee types too. The result says how many were left out.`] : [])]
       : [],
     locations: config.locations.length > 0
       ? ["Name, address, capacity, and order are copied. Dates move by the same number of days as the event's start date; review them on the new event."]

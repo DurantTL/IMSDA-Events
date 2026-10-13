@@ -25,6 +25,7 @@
  *   npm run test:meals
  */
 import { loadEnvConfig } from "@next/env";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { PrismaClient, RegistrationFormStatus } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
@@ -38,10 +39,11 @@ import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import { campMeetingMeals } from "@/modules/meals/camp-meeting";
 import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { createMealDefinitions } from "@/modules/meals/clone-repository";
-import { applyCampMeetingMealPreset, createMealService, loadTicketPrices, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
+import { applyCampMeetingMealPreset, createMealService, loadTicketPrices, removeMealPrice, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
 import { MealError } from "@/modules/meals/errors";
 import {
   cancelMealSelection,
+  cancelMealSelectionsForAttendees,
   cancelMealService,
   changeMealPlan,
   changeMealQuantity,
@@ -50,7 +52,7 @@ import {
   substituteMealSelection,
   syncFormMealSelections,
 } from "@/modules/meals/selection-repository";
-import { loadMealTicketRows, mealTicketsCsv } from "@/modules/meals/view-repository";
+import { loadMealTicketRows, loadRegistrationMeals, mealTicketsCsv } from "@/modules/meals/view-repository";
 import { removeEventOwnedRows } from "@/modules/events/deletion-repository";
 
 loadEnvConfig(process.cwd());
@@ -314,6 +316,71 @@ async function main() {
   assert((await entitleAttendeeToPlan(eventId, userId, { registrationAttendeeId: entitled.attendeeId, planId: conferencePlan.id, ageGroup: "ADULT", reason: "New meal" })).length === 1, "a service added later is entitled on the next run");
   await expectMealError(entitleAttendeeToPlan(eventId, userId, { registrationAttendeeId: entitled.attendeeId, planId: ticketPlan.id, ageGroup: "ADULT", reason: "Wrong plan" }), "INVALID", "entitling to a ticket plan");
 
+  // ---- Substitution on a paid registration: charge first, so a net increase never trips the below-paid check ------------
+  const subReg = await makeRegistration("sub", { total: 10 });
+  const wedBreakfast = service("Wednesday breakfast");
+  const subOrder = await createMealOrder(eventId, userId, { registrationId: subReg.id, registrationAttendeeId: subReg.attendeeId, mealType: "BREAKFAST", serviceId: wedBreakfast.id, ageGroup: "CHILD", quantity: 1, clientRequestId: randomUUID() });
+  assert(await totalOf(subReg.id) === 1600, "a child breakfast is $6");
+  await prisma.payment.create({ data: { eventId, registrationId: subReg.id, amount: 16, status: "SUCCEEDED", method: "CASH", receivedAt: before } });
+  await substituteMealSelection(eventId, subOrder, userId, { mealType: "LUNCH", serviceId: service("Thursday lunch").id, reason: "Swapped for lunch" });
+  assert(await totalOf(subReg.id) === 1700, "a paid registration swapping a $6 meal for a $7 meal ends at the new total, not refused");
+
+  // ---- A cancelled registration: its selections do not count for capacity and a service cancellation still goes through -----
+  const capacityService = await createMealService(eventId, userId, { name: "Capacity test", mealType: "SUPPER", serviceDate: "2027-06-21", startTime: "17:30", endTime: "18:30", location: null, ticketing: "TICKETED", capacity: 2 });
+  const lateReg = await makeRegistration("late", { total: 0 });
+  const lateOrder = await createMealOrder(eventId, userId, { registrationId: lateReg.id, registrationAttendeeId: lateReg.attendeeId, mealType: "SUPPER", serviceId: capacityService, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID() });
+  await prisma.registration.update({ where: { id: lateReg.id }, data: { status: "CANCELLED", cancelledAt: before } });
+  const capacityWalkUp = await createMealOrder(eventId, userId, { registrationId: null, serviceId: capacityService, mealType: "SUPPER", ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID() });
+  assert(Boolean(capacityWalkUp), "a cancelled registration's selections do not use up the service's capacity");
+  const lateTotal = await totalOf(lateReg.id);
+  const cancelOutcome = await cancelMealService(eventId, capacityService, userId, { reason: "Kitchen closed" });
+  assert(cancelOutcome.cancelledSelections === 2 && await totalOf(lateReg.id) === lateTotal, "a service cancellation goes through with a cancelled registration among its orders and posts nothing to it");
+  const notLive = await prisma.eventMealLedgerEntry.findFirstOrThrow({ where: { selectionId: lateOrder, kind: "CREDIT" } });
+  assert(notLive.settlement === "REGISTRATION_NOT_LIVE" && notLive.registrationAdjustmentId === null, "the credit is on the ledger, not on the cancelled registration");
+
+  // ---- A staff order does not collide with a form ticket (and an amendment never fails on it) ----------------------------
+  await createMealOrder(eventId, userId, { registrationId: formRegistration.id, mealType: "BREAKFAST", serviceId: null, ageGroup: "ADULT", quantity: 1, clientRequestId: randomUUID() }).catch((error: unknown) => {
+    throw new Error(`FAILED: a staff order for the same meal as a form ticket: ${String(error)}`);
+  });
+  await prisma.$transaction((tx) => syncFormMealSelections(tx, {
+    eventId, registrationId: formRegistration.id, formVersionId: versionId, responses: { breakfast_adult_qty: 2, breakfast_child_qty: 1 },
+    previousResponses: { breakfast_adult_qty: 1, breakfast_child_qty: 1 },
+    lineItems: [{ key: "breakfast_adult_qty", amountCents: 1400 }, { key: "breakfast_child_qty", amountCents: 600 }],
+  }));
+  const bothAdult = await prisma.eventMealSelection.findMany({ where: { registrationId: formRegistration.id, mealType: "BREAKFAST", ageGroup: "ADULT", status: "ACTIVE" } });
+  assert(bothAdult.length === 2 && bothAdult.some((row) => row.source === "STAFF" && row.quantity === 1) && bothAdult.some((row) => row.source === "REGISTRATION_FORM" && row.quantity === 2), "the form ticket follows the answers and the staff order is left alone");
+
+  // ---- Entitlement keeps paid extra meals ---------------------------------------------------------------------------------
+  const keepReg = await makeRegistration("keep", { total: 0 });
+  const paidThree = await createMealOrder(eventId, userId, { registrationId: keepReg.id, registrationAttendeeId: keepReg.attendeeId, mealType: "BREAKFAST", serviceId: wedBreakfast.id, ageGroup: "ADULT", quantity: 3, clientRequestId: randomUUID() });
+  const paidOne = await createMealOrder(eventId, userId, { registrationId: keepReg.id, registrationAttendeeId: keepReg.attendeeId, mealType: "BREAKFAST", serviceId: service("Thursday breakfast").id, ageGroup: "ADULT", quantity: 1, clientRequestId: randomUUID() });
+  assert(await totalOf(keepReg.id) === 2800, "four paid breakfasts are $28");
+  await entitleAttendeeToPlan(eventId, userId, { registrationAttendeeId: keepReg.attendeeId, planId: conferencePlan.id, ageGroup: "ADULT", reason: "Now a volunteer" });
+  const stillPaid = await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: paidThree } });
+  assert(stillPaid.status === "ACTIVE" && stillPaid.quantity === 2 && stillPaid.payer === "ATTENDEE", "an order of three keeps two paid meals when one becomes the entitlement");
+  assert((await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: paidOne } })).status === "CANCELLED", "an order of one is replaced by the entitlement");
+  assert(await totalOf(keepReg.id) === 1400, "the attendee is credited only for the two entitled meals ($28 to $14)");
+  assert((await prisma.eventMealSelection.count({ where: { registrationId: keepReg.id, mealType: "BREAKFAST", serviceId: wedBreakfast.id, status: "ACTIVE" } })) === 2, "the paid meals and the entitlement sit side by side");
+
+  // ---- Removing an attendee (an amendment) cancels and credits their meals before the row goes ------------------------------
+  const remReg = await makeRegistration("rem", { total: 0 });
+  const secondPerson = await prisma.person.create({ data: { firstName: "Birch", lastName: surname, normalizedEmail: `${P}.birch@meals.example.test` } });
+  const secondAttendee = await prisma.registrationAttendee.create({ data: { eventId, registrationId: remReg.id, personId: secondPerson.id, attendeeType: "adult", position: 1, profileSnapshot: { firstName: "Birch", lastName: surname } } });
+  await entitleAttendeeToPlan(eventId, userId, { registrationAttendeeId: secondAttendee.id, planId: conferencePlan.id, ageGroup: "ADULT", reason: "Pastor" });
+  const removedPaid = await createMealOrder(eventId, userId, { registrationId: remReg.id, registrationAttendeeId: secondAttendee.id, mealType: "LUNCH", serviceId: service("Wednesday lunch").id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID() });
+  const remBefore = await totalOf(remReg.id);
+  assert(remBefore === 1600, "two adult lunches are $16");
+  const removalCredit = await prisma.$transaction(async (tx) => {
+    const posted = await cancelMealSelectionsForAttendees(tx, { eventId, registrationId: remReg.id, attendeeIds: [secondAttendee.id], actorUserId: userId });
+    await tx.registrationAttendee.deleteMany({ where: { id: secondAttendee.id } });
+    return posted;
+  });
+  assert(removalCredit === -1600 && await totalOf(remReg.id) === 0, "the removed attendee's paid meals are credited and the total follows");
+  const orphans = await prisma.eventMealSelection.findMany({ where: { registrationId: remReg.id } });
+  assert(orphans.length > 1 && orphans.every((row) => row.status === "CANCELLED" && row.registrationAttendeeId === null), "nothing is left active for a removed attendee, and removing them does not fail");
+  assert((await prisma.eventMealSelectionChange.count({ where: { selectionId: removedPaid, type: "CANCELLED" } })) === 1, "the removal is in the history");
+  assert(!(await loadMealTicketRows(eventId)).some((row) => row.confirmationCode === remReg.code), "a removed attendee's meals are not in the café CSV");
+
   // ---- Ticket CSV ---------------------------------------------------------------------------------------------------------
   const ticketRows = await loadMealTicketRows(eventId);
   const csv = await mealTicketsCsv(eventId);
@@ -323,11 +390,11 @@ async function main() {
 
   // ---- Walk-up orders -----------------------------------------------------------------------------------------------------
   const thursdayLunch = service("Thursday lunch");
-  await updateMealService(eventId, thursdayLunch.id, userId, { name: "Thursday lunch", mealType: "LUNCH", serviceDate: thursdayLunch.serviceDate, startTime: thursdayLunch.startTime, endTime: thursdayLunch.endTime, location: "Cafeteria", ticketing: "TICKETED", capacity: 3 });
+  await updateMealService(eventId, thursdayLunch.id, userId, { name: "Thursday lunch", mealType: "LUNCH", serviceDate: thursdayLunch.serviceDate, startTime: thursdayLunch.startTime, endTime: thursdayLunch.endTime, location: "Cafeteria", ticketing: "TICKETED", capacity: 6 });
   const requestId = randomUUID();
   const walkUp = await createMealOrder(eventId, userId, { registrationId: null, serviceId: thursdayLunch.id, mealType: "LUNCH", ageGroup: "ADULT", quantity: 2, orderLabel: "Day visitor", clientRequestId: requestId });
   const again = await createMealOrder(eventId, userId, { registrationId: null, serviceId: thursdayLunch.id, mealType: "LUNCH", ageGroup: "ADULT", quantity: 2, orderLabel: "Day visitor", clientRequestId: requestId });
-  assert(walkUp === again && (await prisma.eventMealSelection.count({ where: { eventId, source: "WALK_UP" } })) === 1, "a retried walk-up order is the same order");
+  assert(walkUp === again && (await prisma.eventMealSelection.count({ where: { eventId, clientRequestId: requestId } })) === 1, "a retried walk-up order is the same order");
   await expectMealError(createMealOrder(eventId, userId, { registrationId: null, serviceId: thursdayLunch.id, mealType: "LUNCH", ageGroup: "ADULT", quantity: 1, clientRequestId: requestId }), "REQUEST_REUSED", "a request id reused for another order");
   const walkUpEntry = await prisma.eventMealLedgerEntry.findFirstOrThrow({ where: { selectionId: walkUp } });
   assert(walkUpEntry.settlement === "AT_COUNTER" && walkUpEntry.registrationId === null && walkUpEntry.amountCents === 1600, "a walk-up order is settled at the counter, not on a registration");
@@ -345,7 +412,7 @@ async function main() {
   assert((await prisma.eventMealService.findUniqueOrThrow({ where: { id: friday.id } })).status === "ACTIVE" && (await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: fridayWalkUp } })).status === "ACTIVE" && await totalOf(paying.id) === payingTotal, "a refused cancellation changes nothing");
   await prisma.payment.deleteMany({ where: { registrationId: paying.id } });
   const outcome = await cancelMealService(eventId, friday.id, userId, { reason: "Kitchen closed" });
-  assert(outcome.cancelledSelections === 3, "the cancellation cancels every selection pinned to the service (two orders and one entitlement)");
+  assert(outcome.cancelledSelections === 4, "the cancellation cancels every selection pinned to the service (two orders and two entitlements; a removed attendee's are already cancelled)");
   assert(await totalOf(paying.id) === payingTotal - 1600, "the registration is credited for the cancelled meal");
   assert((await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: fridayOrder } })).status === "CANCELLED" && (await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: fridayWalkUp } })).status === "CANCELLED", "both orders are cancelled, not deleted");
   const credit = await prisma.eventMealLedgerEntry.findFirstOrThrow({ where: { selectionId: fridayWalkUp, kind: "CREDIT" } });
@@ -375,6 +442,15 @@ async function main() {
   })), "a ledger entry that does not match its change and registration");
   const otherEvent = `${P}_ev_other`;
   await prisma.event.create({ data: { id: otherEvent, slug: slugOf(otherEvent), name: `Meal other ${P}`, startsAt: new Date("2027-07-15T15:00:00Z"), endsAt: new Date("2027-07-16T15:00:00Z"), timezone: "America/Chicago" } });
+  // Another event's staff cannot reach this event's rows by id: every lookup is scoped to the event in the URL.
+  const aPrice = await prisma.eventMealPrice.findFirstOrThrow({ where: { eventId } });
+  await expectMealError(changeMealQuantity(otherEvent, childLunch, userId, { quantity: 2, reason: "Other event" }), "SELECTION_NOT_FOUND", "another event's selection");
+  await expectMealError(cancelMealSelection(otherEvent, childLunch, userId, { reason: "Other event" }), "SELECTION_NOT_FOUND", "cancelling another event's selection");
+  await expectMealError(updateMealService(otherEvent, wednesdayLunch.id, userId, { name: "X", mealType: "LUNCH", serviceDate: "2027-06-16", startTime: "12:00", endTime: null, location: null, ticketing: "TICKETED", capacity: null }), "SERVICE_NOT_FOUND", "another event's service");
+  await expectMealError(cancelMealService(otherEvent, wednesdayLunch.id, userId, { reason: "Other event" }), "SERVICE_NOT_FOUND", "cancelling another event's service");
+  await expectMealError(setMealPrice(otherEvent, ticketPlan.id, userId, { mealType: "LUNCH", ageGroup: "ADULT", attendeeTypeId: null, amountCents: 1 }), "PLAN_NOT_FOUND", "pricing another event's plan");
+  await expectMealError(removeMealPrice(otherEvent, aPrice.id, userId), "PRICE_NOT_FOUND", "removing another event's price");
+  await expectMealError(loadRegistrationMeals(otherEvent, paying.id), "REGISTRATION_NOT_FOUND", "another event's registration");
   await expectDatabaseRefusal(prisma.eventMealPlanService.create({ data: { eventId: otherEvent, planId: ticketPlan.id, serviceId: wednesdayLunch.id } }), "a plan listing another event's service");
 
   // ---- Clone safety ---------------------------------------------------------------------------------------------------------
@@ -401,6 +477,31 @@ async function main() {
   assert(staleFive === 0, "the clone's services are its own rows");
   const unchanged = await prisma.eventMealSelection.count({ where: { eventId } });
   assert(unchanged > 0, "the source keeps its selections");
+
+  // ---- The backfill script: dry run by default, one audit row per registration applied, skips waitlisted ------------------
+  const backfillReg = await makeRegistration("bf", { total: 14 });
+  const waitlistedReg = await makeRegistration("bfw", { total: 14, status: "WAITLISTED" });
+  for (const registration of [backfillReg, waitlistedReg]) {
+    await prisma.publicRegistrationSubmission.create({
+      data: {
+        eventId, formVersionId: versionId, registrationId: registration.id, idempotencyKey: randomUUID(), requestHash: randomUUID(),
+        responses: { breakfast_adult_qty: 2 }, pricingSnapshot: { lineItems: [{ key: "breakfast_adult_qty", amountCents: 1400 }] },
+      },
+    });
+  }
+  const runBackfill = (...extra: string[]) => {
+    const output = execFileSync("npx", ["tsx", "--require", "./scripts/support/allow-server-only.cjs", "scripts/meals-backfill-form-tickets.ts", "--event", eventId, ...extra], { env: process.env, cwd: process.cwd(), encoding: "utf8" });
+    return { output, summary: JSON.parse(output.slice(output.indexOf("{"))) as { wouldCreate: number; created: number; alreadyRecorded: number; failed: number } };
+  };
+  const dry = runBackfill();
+  assert(/^Database: localhost:\d+\/\w+/m.test(dry.output) && dry.summary.wouldCreate === 1 && dry.summary.created === 0, "the backfill dry run names the database and writes nothing");
+  assert((await prisma.eventMealSelection.count({ where: { registrationId: backfillReg.id } })) === 0, "a dry run records no selection");
+  const applied = runBackfill("--apply");
+  assert(applied.summary.created === 1 && applied.summary.failed === 0, "the backfill records the tickets");
+  const backfilled = await prisma.eventMealSelection.findFirstOrThrow({ where: { registrationId: backfillReg.id } });
+  assert(backfilled.unitPriceCents === 700 && await totalOf(backfillReg.id) === 1400 && (await prisma.eventMealSelection.count({ where: { registrationId: waitlistedReg.id } })) === 0, "unit price from the snapshot, no total moved, waitlisted skipped");
+  assert((await prisma.auditLog.count({ where: { eventId, action: "MEAL_FORM_TICKETS_BACKFILLED", entityId: backfillReg.id } })) === 1, "one audit row per applied registration");
+  assert(runBackfill("--apply").summary.created === 0, "a second run changes nothing");
 
   // ---- Event deletion ------------------------------------------------------------------------------------------------------
   await prisma.$transaction(async (tx) => {

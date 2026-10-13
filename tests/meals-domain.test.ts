@@ -282,7 +282,7 @@ describe("meal ticket CSV", () => {
 });
 
 describe("meal migration", () => {
-  const sql = readFileSync("prisma/migrations/20261018100000_meal_services_plans_selections/migration.sql", "utf8");
+  const sql = readFileSync("prisma/migrations/20261018110000_meal_services_plans_selections/migration.sql", "utf8");
 
   it("is additive: no drop, no rewrite of existing data", () => {
     expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|TYPE)/i);

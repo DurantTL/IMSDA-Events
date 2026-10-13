@@ -52,6 +52,7 @@ export type AdjustmentErrorCode =
   | "REGISTRATION_NOT_ADJUSTABLE"
   | "ADJUSTMENT_NOT_FOUND"
   | "ADJUSTMENT_ALREADY_REVERSED"
+  | "MEAL_ADJUSTMENT_NOT_REVERSIBLE"
   | "TOTAL_BELOW_ZERO"
   | "TOTAL_BELOW_PAID"
   | "PROMO_ALREADY_APPLIED"
@@ -363,7 +364,7 @@ export async function reverseRegistrationAdjustment(
       throw new AdjustmentError("ADJUSTMENT_NOT_FOUND", "That adjustment could not be found.");
     }
     if (original.kind === "MEAL") {
-      throw new AdjustmentError("ADJUSTMENT_NOT_FOUND", "A meal charge is changed by changing the meal order, not by reversing the line.");
+      throw new AdjustmentError("MEAL_ADJUSTMENT_NOT_REVERSIBLE", "A meal charge is changed by changing the meal order, not by reversing the line.");
     }
     if (original.reversedBy) {
       throw new AdjustmentError("ADJUSTMENT_ALREADY_REVERSED", "That adjustment was already reversed.");

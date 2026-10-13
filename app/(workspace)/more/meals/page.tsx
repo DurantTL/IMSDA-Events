@@ -11,8 +11,11 @@ export default async function MealsPage({ searchParams }: { searchParams: Promis
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   // Authorization is decided here on the server, and again by every API route the screen calls.
-  if (!permissions.includes("CONFIGURE_EVENT")) {
-    return <AccessRestricted title="Meals are restricted" detail="Event administrators can set up meal services and plans for this event." />;
+  const canConfigure = permissions.includes("CONFIGURE_EVENT");
+  const canManageFinance = permissions.includes("MANAGE_FINANCE");
+  const canExport = permissions.includes("VIEW_REPORTS");
+  if (!canConfigure && !canManageFinance && !canExport) {
+    return <AccessRestricted title="Meals are restricted" detail="Event administrators, finance staff and staff who view reports can open the meals screen for this event." />;
   }
   const view = await loadMealView(event.id);
   return (
@@ -20,8 +23,9 @@ export default async function MealsPage({ searchParams }: { searchParams: Promis
       eventId={event.id}
       eventName={event.name}
       initialView={view}
-      canManageFinance={permissions.includes("MANAGE_FINANCE")}
-      canExport={permissions.includes("VIEW_REPORTS")}
+      canConfigure={canConfigure}
+      canManageFinance={canManageFinance}
+      canExport={canExport}
     />
   );
 }

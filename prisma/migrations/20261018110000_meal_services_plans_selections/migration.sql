@@ -32,7 +32,7 @@ CREATE TYPE "MealServiceChangeType" AS ENUM ('CREATED', 'UPDATED', 'CANCELLED', 
 CREATE TYPE "MealLedgerKind" AS ENUM ('CHARGE', 'CREDIT');
 
 -- CreateEnum
-CREATE TYPE "MealSettlement" AS ENUM ('IN_REGISTRATION_PRICING', 'REGISTRATION_ADJUSTMENT', 'AT_COUNTER');
+CREATE TYPE "MealSettlement" AS ENUM ('IN_REGISTRATION_PRICING', 'REGISTRATION_ADJUSTMENT', 'AT_COUNTER', 'REGISTRATION_NOT_LIVE');
 
 -- AlterEnum
 ALTER TYPE "RegistrationAdjustmentKind" ADD VALUE 'MEAL';
@@ -379,13 +379,15 @@ ALTER TABLE "EventMealSelection" ADD CONSTRAINT "EventMealSelection_shape" CHECK
   AND (("source" = 'WALK_UP') = ("registrationId" IS NULL))
   AND (("status" = 'CANCELLED') = ("cancelledAt" IS NOT NULL))
   AND ("orderLabel" IS NULL OR length("orderLabel") <= 60)
-  AND ("source" <> 'PLAN_ASSIGNMENT' OR ("registrationAttendeeId" IS NOT NULL AND "serviceId" IS NOT NULL))
+  -- A cancelled entitlement may lose its attendee (the attendee row was removed by an amendment, ON DELETE SET NULL).
+  AND ("source" <> 'PLAN_ASSIGNMENT' OR "status" = 'CANCELLED' OR ("registrationAttendeeId" IS NOT NULL AND "serviceId" IS NOT NULL))
 );
 
--- One active selection per registration, attendee (or none), meal type, service (or none) and age group; a change
+-- One active selection per registration, attendee (or none), meal type, service (or none), age group, payer and origin
+-- (registration form or not), so a form ticket and a staff order never collide; a change
 -- edits that row's quantity, never adds a second.
 CREATE UNIQUE INDEX "EventMealSelection_one_active_slot" ON "EventMealSelection"(
-  "registrationId", COALESCE("registrationAttendeeId", ''), "mealType", COALESCE("serviceId", ''), "ageGroup"
+  "registrationId", COALESCE("registrationAttendeeId", ''), "mealType", COALESCE("serviceId", ''), "ageGroup", "payer", ("source" = 'REGISTRATION_FORM')
 ) WHERE "status" = 'ACTIVE' AND "registrationId" IS NOT NULL;
 
 -- A client request id makes a walk-up or staff order retry-safe.
