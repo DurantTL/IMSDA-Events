@@ -233,26 +233,28 @@ Keep these server-owned files in `/home/u_events/.xcloud`:
 - `docker-compose.env.yml` — adds `.env` and `.env.dburl` through `env_file`
   and attaches the external PostgreSQL network.
 
-The app service in `docker-compose.env.yml` must also map the release value; an
-`env_file` alone cannot see xCloud’s shell-only deployment variable:
+The complete override is checked in at
+[`deploy/xcloud/docker-compose.env.yml`](../deploy/xcloud/docker-compose.env.yml).
+Copy it to the server (as `root`) and check it merges with xCloud's generated file:
 
-```yaml
-services:
-  app:
-    env_file:
-      - .env
-      - .env.dburl
-    environment:
-      APP_RELEASE_SHA: ${APP_RELEASE_SHA:-}
-    networks:
-      - default
-      - postgresql
-
-networks:
-  postgresql:
-    external: true
-    name: postgresql_9kgaw_239292_xcloud-network
+```bash
+cd /var/www/events.imsda.org && git fetch origin && git checkout --detach origin/main
+install -m 600 -o u_events -g u_events deploy/xcloud/docker-compose.env.yml \
+  /home/u_events/.xcloud/docker-compose.env.yml
+docker volume inspect imsda_events_assets >/dev/null && echo assets-volume-ok
+docker compose -f /home/u_events/.xcloud/docker-compose.yml \
+  -f /home/u_events/.xcloud/docker-compose.env.yml config --quiet && echo config-ok
 ```
+
+It loads `.env` and `.env.dburl`, maps `APP_RELEASE_SHA` (an `env_file` alone
+cannot see xCloud's shell-only deployment variable), attaches the existing
+`imsda_events_assets` uploads volume and the external PostgreSQL network, and
+carries the encryption key file mount (#876) commented out. Uncomment the two
+key-file parts only once the key has moved out of `.env` (see "Loading the
+encryption key from a protected file" below); with the key still in `.env`, leave
+them commented. If `docker volume inspect` fails, the uploads volume has a
+different name on this server (`docker volume ls`); change the `name:` under
+`volumes:` to match rather than creating an empty one.
 
 `.env.dburl` is a plain `env_file` entry, so it must exist; Compose refuses to
 start without it. If `DATABASE_URL` is in `.env`, you can omit the entry.
@@ -357,9 +359,11 @@ A single failed guard run during a manual swap is expected and harmless: it can
 happen between the stop and the rename, and between the run and the network
 connect.
 
-#### Manual deploy script (use this)
+#### Manual deploy script
 
-`scripts/manual-deploy.sh` does the whole swap below in one command, and replaces
+Use this when the xCloud Deploy button cannot be used (for example, when the
+base Compose file is not regenerated). `scripts/manual-deploy.sh` does the
+whole swap below in one command, and replaces
 the hand-kept `/root/manual-deploy.sh`. That copy was written before the
 encryption key file (#876), the lodging sync and the GHCR images, so it can now
 start a container the app refuses to run. Run as `root` on the host, with the
