@@ -267,13 +267,12 @@ export function AppShell({
 
         {!eventlessProfile && <span className="event-workspace-label">Event workspace</span>}
         {!eventlessProfile && <div className="event-picker-wrap">
-          <label className="sr-only" htmlFor="event-picker">Current event</label>
+          <label className="sr-only" htmlFor="event-picker">Event workspace</label>
           <div className="select-shell">
             <select
               id="event-picker"
               value={selectedEventId}
               onChange={(event) => selectEvent(event.target.value)}
-              aria-label="Current event"
             >
               {!selectedEventId && <option value="" disabled>Choose an event</option>}
               {events.map((event) => <option value={event.id} key={event.id}>{event.name}</option>)}

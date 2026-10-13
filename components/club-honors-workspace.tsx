@@ -374,7 +374,7 @@ export function ClubHonorsWorkspace({
                       <HonorPillList honors={row.honors} showStatus />
                     </td>
                     <td {...cardCell(null)}>
-                      <button aria-label={`${readOnly ? "View honor history for" : "Add or view honors for"} ${row.firstName} ${row.lastName}`} className="secondary-button honor-add-button" onClick={() => openHistory(row)} type="button">
+                      <button aria-label={`${readOnly ? "View history for" : "Add or view honors for"} ${row.firstName} ${row.lastName}`} className="secondary-button honor-add-button" onClick={() => openHistory(row)} type="button">
                         {readOnly ? "View history" : <><Plus aria-hidden="true" size={13} /> Add</>}
                       </button>
                     </td>

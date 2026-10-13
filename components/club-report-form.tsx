@@ -231,7 +231,7 @@ export function ClubReportForm({
         )}
         {asDialog && !inDialog && (
           <button className="primary-button" data-monthly-report-open="" onClick={() => setOpen(true)} type="button">
-            <FileText aria-hidden="true" size={16} /> {readOnly ? "View report" : report ? (isDraft ? "Continue report" : "Edit report") : "Open monthly record"}
+            <FileText aria-hidden="true" size={16} /> {readOnly ? "View report" : report ? (isDraft ? "Continue report" : "Edit report") : "Open Monthly Record"}
           </button>
         )}
       </div>

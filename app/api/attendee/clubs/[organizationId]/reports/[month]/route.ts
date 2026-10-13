@@ -17,7 +17,7 @@ async function putHandler(request: Request, context: { params: Promise<{ organiz
     const input = clubReportInputSchema.parse(await request.json());
     return Response.json({ report: await saveClubReport(organizationId, month, input, actorAttribution(access.actor)) });
   } catch (error) {
-    return clubReportApiError(error, "Saving the monthly record");
+    return clubReportApiError(error, "Saving the Monthly Record");
   }
 }
 

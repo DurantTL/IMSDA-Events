@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { EventInfoCards } from "@/components/event-info-cards";
 import { EventContentBlocks, publicEventAssetUrl } from "@/components/event-content-blocks";
@@ -23,14 +24,14 @@ export async function generateMetadata({ params }: GroupRegistrationPageProps): 
   };
 }
 
-async function load(eventSlug: string) {
+const load = cache(async (eventSlug: string) => {
   try {
     return await getGroupRegistrationExperience(eventSlug);
   } catch (error) {
     if (error instanceof GroupRegistrationError && error.code === "EVENT_NOT_FOUND") return null;
     throw error;
   }
-}
+});
 
 /**
  * /register/<eventSlug>/group (#650): people who are not in a club register
