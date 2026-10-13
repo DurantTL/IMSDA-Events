@@ -1,0 +1,43 @@
+# Base compose file for the events.imsda.org xCloud site
+# (/home/u_events/239298/docker-compose.yml, $XCLOUD_COMPOSE_FILE).
+#
+# xCloud generates this file with only the build and the port, so a container
+# started from it has no secrets and no database and refuses to start. This
+# version is the generated file plus the settings, uploads and database network.
+# Keep it in place on the server, and paste it into the site's Docker Compose
+# page if xCloud offers an editor, so a regenerated file keeps it.
+# See docs/DEPLOY-DOCKER.md, "xCloud site setup".
+name: xcloud-site-239298
+services:
+  app:
+    build:
+      context: '${XCLOUD_SITE_PATH:-/var/www/events.imsda.org}'
+      dockerfile: Dockerfile
+    ports:
+      - '127.0.0.1:8100:3100'
+    env_file:
+      # The production environment from the xCloud dashboard.
+      - /home/u_events/239298/.env
+      # Only DATABASE_URL=... (the dashboard environment has no DATABASE_URL).
+      - /home/u_events/.xcloud/.env.dburl
+    environment:
+      PORT: '3100'
+      APP_RELEASE_SHA: ${APP_RELEASE_SHA:-}
+      ASSET_STORAGE_DIR: /app/storage/event-assets
+    volumes:
+      # Uploaded event files; without this every uploaded file returns 404.
+      - imsda_events_assets:/app/storage/event-assets
+    networks:
+      - default
+      - postgresql
+    restart: unless-stopped
+
+volumes:
+  imsda_events_assets:
+    external: true
+    name: imsda_events_assets
+
+networks:
+  postgresql:
+    external: true
+    name: postgresql_9kgaw_239292_xcloud-network

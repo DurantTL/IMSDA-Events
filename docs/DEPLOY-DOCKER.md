@@ -219,48 +219,57 @@ built yet, so the delivery status for SES mail stops at "accepted".
 
 ## xCloud site setup (current, October 2026)
 
-This is how production runs and deploys now. xCloud generates a minimal base
-file, `/home/u_events/239298/docker-compose.yml` (`$XCLOUD_COMPOSE_FILE`), with
-only the build, port `127.0.0.1:8100:3100` and `PORT`. It keeps the production
-environment from its dashboard in `/home/u_events/239298/.env`, but that file
-only fills `${...}` values in Compose files: **the app container does not get
-it unless the override lists it.** Started from the base file alone, the app
-has no secrets and refuses to start ("Invalid server environment").
+This is how production runs and deploys now. xCloud's base compose file is
+`/home/u_events/239298/docker-compose.yml` (`$XCLOUD_COMPOSE_FILE`). As xCloud
+generates it, it has only the build, port `127.0.0.1:8100:3100` and `PORT`.
+xCloud keeps the production environment from its dashboard in
+`/home/u_events/239298/.env`, but that file only fills `${...}` values in the
+compose file: **the app container does not get it unless the compose file
+lists it under `env_file`.** A container started from the generated file has no
+secrets and refuses to start ("Invalid server environment" or "Environment
+variable not found: DATABASE_URL"), and nginx then returns 502.
 
-The override [`deploy/xcloud/docker-compose.env.yml`](../deploy/xcloud/docker-compose.env.yml)
-lives at `/home/u_events/.xcloud/docker-compose.env.yml` (owner `u_events`, mode
-`600`). It loads `/home/u_events/239298/.env` and
-`/home/u_events/.xcloud/.env.dburl` (xCloud's `.env` has no `DATABASE_URL`),
-attaches the `imsda_events_assets` uploads volume and joins
-`postgresql_9kgaw_239292_xcloud-network`. Paths are absolute because Compose
-resolves relative ones against the first file's folder.
+So the base file on the server is replaced with
+[`deploy/xcloud/docker-compose.yml`](../deploy/xcloud/docker-compose.yml): the
+generated file plus `env_file` (xCloud's `.env` and
+`/home/u_events/.xcloud/.env.dburl`, which holds only `DATABASE_URL`), the
+`imsda_events_assets` uploads volume and the PostgreSQL network. Anything that
+starts the app from that file, xCloud included, then gets its settings. Paste
+the same content into the site's **Docker Compose** page if xCloud offers an
+editor. If the file on the server shrinks back to about 250 bytes, xCloud has
+regenerated it: copy it in again (as `root`, `install -m 644 -o u_events -g
+u_events deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
 
 **xCloud Git settings → Deploy Script** (with **Stop the deployment when a
 command fails** turned on):
 
 ```bash
 export APP_RELEASE_SHA="$(git -C "$XCLOUD_SITE_PATH" rev-parse HEAD)"
-docker compose -f "$XCLOUD_COMPOSE_FILE" -f /home/u_events/.xcloud/docker-compose.env.yml build app
-docker compose -f "$XCLOUD_COMPOSE_FILE" -f /home/u_events/.xcloud/docker-compose.env.yml up -d app
+docker compose -f "$XCLOUD_COMPOSE_FILE" build app
+docker compose -f "$XCLOUD_COMPOSE_FILE" up -d app
 ```
 
 It builds first and replaces the container only when the build succeeds, so the
-site stays up during the build. Never use `down`, and never start the app from
-the base file alone.
+site stays up during the build. Never use `down`.
 
 By hand, as `root` (for example to restart without a build):
 
 ```bash
-C="docker compose -f /home/u_events/239298/docker-compose.yml -f /home/u_events/.xcloud/docker-compose.env.yml"
-$C config --quiet && echo config-ok
+B=/home/u_events/239298/docker-compose.yml
+docker compose -f $B config --quiet && echo config-ok
 export APP_RELEASE_SHA="$(git -C /var/www/events.imsda.org rev-parse HEAD)"
-$C up -d --no-build app
+docker compose -f $B up -d --no-build app
 curl -s http://127.0.0.1:8100/api/health
+docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
 ```
 
-To change a secret, edit it in the xCloud dashboard (or
-`/home/u_events/239298/.env`), then run the `up -d` line: a restart alone keeps
-the old values.
+To change a secret, edit it in the xCloud dashboard, then run the `up -d` line:
+a restart alone keeps the old values.
+
+`deploy/xcloud/docker-compose.env.yml` is the earlier override with the same
+additions. It is not needed while the base file carries them; passing it as a
+second `-f` file is harmless.
 
 The server-level runtime guard (`imsda-xcloud-runtime-guard.timer`) belongs to
 the earlier setup and is disabled; it cannot repair a container started from
