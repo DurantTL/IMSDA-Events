@@ -231,6 +231,31 @@ describe("event settings routes", () => {
     expect(forwarded.hotelName).toBeNull();
   });
 
+  it("forwards a refund policy, and leaves it absent when the client omits it (#891)", async () => {
+    dependencies.updateEventSettings.mockResolvedValue({ id: "evt_wr28", ...eventPayload });
+    const params = { params: Promise.resolve({ eventId: "evt_wr28" }) };
+
+    await PATCH(eventRequest("/api/events/evt_wr28", "PATCH", { ...eventPayload, refundPolicy: "  Refunds until Oct 1.  " }), params);
+    expect((dependencies.updateEventSettings.mock.calls[0] as [string, Record<string, unknown>])[1].refundPolicy).toBe("Refunds until Oct 1.");
+
+    dependencies.updateEventSettings.mockClear();
+    await PATCH(eventRequest("/api/events/evt_wr28", "PATCH", eventPayload), params);
+    expect((dependencies.updateEventSettings.mock.calls[0] as [string, Record<string, unknown>])[1].refundPolicy).toBeUndefined();
+  });
+
+  it("does not save a refund policy without event configuration permission (#891)", async () => {
+    dependencies.getCurrentSession.mockResolvedValue({
+      user: { id: "usr_staff", email: "staff@example.test", displayName: "Staff", globalRole: null },
+    });
+    dependencies.findActiveMembership.mockResolvedValue(null);
+    const response = await PATCH(
+      eventRequest("/api/events/evt_wr28", "PATCH", { ...eventPayload, refundPolicy: "Anything." }),
+      { params: Promise.resolve({ eventId: "evt_wr28" }) },
+    );
+    expect(response.status).toBe(403);
+    expect(dependencies.updateEventSettings).not.toHaveBeenCalled();
+  });
+
   it("accepts an update with no IMSDA.org information page (#467)", async () => {
     dependencies.updateEventSettings.mockResolvedValue({
       id: "evt_wr28",

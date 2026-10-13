@@ -76,6 +76,7 @@ const registrationAccessInclude = {
           location: true,
           publicInfoUrl: true,
           supportContact: true,
+          refundPolicy: true,
           collectsShirtSizes: true,
           attendeeEditPolicy: true,
           billingMode: true,
@@ -488,6 +489,7 @@ function serializeRegistrationAccess(
       detailsUrl: links.detailsUrl,
       supportUrl: links.supportUrl,
       supportContact: event.supportContact,
+      refundPolicy: event.refundPolicy,
       shirtSizesAvailable: eventCollectsShirtSizes(event),
       attendeePassesAvailable: attendeePassExpiry(event.endsAt).getTime()
         > now.getTime(),

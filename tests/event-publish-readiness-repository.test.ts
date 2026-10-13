@@ -51,6 +51,7 @@ type RowOverrides = Partial<{
   supportContact: string | null;
   audience: "GENERAL" | "CLUB";
   billingMode: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE";
+  refundPolicy: string | null;
 }>;
 
 const eventRow = (overrides: RowOverrides = {}) => ({
@@ -63,6 +64,8 @@ const eventRow = (overrides: RowOverrides = {}) => ({
   capacity: 350,
   publicInfoUrl: overrides.publicInfoUrl ?? null,
   supportContact: overrides.supportContact === undefined ? "registration@example.test" : overrides.supportContact,
+  helpEmail: null,
+  refundPolicy: overrides.refundPolicy ?? null,
   hotelName: null,
   hotelBookingUrl: null,
   hotelPhone: null,
@@ -556,5 +559,42 @@ describe("changing the audience writes the club modules (#741)", () => {
       expect(tx.eventModule.createMany).not.toHaveBeenCalled();
       expect(tx.eventModule.deleteMany).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("event refund policy setting (#891)", () => {
+  it("writes the policy and audits the before and after values", async () => {
+    const { prisma, eventUpdate, auditLogCreate } = mockPrisma({ isPublished: true, refundPolicy: "Old policy." }, 1, true);
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await updateEventSettings("event-1", { ...baseInput, refundPolicy: "New policy." }, "usr_1");
+
+    expect(eventUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ refundPolicy: "New policy." }),
+    }));
+    expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: "EVENT_SETTINGS_UPDATED",
+        metadata: expect.objectContaining({
+          before: expect.objectContaining({ refundPolicy: "Old policy." }),
+          after: expect.objectContaining({ refundPolicy: "New policy." }),
+        }),
+      }),
+    }));
+  });
+
+  it("clears the policy on an explicit null", async () => {
+    const { prisma, eventUpdate } = mockPrisma({ isPublished: true, refundPolicy: "Old policy." }, 1, true);
+    dependencies.getPrisma.mockReturnValue(prisma);
+    await updateEventSettings("event-1", { ...baseInput, refundPolicy: null }, "usr_1");
+    expect(eventUpdate.mock.calls[0]![0].data.refundPolicy).toBeNull();
+  });
+
+  it("keeps the stored policy when an update omits the field", async () => {
+    const { prisma, eventUpdate } = mockPrisma({ isPublished: true, refundPolicy: "Old policy." }, 1, true);
+    dependencies.getPrisma.mockReturnValue(prisma);
+    await updateEventSettings("event-1", baseInput, "usr_1");
+    // Prisma leaves a field alone when its value is undefined.
+    expect(eventUpdate.mock.calls[0]![0].data.refundPolicy).toBeUndefined();
   });
 });

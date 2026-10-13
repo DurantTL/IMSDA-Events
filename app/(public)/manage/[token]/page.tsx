@@ -18,6 +18,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { accountPromptVisible } from "@/modules/forms/account-prompt";
 import { RegistrationAccountPrompt } from "@/components/registration-account-prompt";
+import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { PublicAttendeePasses } from "@/components/public-attendee-passes";
 import { PublicRegistrationContactForm } from "@/components/public-registration-contact-form";
 import { PublicShirtSizeConfirmation } from "@/components/public-shirt-size-confirmation";
@@ -379,6 +380,10 @@ export default async function PublicManagePage({
                 <dd translate="no">{money(view.payment.amountDueCents)}</dd>
               </div>
             </dl>
+            )}
+            {/* Only for an active registration, like the confirmation email: not waitlisted or cancelled. */}
+            {(view.registration.status === "SUBMITTED" || view.registration.status === "CONFIRMED") && (
+              <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
             )}
             {!view.perPerson && !view.isGroup && <PublicSquarePayment token={token} />}
           </section>

@@ -10686,3 +10686,22 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 @media (max-width: 600px) {
   .schedule-board .text-button { min-height: 44px; min-width: 44px; }
 }
+
+/* Refund policy (#891): plain paragraphs, wrapping on any width. */
+.event-refund-policy {
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 16px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: #40545e;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+.event-refund-policy-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--ink); }
+.event-refund-policy-heading h2,
+.event-refund-policy-heading h3 { margin: 0; font-size: 1.05rem; line-height: 1.3; }
+.event-refund-policy p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.event-refund-policy p + p { margin-top: 0.8rem; }

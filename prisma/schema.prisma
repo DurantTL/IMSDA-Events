@@ -1473,6 +1473,8 @@ model Event {
   subtitle             String?
   /// Where the event's help card and notices send people (#651); club events fall back to youth@imsda.org.
   helpEmail            String?
+  /// Refund policy shown to registrants (#891): plain text, paragraphs split on blank lines. Display only; refund rules and processing live elsewhere. Blank hides it.
+  refundPolicy         String?
   isPublished          Boolean            @default(false)
   registrationOpensOn  String?
   registrationClosesOn String?

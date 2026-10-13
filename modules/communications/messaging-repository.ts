@@ -103,7 +103,7 @@ import {
   type SelectedAudiencePreview,
   type SelectedAudienceTemplateKey,
 } from "@/modules/communications/selected-audience";
-import { enqueueSelectedAudienceMessage } from "@/modules/communications/transactional-messages";
+import { enqueueSelectedAudienceMessage, isRegistrationConfirmation } from "@/modules/communications/transactional-messages";
 import {
   eventCollectsShirtSizes,
   shirtSizeFromResponses,
@@ -1311,6 +1311,7 @@ async function loadTestRegistrationContext(
       event: {
         select: {
           billingMode: true,
+          refundPolicy: true,
           paymentInstructionVersions: {
             orderBy: { versionNumber: "desc" },
             take: 1,
@@ -1411,6 +1412,8 @@ async function loadTestRegistrationContext(
         balanceCents,
         paymentInstructions: paymentInstructionsText,
         portalUrl: REGISTRATION_MANAGE_LINK_SENTINEL,
+        // A test send of a confirmation shows the policy as the real one will (#891).
+        refundPolicy: isRegistrationConfirmation(templateKey ?? "") ? registration.event?.refundPolicy : null,
       }),
       ...buildRegistrationCheckinTokens({
         confirmationCode: registration.confirmationCode,
@@ -3442,6 +3445,7 @@ export async function enqueuePublicRegistrationMessages(
       where: { id: input.event.id },
       select: {
         supportContact: true,
+        refundPolicy: true,
         billingMode: true,
         paymentInstructionVersions: {
           orderBy: { versionNumber: "desc" },
@@ -3539,6 +3543,8 @@ export async function enqueuePublicRegistrationMessages(
       organization: responsibleOrganization,
       billingContact: billingContactName,
       perPersonNotice: isDeferredOrganizationBilling && !billedToGroup ? churchBilledNotice : null,
+      // The confirmation shows the event's refund policy (#891); empty adds nothing.
+      refundPolicy: eventDetails?.refundPolicy,
     }),
     ...buildRegistrationCheckinTokens({
       confirmationCode: input.registration.confirmationCode,

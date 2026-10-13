@@ -275,6 +275,8 @@ export type PublicRegistrationExperience = {
     audience: "GENERAL" | "CLUB";
     /** A person under this age on the event's start date is a minor (#131). */
     ageOfMajority: number;
+    /** Staff-authored refund policy text (#891), shown before submitting; null when none. */
+    refundPolicy: string | null;
   };
   form: {
     slug: string;
@@ -310,6 +312,7 @@ const publicEventSelect = {
   billingMode: true,
   audience: true,
   ageOfMajority: true,
+  refundPolicy: true,
   attendeeTypes: {
     where: { isActive: true },
     orderBy: [{ sortOrder: "asc" as const }, { label: "asc" as const }],
@@ -600,6 +603,7 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
       billingMode: form.event.billingMode,
       audience: form.event.audience,
       ageOfMajority: form.event.ageOfMajority,
+      refundPolicy: form.event.refundPolicy,
     },
     form: { slug: form.slug, versionId: version.id, versionNumber: version.versionNumber, definition },
     choiceUsage: usageFromReservations(definition, reservations),

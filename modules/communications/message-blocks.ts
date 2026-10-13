@@ -3,6 +3,7 @@ import {
   REGISTRATION_MANAGE_LINK_SENTINEL,
 } from "@/modules/communications/manage-link";
 import { escapeMarkdown } from "@/modules/communications/email-html";
+import { refundPolicyParagraphs } from "@/modules/events/refund-policy";
 import { formatMessageMoney } from "@/modules/communications/templates";
 
 /**
@@ -119,6 +120,12 @@ export type PaymentStatusBlockInput = {
    * "$25 per person. Your church is billed after the event." No total is ever printed there.
    */
   perPersonNotice?: string | null;
+  /**
+   * The event's refund policy text (#891). Appended after the payment status of a
+   * confirmed registration only, as plain Markdown-escaped paragraphs; empty adds nothing.
+   * Display only: it states the policy and never promises or starts a refund.
+   */
+  refundPolicy?: string | null;
 };
 
 /**
@@ -140,7 +147,31 @@ export function resolvePaymentState(input: {
   return input.balanceCents > 0 ? "BALANCE_DUE" : "PAID";
 }
 
+const REFUND_POLICY_STATES: ReadonlySet<PaymentState> = new Set([
+  "PAID",
+  "BALANCE_DUE",
+  "COMPLIMENTARY",
+  "ORGANIZATION_INVOICED",
+  "GROUP_INVOICED",
+]);
+
+/** The refund policy as an email section, or "" when there is none. Staff text is Markdown-escaped. */
+export function buildRefundPolicyBlock(policy: string | null | undefined) {
+  const paragraphs = refundPolicyParagraphs(policy);
+  if (paragraphs.length === 0) return "";
+  return ["### Refund policy", "", ...paragraphs.flatMap((paragraph) => [
+    paragraph.split("\n").map((line) => escapeMarkdown(line)).join("  \n"),
+    "",
+  ])].join("\n").trimEnd();
+}
+
 export function buildPaymentStatusBlock(input: PaymentStatusBlockInput) {
+  const status = buildPaymentStatusSection(input);
+  const policy = REFUND_POLICY_STATES.has(input.state) ? buildRefundPolicyBlock(input.refundPolicy) : "";
+  return policy ? `${status}\n\n${policy}` : status;
+}
+
+function buildPaymentStatusSection(input: PaymentStatusBlockInput) {
   const total = formatMessageMoney(Math.max(input.totalCents, 0));
   const paid = formatMessageMoney(Math.max(input.paidCents, 0));
   const balance = formatMessageMoney(Math.max(input.balanceCents, 0));
@@ -194,8 +225,8 @@ export function buildPaymentStatusBlock(input: PaymentStatusBlockInput) {
       "",
       `**${clean(input.perPersonNotice) ?? "Your church is billed after the event."}**`,
     ];
-    if (organization) lines.push("", `Responsible organization: **${organization}**`);
-    if (billingContact) lines.push(`Billing contact: **${billingContact}**`);
+    if (organization) lines.push("", `Responsible organization: **${escapeMarkdown(organization)}**`);
+    if (billingContact) lines.push(`Billing contact: **${escapeMarkdown(billingContact)}**`);
     return lines.join("\n");
   }
 

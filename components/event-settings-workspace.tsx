@@ -114,6 +114,7 @@ function draftFromEvent(event: EventSettingsRecord | null): EventSettingsInput {
     tagline: event?.tagline ?? null,
     subtitle: event?.subtitle ?? null,
     helpEmail: event?.helpEmail ?? null,
+    refundPolicy: event?.refundPolicy ?? null,
     hotelName: event?.hotelName ?? null,
     hotelBookingUrl: event?.hotelBookingUrl ?? null,
     hotelPhone: event?.hotelPhone ?? null,
@@ -261,6 +262,7 @@ export function EventSettingsWorkspace({
             tagline: draft.tagline || null,
             subtitle: draft.subtitle || null,
             helpEmail: draft.helpEmail || null,
+            refundPolicy: draft.refundPolicy || null,
             registrationOpensOn: draft.registrationOpensOn || null,
             registrationClosesOn: draft.registrationClosesOn || null,
             capacity: draft.capacity || null,
@@ -913,6 +915,11 @@ export function EventSettingsWorkspace({
               <input id={settingsFieldDomId("helpEmail")} {...fieldAria("helpEmail")} type="email" value={draft.helpEmail ?? ""} maxLength={200} placeholder="youth@imsda.org" onChange={(event) => update("helpEmail", event.target.value || null)} />
               <small>Used by the help card on a club event&rsquo;s public page. Club events fall back to youth@imsda.org.</small>
             {fieldNote("helpEmail")}</label>
+            <label>
+              Refund policy (optional)
+              <textarea id={settingsFieldDomId("refundPolicy")} {...fieldAria("refundPolicy")} value={draft.refundPolicy ?? ""} rows={5} maxLength={4000} placeholder="Refunds are available until two weeks before the event." onChange={(event) => update("refundPolicy", event.target.value || null)} />
+              <small>Shown to registrants on the event page, before they submit a registration, and on their confirmation. Plain text; leave a blank line between paragraphs. Leave empty to show nothing. This only displays the policy; refunds are still handled by staff.</small>
+            {fieldNote("refundPolicy")}</label>
             {draft.publicInfoUrl && (
               <a className="secondary-button event-info-preview" href={draft.publicInfoUrl} target="_blank" rel="noreferrer">
                 <ExternalLink size={15} aria-hidden="true" /> Open IMSDA.org page

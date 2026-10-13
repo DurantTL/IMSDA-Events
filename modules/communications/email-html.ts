@@ -74,6 +74,14 @@ export function plainTextFromEscapedMarkdown(value: string) {
 }
 
 /**
+ * Removes only the backslash escapes `escapeMarkdown` added, leaving the block's own
+ * Markdown (bold, headings, links) as the text part has always shown it.
+ */
+export function unescapeMarkdown(value: string) {
+  return value.replace(BACKSLASH_ESCAPE_PATTERN, "$1");
+}
+
+/**
  * Neutralise every Markdown construct in an untrusted value. Deliberately
  * escapes all ASCII punctuation rather than only the characters that start a
  * construct today: the alternative is a denylist that has to be revisited every
