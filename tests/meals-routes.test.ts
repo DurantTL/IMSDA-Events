@@ -28,7 +28,7 @@ type Role = "EVENT_ADMIN" | "FINANCE_MANAGER" | "REGISTRATION_MANAGER" | "CHECK_
 
 type Case = {
   name: string;
-  load: () => Promise<Record<string, (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>>>;
+  load: () => Promise<unknown>;
   method: "GET" | "POST" | "PUT" | "DELETE";
   params?: Record<string, string>;
   body?: unknown;
@@ -67,7 +67,10 @@ function asRole(next: Role, extra: string[] = []) {
   extraPermissions = extra;
 }
 
-function call(testCase: Case, handlers: Awaited<ReturnType<Case["load"]>>) {
+type Handlers = Record<string, (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>>;
+
+function call(testCase: Case, loaded: unknown) {
+  const handlers = loaded as Handlers;
   const request = new Request("http://localhost/api/events/event-1/meals", {
     method: testCase.method,
     headers: { "content-type": "application/json" },
@@ -149,7 +152,7 @@ describe("meal routes (#210)", () => {
     asRole("READ_ONLY_STAFF", ["CONFIGURE_EVENT"]);
     const handlers = await import("@/app/api/events/[eventId]/meals/services/[serviceId]/route");
     const request = new Request("http://localhost/api/events/event-1/meals/services/s1", { method: "POST", body: JSON.stringify({ action: "cancel", reason: "Kitchen closed" }) });
-    const response = await handlers.POST(request, { params: Promise.resolve({ eventId: "event-1", serviceId: "s1" }) });
+    const response = await (handlers.POST as unknown as Handlers["POST"])(request, { params: Promise.resolve({ eventId: "event-1", serviceId: "s1" }) });
     expect(response.status).toBe(403);
     expect(mocks.selection.cancelMealService).not.toHaveBeenCalled();
   });
@@ -157,7 +160,7 @@ describe("meal routes (#210)", () => {
   it("an event administrator's meal service routes cannot be reached by staff of another event", async () => {
     mocks.findActiveMembership.mockResolvedValue(null);
     const handlers = await import("@/app/api/events/[eventId]/meals/services/route");
-    const response = await handlers.POST(new Request("http://localhost/x", { method: "POST", body: "{}" }), { params: Promise.resolve({ eventId: "event-2" }) });
+    const response = await (handlers.POST as unknown as Handlers["POST"])(new Request("http://localhost/x", { method: "POST", body: "{}" }), { params: Promise.resolve({ eventId: "event-2" }) });
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: "EVENT_ACCESS_DENIED" });
     expect(mocks.config.createMealService).not.toHaveBeenCalled();
@@ -165,7 +168,7 @@ describe("meal routes (#210)", () => {
 
   it("the meal tickets CSV is a no-store attachment", async () => {
     const handlers = await import("@/app/api/events/[eventId]/exports/meal-tickets/route");
-    const response = await handlers.GET(new Request("http://localhost/x"), { params: Promise.resolve({ eventId: "event-1" }) });
+    const response = await (handlers.GET as unknown as Handlers["GET"])(new Request("http://localhost/x"), { params: Promise.resolve({ eventId: "event-1" }) });
     expect(response.headers.get("content-type")).toContain("text/csv");
     expect(response.headers.get("content-disposition")).toContain("meal-tickets.csv");
     expect(response.headers.get("cache-control")).toContain("no-store");

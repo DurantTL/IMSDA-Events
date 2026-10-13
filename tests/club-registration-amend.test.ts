@@ -209,6 +209,7 @@ function fixture({
       versions: [{ definition }],
     })) },
     clubEventRegistration: { findUnique: vi.fn(async (): Promise<{ registrationId: string } | null> => ({ registrationId: "registration-1" })) },
+    eventMealSelection: { findMany: vi.fn(async () => []) },
     registrationAttendee: {
       findMany: vi.fn(async () => registration.attendees.map((a) => ({ id: a.id, personId: a.personId, profileSnapshot: a.profileSnapshot, formResponses: a.formResponses }))),
       count: vi.fn(async () => 0),
