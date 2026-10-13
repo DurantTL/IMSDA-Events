@@ -132,7 +132,7 @@ export const chargeActionSchema = z.discriminatedUnion("action", [
 export type ChargeAction = z.infer<typeof chargeActionSchema>;
 
 /** The closeout exceptions a person can mark reviewed. */
-export const reviewableExceptionCodes = ["CORRECTION_NEEDS_REVIEW", "WAIVED_ON_INACTIVE_REGISTRATION", "WAIVED_AFTER_REFUND"] as const;
+export const reviewableExceptionCodes = ["CORRECTION_NEEDS_REVIEW", "WAIVED_ON_INACTIVE_REGISTRATION", "WAIVED_AFTER_REFUND", "CHARGED_ON_CANCELLED_REGISTRATION"] as const;
 export type ReviewableExceptionCode = (typeof reviewableExceptionCodes)[number];
 
 /**

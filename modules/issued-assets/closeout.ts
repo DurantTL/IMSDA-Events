@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { registrationBalanceCents } from "@/modules/payments/square-domain";
 import { toCsv } from "@/modules/reporting/csv";
 import {
   applyOutcomeCorrections,
@@ -81,6 +82,7 @@ export const exceptionCodes = [
   "CORRECTION_NEEDS_REVIEW",
   "WAIVED_ON_INACTIVE_REGISTRATION",
   "WAIVED_AFTER_REFUND",
+  "CHARGED_ON_CANCELLED_REGISTRATION",
   "FACILITY_OPEN",
   "BLOCK_ON_FINISHED_ISSUE",
   "RECONCILIATION_MISMATCH",
@@ -96,6 +98,7 @@ export const exceptionLabels: Record<ExceptionCode, string> = {
   CORRECTION_NEEDS_REVIEW: "Outcome corrected after money was recorded",
   WAIVED_ON_INACTIVE_REGISTRATION: "Waived after cancellation: the line is still on the registration total",
   WAIVED_AFTER_REFUND: "Charge waived after the deposit was refunded for it",
+  CHARGED_ON_CANCELLED_REGISTRATION: "Charged for a key or item, but the registration was cancelled before paying",
   FACILITY_OPEN: "Facility issue unresolved",
   BLOCK_ON_FINISHED_ISSUE: "Resolved issue still blocks a room",
   RECONCILIATION_MISMATCH: "Counts do not reconcile",
@@ -330,6 +333,26 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     const refund = depositId ? (settlementsByDeposit.get(depositId) ?? []).find((entry) => entry.kind === "DEPOSIT_RETURNED") : undefined;
     if (refund && refund.createdAt.getTime() > charge.createdAt.getTime() && waiver.createdAt.getTime() > refund.createdAt.getTime() && !reviewedFor(issuanceId, "WAIVED_AFTER_REFUND", waiver.id)) {
       exceptions.push({ code: "WAIVED_AFTER_REFUND", label: exceptionLabels.WAIVED_AFTER_REFUND, subject: subject(row), detail: `The deposit was handed back because ${formatCents(charge.amountCents)} was charged for this loss, and the charge was then waived: nobody paid for it. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
+    }
+  }
+  // A posted, unwaived key or item charge on a registration that is no longer live, whose balance still owes it: someone decides
+  // whether to collect it or write it off. The review names the charge.
+  const postedCharges = chargeEntries.filter((entry) => entry.registrationAdjustmentId !== null && entry.registrationId && entry.issuanceId && !waiverByCharge.has(entry.id));
+  if (postedCharges.length > 0) {
+    const registrations = await client.registration.findMany({
+      where: { eventId, id: { in: [...new Set(postedCharges.map((entry) => entry.registrationId as string))] }, status: { notIn: ["SUBMITTED", "CONFIRMED"] } },
+      select: { id: true, totalAmount: true, payments: { where: { status: "SUCCEEDED" }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } } } },
+    });
+    const owed = new Map(registrations.map((registration) => [registration.id, registrationBalanceCents(registration)]));
+    for (const charge of postedCharges) {
+      const balance = owed.get(charge.registrationId as string);
+      const row = described.get(charge.issuanceId as string);
+      if (!balance || balance <= 0 || !row || reviewedFor(charge.issuanceId as string, "CHARGED_ON_CANCELLED_REGISTRATION", charge.id)) continue;
+      exceptions.push({
+        code: "CHARGED_ON_CANCELLED_REGISTRATION", label: exceptionLabels.CHARGED_ON_CANCELLED_REGISTRATION, subject: subject(row),
+        detail: `${formatCents(charge.amountCents)} was charged to a registration that is no longer active and its balance still owes ${formatCents(Math.min(balance, charge.amountCents))} of it. Decide whether to collect it or write it off; nothing was changed automatically.`,
+        holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: charge.issuanceId as string, triggerId: charge.id,
+      });
     }
   }
   for (const issue of facilityOpen) {

@@ -223,6 +223,14 @@ describe("closeout reviews", () => {
     eventId: "ev1", eventName: "Camp Meeting 2027", report: review, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true,
   }));
 
+  it("lists a key charge on a cancelled registration with a review form for finance only", () => {
+    const cancelled: CloseoutReport = { ...report, exceptions: [{ code: "CHARGED_ON_CANCELLED_REGISTRATION", label: "Charged for a key or item, but the registration was cancelled before paying", subject: "L-11 (Lodge key)", detail: "Decide.", holderLabel: "Pat Example", amountCents: 400, deskAttendeeId: "att1", refId: "i1", triggerId: "c1" }] };
+    const html = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: cancelled, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true }));
+    expect(html(true)).toContain("registration was cancelled before paying");
+    expect(html(true)).toContain("Reviewed, nothing more to do");
+    expect(html(false)).not.toContain("Reviewed, nothing more to do");
+  });
+
   it("shows a deposit partly handed back, and what is still held", () => {
     const partly: CloseoutReport = { ...report, deposits: [{ ...report.deposits[0]!, state: "PARTLY_HANDED_BACK", refundCents: 600, keepCents: 400, lateHandedBackCents: 600, stillHeldCents: 400 }] };
     const html = renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: partly, staff: [], canManageMoney: true, canConfigure: false, canUpdateFacility: true }));

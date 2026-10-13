@@ -233,6 +233,10 @@ describe("reviews and cash handed back after a correction", () => {
     expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "WAIVED_AFTER_REFUND", triggerId: "w1", reason: "Approved" }).success).toBe(true);
   });
 
+  it("lets a charge on a cancelled registration be reviewed by its charge id", () => {
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "CHARGED_ON_CANCELLED_REGISTRATION", triggerId: "c1", reason: "Collect later" }).success).toBe(true);
+  });
+
   it("names the exception a review answers", () => {
     expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", reason: "Manager agreed" }).success).toBe(false);
     expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "UNCHARGED_LOSS", reason: "Manager agreed" }).success).toBe(false);
