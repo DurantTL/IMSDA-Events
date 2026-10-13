@@ -245,6 +245,10 @@ fate: returned, lost or damaged) or `WRITTEN_OFF`, each with actor, reason and t
   same key replays only if the action and the fate match, otherwise it is refused.
 - Blocks: the lodging hold and its link to the facility issue are written in one transaction (the issue row is locked first), so a
   block is never left unlinked and a closed issue cannot be blocked.
+- **An unpaid key or item charge on a registration that is no longer active** (not submitted or confirmed) is a closeout
+  exception. What the registration paid, net of refunds, covers its posted, unwaived charges oldest first, and a charge is
+  flagged only for what that does not reach (so a cancellation that refunded only the registration fee does not flag a key
+  that was paid). Waived and record-only charges are never flagged. Finance clears it with a review that names the charge.
 
 ### Not built (follow-ups)
 
