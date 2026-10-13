@@ -262,6 +262,19 @@ To change a secret, edit it in the xCloud dashboard (or
 `/home/u_events/239298/.env`), then run the `up -d` line: a restart alone keeps
 the old values.
 
+The server-level runtime guard (`imsda-xcloud-runtime-guard.timer`) belongs to
+the earlier setup and is disabled; it cannot repair a container started from
+the new base file. If the app ever comes up without its settings (the log says
+"Invalid server environment" or "Environment variable not found:
+DATABASE_URL"), something started it from the base file alone: check xCloud's
+Recent Deployments and the Deploy Script, then run the `up -d` lines above.
+
+**Nginx is held at 1.31.3** (`apt-mark hold nginx`). On 2026-10-13 unattended
+upgrades moved it to 1.31.6, but xCloud's hand-installed headers-more module
+(`/usr/lib/nginx/modules`) is built for 1.31.3, so nginx refused to start and
+Cloudflare showed error 521. Release the hold (`apt-mark unhold nginx`) only
+after xCloud rebuilds the module for the newer version.
+
 The sections below describe the earlier setup (base file in
 `/home/u_events/.xcloud/`, settings in `/home/u_events/.xcloud/.env`). That
 `.env` is now unused: on 2026-10-13 the host cleanup deleted it, the daily
