@@ -19,6 +19,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: Record<string, unknown>) => { state.audits.push(entry); } }));
+// Deadline reminders (#910) have their own tests; here a calendar change must not add database work this test counts.
+vi.mock("@/modules/calendar/deadline-reminders", () => ({ reconcileDeadlineReminders: vi.fn().mockResolvedValue({ prepared: 0, updated: 0, withdrawn: 0 }) }));
 vi.mock("@/lib/prisma", () => {
   const tx = {
     $executeRaw: async () => { state.locks += 1; },

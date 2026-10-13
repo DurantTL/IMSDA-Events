@@ -42,7 +42,7 @@ const entryFields = {
   ]).nullable(),
   status: z.enum(["SCHEDULED", "POSTPONED", "CANCELLED"]),
   isPublished: z.boolean(),
-  entryType: z.enum(["STANDARD", "CLOSURE"]),
+  entryType: z.enum(["STANDARD", "CLOSURE", "DEADLINE"]),
   repeat: repeatSchema.nullable(),
   repeatExceptions: repeatExceptionsSchema,
 };
@@ -130,6 +130,8 @@ export const calendarBulkSchema = z.object({
     z.object({ action: z.literal("unpublish") }).strict(),
     z.object({ action: z.literal("hide") }).strict(),
     z.object({ action: z.literal("unhide") }).strict(),
+    z.object({ action: z.literal("markDeadline") }).strict(),
+    z.object({ action: z.literal("clearDeadline") }).strict(),
   ]),
 }).strict();
 

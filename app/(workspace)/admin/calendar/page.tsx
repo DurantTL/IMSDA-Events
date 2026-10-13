@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarAdminWorkspace } from "@/components/calendar-admin-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { listPendingReminderBatches } from "@/modules/calendar/deadline-reminders";
 import { listCalendarFeeds } from "@/modules/calendar/feeds";
 import { listCalendarEntries, listCalendarEvents } from "@/modules/calendar/repository";
 
@@ -14,14 +15,14 @@ export default async function CalendarAdminPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
-  const [entries, events, feeds] = await Promise.all([listCalendarEntries(), listCalendarEvents(), listCalendarFeeds()]);
+  const [entries, events, feeds, reminders] = await Promise.all([listCalendarEntries(), listCalendarEvents(), listCalendarFeeds(), listPendingReminderBatches()]);
 
   return (
     <>
       <Link className="secondary-button more-back-link" href="/admin">
         Back to system administration
       </Link>
-      <CalendarAdminWorkspace initialEntries={entries} initialEvents={events} initialFeeds={feeds} />
+      <CalendarAdminWorkspace initialEntries={entries} initialEvents={events} initialFeeds={feeds} initialReminders={reminders} />
     </>
   );
 }

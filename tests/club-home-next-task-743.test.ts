@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getClubReportYear: vi.fn(),
   clubPortalComplianceReminderCounts: vi.fn(),
   listClubHonorsPage: vi.fn(),
+  listUpcomingDeadlines: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -30,10 +31,12 @@ vi.mock("@/modules/club-registrations/repository", async () => {
 vi.mock("@/modules/club-reports/repository", () => ({ getClubReportYear: mocks.getClubReportYear }));
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceReminderCounts: mocks.clubPortalComplianceReminderCounts }));
 vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: mocks.listClubHonorsPage }));
+vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
 import { ClubNextTaskCard } from "@/components/club-next-task";
 import { ClubYearTiles } from "@/components/club-year-tiles";
+import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { pickClubNextTask } from "@/modules/club-rosters/home-next-task";
 import { areaClubPortalNavItems, clubPortalNavItems } from "@/modules/club-rosters/portal-nav";
 
@@ -83,6 +86,7 @@ beforeEach(() => {
   mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
   mocks.clubPortalComplianceReminderCounts.mockResolvedValue(null);
   mocks.listClubHonorsPage.mockResolvedValue([]);
+  mocks.listUpcomingDeadlines.mockResolvedValue([]);
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-15T18:00:00.000Z"));
 });
@@ -179,5 +183,36 @@ describe("the club menu order is unchanged", () => {
     expect(areaClubPortalNavItems({ organizationId: "c" }).map((item) => item.label)).toEqual([
       "Home", "Roster", "Honors", "Events", "Club forms", "Monthly Records", "Orders", "Earned awards",
     ]);
+  });
+});
+
+describe("Upcoming deadlines on the club home (#910)", () => {
+  const deadline = { key: "d1", title: "Spring Camporee Registration Due", dueOn: "2026-12-05", href: null, postponed: false, label: "Due in 20 days", overdue: false };
+
+  it("shows the conference's deadlines to a director, after the year tiles", async () => {
+    mocks.listUpcomingDeadlines.mockResolvedValue([deadline]);
+    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
+    const order = componentElements(tree).map((element) => element.type);
+    const list = componentElements(tree).find((element) => element.type === UpcomingDeadlines)!;
+    expect(list.props.deadlines).toEqual([deadline]);
+    expect(order.indexOf(ClubYearTiles)).toBeLessThan(order.indexOf(UpcomingDeadlines));
+    expect(mocks.listUpcomingDeadlines).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows them to a reporter too, who has no roster", async () => {
+    mocks.listUpcomingDeadlines.mockResolvedValue([deadline]);
+    mocks.getRosterAccessStateForPage.mockResolvedValue({
+      state: "NO_ROSTER",
+      club: { organizationId: "club-1", name: "Test Pathfinders", role: "REPORTER", sponsoringChurch: null },
+    });
+    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
+    expect(componentElements(tree).find((element) => element.type === UpcomingDeadlines)?.props.deadlines).toEqual([deadline]);
+  });
+
+  it("loads nothing for someone who does not direct the club", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "FORBIDDEN" });
+    const tree = await ClubHomePage({ params: Promise.resolve({ organizationId: "club-1" }) });
+    expect(tree).toBeNull();
+    expect(mocks.listUpcomingDeadlines).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { calendarEntryListLimit, planBulkAction, type BulkAction, type BulkChange, type BulkSkip } from "@/modules/calendar/admin-list";
@@ -10,6 +11,8 @@ import {
   sortCalendarItems,
   type CalendarItem,
 } from "@/modules/calendar/domain";
+import { entryTypeEditMark } from "@/modules/calendar/deadlines";
+import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminders";
 import { feedLockKey } from "@/modules/calendar/feed-plan";
 import { importedFieldNames } from "@/modules/calendar/ics-import";
 import { expandOccurrences, parseRepeatRule, repeatStartProblem, serializeRepeatRule } from "@/modules/calendar/recurrence";
@@ -76,8 +79,9 @@ export async function listPublicCalendarItems(
     prisma.calendarEntry.findMany({
       // A repeating entry can reach into the window from long before it, so
       // only its first date is bounded here; its occurrences are cut below.
-      // Imported items staff hid, or that left their feed, never show.
+      // Imported items staff hid, or that left their feed, never show. A Deadline (#910) is for clubs only, never public.
       where: {
+        entryType: { not: "DEADLINE" },
         isPublished: true,
         isHiddenLocally: false,
         sourceRemovedAt: null,
@@ -102,7 +106,8 @@ export async function listPublicCalendarItems(
       status: "SCHEDULED" as const,
       registrationOpen: evaluateEventRegistrationPhase(event, now) === "OPEN",
     })),
-    ...entries.flatMap((entry) => entryItems(entry, from, to, expandRepeats)),
+    // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.
+    ...entries.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),
   ];
   return sortCalendarItems(items.filter((item) => item.recurrence || (item.startsOn <= to && item.endsOn >= from)));
 }
@@ -118,7 +123,7 @@ type PublicEntryRow = {
   category: string;
   linkUrl: string | null;
   status: CalendarItem["status"];
-  entryType: "STANDARD" | "CLOSURE";
+  entryType: "STANDARD" | "CLOSURE" | "DEADLINE";
   repeatRule: string | null;
   repeatExceptions: string[];
 };
@@ -241,7 +246,21 @@ export async function createCalendarEntry(input: CalendarEntryInput, actorUserId
       metadata: { startsOn: entry.startsOn, endsOn: entry.endsOn, isPublished: entry.isPublished },
     }, tx);
   });
+  await keepRemindersCurrent();
   return listCalendarEntries();
+}
+
+/**
+ * After a change to the calendar, bring the pending deadline reminder batches in line (#910): a changed date updates
+ * its batch, a cancelled, hidden or un-deadlined entry withdraws it. Never lets a calendar edit fail; the sweep does
+ * the same every few minutes.
+ */
+async function keepRemindersCurrent() {
+  try {
+    await reconcileDeadlineReminders();
+  } catch (error) {
+    logError("Deadline reminders could not be brought up to date after a calendar change", error);
+  }
 }
 
 export async function updateCalendarEntry(entryId: string, input: CalendarEntryUpdate, actorUserId: string) {
@@ -267,8 +286,12 @@ export async function updateCalendarEntry(entryId: string, input: CalendarEntryU
     const locallyEdited = existing.sourceFeedId || existing.sourceUid
       ? importedFieldNames.filter((name) => name in edits && JSON.stringify(existing[name]) !== JSON.stringify(edits[name]))
       : [];
-    const locallyEditedFields = locallyEdited.length > 0
-      ? { locallyEditedFields: [...new Set([...existing.locallyEditedFields, ...locallyEdited])] }
+    // A type staff changed (Deadline on or off, #910) is theirs: a refresh must not move it back.
+    const typeChosen = (existing.sourceFeedId || existing.sourceUid) && edits.entryType !== undefined && edits.entryType !== existing.entryType
+      ? [entryTypeEditMark]
+      : [];
+    const locallyEditedFields = locallyEdited.length > 0 || typeChosen.length > 0
+      ? { locallyEditedFields: [...new Set([...existing.locallyEditedFields, ...locallyEdited, ...typeChosen])] }
       : {};
     const entry = await tx.calendarEntry.update({ where: { id: entryId }, data: { ...fields, ...columns, ...locallyEditedFields, updatedByUserId: actorUserId } });
     const changed = Object.keys({ ...fields, ...columns }).filter((key) =>
@@ -284,6 +307,7 @@ export async function updateCalendarEntry(entryId: string, input: CalendarEntryU
       metadata: { changed },
     }, tx);
   });
+  await keepRemindersCurrent();
   return listCalendarEntries();
 }
 
@@ -331,6 +355,15 @@ export async function bulkUpdateCalendarEntries(request: CalendarBulkRequest, ac
     for (const group of groups.values()) {
       await tx.calendarEntry.updateMany({ where: { id: { in: group.ids } }, data: { ...group.data, updatedByUserId: actorUserId } });
     }
+    // An imported entry whose type staff chose also records that choice, so a refresh keeps it (#910).
+    for (const change of plan.changes.filter((candidate) => candidate.markTypeEdited)) {
+      const row = byId.get(change.id);
+      if (!row) continue;
+      await tx.calendarEntry.update({
+        where: { id: change.id },
+        data: { locallyEditedFields: [...new Set([...row.locallyEditedFields, entryTypeEditMark])] },
+      });
+    }
     if (plan.changes.length > 0) {
       await writeAuditLog({
         actorUserId,
@@ -346,6 +379,7 @@ export async function bulkUpdateCalendarEntries(request: CalendarBulkRequest, ac
     }
     return { action: request.change.action, changed: plan.changes.length, skipped: plan.skipped } satisfies CalendarBulkResult;
   }, { timeout: 30_000, maxWait: 10_000 });
+  await keepRemindersCurrent();
   return { result, entries: await listCalendarEntries() };
 }
 
@@ -368,6 +402,7 @@ export async function deleteCalendarEntry(entryId: string, actorUserId: string) 
       metadata: { startsOn: existing.startsOn, endsOn: existing.endsOn, wasPublished: existing.isPublished },
     }, tx);
   });
+  await keepRemindersCurrent();
   return listCalendarEntries();
 }
 

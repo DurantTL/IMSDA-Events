@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   clubRosterComplianceStatuses: vi.fn(),
   listClubTeam: vi.fn(),
   listClubHonorsPage: vi.fn(),
+  listUpcomingDeadlines: vi.fn(),
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }),
 }));
 
@@ -45,6 +46,7 @@ vi.mock("@/modules/background-checks/repository", () => ({
 }));
 vi.mock("@/modules/organizations/director-grants-repository", () => ({ listClubTeam: mocks.listClubTeam }));
 vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: mocks.listClubHonorsPage }));
+vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
 import { ClubOverview } from "@/components/club-overview";
@@ -147,6 +149,7 @@ beforeEach(() => {
   mocks.clubRosterComplianceStatuses.mockResolvedValue({ statuses: {}, notInCompliance: 1, expiringSoon: 2, missing: 3 });
   mocks.clubComplianceReminderCounts.mockResolvedValue({ notInCompliance: 0, expiringSoon: 0, missing: 1 });
   mocks.listClubHonorsPage.mockResolvedValue(honorRows);
+  mocks.listUpcomingDeadlines.mockResolvedValue([]);
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-15T18:00:00.000Z"));
 });
