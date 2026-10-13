@@ -14,7 +14,7 @@ import {
   EMAIL_BELONGS_TO_OTHER_MESSAGE,
   INSTRUCTOR_EDIT_GRACE_DAYS,
   ROSTER_CLOSED_MESSAGE,
-  STERLING_REQUIRED_MESSAGE,
+  STERLING_WARNING_MESSAGE,
   applyBulkMark,
   applyPersonMark,
   instructorEditDeadline,
@@ -25,7 +25,7 @@ import {
   markChangeIsLocked,
   resendAvailableAt,
   sortInstructorRoster,
-  sterlingAllowsRoster,
+  sterlingIsCurrent,
   toInstructorRosterRow,
   type BulkMarkAction,
   type InstructorRosterRow,
@@ -47,7 +47,6 @@ export type HonorInstructorErrorCode =
   | "CLASS_NOT_FOUND"
   | "INSTRUCTOR_NOT_FOUND"
   | "NOT_ASSIGNED"
-  | "STERLING_REQUIRED"
   | "MARKS_CLOSED"
   | "MARKS_NOT_OPEN"
   | "ROSTER_CLOSED"
@@ -65,7 +64,6 @@ const errorStatus: Record<HonorInstructorErrorCode, number> = {
   CLASS_NOT_FOUND: 404,
   INSTRUCTOR_NOT_FOUND: 404,
   NOT_ASSIGNED: 404,
-  STERLING_REQUIRED: 403,
   MARKS_CLOSED: 409,
   MARKS_NOT_OPEN: 409,
   ROSTER_CLOSED: 404,
@@ -313,7 +311,7 @@ export async function listHonorInstructors(eventId: string): Promise<{ instructo
     email: row.email,
     status: instructorStatus(row),
     sentAt: row.sentAt?.toISOString() ?? null,
-    sterlingCurrent: sterlingAllowsRoster(sterlingState),
+    sterlingCurrent: sterlingIsCurrent(sterlingState),
     sterlingState,
     offeringIds: row.classes.map((entry) => entry.offeringId),
   };
@@ -415,7 +413,7 @@ export async function listInstructorClasses(accountId: string, now = new Date())
     },
   });
   const personIds = [...new Set(rows.map((row) => row.instructor.personId))];
-  const states = await Promise.all(personIds.map(async (personId) => sterlingAllowsRoster(await currentCheckStateForPerson(personId, now))));
+  const states = await Promise.all(personIds.map(async (personId) => sterlingIsCurrent(await currentCheckStateForPerson(personId, now))));
   return {
     classes: rows.map((row) => ({
       offeringId: row.offering.id,
@@ -467,8 +465,7 @@ function classHeader(assignment: Assignment, now: Date) {
 }
 
 export type InstructorRosterView =
-  | { status: "OK"; header: ReturnType<typeof classHeader>; rows: InstructorRosterRow[] }
-  | { status: "STERLING_REQUIRED"; header: ReturnType<typeof classHeader>; message: string };
+  | { status: "OK"; header: ReturnType<typeof classHeader>; rows: InstructorRosterRow[]; sterlingWarning: string | null };
 
 const rosterEnrollmentSelect = {
   id: true,
@@ -489,29 +486,22 @@ function rosterRows(enrollments: Array<Prisma.HonorEnrollmentGetPayload<{ select
   })));
 }
 
-async function requireSterling(assignment: Assignment, now: Date) {
-  if (!sterlingAllowsRoster(await currentCheckStateForPerson(assignment.instructor.personId, now))) {
-    throw new HonorInstructorError("STERLING_REQUIRED", STERLING_REQUIRED_MESSAGE);
-  }
+/** The warning for an instructor whose Sterling Volunteers check isn't current; null when it is. Never blocks. */
+async function sterlingWarningFor(assignment: Assignment, now: Date) {
+  return sterlingIsCurrent(await currentCheckStateForPerson(assignment.instructor.personId, now)) ? null : STERLING_WARNING_MESSAGE;
 }
 
-/** One class roster for the signed-in instructor: name and club only, or the Sterling Volunteers message. */
+/** One class roster for the signed-in instructor: name and club only, with a Sterling Volunteers warning when their check isn't current. */
 export async function getInstructorRoster(accountId: string, offeringId: string, now = new Date()): Promise<InstructorRosterView> {
   const assignment = await loadAssignment(accountId, offeringId);
   // Reads close at the same deadline as marks.
   if (!instructorMarksOpen(assignment.offering.event.endsAt, now)) throw new HonorInstructorError("ROSTER_CLOSED", ROSTER_CLOSED_MESSAGE);
   const header = classHeader(assignment, now);
-  try {
-    await requireSterling(assignment, now);
-  } catch (error) {
-    if (error instanceof HonorInstructorError && error.code === "STERLING_REQUIRED") return { status: "STERLING_REQUIRED", header, message: error.message };
-    throw error;
-  }
   const enrollments = await getPrisma().honorEnrollment.findMany({
     where: { offeringId, registration: ACTIVE_REGISTRATION },
     select: rosterEnrollmentSelect,
   });
-  return { status: "OK", header, rows: rosterRows(enrollments) };
+  return { status: "OK", header, rows: rosterRows(enrollments), sterlingWarning: await sterlingWarningFor(assignment, now) };
 }
 
 export type InstructorMarkInput =
@@ -519,7 +509,7 @@ export type InstructorMarkInput =
   | { action: "SET"; enrollmentId: string; attended?: boolean; completed?: boolean };
 
 export type InstructorMarkResult = {
-  view: Extract<InstructorRosterView, { status: "OK" }>;
+  view: Omit<Extract<InstructorRosterView, { status: "OK" }>, "sterlingWarning">;
   changed: number;
   /** People skipped because their completion is already in the honor record (staff void it instead). */
   locked: number;
@@ -528,15 +518,14 @@ export type InstructorMarkResult = {
 
 /**
  * One-click or per-person marks on one of the instructor's own classes.
- * Order of checks: the class is theirs, their Sterling Volunteers check is
- * current, the 14-day window is open. The marks, then Completed's honor-record
+ * Order of checks: the class is theirs, the 14-day window is open. A Sterling
+ * Volunteers check that isn't current never blocks a mark (#896). The marks, then Completed's honor-record
  * write (the existing write-back, in its own transaction after the marks
  * commit; a person it couldn't write stays marked and staff can run the
  * write-back), then the audit row, hold counts and ids only.
  */
 export async function markInstructorClass(accountId: string, offeringId: string, input: InstructorMarkInput, now = new Date()): Promise<InstructorMarkResult> {
   const assignment = await loadAssignment(accountId, offeringId);
-  await requireSterling(assignment, now);
   if (!instructorMarksStarted(assignment.offering.event.startsAt, now)) {
     throw new HonorInstructorError("MARKS_NOT_OPEN", "Marks open when the event starts. You can already see your roster.");
   }

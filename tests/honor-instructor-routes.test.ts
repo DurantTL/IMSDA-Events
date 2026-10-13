@@ -45,7 +45,7 @@ import { PATCH as staffClasses, DELETE as staffRemove } from "@/app/api/events/[
 import { POST as staffResend } from "@/app/api/events/[eventId]/honors/instructors/[instructorId]/resend/route";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { HonorInstructorError } from "@/modules/honors/instructor-repository";
-import { STERLING_REQUIRED_MESSAGE } from "@/modules/honors/instructor-domain";
+import { STERLING_WARNING_MESSAGE } from "@/modules/honors/instructor-domain";
 
 const classContext = { params: Promise.resolve({ offeringId: "off-1" }) };
 const inviteContext = { params: Promise.resolve({ instructorId: "ins-1" }) };
@@ -70,7 +70,7 @@ beforeEach(() => {
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1", verifiedEmail: "ins@example.test", displayName: "Ins" }, via: "attendee", sessionId: "s" });
   mocks.requireHonorPermission.mockResolvedValue({ user: { id: "staff-1" } });
   mocks.attendeeSecondStepPending.mockResolvedValue(false);
-  mocks.getInstructorRoster.mockResolvedValue({ status: "OK", header, rows });
+  mocks.getInstructorRoster.mockResolvedValue({ status: "OK", header, rows, sterlingWarning: null });
   mocks.markInstructorClass.mockResolvedValue({ view: { status: "OK", header, rows }, changed: 1, locked: 0, writeBack: null });
 });
 
@@ -80,7 +80,7 @@ describe("instructor roster routes (#833)", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(mocks.getInstructorRoster).toHaveBeenCalledWith("acct-1", "off-1");
-    expect(await response.json()).toEqual({ class: header, people: rows });
+    expect(await response.json()).toEqual({ class: header, people: rows, sterlingWarning: null });
   });
 
   it("needs the person's own sign-in: signed out, or a staff member switched into the account, gets nothing", async () => {
@@ -133,13 +133,17 @@ describe("instructor roster routes (#833)", () => {
     expect(await response.json()).toMatchObject({ error: "NOT_ASSIGNED" });
   });
 
-  it("answers a missing Sterling Volunteers check with 403, the clear message, and no names", async () => {
-    mocks.getInstructorRoster.mockResolvedValue({ status: "STERLING_REQUIRED", header, message: STERLING_REQUIRED_MESSAGE });
+  it("answers a check that isn't current with 200, the roster, and the warning", async () => {
+    mocks.getInstructorRoster.mockResolvedValue({ status: "OK", header, rows: [], sterlingWarning: STERLING_WARNING_MESSAGE });
     const response = await roster(get(), classContext);
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ error: "STERLING_REQUIRED", message: STERLING_REQUIRED_MESSAGE });
-    expect(JSON.stringify(body)).not.toContain("Sample");
+    expect(body).toMatchObject({ people: [], sterlingWarning: STERLING_WARNING_MESSAGE });
+  });
+
+  it("sends a null warning for a current check", async () => {
+    mocks.getInstructorRoster.mockResolvedValue({ status: "OK", header, rows: [], sterlingWarning: null });
+    expect((await (await roster(get(), classContext)).json()).sterlingWarning).toBeNull();
   });
 });
 
@@ -168,8 +172,6 @@ describe("instructor marks route (#833)", () => {
   it("maps the repository's refusals", async () => {
     mocks.markInstructorClass.mockRejectedValue(new HonorInstructorError("MARKS_CLOSED", "closed"));
     expect((await marks(post({ action: "CLEAR" }), classContext)).status).toBe(409);
-    mocks.markInstructorClass.mockRejectedValue(new HonorInstructorError("STERLING_REQUIRED", STERLING_REQUIRED_MESSAGE));
-    expect((await marks(post({ action: "CLEAR" }), classContext)).status).toBe(403);
     mocks.markInstructorClass.mockRejectedValue(new HonorInstructorError("NOT_ASSIGNED", "no"));
     expect((await marks(post({ action: "CLEAR" }), classContext)).status).toBe(404);
   });

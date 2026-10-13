@@ -57,19 +57,19 @@ and a class that doesn't exist all answer the same 404.
 
 ## Sterling Volunteers check
 
-An instructor needs a **current Sterling Volunteers check** to see a roster or
-mark it. This is the one place a check blocks access (everywhere else it only
-flags), because the roster exposes names of young people. The check is matched
-through the existing list (#405, #527) by `currentCheckStateForPerson`. Without
-one, the roster page and API show a clear message and no names; staff see on the
-Instructors page each instructor's state.
+A Sterling Volunteers check that isn't current is a **warning, never a block**
+(decided by Caleb, Oct 12, 2026, #896). An instructor sees their own class
+rosters and can mark attendance and completion whatever their check's state. The
+check is matched through the existing list (#405, #527) by
+`currentCheckStateForPerson`. When it isn't current, the instructor's class list
+and roster page show a warning to contact the conference office, and the roster
+API adds a `sterlingWarning` message; the roster fields are unchanged. Staff see
+a "!" beside the instructor, and their check state, on the Instructors page.
 
-A roster import's "!" mark (FLAGGED) counts as **not current** for this gate,
-although it is current everywhere else: this is the one blocking context, so the
-safer reading wins. A Sterling check that is valid but expires within 60 days is
-still a current check and does not block. Both are pending the owner's
-confirmation and live in one function (`sterlingAllowsRoster`). The staff page
-labels a flagged "!" check as such.
+A roster import's "!" mark (FLAGGED) counts as **not current** for this warning,
+although it is current everywhere else, so the office follows up. A Sterling
+check that is valid but expires within 60 days is still current and gives no
+warning. Both live in one function (`sterlingIsCurrent`).
 
 ## Marks
 

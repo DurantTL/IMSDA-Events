@@ -3,7 +3,7 @@ import {
   GROUP_REGISTRATION_CLUB_LABEL,
   INSTRUCTOR_EDIT_GRACE_DAYS,
   INSTRUCTOR_ROSTER_ROW_KEYS,
-  STERLING_REQUIRED_MESSAGE,
+  STERLING_WARNING_MESSAGE,
   applyBulkMark,
   applyPersonMark,
   instructorEditDeadline,
@@ -17,7 +17,7 @@ import {
   EMAIL_BELONGS_TO_OTHER_MESSAGE,
   ROSTER_CLOSED_MESSAGE,
   sortInstructorRoster,
-  sterlingAllowsRoster,
+  sterlingIsCurrent,
   toInstructorRosterRow,
 } from "@/modules/honors/instructor-domain";
 
@@ -41,15 +41,17 @@ describe("marks open on the event's start (#833)", () => {
   });
 });
 
-describe("Sterling Volunteers gate (#833)", () => {
-  it("lets only a current check see a roster", () => {
-    expect(sterlingAllowsRoster("CURRENT")).toBe(true);
-    for (const state of ["EXPIRED", "MISSING", "NOT_COMPLIANT", "FLAGGED"] as const) expect(sterlingAllowsRoster(state)).toBe(false);
+describe("Sterling Volunteers warning (#896)", () => {
+  it("warns for every state that isn't current, and not for a current one; nothing blocks", () => {
+    expect(sterlingIsCurrent("CURRENT")).toBe(true);
+    for (const state of ["EXPIRED", "MISSING", "NOT_COMPLIANT", "FLAGGED"] as const) expect(sterlingIsCurrent(state)).toBe(false);
   });
 
-  it("says Sterling Volunteers, never the old wording", () => {
-    expect(STERLING_REQUIRED_MESSAGE).toContain("Sterling Volunteers check");
-    expect(STERLING_REQUIRED_MESSAGE.toLowerCase()).not.toContain("background");
+  it("says Sterling Volunteers, never the old wording, and says the roster is still available", () => {
+    expect(STERLING_WARNING_MESSAGE).toContain("Sterling Volunteers check");
+    expect(STERLING_WARNING_MESSAGE).toContain("conference office");
+    expect(STERLING_WARNING_MESSAGE.toLowerCase()).not.toContain("background");
+    expect(STERLING_WARNING_MESSAGE).toContain("still see your class roster");
   });
 });
 
@@ -147,6 +149,8 @@ describe("invites (#833)", () => {
     expect(content.bodyText).toContain("- Birds");
     expect(content.bodyText).toContain("ada@example.test");
     expect(content.bodyText).toContain("Sterling Volunteers check");
+    expect(content.bodyText).not.toContain("you also need a current");
+    expect(content.bodyText).toContain("you can still see your roster");
     expect(content.bodyText.toLowerCase()).not.toContain("background check");
     expect(content.bodyText).not.toMatch(/token|secret|\?code=/i);
   });

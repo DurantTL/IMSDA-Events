@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
 /**
  * One class roster for the instructor it was assigned to (#833): name and club
  * only. A class that isn't theirs is a 404 exactly like one that doesn't exist.
- * Without a current Sterling Volunteers check the page shows the reason and no
- * names.
+ * Without a current Sterling Volunteers check the page shows a warning above the
+ * same roster (#896); it never hides it.
  */
 export default async function InstructorRosterPage({ params }: { params: Promise<{ offeringId: string }> }) {
   await requireAttendeeSecondStep();
@@ -49,19 +49,14 @@ export default async function InstructorRosterPage({ params }: { params: Promise
       </section>
       <div className="account-page-body">
         <p><Link href="/account/instructor">Back to your classes</Link></p>
-        {view.status === "STERLING_REQUIRED" ? (
-          <section className="public-manage-card">
-            <p className="public-manage-empty"><ShieldAlert size={17} aria-hidden="true" /> {view.message}</p>
-          </section>
-        ) : (
-          <InstructorRoster
-            editable={view.header.editable}
-            editDeadline={view.header.editDeadline}
-            notOpenYet={view.header.notOpenYet}
-            initialRows={view.rows}
-            offeringId={view.header.offeringId}
-          />
-        )}
+        {view.sterlingWarning && <div className="inline-notice error" role="status"><ShieldAlert size={17} aria-hidden="true" /> {view.sterlingWarning}</div>}
+        <InstructorRoster
+          editable={view.header.editable}
+          editDeadline={view.header.editDeadline}
+          notOpenYet={view.header.notOpenYet}
+          initialRows={view.rows}
+          offeringId={view.header.offeringId}
+        />
       </div>
     </>
   );
