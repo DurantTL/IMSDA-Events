@@ -65,6 +65,8 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
       # Pull requests (by path or by label) get the quick run; weekly and manual runs the full one.
       MOBILE_LAYOUT_WIDTHS: ${{ github.event_name == 'pull_request' && '360,1024' || '360,390,768,1024' }}
       MOBILE_LAYOUT_NO_SHOTS: ${{ github.event_name == 'pull_request' && '1' || '0' }}
