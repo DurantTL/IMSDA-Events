@@ -57,6 +57,43 @@ export function comboboxKeyResult(key: string, state: ComboboxKeyState): Combobo
   }
 }
 
+export type ComboboxPlacementInput = {
+  /** The input's top and bottom edges, in viewport pixels. */
+  anchorTop: number;
+  anchorBottom: number;
+  /** The visible area the list may use (the window, or the dialog or scroll box around the field), in viewport pixels. */
+  boundsTop: number;
+  boundsBottom: number;
+  /** The full height of the list if nothing limited it. */
+  contentHeight: number;
+};
+export type ComboboxPlacement = { side: "below" | "above"; maxHeight: number };
+
+/** The tallest the floating list gets (14rem), and the least it is squeezed to so a few choices still show. */
+export const COMBOBOX_LIST_MAX_HEIGHT = 224;
+export const COMBOBOX_LIST_MIN_HEIGHT = 96;
+const COMBOBOX_LIST_GAP = 4;
+const COMBOBOX_EDGE_MARGIN = 8;
+
+/**
+ * Where the floating honor/class list goes (the owner's Oct 13 request), kept
+ * pure so it can be tested without a browser. It opens below the field when it
+ * fits there (or when below has more room than above), otherwise above, and its
+ * height is capped to the room on that side so it never runs off the screen or
+ * out of the dialog around it. It scrolls inside itself past that.
+ */
+export function comboboxPopoverPlacement(input: ComboboxPlacementInput): ComboboxPlacement {
+  const wanted = Math.min(Math.max(input.contentHeight, 0), COMBOBOX_LIST_MAX_HEIGHT);
+  const below = input.boundsBottom - input.anchorBottom - COMBOBOX_LIST_GAP - COMBOBOX_EDGE_MARGIN;
+  const above = input.anchorTop - input.boundsTop - COMBOBOX_LIST_GAP - COMBOBOX_EDGE_MARGIN;
+  const side = below >= wanted || below >= above ? "below" : "above";
+  const room = side === "below" ? below : above;
+  return {
+    side,
+    maxHeight: Math.floor(Math.max(COMBOBOX_LIST_MIN_HEIGHT, Math.min(COMBOBOX_LIST_MAX_HEIGHT, room))),
+  };
+}
+
 /** The bulk popup's member search: first and last name, from the start of any word. */
 export function filterPeopleByWordPrefix<T extends { firstName: string; lastName: string }>(people: readonly T[], query: string | undefined): T[] {
   return people.filter((person) => matchesWordPrefixes(`${person.firstName} ${person.lastName}`, query));
