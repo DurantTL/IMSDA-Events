@@ -1622,6 +1622,10 @@ model Event {
   lodgingChangeRequests               EventLodgingChangeRequest[]
   lodgingPlaceholders                 EventLodgingPlaceholder[]
   lodgingAssignments                  EventLodgingAssignment[]
+  issuedAssetTypes                    IssuedAssetType[]
+  issuedAssets                        IssuedAsset[]
+  assetIssuances                      AssetIssuance[]
+  assetIssuanceHistory                AssetIssuanceHistory[]
   lodgingAssignmentHistory            EventLodgingAssignmentHistory[]
   lodgingAssignmentNotices            EventLodgingAssignmentNotice[]
   mealServices                        EventMealService[]
@@ -2696,6 +2700,7 @@ model Registration {
   lodgingRequests         EventLodgingRequest[]
   lodgingChangeRequests   EventLodgingChangeRequest[]
   lodgingWaitlistEntries  EventLodgingWaitlistEntry[]
+  assetIssuances          AssetIssuance[]
   lodgingAssignmentNotices EventLodgingAssignmentNotice[]
   mealSelections          EventMealSelection[]
   mealLedgerEntries       EventMealLedgerEntry[]
@@ -2904,6 +2909,7 @@ model RegistrationAttendee {
   adjustments            RegistrationAdjustment[]
   memberTransferMoves    MemberTransferRegistrationMove[]
   lodgingAssignments     EventLodgingAssignment[]
+  assetIssuances         AssetIssuance[]
   lodgingPlaceholderLinks EventLodgingPlaceholder[]
   mealSelections         EventMealSelection[]
 
@@ -6835,6 +6841,7 @@ model EventLodgingUnit {
   unit         LodgingUnit        @relation(fields: [unitId], references: [id], onDelete: Restrict)
   holds        EventLodgingHold[]
   assignments  EventLodgingAssignment[]
+  assetIssuances AssetIssuance[]
 
   @@unique([eventLodgingId, unitId])
   @@unique([id, eventId])
@@ -7214,6 +7221,7 @@ model EventLodgingAssignment {
   attendee    RegistrationAttendee?           @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
   placeholder EventLodgingPlaceholder?        @relation(fields: [placeholderId, eventId], references: [id, eventId], onDelete: Cascade)
   history     EventLodgingAssignmentHistory[]
+  assetIssuances AssetIssuance[]
 
   /// Migration-level: a night-range exclusion per occupant and a CHECK that exactly one place and one occupant are set.
   @@unique([id, eventId])
@@ -7602,6 +7610,205 @@ model SystemReadinessTick {
   note             String?
 }
 
+// ---------------------------------------------------------------------------
+// Issued assets (#213, slice 1): keys, keycards, wristbands, radios, welcome packets and other event items.
+// A type is serialized (one numbered item, one holder at a time) or quantity (a lot of N identical items).
+// An issuance is one holder's claim on one asset; it changes only to END (transferred, replaced, corrected) and every
+// change appends to AssetIssuanceHistory, which is never rewritten (database triggers). Slice 2 (#214) adds
+// return, loss, damage and charge outcomes as further end reasons and history types, without touching these rows.
+// Money never lives here: a type carries only a *reference* to the deposit/replacement policy.
+// ---------------------------------------------------------------------------
+
+enum IssuedAssetMode {
+  SERIALIZED
+  QUANTITY
+}
+
+enum IssuedAssetAssigneeKind {
+  ATTENDEE
+  REGISTRATION
+  STAFF
+  ROOM
+  VEHICLE
+  TEAM
+}
+
+enum IssuedAssetCondition {
+  NEW
+  GOOD
+  WORN
+  DAMAGED
+}
+
+/// Staff-controlled stock status. "Issued" is never stored: it is read from the open issuances.
+enum IssuedAssetAvailability {
+  AVAILABLE
+  UNAVAILABLE
+  RETIRED
+}
+
+enum IssuedAssetEntryMethod {
+  MANUAL
+  SCAN
+  /// Recorded on a device without a connection and sent later; `issuedAt` is when it really happened.
+  OFFLINE
+}
+
+enum IssuedAssetEndReason {
+  TRANSFERRED
+  REPLACED
+  CORRECTED
+}
+
+enum IssuedAssetEventType {
+  ISSUED
+  TRANSFERRED_OUT
+  TRANSFERRED_IN
+  REPLACED_OUT
+  REPLACED_IN
+  CORRECTED
+}
+
+model IssuedAssetType {
+  id                   String                    @id @default(cuid())
+  eventId              String
+  name                 String
+  mode                 IssuedAssetMode
+  active               Boolean                   @default(true)
+  assigneeKinds        IssuedAssetAssigneeKind[]
+  /// Issuing to an attendee or registration records the lodging room and the exact assignment it came from.
+  roomLinked           Boolean                   @default(false)
+  /// A reference (a name or code staff recognise) to the deposit and replacement policy. No amounts: money is slice 2.
+  depositPolicyRef     String?
+  replacementPolicyRef String?
+  createdByUserId      String?
+  updatedByUserId      String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  event  Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assets IssuedAsset[]
+
+  @@unique([eventId, name])
+  @@unique([id, eventId])
+}
+
+/// One numbered item (quantityTotal 1) or one quantity lot (quantityTotal N) of a type.
+model IssuedAsset {
+  id              String                  @id @default(cuid())
+  eventId         String
+  assetTypeId     String
+  /// What staff read and say: "K-214".
+  identifier      String
+  /// What the barcode or QR encodes; defaults to the identifier. Unique per event.
+  scanCode        String
+  quantityTotal   Int                     @default(1)
+  condition       IssuedAssetCondition    @default(GOOD)
+  location        String?
+  availability    IssuedAssetAvailability @default(AVAILABLE)
+  /// Bumped by every issuance writer after it locks the row, so two writers racing for one asset cannot both commit
+  /// on what they read (the loser is rolled back and retried), like the lodging capacity version.
+  issueVersion    Int                     @default(0)
+  createdByUserId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assetType IssuedAssetType       @relation(fields: [assetTypeId, eventId], references: [id, eventId], onDelete: NoAction)
+  issuances AssetIssuance[]
+
+  @@unique([eventId, identifier])
+  @@unique([eventId, scanCode])
+  @@unique([id, eventId])
+  @@index([eventId, assetTypeId])
+}
+
+/// One holder's claim on one asset. Open while `endedAt` is null. Migration-level: a serialized asset has at most one
+/// open issuance, open quantities never exceed the lot, the holder columns match the kind, and a row changes only to end.
+model AssetIssuance {
+  id                 String                  @id @default(cuid())
+  eventId            String
+  assetId            String
+  /// Snapshot of the type's mode, so the database can keep one open issuance per serialized asset.
+  serialized         Boolean
+  quantity           Int                     @default(1)
+  assigneeKind       IssuedAssetAssigneeKind
+  attendeeId         String?
+  registrationId     String?
+  /// A staff member's user id (plain, like every actor column).
+  staffUserId        String?
+  /// The room: the holder when the kind is ROOM, otherwise the room the key opens (a snapshot of the assignment's room).
+  roomUnitId         String?
+  /// The exact lodging assignment a room-linked item was issued against. A later move cancels that assignment; the
+  /// issuance keeps pointing at it, which is how history stays correct.
+  sourceAssignmentId String?
+  /// The holder when the kind is VEHICLE or TEAM (no such records exist yet).
+  assigneeLabel      String?
+  purpose            String
+  expectedReturnAt   DateTime?
+  /// When it really happened (an offline desk records the moment); `createdAt` is when the server recorded it.
+  issuedAt           DateTime
+  issuedByUserId     String
+  entryMethod        IssuedAssetEntryMethod
+  idempotencyKey     String?
+  /// The issuance this one continues (transfer or replacement).
+  previousIssuanceId String?
+  endedAt            DateTime?
+  endReason          IssuedAssetEndReason?
+  endedByUserId      String?
+  endNote            String?
+  revision           Int                     @default(1)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  event            Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  asset            IssuedAsset                  @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: Cascade)
+  attendee         RegistrationAttendee?       @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
+  registration     Registration?               @relation(fields: [registrationId], references: [id], onDelete: NoAction)
+  roomUnit         EventLodgingUnit?           @relation(fields: [roomUnitId, eventId], references: [id, eventId], onDelete: NoAction)
+  sourceAssignment EventLodgingAssignment?     @relation(fields: [sourceAssignmentId, eventId], references: [id, eventId], onDelete: NoAction)
+  history          AssetIssuanceHistory[]
+
+  @@unique([eventId, idempotencyKey])
+  @@unique([id, eventId])
+  @@index([eventId, assetId])
+  @@index([attendeeId])
+  @@index([registrationId])
+  @@index([eventId, roomUnitId])
+}
+
+/// Append-only: one row per issuance event, with the holder and the lodging reference as they were at the time.
+model AssetIssuanceHistory {
+  id                 String                  @id @default(cuid())
+  eventId            String
+  issuanceId         String
+  assetId            String
+  type               IssuedAssetEventType
+  at                 DateTime                @default(now())
+  /// When the server wrote the row; `at` is when it happened (an offline desk sets it earlier).
+  recordedAt         DateTime                @default(now())
+  actorUserId        String
+  reason             String?
+  entryMethod        IssuedAssetEntryMethod
+  quantity           Int
+  assigneeKind       IssuedAssetAssigneeKind
+  attendeeId         String?
+  registrationId     String?
+  staffUserId        String?
+  roomUnitId         String?
+  sourceAssignmentId String?
+  assigneeLabel      String?
+  /// The paired issuance of a transfer or replacement.
+  relatedIssuanceId  String?
+  revision           Int
+
+  event    Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  issuance AssetIssuance @relation(fields: [issuanceId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@index([eventId, at])
+  @@index([issuanceId, at])
+  @@index([assetId, at])
+}
 
 // ---------------------------------------------------------------------------
 // Meals (#210): services, plans, pricing, selections and the meal ledger.

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   ContactRound,
+  KeyRound,
   Printer,
   RefreshCw,
   RotateCcw,
@@ -510,6 +511,13 @@ export function CheckInWorkspace({
               <ContactRound aria-hidden="true" size={16} />
               Print name badges
             </Link>
+            <Link
+              className="secondary-button checkin-pass-link"
+              href={`/check-in/assets?event=${encodeURIComponent(eventId)}`}
+            >
+              <KeyRound aria-hidden="true" size={16} />
+              Issue keys and items
+            </Link>
           </div>
         </div>
         <div className="checkin-tallies">
@@ -734,6 +742,13 @@ export function CheckInWorkspace({
                   confirmationCode={arrival.confirmationCode}
                   partySize={arrival.partySize}
                 />
+                {arrival.checkedIn && (
+                  <small>
+                    <Link href={`/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(arrival.id)}`}>
+                      Issue keys and items
+                    </Link>
+                  </small>
+                )}
               </span>
               <span className="arrival-time">
                 {arrival.checkedInAt
