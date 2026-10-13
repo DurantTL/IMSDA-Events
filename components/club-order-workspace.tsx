@@ -52,14 +52,18 @@ export const ORDER_SECTION_IDS = {
   uniforms: "club-uniforms",
 } as const;
 
-/** The jump links at the top of Orders, in page order. "Orders waiting to arrive" is listed only while one exists. */
-export function orderSectionLinks(hasWaiting: boolean): { id: string; label: string }[] {
+/**
+ * The jump links at the top of Orders, in page order, each with one plain sentence on what
+ * that part is for (the owner's Oct 13 request). The sentences describe what the sections
+ * below do today. "Orders waiting to arrive" is listed only while one exists.
+ */
+export function orderSectionLinks(hasWaiting: boolean): { id: string; label: string; description: string }[] {
   return [
-    { id: ORDER_SECTION_IDS.list, label: "Order list" },
-    { id: ORDER_SECTION_IDS.supplies, label: "Supplies" },
-    ...(hasWaiting ? [{ id: ORDER_SECTION_IDS.waiting, label: "Waiting to arrive" }] : []),
-    { id: ORDER_SECTION_IDS.ready, label: "Ready to hand out" },
-    { id: ORDER_SECTION_IDS.uniforms, label: "Uniforms" },
+    { id: ORDER_SECTION_IDS.list, label: "Order list", description: "Your shopping list for AdventSource. Finished honors, uniform needs and earned awards show up here on their own. Change quantities, add or remove items, then export or print it." },
+    { id: ORDER_SECTION_IDS.supplies, label: "Supplies", description: "What your club already has on hand. Keep these counts up to date and they come off what you need to order." },
+    ...(hasWaiting ? [{ id: ORDER_SECTION_IDS.waiting, label: "Waiting to arrive", description: "Older orders from before this list. Mark one received when it arrives and its items join your supplies." }] : []),
+    { id: ORDER_SECTION_IDS.ready, label: "Ready to hand out", description: "Members whose honor or award is already covered by supplies you have. Hand it out, then mark it handed out so it leaves this list." },
+    { id: ORDER_SECTION_IDS.uniforms, label: "Uniforms", description: "Who needs which uniform items. They join the order list with the honors, and supplies you already have are taken off." },
   ];
 }
 
@@ -356,7 +360,10 @@ export function ClubOrderWorkspace({
       </div>
       <nav aria-label="Jump to a part of this page" className={styles.jumpNav} id="club-order-sections">
         {orderSectionLinks(waitingBatches.length > 0).map((link) => (
-          <a className={styles.jumpLink} href={`#${link.id}`} key={link.id}>{link.label}</a>
+          <a className={styles.jumpLink} href={`#${link.id}`} key={link.id}>
+            <span className={styles.jumpLabel}>{link.label}</span>
+            <small className={styles.jumpHint}>{link.description}</small>
+          </a>
         ))}
       </nav>
 

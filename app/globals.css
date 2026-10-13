@@ -9387,17 +9387,46 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .honor-name-search-field { display: flex; align-items: center; gap: 6px; }
 .honor-name-search-field svg { flex: 0 0 auto; color: var(--muted); }
 .honor-name-search-field input { flex: 1 1 auto; min-width: 0; }
-/* The type-to-search honor picker (#819). The list sits in the flow, not over the page, so a dialog never clips it. */
-.honor-combobox { display: grid; gap: 4px; min-width: min(100%, 220px); }
+/* The type-to-search honor picker (#819). The list floats under the input (anchored to the field, as wide as it),
+   so opening it never moves the filters or the table around it. The component sets max-height and, when there is
+   no room below, flips it above the field (data-placement="above"); it scrolls inside itself. */
+.honor-combobox { position: relative; display: grid; gap: 4px; min-width: min(100%, 220px); }
 .honor-combobox > label { color: var(--ink); font-size: var(--text-helper-min, 0.8rem); font-weight: 700; }
 .honor-combobox > input[role="combobox"] { width: 100%; min-height: 44px; min-width: 0; border: 1px solid #cbdbe2; border-radius: 10px; background: #fbfcfd; padding: 8px 10px; font-size: var(--text-helper-min, 0.8rem); }
-.honor-combobox-list { list-style: none; margin: 0; padding: 4px; max-height: 14rem; overflow-y: auto; border: 1px solid #cbdbe2; border-radius: 10px; background: #fff; overscroll-behavior: contain; }
+.honor-combobox-list { position: absolute; top: 100%; right: 0; left: 0; z-index: 35; box-sizing: border-box; margin: 4px 0 0; list-style: none; padding: 4px; max-height: 14rem; overflow-y: auto; border: 1px solid #cbdbe2; border-radius: 10px; background: #fff; box-shadow: 0 10px 25px rgba(0, 59, 92, 0.16); overscroll-behavior: contain; }
+.honor-combobox-list[data-placement="above"] { margin: 0; }
 .honor-combobox-list[hidden] { display: none; }
+/* A filter row that holds one: keep every field on one baseline, whatever the label above it wraps to. */
+.club-roster-tools:has(.honor-combobox) { align-items: flex-end; justify-content: flex-start; }
+.club-roster-tools:has(.honor-combobox) > .honor-name-search { flex: 1 1 220px; }
+.club-roster-tools:has(.honor-combobox) > .honor-combobox { flex: 1 1 220px; }
 .honor-combobox-list li { padding: 8px 10px; border-radius: 8px; cursor: pointer; overflow-wrap: anywhere; }
 .honor-combobox-list li.active, .honor-combobox-list li:hover { background: var(--panel-tint, #eef4f6); }
 .honor-combobox-list li[aria-selected="true"] { outline: 2px solid var(--imsda-purple, #5b3a8c); outline-offset: -2px; }
 .honor-combobox-list .honor-combobox-empty { cursor: default; color: var(--muted); }
 @media (max-width: 640px), (pointer: coarse) { .honor-combobox-list li { min-height: 44px; display: flex; align-items: center; } }
+/* Back to top on long club pages. Fixed in the bottom corner, a 44px target, above page content and below
+   dialogs, the phone tab bar and the More launcher (z-index 40 and up). The portal has no bottom bar, and the
+   safe-area insets keep it clear of a phone's home indicator. */
+.back-to-top-button {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--imsda-purple);
+  border-radius: 999px;
+  background: var(--imsda-purple);
+  box-shadow: 0 6px 18px rgba(0, 59, 92, 0.25);
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.back-to-top-button:hover { background: var(--imsda-navy, #003b5c); }
+@media print { .back-to-top-button { display: none !important; } }
 .honor-bulk-dialog { width: min(640px, 100%); }
 .honor-bulk-dialog .modal-close-button { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
 /* A member with a long name must not widen the report page's picker past the window. */

@@ -2,8 +2,11 @@
 .block { display: grid; gap: 10px; margin-top: 16px; }
 .block h3 { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--imsda-navy); font-size: max(var(--type-body-floor, 0px), .86rem); font-weight: 800; line-height: 1.35; }
 .block h3 svg { flex: 0 0 auto; }
-.jumpNav { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 12px; }
-.jumpLink { display: inline-flex; min-height: 44px; align-items: center; border: 1px solid var(--line); border-radius: 999px; color: var(--imsda-purple); padding: 6px 14px; font-size: max(var(--type-body-floor, 0px), .8rem); font-weight: 700; text-decoration: none; }
+/* Each jump link is a small card: the part's name, then one plain sentence on what it is for. One column on a phone. */
+.jumpNav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; margin: 12px 0 14px; }
+.jumpLink { display: grid; align-content: start; gap: 2px; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; color: var(--imsda-purple); padding: 9px 14px; text-decoration: none; }
+.jumpLabel { font-size: max(var(--type-body-floor, 0px), .8rem); font-weight: 700; }
+.jumpHint { color: var(--muted); font-size: max(var(--type-body-floor, 0px), .72rem); font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; }
 .jumpLink:hover { background: var(--imsda-navy-soft); }
 .block, .block h3 { scroll-margin-top: 16px; }
 .list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }

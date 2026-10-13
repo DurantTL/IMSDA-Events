@@ -300,6 +300,8 @@ const findings: Finding[] = [];
 const accepted: Finding[] = [];
 const pagesVisited: string[] = [];
 let dialogsOpened = 0;
+/** The widths at which Back to top was really exercised (a page long enough to scroll). */
+const backToTopChecked = new Set<number>();
 const pageErrors: string[] = [];
 
 function isAccepted(finding: Finding) {
@@ -1243,6 +1245,81 @@ function dialogFitInPage() {
   return { count: dialogs.length, problems: out };
 }
 
+/**
+ * Runs in the page: where every visible element sits on the page (document coordinates, so a
+ * scroll between two snapshots does not count as a move), keyed by its place in the document.
+ * The open list, its live-region text and anything visually hidden are left out: they are the
+ * things that are allowed to change when a filter list opens.
+ */
+function layoutSnapshotInPage() {
+  const rects: Record<string, [number, number, number, number]> = {};
+  const all = Array.from(document.body.querySelectorAll("*"));
+  all.forEach((el, index) => {
+    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, script, style')) return;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || style.position === "fixed") return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+    const id = (el as HTMLElement).id ? `#${(el as HTMLElement).id}` : "";
+    rects[`${index}:${el.tagName.toLowerCase()}${id}`] = [rect.left + window.scrollX, rect.top + window.scrollY, rect.width, rect.height];
+  });
+  return { rects, scrollHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth };
+}
+
+/** What moved between two snapshots (more than half a pixel), named for the report. */
+function movedBetween(before: ReturnType<typeof layoutSnapshotInPage>, after: ReturnType<typeof layoutSnapshotInPage>) {
+  const moved: string[] = [];
+  for (const [key, a] of Object.entries(before.rects)) {
+    const b = after.rects[key];
+    if (!b) continue;
+    if (a.some((value, i) => Math.abs(value - b[i]) > 0.5)) {
+      moved.push(`${key.split(":")[1]} moved from ${a.map(Math.round).join(",")} to ${b.map(Math.round).join(",")}`);
+    }
+  }
+  if (Math.abs(before.scrollHeight - after.scrollHeight) > 1) moved.push(`page height changed from ${before.scrollHeight} to ${after.scrollHeight}`);
+  if (after.scrollWidth > before.scrollWidth + 1) moved.push(`page got wider, ${before.scrollWidth} to ${after.scrollWidth}`);
+  return moved;
+}
+
+/** Runs in the page with a combobox list open: is the list a floating popover that fits the screen and the input? */
+function openComboboxListInPage() {
+  const input = document.querySelector<HTMLInputElement>('.club-roster-tools input[role="combobox"]');
+  const listId = input?.getAttribute("aria-controls");
+  const list = listId ? document.getElementById(listId) : null;
+  if (!input || !list) return { problems: ["the combobox or its list is missing"] };
+  const problems: string[] = [];
+  const rect = list.getBoundingClientRect();
+  const inputRect = input.getBoundingClientRect();
+  const style = getComputedStyle(list);
+  const viewport = window.visualViewport;
+  const width = window.innerWidth;
+  const height = viewport ? viewport.height : window.innerHeight;
+  if (list.hidden || style.display === "none") problems.push("the list is hidden after the field was opened");
+  if (style.position !== "absolute") problems.push(`the list is position:${style.position}, not a floating popover (absolute)`);
+  if (rect.left < -0.5 || rect.right > width + 0.5) problems.push(`the list spans ${Math.round(rect.left)}..${Math.round(rect.right)}px of a ${width}px screen`);
+  if (rect.top < -0.5 || rect.bottom > height + 0.5) problems.push(`the list spans ${Math.round(rect.top)}..${Math.round(rect.bottom)}px of a ${Math.round(height)}px screen`);
+  if (Math.abs(rect.width - inputRect.width) > 1.5) problems.push(`the list is ${Math.round(rect.width)}px wide, the field ${Math.round(inputRect.width)}px`);
+  if (Number(style.zIndex) < 1) problems.push(`the list has no z-index (${style.zIndex})`);
+  if (rect.top < inputRect.bottom && rect.bottom > inputRect.top) problems.push("the list covers the field it belongs to");
+  if (list.querySelectorAll('[role="option"]').length === 0) problems.push("the list has no options");
+  if (input.getAttribute("aria-expanded") !== "true") problems.push("aria-expanded is not true while the list is open");
+  return { problems, optionCount: list.querySelectorAll('[role="option"]').length };
+}
+
+/** Runs in the page: the other fixed or sticky controls a floating button must not sit on. */
+function otherFixedRectsInPage() {
+  const out: Array<{ name: string; left: number; top: number; right: number; bottom: number }> = [];
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    if (el.closest(".back-to-top-button")) continue;
+    const style = getComputedStyle(el);
+    if ((style.position !== "fixed" && style.position !== "sticky") || style.display === "none" || style.visibility === "hidden") continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0 || rect.bottom < 0 || rect.top > window.innerHeight) continue;
+    out.push({ name: `${el.tagName.toLowerCase()}${(el as HTMLElement).className ? `.${String((el as HTMLElement).className).split(/\s+/)[0]}` : ""}`, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
+  }
+  return out;
+}
+
 /** Self-test only: one defect of every kind the audit reports. Runs in the page. */
 function injectDefects() {
   const box = document.createElement("div");
@@ -1278,6 +1355,172 @@ function heightFor(width: number) {
   if (width <= 390) return 844;
   if (width <= 768) return 1024;
   return 768;
+}
+
+/** The club pages with a filter row that holds a type-to-search combobox (the Honor and Class filters). */
+const filterComboboxPages: Record<string, string> = { "club-honors": "Honor", "club-class-tracking": "Class" };
+/** Club pages that are long enough to scroll past one and a half screens, where Back to top must appear. */
+const backToTopPages = ["club-orders", "club-honors", "club-class-tracking", "club-roster"];
+
+/**
+ * The Honor filter on Honors and the Class filter on Class tracking (the owner's Oct 13 request). Opened
+ * in place on the page, twice: once with the field a third of the way down the screen, once with the field
+ * pushed near the bottom so the list has to flip above it. Each time, nothing else on the page may move
+ * (every element's bounding box is compared before and after), the list must be a floating popover that
+ * fits the screen and is as wide as the field, and keyboard use (arrows, Escape, clicking elsewhere) keeps focus
+ * in the field. Closed, every field of the filter row sits on one row on wide screens.
+ */
+async function auditFilterCombobox(page: Page, spec: PageSpec, width: number, prefix: string) {
+  const labelText = filterComboboxPages[spec.name];
+  if (!labelText) return;
+  const name = `${spec.name} (${labelText} filter list)`;
+  const combobox = page.locator('.club-roster-tools input[role="combobox"]:visible').first();
+  if ((await combobox.count()) === 0) {
+    record("dialog-open-failed", name, width, `no ${labelText} combobox in the filter row`);
+    return;
+  }
+  const toolsBox = async () => page.evaluate(() => {
+    const row = document.querySelector(".club-roster-tools:has(input[role=combobox])");
+    if (!row) return null;
+    return Array.from(row.children).map((child) => {
+      const r = child.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, label: (child.textContent ?? "").trim().slice(0, 20) };
+    });
+  });
+  const place = async (fromTop: number) => {
+    await page.evaluate((offset: number) => {
+      const input = document.querySelector('.club-roster-tools input[role="combobox"]') as HTMLElement;
+      window.scrollBy(0, input.getBoundingClientRect().top - offset);
+    }, fromTop);
+    await page.waitForTimeout(80);
+  };
+  try {
+    // Closed: the filter row holds its fields side by side on a wide screen, and nothing sticks out.
+    await place(Math.round(page.viewportSize().height * 0.3));
+    const closed = await toolsBox();
+    if (!closed || closed.length < 3) {
+      record("dialog-open-failed", name, width, "the filter row has fewer than three fields");
+    } else if (width >= 1024) {
+      const tops = closed.map((box: { top: number }) => Math.round(box.top));
+      const bottoms = closed.map((box: { bottom: number }) => Math.round(box.bottom));
+      if (Math.max(...bottoms) - Math.min(...bottoms) > 3) record("filter-row-uneven", name, width, `the filter fields do not sit on one line when closed (bottoms ${bottoms.join(", ")}px; tops ${tops.join(", ")}px)`);
+    }
+    for (const [state, fromTop] of [["opened in the middle of the screen", Math.round(page.viewportSize().height * 0.3)], ["opened near the bottom of the screen", Math.round(page.viewportSize().height - 110)]] as const) {
+      await place(fromTop);
+      const before = await page.evaluate(layoutSnapshotInPage);
+      await combobox.click({ timeout: 3000 });
+      await page.waitForTimeout(200);
+      const after = await page.evaluate(layoutSnapshotInPage);
+      const moved = movedBetween(before, after);
+      for (const move of moved.slice(0, 6)) record("filter-list-shifts-page", name, width, `${state}: ${move}`);
+      if (moved.length > 6) record("filter-list-shifts-page", name, width, `${state}: ${moved.length - 6} more elements moved`);
+      const open = await page.evaluate(openComboboxListInPage);
+      for (const problem of open.problems) record("filter-list-position", name, width, `${state}: ${problem}`);
+      if (takeShots) {
+        const tag = state.includes("bottom") ? "bottom" : "middle";
+        await page.screenshot({ path: `${prefix}-${labelText.toLowerCase()}-list-${tag}.png`, type: "png" });
+      }
+      // Keyboard: arrows move the active option, Escape closes with focus still in the field.
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("ArrowDown");
+      const active = await combobox.getAttribute("aria-activedescendant");
+      if (!active || (await page.locator(`[id="${active}"]`).count()) === 0) record("filter-list-keyboard", name, width, `${state}: no active option after the arrow keys (aria-activedescendant=${active})`);
+      const controls = await combobox.getAttribute("aria-controls");
+      if (!controls || (await page.locator(`[id="${controls}"][role="listbox"]`).count()) === 0) record("filter-list-keyboard", name, width, `${state}: aria-controls does not point at the listbox`);
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(80);
+      if ((await combobox.getAttribute("aria-expanded")) !== "false") record("filter-list-keyboard", name, width, `${state}: Escape did not close the list`);
+      if (!(await combobox.evaluate((el: HTMLElement) => document.activeElement === el))) record("filter-list-keyboard", name, width, `${state}: focus left the field when Escape closed the list`);
+      const closedAgain = await page.evaluate(layoutSnapshotInPage);
+      for (const move of movedBetween(before, closedAgain).slice(0, 3)) record("filter-list-shifts-page", name, width, `${state}, after closing: ${move}`);
+      // Click elsewhere closes it too.
+      await combobox.click({ timeout: 3000 });
+      await page.waitForTimeout(100);
+      await page.mouse.click(2, Math.max(2, Math.round(page.viewportSize().height / 2)));
+      await page.waitForTimeout(100);
+      if ((await combobox.getAttribute("aria-expanded")) !== "false") record("filter-list-keyboard", name, width, `${state}: clicking outside did not close the list`);
+    }
+  } catch (error) {
+    record("dialog-open-failed", name, width, (error as Error).message.split("\n")[0] ?? "failed");
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+/**
+ * Back to top on the club pages (the owner's Oct 13 request): absent at the top and a little way down,
+ * present after scrolling past one and a half screens, a 44px button in the bottom corner that sits on
+ * no other fixed control, and using it returns to the top, moves focus into the main content and hides it.
+ * The audit browser asks for reduced motion, so the jump must be instant.
+ */
+async function auditBackToTop(page: Page, spec: PageSpec, width: number, prefix: string) {
+  if (!backToTopPages.includes(spec.name)) return;
+  const name = `${spec.name} (back to top)`;
+  const button = page.locator('button[aria-label="Back to top"]');
+  try {
+    const innerHeight = page.viewportSize().height;
+    const scrollable = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+    if (scrollable < innerHeight * 1.7) {
+      console.log(`  note  ${spec.name} @${width}: only ${Math.round(scrollable)}px to scroll, too short to need Back to top`);
+      return;
+    }
+    backToTopChecked.add(width);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(120);
+    if ((await button.count()) !== 0) record("back-to-top", name, width, "the button shows at the top of the page");
+    await page.evaluate((y: number) => window.scrollTo(0, y), Math.round(innerHeight * 1.2));
+    await page.waitForTimeout(150);
+    if ((await button.count()) !== 0) record("back-to-top", name, width, "the button shows after scrolling only 1.2 screens");
+    await page.evaluate((y: number) => window.scrollTo(0, y), Math.round(innerHeight * 1.7));
+    await button.first().waitFor({ state: "visible", timeout: 3000 });
+    const box = await button.first().boundingBox();
+    if (!box) {
+      record("back-to-top", name, width, "the button has no box");
+      return;
+    }
+    if (box.width < touchTarget - touchTolerance || box.height < touchTarget - touchTolerance) record("back-to-top", name, width, `the button is ${Math.round(box.width)}x${Math.round(box.height)}px, under ${touchTarget}`);
+    if (box.x < 0 || box.y < 0 || box.x + box.width > width + 0.5 || box.y + box.height > innerHeight + 0.5) record("back-to-top", name, width, "the button is outside the screen");
+    if (box.x + box.width < width * 0.6 || box.y + box.height < innerHeight * 0.6) record("back-to-top", name, width, `the button is not in the bottom corner (${Math.round(box.x)},${Math.round(box.y)})`);
+    for (const other of await page.evaluate(otherFixedRectsInPage)) {
+      if (box.x < other.right && box.x + box.width > other.left && box.y < other.bottom && box.y + box.height > other.top) record("back-to-top", name, width, `the button sits on top of ${other.name}`);
+    }
+    if ((await button.first().getAttribute("aria-label")) !== "Back to top") record("back-to-top", name, width, "the button has no Back to top name");
+    if (takeShots) await page.screenshot({ path: `${prefix}-back-to-top.png`, type: "png" });
+    await button.first().click({ timeout: 3000 });
+    await page.waitForTimeout(150);
+    const afterClick = await page.evaluate(() => ({
+      y: window.scrollY,
+      focus: document.activeElement ? `${document.activeElement.tagName.toLowerCase()}` : "",
+      inMain: Boolean(document.activeElement && document.activeElement.closest("main")),
+    }));
+    if (afterClick.y > 1) record("back-to-top", name, width, `the page is still ${Math.round(afterClick.y)}px down after using it (reduced motion should be instant)`);
+    if (!afterClick.inMain || afterClick.focus === "body" || afterClick.focus === "button") record("back-to-top", name, width, `focus did not move to the top of the main content (it is on ${afterClick.focus})`);
+    if ((await button.count()) !== 0) record("back-to-top", name, width, "the button is still there back at the top");
+  } catch (error) {
+    record("back-to-top", name, width, (error as Error).message.split("\n")[0] ?? "failed");
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+/** The Orders page's four buttons each say, in a plain sentence, what that part is for. */
+async function auditOrderDescriptions(page: Page, spec: PageSpec, width: number, prefix: string) {
+  if (spec.name !== "club-orders") return;
+  const name = `${spec.name} (button descriptions)`;
+  try {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const links = await page.evaluate(() => Array.from(document.querySelectorAll('nav[aria-label="Jump to a part of this page"] a')).map((link) => ({
+      label: (link.firstElementChild?.textContent ?? "").trim(),
+      hint: (link.querySelector("small")?.textContent ?? "").trim(),
+    })));
+    const expected = ["Order list", "Supplies", "Ready to hand out", "Uniforms"];
+    for (const label of expected) {
+      const link = links.find((item: { label: string; hint: string }) => item.label === label);
+      if (!link) record("orders-description", name, width, `no "${label}" button`);
+      else if (link.hint.length < 30) record("orders-description", name, width, `"${label}" has no written description (${JSON.stringify(link.hint)})`);
+    }
+    if (takeShots) await page.screenshot({ path: `${prefix}-orders-top.png`, type: "png" });
+  } catch (error) {
+    record("orders-description", name, width, (error as Error).message.split("\n")[0] ?? "failed");
+  }
 }
 
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
@@ -1676,6 +1919,11 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     if (page.url() !== draftBefore) await page.goto(draftBefore, { waitUntil: "load" });
   }
 
+  // The floating Honor and Class filter lists, the Orders button descriptions and Back to top (the owner's Oct 13 request).
+  await auditOrderDescriptions(page, spec, width, prefix);
+  await auditFilterCombobox(page, spec, width, prefix);
+  await auditBackToTop(page, spec, width, prefix);
+
   if (takeShots) {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `${prefix}.jpg`, type: "jpeg", quality: 60, fullPage: true }).catch(async () => {
@@ -1770,6 +2018,16 @@ async function main() {
       await cleanupSynthetic(prisma).catch((error: Error) => console.error(`Cleanup failed: ${error.message}`));
     }
     await prisma.$disconnect();
+  }
+
+  // Back to top must have been exercised at every width on at least one page. Only asked of a full run: a run
+  // filtered to one page (MOBILE_LAYOUT_ONLY) may not include a page long enough to scroll.
+  if (!only) {
+    for (const width of widths) {
+      if (!backToTopChecked.has(width) && pages.some((spec) => backToTopPages.includes(spec.name))) {
+        record("back-to-top", "club pages", width, "no club page was long enough to check Back to top at this width");
+      }
+    }
   }
 
   writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ widths, pages: pages.map((spec) => spec.name), findings, accepted, pageErrors }, null, 2));
