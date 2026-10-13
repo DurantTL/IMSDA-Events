@@ -20,6 +20,8 @@ vi.mock("@/lib/prisma", () => {
   return { getPrisma: () => client };
 });
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
+// Deadline reminders (#910) have their own tests; here a calendar change must not add database work this test counts.
+vi.mock("@/modules/calendar/deadline-reminders", () => ({ reconcileDeadlineReminders: vi.fn().mockResolvedValue({ prepared: 0, updated: 0, withdrawn: 0 }) }));
 
 import { deleteCalendarEntry, listPublicCalendarItems, updateCalendarEntry } from "@/modules/calendar/repository";
 

@@ -21,6 +21,9 @@
  *    own cell, no two columns touch with no gap, each card label (`data-label`) is its
  *    column header, a header sits over its column, an honor pill never loses its
  *    "In progress / Completed" status, and a table marked `data-fit-width` fits its box;
+ *  - form fields: every visible text input, select, textarea and search box has a boundary (its own
+ *    border, or its nearest bordered wrapper within two levels, such as the `.search-field` box) with at
+ *    least 3:1 contrast against the background behind it (WCAG 2.2 SC 1.4.11);
  *  - a full-page screenshot of every page and width, saved as an artifact.
  *
  * Every layout assertion is made for every page at every width. A finding that
@@ -100,6 +103,9 @@ const reportMonth = "2026-09";
 const touchTarget = 44;
 /** Tolerance for sub-pixel rounding only; a 43 px control is a failure. */
 const touchTolerance = 0.5;
+/** WCAG 2.2 SC 1.4.11: the boundary of a form control against the background behind it. */
+const fieldBoundaryRatio = 3;
+let fieldsChecked = 0;
 /**
  * Widths at or under this are phones: the 44px tap-target rule and the
  * tables-become-cards rule apply. Tablets (768 and up) keep the denser desktop
@@ -508,6 +514,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.honorOffering.deleteMany({ where: { id: multiHonorOfferingId } }),
     prisma.honorSession.deleteMany({ where: { id: multiHonorSessionId } }),
     prisma.honor.deleteMany({ where: { id: { in: multiHonorIds } } }),
+    prisma.deadlineReminderBatch.deleteMany({ where: { title: { startsWith: "Mobilecheck" } } }),
+    prisma.calendarEntry.deleteMany({ where: { id: { startsWith: `${P}_deadline_` } } }),
     prisma.announcement.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.messageOutbox.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.eventMessageTemplate.deleteMany({ where: { eventId: blocksEventId } }),
@@ -744,6 +752,35 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedFailedDeliveries(prisma);
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
+  await seedDeadlines(prisma);
+}
+
+/**
+ * Two Deadlines (#910) so the club home's and the Area Coordinator overview's "Upcoming deadlines" list has
+ * an upcoming row (with a link) and an overdue one, and one prepared reminder batch for the calendar admin's
+ * "Deadline reminders" tab. Dates are relative to today, so the rows stay in the list's window.
+ */
+async function seedDeadlines(prisma: PrismaClient) {
+  const { calendarDateIn, addDays } = await import("../modules/calendar/domain");
+  const today = calendarDateIn(new Date());
+  const rows = [
+    { key: "soon", days: 9, title: "Mobilecheck Spring Camporee Registration Due and Every Other Long Title the Calendar Might Import", linkUrl: "https://calendar.mobilecheck.example.test/registration" },
+    { key: "overdue", days: -2, title: "Mobilecheck Points and Investiture Reports are Due", linkUrl: null },
+  ];
+  for (const row of rows) {
+    const date = addDays(today, row.days);
+    const data = { title: row.title, startsOn: date, endsOn: date, entryType: "DEADLINE" as const, isPublished: true, isHiddenLocally: false, status: "SCHEDULED" as const, linkUrl: row.linkUrl, repeatRule: null };
+    await prisma.calendarEntry.upsert({
+      where: { id: `${P}_deadline_${row.key}` },
+      update: data,
+      create: { id: `${P}_deadline_${row.key}`, ...data, createdByUserId: "usr_system_admin", updatedByUserId: "usr_system_admin" },
+    });
+  }
+  const soon = rows[0];
+  const batchData = { title: soon.title, dueOn: addDays(today, soon.days), linkUrl: soon.linkUrl, status: "PENDING" as const, statusReason: null, decidedAt: null };
+  const existing = await prisma.deadlineReminderBatch.findFirst({ where: { calendarEntryId: `${P}_deadline_soon`, daysBefore: 14 }, select: { id: true } });
+  if (existing) await prisma.deadlineReminderBatch.update({ where: { id: existing.id }, data: batchData });
+  else await prisma.deadlineReminderBatch.create({ data: { calendarEntryId: `${P}_deadline_soon`, daysBefore: 14, ...batchData } });
 }
 
 /**
@@ -1215,6 +1252,146 @@ function coveredByBarInPage() {
   return lowest > barTop + 1 ? `${lowestName} ends at ${Math.round(lowest)}px, under a bar starting at ${Math.round(barTop)}px` : null;
 }
 
+/**
+ * Form-field boundaries (WCAG 2.2 SC 1.4.11, 3:1): every visible text-like input, select, textarea and
+ * search box has a boundary, either its own border or the border of its nearest wrapper within two
+ * levels (the wrapper IS the field for `.search-field`, `.money-input` and the like), and that border
+ * is at least `minRatio`:1 against the background behind it. Colours come from computed styles; a
+ * translucent border is composited over that background first, and a gradient background (the sidebar)
+ * is tested at each of its colour stops. With `dialogOnly`, only fields inside an open dialog
+ * (`[role="dialog"], [aria-modal="true"]`) are scanned; the page behind it was already checked.
+ *
+ * Known blind spots (a pass is not a guarantee): the check measures the border against what is
+ * behind the field, not the fill (a field whose white fill sits on a white page relies on the border
+ * alone, which is the point, but a border that is fine against the page and weak against the fill is
+ * not reported); `background-image: url(...)` backgrounds are ignored, only gradient colour stops
+ * count; a field with only an underline (a bottom border) is reported as having no boundary rather
+ * than measured; custom widgets that draw their own box with no input inside (a div acting as a
+ * textbox) are not found because only input, select and textarea elements are scanned.
+ */
+function fieldBoundaryInPage(args: { minRatio: number; dialogOnly?: boolean }) {
+  type Rgba = { r: number; g: number; b: number; a: number };
+  const parse = (value: string): Rgba | null => {
+    const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/.exec(value);
+    if (!m) return null;
+    const alpha = m[4] === undefined ? 1 : m[4].endsWith("%") ? Number.parseFloat(m[4]) / 100 : Number.parseFloat(m[4]);
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: alpha };
+  };
+  const over = (top: Rgba, under: Rgba): Rgba => {
+    const a = top.a + under.a * (1 - top.a);
+    if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
+    return {
+      r: (top.r * top.a + under.r * under.a * (1 - top.a)) / a,
+      g: (top.g * top.a + under.g * under.a * (1 - top.a)) / a,
+      b: (top.b * top.a + under.b * under.a * (1 - top.a)) / a,
+      a,
+    };
+  };
+  const luminance = ({ r, g, b }: Rgba) => {
+    const [lr, lg, lb] = [r, g, b].map((channel) => {
+      const v = channel / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  };
+  const ratio = (a: Rgba, b: Rgba) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const white: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+  /** The colours painted behind `el` (its ancestors, nearest first, until one is opaque): one per gradient stop. */
+  const backdrops = (el: Element | null): Rgba[] => {
+    for (let node = el; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      const layers: Rgba[] = [];
+      const image = style.backgroundImage;
+      if (image && image !== "none") {
+        for (const stop of image.match(/rgba?\([^)]*\)/g) ?? []) {
+          const colour = parse(stop);
+          if (colour) layers.push(colour);
+        }
+      }
+      const colour = parse(style.backgroundColor);
+      if (layers.length === 0 && colour && colour.a > 0) layers.push(colour);
+      if (layers.length === 0) continue;
+      const stack = layers.map((layer) => over(layer, white));
+      if (layers.every((layer) => layer.a >= 1)) return stack;
+      // A translucent layer: composite it over whatever is behind that element.
+      const below = backdrops(node.parentElement);
+      return stack.flatMap((_, index) => below.map((back) => over(layers[index], back)));
+    }
+    return [white];
+  };
+  const visible = (el: Element) => {
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    // Visually hidden inputs (sr-only, a custom switch's real checkbox) are not fields a person sees.
+    return rect.width >= 8 && rect.height >= 8;
+  };
+  const hiddenTree = (el: Element) => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (node.getAttribute("aria-hidden") === "true" || (node as HTMLElement).hidden || node.hasAttribute("inert")) return true;
+      if (node.tagName === "DETAILS" && !(node as HTMLDetailsElement).open && !(node.firstElementChild?.tagName === "SUMMARY" && node.firstElementChild.contains(el))) return true;
+    }
+    return false;
+  };
+  const describe = (el: Element) => {
+    const id = el.id ? `#${el.id}` : "";
+    const classes = typeof (el as HTMLElement).className === "string"
+      ? (el as HTMLElement).className.split(/\s+/).filter(Boolean).slice(0, 3).map((name) => `.${name}`).join("")
+      : "";
+    const type = el.tagName === "INPUT" ? `[type=${(el as HTMLInputElement).type}]` : "";
+    const name = el.getAttribute("aria-label") ?? el.getAttribute("name") ?? el.getAttribute("placeholder");
+    return `${el.tagName.toLowerCase()}${type}${id}${classes}${name ? ` [${name.slice(0, 30)}]` : ""}`;
+  };
+  const sides = ["Top", "Right", "Bottom", "Left"] as const;
+  /** The border colour when all four sides are drawn, else null. */
+  const borderOf = (el: Element): Rgba | null => {
+    const style = getComputedStyle(el);
+    let first: Rgba | null = null;
+    for (const side of sides) {
+      const width = Number.parseFloat(style[`border${side}Width`]);
+      const kind = style[`border${side}Style`];
+      const colour = parse(style[`border${side}Color`]);
+      if (!(width >= 1) || kind === "none" || kind === "hidden" || !colour || colour.a === 0) return null;
+      first ??= colour;
+    }
+    return first;
+  };
+  const skipTypes = new Set(["checkbox", "radio", "range", "file", "color", "hidden", "button", "submit", "reset", "image"]);
+  const problems: string[] = [];
+  let checked = 0;
+  const roots: ParentNode[] = args.dialogOnly ? Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')) : [document];
+  const candidates = new Set<Element>();
+  for (const root of roots) for (const found of Array.from(root.querySelectorAll("input, select, textarea"))) candidates.add(found);
+  for (const el of Array.from(candidates)) {
+    const field = el as HTMLInputElement;
+    if (el.tagName === "INPUT" && skipTypes.has(field.type)) continue;
+    if (field.disabled || !visible(el) || hiddenTree(el)) continue;
+    checked += 1;
+    // Its own border, else the nearest bordered wrapper within two levels.
+    let holder: Element | null = null;
+    let colour: Rgba | null = null;
+    for (let node: Element | null = el, depth = 0; node && depth <= 2; node = node.parentElement, depth += 1) {
+      colour = borderOf(node);
+      if (colour) { holder = node; break; }
+    }
+    if (!holder || !colour) {
+      problems.push(`${describe(el)}: no visible border on the field or on a wrapper within 2 levels`);
+      continue;
+    }
+    // The border is drawn over what is behind the element that carries it (translucent borders too).
+    const behind = backdrops(holder.parentElement);
+    const worst = Math.min(...behind.map((back) => ratio(over(colour as Rgba, back), back)));
+    if (worst < args.minRatio) {
+      const where = holder === el ? "its border" : `the border of ${describe(holder)}`;
+      problems.push(`${describe(el)}: ${where} is ${worst.toFixed(2)}:1 against the background behind it (needs ${args.minRatio}:1)`);
+    }
+  }
+  return { checked, problems: problems.slice(0, 12) };
+}
+
 /** Runs in the page with a dialog open: does it fit the screen, or scroll inside itself? */
 function dialogFitInPage() {
   const h = window.innerHeight;
@@ -1342,6 +1519,9 @@ function injectDefects() {
     '<table style="table-layout:fixed;width:200px"><thead><tr><th>One</th><th>Two</th></tr></thead><tbody><tr><td data-label="Uno" style="white-space:nowrap">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</td><td data-label="Two">BBBBBBBB</td></tr></tbody></table>',
     '<div style="position:fixed;left:0;right:0;bottom:0;height:90px;background:#ccc;z-index:30">self-test bar</div>',
     '<p style="margin:0 0 0 0">self-test last line</p>',
+    // A field whose border is as pale as the old #cbdbe2 (1.4:1), and one with no border at all.
+    '<input aria-label="self-test pale field" style="display:block;width:200px;height:32px;border:1px solid #cbdbe2;background:#fff">',
+    '<input aria-label="self-test borderless field" style="display:block;width:200px;height:32px;border:0;background:transparent">',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");
@@ -1589,6 +1769,9 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   for (const problem of result.cellProblems) record("table-cell", spec.name, width, problem);
   for (const problem of result.pillProblems) record("honor-pill", spec.name, width, problem);
   for (const problem of result.fitProblems) record("table-too-wide", spec.name, width, problem);
+  const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
+  fieldsChecked += fields.checked;
+  for (const problem of fields.problems) record("field-boundary", spec.name, width, problem);
 
   // Scroll to the bottom: is the last content hidden behind a fixed bar?
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -1616,6 +1799,11 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       dialogsOpened += fit.count;
       if (fit.count === 0) console.log(`  note  ${label}: "${name}" opened no dialog`);
       for (const problem of fit.problems) record("dialog-too-tall", spec.name, width, `"${name}": ${problem}`);
+      if (fit.count > 0) {
+        const dialogFields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio, dialogOnly: true });
+        fieldsChecked += dialogFields.checked;
+        for (const problem of dialogFields.problems) record("field-boundary", `${spec.name} (dialog "${name}")`, width, problem);
+      }
       if (takeShots && fit.count > 0) {
         dialogShots += 1;
         await page.screenshot({ path: `${prefix}-dialog${dialogShots}.jpg`, type: "jpeg", quality: 60 });
@@ -1723,6 +1911,31 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
     await deleteLayoutNotes().catch((error: Error) => record("dialog-open-failed", savedName, width, `could not delete the synthetic note: ${error.message.split("\n")[0]}`));
+  }
+
+  // The calendar admin's Deadline reminders tab (#910): a prepared batch with its recipient chips, the opened email
+  // preview, and the Send and Don't send buttons. Nothing is sent: the buttons are only measured.
+  if (spec.name === "staff-calendar-admin") {
+    const stateName = `${spec.name} (deadline reminders)`;
+    try {
+      await page.getByRole("tab", { name: /Deadline reminders/ }).click({ timeout: 3000 });
+      await page.waitForTimeout(150);
+      const card = page.locator(".deadline-reminder-row:visible").first();
+      await card.waitFor({ state: "visible", timeout: 5000 });
+      const audit = async (state: string, shot: string) => {
+        const open = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
+        const name = `${stateName} ${state}`;
+        if (open.scrollWidth > open.innerWidth) record("horizontal-scroll", name, width, `page is ${open.scrollWidth}px wide in a ${open.innerWidth}px window; sticking out: ${open.overflowers.join("; ") || "(nothing identified)"}`);
+        for (const target of open.smallTargets) record("small-tap-target", name, width, target);
+        if (takeShots) await page.screenshot({ path: `${prefix}-${shot}.jpg`, type: "jpeg", quality: 60 });
+      };
+      await audit("closed", "deadline-reminders");
+      await card.locator("summary").first().click({ timeout: 3000 });
+      await page.waitForTimeout(150);
+      await audit("preview open", "deadline-reminders-preview");
+    } catch (error) {
+      record("dialog-open-failed", stateName, width, (error as Error).message.split("\n")[0] ?? "failed");
+    }
   }
 
   // The class builder with several honors chosen (#812): the add form with its honor search narrowed and
@@ -2057,7 +2270,7 @@ async function main() {
   writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ widths, pages: pages.map((spec) => spec.name), findings, accepted, pageErrors }, null, 2));
   const byKind = new Map<string, Finding[]>();
   for (const finding of findings) byKind.set(finding.kind, [...(byKind.get(finding.kind) ?? []), finding]);
-  console.log(`\n${pagesVisited.length} page/width combinations audited, ${dialogsOpened} dialogs opened, ${accepted.length} accepted findings, ${pageErrors.length} page script errors (informational).`);
+  console.log(`\n${pagesVisited.length} page/width combinations audited, ${dialogsOpened} dialogs opened, ${fieldsChecked} form fields checked for a 3:1 boundary, ${accepted.length} accepted findings, ${pageErrors.length} page script errors (informational).`);
   if (findings.length > 0) {
     console.error(`\n${findings.length} layout finding(s):`);
     for (const [kind, rows] of byKind) {

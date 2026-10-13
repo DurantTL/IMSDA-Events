@@ -59,6 +59,9 @@ import {
 import { readMessageFileBytes } from "@/modules/communications/message-files";
 import {
   announcementOptOutSkipMessage,
+  DEADLINE_REMINDER_TEMPLATE_KEY,
+  deadlineRemindersHonourAnnouncementOptOut,
+  reminderOptOutSkipMessage,
   isOptOutEligibleTemplate,
   unsubscribeApiPath,
   unsubscribeHeadersAllowed,
@@ -431,7 +434,11 @@ async function suppressIfAnnouncementOptedOut(
   policy: AnnouncementPolicy,
   at: Date,
 ): Promise<OptOutCheckResult> {
-  if (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId) return false;
+  // A deadline reminder has no event (#910): only an opt-out of ALL announcements can apply, which an event id no
+  // row carries ("") cannot match as an EVENT one. Announcements need their event as before.
+  const reminder = message.templateKey === DEADLINE_REMINDER_TEMPLATE_KEY;
+  if (reminder ? !deadlineRemindersHonourAnnouncementOptOut() : (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId)) return false;
+  const optOutEventId = message.eventId ?? "";
   const failClosed = async (code: string, text: string, error?: unknown): Promise<OptOutCheckResult> => {
     if (error) logError("Unable to check an announcement opt-out; the message will be retried.", error);
     const outcome = await finalizeFailedAttempt(prisma, message, { code, message: text, retryable: true }, at, true);
@@ -442,10 +449,10 @@ async function suppressIfAnnouncementOptedOut(
   }
   let scope: AnnouncementOptOutScope | null;
   try {
-    scope = await policy.lookupOptOut(message.recipientEmail, message.eventId);
-    if (scope) {
+    scope = await policy.lookupOptOut(message.recipientEmail, optOutEventId);
+    if (scope && !reminder) {
       const announcementId = announcementIdOf(message.metadata);
-      if (announcementId && policy.isEssential && await policy.isEssential(announcementId, message.eventId)) return false;
+      if (announcementId && policy.isEssential && await policy.isEssential(announcementId, optOutEventId)) return false;
     }
   } catch (error) {
     return failClosed("OPT_OUT_CHECK_FAILED", "Could not confirm the recipient had not opted out, so the message was not sent.", error);
@@ -453,17 +460,19 @@ async function suppressIfAnnouncementOptedOut(
   if (!scope) return false;
   const updated = await prisma.messageOutbox.updateMany({
     where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
-    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: announcementOptOutSkipMessage(scope) },
+    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: reminder ? reminderOptOutSkipMessage(scope) : announcementOptOutSkipMessage(scope) },
   });
   if (updated.count !== 1) return "lost";
   await prisma.auditLog.create({
     data: {
-      eventId: message.eventId,
-      action: "EVENT_ANNOUNCEMENT_SKIPPED_OPTED_OUT",
+      eventId: message.eventId ?? undefined,
+      action: reminder ? "DEADLINE_REMINDER_SKIPPED_OPTED_OUT" : "EVENT_ANNOUNCEMENT_SKIPPED_OPTED_OUT",
       entityType: "MessageOutbox",
       entityId: message.id,
       correlationId: randomUUID(),
-      summary: "Skipped an event announcement because the recipient opted out of announcements.",
+      summary: reminder
+        ? "Skipped a deadline reminder because the recipient opted out of announcements."
+        : "Skipped an event announcement because the recipient opted out of announcements.",
       metadata: { messageId: message.id, scope },
     },
   });

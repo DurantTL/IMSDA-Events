@@ -6,7 +6,8 @@ import { getPrisma } from "@/lib/prisma";
 import { fingerprintSecret, isSecretEncryptionConfigured, openSecret, SecretBoxError, sealSecret } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { FeedFetchError, feedUrlHint, fetchFeedText, normalizeFeedUrl, type FeedTransport, type HostResolver } from "@/modules/calendar/feed-fetch";
-import { feedLockKey, planFeedSync, previewOfPlan, type FeedPlan, type FeedPreview, type StoredFeedEntry } from "@/modules/calendar/feed-plan";
+import { entryTypeEditMark } from "@/modules/calendar/deadlines";
+import { feedLockKey, markedDeadlineCount, planFeedSync, previewOfPlan, type FeedPlan, type FeedPreview, type StoredFeedEntry } from "@/modules/calendar/feed-plan";
 import { IcsParseError, parseIcsFeed, type ParsedIcsFeed } from "@/modules/calendar/ics-import";
 import { CalendarError, listCalendarEntries } from "@/modules/calendar/repository";
 import type { CalendarFeedInput, CalendarFeedUpdate } from "@/modules/calendar/schemas";
@@ -165,7 +166,7 @@ async function loadAndParse(feed: { sealedUrl: string }, deps: Deps): Promise<Pa
 const storedSelect = {
   id: true, title: true, description: true, location: true, linkUrl: true, status: true, startsOn: true, endsOn: true,
   timeLabel: true, repeatRule: true, repeatExceptions: true, sourceUid: true, sourceRecurrenceId: true, sourceHash: true,
-  sourceRemovedAt: true, sourceRemovedWasPublished: true, locallyEditedFields: true, isPublished: true,
+  sourceRemovedAt: true, sourceRemovedWasPublished: true, locallyEditedFields: true, isPublished: true, entryType: true,
 } as const;
 
 type StoredRow = Prisma.CalendarEntryGetPayload<{ select: typeof storedSelect }>;
@@ -300,7 +301,7 @@ export async function syncCalendarFeed(
           entityType: "CalendarFeed",
           entityId: feedId,
           summary: `Refreshed the imported calendar "${feed.name}".`,
-          metadata: { created: planned.creates.length, updated: planned.updates.length, removed: planned.removals.length, warnings: parsed.warnings.length },
+          metadata: { created: planned.creates.length, updated: planned.updates.length, removed: planned.removals.length, markedDeadline: markedDeadlineCount(planned), warnings: parsed.warnings.length },
         }, tx);
       }
       return planned;
@@ -319,6 +320,7 @@ export async function syncCalendarFeed(
     relink: visibleUpdates.filter((update) => update.kind === "RELINK").length,
     remove: plan.removals.length,
     unchanged: plan.unchanged,
+    markedDeadline: markedDeadlineCount(plan),
     warnings: parsed.warnings,
     totalInFeed: itemCount,
   };
@@ -376,13 +378,15 @@ export async function setCalendarEntryHidden(entryId: string, hidden: boolean, a
  * the next refresh.
  */
 export async function resetCalendarEntryToSource(entryId: string, actorUserId: string, deps: Deps = {}) {
-  const existing = await getPrisma().calendarEntry.findUnique({ where: { id: entryId }, select: { id: true, title: true, sourceFeedId: true } });
+  const existing = await getPrisma().calendarEntry.findUnique({ where: { id: entryId }, select: { id: true, title: true, sourceFeedId: true, locallyEditedFields: true } });
   if (!existing) throw new CalendarError("ENTRY_NOT_FOUND", "That calendar entry could not be found.");
   if (!existing.sourceFeedId) throw new CalendarError("NOT_IMPORTED", "Only imported items can be reset.");
+  // The Deadline/Standard type is staff's own choice about this site, not part of the Google version: a reset keeps it.
+  const keptMarks = existing.locallyEditedFields.includes(entryTypeEditMark) ? [entryTypeEditMark] : [];
   await getPrisma().$transaction(async (tx) => {
     await tx.calendarEntry.update({
       where: { id: entryId },
-      data: { locallyEditedFields: [], sourceHash: null, updatedByUserId: actorUserId },
+      data: { locallyEditedFields: keptMarks, sourceHash: null, updatedByUserId: actorUserId },
     });
     await writeAuditLog({
       actorUserId,

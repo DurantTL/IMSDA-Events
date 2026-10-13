@@ -574,6 +574,9 @@ enum MessageTemplateKey {
   /// The daily digest of location waitlist changes to Area Coordinators and
   /// event staff (#599). Sent without an event, one email per person.
   LOCATION_WAITLIST_DIGEST
+  /// A reminder that a calendar deadline is coming up, sent to club directors
+  /// and Area Coordinators after staff approve the batch (#910). No event.
+  DEADLINE_REMINDER
   /// A team member of 18 or older needs the Area Coordinator's permission (#809): sent to the location's Area Coordinator, else event staff.
   TEAM_PERMISSION_REQUEST
   /// A club member transfer (#489) was started: sent to the sending club.
@@ -5541,6 +5544,20 @@ enum CalendarEntryStatus {
 enum CalendarEntryType {
   STANDARD
   CLOSURE
+  /// Something is due (#910). Never on the public calendar or its feeds; shown
+  /// to club directors and Area Coordinators as a deadline, with reminders.
+  DEADLINE
+}
+
+enum DeadlineReminderStatus {
+  /// Prepared, waiting for one staff click to send.
+  PENDING
+  /// Staff approved it; its emails were queued in the outbox.
+  SENT
+  /// Taken back before approval because the deadline changed, was cancelled or hidden, or passed.
+  WITHDRAWN
+  /// Staff chose not to send it.
+  DISMISSED
 }
 
 /// An informational item on the public conference calendar (#107) for
@@ -5590,8 +5607,42 @@ model CalendarEntry {
 
   sourceFeed CalendarFeed? @relation(fields: [sourceFeedId], references: [id], onDelete: SetNull)
 
+  deadlineReminderBatches DeadlineReminderBatch[]
+
   @@unique([sourceFeedId, sourceUid, sourceRecurrenceId])
   @@index([isPublished, startsOn])
+}
+
+/// One reminder for one deadline at one reminder point, 14 or 2 days before it is
+/// due (#910). Prepared automatically; emailed only after staff approve it. The
+/// unique key means a deadline, reminder point and due date are never prepared
+/// twice, and a sent batch is final for that due date (a deadline that moves gets
+/// its points prepared again for the new date). `title`, `dueOn` and `linkUrl` follow the entry while the
+/// batch is pending and are frozen once it is decided.
+model DeadlineReminderBatch {
+  id                String                 @id @default(cuid())
+  calendarEntryId   String?
+  /// 14 or 2 (a check constraint in the migration).
+  daysBefore        Int
+  title             String
+  dueOn             String
+  linkUrl           String?
+  status            DeadlineReminderStatus @default(PENDING)
+  /// Why a batch was withdrawn or dismissed.
+  statusReason      String?
+  preparedAt        DateTime               @default(now())
+  decidedAt         DateTime?
+  decidedByUserId   String?
+  /// Set when it is sent: how many emails were queued, and how many people were left out for opting out.
+  recipientCount    Int?
+  optedOutCount     Int?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  calendarEntry CalendarEntry? @relation(fields: [calendarEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([calendarEntryId, daysBefore, dueOn])
+  @@index([status, dueOn])
 }
 
 enum CalendarFeedStatus {

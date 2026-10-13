@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2, CircleAlert, FileText } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { ClubNextTaskCard } from "@/components/club-next-task";
 import { ClubYearTiles } from "@/components/club-year-tiles";
+import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { clubPortalComplianceReminderCounts } from "@/modules/background-checks/repository";
 import { complianceReminders } from "@/modules/background-checks/domain";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -14,6 +15,7 @@ import { listRoster } from "@/modules/club-rosters/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubEventRegistrationSteps, listClubEvents } from "@/modules/club-registrations/repository";
 import { calendarDateIn } from "@/modules/calendar/domain";
+import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { formatDueDate, isLockedForClub, monthlyReportProgress, reportDueDate, reportMonthLabel, reportableMonths } from "@/modules/club-reports/domain";
 import { getClubReportYear } from "@/modules/club-reports/repository";
 import { honorYearSummary } from "@/modules/honors/member-honor-domain";
@@ -40,7 +42,8 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
   if (access.state === "NO_ROSTER") {
-    // A reporter (#375): no roster, no registrations, just monthly reports (#377).
+    // A reporter (#375): no roster, no registrations, just monthly reports (#377). Deadlines are for every club role (#910).
+    const reporterDeadlines = await listUpcomingDeadlines();
     return (
       <>
         {await allMyClubsLink(null)}
@@ -56,6 +59,7 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
             Open Monthly Records <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </section>
+        <UpcomingDeadlines deadlines={reporterDeadlines} />
       </>
     );
   }
@@ -64,7 +68,7 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
   const base = `/account/clubs/${organizationId}`;
   const now = new Date();
   const clubYear = clubYearFor(now);
-  const [members, events, reportYear, clubsLink, compliance, honorRows] = await Promise.all([
+  const [members, events, reportYear, clubsLink, compliance, honorRows, deadlineList] = await Promise.all([
     listRoster(organizationId, clubYear),
     listClubEvents(organizationId),
     access.capabilities.submitReports ? getClubReportYear(organizationId, clubYear) : Promise.resolve(null),
@@ -73,6 +77,8 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
     clubPortalComplianceReminderCounts(organizationId, clubYear, access.capabilities),
     // Honors are visible to anyone who reaches this page: the roster's own gate already applies (#486).
     listClubHonorsPage(organizationId, clubYear),
+    // The conference's deadlines (#910): the same list for every club.
+    listUpcomingDeadlines(now),
   ]);
   const active = members.filter((member) => member.status === "ACTIVE");
   const registered = events.filter((event) => event.registration);
@@ -140,6 +146,8 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
         roster={roster}
         rosterHref={`${base}/roster`}
       />
+
+      <UpcomingDeadlines deadlines={deadlineList} />
 
       {/* The next task is the card above, so the list holds only what comes after it. */}
       {nextTask && nextTask.others.length > 0 && <section className="public-manage-card" aria-labelledby="club-next-heading">

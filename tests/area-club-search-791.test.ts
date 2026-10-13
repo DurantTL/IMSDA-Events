@@ -23,6 +23,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
+vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: async () => [] }));
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({
   getAreaClubsSummary: mocks.getAreaClubsSummary,
   listAreaClubEvents: mocks.listAreaClubEvents,

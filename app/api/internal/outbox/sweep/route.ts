@@ -4,6 +4,7 @@ import {
   sweepOutbox,
 } from "@/modules/communications/outbox-sweep";
 import { refreshDueCalendarFeeds } from "@/modules/calendar/feeds";
+import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminders";
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
@@ -62,6 +63,13 @@ async function postHandler(request: Request) {
       logError("The calendar feed refresh failed after a successful outbox sweep", error);
       return null;
     });
+    // Deadline reminders (#910): prepares the 14-day and 2-day reminder batches that have come due and brings the
+    // waiting ones in line with the calendar. It only prepares: nothing is emailed until a system administrator sends
+    // a batch. Safe on every sweep (one batch per deadline and point). Its failure must not make a successful sweep look failed.
+    const deadlineReminders = await reconcileDeadlineReminders().catch((error) => {
+      logError("Deadline reminder preparation failed after a successful outbox sweep", error);
+      return null;
+    });
     // Pay on Square links (#327): withdraw expired or stale ones and retry any deletion Square has
     // not confirmed. Square has no link expiry of its own, so this is what makes expiry real.
     // Its failure must not make a successful sweep look failed.
@@ -88,6 +96,7 @@ async function postHandler(request: Request) {
       },
       communityRetention,
       calendarFeeds,
+      deadlineReminders,
       hostedLinks,
       classWaitlists,
       locationWaitlistDigest: locationWaitlistDigest && {
