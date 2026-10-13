@@ -378,6 +378,17 @@ deposit now"). The logic lives in `modules/payments/deposit-domain.ts`.
 - Fees already added by earlier card payments (a card deposit, a pay-later
   settlement) stay in the total when an amendment re-prices the registration
   (`applied-surcharge.ts`).
-- Staff payment recording and the card success path both take a
-  `FOR NO KEY UPDATE` lock on the registration and read the balance and deposit
-  under it, so a check deposit and a card deposit cannot both be recorded.
+- Staff payment recording (`recordManualPayment`) and the card success path
+  both run in a SERIALIZABLE transaction (`serializable.ts`, retried from the
+  top when PostgreSQL rolls it back, up to four attempts) and take a
+  `FOR NO KEY UPDATE` lock on the registration, then read the balance and the
+  deposit under it. The lock queues overlapping writers; SERIALIZABLE is what
+  makes a transaction that read before the other committed fail and retry, so
+  a check deposit and a card deposit cannot both count: the one that commits
+  first counts, the other is refused (staff, `DEPOSIT_ALREADY_RECORDED`) or
+  held for review as a duplicate charge (card, no fee added). A retry re-runs
+  every check and the audit row is written once, by the attempt that commits.
+  Nothing writes to the Registration row for the lock. If all four attempts
+  lose, staff see `PAYMENT_CONFLICT` (409) and the card path
+  `PAYMENT_OPERATION_CONFLICT`. Proven against PostgreSQL by
+  `npm run test:reservation-deposit`.

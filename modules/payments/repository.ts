@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
+import { runSerializableTransaction } from "@/modules/payments/serializable";
 import { getRegistrationById } from "@/modules/registrations/repository";
 import {
   staffDepositProblem,
@@ -13,9 +14,11 @@ import {
 } from "@/modules/payments/square-hosted-invalidation";
 
 export class PaymentOperationError extends Error {
-  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | StaffDepositProblem) {
+  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | StaffDepositProblem) {
     super(
-      code === "DEPOSIT_NOT_OFFERED"
+      code === "PAYMENT_CONFLICT"
+        ? "Another payment changed this registration at the same time. Review the registration and try again."
+        : code === "DEPOSIT_NOT_OFFERED"
         ? "This registration's form does not offer a reservation deposit."
         : code === "DEPOSIT_ALREADY_RECORDED"
         ? "A deposit is already recorded for this registration, so the reservation is already held."
@@ -79,10 +82,14 @@ export async function recordManualPayment(
   }
   check(registration);
 
-  await prisma.$transaction(async (tx) => {
-    // Serializes money movement on this registration. A repeated submission (a double click, a retry after a
-    // timeout), a second staff member, and a card payment finishing at the same moment all wait here, then see what
-    // the first recorded: the balance is recomputed from the locked rows, and a deposit cannot be recorded twice.
+  // SERIALIZABLE, run again from the top when PostgreSQL rolls it back (`runSerializableTransaction`), exactly like
+  // the card success path. The row lock below queues overlapping staff entries and card payments; SERIALIZABLE is what
+  // makes the queue safe in both directions: a card transaction that read this registration's payments before our
+  // deposit committed cannot commit on that stale read, and one of the two is retried and then sees the other.
+  // Everything the transaction decides and writes (checks, payment, audit) lives inside it, so a retry re-checks
+  // the balance and the deposit rules and the audit is written once, by the attempt that commits. Nothing writes to
+  // the Registration row itself: the lock is a lock only, so it does not make amendment reviews stale.
+  await runSerializableTransaction(async (tx) => {
     await tx.$queryRaw`
       SELECT "id" FROM "Registration"
       WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
@@ -135,7 +142,7 @@ export async function recordManualPayment(
       reason: "ANOTHER_PAYMENT_RECORDED",
       now: new Date(),
     });
-  });
+  }, () => new PaymentOperationError("PAYMENT_CONFLICT"));
   // Deleted at Square without holding the answer up; the sweep catches what this misses.
   await flushHostedDeletionsAfterResponse({ registrationId });
 

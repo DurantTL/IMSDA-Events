@@ -33,6 +33,7 @@ vi.mock("@/modules/payments/square-hosted-invalidation", () => ({
   flushHostedDeletionsAfterResponse: mocks.flushHosted,
 }));
 
+import { Prisma } from "@prisma/client";
 import type { SquareRuntimeConfiguration } from "@/modules/payments/square-config";
 import { recordManualPayment } from "@/modules/payments/repository";
 import {
@@ -408,6 +409,45 @@ describe("staff-recorded check deposit (#415)", () => {
       }),
     });
     expect(mocks.invalidateHosted).toHaveBeenCalled();
+  });
+
+  it("runs SERIALIZABLE and, when PostgreSQL rolls it back, re-checks everything and audits once", async () => {
+    const { tx, prisma } = staffClient();
+    let attempts = 0;
+    prisma.$transaction = vi.fn(async (operation: (client: typeof tx) => unknown, options?: { isolationLevel?: string }) => {
+      attempts += 1;
+      expect(options).toEqual({ isolationLevel: "Serializable" });
+      const result = await operation(tx);
+      // The first attempt did its work and then lost: PostgreSQL rolls it back (the raw lock query reports 40001 as P2010).
+      if (attempts === 1) {
+        tx.payment.create.mockClear();
+        tx.auditLog.create.mockClear();
+        throw new Prisma.PrismaClientKnownRequestError("could not serialize access", {
+          code: "P2010", clientVersion: "test", meta: { code: "40001", message: "could not serialize access due to concurrent update" },
+        });
+      }
+      return result;
+    }) as never;
+
+    await recordManualPayment("event-1", "registration-1", "user-1", {
+      amountCents: 6500, method: "CHECK", reference: "", isDeposit: true,
+    });
+
+    expect(attempts).toBe(2);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(tx.payment.create).toHaveBeenCalledTimes(1);
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers PAYMENT_CONFLICT when every attempt loses", async () => {
+    const { prisma } = staffClient();
+    prisma.$transaction = vi.fn(async () => {
+      throw new Prisma.PrismaClientKnownRequestError("could not serialize access", { code: "P2034", clientVersion: "test" });
+    }) as never;
+    await expect(recordManualPayment("event-1", "registration-1", "user-1", {
+      amountCents: 6500, method: "CHECK", reference: "", isDeposit: true,
+    })).rejects.toMatchObject({ code: "PAYMENT_CONFLICT" });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(4);
   });
 
   it("an ordinary payment is unchanged and is not the deposit", async () => {

@@ -66,6 +66,20 @@ describe("deposit form settings (#415)", () => {
     expect(registrationFormDefinitionSchema.safeParse(card).success).toBe(false);
   });
 
+  it("lets a deposit that is switched off be saved with no choice, but not one that is on", () => {
+    const off = structuredClone(definition());
+    off.payment!.deposit = { enabled: false, amountCents: 5000, optionValue: "" };
+    expect(registrationFormDefinitionSchema.safeParse(off).success).toBe(true);
+
+    const on = structuredClone(definition());
+    on.payment!.deposit = { enabled: true, amountCents: 5000, optionValue: "" };
+    const result = registrationFormDefinitionSchema.safeParse(on);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
+      "Choose the payment option that means \"Pay a deposit now\".",
+    ]);
+  });
+
   it("is off unless the form turns it on", () => {
     expect(depositOffer({
       definition: definition({ deposit: false }),

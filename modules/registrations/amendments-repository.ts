@@ -1286,7 +1286,7 @@ async function prepareAmendment(
       [],
       {
         paidCents: netPaidCents,
-        proposedTotalCents: pricedCalculation.totalCents,
+        proposedTotalCents: newTotalCents,
       },
     );
   }

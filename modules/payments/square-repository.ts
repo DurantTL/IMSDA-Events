@@ -8,6 +8,7 @@ import {
   type RefundStatus,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { runSerializableTransaction } from "@/modules/payments/serializable";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import {
   depositOffer,
@@ -488,38 +489,14 @@ function operationErrorForCheckout(checkout: SquareCheckoutView): never {
   );
 }
 
-function retryableTransactionError(error: unknown) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError
-    && (error.code === "P2034" || error.code === "P2002")
-  )
-    // Two payment paths settling one balance can lock the same rows in opposite orders; the
-    // loser is rolled back by PostgreSQL (deadlock 40P01, serialization failure 40001) and runs
-    // again against what the winner committed.
-    || (
-      error instanceof Prisma.PrismaClientUnknownRequestError
-      && /40P01|40001|deadlock detected/.test(error.message)
-    );
-}
-
 export async function runSerializable<T>(
   operation: (tx: Prisma.TransactionClient) => Promise<T>,
 ) {
-  const prisma = getPrisma();
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      return await prisma.$transaction(operation, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      });
-    } catch (error) {
-      if (!retryableTransactionError(error)) throw error;
-    }
-  }
-  throw new SquarePaymentOperationError(
+  return runSerializableTransaction(operation, () => new SquarePaymentOperationError(
     "PAYMENT_OPERATION_CONFLICT",
     "Another payment changed this registration at the same time. Refresh and try again.",
     true
-  );
+  ));
 }
 
 type PreparedPaymentAttempt = {
@@ -716,9 +693,10 @@ async function successConflict(
   tx: Prisma.TransactionClient,
   attempt: AttemptRecord,
 ) {
-  // The same row lock staff payment recording takes (`recordManualPayment`): a card payment finishing while staff
-  // record a check deposit waits for it, then reads the deposit it recorded and is held as a duplicate, so the
-  // reservation is never held twice.
+  // The same row lock staff payment recording takes (`recordManualPayment`), under the same SERIALIZABLE retry
+  // (`runSerializable`). The lock queues the two; SERIALIZABLE is what protects the one that read first: if staff
+  // commit a deposit after this transaction's snapshot, this one fails to commit and runs again, sees the deposit,
+  // and is held as a duplicate. The reservation is never held twice.
   await tx.$queryRaw`
     SELECT "id" FROM "Registration"
     WHERE "id" = ${attempt.registrationId}

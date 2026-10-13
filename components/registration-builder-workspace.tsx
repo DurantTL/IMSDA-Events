@@ -1196,7 +1196,8 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
               const depositChoices = (paymentMethodFields.find((field) => field.key === definition.payment?.paymentMethodFieldKey)?.options ?? []).filter((option) => option !== definition.payment?.cardOptionValue);
               return <label className="payment-fee-toggle"><input disabled={!canEdit || (depositChoices.length === 0 && !definition.payment.deposit?.enabled)} type="checkbox" checked={Boolean(definition.payment.deposit?.enabled)} onChange={(event) => {
                 // The deposit choice is never picked for the editor: it stays unselected until they choose it.
-                replaceDefinition({ ...definition, payment: { ...definition.payment!, deposit: { enabled: event.target.checked, amountCents: definition.payment!.deposit?.amountCents ?? 5000, optionValue: definition.payment!.deposit?.optionValue ?? "" } } });
+                // Turning it off removes the setting entirely, so a half-filled deposit never blocks saving the form.
+                replaceDefinition({ ...definition, payment: { ...definition.payment!, deposit: event.target.checked ? { enabled: true, amountCents: definition.payment!.deposit?.amountCents ?? 5000, optionValue: definition.payment!.deposit?.optionValue ?? "" } : undefined } });
               }} /><span><strong>Offer a deposit to hold the reservation</strong><small>A fixed amount per registration, not per person. The card fee applies to the deposit only; the rest stays the balance.{depositChoices.length === 0 ? " Add a payment option other than the card choice to the payment-method field first." : ""}</small></span></label>;
             })()}
             {definition.payment.deposit?.enabled && <>

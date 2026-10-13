@@ -315,7 +315,8 @@ export const registrationFormDefinitionSchema = z.object({
     deposit: z.object({
       enabled: z.boolean(),
       amountCents: z.number().int().min(100).max(10_000_000),
-      optionValue: z.string().trim().min(1, "Choose the payment option that means \"Pay a deposit now\".").max(120),
+      // Required only while the deposit is on (checked in `superRefine`), so a deposit turned off can be saved.
+      optionValue: z.string().trim().max(120),
     }).optional(),
   }).optional(),
 }).superRefine((definition, context) => {
@@ -401,8 +402,9 @@ export const registrationFormDefinitionSchema = z.object({
   if (definition.payment && paymentField?.scope === "ATTENDEE") context.addIssue({ code: "custom", path: ["payment", "paymentMethodFieldKey"], message: "The payment method must apply to the registration, not each attendee." });
   const deposit = definition.payment?.deposit;
   if (definition.payment && deposit?.enabled) {
-    if (deposit.optionValue === definition.payment.cardOptionValue) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "The deposit choice must differ from the pay-in-full card choice." });
-    if (paymentField && paymentField.options.length > 0 && !paymentField.options.includes(deposit.optionValue)) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "The deposit choice must be one of the payment method's options." });
+    if (deposit.optionValue.length === 0) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "Choose the payment option that means \"Pay a deposit now\"." });
+    else if (deposit.optionValue === definition.payment.cardOptionValue) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "The deposit choice must differ from the pay-in-full card choice." });
+    if (deposit.optionValue.length > 0 && paymentField && paymentField.options.length > 0 && !paymentField.options.includes(deposit.optionValue)) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "The deposit choice must be one of the payment method's options." });
   }
   if (definition.attendeeRoster?.enabled) {
     if (definition.attendeeRoster.minAttendees > definition.attendeeRoster.maxAttendees) {

@@ -26,7 +26,7 @@ async function postHandler(
     if (error instanceof PaymentOperationError) {
       const status = error.code === "PAYMENT_EXCEEDS_BALANCE" || error.code === "DEPOSIT_AMOUNT_TOO_LOW" || error.code === "DEPOSIT_NOT_OFFERED"
         ? 400
-        : error.code === "REGISTRATION_NOT_PAYABLE" || error.code === "DEPOSIT_ALREADY_RECORDED"
+        : error.code === "REGISTRATION_NOT_PAYABLE" || error.code === "DEPOSIT_ALREADY_RECORDED" || error.code === "PAYMENT_CONFLICT"
           ? 409
           : 404;
       return Response.json({ error: error.code, message: error.message }, { status });
