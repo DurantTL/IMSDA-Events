@@ -85,7 +85,7 @@ export default async function StaffOpenClubPage({
 
       <p className="inline-notice" role="status">
         <Eye aria-hidden="true" size={14} /> View only. Change club admins or the profile with the buttons above, and file
-        or correct reports from Monthly reports.
+        or correct reports from Monthly Records.
       </p>
 
       <nav aria-label="Roster club year" className="intro-actions club-year-choice">

@@ -37,7 +37,7 @@ export default async function EventClubsPage({ searchParams }: { searchParams: P
       <div className="intro-actions club-admin-links">
         <BackLink href={`/more?event=${event.id}`} variant="staff">Back to More</BackLink>
         <Link className="secondary-button" href={`/more/clubs/reports?event=${event.id}`}>
-          <FileText aria-hidden="true" size={14} /> All clubs&apos; monthly reports
+          <FileText aria-hidden="true" size={14} /> All clubs&apos; Monthly Records
         </Link>
         {teamSettings && <Link className="secondary-button" href={`/more/team-results?event=${event.id}`}>Team results</Link>}
       </div>

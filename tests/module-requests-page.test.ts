@@ -26,9 +26,6 @@ vi.mock("@/modules/event-modules/requests", () => ({ listModuleRequestsForEvent:
 vi.mock("@/modules/audit/audit-service", () => ({ listRecentAuditActivity: mocks.listRecentAuditActivity }));
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/components/event-activity-panel", () => ({ EventActivityPanel: () => createElement("div", { "data-panel": "activity" }) }));
-vi.mock("@/components/details-open-on-hash", () => ({
-  DetailsOpenOnHash: (props: { children: React.ReactNode }) => createElement("details", null, props.children),
-}));
 
 import MorePage from "@/app/(workspace)/more/page";
 import { buildRequestPanel } from "@/components/event-modules-page-model";
