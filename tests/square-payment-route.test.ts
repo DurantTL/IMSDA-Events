@@ -99,7 +99,7 @@ describe("private Square payment route", () => {
     expect(response.headers.get("cache-control")).toBe(
       "private, no-store, max-age=0",
     );
-    expect(mocks.getPublicSquareCheckout).toHaveBeenCalledWith(token);
+    expect(mocks.getPublicSquareCheckout).toHaveBeenCalledWith(token, { kind: undefined });
     const body = await response.json();
     expect(body.checkout.amountCents).toBe(12_930);
     expect(JSON.stringify(body)).not.toContain("accessToken");

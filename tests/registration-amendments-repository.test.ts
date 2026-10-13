@@ -299,6 +299,8 @@ function repositoryFixture() {
     },
     promoCodeRedemption: { update: vi.fn() },
     registrationAdjustment: { aggregate: vi.fn().mockResolvedValue({ _sum: { amountCents: null } }) },
+    // Card fees already applied by earlier card payments (#415); none unless a test supplies them.
+    payment: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     person: { findUnique: vi.fn(), create: vi.fn() },
     auditLog: { create: vi.fn(async () => ({})) },
   };
@@ -426,6 +428,48 @@ describe("registration amendments repository", () => {
       [{ code: "YOUTH", isActive: false }],
       [{ id: "attendee-1", attendeeTypeDefinition: { code: "YOUTH" } }],
     )).not.toThrow();
+  });
+
+  it("keeps card fees already applied by a card deposit or a pay-later card settlement in the total (#415)", async () => {
+    const baseline = repositoryFixture();
+    const changed = { ...attendeeResponses, notes: "Near the front" };
+    await commitAmendment(
+      "2b8f0d5e-9a53-4f1c-b0a8-6a1d5e7c9001",
+      initialUpdatedAt.toISOString(),
+      changed,
+      new Date("2026-08-04T13:00:00.000Z"),
+    );
+    const totalWithoutFees = baseline.registration.totalAmount;
+
+    const withFee = repositoryFixture();
+    // A $65 card deposit paid with its $2.26 fee, which joined the total when the payment succeeded.
+    withFee.tx.payment.findMany.mockResolvedValue([{
+      amount: 67.26,
+      paymentAttempt: { surchargeCents: 226 },
+      refunds: [],
+    }]);
+    await commitAmendment(
+      "2b8f0d5e-9a53-4f1c-b0a8-6a1d5e7c9002",
+      initialUpdatedAt.toISOString(),
+      changed,
+      new Date("2026-08-04T13:00:00.000Z"),
+    );
+    expect(Math.round((withFee.registration.totalAmount - totalWithoutFees) * 100)).toBe(226);
+
+    // A fee on a payment refunded in full was given back and does not count.
+    const refunded = repositoryFixture();
+    refunded.tx.payment.findMany.mockResolvedValue([{
+      amount: 67.26,
+      paymentAttempt: { surchargeCents: 226 },
+      refunds: [{ amount: 67.26 }],
+    }]);
+    await commitAmendment(
+      "2b8f0d5e-9a53-4f1c-b0a8-6a1d5e7c9003",
+      initialUpdatedAt.toISOString(),
+      changed,
+      new Date("2026-08-04T13:00:00.000Z"),
+    );
+    expect(refunded.registration.totalAmount).toBe(totalWithoutFees);
   });
 
   it("enqueues one update for a real amendment and does not enqueue again on replay", async () => {

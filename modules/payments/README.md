@@ -341,3 +341,58 @@ payment note (`modules/payments/in-person-card.ts`).
   in Square, and finance attaches it on **Payments → Unmatched Square
   payments**, which recognizes the confirmation code in the note.
 - Events billed to an organization show no balance at check-in.
+
+## Reservation deposit (#415)
+
+A form's payment settings can offer a fixed deposit per registration
+(`payment.deposit`: amount and the payment-method answer that means "Pay a
+deposit now"). The logic lives in `modules/payments/deposit-domain.ts`.
+
+- The deposit is an ordinary payment marked `isDeposit`, so the balance (total
+  minus net payments) stays right in reminders, self-service "pay now", and the
+  in-person card total at check-in. No parallel ledger.
+- A card deposit charges `deposit + card fee on the deposit`. The fee joins the
+  registration total only when the payment succeeds (the existing surcharge
+  path), so the balance left is exactly the subtotal minus the deposit. A
+  registration that chose to pay the whole amount by card is never offered one.
+- The pay page can switch between the deposit and the whole balance
+  (`?kind=` on GET, `kind` in the POST body). The server prices both; the
+  client never sends an amount. A deposit that is not on offer is refused with
+  `DEPOSIT_UNAVAILABLE`, never silently charged as the balance. A pay-later
+  registrant is offered the deposit too.
+- Staff record a mailed check deposit from **Payments** (Record deposit). It is
+  audited as `RESERVATION_DEPOSIT_RECORDED`, serialized per registration, and a
+  repeat is refused (`DEPOSIT_ALREADY_RECORDED`). A check below the deposit is
+  refused (`DEPOSIT_AMOUNT_TOO_LOW`) and is recorded as an ordinary payment.
+- "Held" is derived, never stored (owner decision, Oct 13): a registration is
+  held once it has paid at least the deposit, however it was paid. That is a
+  recorded deposit payment with a net amount above zero, or net succeeded
+  payments after refunds that total at least the deposit amount (capped at the
+  registration total). A registration paid in full is therefore held, and
+  Payments shows "Reservation held — paid in full". A registration that has
+  already paid that much is not offered a deposit. Forfeiting a deposit belongs
+  to the cancellation rules (#169-#171) and is not built here.
+- "Held" is a label for staff and gates nothing. Every registration is
+  confirmed and counts toward capacity and housing whether or not it has paid,
+  so confirmation, capacity and housing never read it (it is computed only for
+  the Payments screen).
+- Balance reminders open the pay page with `?pay=balance`, so it quotes the
+  whole balance; the deposit is the default only when the registrant arrives
+  from the form's deposit choice.
+- Fees already added by earlier card payments (a card deposit, a pay-later
+  settlement) stay in the total when an amendment re-prices the registration
+  (`applied-surcharge.ts`).
+- Staff payment recording (`recordManualPayment`) and the card success path
+  both run in a SERIALIZABLE transaction (`serializable.ts`, retried from the
+  top when PostgreSQL rolls it back, up to four attempts) and take a
+  `FOR NO KEY UPDATE` lock on the registration, then read the balance and the
+  deposit under it. The lock queues overlapping writers; SERIALIZABLE is what
+  makes a transaction that read before the other committed fail and retry, so
+  a check deposit and a card deposit cannot both count: the one that commits
+  first counts, the other is refused (staff, `DEPOSIT_ALREADY_RECORDED`) or
+  held for review as a duplicate charge (card, no fee added). A retry re-runs
+  every check and the audit row is written once, by the attempt that commits.
+  Nothing writes to the Registration row for the lock. If all four attempts
+  lose, staff see `PAYMENT_CONFLICT` (409) and the card path
+  `PAYMENT_OPERATION_CONFLICT`. Proven against PostgreSQL by
+  `npm run test:reservation-deposit`.

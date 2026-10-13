@@ -1,5 +1,10 @@
 import { getPrisma } from "@/lib/prisma";
+import { runSerializableTransaction } from "@/modules/payments/serializable";
 import { getRegistrationById } from "@/modules/registrations/repository";
+import {
+  staffDepositProblem,
+  type StaffDepositProblem,
+} from "@/modules/payments/deposit-domain";
 import { enqueueRefundNoticeMessage } from "@/modules/communications/transactional-messages";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { logError } from "@/lib/logger";
@@ -9,9 +14,17 @@ import {
 } from "@/modules/payments/square-hosted-invalidation";
 
 export class PaymentOperationError extends Error {
-  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED") {
+  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | "PAYMENT_CONFLICT" | StaffDepositProblem) {
     super(
-      code === "REFUND_IDEMPOTENCY_KEY_REUSED"
+      code === "PAYMENT_CONFLICT"
+        ? "Another payment changed this registration at the same time. Review the registration and try again."
+        : code === "DEPOSIT_NOT_OFFERED"
+        ? "This registration's form does not offer a reservation deposit."
+        : code === "DEPOSIT_ALREADY_RECORDED"
+        ? "A deposit is already recorded for this registration, so the reservation is already held."
+        : code === "DEPOSIT_AMOUNT_TOO_LOW"
+        ? "The amount is below the deposit due. Record it as an ordinary payment, or record the full deposit to hold the reservation."
+        : code === "REFUND_IDEMPOTENCY_KEY_REUSED"
         ? "This refund key was already used for a different amount or reason. Review the refund again to start a new one."
         : code === "CARD_REFUND_REQUIRES_SQUARE"
         ? "Card refunds must be issued in Square. IMSDA Events will update automatically after Square confirms the refund."
@@ -31,30 +44,76 @@ export async function recordManualPayment(
   eventId: string,
   registrationId: string,
   actorUserId: string,
-  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string },
+  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean },
 ) {
   const prisma = getPrisma();
   const registration = await prisma.registration.findFirst({
     where: { id: registrationId, eventId },
-    include: { payments: { where: { status: "SUCCEEDED" }, include: { refunds: { where: { status: "SUCCEEDED" } } } } },
+    include: {
+      payments: { where: { status: "SUCCEEDED" }, include: { refunds: { where: { status: "SUCCEEDED" } } } },
+      publicFormSubmission: { select: { formVersion: { select: { definition: true } } } },
+    },
   });
   if (!registration) throw new PaymentOperationError("REGISTRATION_NOT_FOUND");
   if (registration.status !== "SUBMITTED" && registration.status !== "CONFIRMED") {
     throw new PaymentOperationError("REGISTRATION_NOT_PAYABLE");
   }
-  const netPaidCents = registration.payments.reduce((total, payment) => {
-    const refunds = payment.refunds.reduce((sum, refund) => sum + Math.round(Number(refund.amount) * 100), 0);
-    return total + Math.round(Number(payment.amount) * 100) - refunds;
-  }, 0);
-  const balanceCents = Math.max(Math.round(Number(registration.totalAmount) * 100) - netPaidCents, 0);
-  if (input.amountCents > balanceCents) throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");
+  const isDeposit = input.isDeposit === true;
+  const definition = registration.publicFormSubmission?.formVersion.definition;
+  // The same checks, run twice: once here to refuse a bad request without opening a transaction, and again below
+  // against the rows read under the registration lock, which are the ones that decide.
+  function check(snapshot: { totalAmount: { toString(): string } | number; payments: NonNullable<typeof registration>["payments"] }) {
+    const netPaidCents = snapshot.payments.reduce((total, payment) => {
+      const refunds = payment.refunds.reduce((sum, refund) => sum + Math.round(Number(refund.amount) * 100), 0);
+      return total + Math.round(Number(payment.amount) * 100) - refunds;
+    }, 0);
+    const balanceCents = Math.max(Math.round(Number(snapshot.totalAmount) * 100) - netPaidCents, 0);
+    if (input.amountCents > balanceCents) throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");
+    if (isDeposit) {
+      const problem = staffDepositProblem({
+        definition,
+        balanceCents,
+        amountCents: input.amountCents,
+        payments: snapshot.payments,
+      });
+      if (problem) throw new PaymentOperationError(problem);
+    }
+    return balanceCents;
+  }
+  check(registration);
 
-  await prisma.$transaction(async (tx) => {
+  // SERIALIZABLE, run again from the top when PostgreSQL rolls it back (`runSerializableTransaction`), exactly like
+  // the card success path. The row lock below queues overlapping staff entries and card payments; SERIALIZABLE is what
+  // makes the queue safe in both directions: a card transaction that read this registration's payments before our
+  // deposit committed cannot commit on that stale read, and one of the two is retried and then sees the other.
+  // Everything the transaction decides and writes (checks, payment, audit) lives inside it, so a retry re-checks
+  // the balance and the deposit rules and the audit is written once, by the attempt that commits. Nothing writes to
+  // the Registration row itself: the lock is a lock only, so it does not make amendment reviews stale.
+  await runSerializableTransaction(async (tx) => {
+    await tx.$queryRaw`
+      SELECT "id" FROM "Registration"
+      WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
+      FOR NO KEY UPDATE
+    `;
+    const locked = await tx.registration.findFirst({
+      where: { id: registrationId, eventId },
+      select: { status: true, totalAmount: true },
+    });
+    if (!locked) throw new PaymentOperationError("REGISTRATION_NOT_FOUND");
+    if (locked.status !== "SUBMITTED" && locked.status !== "CONFIRMED") {
+      throw new PaymentOperationError("REGISTRATION_NOT_PAYABLE");
+    }
+    const lockedPayments = await tx.payment.findMany({
+      where: { registrationId, status: "SUCCEEDED" },
+      include: { refunds: { where: { status: "SUCCEEDED" } } },
+    });
+    const balanceCents = check({ totalAmount: locked.totalAmount, payments: lockedPayments });
     const payment = await tx.payment.create({
       data: {
         eventId,
         registrationId,
         amount: input.amountCents / 100,
+        isDeposit,
         status: "SUCCEEDED",
         method: input.method,
         externalReference: input.reference || null,
@@ -65,12 +124,16 @@ export async function recordManualPayment(
       data: {
         eventId,
         actorUserId,
-        action: "MANUAL_PAYMENT_RECORDED",
+        action: isDeposit ? "RESERVATION_DEPOSIT_RECORDED" : "MANUAL_PAYMENT_RECORDED",
         entityType: "Payment",
         entityId: payment.id,
         correlationId: crypto.randomUUID(),
-        summary: `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}.`,
-        metadata: { amountCents: input.amountCents },
+        summary: isDeposit
+          ? `Recorded a ${input.method.toLowerCase()} reservation deposit on registration ${registration.confirmationCode}; the reservation is now held.`
+          : `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}.`,
+        metadata: isDeposit
+          ? { amountCents: input.amountCents, method: input.method, balanceBeforeCents: balanceCents, balanceAfterCents: balanceCents - input.amountCents, reservationHeld: true }
+          : { amountCents: input.amountCents },
       },
     });
     // The balance moved, so a Pay on Square link quoted against the old one must not stay payable (#327).
@@ -79,7 +142,7 @@ export async function recordManualPayment(
       reason: "ANOTHER_PAYMENT_RECORDED",
       now: new Date(),
     });
-  });
+  }, () => new PaymentOperationError("PAYMENT_CONFLICT"));
   // Deleted at Square without holding the answer up; the sweep catches what this misses.
   await flushHostedDeletionsAfterResponse({ registrationId });
 

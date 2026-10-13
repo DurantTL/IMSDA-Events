@@ -7,7 +7,13 @@ describe("financial input validation", () => {
       amountCents: 12500,
       method: "CHECK",
       reference: "TEST-42",
+      isDeposit: false,
     });
+  });
+
+  it("records a reservation deposit only when asked to (#415)", () => {
+    expect(manualPaymentSchema.parse({ amountCents: 6500, method: "CHECK", isDeposit: true }).isDeposit).toBe(true);
+    expect(manualPaymentSchema.parse({ amountCents: 6500, method: "CHECK" }).isDeposit).toBe(false);
   });
 
   it("rejects zero and negative payments", () => {

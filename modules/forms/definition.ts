@@ -307,6 +307,17 @@ export const registrationFormDefinitionSchema = z.object({
     percentageBasisPoints: z.number().int().min(0).max(2000).default(290),
     fixedFeeCents: z.number().int().min(0).max(1000).default(30),
     passFeeToRegistrant: z.boolean().default(true),
+    /**
+     * A fixed reservation deposit per registration, not per person (#415). The registrant may pay it now by card
+     * (the card fee applies to the deposit only) or staff record a mailed check for it; the rest stays the balance.
+     * `optionValue` is the payment-method answer that means "I will pay the deposit now".
+     */
+    deposit: z.object({
+      enabled: z.boolean(),
+      amountCents: z.number().int().min(100).max(10_000_000),
+      // Required only while the deposit is on (checked in `superRefine`), so a deposit turned off can be saved.
+      optionValue: z.string().trim().max(120),
+    }).optional(),
   }).optional(),
 }).superRefine((definition, context) => {
   const sectionIds = new Set<string>();
@@ -389,6 +400,12 @@ export const registrationFormDefinitionSchema = z.object({
   const paymentField = definition.payment ? allFields.find((field) => field.key === definition.payment?.paymentMethodFieldKey) : null;
   if (definition.payment && !paymentField) context.addIssue({ code: "custom", path: ["payment", "paymentMethodFieldKey"], message: "Payment settings must reference a configured payment-method field." });
   if (definition.payment && paymentField?.scope === "ATTENDEE") context.addIssue({ code: "custom", path: ["payment", "paymentMethodFieldKey"], message: "The payment method must apply to the registration, not each attendee." });
+  const deposit = definition.payment?.deposit;
+  if (definition.payment && deposit?.enabled) {
+    if (deposit.optionValue.length === 0) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "Choose the payment option that means \"Pay a deposit now\"." });
+    else if (deposit.optionValue === definition.payment.cardOptionValue) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "The deposit choice must differ from the pay-in-full card choice." });
+    if (deposit.optionValue.length > 0 && paymentField && paymentField.options.length > 0 && !paymentField.options.includes(deposit.optionValue)) context.addIssue({ code: "custom", path: ["payment", "deposit", "optionValue"], message: "The deposit choice must be one of the payment method's options." });
+  }
   if (definition.attendeeRoster?.enabled) {
     if (definition.attendeeRoster.minAttendees > definition.attendeeRoster.maxAttendees) {
       context.addIssue({ code: "custom", path: ["attendeeRoster", "minAttendees"], message: "Minimum attendees cannot exceed the maximum." });
@@ -953,7 +970,7 @@ export const formTemplates: FormTemplate[] = [
       description: "Choose housing and nights, add every guest, order meal tickets, and review the complete total.",
       confirmationMessage: "Your Camp Meeting registration has been received. Watch for an email with confirmation, payment, and check-in details.",
       attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 20, attendeeLabel: "Guest", addButtonLabel: "Add another guest" },
-      payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true },
+      payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true, deposit: { enabled: true, amountCents: 6500, optionValue: "Pay a $65 deposit now by card" } },
       sections: [
         { id: "cm_contact", title: "Contact information", description: "Primary household contact and mailing address.", fields: [
           templateField("cm_first", "primary_first_name", "First name", "TEXT", true),
@@ -994,8 +1011,8 @@ export const formTemplates: FormTemplate[] = [
           templateField("cm_supper_child", "supper_child_qty", "Child supper tickets — $7 each", "NUMBER", false, [], { priceCents: 700, helpText: "Available Tuesday through Saturday." }),
           templateField("cm_dietary", "dietary_restrictions", "Dietary restrictions or allergies", "LONG_TEXT"),
         ] },
-        { id: "cm_payment", title: "Review & payment", description: "Card payments include the processing fee. Checks require a $65 deposit to hold the reservation.", stepLabel: "Payment", isReviewStep: true, fields: [
-          templateField("cm_pay", "payment_method", "Payment method", "RADIO", true, ["Pay by check", "Credit / debit card"]),
+        { id: "cm_payment", title: "Review & payment", description: "Card payments include the processing fee. A $65 deposit holds the reservation: pay it now by card (the card fee applies to the deposit only) or mail a check. The balance is due later.", stepLabel: "Payment", isReviewStep: true, fields: [
+          templateField("cm_pay", "payment_method", "Payment method", "RADIO", true, ["Pay by check", "Pay a $65 deposit now by card", "Credit / debit card"]),
           templateField("cm_deposit", "check_deposit_acknowledgment", "Check deposit acknowledgment", "CHECKBOX", true, [], { conditional: { fieldKey: "payment_method", operator: "EQUALS", value: "Pay by check" }, placeholder: "I understand a $65 mailed deposit is required to hold this reservation." }),
           templateField("cm_comments", "comments", "Comments", "LONG_TEXT"),
         ] },

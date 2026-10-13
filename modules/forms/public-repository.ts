@@ -4,6 +4,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { depositOptionSelected } from "@/modules/payments/deposit-domain";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { admitToLocation } from "@/modules/event-locations/admission";
@@ -208,6 +209,8 @@ type PricingSnapshot = {
   processingFeeCents: number;
   totalCents: number;
   cardSelected: boolean;
+  /** The registrant chose "Pay a deposit now" (#415): the card fee applies to the deposit only, when it is paid. */
+  depositSelected?: boolean;
   paymentCollected: false;
   /** Whether the form has an attendee roster, so a church-billed price can be worded per person (#621). */
   rosterEnabled?: boolean;
@@ -245,6 +248,8 @@ export type PublicRegistrationConfirmation = {
   perPerson?: PerPersonPrice;
   pricingDate: string;
   cardSelected: boolean;
+  /** The registrant chose to pay a deposit now (#415); the private page offers it. */
+  depositSelected?: boolean;
   emailSent: boolean;
   paymentCollected: false;
   notificationQueued: boolean;
@@ -544,6 +549,7 @@ function confirmationFromSnapshot(
       : {}),
     pricingDate: snapshot.pricingDate,
     cardSelected: !isWaitlisted && snapshot.cardSelected,
+    depositSelected: !isWaitlisted && Boolean(snapshot.depositSelected),
     emailSent: false,
     paymentCollected: false,
     notificationQueued: notificationStatus !== "DISABLED",
@@ -1282,6 +1288,7 @@ async function createPublicRegistrationTransaction(
     processingFeeCents: admittedCalculation.processingFeeCents,
     totalCents: admittedCalculation.totalCents,
     cardSelected: !isWaitlisted && isCardSelected(definition, prepared.registrationResponses),
+    depositSelected: !isWaitlisted && depositOptionSelected(definition, prepared.registrationResponses),
     paymentCollected: false,
     rosterEnabled: getAttendeeRosterConfig(definition).enabled,
     attendeeCount: createdAttendees.length,

@@ -40,6 +40,7 @@ import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
 import { adjustmentTotalCents } from "@/modules/registrations/adjustments";
 import { cancelMealSelectionsForAttendees, syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { MealError } from "@/modules/meals/errors";
+import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
 import { lockRegistrationLodging, recomputeChurchShare } from "@/modules/lodging/preferences-service";
 import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/modules/registrations/amendment-answers";
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
@@ -1283,14 +1284,18 @@ async function prepareAmendment(
   const netPaidCents = paidCents(registration);
   // Staff adjustments (#396) stay on top of whatever the new answers cost.
   const adjustmentsCents = await adjustmentTotalCents(tx, registration.id);
-  if (Math.max(pricedCalculation.totalCents + adjustmentsCents, 0) < netPaidCents) {
+  // Card fees already added to the total by earlier card payments (a card deposit, a pay-later balance settled by
+  // card) are not in the form's calculation; they stay on top of it like adjustments do.
+  const appliedFeesCents = await appliedCardSurchargeCents(tx, registration.id);
+  const newTotalCents = Math.max(pricedCalculation.totalCents + adjustmentsCents + appliedFeesCents, 0);
+  if (newTotalCents < netPaidCents) {
     throw new RegistrationAmendmentError(
       "PAYMENT_ADJUSTMENT_REQUIRED",
       "This change would lower the registration total below the amount already paid. Record the required refund or adjustment in Payments before completing this amendment.",
       [],
       {
         paidCents: netPaidCents,
-        proposedTotalCents: pricedCalculation.totalCents,
+        proposedTotalCents: newTotalCents,
       },
     );
   }
@@ -1330,7 +1335,7 @@ async function prepareAmendment(
       attendeeId: attendee.attendeeId,
       responses: prepared.attendees[index]?.responses ?? {},
     })),
-    totalCents: Math.max(pricedCalculation.totalCents + adjustmentsCents, 0),
+    totalCents: newTotalCents,
     activeReservationIds: registration.capacityReservations.map((reservation) => reservation.id).sort(),
   });
 
@@ -1346,7 +1351,7 @@ async function prepareAmendment(
     quoteFingerprint,
     paidCents: netPaidCents,
     adjustmentsCents,
-    finalTotalCents: Math.max(pricedCalculation.totalCents + adjustmentsCents, 0),
+    finalTotalCents: newTotalCents,
     addedAttendeeCount: input.attendees.filter((attendee) => !attendee.attendeeId).length,
     seminarPreferencesChanged,
     configuredTypes,
