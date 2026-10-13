@@ -69,9 +69,9 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
           <option value="QUANTITY">Quantity (a lot of identical items)</option>
         </select></label>
         <fieldset><legend>Can be issued to</legend>
-          {assigneeKinds.map((kind) => <label key={kind}><input type="checkbox" name="kinds" value={kind} defaultChecked={kind === "ATTENDEE" || kind === "REGISTRATION"} /> {assigneeKindLabels[kind]}</label>)}
+          {assigneeKinds.map((kind) => <label className="checkbox-label" key={kind}><input type="checkbox" name="kinds" value={kind} defaultChecked={kind === "ATTENDEE" || kind === "REGISTRATION"} /> {assigneeKindLabels[kind]}</label>)}
         </fieldset>
-        <label><input type="checkbox" name="roomLinked" /> Room-linked: remember the room and the exact lodging assignment it was issued against</label>
+        <label className="checkbox-label"><input type="checkbox" name="roomLinked" /> Room-linked: remember the room and the exact lodging assignment it was issued against</label>
         <label>Deposit policy reference (optional) <input name="depositPolicyRef" maxLength={120} placeholder="CM26 key deposit" /></label>
         <label>Replacement policy reference (optional) <input name="replacementPolicyRef" maxLength={120} /></label>
         <button className="primary-button" type="submit" disabled={busy}>Add kind of item</button>
@@ -98,10 +98,10 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
     <h3>{type.name}{type.active ? "" : " (switched off)"}</h3>
     <p>{serialized ? "Numbered" : "Quantity"}. {type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.{type.roomLinked ? " Room-linked." : ""}{type.depositPolicyRef ? ` Deposit policy: ${type.depositPolicyRef}.` : ""}{type.replacementPolicyRef ? ` Replacement policy: ${type.replacementPolicyRef}.` : ""}</p>
     <div>
-      <label><input type="checkbox" checked={type.active} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, active: event.target.checked }, () => `${type.name} ${event.target.checked ? "switched on" : "switched off"}.`)} /> Active</label>{" "}
-      <label><input type="checkbox" checked={type.roomLinked} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, roomLinked: event.target.checked }, () => `${type.name} updated.`)} /> Room-linked</label>
+      <label className="checkbox-label"><input type="checkbox" checked={type.active} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, active: event.target.checked }, () => `${type.name} ${event.target.checked ? "switched on" : "switched off"}.`)} /> Active</label>{" "}
+      <label className="checkbox-label"><input type="checkbox" checked={type.roomLinked} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, roomLinked: event.target.checked }, () => `${type.name} updated.`)} /> Room-linked</label>
       <fieldset><legend>Can be issued to</legend>
-        {assigneeKinds.map((kind) => <label key={kind}><input type="checkbox" checked={type.assigneeKinds.includes(kind)} disabled={busy} onChange={(event) => setKinds(kind, event.target.checked)} /> {assigneeKindLabels[kind]}</label>)}
+        {assigneeKinds.map((kind) => <label className="checkbox-label" key={kind}><input type="checkbox" checked={type.assigneeKinds.includes(kind)} disabled={busy} onChange={(event) => setKinds(kind, event.target.checked)} /> {assigneeKindLabels[kind]}</label>)}
       </fieldset>
     </div>
     <form onSubmit={(event) => {
@@ -111,7 +111,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
     }}>
       <label>Deposit policy reference <input name="depositPolicyRef" maxLength={120} defaultValue={type.depositPolicyRef ?? ""} /></label>
       <label>Replacement policy reference <input name="replacementPolicyRef" maxLength={120} defaultValue={type.replacementPolicyRef ?? ""} /></label>
-      <button type="submit" disabled={busy}>Save references</button>
+      <button className="secondary-button" type="submit" disabled={busy}>Save references</button>
     </form>
 
     <form onSubmit={(event) => {
@@ -130,7 +130,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       {serialized ? null : <label>Quantity <input name="quantityTotal" type="number" min={1} max={100000} defaultValue={100} required /></label>}
       <label>Condition <select name="condition" defaultValue="GOOD">{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></label>
       <label>Location <input name="location" maxLength={120} placeholder="Front desk" /></label>
-      <button type="submit" disabled={busy}>Add</button>
+      <button className="secondary-button" type="submit" disabled={busy}>Add</button>
     </form>
 
     {serialized ? <form onSubmit={(event) => {
@@ -149,7 +149,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       <label>Zero-pad to width (0 for none) <input name="width" type="number" min={0} max={8} defaultValue={0} /></label>
       <input name="condition" type="hidden" value="GOOD" />
       <input name="location" type="hidden" value="" />
-      <button type="submit" disabled={busy}>Add range</button>
+      <button className="secondary-button" type="submit" disabled={busy}>Add range</button>
     </form> : null}
 
     {assets.length === 0 ? null : <details>
@@ -166,7 +166,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
           <td><form onSubmit={(event) => {
             event.preventDefault();
             void run(`${base}/items`, { action: "update", assetId: asset.id, location: new FormData(event.currentTarget).get("location") ?? "" }, () => `${asset.identifier} updated.`);
-          }}><label className="visually-hidden" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button type="submit" disabled={busy}>Save</button></form></td>
+          }}><label className="visually-hidden" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button className="secondary-button" type="submit" disabled={busy}>Save</button></form></td>
           <td><label className="visually-hidden" htmlFor={`avail-${asset.id}`}>Status of {asset.identifier}</label>
             <select id={`avail-${asset.id}`} value={asset.availability} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, availability: event.target.value as AssetAvailability }, () => `${asset.identifier} updated.`)}>{assetAvailabilities.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
         </tr>)}</tbody>

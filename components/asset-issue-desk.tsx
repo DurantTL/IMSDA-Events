@@ -233,8 +233,8 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       <p>Requests that did not reach the server, or that it refused, stay here until you dismiss them. Retrying is safe: the same saved key can never issue twice.</p>
       <ul>{queue.map((entry) => <li key={entry.idempotencyKey}>{entry.items.map((item) => item.code).join(", ")}{" "}
         {entry.rejected ? <strong>Not accepted by the server: {entry.rejected} </strong> : null}
-        {entry.rejected ? null : <button type="button" disabled={busy} onClick={() => void deliver(entry)}>Retry</button>}{" "}
-        <button type="button" disabled={busy} onClick={() => { const rest = readQueue(scope).filter((other) => other.idempotencyKey !== entry.idempotencyKey); writeQueue(scope, rest); setQueue(rest); }}>{entry.rejected ? "Dismiss" : "Discard"}</button></li>)}</ul>
+        {entry.rejected ? null : <button className="secondary-button" type="button" disabled={busy} onClick={() => void deliver(entry)}>Retry</button>}{" "}
+        <button className="secondary-button" type="button" disabled={busy} onClick={() => { const rest = readQueue(scope).filter((other) => other.idempotencyKey !== entry.idempotencyKey); writeQueue(scope, rest); setQueue(rest); }}>{entry.rejected ? "Dismiss" : "Discard"}</button></li>)}</ul>
     </section> : null}
 
     <section className="panel">
@@ -260,12 +260,12 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       <h3>Items</h3>
       <form onSubmit={(event) => { event.preventDefault(); addCode(codeText, 1, arrivedLikeAScan()); }}>
         <label>Scan or type a code (K-214) <input ref={codeInput} value={codeText} onChange={(event) => { keyTimes.current.push(Date.now()); setCodeText(event.target.value); }} autoComplete="off" autoCapitalize="characters" maxLength={64} /></label>
-        <button type="submit">Add</button>
+        <button className="secondary-button" type="submit">Add</button>
       </form>
       {lots.length > 0 ? <p>{lots.map((lot) => <button key={lot.code} type="button" className="secondary-button" disabled={lot.remaining <= 0} onClick={() => addCode(lot.code)}>{lot.typeName}: {lot.identifier} ({lot.remaining} left)</button>)}</p> : null}
       {items.length === 0 ? <p>Nothing added yet.</p> : <ul>{items.map((item) => <li key={item.code}>{item.code}{" "}
         <label>Quantity <input type="number" min={1} max={100000} value={item.quantity} onChange={(event) => setItems((current) => current.map((row) => row.code === item.code ? { ...row, quantity: Math.max(1, Number(event.target.value) || 1) } : row))} /></label>{" "}
-        <button type="button" onClick={() => setItems((current) => current.filter((row) => row.code !== item.code))}>Remove</button></li>)}</ul>}
+        <button className="secondary-button" type="button" onClick={() => setItems((current) => current.filter((row) => row.code !== item.code))}>Remove</button></li>)}</ul>}
       <label>Purpose <input value={purpose} maxLength={200} onChange={(event) => setPurpose(event.target.value)} /></label>
       <label>Expected back (optional) <input type="datetime-local" value={expectedReturn} onChange={(event) => setExpectedReturn(event.target.value)} /></label>
       <button className="primary-button" type="button" disabled={busy || items.length === 0} onClick={() => void submit()}>Issue {items.length > 0 ? `${items.length} item${items.length === 1 ? "" : "s"}` : ""}</button>
@@ -295,7 +295,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       <h3>Look up an item</h3>
       <form onSubmit={(event) => { event.preventDefault(); void runLookup(); }}>
         <label>Code <input value={lookupCode} onChange={(event) => setLookupCode(event.target.value)} maxLength={64} /></label>
-        <button type="submit">Look up</button>
+        <button className="secondary-button" type="submit">Look up</button>
       </form>
       {lookup === "none" ? <p role="status">No item has that code.</p> : lookup ? <div role="status">
         <p><strong>{lookup.asset.identifier}</strong> ({lookup.asset.typeName}), {lookup.asset.availability.toLowerCase()}, {lookup.asset.outQuantity} of {lookup.asset.quantityTotal} out.</p>
@@ -322,15 +322,15 @@ function IssuanceActions({ row, busy, change }: { row: IssuanceRow; busy: boolea
   // One key per attempt: sending the same form again after a lost response replays instead of replacing twice.
   const pendingKey = useRef(newKey());
   return <div>
-    <button type="button" disabled={busy} onClick={() => setMode(mode === "replace" ? "" : "replace")}>Replace</button>{" "}
-    <button type="button" disabled={busy} onClick={() => setMode(mode === "correct" ? "" : "correct")}>Entered in error</button>
+    <button className="secondary-button" type="button" disabled={busy} onClick={() => setMode(mode === "replace" ? "" : "replace")}>Replace</button>{" "}
+    <button className="secondary-button" type="button" disabled={busy} onClick={() => setMode(mode === "correct" ? "" : "correct")}>Entered in error</button>
     {mode ? <form onSubmit={(event) => {
       event.preventDefault();
       void change(row.id, mode === "replace" ? { action: "replace", replacementCode: code, reason, originalAvailability: "UNAVAILABLE", idempotencyKey: pendingKey.current } : { action: "correct", reason }, mode === "replace" ? `${row.identifier} replaced` : `${row.identifier} withdrawn`).then(() => { setMode(""); setReason(""); setCode(""); pendingKey.current = newKey(); });
     }}>
       {mode === "replace" ? <label>Replacement code <input value={code} onChange={(event) => setCode(event.target.value)} required maxLength={64} /></label> : null}
       <label>Reason <input value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={300} /></label>
-      <button type="submit" disabled={busy}>{mode === "replace" ? "Replace" : "Withdraw"}</button>
+      <button className="secondary-button" type="submit" disabled={busy}>{mode === "replace" ? "Replace" : "Withdraw"}</button>
     </form> : null}
   </div>;
 }
