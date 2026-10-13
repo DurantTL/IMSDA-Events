@@ -7,8 +7,12 @@ vi.mock("@/modules/issued-assets/returns-view", () => ({ listFacilityIssues: vi.
 
 import { closeoutCsv, type CloseoutReport } from "@/modules/issued-assets/closeout";
 import {
+  applyOutcomeCorrections,
   chargeActionSchema,
+  correctionActionSchema,
   coverStateOf,
+  effectiveEndReason,
+  keepFeesNeedsFee,
   decideDepositOutcome,
   depositActionSchema,
   facilityActionSchema,
@@ -163,5 +167,56 @@ describe("the closeout CSV", () => {
     for (const section of ["summary", "outstanding", "lost", "damaged", "charges", "deposits", "facility", "exceptions"] as const) {
       expect(closeoutCsv(empty, section).split("\r\n")[0]).toMatch(/\w/);
     }
+  });
+});
+
+describe("a loss that is already charged", () => {
+  const lostCharged = [{ state: "RETURNED" as const, quantity: 1 }, { state: "LOST" as const, quantity: 1, charged: true }];
+
+  it("does not keep the deposit as well, under either policy", () => {
+    for (const policy of ["KEEP_ALL", "KEEP_FEES"] as const) {
+      const outcome = decideDepositOutcome({ depositCents: 1000, policy, replacementFeeCents: 400, covers: lostCharged });
+      expect(outcome, policy).toMatchObject({ ok: true, outcome: "FULL_REFUND", refundCents: 1000, keepCents: 0, missing: 0 });
+      expect(outcome.ok && outcome.message).toContain("already charged");
+    }
+  });
+
+  it("still keeps the deposit for a loss nobody charged", () => {
+    const covers = [{ state: "LOST" as const, quantity: 1, charged: true }, { state: "LOST" as const, quantity: 1 }];
+    expect(decideDepositOutcome({ depositCents: 1000, policy: "KEEP_ALL", replacementFeeCents: 400, covers })).toMatchObject({ outcome: "KEPT", keepCents: 1000, missing: 1 });
+    expect(decideDepositOutcome({ depositCents: 1000, policy: "KEEP_FEES", replacementFeeCents: 400, covers })).toMatchObject({ outcome: "PARTIAL_REFUND", keepCents: 400, refundCents: 600 });
+  });
+});
+
+describe("corrections and policy rules", () => {
+  it("reads the corrected fate, and treats a written-off replaced original as settled", () => {
+    expect(effectiveEndReason("LOST", "RETURNED", false)).toBe("RETURNED");
+    expect(effectiveEndReason("LOST", null, true)).toBe("LOST");
+    expect(effectiveEndReason("REPLACED", null, false)).toBe("REPLACED");
+    expect(effectiveEndReason("REPLACED", null, true)).toBe("TRANSFERRED");
+    expect(effectiveEndReason("REPLACED", "LOST", true)).toBe("LOST");
+  });
+
+  it("moves units between buckets for a correction and keeps the reconciliation balanced", () => {
+    const counts = { inflow: 2, returned: 1, lost: 1, damaged: 0, corrected: 0, replacedUnaccounted: 0, outstanding: 0 };
+    const next = applyOutcomeCorrections(counts, [{ from: "LOST", to: "RETURNED", quantity: 1 }]);
+    expect(next).toMatchObject({ returned: 2, lost: 0 });
+    expect(reconcileUnits(next).balanced).toBe(true);
+    expect(applyOutcomeCorrections({ ...counts, lost: 0, replacedUnaccounted: 1 }, [{ from: "REPLACED", to: "DAMAGED", quantity: 1 }])).toMatchObject({ replacedUnaccounted: 0, damaged: 1 });
+  });
+
+  it("needs a reason for a correction and for a write-off", () => {
+    expect(correctionActionSchema.safeParse({ action: "correct", issuanceId: "i1", fate: "RETURNED", reason: "Found under the bed" }).success).toBe(true);
+    expect(correctionActionSchema.safeParse({ action: "correct", issuanceId: "i1", fate: "RETURNED", reason: "" }).success).toBe(false);
+    expect(correctionActionSchema.safeParse({ action: "correct", issuanceId: "i1", fate: "CORRECTED", reason: "Because" }).success).toBe(false);
+    expect(correctionActionSchema.safeParse({ action: "write_off", issuanceId: "i1", reason: "" }).success).toBe(false);
+    expect(correctionActionSchema.safeParse({ action: "write_off", issuanceId: "i1", reason: "Guest left the camp" }).success).toBe(true);
+  });
+
+  it("asks for a confirmation to charge past a kept deposit, and refuses keep-fees without a fee", () => {
+    expect(chargeActionSchema.safeParse({ action: "charge", issuanceId: "i1", category: "REPLACEMENT", amountCents: 2500, reason: "Lost", confirmKeptDeposit: true }).success).toBe(true);
+    expect(keepFeesNeedsFee("KEEP_FEES", 0)).toBe(true);
+    expect(keepFeesNeedsFee("KEEP_FEES", 400)).toBe(false);
+    expect(keepFeesNeedsFee("KEEP_ALL", 0)).toBe(false);
   });
 });

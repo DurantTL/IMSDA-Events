@@ -1,14 +1,13 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
-import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { normalizeAssetCode } from "@/modules/issued-assets/domain";
 import { AssetError } from "@/modules/issued-assets/errors";
 import { facilityActionSchema, type FacilityBlockInput } from "@/modules/issued-assets/returns-domain";
 import { requireEvent, resolveAssetByCode, transact, type Tx } from "@/modules/issued-assets/service";
 import { LodgingError } from "@/modules/lodging/errors";
-import { createHold } from "@/modules/lodging/service";
+import { createHoldInTransaction } from "@/modules/lodging/service";
 
 /**
  * Issued assets (#214, slice 2): facility issues and room blocks.
@@ -126,35 +125,36 @@ export async function applyFacilityAction(eventId: string, actorUserId: string, 
   });
 }
 
+
 /**
  * Blocks the room or site of a facility issue for a window of nights, through the lodging hold service: the hold is the
- * block, availability reads it, and no assignment is changed. The hold is placed in the lodging service's own
- * transaction and then linked to the issue.
+ * block, availability reads it, and no assignment is changed. The issue row is locked first, and the hold is placed and
+ * linked to the issue in one transaction, so a block is never left unlinked and two staff cannot both block one issue.
  */
 async function placeBlock(eventId: string, actorUserId: string, issueId: string, block: FacilityBlockInput): Promise<FacilityResult> {
-  const issue = await getPrisma().facilityIssue.findFirst({ where: { id: issueId, eventId }, include: { hold: { select: { releasedAt: true } } } });
-  if (!issue) throw new AssetError("FACILITY_NOT_FOUND", "That facility issue was not found.");
-  if (finished.has(issue.status)) throw new AssetError("FACILITY_FINISHED", "That issue is closed.");
-  if (issue.targetKind !== "UNIT" || !issue.eventUnitId) throw new AssetError("FACILITY_INVALID", "Only a room or site can be blocked.");
-  if (issue.hold && !issue.hold.releasedAt) throw new AssetError("BLOCK_EXISTS", "That issue already blocks the room. Release the block in Lodging first to place another.");
-  let holdId: string;
   try {
-    holdId = (await createHold(eventId, issue.eventUnitId, actorUserId, { kind: block.kind, reason: block.reason, firstNight: block.firstNight, lastNight: block.lastNight })).id;
+    const holdId = await transact(async (tx) => {
+      await requireEvent(tx, eventId);
+      await tx.$queryRaw`SELECT "id" FROM "FacilityIssue" WHERE "id" = ${issueId} AND "eventId" = ${eventId} FOR UPDATE`;
+      const issue = await tx.facilityIssue.findFirst({ where: { id: issueId, eventId }, include: { hold: { select: { releasedAt: true } } } });
+      if (!issue) throw new AssetError("FACILITY_NOT_FOUND", "That facility issue was not found.");
+      if (finished.has(issue.status)) throw new AssetError("FACILITY_FINISHED", "That issue is closed.");
+      if (issue.targetKind !== "UNIT" || !issue.eventUnitId) throw new AssetError("FACILITY_INVALID", "Only a room or site can be blocked.");
+      if (issue.hold && !issue.hold.releasedAt) throw new AssetError("BLOCK_EXISTS", "That issue already blocks the room. Release the block in Lodging first to place another.");
+      const created = await createHoldInTransaction(tx, eventId, issue.eventUnitId, actorUserId, { kind: block.kind, reason: block.reason, firstNight: block.firstNight, lastNight: block.lastNight });
+      const revision = issue.revision + 1;
+      const updated = await tx.facilityIssue.updateMany({ where: { id: issue.id, revision: issue.revision }, data: { holdId: created.id, revision } });
+      if (updated.count !== 1) throw new AssetError("BUSY", "Someone else changed that issue. Reload and try again.");
+      await snapshot(tx, { ...issue, holdId: created.id, revision }, "BLOCK_PLACED", actorUserId, `${block.kind.toLowerCase()} block ${block.firstNight} to ${block.lastNight}`);
+      await writeAuditLog({
+        eventId, actorUserId, action: "FACILITY_BLOCK_PLACED", entityType: "FacilityIssue", entityId: issue.id,
+        summary: "Blocked a room or site for a facility issue.", metadata: { holdId: created.id, kind: block.kind, firstNight: block.firstNight, lastNight: block.lastNight },
+      }, tx);
+      return created.id;
+    });
+    return { issueId, holdId, blockError: null };
   } catch (error) {
     if (error instanceof LodgingError) throw new AssetError("BLOCK_REFUSED", error.message);
     throw error;
   }
-  await transact(async (tx) => {
-    const current = await tx.facilityIssue.findFirstOrThrow({ where: { id: issue.id, eventId } });
-    if (finished.has(current.status)) return;
-    const revision = current.revision + 1;
-    const updated = await tx.facilityIssue.updateMany({ where: { id: current.id, revision: current.revision }, data: { holdId, revision } });
-    if (updated.count !== 1) throw new AssetError("BUSY", "Someone else changed that issue. Reload and try again.");
-    await snapshot(tx, { ...current, holdId, revision }, "BLOCK_PLACED", actorUserId, `${block.kind.toLowerCase()} block ${block.firstNight} to ${block.lastNight}`);
-    await writeAuditLog({
-      eventId, actorUserId, action: "FACILITY_BLOCK_PLACED", entityType: "FacilityIssue", entityId: current.id,
-      summary: "Blocked a room or site for a facility issue.", metadata: { holdId, kind: block.kind, firstNight: block.firstNight, lastNight: block.lastNight },
-    }, tx);
-  });
-  return { issueId: issue.id, holdId, blockError: null };
 }

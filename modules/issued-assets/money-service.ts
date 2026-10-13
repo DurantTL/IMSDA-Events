@@ -2,9 +2,9 @@ import "server-only";
 
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AssetError } from "@/modules/issued-assets/errors";
+import { coverInputs, fateOf, loadChargedIssuances, loadCorrectionRows } from "@/modules/issued-assets/corrections";
 import {
   chargeActionSchema,
-  coverStateOf,
   decideDepositOutcome,
   depositActionSchema,
   formatCents,
@@ -81,6 +81,7 @@ export async function recordDeposit(eventId: string, actorUserId: string, rawInp
     const entry = await tx.assetLedgerEntry.create({
       data: {
         eventId, kind: "DEPOSIT_RECEIVED", amountCents: input.amountCents, assetTypeId: type.id, registrationId, settlement: "CASH_AT_DESK",
+        depositShortfallSnapshot: type.depositShortfall, replacementFeeSnapshotCents: type.replacementFeeCents,
         reason: input.reason.trim() || "Cash key deposit taken at check-in", actorUserId, actorNameSnapshot: await actorNameOf(tx, actorUserId), idempotencyKey: input.idempotencyKey ?? null,
       },
     });
@@ -132,10 +133,13 @@ export async function settleDeposit(eventId: string, actorUserId: string, rawInp
       return { depositEntryId: found.id, outcome: keep === 0 ? "FULL_REFUND" : refund === 0 ? "KEPT" : "PARTIAL_REFUND", refundCents: refund, keepCents: keep, shortfallCents: 0, message: "Already settled.", replayed: true };
     }
     const rows = await tx.assetIssuance.findMany({ where: { eventId, id: { in: coveredIds } } });
+    // Settled by the terms the deposit was taken under, not by the kind as it reads today.
     const type = await tx.issuedAssetType.findFirstOrThrow({ where: { id: found.assetTypeId!, eventId } });
+    const corrections = await loadCorrectionRows(tx, eventId, coveredIds);
+    const charged = await loadChargedIssuances(tx, eventId, coveredIds);
     const outcome = decideDepositOutcome({
-      depositCents: found.amountCents, policy: type.depositShortfall, replacementFeeCents: type.replacementFeeCents,
-      covers: rows.map((row) => ({ state: coverStateOf(row), quantity: row.endQuantity ?? row.quantity })),
+      depositCents: found.amountCents, policy: found.depositShortfallSnapshot ?? type.depositShortfall, replacementFeeCents: found.replacementFeeSnapshotCents ?? type.replacementFeeCents,
+      covers: coverInputs(rows, corrections, charged),
     });
     if (!outcome.ok) throw new AssetError("DEPOSIT_UNRESOLVED", outcome.message, { unresolved: outcome.unresolved });
     const note = input.note?.trim();
@@ -157,7 +161,7 @@ export async function settleDeposit(eventId: string, actorUserId: string, rawInp
 // Charges and waivers
 // ---------------------------------------------------------------------------
 
-export type ChargeRecorded = { chargeEntryId: string; amountCents: number; posted: boolean; replayed: boolean };
+export type ChargeRecorded = { chargeEntryId: string; amountCents: number; /** What a deposit that already kept money for the loss covered; the charge is the rest. */ offsetCents: number; posted: boolean; replayed: boolean };
 
 function adjustmentFailure(error: unknown): never {
   if (error instanceof AdjustmentError) throw new AssetError("CHARGE_NOT_POSTABLE", error.message);
@@ -180,17 +184,18 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
     if (input.idempotencyKey) {
       const existing = await tx.assetLedgerEntry.findUnique({ where: { eventId_idempotencyKey: { eventId, idempotencyKey: input.idempotencyKey } } });
       if (existing) {
-        if (existing.kind !== "CHARGE" || existing.issuanceId !== input.issuanceId || existing.chargeCategory !== input.category || existing.amountCents !== input.amountCents) {
+        if (existing.kind !== "CHARGE" || existing.issuanceId !== input.issuanceId || existing.chargeCategory !== input.category || existing.amountCents + existing.depositOffsetCents !== input.amountCents) {
           throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different charge.");
         }
-        return { chargeEntryId: existing.id, amountCents: existing.amountCents, posted: existing.registrationAdjustmentId !== null, replayed: true };
+        return { chargeEntryId: existing.id, amountCents: existing.amountCents, offsetCents: existing.depositOffsetCents, posted: existing.registrationAdjustmentId !== null, replayed: true };
       }
     }
     const first = await tx.assetIssuance.findFirst({ where: { id: input.issuanceId, eventId }, select: { assetId: true } });
     if (!first) throw new AssetError("ISSUANCE_NOT_FOUND", "That issue was not found.");
     await lockAssets(tx, eventId, [first.assetId]);
     const row = await tx.assetIssuance.findFirstOrThrow({ where: { id: input.issuanceId, eventId }, include: { asset: { include: { assetType: true } } } });
-    const lostOrDamaged = row.endReason === "LOST" || row.endReason === "DAMAGED";
+    const effective = fateOf(row, (await loadCorrectionRows(tx, eventId, [row.id])).get(row.id)).endReason;
+    const lostOrDamaged = effective === "LOST" || effective === "DAMAGED";
     if (input.category !== "OTHER" && !lostOrDamaged) throw new AssetError("CHARGE_NOT_ALLOWED", "A replacement or damage charge is for an item recorded as lost or damaged.");
     if (row.endReason === "CORRECTED") throw new AssetError("CHARGE_NOT_ALLOWED", "That issue was withdrawn as entered in error, so it cannot be charged.");
     const type = row.asset.assetType;
@@ -203,6 +208,31 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
           : "This kind has no standard replacement fee. A charge needs finance or an event administrator.");
       }
     }
+    // A deposit that already kept money for this loss must not be taken again as a charge: only a money manager, with
+    // a confirmation, may charge the part above what the deposit kept.
+    let offset = 0;
+    if (input.category !== "OTHER" && lostOrDamaged) {
+      const cover = await tx.assetDepositCover.findUnique({ where: { issuanceId: row.id } });
+      if (cover) {
+        const settlements = await tx.assetLedgerEntry.findMany({ where: { eventId, depositEntryId: cover.depositEntryId, kind: "DEPOSIT_KEPT" }, select: { amountCents: true } });
+        const kept = settlements.reduce((sum, entry) => sum + entry.amountCents, 0);
+        if (kept > 0) {
+          const siblings = await tx.assetDepositCover.findMany({ where: { depositEntryId: cover.depositEntryId }, select: { issuanceId: true } });
+          const used = (await tx.assetLedgerEntry.aggregate({
+            where: { eventId, kind: "CHARGE", issuanceId: { in: siblings.map((entry) => entry.issuanceId) }, waivedBy: { none: {} } }, _sum: { depositOffsetCents: true },
+          }))._sum.depositOffsetCents ?? 0;
+          const remaining = Math.max(0, kept - used);
+          if (remaining > 0) {
+            if (!options.canManageMoney || !input.confirmKeptDeposit) {
+              throw new AssetError("DEPOSIT_ALREADY_KEPT", `The cash deposit already kept ${formatCents(remaining)} for lost or damaged items, so charging the full amount would take the guest's money twice. ${options.canManageMoney ? "Confirm to charge only the part above what the deposit kept." : "Finance or an event administrator can charge only the part above it."}`);
+            }
+            offset = Math.min(input.amountCents, remaining);
+            if (offset >= input.amountCents) throw new AssetError("CHARGE_NOT_ALLOWED", "The deposit that was kept already covers that amount. Nothing more is charged.");
+          }
+        }
+      }
+    }
+    const chargeCents = input.amountCents - offset;
     const duplicate = await tx.assetLedgerEntry.findFirst({ where: { eventId, issuanceId: row.id, kind: "CHARGE", chargeCategory: input.category }, select: { id: true } });
     if (duplicate) throw new AssetError("CHARGE_EXISTS", "That item already has a charge of this kind. If it was a mistake, waive it.");
     const registrationId = (await registrationsOf(tx, [row])).get(row.id) ?? null;
@@ -210,28 +240,28 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
     if (input.post) {
       if (!registrationId) throw new AssetError("CHARGE_NOT_POSTABLE", "This holder has no registration to post to. Record the charge without posting.");
       try {
-        adjustmentId = await postAssetAdjustment(tx, { eventId, registrationId, actorUserId, amountCents: input.amountCents, reason: `${row.asset.identifier}: ${input.reason}`.slice(0, 500) });
+        adjustmentId = await postAssetAdjustment(tx, { eventId, registrationId, actorUserId, amountCents: chargeCents, reason: `${row.asset.identifier}: ${input.reason}`.slice(0, 500) });
       } catch (error) {
         adjustmentFailure(error);
       }
     }
     const entry = await tx.assetLedgerEntry.create({
       data: {
-        eventId, kind: "CHARGE", amountCents: input.amountCents, assetTypeId: type.id, issuanceId: row.id, registrationId, chargeCategory: input.category,
+        eventId, kind: "CHARGE", amountCents: chargeCents, depositOffsetCents: offset, assetTypeId: type.id, issuanceId: row.id, registrationId, chargeCategory: input.category,
         settlement: adjustmentId ? "REGISTRATION_ADJUSTMENT" : "RECORD_ONLY", registrationAdjustmentId: adjustmentId, reason: input.reason,
         actorUserId, actorNameSnapshot: await actorNameOf(tx, actorUserId), idempotencyKey: input.idempotencyKey ?? null,
       },
     });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_CHARGE_RECORDED", entityType: "AssetLedgerEntry", entityId: entry.id,
-      summary: `Recorded a ${input.category.toLowerCase()} charge of ${formatCents(input.amountCents)}${adjustmentId ? " and posted it to the registration" : ""}.`,
-      metadata: { amountCents: input.amountCents, category: input.category, issuanceId: row.id, posted: adjustmentId !== null, registrationId },
+      summary: `Recorded a ${input.category.toLowerCase()} charge of ${formatCents(chargeCents)}${adjustmentId ? " and posted it to the registration" : ""}.`,
+      metadata: { amountCents: chargeCents, depositOffsetCents: offset, category: input.category, issuanceId: row.id, posted: adjustmentId !== null, registrationId },
     }, tx);
-    return { chargeEntryId: entry.id, amountCents: entry.amountCents, posted: adjustmentId !== null, replayed: false };
+    return { chargeEntryId: entry.id, amountCents: entry.amountCents, offsetCents: offset, posted: adjustmentId !== null, replayed: false };
   });
 }
 
-export type WaiverRecorded = { waiverEntryId: string; chargeEntryId: string; amountCents: number; reversedOnRegistration: boolean; replayed: boolean };
+export type WaiverRecorded = { waiverEntryId: string; chargeEntryId: string; amountCents: number; reversedOnRegistration: boolean; /** The registration is no longer active, so the waiver is recorded here and the charge line on it is left as it is. */ registrationInactive: boolean; replayed: boolean };
 
 /**
  * Waives a charge in full: an approved decision with a required reason, by finance (MANAGE_FINANCE) or an event
@@ -249,7 +279,7 @@ export async function waiveCharge(eventId: string, actorUserId: string, rawInput
       const existing = await tx.assetLedgerEntry.findUnique({ where: { eventId_idempotencyKey: { eventId, idempotencyKey: input.idempotencyKey } } });
       if (existing) {
         if (existing.kind !== "WAIVER" || existing.waivesEntryId !== input.chargeEntryId) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different waiver.");
-        return { waiverEntryId: existing.id, chargeEntryId: input.chargeEntryId, amountCents: existing.amountCents, reversedOnRegistration: existing.registrationAdjustmentId !== null, replayed: true };
+        return { waiverEntryId: existing.id, chargeEntryId: input.chargeEntryId, amountCents: existing.amountCents, reversedOnRegistration: existing.registrationAdjustmentId !== null, registrationInactive: false, replayed: true };
       }
     }
     const first = await tx.assetLedgerEntry.findFirst({ where: { id: input.chargeEntryId, eventId, kind: "CHARGE" }, select: { issuanceId: true } });
@@ -259,28 +289,35 @@ export async function waiveCharge(eventId: string, actorUserId: string, rawInput
     const charge = await tx.assetLedgerEntry.findFirstOrThrow({ where: { id: input.chargeEntryId, eventId, kind: "CHARGE" }, include: { waivedBy: { select: { id: true } } } });
     if (charge.waivedBy.length > 0) throw new AssetError("CHARGE_ALREADY_WAIVED", "That charge was already waived.");
     let reversal: string | null = null;
+    let registrationInactive = false;
     if (charge.registrationAdjustmentId) {
-      try {
-        reversal = await postAssetAdjustment(tx, {
-          eventId, registrationId: charge.registrationId!, actorUserId, amountCents: -charge.amountCents,
-          reason: `Waived: ${input.reason}`.slice(0, 500), reversesAdjustmentId: charge.registrationAdjustmentId,
-        });
-      } catch (error) {
-        adjustmentFailure(error);
+      // A cancelled or waitlisted registration takes no adjustment: the waiver is still recorded in the asset ledger, and says so.
+      const active = await tx.registration.findFirst({ where: { id: charge.registrationId!, eventId, status: { in: ["SUBMITTED", "CONFIRMED"] } }, select: { id: true } });
+      if (!active) {
+        registrationInactive = true;
+      } else {
+        try {
+          reversal = await postAssetAdjustment(tx, {
+            eventId, registrationId: charge.registrationId!, actorUserId, amountCents: -charge.amountCents,
+            reason: `Waived: ${input.reason}`.slice(0, 500), reversesAdjustmentId: charge.registrationAdjustmentId,
+          });
+        } catch (error) {
+          adjustmentFailure(error);
+        }
       }
     }
     const entry = await tx.assetLedgerEntry.create({
       data: {
         eventId, kind: "WAIVER", amountCents: charge.amountCents, assetTypeId: charge.assetTypeId, issuanceId: charge.issuanceId, registrationId: charge.registrationId,
-        waivesEntryId: charge.id, settlement: reversal ? "REGISTRATION_ADJUSTMENT" : "RECORD_ONLY", registrationAdjustmentId: reversal, reason: input.reason,
+        waivesEntryId: charge.id, settlement: reversal ? "REGISTRATION_ADJUSTMENT" : "RECORD_ONLY", registrationAdjustmentId: reversal, reason: registrationInactive ? `${input.reason} (the registration is not active, so no line was reversed on it)`.slice(0, 500) : input.reason,
         actorUserId, actorNameSnapshot: await actorNameOf(tx, actorUserId), idempotencyKey: input.idempotencyKey ?? null,
       },
     });
     await writeAuditLog({
       eventId, actorUserId, action: "ASSET_CHARGE_WAIVED", entityType: "AssetLedgerEntry", entityId: entry.id,
       summary: `Waived a charge of ${formatCents(charge.amountCents)}.`,
-      metadata: { chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null },
+      metadata: { chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, registrationInactive },
     }, tx);
-    return { waiverEntryId: entry.id, chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, replayed: false };
+    return { waiverEntryId: entry.id, chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, registrationInactive, replayed: false };
   });
 }

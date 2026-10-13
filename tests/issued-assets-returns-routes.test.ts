@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   waiveCharge: vi.fn(),
   applyFacilityAction: vi.fn(),
   getCloseoutReport: vi.fn(),
+  recordOutcomeCorrection: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -26,6 +27,7 @@ vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: 
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/modules/issued-assets/returns-service", () => ({ returnAssets: mocks.returnAssets }));
 vi.mock("@/modules/issued-assets/money-service", () => ({ recordDeposit: mocks.recordDeposit, settleDeposit: mocks.settleDeposit, postCharge: mocks.postCharge, waiveCharge: mocks.waiveCharge }));
+vi.mock("@/modules/issued-assets/corrections", () => ({ recordOutcomeCorrection: mocks.recordOutcomeCorrection }));
 vi.mock("@/modules/issued-assets/facility-service", () => ({ applyFacilityAction: mocks.applyFacilityAction }));
 vi.mock("@/modules/issued-assets/closeout", () => ({
   getCloseoutReport: mocks.getCloseoutReport,
@@ -37,6 +39,7 @@ import { POST as returnsRoute } from "@/app/api/events/[eventId]/assets/returns/
 import { POST as depositsRoute } from "@/app/api/events/[eventId]/assets/deposits/route";
 import { POST as chargesRoute } from "@/app/api/events/[eventId]/assets/charges/route";
 import { POST as facilityRoute } from "@/app/api/events/[eventId]/assets/facility/route";
+import { POST as correctionsRoute } from "@/app/api/events/[eventId]/assets/corrections/route";
 import { GET as closeoutRoute } from "@/app/api/events/[eventId]/assets/closeout/route";
 import { AssetError } from "@/modules/issued-assets/errors";
 
@@ -57,6 +60,7 @@ beforeEach(() => {
   mocks.waiveCharge.mockResolvedValue({ waiverEntryId: "w1" });
   mocks.applyFacilityAction.mockResolvedValue({ issueId: "f1" });
   mocks.getCloseoutReport.mockResolvedValue({ unresolvedCount: 0 });
+  mocks.recordOutcomeCorrection.mockResolvedValue({ issuanceId: "i1" });
 });
 
 describe("check-out routes", () => {
@@ -135,6 +139,27 @@ describe("charge and waiver routes", () => {
   });
 });
 
+describe("correction routes", () => {
+  it("is for finance and event administrators only, and says whether they may handle money", async () => {
+    for (const role of ["FINANCE_MANAGER", "EVENT_ADMIN"]) {
+      mocks.findActiveMembership.mockResolvedValue(membership(role));
+      expect((await correctionsRoute(request("POST", { action: "write_off" }), ctx)).status, role).toBe(200);
+    }
+    expect(mocks.recordOutcomeCorrection.mock.calls.every((call) => (call[3] as { canManageMoney: boolean }).canManageMoney)).toBe(true);
+    for (const role of ["CHECK_IN_STAFF", "REGISTRATION_MANAGER", "READ_ONLY_STAFF"]) {
+      mocks.findActiveMembership.mockResolvedValue(membership(role));
+      expect((await correctionsRoute(request("POST", { action: "write_off" }), ctx)).status, role).toBe(403);
+    }
+    expect(mocks.recordOutcomeCorrection).toHaveBeenCalledTimes(2);
+  });
+
+  it("answers an invalid correction as a conflict", async () => {
+    mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
+    mocks.recordOutcomeCorrection.mockRejectedValue(new AssetError("CORRECTION_INVALID", "Already recorded."));
+    expect((await correctionsRoute(request("POST", { action: "correct" }), ctx)).status).toBe(409);
+  });
+});
+
 describe("facility routes", () => {
   it("lets check-in staff report, and passes whether they may block a room", async () => {
     mocks.findActiveMembership.mockResolvedValue(membership("CHECK_IN_STAFF"));
@@ -190,8 +215,8 @@ describe("every slice 2 mutation", () => {
   it("rejects a cross-origin request before anything else", async () => {
     mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({ error: "INVALID_REQUEST_ORIGIN" }, { status: 403 }));
     mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
-    for (const route of [returnsRoute, depositsRoute, chargesRoute, facilityRoute]) expect((await route(request("POST", {}), ctx)).status).toBe(403);
+    for (const route of [returnsRoute, depositsRoute, chargesRoute, facilityRoute, correctionsRoute]) expect((await route(request("POST", {}), ctx)).status).toBe(403);
     expect(mocks.getCurrentSession).not.toHaveBeenCalled();
-    for (const service of [mocks.returnAssets, mocks.recordDeposit, mocks.settleDeposit, mocks.postCharge, mocks.waiveCharge, mocks.applyFacilityAction]) expect(service).not.toHaveBeenCalled();
+    for (const service of [mocks.returnAssets, mocks.recordDeposit, mocks.settleDeposit, mocks.postCharge, mocks.waiveCharge, mocks.applyFacilityAction, mocks.recordOutcomeCorrection]) expect(service).not.toHaveBeenCalled();
   });
 });

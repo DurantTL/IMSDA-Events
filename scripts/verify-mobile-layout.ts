@@ -798,7 +798,7 @@ async function seedIssuedAssets(prisma: PrismaClient) {
     if (lost) await prisma.issuedAsset.update({ where: { id: assetId }, data: { availability: "UNAVAILABLE" } });
   }
   await prisma.assetLedgerEntry.create({
-    data: { id: `${P}_asset_deposit`, eventId, kind: "DEPOSIT_RECEIVED", amountCents: 800, assetTypeId: typeId, registrationId, settlement: "CASH_AT_DESK", reason: "Cash key deposit taken at check-in", actorUserId: actor, actorNameSnapshot: "System Administrator" },
+    data: { id: `${P}_asset_deposit`, eventId, kind: "DEPOSIT_RECEIVED", amountCents: 800, assetTypeId: typeId, registrationId, settlement: "CASH_AT_DESK", depositShortfallSnapshot: "KEEP_FEES", replacementFeeSnapshotCents: 2500, reason: "Cash key deposit taken at check-in", actorUserId: actor, actorNameSnapshot: "System Administrator" },
   });
   for (const index of [0, 1, 2]) await prisma.assetDepositCover.create({ data: { eventId, issuanceId: `${P}_asset_issuance_${index}`, depositEntryId: `${P}_asset_deposit` } });
   await prisma.assetLedgerEntry.create({

@@ -25,7 +25,7 @@ const person = (issuances: IssuanceRow[]): DeskPerson => ({
   attendeeId: "att1", registrationId: "reg1", name: "Pat Example", confirmationCode: "CODE-1", registrationActive: true,
   rooms: [{ assignmentId: "as1", unitId: "u1", roomName: "214, Girls Dorm", firstNight: "2027-06-15", lastNight: "2027-06-18" }], issuances,
 });
-const noMoney: DeskMoney = { deposits: [], charges: [] };
+const noMoney: DeskMoney = { deposits: [], charges: [], fates: {} };
 
 const panel = (p: DeskPerson, money: DeskMoney, flags: { canConfigure?: boolean; canManageMoney?: boolean } = {}) => renderToStaticMarkup(createElement(AssetReturnPanel, {
   eventId: "ev1", userId: "usr_1", person: p, money, types, canConfigure: flags.canConfigure ?? false, canManageMoney: flags.canManageMoney ?? false,
@@ -52,11 +52,11 @@ describe("check-out panel", () => {
 
   it("says what settling would do, in words, and records that cash was handed back", () => {
     const money: DeskMoney = {
-      charges: [],
+      charges: [], fates: {},
       deposits: [{
         entryId: "d1", amountCents: 1000, typeName: "Dorm room key", takenAt: "2027-06-15T18:05:00.000Z", takenByName: "Synthetic Staff",
-        covers: [{ issuanceId: "i1", identifier: "K-214", state: "RETURNED", quantity: 1 }, { issuanceId: "i2", identifier: "K-215", state: "RETURNED", quantity: 1 }],
-        settled: null, outcome: { ok: true, outcome: "FULL_REFUND", refundCents: 1000, keepCents: 0, shortfallCents: 0, missing: 0, damaged: 0, message: "Every covered item came back in good order: hand back the full deposit." },
+        covers: [{ issuanceId: "i1", identifier: "K-214", state: "RETURNED", quantity: 1, charged: false }, { issuanceId: "i2", identifier: "K-215", state: "RETURNED", quantity: 1, charged: false }],
+        keptRemainingCents: 0, settled: null, outcome: { ok: true, outcome: "FULL_REFUND", refundCents: 1000, keepCents: 0, shortfallCents: 0, missing: 0, damaged: 0, message: "Every covered item came back in good order: hand back the full deposit." },
       }],
     };
     const html = panel(person([row({ open: false, endReason: "RETURNED", endedAt: "2027-06-18T10:00:00.000Z", endQuantity: 1, depositEntryId: "d1" })]), money);
@@ -68,11 +68,11 @@ describe("check-out panel", () => {
 
   it("says why a deposit cannot be settled while a key is still out", () => {
     const money: DeskMoney = {
-      charges: [],
+      charges: [], fates: {},
       deposits: [{
         entryId: "d1", amountCents: 1000, typeName: "Dorm room key", takenAt: "2027-06-15T18:05:00.000Z", takenByName: "Synthetic Staff",
-        covers: [{ issuanceId: "i1", identifier: "K-214", state: "RETURNED", quantity: 1 }, { issuanceId: "i2", identifier: "K-215", state: "OUTSTANDING", quantity: 1 }],
-        settled: null, outcome: { ok: false, code: "UNRESOLVED", unresolved: 1, message: "1 covered item is still out or without a recorded return, loss or damage." },
+        covers: [{ issuanceId: "i1", identifier: "K-214", state: "RETURNED", quantity: 1, charged: false }, { issuanceId: "i2", identifier: "K-215", state: "OUTSTANDING", quantity: 1, charged: false }],
+        keptRemainingCents: 0, settled: null, outcome: { ok: false, code: "UNRESOLVED", unresolved: 1, message: "1 covered item is still out or without a recorded return, loss or damage." },
       }],
     };
     const html = panel(person([row({ id: "i2", identifier: "K-215", depositEntryId: "d1" })]), money);
@@ -90,8 +90,34 @@ describe("check-out panel", () => {
     expect(panel(person([lost]), noMoney, { canManageMoney: true })).toContain("Another amount");
   });
 
+  it("does not offer the standard fee when the deposit already kept money for the loss", () => {
+    const lostRow = row({ id: "i3", open: false, endReason: "LOST", endedAt: "2027-06-18T10:00:00.000Z", endQuantity: 1, depositEntryId: "d1" });
+    const money: DeskMoney = {
+      charges: [], fates: {},
+      deposits: [{
+        entryId: "d1", amountCents: 1000, typeName: "Dorm room key", takenAt: "2027-06-15T18:05:00.000Z", takenByName: "Synthetic Staff", keptRemainingCents: 1000,
+        covers: [{ issuanceId: "i3", identifier: "K-214", state: "LOST", quantity: 1, charged: false }],
+        settled: { refundCents: 0, keepCents: 1000, at: "2027-06-18T11:00:00.000Z", byName: "Synthetic Staff" }, outcome: null,
+      }],
+    };
+    const checkIn = panel(person([lostRow]), money);
+    expect(checkIn).toContain("The cash deposit already kept $10.00");
+    expect(checkIn).toContain("would take the guest");
+    expect(checkIn).not.toContain("Charge $25.00 to the registration");
+    expect(checkIn).toContain("Finance or an event administrator can charge the part above what the deposit kept.");
+    const finance = panel(person([lostRow]), money, { canManageMoney: true });
+    expect(finance).toContain("Charge only the part above the kept deposit");
+    expect(finance).not.toContain("Charge $25.00 to the registration");
+  });
+
+  it("stops offering a charge for a loss that was written off or found", () => {
+    const lostRow = row({ id: "i3", open: false, endReason: "LOST", endedAt: "2027-06-18T10:00:00.000Z", endQuantity: 1 });
+    expect(panel(person([lostRow]), { ...noMoney, fates: { i3: { endReason: "LOST", corrected: false, writtenOff: true } } })).not.toContain("The standard replacement fee");
+    expect(panel(person([lostRow]), { ...noMoney, fates: { i3: { endReason: "RETURNED", corrected: true, writtenOff: false } } })).not.toContain("The standard replacement fee");
+  });
+
   it("shows a recorded charge and where a waiver is done", () => {
-    const money: DeskMoney = { deposits: [], charges: [{ entryId: "c1", issuanceId: "i3", identifier: "K-214", category: "REPLACEMENT", amountCents: 2500, posted: true, reason: "Replacement fee for K-214", at: "2027-06-18T10:00:00.000Z", waived: false }] };
+    const money: DeskMoney = { deposits: [], charges: [{ entryId: "c1", issuanceId: "i3", identifier: "K-214", category: "REPLACEMENT", amountCents: 2500, posted: true, reason: "Replacement fee for K-214", at: "2027-06-18T10:00:00.000Z", waived: false, depositOffsetCents: 0 }], fates: {} };
     const html = panel(person([row({ id: "i3", open: false, endReason: "LOST", endedAt: "2027-06-18T10:00:00.000Z", endQuantity: 1 })]), money);
     expect(html).toContain("Replacement charge $25.00 (posted to the registration)");
     expect(html).toContain("Waiving a charge needs finance or an event administrator");
@@ -162,5 +188,25 @@ describe("closeout screen", () => {
     expect(finance).toContain("Reason to waive");
     expect(finance).not.toContain("Block the room");
     expect(closeout({ canManageMoney: true, canConfigure: true })).toContain("Block the room");
+  });
+});
+
+describe("closeout corrections", () => {
+  const withException: CloseoutReport = {
+    ...report,
+    exceptions: [{ code: "UNCHARGED_LOSS", label: "Lost or damaged, nothing charged, waived or kept", subject: "K-214 (Dorm room key)", detail: "Lost.", holderLabel: "Pat Example", amountCents: null, deskAttendeeId: "att1", refId: "l1" }],
+  };
+  const render = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, {
+    eventId: "ev1", eventName: "Camp Meeting 2027", report: withException, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true,
+  }));
+
+  it("offers a found key, a loss and a write-off to finance and administrators only", () => {
+    const finance = render(true);
+    expect(finance).toContain("Found: it came back");
+    expect(finance).toContain("Write off, charge nothing");
+    expect(finance).toContain("Resolve");
+    const checkIn = render(false);
+    expect(checkIn).not.toContain("Write off, charge nothing");
+    expect(checkIn).not.toContain("Found: it came back");
   });
 });

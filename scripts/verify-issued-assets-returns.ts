@@ -34,6 +34,7 @@ import { removeEventOwnedRows } from "@/modules/events/deletion-repository";
 import { AssetError, type AssetErrorCode } from "@/modules/issued-assets/errors";
 import { closeoutCsv, closeoutSections, getCloseoutReport } from "@/modules/issued-assets/closeout";
 import { applyFacilityAction } from "@/modules/issued-assets/facility-service";
+import { recordOutcomeCorrection } from "@/modules/issued-assets/corrections";
 import { postCharge, recordDeposit, settleDeposit, waiveCharge } from "@/modules/issued-assets/money-service";
 import { returnAssets, type ReturnItemResult } from "@/modules/issued-assets/returns-service";
 import { getDeskMoney, listFacilityIssues } from "@/modules/issued-assets/returns-view";
@@ -179,8 +180,12 @@ async function main() {
   const typeRow = await prisma.issuedAssetType.findUniqueOrThrow({ where: { id: keyType } });
   assert(typeRow.depositCents === 1000 && typeRow.depositShortfall === "KEEP_ALL" && typeRow.replacementFeeCents === 2500, "a kind keeps its deposit, shortfall policy and replacement fee");
   await expectDatabaseRefusal(prisma.issuedAssetType.update({ where: { id: keyType }, data: { depositCents: -1 } }), "a negative deposit");
-  await applyAssetAction(eventId, adminId, { action: "bulk", typeId: keyType, prefix: "K-", from: 201, to: 240 });
-  for (const identifier of ["L-1", "L-2", "L-3"]) await applyAssetAction(eventId, adminId, { action: "create", typeId: lodgeType, identifier });
+  await expectAssetError(applyAssetTypeAction(eventId, adminId, { action: "create", name: "Free-fee key", mode: "SERIALIZED", assigneeKinds: ["ATTENDEE"], depositCents: 500, depositShortfall: "KEEP_FEES", replacementFeeCents: 0 }), "POLICY_INVALID", "keeping fees with no fee to keep");
+  await expectAssetError(applyAssetTypeAction(eventId, adminId, { action: "update", typeId: bandType, depositShortfall: "KEEP_FEES" }), "POLICY_INVALID", "switching a kind with no fee to keep-fees");
+  await expectAssetError(applyAssetTypeAction(eventId, adminId, { action: "update", typeId: lodgeType, replacementFeeCents: 0 }), "POLICY_INVALID", "removing the fee of a keep-fees kind");
+  await expectDatabaseRefusal(prisma.issuedAssetType.update({ where: { id: lodgeType }, data: { replacementFeeCents: 0 } }), "keep-fees with no fee, around the service");
+  await applyAssetAction(eventId, adminId, { action: "bulk", typeId: keyType, prefix: "K-", from: 201, to: 260 });
+  for (const identifier of ["L-1", "L-2", "L-3", "L-4", "L-5", "L-6", "L-7", "L-8"]) await applyAssetAction(eventId, adminId, { action: "create", typeId: lodgeType, identifier });
   await applyAssetAction(eventId, adminId, { action: "create", typeId: towelType, identifier: "TOWELS", quantityTotal: 10 });
   for (const identifier of ["W-1", "W-2", "W-3"]) await applyAssetAction(eventId, adminId, { action: "create", typeId: bandType, identifier });
 
@@ -320,16 +325,133 @@ async function main() {
   assert((await prisma.assetLedgerEntry.findUniqueOrThrow({ where: { id: charge.chargeEntryId } })).amountCents === 2500, "the original charge stays on record");
   const reverseAttempt = await caught(reverseRegistrationAdjustment(eventId, dana.registrationId, chargeEntry.registrationAdjustmentId!, financeId, "Reverse it by hand"));
   assert(reverseAttempt instanceof Error && (reverseAttempt as { code?: string }).code === "ASSET_ADJUSTMENT_NOT_REVERSIBLE", "an asset charge cannot be reversed from the finance screen, only waived with its record");
-  const recordOnly = await postCharge(eventId, financeId, { action: "charge", issuanceId: (await issuanceOf(erin, "L-1")).id, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: false }, FINANCE);
-  assert(!recordOnly.posted && (await registrationTotal(erin)) === 0, "a charge recorded without posting leaves the registration alone");
+  // Settle, then charge (keep-fees): the deposit already kept $4 for the damaged key, so the same loss is not charged in full as well.
+  const erinL1 = (await issuanceOf(erin, "L-1")).id;
+  await expectAssetError(postCharge(eventId, staffId, { action: "charge", issuanceId: erinL1, category: "REPLACEMENT", amountCents: 400, reason: "Standard fee", post: false }, CHECK_IN), "DEPOSIT_ALREADY_KEPT", "check-in staff charging the standard fee for a loss the deposit already kept money for");
+  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: false }, FINANCE), "DEPOSIT_ALREADY_KEPT", "finance charging without confirming the kept deposit");
+  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 300, reason: "Bent key", post: false, confirmKeptDeposit: true }, FINANCE), "CHARGE_NOT_ALLOWED", "a charge the kept deposit already covers");
+  assert((await prisma.assetLedgerEntry.count({ where: { eventId, kind: "CHARGE", issuanceId: erinL1 } })) === 0, "refused charges wrote nothing");
+  const recordOnly = await postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: false, confirmKeptDeposit: true }, FINANCE);
+  const recordOnlyEntry = await prisma.assetLedgerEntry.findUniqueOrThrow({ where: { id: recordOnly.chargeEntryId } });
+  assert(!recordOnly.posted && recordOnly.offsetCents === 400 && recordOnlyEntry.amountCents === 1100 && recordOnlyEntry.depositOffsetCents === 400 && (await registrationTotal(erin)) === 0, "a confirmed charge is only the part above what the deposit kept, and recording it without posting leaves the registration alone");
   const recordOnlyWaiver = await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: recordOnly.chargeEntryId, reason: "Within normal wear" }, FINANCE);
   assert(!recordOnlyWaiver.reversedOnRegistration && (await registrationTotal(erin)) === 0, "waiving a record-only charge posts nothing");
+  // Settle, then charge (keep-all): Bob's deposit was kept for the lost K-217.
+  const bobTotal = await registrationTotal(bob);
+  const bobLost = (await issuanceOf(bob, "K-217")).id;
+  await expectAssetError(postCharge(eventId, staffId, { action: "charge", issuanceId: bobLost, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key", post: true }, CHECK_IN), "DEPOSIT_ALREADY_KEPT", "check-in staff charging a lost key whose deposit was kept");
+  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: bobLost, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key", post: true }, FINANCE), "DEPOSIT_ALREADY_KEPT", "finance charging a kept deposit's loss without confirming");
+  assert((await registrationTotal(bob)) === bobTotal, "and nothing was posted");
+  const bobCharge = await postCharge(eventId, financeId, { action: "charge", issuanceId: bobLost, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key, replacement cost above the kept deposit", post: true, confirmKeptDeposit: true }, FINANCE);
+  assert(bobCharge.amountCents === 1500 && bobCharge.offsetCents === 1000 && (await registrationTotal(bob)) === bobTotal + 15, "keep-all: only the $15 above the $10 kept deposit is charged");
   await expectDatabaseRefusal(prisma.assetLedgerEntry.update({ where: { id: charge.chargeEntryId }, data: { amountCents: 1 } }), "rewriting a ledger entry");
   await expectDatabaseRefusal(prisma.assetLedgerEntry.delete({ where: { id: charge.chargeEntryId } }), "deleting a ledger entry");
   await expectDatabaseRefusal(prisma.assetLedgerEntry.create({ data: { eventId, kind: "WAIVER", amountCents: 1, waivesEntryId: charge.chargeEntryId, issuanceId: lost219.id, settlement: "RECORD_ONLY", reason: "Different amount", actorUserId: financeId, actorNameSnapshot: "Finance person" } }), "a waiver of another amount, or a second waiver");
   await expectDatabaseRefusal(prisma.assetDepositCover.delete({ where: { issuanceId: (await prisma.assetDepositCover.findFirstOrThrow({ where: { depositEntryId: bobDeposit.depositEntryId } })).issuanceId } }), "deleting a deposit's coverage");
   const moneyAudit = await prisma.auditLog.findMany({ where: { eventId, action: { in: ["ASSET_DEPOSIT_RECORDED", "ASSET_DEPOSIT_SETTLED", "ASSET_CHARGE_RECORDED", "ASSET_CHARGE_WAIVED", "ASSET_RETURN_RECORDED"] } } });
   assert(moneyAudit.length >= 8 && !JSON.stringify(moneyAudit).includes(dana.last) && !JSON.stringify(moneyAudit).includes(alice.first), "the money and return audit entries carry no names");
+
+  // ---- Charge first, then settle: a loss already charged is not also kept (both policies) -------------------
+  const pat = await makeReg(eventId);
+  await place(pat, "girls-218");
+  await issue(pat, ["K-231", "K-232"]);
+  const patDeposit = await takeDeposit(pat, ["K-231", "K-232"], 1000);
+  await give([{ code: "K-232", outcome: "LOST", note: "Lost at the lake" }]);
+  await postCharge(eventId, staffId, { action: "charge", issuanceId: (await issuanceOf(pat, "K-232")).id, category: "REPLACEMENT", amountCents: 2500, reason: "Standard fee", post: true }, CHECK_IN);
+  await give([{ code: "K-231" }]);
+  const patSettled = await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: patDeposit.depositEntryId });
+  assert(patSettled.outcome === "FULL_REFUND" && patSettled.refundCents === 1000 && patSettled.keepCents === 0 && patSettled.message.includes("already charged"), `keep-all: the lost key was charged, so the deposit is not kept as well: ${JSON.stringify(patSettled)}`);
+  assert((await ledgerOf(patDeposit.depositEntryId)).map((row) => row.kind).join() === "DEPOSIT_RETURNED", "and only a hand-back is recorded");
+  const quinn = await makeReg(eventId);
+  await issue(quinn, ["L-4", "L-5"]);
+  const quinnDeposit = await takeDeposit(quinn, ["L-4", "L-5"], 1000);
+  await give([{ code: "L-5", outcome: "LOST", note: "Lost at the lake" }, { code: "L-4" }]);
+  await postCharge(eventId, staffId, { action: "charge", issuanceId: (await issuanceOf(quinn, "L-5")).id, category: "REPLACEMENT", amountCents: 400, reason: "Standard fee", post: true }, CHECK_IN);
+  const quinnSettled = await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: quinnDeposit.depositEntryId });
+  assert(quinnSettled.outcome === "FULL_REFUND" && quinnSettled.keepCents === 0, `keep-fees: the same, the fee is charged and not also kept: ${JSON.stringify(quinnSettled)}`);
+
+  // ---- Deposit terms are snapshotted: editing the kind later never changes a deposit already held -----------
+  const wade = await makeReg(eventId);
+  await issue(wade, ["L-6", "L-7"]);
+  const wadeDeposit = await takeDeposit(wade, ["L-6", "L-7"], 1000);
+  const wadeEntry = await prisma.assetLedgerEntry.findUniqueOrThrow({ where: { id: wadeDeposit.depositEntryId } });
+  assert(wadeEntry.depositShortfallSnapshot === "KEEP_FEES" && wadeEntry.replacementFeeSnapshotCents === 400, "a deposit remembers the policy and fee it was taken under");
+  await applyAssetTypeAction(eventId, adminId, { action: "update", typeId: lodgeType, replacementFeeCents: 900, depositShortfall: "KEEP_ALL" });
+  await give([{ code: "L-6", outcome: "LOST", note: "Lost" }, { code: "L-7" }]);
+  const wadeSettled = await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: wadeDeposit.depositEntryId });
+  assert(wadeSettled.outcome === "PARTIAL_REFUND" && wadeSettled.keepCents === 400 && wadeSettled.refundCents === 600, `settled by the terms it was taken under, not the edited kind: ${JSON.stringify(wadeSettled)}`);
+  await applyAssetTypeAction(eventId, adminId, { action: "update", typeId: lodgeType, replacementFeeCents: 400, depositShortfall: "KEEP_FEES" });
+
+  // ---- Corrections: a key found, a settled deposit that needs review, replaced originals, write-offs ---------
+  const rita = await makeReg(eventId);
+  await place(rita, "girls-219");
+  await issue(rita, ["K-233", "K-234"]);
+  const ritaDeposit = await takeDeposit(rita, ["K-233", "K-234"], 1000);
+  await give([{ code: "K-233", outcome: "LOST", note: "Not in the room" }, { code: "K-234" }]);
+  const ritaLost = await issuanceOf(rita, "K-233");
+  await expectAssetError(recordOutcomeCorrection(eventId, staffId, { action: "correct", issuanceId: ritaLost.id, fate: "RETURNED", reason: "Found under the bed" }, CHECK_IN), "MONEY_PERMISSION_REQUIRED", "check-in staff correcting an outcome");
+  assert((await caught(recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: ritaLost.id, fate: "RETURNED", reason: "" }, FINANCE))) !== null, "a correction needs a reason");
+  await expectAssetError(recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: ritaLost.id, fate: "LOST", reason: "Same again" }, FINANCE), "CORRECTION_INVALID", "correcting to the fate already recorded");
+  const found = await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: ritaLost.id, fate: "RETURNED", reason: "Found under the bed", idempotencyKey: `found-${randomUUID()}` }, FINANCE);
+  assert(found.from === "LOST" && found.to === "RETURNED", "a lost key found later is LOST corrected to RETURNED");
+  const foundHistory = (await historyOf(ritaLost.id)).find((row) => row.type === "OUTCOME_CORRECTED")!;
+  assert(foundHistory.correctedEndReason === "RETURNED" && foundHistory.actorUserId === financeId && foundHistory.reason === "Found under the bed", "the correction is an append-only history row with actor and reason");
+  assert((await prisma.assetIssuance.findUniqueOrThrow({ where: { id: ritaLost.id } })).endReason === "LOST" && (await assetOf("K-233")).availability === "AVAILABLE", "the ended issue never changed, and the found key is back in stock");
+  await expectDatabaseRefusal(prisma.assetIssuanceHistory.update({ where: { id: foundHistory.id }, data: { reason: "Rewritten" } }), "rewriting a correction");
+  const ritaSettled = await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: ritaDeposit.depositEntryId });
+  assert(ritaSettled.outcome === "FULL_REFUND", "an unsettled deposit is settled by the corrected fates: the found key means a full refund");
+
+  const sam = await makeReg(eventId);
+  await place(sam, "girls-220");
+  await issue(sam, ["K-235", "K-236"]);
+  const samDeposit = await takeDeposit(sam, ["K-235", "K-236"], 1000);
+  await give([{ code: "K-235", outcome: "LOST", note: "Not in the room" }, { code: "K-236" }]);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: samDeposit.depositEntryId })).outcome === "KEPT", "a lost key's deposit is kept");
+  const ledgerBeforeLate = await prisma.assetLedgerEntry.count({ where: { eventId } });
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: (await issuanceOf(sam, "K-235")).id, fate: "RETURNED", reason: "Found after the deposit was settled" }, FINANCE);
+  assert((await prisma.assetLedgerEntry.count({ where: { eventId } })) === ledgerBeforeLate, "a correction after settlement refunds nothing by itself");
+
+  const tess = await makeReg(eventId);
+  await place(tess, "girls-221");
+  await issue(tess, ["K-237"]);
+  const tessDeposit = await takeDeposit(tess, ["K-237"], 1000);
+  await applyIssuanceAction(eventId, adminId, (await openIssuanceOf(tess, "K-237")).id, { action: "replace", replacementCode: "K-238", reason: "Key does not turn", originalAvailability: "UNAVAILABLE" }, { canConfigure: true });
+  await give([{ code: "K-238" }]);
+  await expectAssetError(settleDeposit(eventId, staffId, { action: "settle", depositEntryId: tessDeposit.depositEntryId }), "DEPOSIT_UNRESOLVED", "a replaced original with no recorded fate");
+  const tessOriginal = await issuanceOf(tess, "K-237");
+  await expectAssetError(recordOutcomeCorrection(eventId, staffId, { action: "write_off", issuanceId: tessOriginal.id, reason: "Written off" }, CHECK_IN), "MONEY_PERMISSION_REQUIRED", "check-in staff writing off");
+  await recordOutcomeCorrection(eventId, adminId, { action: "write_off", issuanceId: tessOriginal.id, reason: "The old key was scrapped" }, FINANCE);
+  await expectAssetError(recordOutcomeCorrection(eventId, adminId, { action: "write_off", issuanceId: tessOriginal.id, reason: "Again" }, FINANCE), "CORRECTION_INVALID", "writing the same item off twice");
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: tessDeposit.depositEntryId })).outcome === "FULL_REFUND", "a written-off replaced original no longer blocks the deposit");
+
+  const uma = await makeReg(eventId);
+  await place(uma, "girls-222");
+  await issue(uma, ["K-241"]);
+  const umaDeposit = await takeDeposit(uma, ["K-241"], 1000);
+  await applyIssuanceAction(eventId, adminId, (await openIssuanceOf(uma, "K-241")).id, { action: "replace", replacementCode: "K-242", reason: "Key does not turn", originalAvailability: "UNAVAILABLE" }, { canConfigure: true });
+  await give([{ code: "K-242" }]);
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: (await issuanceOf(uma, "K-241")).id, fate: "LOST", reason: "The old key never came back" }, FINANCE);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: umaDeposit.depositEntryId })).outcome === "KEPT", "the fate given to a replaced original decides the deposit");
+
+  const vic = await makeReg(eventId);
+  await place(vic, "girls-223");
+  await issue(vic, ["K-243"]);
+  await give([{ code: "K-243", outcome: "LOST", note: "Left the camp" }]);
+  await expectAssetError(recordOutcomeCorrection(eventId, staffId, { action: "write_off", issuanceId: (await issuanceOf(vic, "K-243")).id, reason: "Nothing to collect" }, CHECK_IN), "MONEY_PERMISSION_REQUIRED", "check-in staff writing off a loss");
+  await recordOutcomeCorrection(eventId, financeId, { action: "write_off", issuanceId: (await issuanceOf(vic, "K-243")).id, reason: "Guest left the camp; nothing to collect" }, FINANCE);
+  assert((await historyOf((await issuanceOf(vic, "K-243")).id)).some((row) => row.type === "WRITTEN_OFF" && row.actorUserId === financeId), "a write-off is an append-only history row");
+
+  // ---- A waiver after the registration was cancelled is recorded without posting -----------------------------
+  const xena = await makeReg(eventId);
+  await place(xena, "girls-224");
+  await issue(xena, ["K-244"]);
+  await give([{ code: "K-244", outcome: "LOST", note: "Lost" }]);
+  const xenaCharge = await postCharge(eventId, financeId, { action: "charge", issuanceId: (await issuanceOf(xena, "K-244")).id, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key", post: true }, FINANCE);
+  await prisma.registration.update({ where: { id: xena.registrationId }, data: { status: "CANCELLED" } });
+  const adjustmentsBeforeWaiver = await prisma.registrationAdjustment.count({ where: { eventId } });
+  const xenaWaiver = await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: xenaCharge.chargeEntryId, reason: "Registration was cancelled and refunded in full" }, FINANCE);
+  const xenaWaiverEntry = await prisma.assetLedgerEntry.findUniqueOrThrow({ where: { id: xenaWaiver.waiverEntryId } });
+  assert(xenaWaiver.registrationInactive && !xenaWaiver.reversedOnRegistration && xenaWaiverEntry.settlement === "RECORD_ONLY" && xenaWaiverEntry.reason.includes("not active") && (await prisma.registrationAdjustment.count({ where: { eventId } })) === adjustmentsBeforeWaiver, "waiving on a cancelled registration records the waiver in the ledger and says no line was reversed");
 
   // ---- A lot returned in part ---------------------------------------------------------------------
   const fay = await makeReg(eventId);
@@ -436,6 +558,19 @@ async function main() {
   await expectDatabaseRefusal(prisma.facilityIssue.update({ where: { id: second.issueId }, data: { title: "Rewritten", revision: { increment: 1 } } }), "rewriting what an open issue is about");
   await expectDatabaseRefusal(prisma.facilityIssue.update({ where: { id: second.issueId }, data: { severity: "LOW", revision: { increment: 1 } } }), "changing an issue without its history row");
 
+  // Blocks are placed and linked in one transaction: two staff racing to block one issue leave exactly one hold, and a closed issue cannot be blocked.
+  const raceUnit = await unitRow("girls-226");
+  const raceIssue = await applyFacilityAction(eventId, staffId, { action: "report", targetKind: "UNIT", eventUnitId: raceUnit.id, title: "Door will not lock" }, { canConfigure: false });
+  const holdsBeforeRace = await prisma.eventLodgingHold.count({ where: { eventId } });
+  const raced = await Promise.all([N[2], N[3]].map((night) => settle(applyFacilityAction(eventId, adminId, { action: "block", issueId: raceIssue.issueId, block: { kind: "MAINTENANCE", reason: "Door will not lock", firstNight: night, lastNight: night } }, { canConfigure: true }))));
+  const winners = raced.filter((outcome) => !(outcome instanceof Error));
+  const losers = raced.filter((outcome): outcome is Error => outcome instanceof Error);
+  assert(winners.length === 1 && losers.length === 1 && losers[0] instanceof AssetError && losers[0].code === "BLOCK_EXISTS", `one block wins and the other is told the issue is already blocked: ${raced.map((outcome) => (outcome instanceof Error ? outcome.message : "ok")).join(" | ")}`);
+  assert((await prisma.eventLodgingHold.count({ where: { eventId } })) === holdsBeforeRace + 1 && (await prisma.facilityIssue.findUniqueOrThrow({ where: { id: raceIssue.issueId } })).holdId !== null, "exactly one hold exists and it is linked to the issue");
+  const holdsBeforeRefusal = await prisma.eventLodgingHold.count({ where: { eventId } });
+  await expectAssetError(applyFacilityAction(eventId, adminId, { action: "block", issueId: reported.issueId, block: { kind: "SAFETY", reason: "Too late", firstNight: N[0], lastNight: N[0] } }, { canConfigure: true }), "FACILITY_FINISHED", "blocking a resolved issue");
+  assert((await prisma.eventLodgingHold.count({ where: { eventId } })) === holdsBeforeRefusal, "a refused block leaves no hold behind");
+
   // ---- Unresolved assets for the closeout ---------------------------------------------------------------
   const jules = await makeReg(eventId);
   await place(jules, "girls-215");
@@ -480,9 +615,16 @@ async function main() {
   assert(report.exceptions.some((row) => row.code === "UNCHARGED_LOSS" && row.subject.startsWith("K-228")) && !report.exceptions.some((row) => row.code === "UNCHARGED_LOSS" && row.subject.startsWith("K-219")) && !report.exceptions.some((row) => row.code === "UNCHARGED_LOSS" && row.subject.startsWith("K-217")), "a loss with no charge is flagged; a charged loss and a kept deposit are not");
   assert(report.exceptions.some((row) => row.code === "CORRECTED_WITH_DEPOSIT" && row.subject.startsWith("K-225")), "an issue withdrawn as an error while a deposit is open is an exception, not an ordinary return");
   assert(report.deposits.some((row) => row.entryId === julesDeposit.depositEntryId && row.state === "HELD") && report.deposits.some((row) => row.entryId === deposit.depositEntryId && row.state === "HANDED_BACK") && report.deposits.some((row) => row.entryId === bobDeposit.depositEntryId && row.state === "KEPT") && report.deposits.some((row) => row.entryId === erinDeposit.depositEntryId && row.state === "PARTLY_KEPT"), "deposits are listed held, handed back, kept and partly kept");
-  assert(report.money.depositsReceivedCents === 800 + 1000 + 1000 + 1000 + 1000 && report.money.depositsHandedBackCents === 800 + 600 && report.money.depositsKeptCents === 1000 + 400 && report.money.depositsHeldCents === 2000, `deposits held versus returned reconcile: ${JSON.stringify(report.money)}`);
-  assert(report.money.chargedCents === 2500 + 1500 && report.money.waivedCents === 2500 + 1500 && report.money.netChargedCents === 0, "charged and waived totals reconcile");
-  assert(report.charges.length === 2 && report.charges.every((row) => row.state === "WAIVED" && row.waiver), "charges list their waivers");
+  const sumKind = async (kind: "DEPOSIT_RECEIVED" | "DEPOSIT_RETURNED" | "DEPOSIT_KEPT") => (await prisma.assetLedgerEntry.aggregate({ where: { eventId, kind }, _sum: { amountCents: true } }))._sum.amountCents ?? 0;
+  const [received, handedBack, keptTotal] = await Promise.all([sumKind("DEPOSIT_RECEIVED"), sumKind("DEPOSIT_RETURNED"), sumKind("DEPOSIT_KEPT")]);
+  assert(report.money.depositsReceivedCents === received && report.money.depositsHandedBackCents === handedBack && report.money.depositsKeptCents === keptTotal && report.money.depositsHeldCents === received - handedBack - keptTotal && report.money.depositsHeldCents === 2000, `deposits held versus returned reconcile (only Jules and Kim are still held): ${JSON.stringify(report.money)}`);
+  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 && report.money.waivedCents === 2500 + 1100 + 2500 && report.money.netChargedCents === 1500 + 2500 + 400, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
+  assert(report.charges.length === 6 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 3, "charges list their waivers");
+  assert(report.lost.find((row) => row.identifier === "TOWELS")?.quantity === 1, "a lot lost in part shows the quantity lost, not the quantity of the issue");
+  assert(report.lost.some((row) => row.identifier === "K-241") && !report.lost.some((row) => row.identifier === "K-235" || row.identifier === "K-233"), "the closeout reads the corrected fates: a replaced original corrected to lost is lost, a found key is not");
+  assert(report.exceptions.some((row) => row.code === "CORRECTION_NEEDS_REVIEW" && row.subject.startsWith("K-235")), "a correction after the deposit was settled is flagged for staff");
+  assert(!report.exceptions.some((row) => row.code === "UNCHARGED_LOSS" && (row.subject.startsWith("K-243") || row.subject.startsWith("K-241") || row.subject.startsWith("L-6"))) && report.exceptions.some((row) => row.code === "UNCHARGED_LOSS" && row.subject.startsWith("K-228")), "a written-off loss and a loss whose deposit was settled are not flagged; an untouched one is");
+  assert(report.exceptions.some((row) => row.code === "REPLACED_UNACCOUNTED" && row.subject.startsWith("K-226")) && !report.exceptions.some((row) => row.code === "REPLACED_UNACCOUNTED" && (row.subject.startsWith("K-237") || row.subject.startsWith("K-241"))), "a replaced original given a fate or written off leaves the exceptions");
   assert(report.types.every((row) => row.balanced), `issued, returned, outstanding, lost and damaged reconcile for every kind: ${report.types.filter((row) => !row.balanced).map((row) => `${row.typeName} ${JSON.stringify(row)}`).join(" | ")}`);
   const towelCounts = report.types.find((row) => row.typeName === "Towels")!;
   assert(towelCounts.inflow === 7 && towelCounts.returned === 3 && towelCounts.lost === 1 && towelCounts.outstanding === 3, `the lot's counts add up: ${JSON.stringify(towelCounts)}`);

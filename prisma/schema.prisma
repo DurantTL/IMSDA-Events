@@ -7690,6 +7690,10 @@ enum IssuedAssetEventType {
   DAMAGED
   /// The part of a lot that stayed out after a partial return or loss: a new issuance continuing the old one.
   REMAINDER_ISSUED
+  /// An administrator corrected a recorded outcome (a lost key found, a return that was really a loss); `correctedEndReason` is the corrected fate (#214).
+  OUTCOME_CORRECTED
+  /// A loss, or the original of a replacement, written off with a reason: nothing is charged and nothing more is owed.
+  WRITTEN_OFF
 }
 
 /// What happens to a cash deposit when a covered item does not come back (#214).
@@ -7904,6 +7908,8 @@ model AssetIssuanceHistory {
   revision           Int
   /// Slice 2 (#214): the saved retry key of a return, so a repeated or replayed offline return writes nothing twice.
   idempotencyKey     String?
+  /// The corrected fate of an OUTCOME_CORRECTED row (RETURNED, LOST or DAMAGED). The ended issuance itself never changes.
+  correctedEndReason IssuedAssetEndReason?
   /// A reference to the evidence of the item's condition (a photo number, an incident or work-order number). Text only.
   evidenceRef        String?
   /// The condition the item was found in (a return, loss or damage).
@@ -7942,6 +7948,11 @@ model AssetLedgerEntry {
   actorUserId              String
   actorNameSnapshot        String
   idempotencyKey           String?
+  /// A received deposit remembers the terms it was taken under, so a later edit of the kind never changes a deposit already held.
+  depositShortfallSnapshot AssetDepositShortfall?
+  replacementFeeSnapshotCents Int?
+  /// A charge made after a deposit already kept money for the same loss is only the part above what the deposit kept.
+  depositOffsetCents       Int                     @default(0)
   createdAt                DateTime                @default(now())
 
   event        Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)

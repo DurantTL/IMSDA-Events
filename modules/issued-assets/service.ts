@@ -31,6 +31,7 @@ import {
   type RoomCandidate,
 } from "@/modules/issued-assets/domain";
 import { AssetError } from "@/modules/issued-assets/errors";
+import { keepFeesNeedsFee } from "@/modules/issued-assets/returns-domain";
 
 /**
  * Issued assets (#213, slice 1): the catalog writers and the one transactional issue service.
@@ -88,6 +89,7 @@ export async function applyAssetTypeAction(eventId: string, actorUserId: string,
     return await prisma.$transaction(async (tx) => {
       await requireEvent(tx, eventId);
       if (input.action === "create") {
+        if (keepFeesNeedsFee(input.depositShortfall, input.replacementFeeCents)) throw new AssetError("POLICY_INVALID", "Keeping the replacement fee needs a replacement fee above $0. Set the fee, or choose to keep the whole deposit.");
         const created = await tx.issuedAssetType.create({
           data: {
             eventId, name: input.name, mode: input.mode, assigneeKinds: [...new Set(input.assigneeKinds)], roomLinked: input.roomLinked,
@@ -101,6 +103,9 @@ export async function applyAssetTypeAction(eventId: string, actorUserId: string,
       }
       const existing = await tx.issuedAssetType.findFirst({ where: { id: input.typeId, eventId } });
       if (!existing) throw new AssetError("TYPE_NOT_FOUND", "That kind of item was not found.");
+      if (keepFeesNeedsFee(input.depositShortfall ?? existing.depositShortfall, input.replacementFeeCents ?? existing.replacementFeeCents)) {
+        throw new AssetError("POLICY_INVALID", "Keeping the replacement fee needs a replacement fee above $0. Set the fee, or choose to keep the whole deposit.");
+      }
       const data: Prisma.IssuedAssetTypeUpdateInput = { updatedByUserId: actorUserId };
       if (input.name !== undefined) data.name = input.name;
       if (input.active !== undefined) data.active = input.active;

@@ -133,12 +133,18 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
   }
 
   /** One money or facility call: the same screen shows the result and refreshes. */
+  // One saved key per intended action (the same path and details), kept until the server confirms it: a retry after a lost
+  // response replays instead of recording twice, and a different amount or item is a different action with its own key.
+  const actionKeys = useRef<Record<string, string>>({});
   async function post(path: string, body: unknown, done: string) {
     setBusy(true); setError(""); setNotice(""); setResult(null);
+    const signature = `${path}:${JSON.stringify(body)}`;
     try {
-      const response = await fetch(`${base}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const keyed = path === "facility" ? body : { ...(body as object), idempotencyKey: (actionKeys.current[signature] ??= newKey()) };
+      const response = await fetch(`${base}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(keyed) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.message ?? "That could not be saved.");
+      delete actionKeys.current[signature];
       setNotice(json.blockError ? `${done} The room could not be blocked: ${json.blockError}` : done);
       router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "That could not be saved."); }
@@ -148,7 +154,9 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
   // Open items of a deposit-bearing kind that no deposit covers yet, by kind.
   const uncovered = open.filter((row) => !row.depositEntryId && (typeOf(row)?.depositCents ?? 0) > 0);
   const uncoveredByType = [...new Set(uncovered.map((row) => row.typeName))].map((name) => ({ type: types.find((type) => type.name === name)!, rows: uncovered.filter((row) => row.typeName === name) }));
-  const chargeable = person.issuances.filter((row) => (row.endReason === "LOST" || row.endReason === "DAMAGED") && !money.charges.some((charge) => charge.issuanceId === row.id));
+  // The fate an issue has now: an administrator may have corrected it (a lost key found) or written the loss off.
+  const fateOf = (row: IssuanceRow) => money.fates[row.id]?.endReason ?? row.endReason;
+  const chargeable = person.issuances.filter((row) => (fateOf(row) === "LOST" || fateOf(row) === "DAMAGED") && !money.fates[row.id]?.writtenOff && !money.charges.some((charge) => charge.issuanceId === row.id));
 
   return <section className="panel" aria-labelledby="checkout-heading">
     <h3 id="checkout-heading">Check out: {person.name}</h3>
@@ -205,14 +213,14 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
     </div> : null}
 
     <h4>Cash key deposit</h4>
-    {uncoveredByType.map(({ type, rows }) => <DepositForm key={type.id} type={type} rows={rows} busy={busy} onSubmit={(amountCents) => post("deposits", { action: "record", issuanceIds: rows.map((row) => row.id), amountCents, idempotencyKey: newKey() }, `Recorded a ${formatCents(amountCents)} cash deposit for ${rows.map((row) => row.identifier).join(", ")}.`)} />)}
+    {uncoveredByType.map(({ type, rows }) => <DepositForm key={type.id} type={type} rows={rows} busy={busy} onSubmit={(amountCents) => post("deposits", { action: "record", issuanceIds: rows.map((row) => row.id), amountCents }, `Recorded a ${formatCents(amountCents)} cash deposit for ${rows.map((row) => row.identifier).join(", ")}.`)} />)}
     {money.deposits.length === 0 && uncoveredByType.length === 0 ? <p>No deposit has been taken for this person.</p> : null}
     {money.deposits.map((deposit) => <div key={deposit.entryId} className="panel">
       <p><strong>{formatCents(deposit.amountCents)} cash deposit</strong> ({deposit.typeName}), taken by {deposit.takenByName} {new Date(deposit.takenAt).toLocaleString()}. Covers: {deposit.covers.map((cover) => `${cover.identifier} (${stateWords[cover.state] ?? cover.state})`).join(", ")}.</p>
       {deposit.settled ? <p role="status">Settled: {formatCents(deposit.settled.refundCents)} handed back, {formatCents(deposit.settled.keepCents)} kept ({new Date(deposit.settled.at).toLocaleString()}, {deposit.settled.byName}).</p>
         : deposit.outcome && deposit.outcome.ok ? <div>
           <p role="status">{deposit.outcome.message}</p>
-          <button className="primary-button" type="button" disabled={busy} onClick={() => void post("deposits", { action: "settle", depositEntryId: deposit.entryId, idempotencyKey: newKey() }, deposit.outcome && deposit.outcome.ok && deposit.outcome.refundCents > 0 ? `Recorded: ${formatCents(deposit.outcome.refundCents)} handed back${deposit.outcome.keepCents > 0 ? `, ${formatCents(deposit.outcome.keepCents)} kept` : ""}.` : `Recorded: the ${formatCents(deposit.outcome?.ok ? deposit.outcome.keepCents : 0)} deposit is kept.`)}>
+          <button className="primary-button" type="button" disabled={busy} onClick={() => void post("deposits", { action: "settle", depositEntryId: deposit.entryId }, deposit.outcome && deposit.outcome.ok && deposit.outcome.refundCents > 0 ? `Recorded: ${formatCents(deposit.outcome.refundCents)} handed back${deposit.outcome.keepCents > 0 ? `, ${formatCents(deposit.outcome.keepCents)} kept` : ""}.` : `Recorded: the ${formatCents(deposit.outcome?.ok ? deposit.outcome.keepCents : 0)} deposit is kept.`)}>
             {deposit.outcome.refundCents > 0 ? `I handed back ${formatCents(deposit.outcome.refundCents)}${deposit.outcome.keepCents > 0 ? ` and kept ${formatCents(deposit.outcome.keepCents)}` : ""}` : `Record the ${formatCents(deposit.outcome.keepCents)} deposit as kept`}
           </button>
         </div>
@@ -224,10 +232,12 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
       {chargeable.map((row) => {
         const type = typeOf(row);
         const fee = (type?.replacementFeeCents ?? 0) * (row.endQuantity ?? row.quantity);
-        return <ChargeForm key={row.id} row={row} fee={fee} canManageMoney={canManageMoney} busy={busy}
-          onCharge={(category, amountCents, reason) => post("charges", { action: "charge", issuanceId: row.id, category, amountCents, reason, post: true, idempotencyKey: newKey() }, `Charged ${formatCents(amountCents)} for ${row.identifier} to the registration.`)} />;
+        // A deposit that already kept money for this loss: charging the whole fee as well would take it twice.
+        const kept = money.deposits.find((deposit) => deposit.entryId === row.depositEntryId)?.keptRemainingCents ?? 0;
+        return <ChargeForm key={row.id} row={row} lost={fateOf(row) === "LOST"} fee={fee} keptByDeposit={kept} canManageMoney={canManageMoney} busy={busy}
+          onCharge={(category, amountCents, reason, confirmKeptDeposit) => post("charges", { action: "charge", issuanceId: row.id, category, amountCents, reason, post: true, ...(confirmKeptDeposit ? { confirmKeptDeposit: true } : {}) }, `Charged ${formatCents(amountCents)} for ${row.identifier} to the registration.`)} />;
       })}
-      {money.charges.length > 0 ? <ul>{money.charges.map((charge) => <li key={charge.entryId}>{charge.identifier}: {chargeCategoryLabels[charge.category]} charge {formatCents(charge.amountCents)}{charge.posted ? " (posted to the registration)" : " (recorded only)"}{charge.waived ? ", waived" : ""}. {charge.reason}</li>)}</ul> : null}
+      {money.charges.length > 0 ? <ul>{money.charges.map((charge) => <li key={charge.entryId}>{charge.identifier}: {chargeCategoryLabels[charge.category]} charge {formatCents(charge.amountCents)}{charge.posted ? " (posted to the registration)" : " (recorded only)"}{charge.waived ? ", waived" : ""}{charge.depositOffsetCents > 0 ? `; the deposit that was kept covered ${formatCents(charge.depositOffsetCents)} of it` : ""}. {charge.reason}</li>)}</ul> : null}
       {money.charges.some((charge) => !charge.waived) ? <p>Waiving a charge needs finance or an event administrator and is done from the <a href={`/more/issued-assets/closeout?event=${encodeURIComponent(eventId)}`}>closeout</a>.</p> : null}
     </> : null}
 
@@ -247,14 +257,27 @@ function DepositForm({ type, rows, busy, onSubmit }: { type: DeskType; rows: Iss
   </form>;
 }
 
-function ChargeForm({ row, fee, canManageMoney, busy, onCharge }: { row: IssuanceRow; fee: number; canManageMoney: boolean; busy: boolean; onCharge: (category: "REPLACEMENT" | "DAMAGE" | "OTHER", amountCents: number, reason: string) => Promise<void> }) {
+function ChargeForm({ row, lost, fee, keptByDeposit, canManageMoney, busy, onCharge }: {
+  row: IssuanceRow; lost: boolean; fee: number; keptByDeposit: number; canManageMoney: boolean; busy: boolean;
+  onCharge: (category: "REPLACEMENT" | "DAMAGE" | "OTHER", amountCents: number, reason: string, confirmKeptDeposit?: boolean) => Promise<void>;
+}) {
   const [custom, setCustom] = useState(false);
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<"REPLACEMENT" | "DAMAGE" | "OTHER">(row.endReason === "DAMAGED" ? "DAMAGE" : "REPLACEMENT");
+  const [category, setCategory] = useState<"REPLACEMENT" | "DAMAGE" | "OTHER">(lost ? "REPLACEMENT" : "DAMAGE");
   const [reason, setReason] = useState("");
-  const what = `${row.identifier} (${row.typeName}) ${row.endReason === "LOST" ? "was lost" : "came back damaged"}`;
+  const what = `${row.identifier} (${row.typeName}) ${lost ? "was lost" : "came back damaged"}`;
+  if (keptByDeposit > 0) {
+    return <div>
+      <p>{what}. The cash deposit already kept {formatCents(keptByDeposit)} for lost or damaged items, so the standard fee is not offered: charging it as well would take the guest&apos;s money twice.</p>
+      {canManageMoney ? <form onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category === "OTHER" ? "REPLACEMENT" : category, cents, reason.trim(), true); }}>
+        <label>Full cost of the loss (dollars); only the part above {formatCents(keptByDeposit)} is charged <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
+        <label>Reason <input value={reason} maxLength={500} minLength={3} required onChange={(event) => setReason(event.target.value)} /></label>
+        <button className="secondary-button" type="submit" disabled={busy}>Charge only the part above the kept deposit</button>
+      </form> : <p>Finance or an event administrator can charge the part above what the deposit kept.</p>}
+    </div>;
+  }
   return <div>
-    <p>{what}. {fee > 0 ? `The standard replacement fee is ${formatCents(fee)}.` : "This kind has no standard replacement fee."}</p>
+    <p>{what}. {fee > 0 ? `The standard replacement fee is ${formatCents(fee)}. If the cash deposit is settled before this is charged, it will not be kept for this item as well.` : "This kind has no standard replacement fee."}</p>
     {fee > 0 ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void onCharge("REPLACEMENT", fee, `Replacement fee for ${row.identifier}`)}>Charge {formatCents(fee)} to the registration</button> : null}
     {canManageMoney ? <>{" "}<button className="secondary-button" type="button" onClick={() => setCustom(!custom)}>{custom ? "Cancel" : "Another amount"}</button></> : null}
     {custom && canManageMoney ? <form onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category, cents, reason.trim()); }}>

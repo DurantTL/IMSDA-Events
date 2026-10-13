@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
 import { assigneeKindLabels } from "@/modules/issued-assets/domain";
 import type { CloseoutReport, CloseoutRow } from "@/modules/issued-assets/closeout";
@@ -36,12 +36,17 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  // One saved key per intended action, kept until the server confirms it: a retry after a lost response replays.
+  const actionKeys = useRef<Record<string, string>>({});
   async function post(path: string, body: unknown, done: string) {
     setBusy(true); setError(""); setNotice("");
+    const signature = `${path}:${JSON.stringify(body)}`;
     try {
-      const response = await fetch(`${base}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const keyed = path === "facility" ? body : { ...(body as object), idempotencyKey: (actionKeys.current[signature] ??= newKey()) };
+      const response = await fetch(`${base}/${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(keyed) });
       const json = await response.json();
       if (!response.ok) throw new Error(json.message ?? "That could not be saved.");
+      delete actionKeys.current[signature];
       setNotice(done);
       router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "That could not be saved."); }
@@ -56,12 +61,13 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     {download(section)}
     {rows.length === 0 ? <p>{empty}</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
       <caption className="sr-only">{title}</caption>
-      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Room</th><th role="columnheader" scope="col">Issued</th><th role="columnheader" scope="col">{section === "outstanding" ? "Expected back" : "Ended"}</th></tr></thead>
+      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Room</th><th role="columnheader" scope="col">Issued</th><th role="columnheader" scope="col">{section === "outstanding" ? "Expected back" : "Ended"}</th>{canManageMoney && section !== "outstanding" ? <th role="columnheader" scope="col">Correct</th> : null}</tr></thead>
       <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.id}>
         <th role="rowheader" scope="row">{row.identifier} <small>{row.typeName}</small></th><td {...cardCell("Qty")}>{row.quantity}</td>
         <td {...cardCell("Holder")}>{holder({ holderLabel: row.holderLabel, deskAttendeeId: row.deskAttendeeId })} <small>({assigneeKindLabels[row.holderKind].toLowerCase()})</small></td>
         <td {...cardCell("Room")}>{row.roomName ?? ""}</td><td {...cardCell("Issued")}>{when(row.issuedAt)}</td>
         <td {...cardCell(section === "outstanding" ? "Expected back" : "Ended")}>{section === "outstanding" ? (row.expectedReturnAt ? `${when(row.expectedReturnAt)}${row.overdue ? " (past due)" : ""}` : "") : `${when(row.endedAt)}${row.endNote ? `: ${row.endNote}` : ""}`}</td>
+        {canManageMoney && section !== "outstanding" ? <td {...cardCell(null)}><OutcomeForm busy={busy} current={section === "lost" ? "LOST" : "DAMAGED"} onSubmit={(body) => post("corrections", { ...body, issuanceId: row.id }, "Saved. Nothing was refunded or charged; review the closeout.")} /></td> : null}
       </tr>)}</tbody>
     </table></div>}
   </section>;
@@ -81,9 +87,10 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       {download("exceptions")}
       {report.exceptions.length === 0 ? <p>Every key and item is accounted for, every deposit is settled and no facility issue is open.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
         <caption className="sr-only">Unresolved items</caption>
-        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Exception</th><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Detail</th></tr></thead>
+        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Exception</th><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Detail</th>{canManageMoney ? <th role="columnheader" scope="col">Resolve</th> : null}</tr></thead>
         <tbody role="rowgroup">{report.exceptions.map((row) => <tr role="row" key={`${row.code}:${row.refId}`}>
           <th role="rowheader" scope="row">{row.label}</th><td {...cardCell("Item")}>{row.subject}</td><td {...cardCell("Holder")}>{row.holderLabel ? holder({ holderLabel: row.holderLabel, deskAttendeeId: row.deskAttendeeId }) : ""}</td><td {...cardCell("Detail")}>{row.detail}</td>
+          {canManageMoney ? <td {...cardCell(null)}>{row.code === "UNCHARGED_LOSS" || row.code === "REPLACED_UNACCOUNTED" ? <OutcomeForm busy={busy} current={row.code === "REPLACED_UNACCOUNTED" ? "REPLACED" : "LOST"} onSubmit={(body) => post("corrections", { ...body, issuanceId: row.refId }, "Saved. Nothing was refunded or charged.")} /> : null}</td> : null}
         </tr>)}</tbody>
       </table></div>}
     </section>
@@ -119,7 +126,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
           <td {...cardCell("Charge")}>{chargeCategoryLabels[row.category]} {formatCents(row.amountCents)}{row.posted ? " (on the registration)" : " (recorded only)"}</td>
           <td {...cardCell("State")}>{row.state === "WAIVED" ? `Waived by ${row.waiver!.actorName}: ${row.waiver!.reason}` : "Charged"}</td>
           <td {...cardCell("Why")}>{row.reason} <small>({row.actorName}, {when(row.at)})</small></td>
-          {canManageMoney ? <td {...cardCell(null)}>{row.state === "CHARGED" ? <WaiveForm busy={busy} onWaive={(reason) => post("charges", { action: "waive", chargeEntryId: row.entryId, reason, idempotencyKey: newKey() }, `Waived ${formatCents(row.amountCents)} for ${row.identifier}.`)} /> : null}</td> : null}
+          {canManageMoney ? <td {...cardCell(null)}>{row.state === "CHARGED" ? <WaiveForm busy={busy} onWaive={(reason) => post("charges", { action: "waive", chargeEntryId: row.entryId, reason }, `Waived ${formatCents(row.amountCents)} for ${row.identifier}.`)} /> : null}</td> : null}
         </tr>)}</tbody>
       </table></div>}
       {canManageMoney ? null : <p>Waiving a charge needs finance or an event administrator.</p>}
@@ -145,6 +152,26 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       {report.facility.length === 0 ? <p>No facility issue is open.</p> : report.facility.map((issue) => <FacilityCard key={issue.id} issue={issue} staff={staff} canUpdate={canUpdateFacility} canConfigure={canConfigure} busy={busy} post={post} />)}
     </section>
   </div>;
+}
+
+/**
+ * Records what really happened to an item, or writes a loss off (finance and administrators, with a reason). A lost key
+ * found later is Lost corrected to Returned. Nothing is refunded, charged or settled by it; the closeout lists anything
+ * that needs a decision afterwards.
+ */
+function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOST" | "DAMAGED" | "REPLACED"; onSubmit: (body: { action: "correct"; fate: string; reason: string } | { action: "write_off"; reason: string }) => Promise<void> }) {
+  const [choice, setChoice] = useState(current === "REPLACED" ? "RETURNED" : "WRITE_OFF");
+  const [reason, setReason] = useState("");
+  return <form onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }); }}>
+    <label>What happened <select value={choice} onChange={(event) => setChoice(event.target.value)}>
+      <option value="RETURNED">{current === "LOST" ? "Found: it came back" : "It came back"}</option>
+      <option value="LOST">Lost</option>
+      <option value="DAMAGED">Returned damaged</option>
+      <option value="WRITE_OFF">Write off, charge nothing</option>
+    </select></label>
+    <label>Reason <input value={reason} minLength={3} maxLength={500} required onChange={(event) => setReason(event.target.value)} /></label>
+    <button className="secondary-button" type="submit" disabled={busy}>Save</button>
+  </form>;
 }
 
 function WaiveForm({ busy, onWaive }: { busy: boolean; onWaive: (reason: string) => Promise<void> }) {

@@ -182,9 +182,43 @@ deposit, an open facility issue, a resolved issue that still blocks a room, a re
 settles or releases anything. Each list downloads as CSV through the shared `csvCell`, which prefixes `=`, `+`, `-`, `@`, tab and
 return, so a name or a note cannot run as a formula.
 
+### One loss, one payment (charge and deposit never both take the money)
+
+Migration `20261019130000_issued_assets_corrections`.
+
+- **Charge first, then settle:** a lost or damaged item that already has an unwaived replacement or damage charge is not counted
+  against the deposit, under either policy. The deposit is handed back for it and the settle message says why.
+- **Settle first, then charge:** once a deposit has kept money for a loss, a replacement or damage charge on that item is refused
+  (`DEPOSIT_ALREADY_KEPT`) for check-in staff. A money manager (`MANAGE_FINANCE` or `CONFIGURE_EVENT`) may confirm it, and then
+  only the part above what the deposit kept is charged (`depositOffsetCents` on the charge entry records the offset). The desk hides
+  the standard-fee button and says why.
+- **Deposit terms are snapshotted** (`depositShortfallSnapshot`, `replacementFeeSnapshotCents`) on the received entry and the
+  deposit settles by them, so editing the kind mid-event never changes a deposit already held. A kind that keeps fees must have a
+  fee above $0 (checked in the service and by the database).
+- A settled deposit, a charge or a write-off each resolve the "lost, nothing charged" exception.
+
+### Corrections and write-offs (`/api/events/[eventId]/assets/corrections`, `modules/issued-assets/corrections.ts`)
+
+An ended issuance never changes, so a correction is an **append-only history row** on it: `OUTCOME_CORRECTED` (with the corrected
+fate: returned, lost or damaged) or `WRITTEN_OFF`, each with actor, reason and time. Finance or an event administrator only
+(`MANAGE_FINANCE` or `CONFIGURE_EVENT`), a reason is required, and the closeout and the deposit rules read the **effective fate**
+(the last correction, else the recorded end).
+
+- A **lost key found later** is a correction of LOST to RETURNED (the key goes back in stock).
+- The **original of a replacement** (the older server `replace`, which records no fate) is given its fate the same way, or is
+  written off; a written-off original no longer blocks its deposit. The closeout's *replaced, original not accounted for* rows
+  carry the form.
+- A **loss can be written off** by finance with a reason, which clears the uncharged-loss exception without charging.
+- Deposit rule: if the deposit is not settled yet it is settled by the corrected fates. If it is already settled (or a charge
+  was recorded on the earlier fate), nothing is refunded or re-charged automatically: the closeout lists a *corrected after money
+  was recorded* exception for staff.
+- A waiver on a registration that is no longer active is recorded in the asset ledger without posting an adjustment, and says so.
+- Blocks: the lodging hold and its link to the facility issue are written in one transaction (the issue row is locked first), so a
+  block is never left unlinked and a closed issue cannot be blocked.
+
 ### Not built (follow-ups)
 
-Recording that a lost key was found later (a "found" event needs its own table), procurement and inventory purchasing, incident
+Procurement and inventory purchasing, incident
 records beyond a text reference, and anything that moves money (card refunds, provider calls). Decisions for the owner are listed
 in the pull request: the standard-fee permission for check-in staff, keeping the cash deposit out of the registration balance, and
 what a corrected deposit-bearing issue should do.

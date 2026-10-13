@@ -118,6 +118,8 @@ export const chargeActionSchema = z.discriminatedUnion("action", [
     reason: reasonSchema,
     /** Post the charge to the registration (the existing adjustment path) so it shows in the balance. Off: recorded only. */
     post: z.boolean().default(true),
+    /** A money manager's confirmation that a deposit already kept money for this loss: only the part above it is charged. */
+    confirmKeptDeposit: z.boolean().default(false),
     idempotencyKey: keySchema.optional(),
   }).strict(),
   z.object({
@@ -128,6 +130,36 @@ export const chargeActionSchema = z.discriminatedUnion("action", [
   }).strict(),
 ]);
 export type ChargeAction = z.infer<typeof chargeActionSchema>;
+
+/** Corrections of a recorded outcome, and write-offs (#214): administrators and finance, with a reason. */
+export const correctionActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("correct"),
+    issuanceId: idSchema,
+    /** What really happened: a lost key found later is LOST to RETURNED. */
+    fate: z.enum(returnOutcomes),
+    reason: reasonSchema,
+    idempotencyKey: keySchema.optional(),
+  }).strict(),
+  z.object({
+    action: z.literal("write_off"),
+    issuanceId: idSchema,
+    reason: reasonSchema,
+    idempotencyKey: keySchema.optional(),
+  }).strict(),
+]);
+export type CorrectionAction = z.infer<typeof correctionActionSchema>;
+
+/** Keeping the replacement fee of a missing item needs a fee to keep. */
+export function keepFeesNeedsFee(policy: string, replacementFeeCents: number) {
+  return policy === "KEEP_FEES" && replacementFeeCents <= 0;
+}
+
+/** The fate an issuance has now: its recorded end, unless an administrator corrected it. A written-off replaced original is settled (neutral). */
+export function effectiveEndReason(endReason: string | null, correctedFate: string | null, writtenOff: boolean) {
+  const reason = correctedFate ?? endReason;
+  return reason === "REPLACED" && writtenOff ? "TRANSFERRED" : reason;
+}
 
 const blockSchema = z.object({
   kind: z.enum(lodgingHoldKinds),
@@ -202,7 +234,7 @@ export type DepositOutcomeInput = {
   policy: DepositShortfall;
   replacementFeeCents: number;
   /** Every issuance the deposit covers, with the quantity its outcome applies to. */
-  covers: ReadonlyArray<{ state: CoverState; quantity: number }>;
+  covers: ReadonlyArray<{ state: CoverState; quantity: number; /** A lost or damaged item that already has an unwaived charge: the deposit is not kept for it as well. */ charged?: boolean }>;
 };
 
 export type DepositOutcome =
@@ -222,10 +254,16 @@ export function decideDepositOutcome(input: DepositOutcomeInput): DepositOutcome
   if (unresolved > 0) {
     return { ok: false, code: "UNRESOLVED", unresolved, message: `${unresolved} covered item${unresolved === 1 ? " is" : "s are"} still out or without a recorded return, loss or damage.` };
   }
-  const missing = input.covers.filter((row) => row.state === "LOST").reduce((sum, row) => sum + row.quantity, 0);
-  const damaged = input.covers.filter((row) => row.state === "DAMAGED").reduce((sum, row) => sum + row.quantity, 0);
+  const missing = input.covers.filter((row) => row.state === "LOST" && !row.charged).reduce((sum, row) => sum + row.quantity, 0);
+  const damaged = input.covers.filter((row) => row.state === "DAMAGED" && !row.charged).reduce((sum, row) => sum + row.quantity, 0);
+  const charged = input.covers.filter((row) => (row.state === "LOST" || row.state === "DAMAGED") && row.charged).reduce((sum, row) => sum + row.quantity, 0);
   if (missing + damaged === 0) {
-    return { ok: true, outcome: "FULL_REFUND", refundCents: input.depositCents, keepCents: 0, shortfallCents: 0, missing, damaged, message: "Every covered item came back in good order: hand back the full deposit." };
+    return {
+      ok: true, outcome: "FULL_REFUND", refundCents: input.depositCents, keepCents: 0, shortfallCents: 0, missing, damaged,
+      message: charged > 0
+        ? `${charged} lost or damaged item${charged === 1 ? " is" : "s are"} already charged, so the deposit is not kept for ${charged === 1 ? "it" : "them"} as well: hand back the full deposit.`
+        : "Every covered item came back in good order: hand back the full deposit.",
+    };
   }
   const what = [missing > 0 ? `${missing} lost` : "", damaged > 0 ? `${damaged} damaged` : ""].filter(Boolean).join(" and ");
   if (input.policy === "KEEP_ALL") {
@@ -312,4 +350,23 @@ export function unitCountsFromHistory(rows: ReadonlyArray<{ type: string; quanti
     replacedUnaccounted: sum("REPLACED_OUT"),
     outstanding,
   };
+}
+
+export type FateStep = { from: string; to: string; quantity: number };
+
+/**
+ * Moves units between buckets for each correction of a recorded outcome: what the ended issue first said, then what an
+ * administrator corrected it to. Written-off originals of a replacement stay in the replaced bucket (the loss was written
+ * off, not found).
+ */
+export function applyOutcomeCorrections(counts: UnitCounts, steps: ReadonlyArray<FateStep>): UnitCounts {
+  const next = { ...counts };
+  const bucket = (fate: string): keyof UnitCounts | null => (fate === "RETURNED" ? "returned" : fate === "LOST" ? "lost" : fate === "DAMAGED" ? "damaged" : fate === "REPLACED" ? "replacedUnaccounted" : null);
+  for (const step of steps) {
+    const from = bucket(step.from);
+    const to = bucket(step.to);
+    if (from) next[from] -= step.quantity;
+    if (to) next[to] += step.quantity;
+  }
+  return next;
 }

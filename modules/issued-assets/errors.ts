@@ -38,7 +38,10 @@ export type AssetErrorCode =
   | "FACILITY_FINISHED"
   | "FACILITY_INVALID"
   | "BLOCK_EXISTS"
-  | "BLOCK_REFUSED";
+  | "BLOCK_REFUSED"
+  | "CORRECTION_INVALID"
+  | "DEPOSIT_ALREADY_KEPT"
+  | "POLICY_INVALID";
 
 /** Every refusal the issued-assets module makes. Free of server-only imports so any layer can catch it. */
 export class AssetError extends Error {
@@ -95,9 +98,11 @@ export function assetErrorStatus(code: AssetErrorCode) {
     case "FACILITY_FINISHED":
     case "BLOCK_EXISTS":
     case "BLOCK_REFUSED":
+    case "CORRECTION_INVALID":
       return 409;
     case "CONFIGURE_REQUIRED":
     case "MONEY_PERMISSION_REQUIRED":
+    case "DEPOSIT_ALREADY_KEPT":
       return 403;
     case "BUSY":
       return 503;

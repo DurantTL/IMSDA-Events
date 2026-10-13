@@ -1,8 +1,8 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { coverInputs, fateOf, loadChargedIssuances, loadCorrectionRows } from "@/modules/issued-assets/corrections";
 import {
-  coverStateOf,
   decideDepositOutcome,
   type ChargeCategory,
   type CoverState,
@@ -32,7 +32,9 @@ export type DepositView = {
   typeName: string;
   takenAt: string;
   takenByName: string;
-  covers: Array<{ issuanceId: string; identifier: string; state: CoverState; quantity: number }>;
+  covers: Array<{ issuanceId: string; identifier: string; state: CoverState; quantity: number; charged: boolean }>;
+  /** What the deposit kept that no charge has offset yet. Above zero, charging the same loss in full would take the money twice. */
+  keptRemainingCents: number;
   /** Set once the deposit has been settled (handed back and/or kept). */
   settled: null | { refundCents: number; keepCents: number; at: string; byName: string };
   /** What settling it would do now (null once settled). */
@@ -49,12 +51,17 @@ export type ChargeView = {
   reason: string;
   at: string;
   waived: boolean;
+  /** The part of the loss a deposit that was already kept covered; the charge is the rest. */
+  depositOffsetCents: number;
 };
 
-export type DeskMoney = { deposits: DepositView[]; charges: ChargeView[] };
+/** The fate each of the person's ended issues has now (a correction or a write-off changes it), by issue id. */
+export type DeskFate = { endReason: string | null; corrected: boolean; writtenOff: boolean };
+
+export type DeskMoney = { deposits: DepositView[]; charges: ChargeView[]; fates: Record<string, DeskFate> };
 
 export async function getDeskMoney(eventId: string, issuanceIds: readonly string[], client: Client = getPrisma()): Promise<DeskMoney> {
-  if (issuanceIds.length === 0) return { deposits: [], charges: [] };
+  if (issuanceIds.length === 0) return { deposits: [], charges: [], fates: {} };
   const [depositRows, chargeRows] = await Promise.all([
     client.assetLedgerEntry.findMany({
       where: { eventId, kind: "DEPOSIT_RECEIVED", covers: { some: { issuanceId: { in: [...issuanceIds] } } } },
@@ -71,27 +78,43 @@ export async function getDeskMoney(eventId: string, issuanceIds: readonly string
       include: { waivedBy: { select: { id: true } }, issuance: { select: { asset: { select: { identifier: true } } } } },
     }),
   ]);
+  const allIds = [...new Set([...issuanceIds, ...depositRows.flatMap((row) => row.covers.map((cover) => cover.issuance.id))])];
+  const corrections = await loadCorrectionRows(client, eventId, allIds);
+  const charged = await loadChargedIssuances(client, eventId, allIds);
+  const fates: Record<string, DeskFate> = {};
+  for (const id of allIds) {
+    const entries = corrections.get(id);
+    if (entries) {
+      const fate = fateOf({ endedAt: new Date(), endReason: null }, entries);
+      fates[id] = { endReason: fate.endReason, corrected: fate.corrected, writtenOff: fate.writtenOff };
+    }
+  }
   const deposits: DepositView[] = depositRows.map((row) => {
-    const covers = row.covers.map((cover) => ({
-      issuanceId: cover.issuance.id, identifier: cover.issuance.asset.identifier, state: coverStateOf(cover.issuance), quantity: cover.issuance.endQuantity ?? cover.issuance.quantity,
+    const inputs = coverInputs(row.covers.map((cover) => cover.issuance), corrections, charged);
+    const covers = row.covers.map((cover, index) => ({
+      issuanceId: cover.issuance.id, identifier: cover.issuance.asset.identifier, state: inputs[index]!.state, quantity: inputs[index]!.quantity, charged: inputs[index]!.charged,
     }));
+    const keptTotal = row.settlements.filter((entry) => entry.kind === "DEPOSIT_KEPT").reduce((sum, entry) => sum + entry.amountCents, 0);
+    const coverIds = new Set(row.covers.map((cover) => cover.issuance.id));
+    const offsets = chargeRows.filter((charge) => charge.issuanceId && coverIds.has(charge.issuanceId) && charge.waivedBy.length === 0).reduce((sum, charge) => sum + charge.depositOffsetCents, 0);
     const refund = row.settlements.find((entry) => entry.kind === "DEPOSIT_RETURNED");
     const keep = row.settlements.find((entry) => entry.kind === "DEPOSIT_KEPT");
     const settledAt = [refund, keep].filter((entry) => entry).map((entry) => entry!.createdAt).sort((a, b) => a.getTime() - b.getTime())[0];
     return {
       entryId: row.id, amountCents: row.amountCents, typeName: row.assetType?.name ?? "", takenAt: row.createdAt.toISOString(), takenByName: row.actorNameSnapshot, covers,
+      keptRemainingCents: Math.max(0, keptTotal - offsets),
       settled: settledAt ? { refundCents: refund?.amountCents ?? 0, keepCents: keep?.amountCents ?? 0, at: settledAt.toISOString(), byName: (refund ?? keep)!.actorNameSnapshot } : null,
       outcome: settledAt ? null : decideDepositOutcome({
-        depositCents: row.amountCents, policy: row.assetType?.depositShortfall ?? "KEEP_ALL", replacementFeeCents: row.assetType?.replacementFeeCents ?? 0,
-        covers: covers.map((cover) => ({ state: cover.state, quantity: cover.quantity })),
+        depositCents: row.amountCents, policy: row.depositShortfallSnapshot ?? row.assetType?.depositShortfall ?? "KEEP_ALL", replacementFeeCents: row.replacementFeeSnapshotCents ?? row.assetType?.replacementFeeCents ?? 0,
+        covers: covers.map((cover) => ({ state: cover.state, quantity: cover.quantity, charged: cover.charged })),
       }),
     };
   });
   const charges: ChargeView[] = chargeRows.map((row) => ({
     entryId: row.id, issuanceId: row.issuanceId!, identifier: row.issuance?.asset.identifier ?? "", category: row.chargeCategory!, amountCents: row.amountCents,
-    posted: row.registrationAdjustmentId !== null, reason: row.reason, at: row.createdAt.toISOString(), waived: row.waivedBy.length > 0,
+    posted: row.registrationAdjustmentId !== null, reason: row.reason, at: row.createdAt.toISOString(), waived: row.waivedBy.length > 0, depositOffsetCents: row.depositOffsetCents,
   }));
-  return { deposits, charges };
+  return { deposits, charges, fates };
 }
 
 // ---------------------------------------------------------------------------

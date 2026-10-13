@@ -3,8 +3,8 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import { toCsv } from "@/modules/reporting/csv";
 import {
+  applyOutcomeCorrections,
   chargeCategoryLabels,
-  coverStateOf,
   decideDepositOutcome,
   formatCents,
   reconcileUnits,
@@ -13,6 +13,7 @@ import {
   type ChargeCategory,
   type UnitCounts,
 } from "@/modules/issued-assets/returns-domain";
+import { coverInputs, fateOf, loadChargedIssuances, loadCorrectionRows } from "@/modules/issued-assets/corrections";
 import { listFacilityIssues, type FacilityIssueRow } from "@/modules/issued-assets/returns-view";
 import { describeIssuances, type IssuanceRow } from "@/modules/issued-assets/view";
 
@@ -70,6 +71,7 @@ export const exceptionCodes = [
   "UNCHARGED_LOSS",
   "DEPOSIT_UNSETTLED",
   "CORRECTED_WITH_DEPOSIT",
+  "CORRECTION_NEEDS_REVIEW",
   "FACILITY_OPEN",
   "BLOCK_ON_FINISHED_ISSUE",
   "RECONCILIATION_MISMATCH",
@@ -82,6 +84,7 @@ export const exceptionLabels: Record<ExceptionCode, string> = {
   UNCHARGED_LOSS: "Lost or damaged, nothing charged, waived or kept",
   DEPOSIT_UNSETTLED: "Cash deposit not settled",
   CORRECTED_WITH_DEPOSIT: "Withdrawn as an error but a deposit is open",
+  CORRECTION_NEEDS_REVIEW: "Outcome corrected after money was recorded",
   FACILITY_OPEN: "Facility issue unresolved",
   BLOCK_ON_FINISHED_ISSUE: "Resolved issue still blocks a room",
   RECONCILIATION_MISMATCH: "Counts do not reconcile",
@@ -118,11 +121,13 @@ export type CloseoutReport = {
 
 export async function getCloseoutReport(eventId: string, now: Date = new Date(), client: Client = getPrisma()): Promise<CloseoutReport> {
   const limit = CLOSEOUT_ROW_LIMIT + 1;
+  const corrections = await loadCorrectionRows(client, eventId);
+  const correctedIds = [...corrections.keys()];
   const [types, assets, openRows, outcomeRows, replacedRows, correctedRows, ledger, historySums, openSums, facilityOpen, finishedWithBlock] = await Promise.all([
     client.issuedAssetType.findMany({ where: { eventId }, orderBy: { name: "asc" } }),
     client.issuedAsset.findMany({ where: { eventId }, select: { id: true, assetTypeId: true } }),
     client.assetIssuance.findMany({ where: { eventId, endedAt: null }, orderBy: { issuedAt: "asc" }, take: limit }),
-    client.assetIssuance.findMany({ where: { eventId, endReason: { in: ["LOST", "DAMAGED"] } }, orderBy: { endedAt: "desc" }, take: limit }),
+    client.assetIssuance.findMany({ where: { eventId, OR: [{ endReason: { in: ["LOST", "DAMAGED"] } }, { id: { in: correctedIds } }] }, orderBy: { endedAt: "desc" }, take: limit }),
     client.assetIssuance.findMany({ where: { eventId, endReason: "REPLACED" }, orderBy: { endedAt: "desc" }, take: limit }),
     client.assetIssuance.findMany({ where: { eventId, endReason: "CORRECTED", deposits: { some: {} } }, orderBy: { endedAt: "desc" }, take: limit }),
     client.assetLedgerEntry.findMany({ where: { eventId }, orderBy: { createdAt: "asc" }, take: limit * 2 }),
@@ -145,6 +150,7 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
   const chargeIssuances = chargeIssuanceIds.length === 0 ? [] : await client.assetIssuance.findMany({ where: { eventId, id: { in: chargeIssuanceIds } } });
 
   const everyRow = new Map([...openRows, ...outcomeRows, ...replacedRows, ...correctedRows, ...coveredRows, ...chargeIssuances].map((row) => [row.id, row]));
+  const chargedNow = await loadChargedIssuances(client, eventId, [...everyRow.keys()]);
   const described = new Map((await describeIssuances(client, eventId, [...everyRow.values()])).map((row) => [row.id, row]));
 
   // Where to send staff for a holder: an attendee holder directly, a registration through its first attendee.
@@ -159,10 +165,16 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     return { ...found, deskAttendeeId: deskAttendee(found), overdue: found.open && found.expectedReturnAt !== null && new Date(found.expectedReturnAt) < now };
   };
   const rowsOf = (rows: Array<{ id: string }>) => cap(rows).flatMap((row) => { const found = toRow(row); return found ? [found] : []; });
+  const effectiveOf = (row: { id: string; endedAt: Date | null; endReason: string | null }) => fateOf(row, corrections.get(row.id));
+  /** A lost or damaged row shows its effective fate and the quantity it covers (a lot may be lost in part). */
+  const outcomeRowsOf = (fate: "LOST" | "DAMAGED") => cap(outcomeRows.filter((row) => effectiveOf(row).endReason === fate)).flatMap((row) => {
+    const found = toRow(row);
+    return found ? [{ ...found, quantity: row.endQuantity ?? row.quantity, endReason: fate }] : [];
+  });
 
   const outstanding = rowsOf(openRows);
-  const lost = rowsOf(outcomeRows.filter((row) => row.endReason === "LOST"));
-  const damaged = rowsOf(outcomeRows.filter((row) => row.endReason === "DAMAGED"));
+  const lost = outcomeRowsOf("LOST");
+  const damaged = outcomeRowsOf("DAMAGED");
 
   // Charges with their waivers.
   const waiverByCharge = new Map(ledger.filter((entry) => entry.kind === "WAIVER").map((entry) => [entry.waivesEntryId!, entry]));
@@ -194,8 +206,8 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     const keep = settlements.find((row) => row.kind === "DEPOSIT_KEPT")?.amountCents ?? 0;
     const type = entry.assetTypeId ? typeById.get(entry.assetTypeId) : undefined;
     const outcome = decideDepositOutcome({
-      depositCents: entry.amountCents, policy: type?.depositShortfall ?? "KEEP_ALL", replacementFeeCents: type?.replacementFeeCents ?? 0,
-      covers: own.map((row) => ({ state: coverStateOf(row), quantity: row.endQuantity ?? row.quantity })),
+      depositCents: entry.amountCents, policy: entry.depositShortfallSnapshot ?? type?.depositShortfall ?? "KEEP_ALL", replacementFeeCents: entry.replacementFeeSnapshotCents ?? type?.replacementFeeCents ?? 0,
+      covers: coverInputs(own, corrections, chargedNow),
     });
     const first = own[0] ? described.get(own[0].id) : undefined;
     return {
@@ -212,7 +224,8 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
   const reconciliation: TypeReconciliation[] = types.map((type) => {
     const rows = historySums.filter((row) => typeOfAsset.get(row.assetId) === type.id).map((row) => ({ type: row.type as string, quantity: row._sum.quantity ?? 0 }));
     const out = openSums.filter((row) => typeOfAsset.get(row.assetId) === type.id).reduce((sum, row) => sum + (row._sum.quantity ?? 0), 0);
-    const counts = unitCountsFromHistory(rows, out);
+    const steps = [...corrections.entries()].flatMap(([id, entries]) => (typeOfAsset.get(entries[0]!.assetId) === type.id ? fateOf({ endedAt: new Date(), endReason: everyRow.get(id)?.endReason ?? null }, entries).steps : []));
+    const counts = applyOutcomeCorrections(unitCountsFromHistory(rows, out), steps);
     const result = reconcileUnits(counts);
     return { typeId: type.id, typeName: type.name, ...counts, difference: result.difference, balanced: result.balanced };
   });
@@ -233,17 +246,18 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
   for (const row of outstanding) {
     exceptions.push({ code: "OUTSTANDING_ITEM", label: exceptionLabels.OUTSTANDING_ITEM, subject: subject(row), detail: `${row.quantity > 1 ? `${row.quantity} ` : ""}out since ${row.issuedAt.slice(0, 10)}${row.overdue ? ", past its expected return" : ""}`, holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
   }
-  for (const row of rowsOf(replacedRows)) {
-    exceptions.push({ code: "REPLACED_UNACCOUNTED", label: exceptionLabels.REPLACED_UNACCOUNTED, subject: subject(row), detail: "It was replaced without recording whether the original came back. Record it as lost or returned from the catalog, or write it off.", holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
+  for (const row of rowsOf(replacedRows.filter((entry) => { const fate = effectiveOf(entry); return fate.endReason === "REPLACED"; }))) {
+    exceptions.push({ code: "REPLACED_UNACCOUNTED", label: exceptionLabels.REPLACED_UNACCOUNTED, subject: subject(row), detail: "It was replaced without recording whether the original came back. Record whether it was returned, lost or damaged, or write it off, with a reason.", holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
   }
   const chargedIssuances = new Set(chargeEntries.map((entry) => entry.issuanceId));
-  const keptDepositIssuances = new Set<string>();
+  // A loss is dealt with when it was charged (even if waived), its cash deposit was settled, or finance wrote it off.
+  const settledDepositIssuances = new Set<string>();
   for (const deposit of deposits) {
-    if ((settlementsByDeposit.get(deposit.id) ?? []).some((entry) => entry.kind === "DEPOSIT_KEPT")) for (const row of coversByDeposit.get(deposit.id) ?? []) keptDepositIssuances.add(row.id);
+    if ((settlementsByDeposit.get(deposit.id) ?? []).length > 0) for (const row of coversByDeposit.get(deposit.id) ?? []) settledDepositIssuances.add(row.id);
   }
   for (const row of [...lost, ...damaged]) {
-    if (chargedIssuances.has(row.id) || keptDepositIssuances.has(row.id)) continue;
-    exceptions.push({ code: "UNCHARGED_LOSS", label: exceptionLabels.UNCHARGED_LOSS, subject: subject(row), detail: `${returnOutcomeLabels[row.endReason === "LOST" ? "LOST" : "DAMAGED"]} ${row.endedAt?.slice(0, 10) ?? ""}. Charge it, waive it with a reason, or settle its deposit.`, holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
+    if (chargedIssuances.has(row.id) || settledDepositIssuances.has(row.id) || effectiveOf({ id: row.id, endedAt: row.endedAt ? new Date(row.endedAt) : null, endReason: row.endReason }).writtenOff) continue;
+    exceptions.push({ code: "UNCHARGED_LOSS", label: exceptionLabels.UNCHARGED_LOSS, subject: subject(row), detail: `${returnOutcomeLabels[row.endReason === "LOST" ? "LOST" : "DAMAGED"]} ${row.endedAt?.slice(0, 10) ?? ""}. Charge it, settle its deposit, or have finance write it off with a reason.`, holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
   }
   for (const deposit of depositRows.filter((row) => row.state === "HELD")) {
     exceptions.push({ code: "DEPOSIT_UNSETTLED", label: exceptionLabels.DEPOSIT_UNSETTLED, subject: `${formatCents(deposit.amountCents)} ${deposit.typeName} deposit`, detail: deposit.stillOut > 0 ? `${deposit.stillOut} covered item${deposit.stillOut === 1 ? " is" : "s are"} still out.` : deposit.readyToSettle ? "Every covered item is accounted for: ready to settle at the desk." : "Covered items have no recorded outcome.", holderLabel: deposit.holderLabel, amountCents: deposit.amountCents, deskAttendeeId: deposit.deskAttendeeId, refId: deposit.entryId });
@@ -255,6 +269,24 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     const state = depositRows.find((deposit) => deposit.entryId === depositId)?.state;
     if (state && state !== "HELD") continue;
     exceptions.push({ code: "CORRECTED_WITH_DEPOSIT", label: exceptionLabels.CORRECTED_WITH_DEPOSIT, subject: subject(row), detail: "It was withdrawn as entered in error, but a cash deposit covers it and is not settled. Decide whether the deposit goes back.", holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: row.deskAttendeeId, refId: row.id });
+  }
+  // A corrected outcome never refunds or charges by itself: when money was already recorded on the old fate, staff review it.
+  for (const [issuanceId, entries] of corrections) {
+    const fate = fateOf({ endedAt: new Date(), endReason: null }, entries);
+    if (!fate.corrected) continue;
+    const row = described.get(issuanceId);
+    if (!row) continue;
+    const lastCorrection = entries.filter((entry) => entry.type === "OUTCOME_CORRECTED").slice(-1)[0]!;
+    const depositId = heldDepositOf.get(issuanceId);
+    const settledAt = depositId ? (settlementsByDeposit.get(depositId) ?? []).map((entry) => entry.createdAt.getTime()).sort((a, b) => a - b)[0] : undefined;
+    const settledBefore = settledAt !== undefined && settledAt < lastCorrection.recordedAt.getTime();
+    const staleCharge = chargedNow.has(issuanceId) && fate.endReason !== "LOST" && fate.endReason !== "DAMAGED";
+    if (!settledBefore && !staleCharge) continue;
+    exceptions.push({
+      code: "CORRECTION_NEEDS_REVIEW", label: exceptionLabels.CORRECTION_NEEDS_REVIEW, subject: subject(row),
+      detail: `Corrected to ${(fate.endReason ?? "").toLowerCase()}: ${settledBefore ? "its cash deposit was settled on the earlier outcome" : "a charge was recorded on the earlier outcome"}. Review whether to refund, waive or charge; nothing was changed automatically.`,
+      holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: deskAttendee(row), refId: issuanceId,
+    });
   }
   for (const issue of facilityOpen) {
     exceptions.push({ code: "FACILITY_OPEN", label: exceptionLabels.FACILITY_OPEN, subject: `${issue.targetLabel}: ${issue.title}`, detail: `${issue.severity.toLowerCase()} severity, ${issue.status === "OPEN" ? "open" : "in progress"}${issue.assigneeName ? `, assigned to ${issue.assigneeName}` : ", not assigned"}.`, holderLabel: null, amountCents: null, deskAttendeeId: null, refId: issue.id });
