@@ -217,6 +217,42 @@ again. Resend's delivery and bounce webhooks stay in place but receive nothing
 while SES is active. SES bounce and complaint reporting (through SNS) is not
 built yet, so the delivery status for SES mail stops at "accepted".
 
+## xCloud Docker Compose site
+
+Use this when the site is an xCloud **Docker Compose** site (Git settings show a
+Deploy Script running `docker compose -f "$XCLOUD_COMPOSE_FILE" ...`).
+
+**Do not point that site at `docker-compose.yml`.** That file is the all-in-one
+stack: it starts its own new, empty Postgres instead of the production database,
+and builds Next on the server. Use `docker-compose.xcloud.yml`, which runs only
+the app and the outbox sweeper, joins the existing database network, attaches the
+existing `imsda_events_assets` uploads volume, and runs the image GitHub already
+built for the commit.
+
+1. **Docker Compose settings:** compose file `docker-compose.xcloud.yml`, and the
+   app port `8100` (or set `APP_PORT` in `.env` to the port xCloud's Nginx uses).
+2. **`.env`** in the site directory (next to the compose file): the production
+   environment, including `DATABASE_URL` for the existing database (copy it from
+   `/home/u_events/.xcloud/.env` and `.env.dburl` on the old site). It is
+   git-ignored, so the pull script's `git clean -df` keeps it.
+3. **Git settings → Deploy Script**, replacing the `down` / `up --build` lines,
+   and turn on **Stop the deployment when a command fails**:
+
+   ```bash
+   sh "$XCLOUD_SITE_PATH/scripts/xcloud-compose-deploy.sh"
+   ```
+
+   It waits up to 20 minutes for the commit's image from the Docker image
+   workflow, builds on the server only if it never appears, and replaces the
+   containers with `up -d` without a `down`, so the site stays up meanwhile.
+4. **Before the first deploy**, stop the old standalone containers that hold the
+   port and duplicate the sweeper (keep them, do not remove, until the new site
+   is confirmed): `docker stop xcloud-site-239298-app-1 imsda-outbox-sweeper`.
+   Also disable the runtime guard timer (`systemctl disable --now
+   imsda-xcloud-runtime-guard.timer`); it belongs to the old site type.
+5. **Verify:** `curl -s http://127.0.0.1:8100/api/health` shows the deployed
+   `release.sha` and `database` `ok`; sign in; open one uploaded file.
+
 ## Permanent xCloud Dockerfile-only runtime override
 
 xCloud's Dockerfile-only site type regenerates
