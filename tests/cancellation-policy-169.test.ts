@@ -274,10 +274,10 @@ describe("nonrefundable components and fees", () => {
     expect(result.lines.every((line) => line.withheldCents === line.inScopeCents)).toBe(true);
   });
 
-  it("never treats a discount as nonrefundable", () => {
-    const withDiscount = [...charges, charge({ id: "disc", fieldKey: "banquet", amountCents: -500 })];
-    const result = run(facts({ charges: withDiscount, registrationPaidCents: 30_400 }), [rules("REFUNDABLE")]);
-    expect(result.lines.find((line) => line.chargeId === "disc")).toMatchObject({ treatment: "REFUNDABLE", eligibleCents: -500 });
+  it("treats a credit in a nonrefundable class as nonrefundable too, so it cancels its charge", () => {
+    const withCredit = [...charges, charge({ id: "disc", fieldKey: "banquet", amountCents: -500 })];
+    const result = run(facts({ charges: withCredit, registrationPaidCents: 30_400 }), [rules("REFUNDABLE")]);
+    expect(result.lines.find((line) => line.chargeId === "disc")).toMatchObject({ treatment: "NONREFUNDABLE", eligibleCents: 0, withheldCents: -500 });
   });
 });
 

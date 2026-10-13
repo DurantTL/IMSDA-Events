@@ -280,7 +280,7 @@ async function main() {
   const parallelRules = campMeetingRules("2028-06-01");
   const parallel = await Promise.all([
     repo.createPolicyVersion(parallelEventId, adminId, { rules: parallelRules, effectiveFrom: "2028-03-31T20:00:00.000Z", note: "parallel a" }, now),
-    repo.createPolicyVersion(parallelEventId, adminId, { rules: parallelRules, effectiveFrom: "2028-03-31T21:00:00.000Z", note: "parallel b" }, now),
+    repo.createPolicyVersion(parallelEventId, adminId, { rules: parallelRules, effectiveFrom: "2028-03-31T20:00:00.000Z", note: "parallel b" }, now),
   ]);
   const numbers = parallel.map((version) => version.version).sort();
   assert(numbers[0] === 1 && numbers[1] === 2, `parallel saves get distinct versions, got ${numbers.join(",")}`);
@@ -428,28 +428,74 @@ async function main() {
   }
   console.log("ok: previews stay inside the event, and zero-dollar and synthetic input calculate");
 
-  // ---- A staff meal order posts a MEAL adjustment; the policy treats it as a meal. ----
+  // ---- Staff meal orders: a charge then a credit is netted per selection, as the meal ledger posts them (#210). ----
   {
-    const meals = await createFixture();
-    // What the meal ledger posts for a staff meal order (#210): a MEAL adjustment for the attendee, added to the total.
-    await base.registrationAdjustment.create({
-      data: { eventId, registrationId: meals.registrationId, kind: "MEAL", amountCents: 2000, reason: "Synthetic staff meal order", registrationAttendeeId: meals.attendeeIds[0], createdByNameSnapshot: "Check" },
-    });
-    await base.registration.update({ where: { id: meals.registrationId }, data: { totalAmount: 462 } });
+    const plan = await base.eventMealPlan.create({ data: { eventId, code: "cpl-plan", name: "Synthetic plan" } });
+    let mealCounter = 0;
+    /** A staff meal order the way the meal ledger records it: one selection, a MEAL adjustment per ledger entry. */
+    async function staffMeal(fixture: Fixture, entries: number[]) {
+      mealCounter += 1;
+      const selection = await base.eventMealSelection.create({
+        data: {
+          eventId, planId: plan.id, mealType: "LUNCH", registrationId: fixture.registrationId, registrationAttendeeId: fixture.attendeeIds[0],
+          ageGroup: "ADULT", quantity: 2, source: "STAFF", payer: "ATTENDEE", unitPriceCents: 1000, pricingSnapshot: {}, clientRequestId: `${P}_meal_${mealCounter}`,
+        },
+      });
+      const change = await base.eventMealSelectionChange.create({ data: { eventId, selectionId: selection.id, type: "CREATED", actorName: "Check", after: {} } });
+      let net = 0;
+      for (const amountCents of entries) {
+        const adjustment = await base.registrationAdjustment.create({
+          data: { eventId, registrationId: fixture.registrationId, kind: "MEAL", amountCents, reason: "Synthetic staff meal order", registrationAttendeeId: fixture.attendeeIds[0], createdByNameSnapshot: "Check" },
+        });
+        const quantity = Math.abs(amountCents) / 1000;
+        await base.eventMealLedgerEntry.create({
+          data: {
+            eventId, selectionId: selection.id, changeId: change.id, registrationId: fixture.registrationId, mealType: "LUNCH", ageGroup: "ADULT",
+            kind: amountCents > 0 ? "CHARGE" : "CREDIT", quantity, unitPriceCents: 1000, amountCents, payer: "ATTENDEE", settlement: "REGISTRATION_ADJUSTMENT", registrationAdjustmentId: adjustment.id,
+          },
+        });
+        net += amountCents;
+      }
+      await base.registration.update({ where: { id: fixture.registrationId }, data: { totalAmount: 442 + net / 100 } });
+      return selection.id;
+    }
+
     const v3 = await repo.createPolicyVersion(eventId, adminId, {
       rules: { ...campMeetingRules("2028-05-25"), nonrefundable: { categories: ["MEAL"], fieldKeys: [] } },
       effectiveFrom: "2028-05-01T00:00:00.000Z",
       note: "Meals nonrefundable",
     }, new Date("2028-04-20T12:00:00.000Z"));
     assert(v3.version === 3, "meals policy is version 3");
-    const result = (await repo.previewCancellation(eventId, request(meals.code), new Date("2028-05-02T12:00:00.000Z"))).result;
-    const mealLine = result.lines.find((line) => line.category === "MEAL" && line.source === "ADJUSTMENT");
-    assert(mealLine?.treatment === "NONREFUNDABLE" && mealLine.withheldCents === 2000 && mealLine.attendeeId === meals.attendeeIds[0], "the staff meal order is a nonrefundable meal charge for its attendee");
-    assert(!JSON.stringify(result).includes("Synthetic staff meal order"), "the meal order's free text is not copied");
-    const others = await repo.previewCancellation(eventId, request(meals.code, "ATTENDEE", { attendeeIds: [meals.attendeeIds[1] as string] }), new Date("2028-05-02T12:00:00.000Z"));
+
+    const baseline = await createFixture();
+    const cancelled = await createFixture();
+    await staffMeal(cancelled, [2000, -2000]);
+    const reduced = await createFixture();
+    const reducedSelection = await staffMeal(reduced, [2000, -1000]);
+
+    // (a) meals nonrefundable (version 3, May) and (b) a 50% window (version 2, April): a meal charged and fully
+    // credited leaves exactly the refund a registration with no meal has.
+    for (const [name, at] of [["meals nonrefundable", "2028-05-02T12:00:00.000Z"], ["a 50% window", "2028-04-10T12:00:00.000Z"]] as const) {
+      const none = (await repo.previewCancellation(eventId, request(baseline.code), new Date(at))).result;
+      const netted = (await repo.previewCancellation(eventId, request(cancelled.code), new Date(at))).result;
+      assert(!netted.lines.some((line) => line.category === "MEAL" && line.source === "ADJUSTMENT"), `a fully credited meal is not a charge (${name})`);
+      assert(netted.money.refundCents === none.money.refundCents, `${name}: refund equals the registration with no meal (${netted.money.refundCents} vs ${none.money.refundCents})`);
+      assert(!JSON.stringify(netted).includes("Synthetic staff meal order"), "the meal order's free text is not copied");
+    }
+    // A partial reduction is one meal charge for what is still ordered, attributed to the attendee.
+    const at = new Date("2028-05-02T12:00:00.000Z");
+    const partial = (await repo.previewCancellation(eventId, request(reduced.code), at)).result;
+    const mealLine = partial.lines.find((line) => line.category === "MEAL" && line.source === "ADJUSTMENT");
+    assert(mealLine?.chargeId === `meal:${reducedSelection}` && mealLine.amountCents === 1000 && mealLine.treatment === "NONREFUNDABLE" && mealLine.withheldCents === 1000 && mealLine.attendeeId === reduced.attendeeIds[0], "a partial reduction is one nonrefundable $10.00 meal charge for its attendee");
+    // (c) COMPONENT scope: the netted meal can be chosen once; a meal netting to $0 is not a charge and cannot.
+    const component = await repo.previewCancellation(eventId, request(reduced.code, "COMPONENT", { chargeIds: [`meal:${reducedSelection}`] }), at);
+    assert(component.result.status === "CALCULATED" && component.result.lines.find((line) => line.chargeId === `meal:${reducedSelection}`)?.inScopeCents === 1000, "the netted meal is one component worth $10.00");
+    const gone = await repo.previewCancellation(eventId, request(cancelled.code, "COMPONENT", { chargeIds: [`meal:${reducedSelection}`] }), at);
+    assert(gone.result.status === "INVALID_SELECTION", "a meal that nets to $0 cannot be cancelled again");
+    const others = await repo.previewCancellation(eventId, request(reduced.code, "ATTENDEE", { attendeeIds: [reduced.attendeeIds[1] as string] }), at);
     assert(others.result.lines.find((line) => line.category === "MEAL" && line.source === "ADJUSTMENT")?.treatment === "KEPT", "removing the other attendee keeps this attendee's meal charge");
   }
-  console.log("ok: a staff meal order is a nonrefundable meal charge for its attendee");
+  console.log("ok: staff meal orders are netted per selection and follow the meal rules");
 
   // ---- A card deposit is forfeited without its card fee. ----
   {

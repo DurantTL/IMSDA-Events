@@ -201,7 +201,8 @@ function effectiveCategory(entry: ChargeEntry, rules: CancellationRules): Charge
 }
 
 function isNonrefundable(entry: ChargeEntry, category: ChargeCategory, rules: CancellationRules) {
-  if (entry.amountCents <= 0) return false;
+  // A credit in a nonrefundable class is nonrefundable too (eligible 0), so an unpaired credit still cancels its charge.
+  if (entry.amountCents === 0) return false;
   if (category === "FEE" && rules.cardFeeTreatment === "NONREFUNDABLE") return true;
   if (rules.nonrefundable.categories.includes(category)) return true;
   return entry.fieldKey !== null && rules.nonrefundable.fieldKeys.includes(entry.fieldKey);

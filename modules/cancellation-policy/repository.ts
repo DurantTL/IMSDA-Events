@@ -25,7 +25,7 @@ import {
 import { isValidTimeZone } from "@/modules/cancellation-policy/event-time";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
 import { depositConfigurationFromValue, netPaidCents } from "@/modules/payments/deposit-domain";
-import { adjustmentCharge } from "@/modules/cancellation-policy/adjustment-charge";
+import { adjustmentCharges, mealFieldKeySet } from "@/modules/cancellation-policy/adjustment-charge";
 import { forfeitableDeposit } from "@/modules/cancellation-policy/deposit-facts";
 
 /**
@@ -267,6 +267,7 @@ async function loadRegistrationRows(client: Client, eventId: string, reference: 
       },
       publicFormSubmission: { select: { pricingSnapshot: true, formVersion: { select: { definition: true } } } },
       operations: { where: { type: "AMENDMENT" }, orderBy: { createdAt: "desc" }, take: 1, select: { afterSnapshot: true } },
+      mealSelections: { where: { source: "REGISTRATION_FORM" }, select: { sourceFieldKey: true } },
       paymentChoiceOperations: { orderBy: { sequence: "desc" }, take: 1, select: { processingFeeCents: true } },
       payments: {
         where: { status: "SUCCEEDED" },
@@ -280,7 +281,10 @@ async function loadRegistrationRows(client: Client, eventId: string, reference: 
       adjustments: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         // The free-text reason is deliberately not read: it can hold personal detail and does not belong in a calculation.
-        select: { id: true, kind: true, amountCents: true, registrationAttendeeId: true },
+        select: {
+          id: true, kind: true, amountCents: true, registrationAttendeeId: true,
+          mealLedgerEntry: { select: { selectionId: true, mealType: true, selection: { select: { registrationAttendeeId: true } } } },
+        },
       },
       merchandiseOrders: {
         where: { status: "PAID" },
@@ -305,6 +309,7 @@ type RegistrationRows = NonNullable<Awaited<ReturnType<typeof loadRegistrationRo
 function buildCharges(registration: RegistrationRows, appliedSurchargeCents: number): ChargeEntry[] {
   const snapshot = currentPricingSnapshot(registration);
   const attendeeIds = registration.attendees.map((attendee) => attendee.id);
+  const mealKeys = mealFieldKeySet(registration.mealSelections.map((selection) => selection.sourceFieldKey));
   const charges: ChargeEntry[] = [];
   const seen = new Map<string, number>();
   const rawLines = Array.isArray(snapshot.lineItems) ? snapshot.lineItems.map(record) : [];
@@ -319,7 +324,8 @@ function buildCharges(registration: RegistrationRows, appliedSurchargeCents: num
       source: "PRICING_LINE",
       label: line.label,
       amountCents: Math.round(line.amountCents),
-      category: "REGISTRATION",
+      // A meal ticket field (#210) is a meal even though the form priced it, so "meals nonrefundable" reaches it.
+      category: mealKeys.has(fieldKeyOf(key)) ? "MEAL" : "REGISTRATION",
       fieldKey: fieldKeyOf(key),
       attendeeId: attendeeIndex !== null ? attendeeIds[attendeeIndex] ?? null : null,
     });
@@ -332,7 +338,7 @@ function buildCharges(registration: RegistrationRows, appliedSurchargeCents: num
   if (appliedSurchargeCents > 0) {
     charges.push({ id: "fee:applied-surcharge", source: "APPLIED_SURCHARGE", label: "Card processing fee on a card payment", amountCents: appliedSurchargeCents, category: "FEE", fieldKey: null, attendeeId: null });
   }
-  for (const adjustment of registration.adjustments) charges.push(adjustmentCharge(adjustment, attendeeIds));
+  charges.push(...adjustmentCharges(registration.adjustments, attendeeIds));
   // What the stored total holds that the lines above do not explain (a registration entered without itemized pricing,
   // or a discount applied to the whole registration at checkout). Shown, so the lines always add up to the total.
   const explained = charges.reduce((total, entry) => total + entry.amountCents, 0);
