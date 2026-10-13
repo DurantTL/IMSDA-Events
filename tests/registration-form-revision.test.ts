@@ -62,6 +62,7 @@ function txFor(versions: unknown[]) {
   return {
     $executeRaw: vi.fn().mockResolvedValue(0),
     $queryRaw: vi.fn().mockResolvedValue([]),
+    eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
     registrationForm: { findFirst: vi.fn().mockResolvedValue(formRow(versions)), update: vi.fn().mockResolvedValue({}) },
     registrationFormVersion: { create: vi.fn().mockResolvedValue({}), update: vi.fn().mockResolvedValue({}), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     formTestSubmission: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },

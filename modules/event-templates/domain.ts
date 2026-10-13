@@ -5,6 +5,7 @@ import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/
 import { operationalReportKinds } from "@/modules/reporting/operational-reports";
 import { attendeeClassificationInputSchema, attendeeTypeInputSchema } from "@/modules/attendee-types/domain";
 import { teamSettingsInputSchema } from "@/modules/club-teams/domain";
+import { templateMealsSchema } from "@/modules/meals/clone-domain";
 
 /**
  * The fixed set of optional feature toggles a template may set on the new
@@ -133,6 +134,8 @@ export const eventTemplatePayloadSchema = z.object({
   }),
   /** Locations created on the new event, in this order (#413). Optional, so no stored payload changes shape. */
   locations: z.array(templateLocationSchema).max(20).optional(),
+  /** Meal services and plans the new event starts with (#210), dated by day offsets from its first day. Definitions only. Optional, so no stored payload changes shape. */
+  meals: templateMealsSchema.optional(),
   /**
    * The event's registration deadline (#809), a calendar date, for a template made for one year's event such as the
    * Pathfinder Bible Experience. Optional: most templates leave the dates to staff.

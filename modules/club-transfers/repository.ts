@@ -1168,7 +1168,8 @@ const moveSelect = {
       profileSnapshot: true,
       person: { select: { firstName: true, lastName: true } },
       // Filtered to the old registration in `describeMove`: exactly the lines the move carries.
-      adjustments: { select: { amountCents: true, registrationId: true } },
+      // MEAL lines (#210) are never moved with a person, so they are not part of the move's money.
+      adjustments: { where: { kind: { not: "MEAL" } }, select: { amountCents: true, registrationId: true } },
       honorEnrollments: { select: { offeringId: true, consumesSeat: true, offering: { select: { perClubLimit: true } } } },
     },
   },
@@ -1419,6 +1420,11 @@ async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId:
   const fromRegistrationId = move.fromRegistration.id;
   const toRegistrationId = described.toRegistration.id;
 
+  const activeMeals = await tx.eventMealSelection.count({ where: { registrationAttendeeId: attendeeId, status: "ACTIVE" } });
+  if (activeMeals > 0) {
+    throw new MemberTransferError("MOVE_BLOCKED", "This person has active meal selections on the old registration. Cancel them under More > Meals first, then approve the move.");
+  }
+
   const last = await tx.registrationAttendee.findFirst({
     where: { registrationId: toRegistrationId },
     orderBy: { position: "desc" },
@@ -1438,8 +1444,10 @@ async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId:
       profileSnapshot: { ...snapshot, clubRosterMemberId: move.transfer.toRosterMemberId },
     },
   });
+  // Meal charges (#210) stay with the registration they were ledgered on: a MEAL line is never moved, and a person with
+  // active meal selections is not moved until those are cancelled (their selections and ledger rows cannot follow).
   const adjustments = await tx.registrationAdjustment.updateMany({
-    where: { registrationAttendeeId: attendeeId, registrationId: fromRegistrationId },
+    where: { registrationAttendeeId: attendeeId, registrationId: fromRegistrationId, kind: { not: "MEAL" } },
     data: { registrationId: toRegistrationId },
   });
   // Their places on class waitlists move with them, keeping their place in line (#831). Waitlist spots are not seats, so the

@@ -171,6 +171,8 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   "/more/lodging": (scenario) => has(scenario, "CONFIGURE_EVENT"),
   // app/(workspace)/more/issued-assets/page.tsx
   "/more/issued-assets": (scenario) => has(scenario, "CONFIGURE_EVENT"),
+  // app/(workspace)/more/meals/page.tsx
+  "/more/meals": (scenario) => has(scenario, "CONFIGURE_EVENT") || has(scenario, "MANAGE_FINANCE") || has(scenario, "VIEW_REPORTS"),
   // app/(workspace)/more/lodging/requests/page.tsx
   "/more/lodging/requests": (scenario) => has(scenario, "MANAGE_REGISTRATION"),
   // app/(workspace)/more/lodging/assignments/page.tsx

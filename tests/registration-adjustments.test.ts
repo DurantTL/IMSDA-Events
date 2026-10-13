@@ -38,6 +38,7 @@ vi.mock("@/modules/promo-codes/repository", () => {
 import {
   createAdjustmentSchema,
   createRegistrationAdjustment,
+  postMealAdjustment,
   reverseRegistrationAdjustment,
 } from "@/modules/registrations/adjustments";
 import { PublicPromoCodeError } from "@/modules/promo-codes/repository";
@@ -74,6 +75,34 @@ beforeEach(() => {
   mocks.adjustmentCreate.mockResolvedValue({ id: "adj-1" });
   mocks.userFindUnique.mockResolvedValue({ displayName: "Finance Staff" });
   mocks.getRegistrationById.mockResolvedValue({ id: "reg-1" });
+});
+
+describe("posting a meal line (#210)", () => {
+  const paid = (amount: number) => [{ amount, refunds: [] }];
+
+  it("refuses a meal credit that takes the stored total below what was paid, for any other caller", async () => {
+    mocks.registrationFindFirst.mockResolvedValue(registration({ totalAmount: 100, payments: paid(100) }));
+    await expect(postMealAdjustment(tx as never, { eventId: "event-1", registrationId: "reg-1", actorUserId: "user-1", amountCents: -800, reason: "Meal order change", attendeeId: null }))
+      .rejects.toMatchObject({ code: "TOTAL_BELOW_PAID" });
+    expect(mocks.adjustmentCreate).not.toHaveBeenCalled();
+  });
+
+  it("an amendment's credit skips only that comparison: a paid $100 registration that adds a $30 item and removes an $8 meal posts the credit", async () => {
+    // The amendment checked the combined total ($100 + $30 - $8 = $122) against the $100 paid before it posts anything.
+    mocks.registrationFindFirst.mockResolvedValue(registration({ totalAmount: 100, payments: paid(100) }));
+    await postMealAdjustment(tx as never, { eventId: "event-1", registrationId: "reg-1", actorUserId: "user-1", amountCents: -800, reason: "The attendee was removed", attendeeId: null, skipBelowPaidCheck: true });
+    expect(mocks.adjustmentCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "MEAL", amountCents: -800 }) });
+    expect(mocks.registrationUpdate).toHaveBeenCalledWith({ where: { id: "reg-1" }, data: { totalAmount: 92 } });
+  });
+
+  it("still refuses a credit below $0 and a registration that is not submitted or confirmed, even when skipping", async () => {
+    mocks.registrationFindFirst.mockResolvedValue(registration({ totalAmount: 5, payments: [] }));
+    await expect(postMealAdjustment(tx as never, { eventId: "event-1", registrationId: "reg-1", actorUserId: null, amountCents: -800, reason: "x y z", attendeeId: null, skipBelowPaidCheck: true }))
+      .rejects.toMatchObject({ code: "TOTAL_BELOW_ZERO" });
+    mocks.registrationFindFirst.mockResolvedValue(registration({ status: "CANCELLED" }));
+    await expect(postMealAdjustment(tx as never, { eventId: "event-1", registrationId: "reg-1", actorUserId: null, amountCents: -800, reason: "x y z", attendeeId: null, skipBelowPaidCheck: true }))
+      .rejects.toMatchObject({ code: "REGISTRATION_NOT_ADJUSTABLE" });
+  });
 });
 
 describe("registration adjustments (#396)", () => {

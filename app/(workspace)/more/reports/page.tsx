@@ -215,6 +215,7 @@ export default async function OperationalReportsPage({
           <Link className="secondary-button" href={`/more/reports/clubs/check-in-book${peopleQuery}`}><ClipboardCheck aria-hidden="true" size={15} /> Check-in book</Link>
           <Link className="secondary-button" href={`/more/honors/rosters${peopleQuery}`}><Award aria-hidden="true" size={15} /> Honors rosters</Link>
           <Link className="secondary-button" href={`/more/kitchen-report${peopleQuery}`}><Utensils aria-hidden="true" size={15} /> Kitchen report</Link>
+          <a className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-tickets`}><Utensils aria-hidden="true" size={15} /> Meal tickets CSV</a>
           <PrintReportButton />
         </div>
       </div>

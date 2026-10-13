@@ -314,6 +314,8 @@ describe("registration moves (staff approve each one)", () => {
     // No class waitlist places on the move (#831).
     db.honorClassWaitlistEntry.findMany.mockResolvedValue([]);
     db.honorClassWaitlistEntry.count.mockResolvedValue(0);
+    // No active meal selections (#210): a person with one is not moved until it is cancelled.
+    db.eventMealSelection.count.mockResolvedValue(0);
     for (const name of ["registrationAdjustment", "honorEnrollment", "registrationCapacityReservation"]) {
       db[name]!.updateMany!.mockResolvedValue({ count: 1 });
     }
@@ -325,7 +327,7 @@ describe("registration moves (staff approve each one)", () => {
       where: { id: "att-1" },
       data: { registrationId: "reg-b", position: 4, profileSnapshot: { firstName: "Ada", clubRosterMemberId: "row-b" } },
     });
-    expect(db.registrationAdjustment.updateMany).toHaveBeenCalledWith({ where: { registrationAttendeeId: "att-1", registrationId: "reg-a" }, data: { registrationId: "reg-b" } });
+    expect(db.registrationAdjustment.updateMany).toHaveBeenCalledWith({ where: { registrationAttendeeId: "att-1", registrationId: "reg-a", kind: { not: "MEAL" } }, data: { registrationId: "reg-b" } });
     expect(db.honorEnrollment.updateMany).toHaveBeenCalledWith({ where: { registrationAttendeeId: "att-1" }, data: { registrationId: "reg-b", organizationId: "club-b" } });
     expect(db.registrationCapacityReservation.updateMany).toHaveBeenCalledWith({ where: { registrationAttendeeId: "att-1" }, data: { registrationId: "reg-b" } });
     // Operation history stays with the old registration.

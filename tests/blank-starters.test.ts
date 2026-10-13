@@ -145,6 +145,7 @@ describe("applying the blank starters through the create-from-template flow (#59
       eventModule: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventAttendeeType: { createMany: vi.fn() },
       eventAttendeeClassification: { createMany: vi.fn() },
+      eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
       registrationForm: { findUnique: vi.fn().mockResolvedValue(null), create: registrationFormCreate },
       eventMessageTemplate: { create: vi.fn() },
       eventTemplateApplication: { create: vi.fn().mockResolvedValue({ id: "application-1" }) },

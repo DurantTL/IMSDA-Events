@@ -13,6 +13,8 @@ import {
   type RegistrationFormDefinition,
 } from "@/modules/forms/definition";
 import { preparePublicRegistration } from "@/modules/forms/public-domain";
+import { loadTicketPrices } from "@/modules/meals/config-repository";
+import { applyMealPricesToDefinition, mealPriceDrift } from "@/modules/meals/domain";
 import { slugCandidate, slugify, slugMatchesTitle } from "@/modules/forms/slug";
 import { listActiveAttendeeTypes } from "@/modules/attendee-types/repository";
 import { stripAttendeeTypeOptions, withAttendeeTypeOptions } from "@/modules/attendee-types/form-options";
@@ -48,7 +50,7 @@ const emptyDirectory: OrganizationDirectory = { clubs: [], churches: [], schools
 
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT",
     message: string,
   ) {
     super(message);
@@ -230,7 +232,8 @@ export async function createRegistrationFormFromDefinitionInTransaction(
   },
 ) {
   const definition = registrationFormDefinitionSchema.parse(structuredClone(source.definition));
-  const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(definition));
+  // Meal ticket prices come from the event's meal plan (#210), the one place they are set.
+  const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(applyMealPricesToDefinition(definition, await loadTicketPrices(tx, eventId))));
   const baseSlug = source.preferredSlug || slugify(definition.title);
   let slug = baseSlug;
   let suffix = 2;
@@ -268,10 +271,11 @@ export async function updateRegistrationForm(
 ) {
   const definition = registrationFormDefinitionSchema.parse(input.definition);
   assertNoReservedChoiceValues(definition);
-  const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(definition));
   try {
   await formWriteTransaction(async (tx) => {
     let invalidatedTestCount = 0;
+    // Meal ticket prices come from the event's meal plan (#210), the one place they are set.
+    const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(applyMealPricesToDefinition(definition, await loadTicketPrices(tx, eventId))));
     const form = await tx.registrationForm.findFirst({ where: { id: formId, eventId }, include: { versions: { orderBy: { versionNumber: "desc" } } } });
     if (!form) throw new FormOperationError("FORM_NOT_FOUND", "That registration form was not found.");
     const draft = form.versions.find((version) => version.status === RegistrationFormStatus.DRAFT);
@@ -404,6 +408,10 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     // earlier version's test says nothing about a new module, a switch to team
     // registration, or a changed price. Saving a draft deletes its tests, so a
     // revised draft always needs a fresh one.
+    // A draft saved before the meal plan's price changed would sell tickets at a price the plan no longer has (#210).
+    if (mealPriceDrift(definition, await loadTicketPrices(tx, eventId)).length > 0) {
+      throw new FormOperationError("MEAL_PRICE_DRIFT", "The meal ticket prices on this form no longer match the event's meal plan. Open the form and save it again to bring them up to date, run a test submission, then publish.");
+    }
     const validTests = await tx.formTestSubmission.count({ where: { formVersionId: draft.id, isValid: true } });
     if (validTests === 0) throw new FormOperationError("TEST_REQUIRED", "Run at least one valid test submission against this version before publishing it.");
     await tx.registrationFormVersion.updateMany({ where: { formId, status: RegistrationFormStatus.PUBLISHED }, data: { status: RegistrationFormStatus.ARCHIVED } });
