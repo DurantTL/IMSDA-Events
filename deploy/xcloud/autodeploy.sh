@@ -7,7 +7,8 @@
 set -eu
 
 SITE="${XCLOUD_SITE_PATH:-/var/www/events.imsda.org}"
-SHA="$(git -C "$SITE" rev-parse HEAD)"
+# The checkout belongs to u_events; root (systemd) needs it marked safe.
+SHA="$(git -c safe.directory="$SITE" -C "$SITE" rev-parse HEAD)"
 LIVE="$(docker image inspect imsda-events:live \
   --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || true)"
 

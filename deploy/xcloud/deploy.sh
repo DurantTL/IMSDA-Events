@@ -7,7 +7,8 @@ set -eu
 
 SITE="${XCLOUD_SITE_PATH:-/var/www/events.imsda.org}"
 COMPOSE="${XCLOUD_COMPOSE_FILE:-/home/u_events/239298/docker-compose.yml}"
-SHA="$(git -C "$SITE" rev-parse HEAD)"
+# The checkout belongs to u_events; root (systemd) needs it marked safe.
+SHA="$(git -c safe.directory="$SITE" -C "$SITE" rev-parse HEAD)"
 IMAGE="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}:$SHA"
 WAIT_SECONDS="${IMSDA_IMAGE_WAIT_SECONDS:-1200}"
 
