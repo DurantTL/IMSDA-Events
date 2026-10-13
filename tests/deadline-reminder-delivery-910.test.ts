@@ -16,13 +16,13 @@ const now = () => new Date("2026-12-03T12:00:00.000Z");
 
 type Row = Record<string, unknown> & { id: string; status: string };
 
-function store() {
+function store(templateKey = "DEADLINE_REMINDER") {
   const message: Row = {
     id: "reminder-1",
     eventId: null,
     accountUserId: null,
     accountAttendeeId: null,
-    templateKey: "DEADLINE_REMINDER",
+    templateKey,
     registrationId: null,
     recipientEmail: "director@example.test",
     senderNameSnapshot: "IMSDA Events",
@@ -103,6 +103,16 @@ describe("deadline reminders and opt-outs at delivery (#910)", () => {
     expect(lookup).toHaveBeenCalledWith("director@example.test", "");
     expect(state.auditRows).toEqual([expect.objectContaining({ action: "DEADLINE_REMINDER_SKIPPED_OPTED_OUT", metadata: { messageId: "reminder-1", scope: "ALL" } })]);
     expect(JSON.stringify(state.auditRows)).not.toContain("director@example.test");
+  });
+
+  it.each(["CLUB_INVITE", "LOCATION_WAITLIST_DIGEST"])("an opt-out of all announcements does not stop other event-less mail (%s)", async (templateKey) => {
+    const state = store(templateKey);
+    const lookup = vi.fn(async () => "ALL" as const);
+    const { sendEmail, done } = run(state, lookup);
+    expect((await done).sentIds).toEqual(["reminder-1"]);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(lookup).not.toHaveBeenCalled();
+    expect(state.message.status).not.toBe("SUPPRESSED");
   });
 
   it("sends when nobody opted out", async () => {

@@ -311,6 +311,8 @@ export type PendingReminderBatch = {
   daysBefore: number;
   linkUrl: string | null;
   preparedAt: string;
+  /** The same point was already sent or dismissed for a different due date: a near-duplicate staff should know about. */
+  earlierDecision: { status: "SENT" | "DISMISSED"; dueOn: string } | null;
   subject: string;
   /** The email as a club role holder reads it, and as an Area Coordinator reads it. */
   bodyText: string;
@@ -358,6 +360,12 @@ export async function listPendingReminderBatches(now = new Date()): Promise<Pend
     }),
   ]);
   const emailConfigured = isAccountEmailConfigured();
+  const decided = batches.length === 0
+    ? []
+    : await prisma.deadlineReminderBatch.findMany({
+      where: { calendarEntryId: { in: batches.map((batch) => batch.calendarEntryId).filter((id): id is string => id !== null) }, status: { in: ["SENT", "DISMISSED"] } },
+      orderBy: [{ decidedAt: "desc" }],
+    });
   return {
     emailConfigured,
     repeatingDeadlines,
@@ -372,6 +380,10 @@ export async function listPendingReminderBatches(now = new Date()): Promise<Pend
         daysBefore: batch.daysBefore,
         linkUrl: batch.linkUrl,
         preparedAt: batch.preparedAt.toISOString(),
+        earlierDecision: (() => {
+          const earlier = decided.find((other) => other.calendarEntryId === batch.calendarEntryId && other.daysBefore === batch.daysBefore && other.dueOn !== batch.dueOn);
+          return earlier ? { status: earlier.status as "SENT" | "DISMISSED", dueOn: earlier.dueOn } : null;
+        })(),
         subject: preview.subject,
         bodyText: preview.bodyText,
         areaBodyText: areaPreview.bodyText,

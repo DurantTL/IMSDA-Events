@@ -446,11 +446,11 @@ export function CalendarAdminWorkspace({
                           {entry.isPublished ? " Hide" : " Show"}
                         </button>
                       )}
-                      {entry.sourceFeedId && entry.locallyEditedFields.length > 0 && (
+                      {entry.sourceFeedId && entry.locallyEditedFields.some((field) => field !== "entryType") && (
                         <button
                           className="secondary-button"
                           disabled={saving}
-                          onClick={() => call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}/source`, "POST", { action: "reset" }, "Reset to Google's version.")}
+                          onClick={() => call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}/source`, "POST", { action: "reset" }, "Reset to Google's version. A deadline or standard type you chose is kept.")}
                           type="button"
                         >
                           Reset to Google&apos;s version

@@ -98,6 +98,11 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
                   <small>
                     Due {formatDateRange(batch.dueOn, batch.dueOn)} · {batch.dueLabel} · {batch.daysBefore}-day reminder
                   </small>
+                  {batch.earlierDecision && (
+                    <small className="deadline-reminder-earlier" role="note">
+                      A {batch.daysBefore}-day reminder was already {batch.earlierDecision.status === "SENT" ? "sent" : "dismissed"} for {formatDateRange(batch.earlierDecision.dueOn, batch.earlierDecision.dueOn)}. This one is for the new due date.
+                    </small>
+                  )}
                   <span className="calendar-admin-chips">
                     <span className="status-chip gold">Waiting for you</span>
                     <span className="status-chip">{batch.recipientCount} {batch.recipientCount === 1 ? "person" : "people"}</span>

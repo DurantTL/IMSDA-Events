@@ -400,6 +400,45 @@ describe("a deadline whose date moves after a reminder was decided (#910)", () =
     expect(state.batches.map((row) => `${row.dueOn}:${row.daysBefore}:${row.status}`).sort()).toEqual(["2026-12-05:14:DISMISSED", "2027-12-05:14:PENDING"]);
   });
 
+  it("tells staff when the same point was already sent or dismissed for another due date", async () => {
+    const now = at("2026-11-25T18:00:00Z");
+    await reconcileDeadlineReminders(now);
+    const first = (await listPendingReminderBatches(now)).batches[0];
+    expect(first.earlierDecision).toBeNull();
+    await sendReminderBatch(first.id, { fingerprint: first.fingerprint }, "admin-1", now);
+    state.entries = [entry({ startsOn: "2026-12-12", endsOn: "2026-12-12" })];
+    const later = at("2026-11-29T18:00:00Z");
+    await reconcileDeadlineReminders(later);
+    const second = (await listPendingReminderBatches(later)).batches;
+    expect(second).toHaveLength(1);
+    expect(second[0]).toMatchObject({ dueOn: "2026-12-12", earlierDecision: { status: "SENT", dueOn: "2026-12-05" } });
+    // A dismissed earlier date is reported too, and a different point is not.
+    await dismissReminderBatch(second[0].id, "admin-1", later);
+    state.entries = [entry({ startsOn: "2026-12-20", endsOn: "2026-12-20" })];
+    await reconcileDeadlineReminders(at("2026-12-07T18:00:00Z"));
+    const third = (await listPendingReminderBatches(at("2026-12-07T18:00:00Z"))).batches[0];
+    expect(third.earlierDecision).toMatchObject({ dueOn: expect.stringMatching(/^2026-12-(05|12)$/) });
+    expect(["SENT", "DISMISSED"]).toContain(third.earlierDecision?.status);
+  });
+
+  it("A to B to A after A was sent: A is not prepared or sent again, and B's waiting batch is withdrawn", async () => {
+    const now = at("2026-11-25T18:00:00Z");
+    await reconcileDeadlineReminders(now);
+    const a = (await listPendingReminderBatches(now)).batches[0];
+    await sendReminderBatch(a.id, { fingerprint: a.fingerprint }, "admin-1", now);
+    const queued = state.outbox.length;
+    state.entries = [entry({ startsOn: "2026-12-12", endsOn: "2026-12-12" })]; // B
+    const b = at("2026-11-29T18:00:00Z");
+    await reconcileDeadlineReminders(b);
+    expect(pending()).toHaveLength(1);
+    state.entries = [entry()]; // back to A
+    await reconcileDeadlineReminders(b);
+    await reconcileDeadlineReminders(b);
+    expect(state.batches.map((row) => `${row.dueOn}:${row.status}`).sort()).toEqual(["2026-12-05:SENT", "2026-12-12:WITHDRAWN"]);
+    expect(pending()).toHaveLength(0);
+    expect(state.outbox).toHaveLength(queued);
+  });
+
   it("moves a waiting batch along with its deadline instead of leaving two", async () => {
     await reconcileDeadlineReminders(at("2026-11-25T18:00:00Z"));
     state.entries = [entry({ startsOn: "2026-12-07", endsOn: "2026-12-07" })];

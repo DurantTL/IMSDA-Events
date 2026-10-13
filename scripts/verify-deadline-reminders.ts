@@ -180,8 +180,7 @@ async function main() {
   assert((await imported()).e.entryType === "STANDARD", "bulk Clear sticks across a refresh");
   // Reset to source forgets the choice and reads the rule again.
   await resetCalendarEntryToSource(rows.b.id, adminId, { transport, resolve });
-  assert((await imported()).b.entryType === "DEADLINE", "reset to source re-reads the title ('Reports are Due' is a Deadline) and drops the staff choice");
-  assert(!(await imported()).b.locallyEditedFields.includes("entryType"), "reset forgets the staff mark");
+  assert((await imported()).b.entryType === "STANDARD" && (await imported()).b.locallyEditedFields.includes("entryType"), "reset to source keeps the Deadline/Standard type staff chose, and its mark");
   console.log("ok  bulk Mark and Clear deadline, and reset to source");
 
   // ---- 2. Public exclusion ------------------------------------------------------------------------------
@@ -449,7 +448,8 @@ async function main() {
   await edit({ entryType: "DEADLINE" });
   const finalBatches = await batchesOf(live.id);
   assert(finalBatches.length === 2 && (await newest()).status === "PENDING" && finalBatches.filter((batch) => batch.status === "PENDING").length === 1, "and marking it again brings back the one waiting batch");
-  assert((await prisma.messageOutbox.count({ where: { idempotencyKey: { startsWith: "deadline-reminder:" }, metadata: { path: ["deadlineReminderBatchId"], equals: liveBatchId } } })) === 0, "through all of it nothing was queued");
+  const queuedForLive = (await Promise.all(finalBatches.map((batch) => prisma.messageOutbox.count({ where: { templateKey: "DEADLINE_REMINDER", metadata: { path: ["deadlineReminderBatchId"], equals: batch.id } } })))).reduce((sum, count) => sum + count, 0);
+  assert(queuedForLive === 0, `through all of it nothing was queued for any of this entry's batches, got ${queuedForLive}`);
   const edited = await prisma.auditLog.count({ where: { entityType: "DeadlineReminderBatch", action: { in: ["DEADLINE_REMINDER_UPDATED", "DEADLINE_REMINDER_WITHDRAWN", "DEADLINE_REMINDER_PREPARED"] }, entityId: { in: finalBatches.map((batch) => batch.id) } } });
   assert(edited >= 6, `every change to the batches was audited, got ${edited}`);
   console.log("ok  a changed, cancelled, hidden or un-marked deadline updates or withdraws its waiting batch");
