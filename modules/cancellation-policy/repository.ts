@@ -24,12 +24,8 @@ import {
 } from "@/modules/cancellation-policy/rules";
 import { isValidTimeZone } from "@/modules/cancellation-policy/event-time";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
-import {
-  depositConfigurationFromValue,
-  netPaidCents,
-  paidAtLeastDeposit,
-  recordedDepositCents,
-} from "@/modules/payments/deposit-domain";
+import { depositConfigurationFromValue, netPaidCents } from "@/modules/payments/deposit-domain";
+import { forfeitableDeposit } from "@/modules/cancellation-policy/deposit-facts";
 
 /**
  * Storage and fact-gathering for cancellation policy (#169).
@@ -45,6 +41,7 @@ export class CancellationPolicyError extends Error {
       | "EVENT_NOT_FOUND"
       | "REGISTRATION_NOT_FOUND"
       | "EFFECTIVE_DATE_IN_PAST"
+      | "EFFECTIVE_DATE_BEFORE_LATEST"
       | "TIMEZONE_INVALID"
       | "VERSION_CONFLICT",
     message: string,
@@ -146,18 +143,29 @@ export async function createPolicyVersion(
   now = new Date(),
 ) {
   const rules = parseCancellationRules(input.rules);
-  const effectiveFrom = input.effectiveFrom ? new Date(input.effectiveFrom) : now;
-  if (effectiveFrom.getTime() < now.getTime() - EFFECTIVE_FROM_SLACK_MS) {
+  const requested = input.effectiveFrom ? new Date(input.effectiveFrom) : now;
+  if (requested.getTime() < now.getTime() - EFFECTIVE_FROM_SLACK_MS) {
     throw new CancellationPolicyError(
       "EFFECTIVE_DATE_IN_PAST",
       "A new version cannot take effect in the past. Choose now or a later time; earlier cancellations keep the version they were calculated with.",
     );
   }
+  // Never earlier than the server's now, so a version cannot reach back over a moment already calculated against.
+  const effectiveFrom = requested.getTime() < now.getTime() ? now : requested;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       return await getPrisma().$transaction(async (tx) => {
         await loadEvent(tx, eventId);
-        const latest = await tx.eventCancellationPolicyVersion.findFirst({ where: { eventId }, orderBy: { version: "desc" }, select: { version: true } });
+        const latest = await tx.eventCancellationPolicyVersion.findFirst({ where: { eventId }, orderBy: { version: "desc" }, select: { version: true, effectiveFrom: true } });
+        // A higher version supersedes every lower one once it takes effect, so a future-dated version must not be
+        // earlier than the latest one's date (that would silently cut it short). Taking effect now is always allowed:
+        // that is how a correction replaces a future-dated mistake immediately and permanently.
+        if (latest && effectiveFrom.getTime() > now.getTime() && effectiveFrom.getTime() < latest.effectiveFrom.getTime()) {
+          throw new CancellationPolicyError(
+            "EFFECTIVE_DATE_BEFORE_LATEST",
+            "A new version cannot take effect earlier than the latest saved version (a higher version always replaces the lower ones). Choose a date on or after it, or save it to take effect now.",
+          );
+        }
         const actor = await tx.user.findUnique({ where: { id: actorUserId }, select: { displayName: true } });
         const created = await tx.eventCancellationPolicyVersion.create({
           data: {
@@ -267,11 +275,17 @@ async function loadRegistrationRows(client: Client, eventId: string, reference: 
       paymentChoiceOperations: { orderBy: { sequence: "desc" }, take: 1, select: { processingFeeCents: true } },
       payments: {
         where: { status: "SUCCEEDED" },
-        select: { amount: true, isDeposit: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } },
+        select: {
+          amount: true,
+          isDeposit: true,
+          refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } },
+          paymentAttempt: { select: { surchargeCents: true, duplicateReason: true } },
+        },
       },
       adjustments: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: { id: true, kind: true, amountCents: true, reason: true, registrationAttendeeId: true },
+        // The free-text reason is deliberately not read: it can hold personal detail and does not belong in a calculation.
+        select: { id: true, kind: true, amountCents: true, registrationAttendeeId: true },
       },
       merchandiseOrders: {
         where: { status: "PAID" },
@@ -327,7 +341,7 @@ function buildCharges(registration: RegistrationRows, appliedSurchargeCents: num
     charges.push({
       id: `adjustment:${adjustment.id}`,
       source: "ADJUSTMENT",
-      label: `${adjustmentKindWords[adjustment.kind] ?? "Adjustment"}: ${adjustment.reason}`,
+      label: `${adjustmentKindWords[adjustment.kind] ?? "Adjustment"} (adjustment)`,
       amountCents: adjustment.amountCents,
       category: "ADJUSTMENT",
       fieldKey: null,
@@ -360,24 +374,27 @@ function buildCharges(registration: RegistrationRows, appliedSurchargeCents: num
         fieldKey: null,
         attendeeId: null,
         settledSeparately: true,
+        moneySourceId: `merchandise-order:${order.id}`,
       });
     }
-    if (order.feeCents > 0) charges.push({ id: `merchandise-fee:${order.id}`, source: "MERCHANDISE_ORDER", label: "Merchandise order fee", amountCents: order.feeCents, category: "MERCHANDISE", fieldKey: null, attendeeId: null, settledSeparately: true });
-    if (order.taxCents > 0) charges.push({ id: `merchandise-tax:${order.id}`, source: "MERCHANDISE_ORDER", label: "Merchandise order tax", amountCents: order.taxCents, category: "MERCHANDISE", fieldKey: null, attendeeId: null, settledSeparately: true });
+    if (order.feeCents > 0) charges.push({ id: `merchandise-fee:${order.id}`, source: "MERCHANDISE_ORDER", label: "Merchandise order fee", amountCents: order.feeCents, category: "MERCHANDISE", fieldKey: null, attendeeId: null, settledSeparately: true, moneySourceId: `merchandise-order:${order.id}` });
+    if (order.taxCents > 0) charges.push({ id: `merchandise-tax:${order.id}`, source: "MERCHANDISE_ORDER", label: "Merchandise order tax", amountCents: order.taxCents, category: "MERCHANDISE", fieldKey: null, attendeeId: null, settledSeparately: true, moneySourceId: `merchandise-order:${order.id}` });
   }
   return charges;
 }
 
 function depositFacts(registration: RegistrationRows) {
-  const payments = registration.payments;
-  const recorded = recordedDepositCents(payments);
-  if (recorded > 0) return { depositCents: recorded, depositSource: "RECORDED_DEPOSIT" as const };
   const config = depositConfigurationFromValue(registration.publicFormSubmission?.formVersion.definition);
-  const totalCents = cents(registration.totalAmount);
-  if (config && paidAtLeastDeposit(payments, { amountCents: config.amountCents, totalCents })) {
-    return { depositCents: Math.min(config.amountCents, totalCents), depositSource: "PAID_AT_LEAST_DEPOSIT" as const };
-  }
-  return { depositCents: 0, depositSource: "NONE" as const };
+  return forfeitableDeposit({
+    configuredCents: config?.amountCents ?? null,
+    totalCents: cents(registration.totalAmount),
+    payments: registration.payments.map((payment) => ({
+      isDeposit: payment.isDeposit,
+      amountCents: Math.max(cents(payment.amount), 0),
+      refundedCents: payment.refunds.reduce((sum, refund) => sum + Math.max(cents(refund.amount), 0), 0),
+      surchargeCents: payment.paymentAttempt && !payment.paymentAttempt.duplicateReason ? payment.paymentAttempt.surchargeCents : 0,
+    })),
+  });
 }
 
 export type RegistrationSummary = {
@@ -410,8 +427,8 @@ async function prepareRegistrationFacts(
     attendees: registration.attendees.map((attendee) => ({ id: attendee.id, position: attendee.position })),
     charges,
     registrationPaidCents: netPaidCents(registration.payments),
-    depositCents: deposit.depositCents,
-    depositSource: deposit.depositSource,
+    depositCents: deposit.cents,
+    depositSource: deposit.source,
     noShowFirstNight: input.noShowFirstNight,
   };
   return {
@@ -493,11 +510,16 @@ export async function previewCancellation(eventId: string, request: PreviewReque
  * uses server time. The caller supplies the request, never a result, so a stored outcome is always one the calculator
  * produced.
  */
-export async function recordCancellationCalculation(
+export async function recordCancellationCalculation(eventId: string, actorUserId: string, request: Omit<PreviewRequest, "asOf">) {
+  return recordCalculationAt(eventId, actorUserId, request, new Date());
+}
+
+/** Test seam for the real-database check, which needs fixed times. Callers in the app use `recordCancellationCalculation`. */
+export async function recordCalculationAt(
   eventId: string,
   actorUserId: string,
   request: Omit<PreviewRequest, "asOf">,
-  now = new Date(),
+  now: Date,
 ) {
   const { result } = await previewCancellation(eventId, { ...request, asOf: undefined }, now);
   const db = getPrisma();

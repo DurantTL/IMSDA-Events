@@ -51,6 +51,8 @@ export type ChargeEntry = {
   attendeeId: string | null;
   /** Paid at the time it was ordered, outside the registration's payments (a merchandise order). Counted as paid. */
   settledSeparately?: boolean;
+  /** Which separately paid order this entry belongs to (so money is never mixed across orders); unset means the registration's payments. */
+  moneySourceId?: string;
 };
 
 export type CalculationFacts = {
@@ -64,7 +66,7 @@ export type CalculationFacts = {
   charges: ChargeEntry[];
   /** Succeeded payments less succeeded refunds on the registration. */
   registrationPaidCents: number;
-  /** The reservation deposit held, net of refunds (#415); 0 when none. */
+  /** The forfeitable reservation deposit (#415): the deposit amount held, net of refunds, never including the card fee charged on a card deposit. 0 when none. */
   depositCents: number;
   depositSource: "RECORDED_DEPOSIT" | "PAID_AT_LEAST_DEPOSIT" | "NONE";
   /** Staff-recorded fact: the registrant did not arrive for the first night. */
@@ -145,6 +147,8 @@ export type CancellationResult = {
     refundCents: number;
     retainedCents: number;
     unpaidWithholdingCents: number;
+    /** The same money split by where it was paid, so each source can be refunded on its own (#171). */
+    bySource: Array<{ sourceId: string; label: string; paidCents: number; refundCents: number; retainedCents: number }>;
   };
   deposit: {
     heldCents: number;
@@ -153,22 +157,21 @@ export type CancellationResult = {
     forfeitedCents: number;
   };
   feeTreatment: { cardFeeCents: number; treatment: "REFUNDABLE" | "NONREFUNDABLE"; flatFeeCents: number };
-  capacity: { registrationCancelled: boolean; attendeesReleased: string[]; componentsReleased: string[] };
+  capacity: { registrationCancelled: boolean; attendeesReleased: string[]; componentsReleased: string[]; waitlistPlaceReleased: boolean };
   creditOption: { available: boolean; maximumCents: number; note: string };
   explanation: string[];
   facts: CalculationFacts;
 };
 
-/** The version in effect at `at`: the latest one whose effective date has arrived; ties go to the higher version. */
+/**
+ * The version in effect at `at`: the highest-numbered version whose effective date has arrived. A higher version
+ * always supersedes every lower one, so a later correction replaces an earlier (even future-dated) mistake for good.
+ */
 export function selectPolicyVersion<T extends { version: number; effectiveFrom: Date }>(versions: readonly T[], at: Date): T | null {
   let best: T | null = null;
   for (const candidate of versions) {
     if (candidate.effectiveFrom.getTime() > at.getTime()) continue;
-    if (
-      !best
-      || candidate.effectiveFrom.getTime() > best.effectiveFrom.getTime()
-      || (candidate.effectiveFrom.getTime() === best.effectiveFrom.getTime() && candidate.version > best.version)
-    ) best = candidate;
+    if (!best || candidate.version > best.version) best = candidate;
   }
   return best;
 }
@@ -206,7 +209,7 @@ function isNonrefundable(entry: ChargeEntry, category: ChargeCategory, rules: Ca
 
 function isSupportedComponent(entry: ChargeEntry, category: ChargeCategory, rules: CancellationRules) {
   const supported = rules.supportedComponents;
-  return supported.categories.includes(category) || (entry.fieldKey !== null && supported.fieldKeys.includes(entry.fieldKey));
+  return (supported.categories as readonly ChargeCategory[]).includes(category) || (entry.fieldKey !== null && supported.fieldKeys.includes(entry.fieldKey));
 }
 
 function refundPercent(terms: CancellationTerms) {
@@ -230,10 +233,10 @@ function emptyResult(facts: CalculationFacts, status: CalculationStatus, message
     lines: [],
     flatFee: null,
     totals: { chargedCents: facts.charges.reduce((total, entry) => total + entry.amountCents, 0), inScopeCents: 0, keptChargesCents: 0, eligibleCents: 0, withheldCents: 0 },
-    money: { paidCents: 0, refundCents: 0, retainedCents: 0, unpaidWithholdingCents: 0 },
+    money: { paidCents: 0, refundCents: 0, retainedCents: 0, unpaidWithholdingCents: 0, bySource: [] },
     deposit: { heldCents: facts.depositCents, source: facts.depositSource, outcome: facts.depositCents > 0 ? "STAYS_WITH_REGISTRATION" : "NO_DEPOSIT", forfeitedCents: 0 },
     feeTreatment: { cardFeeCents: 0, treatment: "REFUNDABLE", flatFeeCents: 0 },
-    capacity: { registrationCancelled: false, attendeesReleased: [], componentsReleased: [] },
+    capacity: { registrationCancelled: false, attendeesReleased: [], componentsReleased: [], waitlistPlaceReleased: false },
     creditOption: { available: false, maximumCents: 0, note: "No outcome was calculated." },
     explanation: [message],
     facts,
@@ -291,6 +294,9 @@ export function calculateCancellation(input: {
     if (chargeIds.length === 0) return withPolicy(emptyResult(facts, "INVALID_SELECTION", "Choose at least one charge."));
     const byId = new Map(facts.charges.map((entry) => [entry.id, entry]));
     if (chargeIds.some((id) => !byId.has(id))) return withPolicy(emptyResult(facts, "INVALID_SELECTION", "One of the chosen charges is not on this registration."));
+    if (chargeIds.some((id) => (byId.get(id) as ChargeEntry).amountCents <= 0)) {
+      return withPolicy(emptyResult(facts, "INVALID_SELECTION", "Only a charge with an amount above $0 can be cancelled on its own."));
+    }
     const unsupported = chargeIds.filter((id) => !isSupportedComponent(byId.get(id) as ChargeEntry, categories.get(id) as ChargeCategory, rules));
     if (unsupported.length > 0) {
       const labels = unsupported.map((id) => (byId.get(id) as ChargeEntry).label).join(", ");
@@ -385,21 +391,48 @@ export function calculateCancellation(input: {
   const flatApplied = Math.min(terms.flatWithholdCents, Math.max(linesEligible, 0));
   const cardFeeCents = lines.filter((line) => line.category === "FEE").reduce((total, line) => total + line.inScopeCents, 0);
 
-  // ---- Cash, in a fixed order ----
-  const separatelyPaid = facts.charges.filter((entry) => entry.settledSeparately).reduce((total, entry) => total + entry.amountCents, 0);
-  const paidCents = facts.registrationPaidCents + separatelyPaid;
-  let remaining = Math.max(paidCents - keptChargesCents, 0);
-  const retainedForLines = Math.min(Math.max(linesWithheld, 0), remaining);
-  remaining -= retainedForLines;
-  const retainedForFlat = Math.min(flatApplied, remaining);
-  remaining -= retainedForFlat;
+  // ---- Cash, in a fixed order, separately for each place the money was paid ----
+  // The registration's payments and each merchandise order are separate sources, so a registration fee is never taken
+  // out of merchandise money. The flat fee and the deposit belong to the registration, so only its payments cover them.
   const wholeRegistration = effectiveScope === "FULL_REGISTRATION";
+  const sourceOf = (entry: ChargeEntry) => entry.moneySourceId ?? (entry.settledSeparately ? "separate" : "registration");
+  const sourceIds = ["registration", ...new Set(facts.charges.map(sourceOf).filter((id) => id !== "registration"))];
+  const lineById = new Map(lines.map((line) => [line.chargeId, line]));
   const forfeitRequested = wholeRegistration && terms.depositTreatment === "FORFEIT" && facts.depositCents > 0;
-  const forfeitedCents = forfeitRequested ? Math.min(facts.depositCents, remaining) : 0;
-  remaining -= forfeitedCents;
-  const refundCents = remaining;
-  const retainedCents = retainedForLines + retainedForFlat + forfeitedCents;
-  const unpaidWithholdingCents = (Math.max(linesWithheld, 0) - retainedForLines) + (flatApplied - retainedForFlat);
+  let paidCents = 0;
+  let refundCents = 0;
+  let retainedCents = 0;
+  let forfeitedCents = 0;
+  let unpaidWithholdingCents = 0;
+  const bySource: CancellationResult["money"]["bySource"] = [];
+  let orderNumber = 0;
+  for (const sourceId of sourceIds) {
+    const entries = facts.charges.filter((entry) => sourceOf(entry) === sourceId);
+    const isRegistration = sourceId === "registration";
+    const sourcePaid = isRegistration ? facts.registrationPaidCents : entries.reduce((total, entry) => total + entry.amountCents, 0);
+    const sourceKept = entries.reduce((total, entry) => total + entry.amountCents - (lineById.get(entry.id)?.inScopeCents ?? 0), 0);
+    const sourceWithheld = entries.reduce((total, entry) => total + (lineById.get(entry.id)?.withheldCents ?? 0), 0);
+    let remaining = Math.max(sourcePaid - sourceKept, 0);
+    const retainedForLines = Math.min(Math.max(sourceWithheld, 0), remaining);
+    remaining -= retainedForLines;
+    const retainedForFlat = isRegistration ? Math.min(flatApplied, remaining) : 0;
+    remaining -= retainedForFlat;
+    const forfeited = isRegistration && forfeitRequested ? Math.min(facts.depositCents, remaining) : 0;
+    remaining -= forfeited;
+    paidCents += sourcePaid;
+    refundCents += remaining;
+    retainedCents += retainedForLines + retainedForFlat + forfeited;
+    forfeitedCents += forfeited;
+    unpaidWithholdingCents += (Math.max(sourceWithheld, 0) - retainedForLines) + (isRegistration ? flatApplied - retainedForFlat : 0);
+    if (!isRegistration) orderNumber += 1;
+    bySource.push({
+      sourceId,
+      label: isRegistration ? "Registration payments" : `Merchandise order ${orderNumber}`,
+      paidCents: sourcePaid,
+      refundCents: remaining,
+      retainedCents: retainedForLines + retainedForFlat + forfeited,
+    });
+  }
 
   const depositOutcome: CancellationResult["deposit"]["outcome"] = facts.depositCents <= 0
     ? "NO_DEPOSIT"
@@ -409,8 +442,11 @@ export function calculateCancellation(input: {
 
   // ---- Credit, capacity, explanation ----
   const creditAvailable = terms.creditAllowed && refundCents > 0;
-  const releasedAttendees = wholeRegistration ? [...allAttendeeIds].sort() : effectiveScope === "ATTENDEE" ? attendeeIds : [];
-  const releasedComponents = effectiveScope === "COMPONENT" ? chargeIds : [];
+  // A waitlisted registration holds no seat (SUBMITTED and CONFIRMED both do), so cancelling it releases a waitlist
+  // place, not capacity.
+  const waitlisted = facts.registration?.status === "WAITLISTED";
+  const releasedAttendees = waitlisted ? [] : wholeRegistration ? [...allAttendeeIds].sort() : effectiveScope === "ATTENDEE" ? attendeeIds : [];
+  const releasedComponents = !waitlisted && effectiveScope === "COMPONENT" ? chargeIds : [];
 
   const explanation: string[] = [
     `Policy version ${policy.version} (effective ${policy.effectiveFrom.toISOString()}) applies at ${facts.evaluatedAt}${facts.clock === "STAFF_PREVIEW_OVERRIDE" ? " (a staff-chosen preview time, not the server clock)" : " (server time)"}.`,
@@ -426,6 +462,8 @@ export function calculateCancellation(input: {
   ];
   if (depositOutcome === "FORFEITED") explanation.push(`The ${formatCents(facts.depositCents)} reservation deposit is forfeited: ${formatCents(forfeitedCents)} of paid money is kept and the reservation is cancelled.`);
   if (depositOutcome === "REFUNDED") explanation.push(`The ${formatCents(facts.depositCents)} reservation deposit is refunded with the other paid money.`);
+  if (waitlisted) explanation.push(wholeRegistration ? "This registration is on the waitlist: its waitlist place would be released; no seat or capacity is freed." : "This registration is on the waitlist, so no seat or capacity is freed.");
+  if (depositOutcome === "FORFEITED") explanation.push("Any card fee charged on the deposit is not part of the deposit; it follows the card fee rule.");
   if (depositOutcome === "STAYS_WITH_REGISTRATION") explanation.push("The reservation deposit belongs to the registration, so it stays with it when only part of it is cancelled.");
   if (unpaidWithholdingCents > 0) explanation.push(`${formatCents(unpaidWithholdingCents)} of the withheld amount was never paid, so there is nothing to keep; this calculation does not charge it.`);
   explanation.push("Nothing has been cancelled, refunded or credited. This is a proposed outcome only.");
@@ -450,10 +488,10 @@ export function calculateCancellation(input: {
       eligibleCents: Math.max(linesEligible - flatApplied, 0),
       withheldCents: linesWithheld + flatApplied,
     },
-    money: { paidCents, refundCents, retainedCents, unpaidWithholdingCents },
+    money: { paidCents, refundCents, retainedCents, unpaidWithholdingCents, bySource },
     deposit: { heldCents: facts.depositCents, source: facts.depositSource, outcome: depositOutcome, forfeitedCents },
     feeTreatment: { cardFeeCents, treatment: rules.cardFeeTreatment, flatFeeCents: flatApplied },
-    capacity: { registrationCancelled: wholeRegistration, attendeesReleased: releasedAttendees, componentsReleased: releasedComponents },
+    capacity: { registrationCancelled: wholeRegistration, attendeesReleased: releasedAttendees, componentsReleased: releasedComponents, waitlistPlaceReleased: waitlisted && wholeRegistration },
     creditOption: creditAvailable
       ? { available: true, maximumCents: refundCents, note: "Future-event credit up to the refundable amount may be offered instead of a refund. Nothing has been issued." }
       : { available: false, maximumCents: 0, note: terms.creditAllowed ? "There is no refundable amount to turn into credit." : "This policy does not offer future-event credit for this cancellation." },

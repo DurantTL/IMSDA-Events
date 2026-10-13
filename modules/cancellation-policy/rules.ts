@@ -92,7 +92,8 @@ export const cancellationRulesSchema = z.object({
   allowedScopes: z.array(z.enum(cancellationScopes)).min(1).default([...cancellationScopes]),
   /** Which charge entries may be cancelled one at a time under the COMPONENT scope. */
   supportedComponents: z.object({
-    categories: z.array(z.enum(chargeCategories)).max(chargeCategories.length).default([]),
+    // Fees, tax and adjustments are shared charges that follow whatever is cancelled; they are never cancelled alone.
+    categories: z.array(z.enum(classifiableCategories)).max(classifiableCategories.length).default([]),
     fieldKeys: z.array(fieldKey).max(40).default([]),
   }).strict().default({ categories: [], fieldKeys: [] }),
   /** Form price fields that are meals, lodging, merchandise or other, rather than plain registration. */

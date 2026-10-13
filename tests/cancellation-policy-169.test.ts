@@ -8,6 +8,7 @@ import {
   type ChargeEntry,
   type PolicyVersionRecord,
 } from "@/modules/cancellation-policy/calculator";
+import { forfeitableDeposit } from "@/modules/cancellation-policy/deposit-facts";
 import { windowClosesAt, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
 import {
   campMeetingPreset,
@@ -359,7 +360,7 @@ describe("zero-dollar and unusual registrations", () => {
   it("proposes $0 for a free registration without error", () => {
     const result = run(facts({ charges: [charge({ id: "reg", amountCents: 0 })] }), [campMeeting()]);
     expect(result.status).toBe("CALCULATED");
-    expect(result.money).toEqual({ paidCents: 0, refundCents: 0, retainedCents: 0, unpaidWithholdingCents: 0 });
+    expect(result.money).toMatchObject({ paidCents: 0, refundCents: 0, retainedCents: 0, unpaidWithholdingCents: 0 });
     expect(result.flatFee?.cents).toBe(0);
     expect(result.totals.chargedCents).toBe(0);
   });
@@ -408,11 +409,13 @@ describe("policy revisions", () => {
     expect(later.money.refundCents).toBe(10_000);
   });
 
-  it("breaks an effective-date tie with the higher version", () => {
-    const same = new Date("2026-02-01T00:00:00Z");
-    const a = version(campMeetingPreset("2026-05-25"), { id: "a", version: 3, effectiveFrom: same });
-    const b = version(campMeetingPreset("2026-05-25"), { id: "b", version: 4, effectiveFrom: same });
-    expect(selectPolicyVersion([b, a], new Date("2026-03-01T00:00:00Z"))?.id).toBe("b");
+  it("lets a higher version supersede every lower one, even if its date is earlier", () => {
+    const low = version(campMeetingPreset("2026-05-25"), { id: "low", version: 2, effectiveFrom: new Date("2026-06-01T00:00:00Z") });
+    const high = version(campMeetingPreset("2026-05-25"), { id: "high", version: 3, effectiveFrom: new Date("2026-03-01T00:00:00Z") });
+    expect(selectPolicyVersion([low, high], new Date("2026-02-01T00:00:00Z"))).toBeNull();
+    expect(selectPolicyVersion([low, high], new Date("2026-03-15T00:00:00Z"))?.id).toBe("high");
+    // Version 2 arriving later never retakes over from version 3.
+    expect(selectPolicyVersion([high, low], new Date("2026-07-01T00:00:00Z"))?.id).toBe("high");
   });
 
   it("records the policy and the facts used, and a later revision cannot alter a recorded result", () => {
@@ -499,5 +502,110 @@ describe("rules schema", () => {
     expect(parsed.windows[0]).toMatchObject({ endsOn: "2026-05-25", terms: { refund: { kind: "FULL" }, flatWithholdCents: 1000, depositTreatment: "REFUND" } });
     expect(parsed.afterWindows.terms.depositTreatment).toBe("FORFEIT");
     expect(parsed.noShow?.terms.depositTreatment).toBe("FORFEIT");
+  });
+});
+
+describe("forfeitable deposit never includes the card fee", () => {
+  const card = { isDeposit: true, amountCents: 10_300, refundedCents: 0, surchargeCents: 300 };
+
+  it("a card deposit of $100 plus a $3 fee forfeits $100, not $103", () => {
+    expect(forfeitableDeposit({ payments: [card], configuredCents: 10_000, totalCents: 40_000 })).toEqual({ cents: 10_000, source: "RECORDED_DEPOSIT", cardFeeOnDepositCents: 300 });
+  });
+
+  it("a staff check larger than the deposit forfeits only the configured deposit; a fee-free smaller one forfeits what it is", () => {
+    expect(forfeitableDeposit({ payments: [{ ...card, amountCents: 12_000, surchargeCents: 0 }], configuredCents: 10_000, totalCents: 40_000 }).cents).toBe(10_000);
+    expect(forfeitableDeposit({ payments: [{ ...card, amountCents: 5000, surchargeCents: 0 }], configuredCents: 10_000, totalCents: 40_000 }).cents).toBe(5000);
+    expect(forfeitableDeposit({ payments: [{ ...card, amountCents: 5000, surchargeCents: 0 }], configuredCents: null, totalCents: 40_000 }).cents).toBe(5000);
+  });
+
+  it("a partially refunded card deposit keeps its fee out; a fully refunded one has nothing to forfeit", () => {
+    expect(forfeitableDeposit({ payments: [{ ...card, refundedCents: 2000 }], configuredCents: 10_000, totalCents: 40_000 }).cents).toBe(8000);
+    expect(forfeitableDeposit({ payments: [{ ...card, refundedCents: 10_300 }], configuredCents: 10_000, totalCents: 40_000 })).toMatchObject({ cents: 0, source: "NONE" });
+  });
+
+  it("when paid in full with no deposit recorded, the configured deposit is capped at net payments without card fees", () => {
+    const full = { isDeposit: false, amountCents: 40_900, refundedCents: 0, surchargeCents: 900 };
+    expect(forfeitableDeposit({ payments: [full], configuredCents: 10_000, totalCents: 40_900 })).toEqual({ cents: 10_000, source: "PAID_AT_LEAST_DEPOSIT", cardFeeOnDepositCents: 0 });
+    expect(forfeitableDeposit({ payments: [{ ...full, amountCents: 2000, surchargeCents: 0 }], configuredCents: 10_000, totalCents: 40_900 }).source).toBe("NONE");
+    expect(forfeitableDeposit({ payments: [], configuredCents: 10_000, totalCents: 40_900 }).source).toBe("NONE");
+  });
+
+  it("forfeits the $100 deposit and refunds the deposit's card fee under a refundable card fee rule", () => {
+    const charges = [charge({ id: "reg", amountCents: 40_000 }), charge({ id: "fee", source: "APPLIED_SURCHARGE", category: "FEE", fieldKey: null, amountCents: 300 })];
+    const result = run(
+      facts({ charges, registrationPaidCents: 10_300, depositCents: 10_000, depositSource: "RECORDED_DEPOSIT", evaluatedAt: "2026-06-10T15:00:00.000Z" }),
+      [campMeeting()],
+    );
+    expect(result.deposit).toMatchObject({ outcome: "FORFEITED", forfeitedCents: 10_000 });
+    expect(result.money.refundCents).toBe(300);
+    expect(result.explanation.join(" ")).toContain("$100.00 reservation deposit is forfeited");
+  });
+});
+
+describe("component selection and capacity", () => {
+  const rules = () => version({ ...campMeetingPreset("2026-05-25"), allowedScopes: ["FULL_REGISTRATION", "ATTENDEE", "COMPONENT"], supportedComponents: { categories: ["REGISTRATION", "MEAL"], fieldKeys: [] } });
+  const charges = [
+    charge({ id: "reg", amountCents: 10_000, attendeeId: "att_a" }),
+    charge({ id: "disc", amountCents: -500, attendeeId: "att_a" }),
+    charge({ id: "zero", amountCents: 0, attendeeId: "att_a" }),
+  ];
+
+  it("rejects a discount or zero-dollar charge as a component", () => {
+    for (const id of ["disc", "zero"]) {
+      expect(run(facts({ charges }), [rules()], { scope: "COMPONENT", chargeIds: [id] }).status).toBe("INVALID_SELECTION");
+    }
+    expect(run(facts({ charges }), [rules()], { scope: "COMPONENT", chargeIds: ["reg"] }).status).toBe("CALCULATED");
+  });
+
+  it("does not let a policy list fees, tax or adjustments as components", () => {
+    for (const category of ["FEE", "TAX", "ADJUSTMENT"]) {
+      expect(() => parseCancellationRules({ ...campMeetingPreset("2026-05-25"), supportedComponents: { categories: [category], fieldKeys: [] } })).toThrow();
+    }
+  });
+
+  it("a waitlisted registration releases a waitlist place, not capacity; submitted and confirmed release seats", () => {
+    const waitlisted = run(facts({ charges, registration: { id: "r", confirmationCode: "W", status: "WAITLISTED" } }), [rules()]);
+    expect(waitlisted.capacity).toEqual({ registrationCancelled: true, attendeesReleased: [], componentsReleased: [], waitlistPlaceReleased: true });
+    expect(waitlisted.explanation.join(" ")).toContain("waitlist place");
+    const partial = run(facts({ charges, registration: { id: "r", confirmationCode: "W", status: "WAITLISTED" } }), [rules()], { scope: "ATTENDEE", attendeeIds: ["att_a"] });
+    expect(partial.capacity).toMatchObject({ attendeesReleased: [], waitlistPlaceReleased: false });
+    for (const status of ["SUBMITTED", "CONFIRMED"]) {
+      const held = run(facts({ charges, registration: { id: "r", confirmationCode: "S", status } }), [rules()]);
+      expect(held.capacity).toMatchObject({ attendeesReleased: ["att_a", "att_b"], waitlistPlaceReleased: false });
+    }
+  });
+});
+
+describe("merchandise money stays with merchandise", () => {
+  const merch = (id: string, amountCents: number) => charge({
+    id, source: "MERCHANDISE_ORDER", category: "MERCHANDISE", fieldKey: null, amountCents, settledSeparately: true, moneySourceId: `merchandise-order:${id}`,
+  });
+
+  it("an unpaid registration with $30 of paid merchandise: the registration's $10 fee is not taken from merchandise money", () => {
+    const result = run(facts({ charges: [charge({ id: "reg", amountCents: 20_000 }), merch("m1", 3000)] }), [campMeeting()]);
+    expect(result.money.refundCents).toBe(3000);
+    expect(result.money.retainedCents).toBe(0);
+    expect(result.money.unpaidWithholdingCents).toBe(1000);
+    expect(result.money.bySource).toEqual([
+      { sourceId: "registration", label: "Registration payments", paidCents: 0, refundCents: 0, retainedCents: 0 },
+      { sourceId: "merchandise-order:m1", label: "Merchandise order 1", paidCents: 3000, refundCents: 3000, retainedCents: 0 },
+    ]);
+  });
+
+  it("splits refunds per merchandise order and the flat fee and deposit come only from registration payments", () => {
+    const result = run(
+      facts({ charges: [charge({ id: "reg", amountCents: 20_000 }), merch("m1", 3000), merch("m2", 1500)], registrationPaidCents: 6500, depositCents: 6500, depositSource: "RECORDED_DEPOSIT", evaluatedAt: "2026-06-10T15:00:00.000Z" }),
+      [campMeeting()],
+    );
+    expect(result.money.bySource.map((source) => [source.sourceId, source.refundCents, source.retainedCents])).toEqual([
+      ["registration", 0, 6500], ["merchandise-order:m1", 3000, 0], ["merchandise-order:m2", 1500, 0],
+    ]);
+    expect(result.money.refundCents).toBe(4500);
+  });
+
+  it("nonrefundable merchandise is kept from its own order's money only", () => {
+    const rules = version({ ...campMeetingPreset("2026-05-25"), nonrefundable: { categories: ["MERCHANDISE"], fieldKeys: [] } });
+    const result = run(facts({ charges: [charge({ id: "reg", amountCents: 20_000 }), merch("m1", 3000)], registrationPaidCents: 20_000 }), [rules]);
+    expect(result.money.bySource.map((source) => [source.refundCents, source.retainedCents])).toEqual([[19_000, 1000], [0, 3000]]);
   });
 });

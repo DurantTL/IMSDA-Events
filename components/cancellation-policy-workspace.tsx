@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
 import { postJson } from "@/lib/post-json";
 import type { CancellationResult } from "@/modules/cancellation-policy/calculator";
-import { localInstant, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
+import { localDateKey, localInstant, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
 import {
   campMeetingPreset,
   chargeCategories,
@@ -102,7 +102,10 @@ function draftToRequest(draft: Draft, timezone: string) {
   };
   return {
     rules,
-    ...(draft.effectiveOn ? { effectiveFrom: localMidnightInstant(draft.effectiveOn, timezone).toISOString() } : {}),
+    // Today (or an earlier day) means "now": the start of today has already passed, so it would be refused.
+    ...(draft.effectiveOn && draft.effectiveOn > localDateKey(new Date(), timezone)
+      ? { effectiveFrom: localMidnightInstant(draft.effectiveOn, timezone).toISOString() }
+      : {}),
     ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
   };
 }
@@ -275,7 +278,7 @@ function NewVersion({ eventId, timezone }: { eventId: string; timezone: string }
       <div className="section-heading"><h3 id="cancel-policy-new">New version</h3></div>
       {notice && <p role="status">{notice}</p>}
       <form className="form-stack" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-        <label>Takes effect on (start of this day in {timezone}; blank means now)
+        <label>Takes effect on (start of this day in {timezone}; blank or today means now)
           <input type="date" value={draft.effectiveOn} onChange={(event) => update({ effectiveOn: event.target.value })} />
         </label>
 
@@ -310,7 +313,7 @@ function NewVersion({ eventId, timezone }: { eventId: string; timezone: string }
             <label className="cancel-policy-check" key={scope}><input type="checkbox" checked={draft.scopes[scope]} onChange={(event) => update({ scopes: { ...draft.scopes, [scope]: event.target.checked } })} /> {text}</label>
           ))}
           <p><small>Components that may be cancelled on their own, by kind:</small></p>
-          {chargeCategories.map((category) => (
+          {classifiableCategories.map((category) => (
             <label className="cancel-policy-check" key={category}><input type="checkbox" checked={draft.supported.includes(category)} onChange={() => update({ supported: toggle(draft.supported, category) })} /> {category.toLowerCase()}</label>
           ))}
           <label>Or by form field keys, comma separated<input value={draft.supportedKeys} onChange={(event) => update({ supportedKeys: event.target.value })} /></label>
@@ -545,11 +548,14 @@ function ResultView({ result }: { result: CancellationResult }) {
             </table>
           </div>
           <dl className="cancel-policy-facts">
+            {result.money.bySource.length > 1 && (
+              <div><dt>Money by source</dt><dd>{result.money.bySource.map((source) => `${source.label}: paid ${dollars(source.paidCents)}, refundable ${dollars(source.refundCents)}, kept ${dollars(source.retainedCents)}`).join("; ")}</dd></div>
+            )}
             <div><dt>Policy</dt><dd>Version {result.policy?.version}</dd></div>
             <div><dt>Terms</dt><dd>{result.timing?.label}: {result.timing?.termsText}</dd></div>
             <div><dt>Reservation deposit</dt><dd>{result.deposit.outcome === "NO_DEPOSIT" ? "None held" : `${dollars(result.deposit.heldCents)} held, ${result.deposit.outcome.replaceAll("_", " ").toLowerCase()}${result.deposit.forfeitedCents > 0 ? ` (${dollars(result.deposit.forfeitedCents)} kept)` : ""}`}</dd></div>
             <div><dt>Card fees</dt><dd>{dollars(result.feeTreatment.cardFeeCents)} in this cancellation, {result.feeTreatment.treatment === "REFUNDABLE" ? "refundable" : "nonrefundable"}</dd></div>
-            <div><dt>Seats and capacity</dt><dd>{result.capacity.registrationCancelled ? "The whole registration would be cancelled" : "The registration would stay"}; {result.capacity.attendeesReleased.length} attendee{result.capacity.attendeesReleased.length === 1 ? "" : "s"} released{result.capacity.componentsReleased.length > 0 ? `, ${result.capacity.componentsReleased.length} component${result.capacity.componentsReleased.length === 1 ? "" : "s"} released` : ""}</dd></div>
+            <div><dt>Seats and capacity</dt><dd>{result.capacity.registrationCancelled ? "The whole registration would be cancelled" : "The registration would stay"}; {result.capacity.waitlistPlaceReleased ? "its waitlist place would be released (no seat is freed)" : `${result.capacity.attendeesReleased.length} attendee${result.capacity.attendeesReleased.length === 1 ? "" : "s"} released`}{result.capacity.componentsReleased.length > 0 ? `, ${result.capacity.componentsReleased.length} component${result.capacity.componentsReleased.length === 1 ? "" : "s"} released` : ""}</dd></div>
             <div><dt>Future-event credit</dt><dd>{result.creditOption.available ? `May be offered, up to ${dollars(result.creditOption.maximumCents)}` : result.creditOption.note}</dd></div>
             <div><dt>Evaluated</dt><dd>{result.evaluatedAt}{result.clock === "STAFF_PREVIEW_OVERRIDE" ? " (a time you chose)" : " (server time)"}</dd></div>
           </dl>

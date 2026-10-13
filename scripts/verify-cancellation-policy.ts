@@ -33,6 +33,8 @@ const P = "cpl";
 const adminId = `${P}_admin`;
 const eventId = `${P}_event`;
 const otherEventId = `${P}_other_event`;
+const versionsEventId = `${P}_versions_event`;
+const parallelEventId = `${P}_parallel_event`;
 const startsWithP = { startsWith: `${P}_` };
 
 const base = new PrismaClient();
@@ -56,7 +58,7 @@ async function removeEvent(id: string) {
 }
 
 async function cleanup() {
-  for (const id of [eventId, otherEventId, `${P}_delete_event`]) await removeEvent(id);
+  for (const id of [eventId, otherEventId, versionsEventId, parallelEventId, `${P}_delete_event`]) await removeEvent(id);
   await base.person.deleteMany({ where: { id: startsWithP } });
   await base.auditLog.deleteMany({ where: { actorUserId: adminId } });
   await base.user.deleteMany({ where: { id: adminId } });
@@ -160,6 +162,40 @@ async function createFixture(options: { zeroDollar?: boolean } = {}): Promise<Fi
   return { registrationId: registration.id, code, attendeeIds };
 }
 
+/**
+ * A $300.00 registration whose reservation deposit was paid by card, created the way the Square webhook does it: one
+ * attempt for the deposit plus its card fee ($65.00 + $2.26 = $67.26), one payment of that amount marked as the deposit,
+ * and the fee added to the registration total ($302.26).
+ */
+async function createCardDepositFixture(): Promise<Fixture> {
+  counter += 1;
+  const code = `CPL${String(counter).padStart(4, "0")}`;
+  const holder = await base.person.create({ data: { id: `${P}_holder_${counter}`, firstName: "Card", lastName: `Deposit${counter}`, normalizedEmail: `${P}-card-${counter}@example.test` } });
+  const registration = await base.registration.create({
+    data: { eventId, accountHolderPersonId: holder.id, confirmationCode: code, totalAmount: 302.26, status: "CONFIRMED", submittedAt: new Date("2028-03-01T15:00:00Z"), contactSnapshot: {} },
+  });
+  const person = await base.person.create({ data: { id: `${P}_att_${counter}_0`, firstName: "Card", lastName: `Attendee${counter}`, normalizedEmail: `${P}-cardatt-${counter}@example.test` } });
+  const attendee = await base.registrationAttendee.create({
+    data: { eventId, registrationId: registration.id, personId: person.id, attendeeType: "ADULT", position: 0, profileSnapshot: { firstName: "Card", lastName: `Attendee${counter}` } },
+  });
+  await base.publicRegistrationSubmission.create({
+    data: {
+      eventId, formVersionId, registrationId: registration.id, idempotencyKey: `${P}_idem_${counter}`, requestHash: "hash", responses: { payment_method: "Pay a deposit now by card" },
+      pricingSnapshot: { currency: "USD", lineItems: [{ key: "attendees.0.registration_fee", label: "Registration, Card", amountCents: 30_000, attendeeIndex: 0 }], subtotalCents: 30_000, processingFeeCents: 0, totalCents: 30_000 },
+    },
+  });
+  const payment = await base.payment.create({
+    data: { eventId, registrationId: registration.id, amount: 67.26, status: "SUCCEEDED", method: "CARD_REFERENCE", isDeposit: true, externalReference: `${P}_sq_${counter}`, receivedAt: new Date("2028-03-02T15:00:00Z") },
+  });
+  await base.paymentAttempt.create({
+    data: {
+      eventId, registrationId: registration.id, paymentId: payment.id, provider: "SQUARE", environment: "sandbox", clientIdempotencyKey: `${P}_client_${counter}`,
+      providerIdempotencyKey: `${P}_provider_${counter}`, isDeposit: true, amountCents: 6726, surchargeCents: 226, status: "SUCCEEDED", completedAt: new Date("2028-03-02T15:00:00Z"),
+    },
+  });
+  return { registrationId: registration.id, code, attendeeIds: [attendee.id] };
+}
+
 /** Everything a cancellation could change, so "nothing changed" is checked by content, not by count. */
 async function moneyAndRegistrationState(registrationId: string) {
   const [registration, attendees, payments, refunds, adjustments, orders, reservations] = await Promise.all([
@@ -196,7 +232,7 @@ async function main() {
 
   await cleanup();
   await base.user.create({ data: { id: adminId, email: `${P}-admin@example.test`, displayName: "Cancellation Policy Check Admin", globalRole: "SYSTEM_ADMIN" } });
-  for (const [id, slug] of [[eventId, "cpl-event-slug"], [otherEventId, "cpl-other-event-slug"]] as const) {
+  for (const [id, slug] of [[eventId, "cpl-event-slug"], [otherEventId, "cpl-other-event-slug"], [versionsEventId, "cpl-versions-event-slug"], [parallelEventId, "cpl-parallel-event-slug"]] as const) {
     await base.event.create({
       data: {
         id, slug, name: `Cancellation policy check ${slug}`, timezone: "America/Chicago",
@@ -243,13 +279,13 @@ async function main() {
   assert(invalidRejected, "rules that do not parse are refused");
   const parallelRules = campMeetingRules("2028-06-01");
   const parallel = await Promise.all([
-    repo.createPolicyVersion(eventId, adminId, { rules: parallelRules, effectiveFrom: "2030-01-01T00:00:00.000Z", note: "parallel a" }, now),
-    repo.createPolicyVersion(eventId, adminId, { rules: parallelRules, effectiveFrom: "2030-01-02T00:00:00.000Z", note: "parallel b" }, now),
+    repo.createPolicyVersion(parallelEventId, adminId, { rules: parallelRules, effectiveFrom: "2028-03-31T20:00:00.000Z", note: "parallel a" }, now),
+    repo.createPolicyVersion(parallelEventId, adminId, { rules: parallelRules, effectiveFrom: "2028-03-31T21:00:00.000Z", note: "parallel b" }, now),
   ]);
   const numbers = parallel.map((version) => version.version).sort();
-  assert(numbers[0] === 2 && numbers[1] === 3, `parallel saves get distinct versions, got ${numbers.join(",")}`);
+  assert(numbers[0] === 1 && numbers[1] === 2, `parallel saves get distinct versions, got ${numbers.join(",")}`);
   const listed = await repo.listPolicyVersions(eventId, now);
-  assert(listed.versions.length === 3 && listed.inEffectVersionId === v1.id, "listing shows three versions with version 1 in effect");
+  assert(listed.versions.length === 1 && listed.inEffectVersionId === v1.id, "listing shows version 1 in effect");
   console.log("ok: versions are sequential, parallel-safe and never reach into the past");
 
   for (const [table, run] of [
@@ -332,11 +368,11 @@ async function main() {
   console.log("ok: attendee removal and component cancellation are distinct scopes");
 
   // ---- Revisions: the version in effect, and recorded calculations that never change. ----
-  const recorded = await repo.recordCancellationCalculation(eventId, adminId, request(fixture.code), new Date("2028-03-15T15:00:00.000Z"));
+  const recorded = await repo.recordCalculationAt(eventId, adminId, request(fixture.code), new Date("2028-03-15T15:00:00.000Z"));
   assert(recorded.result.policy?.version === 1, "the recorded calculation used version 1");
   const storedBefore = await base.cancellationCalculation.findUniqueOrThrow({ where: { id: recorded.id } });
   assert(storedBefore.policyVersion === 1 && storedBefore.registrationId === fixture.registrationId, "the record carries the version and registration");
-  const v4 = await repo.createPolicyVersion(eventId, adminId, {
+  const v2r = await repo.createPolicyVersion(eventId, adminId, {
     rules: {
       ...campMeetingRules("2028-05-25"),
       windows: [{ id: "half", label: "Half refund", endsOn: "2028-05-25", terms: { refund: { kind: "PERCENT", percent: 50 }, flatWithholdCents: 0, flatWithholdLabel: "Processing fee", depositTreatment: "REFUND", creditAllowed: true } }],
@@ -345,15 +381,14 @@ async function main() {
     effectiveFrom: "2028-04-01T05:00:00.000Z",
     note: "Revision",
   }, new Date("2028-03-20T12:00:00.000Z"));
-  assert(v4.version === 4, "the revision is the next version");
+  assert(v2r.version === 2, "the revision is the next version");
   const early = await repo.previewCancellation(eventId, request(fixture.code), new Date("2028-03-31T12:00:00.000Z"));
   const late = await repo.previewCancellation(eventId, request(fixture.code), new Date("2028-04-02T12:00:00.000Z"));
   assert(early.result.policy?.version === 1 && early.result.money.refundCents === 37_500, "before the revision's effective date, version 1 still applies");
-  // The two parallel versions take effect in 2030, so by April 2028 version 4 is the latest in effect.
-  assert(late.result.policy?.version === 4, `after the effective date, version 4 applies, got ${late.result.policy?.version}`);
+    assert(late.result.policy?.version === 2, `after the effective date, version 2 applies, got ${late.result.policy?.version}`);
   const merchandise = late.result.lines.find((line) => line.category === "MERCHANDISE");
-  assert(merchandise?.treatment === "NONREFUNDABLE" && merchandise.withheldCents === 2500, "merchandise is nonrefundable under version 4");
-  assert(late.result.creditOption.available, "version 4 allows future-event credit");
+  assert(merchandise?.treatment === "NONREFUNDABLE" && merchandise.withheldCents === 2500, "merchandise is nonrefundable under version 2");
+  assert(late.result.creditOption.available, "version 2 allows future-event credit");
   const storedAfter = await base.cancellationCalculation.findUniqueOrThrow({ where: { id: recorded.id } });
   assert(stable(storedAfter) === stable(storedBefore), "the recorded calculation is unchanged by the revision");
   assert(isDeepStrictEqual((storedAfter.result as { policy: unknown }).policy, JSON.parse(stable(recorded.result.policy))), "it still holds the rules it was calculated with");
@@ -366,7 +401,7 @@ async function main() {
     assert(rejected, `the database rejects a ${name} of a recorded calculation`);
   }
   // A recorded calculation always uses server time, whatever a preview was asked.
-  const asOf = await repo.recordCancellationCalculation(eventId, adminId, { ...request(fixture.code), asOf: "2028-04-02T00:00:00.000Z" } as Parameters<typeof repo.recordCancellationCalculation>[2], new Date("2028-03-16T12:00:00.000Z"));
+  const asOf = await repo.recordCalculationAt(eventId, adminId, { ...request(fixture.code), asOf: "2028-04-02T00:00:00.000Z" } as Parameters<typeof repo.recordCalculationAt>[2], new Date("2028-03-16T12:00:00.000Z"));
   assert(asOf.result.clock === "SERVER" && asOf.result.evaluatedAt === "2028-03-16T12:00:00.000Z", "a recorded calculation ignores a preview 'as of' time");
   console.log("ok: revisions apply by effective date and never change a recorded calculation");
 
@@ -393,6 +428,54 @@ async function main() {
   }
   console.log("ok: previews stay inside the event, and zero-dollar and synthetic input calculate");
 
+  // ---- A card deposit is forfeited without its card fee. ----
+  {
+    const card = await createCardDepositFixture();
+    const afterDeadline = new Date("2028-06-10T15:00:00.000Z");
+    const result = (await repo.previewCancellation(eventId, request(card.code), afterDeadline)).result;
+    assert(result.facts.registrationPaidCents === 6726, "the card deposit payment is $67.26");
+    assert(result.facts.depositCents === 6500 && result.facts.depositSource === "RECORDED_DEPOSIT", `the forfeitable deposit is $65.00, got ${result.facts.depositCents}`);
+    assert(result.facts.charges.some((entry) => entry.source === "APPLIED_SURCHARGE" && entry.amountCents === 226), "the card fee on the deposit is its own charge entry");
+    assert(result.deposit.forfeitedCents === 6500, "$65.00 is forfeited, not the $67.26 paid");
+    assert(result.money.refundCents === 226, `the deposit's card fee follows the refundable card fee rule, got ${result.money.refundCents}`);
+    assert(result.explanation.join(" ").includes("$65.00 reservation deposit is forfeited"), "the explanation shows the deposit amount");
+    const beforeDeadline = (await repo.previewCancellation(eventId, request(card.code), new Date("2028-03-15T15:00:00.000Z"))).result;
+    assert(beforeDeadline.money.refundCents === 5726, "before the deadline the whole $67.26 less the $10.00 fee comes back");
+  }
+  console.log("ok: a card deposit is forfeited without its card fee");
+
+  // ---- Money by source, and nothing free-text in the record. ----
+  {
+    const sources = beforeEvent.result.money.bySource;
+    assert(sources.length === 2 && sources[0]?.sourceId === "registration", "registration payments and the merchandise order are separate sources");
+    assert(sources[0]?.refundCents === 35_000 && sources[1]?.refundCents === 2500, "the $10.00 fee comes out of registration money, never merchandise money");
+    const text = JSON.stringify(beforeEvent.result);
+    assert(!text.includes("Synthetic discount"), "an adjustment's free-text reason is not copied into the calculation");
+    assert(beforeEvent.result.facts.charges.some((entry) => entry.id.startsWith("adjustment:") && entry.label === "Discount (adjustment)"), "an adjustment is stored by id and generic label");
+  }
+  console.log("ok: money is split by source and free text stays out of the record");
+
+  // ---- A higher version supersedes lower ones; effective dates are clamped and ordered. ----
+  {
+    const t0 = new Date("2028-02-01T12:00:00.000Z");
+    const rules = campMeetingRules("2028-05-25");
+    const a = await repo.createPolicyVersion(versionsEventId, adminId, { rules }, t0);
+    const b = await repo.createPolicyVersion(versionsEventId, adminId, { rules: campMeetingRules("2028-06-01"), effectiveFrom: "2029-06-01T00:00:00.000Z" }, t0);
+    assert(a.version === 1 && b.version === 2, "versions 1 and 2 saved");
+    let refused = false;
+    try { await repo.createPolicyVersion(versionsEventId, adminId, { rules, effectiveFrom: "2029-01-01T00:00:00.000Z" }, t0); } catch (error) { refused = (error as { code?: string }).code === "EFFECTIVE_DATE_BEFORE_LATEST"; }
+    assert(refused, "a future-dated version may not be earlier than the latest version's date");
+    const c = await repo.createPolicyVersion(versionsEventId, adminId, { rules: campMeetingRules("2028-07-01") }, t0);
+    assert(c.version === 3 && c.effectiveFrom === t0.toISOString(), "a correction taking effect now is allowed and stored as now");
+    const slack = await repo.createPolicyVersion(versionsEventId, adminId, { rules, effectiveFrom: "2028-02-01T11:58:00.000Z" }, t0);
+    assert(slack.effectiveFrom === t0.toISOString(), "an effective date within the slack is stored as now, never earlier");
+    const request2 = { input: { kind: "SYNTHETIC" as const, attendeeCount: 1, charges: [{ label: "Example", amountCents: 100, category: "REGISTRATION" as const }], paidCents: 100, depositCents: 0, noShowFirstNight: false }, selection: { scope: "FULL_REGISTRATION" as const } };
+    const during = await repo.previewCancellation(versionsEventId, request2, new Date("2028-03-01T12:00:00.000Z"));
+    const later = await repo.previewCancellation(versionsEventId, request2, new Date("2030-01-01T12:00:00.000Z"));
+    assert(during.result.policy?.version === 4 && later.result.policy?.version === 4, "the highest version in effect applies, and the old future-dated version 2 never retakes over");
+  }
+  console.log("ok: a higher version supersedes lower ones, and effective dates cannot reach back");
+
   // ---- Nothing was cancelled, refunded or credited by any of it. ----
   const after = await moneyAndRegistrationState(fixture.registrationId);
   assert(after === before, "no registration, attendee, payment, refund, adjustment, merchandise order or reservation changed");
@@ -405,7 +488,7 @@ async function main() {
     const deleteEventId = `${P}_delete_event`;
     await base.event.create({ data: { id: deleteEventId, slug: "cpl-delete-event", name: "Cancellation policy delete check", timezone: "America/Chicago", startsAt: new Date("2028-07-13T15:00:00Z"), endsAt: new Date("2028-07-16T18:00:00Z") } });
     await repo.createPolicyVersion(deleteEventId, adminId, { rules: campMeetingRules("2028-05-25"), effectiveFrom: "2028-01-10T12:00:00.000Z" }, now);
-    await repo.recordCancellationCalculation(deleteEventId, adminId, {
+    await repo.recordCalculationAt(deleteEventId, adminId, {
       input: { kind: "SYNTHETIC", attendeeCount: 1, charges: [{ label: "Example", amountCents: 100, category: "REGISTRATION" }], paidCents: 100, depositCents: 0, noShowFirstNight: false },
       selection: { scope: "FULL_REGISTRATION" },
     }, new Date("2028-03-01T12:00:00.000Z"));
