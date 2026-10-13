@@ -341,3 +341,30 @@ payment note (`modules/payments/in-person-card.ts`).
   in Square, and finance attaches it on **Payments → Unmatched Square
   payments**, which recognizes the confirmation code in the note.
 - Events billed to an organization show no balance at check-in.
+
+## Reservation deposit (#415)
+
+A form's payment settings can offer a fixed deposit per registration
+(`payment.deposit`: amount and the payment-method answer that means "Pay a
+deposit now"). The logic lives in `modules/payments/deposit-domain.ts`.
+
+- The deposit is an ordinary payment marked `isDeposit`, so the balance (total
+  minus net payments) stays right in reminders, self-service "pay now", and the
+  in-person card total at check-in. No parallel ledger.
+- A card deposit charges `deposit + card fee on the deposit`. The fee joins the
+  registration total only when the payment succeeds (the existing surcharge
+  path), so the balance left is exactly the subtotal minus the deposit. A
+  registration that chose to pay the whole amount by card is never offered one.
+- The pay page can switch between the deposit and the whole balance
+  (`?kind=` on GET, `kind` in the POST body). The server prices both; the
+  client never sends an amount. A deposit that is not on offer is refused with
+  `DEPOSIT_UNAVAILABLE`, never silently charged as the balance. A pay-later
+  registrant is offered the deposit too.
+- Staff record a mailed check deposit from **Payments** (Record deposit). It is
+  audited as `RESERVATION_DEPOSIT_RECORDED`, serialized per registration, and a
+  repeat is refused (`DEPOSIT_ALREADY_RECORDED`). A check below the deposit is
+  refused (`DEPOSIT_AMOUNT_TOO_LOW`) and is recorded as an ordinary payment.
+- "Held" is derived, never stored: a reservation is held exactly while a
+  deposit payment's net amount (after refunds) is above zero. It cannot be set
+  without a recorded deposit. Forfeiting a deposit belongs to the cancellation
+  rules (#169-#171) and is not built here.

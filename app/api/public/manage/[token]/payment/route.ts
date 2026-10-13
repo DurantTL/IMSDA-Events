@@ -50,6 +50,12 @@ function applyPrivateHeaders(response: Response) {
   return response;
 }
 
+/** `?kind=DEPOSIT` or `?kind=BALANCE` (#415); anything else leaves the server to pick. */
+function requestedPaymentKind(request: Request) {
+  const value = new URL(request.url).searchParams.get("kind");
+  return value === "DEPOSIT" || value === "BALANCE" ? value : undefined;
+}
+
 function unavailableResponse() {
   return json({
     error: "REGISTRATION_ACCESS_UNAVAILABLE",
@@ -106,10 +112,12 @@ function errorResponse(error: unknown, rateLimit?: RateLimitOutcome) {
   }, { status: 500 }, rateLimit);
 }
 
-async function getHandler(_request: Request, context: RouteContext) {
+async function getHandler(request: Request, context: RouteContext) {
   try {
     const { token } = await context.params;
-    const checkout = await getPublicSquareCheckout(token);
+    const checkout = await getPublicSquareCheckout(token, {
+      kind: requestedPaymentKind(request),
+    });
     return checkout ? json({ checkout }) : unavailableResponse();
   } catch (error) {
     return errorResponse(error);

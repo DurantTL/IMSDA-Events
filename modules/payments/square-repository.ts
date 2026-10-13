@@ -8,6 +8,12 @@ import {
   type RefundStatus,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import {
+  depositOffer,
+  depositRecorded,
+  type PaymentKind,
+} from "@/modules/payments/deposit-domain";
 import { dispatchAlerts, type Alert } from "@/modules/operations/alerting";
 import {
   flushHostedDeletionsAfterResponse,
@@ -66,6 +72,7 @@ export type SquarePaymentOperationErrorCode =
   | "PAYMENT_NOT_ELIGIBLE"
   | "CARD_PAYMENT_NOT_SELECTED"
   | "PAYMENT_ALREADY_COMPLETE"
+  | "DEPOSIT_UNAVAILABLE"
   | "PAYMENT_IN_PROGRESS"
   | "PAYMENT_IDEMPOTENCY_CONFLICT"
   | "PAYMENT_ATTEMPT_FAILED"
@@ -108,6 +115,7 @@ const checkoutRegistrationSelect = {
     where: { status: "SUCCEEDED" as const },
     select: {
       amount: true,
+      isDeposit: true,
       refunds: {
         where: { status: "SUCCEEDED" as const },
         select: { amount: true },
@@ -207,6 +215,7 @@ function billingContact(registration: CheckoutRegistration) {
 export function checkoutFromRegistration(
   registration: CheckoutRegistration,
   configuration: SquareRuntimeConfiguration,
+  options: { kind?: PaymentKind } = {},
 ): SquareCheckoutView {
   if (registration.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
     // A deferred-organization event must never take an online card payment, even if a form were
@@ -291,13 +300,37 @@ export function checkoutFromRegistration(
         submission.formVersion.definition,
         balanceCents,
       );
-  const amountCents = balanceCents + surchargeCents;
+  // A fixed reservation deposit (#415), offered only while none is recorded and the registration did not price the
+  // card fee into its total. A promoted-waitlist registration owns its own payment choice and is never offered one.
+  const parsedDefinition = submission && !promotedWaitlist
+    ? registrationFormDefinitionSchema.safeParse(submission.formVersion.definition)
+    : null;
+  const deposit = parsedDefinition?.success && paymentSelection.configured
+    ? depositOffer({
+        definition: parsedDefinition.data,
+        responses: record(submission?.responses),
+        balanceCents,
+        payments: registration.payments,
+        cardSelected: paymentSelection.cardSelected,
+      })
+    : null;
+  // The kind asked for wins; otherwise a registrant who chose "Pay a deposit now" is quoted the deposit. A deposit
+  // that is not on offer falls back to the balance, so the quote is always one the server can honor.
+  const requestedKind = options.kind ?? (deposit?.chosenOnForm ? "DEPOSIT" : "BALANCE");
+  const paymentKind: PaymentKind = requestedKind === "DEPOSIT" && deposit ? "DEPOSIT" : "BALANCE";
+  const chargedSurchargeCents = paymentKind === "DEPOSIT" && deposit ? deposit.surchargeCents : surchargeCents;
+  const amountCents = paymentKind === "DEPOSIT" && deposit
+    ? deposit.chargeCents
+    : balanceCents + surchargeCents;
   const base = {
     amountCents,
     balanceCents,
-    surchargeCents,
+    surchargeCents: chargedSurchargeCents,
     currency: "USD" as const,
     cardSelected: paymentSelection.cardSelected,
+    paymentKind,
+    deposit,
+    depositRecorded: depositRecorded(registration.payments),
     hostedLink: false,
     paymentChoice,
     square: null,
@@ -363,9 +396,11 @@ export function checkoutFromRegistration(
     // reminder that says "pay now" has to land on a page that can take the
     // payment, so an outstanding balance opens the card form either way. The
     // total is untouched: no card processing fee is added after the fact.
-    message: paymentSelection.cardSelected || surchargeCents === 0
-      ? "Secure card payment is available through Square."
-      : "This registration chose to pay later. The balance can still be paid by card now, with the same card processing fee a card registration is charged.",
+    message: paymentKind === "DEPOSIT"
+      ? "Pay the deposit now to hold your reservation. The card processing fee applies to the deposit only; the rest stays as your balance."
+      : paymentSelection.cardSelected || surchargeCents === 0
+        ? "Secure card payment is available through Square."
+        : "This registration chose to pay later. The balance can still be paid by card now, with the same card processing fee a card registration is charged.",
     square,
   };
 }
@@ -386,6 +421,7 @@ export async function getPublicSquareCheckout(
     now?: Date;
     client?: PaymentClient;
     configuration?: SquareRuntimeConfiguration;
+    kind?: PaymentKind;
   } = {},
 ) {
   const client = options.client ?? getPrisma();
@@ -401,7 +437,8 @@ export async function getPublicSquareCheckout(
   if (!registration || registration.eventId !== access.eventId) return null;
   return checkoutFromRegistration(
     registration,
-    options.configuration ?? getSquareConfiguration()
+    options.configuration ?? getSquareConfiguration(),
+    { kind: options.kind },
   );
 }
 
@@ -410,6 +447,7 @@ export async function getAttendeeSquareCheckout(
   options: {
     client?: PaymentClient;
     configuration?: SquareRuntimeConfiguration;
+    kind?: PaymentKind;
   } = {},
 ) {
   const client = options.client ?? getPrisma();
@@ -418,6 +456,7 @@ export async function getAttendeeSquareCheckout(
   return checkoutFromRegistration(
     registration,
     options.configuration ?? getSquareConfiguration(),
+    { kind: options.kind },
   );
 }
 
@@ -576,8 +615,15 @@ async function preparePaymentAttempt(
       "This private registration link is invalid or no longer active."
     );
   }
-  const checkout = checkoutFromRegistration(registration, configuration);
+  const checkout = checkoutFromRegistration(registration, configuration, { kind: input.kind });
   if (checkout.state !== "READY") operationErrorForCheckout(checkout);
+  // A deposit asked for must be one the server priced; it never silently charges the whole balance instead.
+  if (input.kind === "DEPOSIT" && checkout.paymentKind !== "DEPOSIT") {
+    throw new SquarePaymentOperationError(
+      "DEPOSIT_UNAVAILABLE",
+      "A deposit is not available for this registration. It may already be recorded, or the whole balance may be due.",
+    );
+  }
 
   const activeAttempt = await tx.paymentAttempt.findUnique({
     where: { activeRegistrationKey: registration.id },
@@ -614,6 +660,7 @@ async function preparePaymentAttempt(
       clientIdempotencyKey: input.idempotencyKey,
       providerIdempotencyKey: providerKey,
       activeRegistrationKey: registration.id,
+      isDeposit: checkout.paymentKind === "DEPOSIT",
       amountCents: checkout.amountCents,
       surchargeCents: checkout.surchargeCents,
       currency: "USD",
@@ -637,6 +684,7 @@ async function preparePaymentAttempt(
         amountCents: checkout.amountCents,
         balanceCents: checkout.balanceCents,
         surchargeCents: checkout.surchargeCents,
+        paymentKind: checkout.paymentKind,
         currency: "USD",
         registrationAccessTokenId: access.accessTokenId,
       },
@@ -679,6 +727,7 @@ async function successConflict(
         select: {
           id: true,
           amount: true,
+          isDeposit: true,
           refunds: {
             where: { status: "SUCCEEDED" },
             select: { amount: true },
@@ -692,6 +741,8 @@ async function successConflict(
     registrationStatus: registration.status,
     balanceCents: registrationBalanceCents(registration),
     quotedBalanceCents: attempt.amountCents - attempt.surchargeCents,
+    // A second deposit would hold the same reservation twice: the first one recorded wins.
+    duplicateDeposit: attempt.isDeposit && depositRecorded(registration.payments),
   });
   return reason
     ? { reason, winningPaymentId: registration.payments[0]?.id ?? null }
@@ -701,6 +752,7 @@ async function successConflict(
 const duplicateReasonText: Record<string, string> = {
   BALANCE_ALREADY_PAID: "the balance had already been paid",
   BALANCE_CHANGED: "the balance had fallen below the amount charged",
+  DEPOSIT_ALREADY_RECORDED: "the reservation deposit had already been recorded",
   REGISTRATION_NOT_PAYABLE: "the registration was no longer payable",
   SECOND_PAYMENT_ON_ORDER: "a payment had already been recorded through the same link",
   AMOUNT_MISMATCH: "its amount was not the amount quoted for the link",
@@ -899,6 +951,7 @@ async function applyProviderPayment(
         where: { id: attempt.payment.id },
         data: {
           amount: attempt.amountCents / 100,
+          isDeposit: attempt.isDeposit,
           status: state.paymentStatus,
           method: "CARD_REFERENCE",
           externalReference: provider.id,
@@ -912,6 +965,7 @@ async function applyProviderPayment(
           eventId: attempt.eventId,
           registrationId: attempt.registrationId,
           amount: attempt.amountCents / 100,
+          isDeposit: attempt.isDeposit,
           status: state.paymentStatus,
           method: "CARD_REFERENCE",
           externalReference: provider.id,

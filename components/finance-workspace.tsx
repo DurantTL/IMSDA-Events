@@ -57,6 +57,8 @@ export function FinanceWorkspace({
   const [filter, setFilter] = useState(initialFilter);
   const [selected, setSelected] = useState<RegistrationRecord | null>(initialSelected);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
+  /** Whether the payment form opened from the reservation-deposit line (#415), so it starts as a deposit. */
+  const [depositFirst, setDepositFirst] = useState(false);
   const [modal, setModal] = useState<"detail" | "payment" | "refund" | "adjust" | "reverse" | null>(initialSelected ? "detail" : null);
   const [adjustKind, setAdjustKind] = useState<AdjustmentKind>("SCHOLARSHIP");
   const [selectedAdjustment, setSelectedAdjustment] = useState<AdjustmentRecord | null>(null);
@@ -98,6 +100,7 @@ export function FinanceWorkspace({
           amountCents: Math.round(Number(form.get("amount") ?? 0) * 100),
           method: form.get("method"),
           reference: form.get("reference"),
+          isDeposit: form.get("isDeposit") === "on",
         }),
       });
       const result = await response.json();
@@ -237,9 +240,19 @@ export function FinanceWorkspace({
                 {selected.isDeferredOrganizationBilling && selected.isGroup && (
                   <div className="inline-notice">This group registration is billed to its contact, {selected.accountHolder.firstName} {selected.accountHolder.lastName}{selected.accountHolder.email ? ` (${selected.accountHolder.email})` : ""}, after the event, not paid online. It is not billed to any club or church. The estimated amount is not an attendee balance. {groupBillingFinalNote}</div>
                 )}
+                {selected.deposit && !selected.isDeferredOrganizationBilling && (
+                  <div className="inline-notice" data-testid="reservation-deposit">
+                    {selected.deposit.held
+                      ? <><strong>Reservation held.</strong> Deposit recorded: {money(selected.deposit.recordedCents)}.</>
+                      : <><strong>Reservation not held yet.</strong> The deposit of {money(selected.deposit.dueCents)} has not been recorded.</>}
+                    {canManage && !selected.deposit.held && selected.deposit.dueCents > 0 && activeFinancialStatuses.has(selected.status) && (
+                      <> <button className="text-button" type="button" onClick={() => { setDepositFirst(true); setError(""); setModal("payment"); }}>Record deposit</button></>
+                    )}
+                  </div>
+                )}
                 <div className="detail-grid">{financeDetailFacts(selected).map((fact) => <span key={fact.value}><small>{fact.label}</small><strong>{fact.value === "payments" ? selected.payments.length : money(fact.value === "total" ? selected.totalAmountCents : fact.value === "received" ? selected.paidCents : selected.balanceCents)}</strong></span>)}</div>
                 <div><p className="eyebrow">Attendees on this registration</p><ul className="finance-attendee-list">{selected.attendees.map((attendee) => <li key={attendee.id}><span><strong>{attendee.firstName} {attendee.lastName}</strong><small>{attendee.attendeeType.toLowerCase()}{attendee.email ? ` · ${attendee.email}` : ""}</small></span></li>)}</ul>{selected.attendees.length === 0 && <p className="quiet-copy">No attendees are recorded on this registration.</p>}</div>
-                <div><p className="eyebrow">Payment history</p>{selected.payments.map((payment) => { const available = payment.amountCents - payment.refundedCents; const squareManaged = payment.method === "CARD_REFERENCE"; return <div className="payment-history" key={payment.id}><span className="payment-icon"><Banknote aria-hidden="true" size={17} /></span><span><strong>{money(payment.amountCents)} · {squareManaged ? "Square card" : payment.method.toLowerCase()}</strong><small>{payment.receivedAt ? new Date(payment.receivedAt).toLocaleString() : "Recorded manually"}{payment.refundedCents ? ` · ${money(payment.refundedCents)} refunded` : ""}{squareManaged && available > 0 ? " · refund through Square Dashboard" : ""}</small></span>{canManage && available > 0 && !squareManaged && <button className="text-button" type="button" onClick={() => { setSelectedPayment(payment); setError(""); setModal("refund"); }}>Refund</button>}</div>; })}{selected.payments.length === 0 && <p className="quiet-copy">No payments have been recorded.</p>}</div>
+                <div><p className="eyebrow">Payment history</p>{selected.payments.map((payment) => { const available = payment.amountCents - payment.refundedCents; const squareManaged = payment.method === "CARD_REFERENCE"; return <div className="payment-history" key={payment.id}><span className="payment-icon"><Banknote aria-hidden="true" size={17} /></span><span><strong>{money(payment.amountCents)} · {squareManaged ? "Square card" : payment.method.toLowerCase()}{payment.isDeposit ? " · reservation deposit" : ""}</strong><small>{payment.receivedAt ? new Date(payment.receivedAt).toLocaleString() : "Recorded manually"}{payment.refundedCents ? ` · ${money(payment.refundedCents)} refunded` : ""}{squareManaged && available > 0 ? " · refund through Square Dashboard" : ""}</small></span>{canManage && available > 0 && !squareManaged && <button className="text-button" type="button" onClick={() => { setSelectedPayment(payment); setError(""); setModal("refund"); }}>Refund</button>}</div>; })}{selected.payments.length === 0 && <p className="quiet-copy">No payments have been recorded.</p>}</div>
                 {(selected.adjustments.length > 0 || (canManage && activeFinancialStatuses.has(selected.status))) && (
                   <div>
                     <p className="eyebrow">Adjustments</p>
@@ -268,7 +281,7 @@ export function FinanceWorkspace({
                     )}
                   </div>
                 )}
-                {canManage && selected.balanceCents > 0 && activeFinancialStatuses.has(selected.status) && <button className="primary-button full-button" type="button" onClick={() => { setError(""); setModal("payment"); }}><Banknote aria-hidden="true" size={17} /> Record payment</button>}
+                {canManage && selected.balanceCents > 0 && activeFinancialStatuses.has(selected.status) && <button className="primary-button full-button" type="button" onClick={() => { setDepositFirst(false); setError(""); setModal("payment"); }}><Banknote aria-hidden="true" size={17} /> Record payment</button>}
                 {!activeFinancialStatuses.has(selected.status) && <div className="inline-notice">This registration is {selected.status.toLowerCase()}. New payments are disabled, but existing payment and refund history remains available.</div>}
               </div>
             ) : modal === "adjust" ? (
@@ -317,7 +330,7 @@ export function FinanceWorkspace({
                 <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Reverse adjustment"}</button></div>
               </form>
             ) : modal === "payment" ? (
-              <form className="form-stack" onSubmit={recordPayment}><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required defaultValue={Math.max(selected.balanceCents, 0) / 100} /></label><label>Method<select name="method" defaultValue="CHECK"><option value="CHECK">Check</option><option value="CASH">Cash</option><option value="MANUAL">Other manual payment</option></select></label><label>Reference or note<input name="reference" maxLength={120} placeholder="Check number or staff note" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Record payment"}</button></div></form>
+              <form className="form-stack" onSubmit={recordPayment}><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required defaultValue={(depositFirst && selected.deposit ? selected.deposit.dueCents : Math.max(selected.balanceCents, 0)) / 100} /></label>{selected.deposit && !selected.deposit.held && <label className="checkbox-row"><input name="isDeposit" type="checkbox" defaultChecked={depositFirst} /> This is the reservation deposit (holds the reservation)</label>}<label>Method<select name="method" defaultValue="CHECK"><option value="CHECK">Check</option><option value="CASH">Cash</option><option value="MANUAL">Other manual payment</option></select></label><label>Reference or note<input name="reference" maxLength={120} placeholder="Check number or staff note" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Record payment"}</button></div></form>
             ) : (
               <form className="form-stack" onSubmit={reviewRefund}><div className="inline-notice">Refundable on this payment: {money((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0))}</div><label>Refund amount<input name="amount" type="number" min="0.01" max={((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)) / 100} step="0.01" required /></label><label>Reason<textarea name="reason" minLength={3} maxLength={300} rows={4} required placeholder="Why is this refund being recorded?" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>Review refund</button></div></form>
             )}

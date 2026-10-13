@@ -80,10 +80,11 @@ type LinkOptions = {
 };
 
 function quoteMatches(
-  attempt: { amountCents: number; surchargeCents: number },
-  checkout: { amountCents: number; surchargeCents: number },
+  attempt: { amountCents: number; surchargeCents: number; isDeposit: boolean },
+  checkout: { amountCents: number; surchargeCents: number; paymentKind: "BALANCE" | "DEPOSIT" },
 ) {
-  return attempt.amountCents === checkout.amountCents
+  return attempt.isDeposit === (checkout.paymentKind === "DEPOSIT")
+    && attempt.amountCents === checkout.amountCents
     && attempt.surchargeCents === checkout.surchargeCents;
 }
 
@@ -125,7 +126,7 @@ async function prepareHostedLink(
       "This private registration link is invalid or no longer active.",
     );
   }
-  const checkout = checkoutFromRegistration(registration, configuration);
+  const checkout = checkoutFromRegistration(registration, configuration, { kind: input.kind });
 
   const existing = await tx.paymentAttempt.findUnique({
     where: { clientIdempotencyKey: input.idempotencyKey },
@@ -225,6 +226,12 @@ async function prepareHostedLink(
       "Pay on Square is not offered for this event.",
     );
   }
+  if (input.kind === "DEPOSIT" && checkout.paymentKind !== "DEPOSIT") {
+    throw new SquarePaymentOperationError(
+      "DEPOSIT_UNAVAILABLE",
+      "A deposit is not available for this registration. It may already be recorded, or the whole balance may be due.",
+    );
+  }
 
   // One payment in flight at a time, whichever way it was started.
   const active = await tx.paymentAttempt.findUnique({
@@ -293,6 +300,7 @@ async function prepareHostedLink(
       ),
       // No activeRegistrationKey: an unpaid link is an offer, not a payment in flight. The webhook
       // takes the slot only when a payment through the link is actually pending.
+      isDeposit: checkout.paymentKind === "DEPOSIT",
       amountCents: checkout.amountCents,
       surchargeCents: checkout.surchargeCents,
       currency: "USD",
@@ -329,6 +337,7 @@ async function prepareHostedLink(
         amountCents: checkout.amountCents,
         balanceCents: checkout.balanceCents,
         surchargeCents: checkout.surchargeCents,
+        paymentKind: checkout.paymentKind,
         currency: "USD",
         registrationAccessTokenId: access.accessTokenId,
       },

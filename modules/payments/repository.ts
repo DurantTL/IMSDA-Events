@@ -1,5 +1,9 @@
 import { getPrisma } from "@/lib/prisma";
 import { getRegistrationById } from "@/modules/registrations/repository";
+import {
+  staffDepositProblem,
+  type StaffDepositProblem,
+} from "@/modules/payments/deposit-domain";
 import { enqueueRefundNoticeMessage } from "@/modules/communications/transactional-messages";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { logError } from "@/lib/logger";
@@ -9,9 +13,15 @@ import {
 } from "@/modules/payments/square-hosted-invalidation";
 
 export class PaymentOperationError extends Error {
-  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED") {
+  constructor(public readonly code: "REGISTRATION_NOT_FOUND" | "REGISTRATION_NOT_PAYABLE" | "PAYMENT_NOT_FOUND" | "PAYMENT_EXCEEDS_BALANCE" | "REFUND_EXCEEDS_AVAILABLE" | "CARD_REFUND_REQUIRES_SQUARE" | "REFUND_IDEMPOTENCY_KEY_REUSED" | StaffDepositProblem) {
     super(
-      code === "REFUND_IDEMPOTENCY_KEY_REUSED"
+      code === "DEPOSIT_NOT_OFFERED"
+        ? "This registration's form does not offer a reservation deposit."
+        : code === "DEPOSIT_ALREADY_RECORDED"
+        ? "A deposit is already recorded for this registration, so the reservation is already held."
+        : code === "DEPOSIT_AMOUNT_TOO_LOW"
+        ? "The amount is below the deposit due. Record it as an ordinary payment, or record the full deposit to hold the reservation."
+        : code === "REFUND_IDEMPOTENCY_KEY_REUSED"
         ? "This refund key was already used for a different amount or reason. Review the refund again to start a new one."
         : code === "CARD_REFUND_REQUIRES_SQUARE"
         ? "Card refunds must be issued in Square. IMSDA Events will update automatically after Square confirms the refund."
@@ -31,12 +41,15 @@ export async function recordManualPayment(
   eventId: string,
   registrationId: string,
   actorUserId: string,
-  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string },
+  input: { amountCents: number; method: "CASH" | "CHECK" | "MANUAL"; reference: string; isDeposit?: boolean },
 ) {
   const prisma = getPrisma();
   const registration = await prisma.registration.findFirst({
     where: { id: registrationId, eventId },
-    include: { payments: { where: { status: "SUCCEEDED" }, include: { refunds: { where: { status: "SUCCEEDED" } } } } },
+    include: {
+      payments: { where: { status: "SUCCEEDED" }, include: { refunds: { where: { status: "SUCCEEDED" } } } },
+      publicFormSubmission: { select: { formVersion: { select: { definition: true } } } },
+    },
   });
   if (!registration) throw new PaymentOperationError("REGISTRATION_NOT_FOUND");
   if (registration.status !== "SUBMITTED" && registration.status !== "CONFIRMED") {
@@ -48,13 +61,44 @@ export async function recordManualPayment(
   }, 0);
   const balanceCents = Math.max(Math.round(Number(registration.totalAmount) * 100) - netPaidCents, 0);
   if (input.amountCents > balanceCents) throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");
+  const isDeposit = input.isDeposit === true;
+  if (isDeposit) {
+    const problem = staffDepositProblem({
+      definition: registration.publicFormSubmission?.formVersion.definition,
+      balanceCents,
+      amountCents: input.amountCents,
+      payments: registration.payments,
+    });
+    if (problem) throw new PaymentOperationError(problem);
+  }
 
   await prisma.$transaction(async (tx) => {
+    if (isDeposit) {
+      // Serializes deposits on this registration: a repeated submission (a double click, a retry after a timeout)
+      // waits here, then finds the deposit the first one recorded and is refused instead of holding it twice.
+      await tx.$queryRaw`
+        SELECT "id" FROM "Registration"
+        WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
+        FOR NO KEY UPDATE
+      `;
+      const recorded = await tx.payment.findMany({
+        where: { registrationId, status: "SUCCEEDED", isDeposit: true },
+        include: { refunds: { where: { status: "SUCCEEDED" } } },
+      });
+      const problem = staffDepositProblem({
+        definition: registration.publicFormSubmission?.formVersion.definition,
+        balanceCents,
+        amountCents: input.amountCents,
+        payments: recorded,
+      });
+      if (problem) throw new PaymentOperationError(problem);
+    }
     const payment = await tx.payment.create({
       data: {
         eventId,
         registrationId,
         amount: input.amountCents / 100,
+        isDeposit,
         status: "SUCCEEDED",
         method: input.method,
         externalReference: input.reference || null,
@@ -65,12 +109,16 @@ export async function recordManualPayment(
       data: {
         eventId,
         actorUserId,
-        action: "MANUAL_PAYMENT_RECORDED",
+        action: isDeposit ? "RESERVATION_DEPOSIT_RECORDED" : "MANUAL_PAYMENT_RECORDED",
         entityType: "Payment",
         entityId: payment.id,
         correlationId: crypto.randomUUID(),
-        summary: `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}.`,
-        metadata: { amountCents: input.amountCents },
+        summary: isDeposit
+          ? `Recorded a ${input.method.toLowerCase()} reservation deposit on registration ${registration.confirmationCode}; the reservation is now held.`
+          : `Recorded a ${input.method.toLowerCase()} payment on registration ${registration.confirmationCode}.`,
+        metadata: isDeposit
+          ? { amountCents: input.amountCents, method: input.method, balanceBeforeCents: balanceCents, balanceAfterCents: balanceCents - input.amountCents, reservationHeld: true }
+          : { amountCents: input.amountCents },
       },
     });
     // The balance moved, so a Pay on Square link quoted against the old one must not stay payable (#327).

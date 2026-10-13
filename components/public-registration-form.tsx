@@ -205,6 +205,8 @@ type Confirmation = {
   lineItems: Array<{ key: string; label: string; amountCents: number; pricingLabel?: string }>;
   pricingDate: string;
   cardSelected: boolean;
+  /** The registrant chose "Pay a deposit now" (#415). */
+  depositSelected?: boolean;
   emailSent: boolean;
   paymentCollected: boolean;
   notificationQueued: boolean;
@@ -3076,6 +3078,8 @@ export function PublicRegistrationForm({
                     ? "Your payment is recorded. Keep this confirmation code and private registration link."
                     : confirmation.cardSelected
                       ? "Your registration is saved, but the card is not charged yet. Continue through the private registration link below to complete secure Square checkout."
+                      : confirmation.depositSelected
+                        ? "Your registration is saved, but the deposit is not charged yet. Continue through the private registration link below to pay the deposit and hold your reservation."
                       : "Keep this confirmation code and private registration link for future changes."}
                 </small>
               </span>
@@ -3128,8 +3132,8 @@ export function PublicRegistrationForm({
             {confirmation.managePath && (
               <div className="public-registration-manage-link">
                 <a {...eventsSiteNavigation} href={confirmation.managePath}>
-                  {confirmation.cardSelected && !confirmation.paymentCollected && !waitlisted
-                    ? "Continue to secure card payment"
+                  {(confirmation.cardSelected || confirmation.depositSelected) && !confirmation.paymentCollected && !waitlisted
+                    ? (confirmation.depositSelected && !confirmation.cardSelected ? "Continue to pay the deposit" : "Continue to secure card payment")
                     : "View or update this registration"}{" "}
                   <ArrowRight size={17} aria-hidden="true" />
                 </a>

@@ -15,6 +15,12 @@ import { directoryForDefinitions } from "@/modules/forms/form-options-repository
 import { withDirectoryOptions } from "@/modules/organizations/directory-form-options";
 import type { OrganizationDirectory } from "@/modules/organizations/directory-options";
 import { selectedCardPayment } from "@/modules/payments/square-domain";
+import {
+  depositConfigurationFromValue,
+  depositDueCents,
+  recordedDepositCents,
+  reservationHeld,
+} from "@/modules/payments/deposit-domain";
 
 type RegistrationWithRelations = Awaited<ReturnType<typeof getRegistrationQuery>>[number];
 type RegistrationReadClient = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
@@ -247,11 +253,23 @@ function serializeRegistration(registration: RegistrationWithRelations, director
     && balanceCents > 0
     && registration.event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE"
     && !cardPaymentConfigured;
+  // The reservation deposit (#415): offered by the submitted form, recorded as an ordinary payment marked as the
+  // deposit, and "held" exactly while that payment stands. Null when the form offers no deposit.
+  const depositConfig = depositConfigurationFromValue(registration.publicFormSubmission?.formVersion.definition);
+  const deposit = depositConfig
+    ? {
+        amountCents: depositConfig.amountCents,
+        dueCents: reservationHeld(registration.payments) ? 0 : depositDueCents(depositConfig, balanceCents),
+        recordedCents: recordedDepositCents(registration.payments),
+        held: reservationHeld(registration.payments),
+      }
+    : null;
   return {
     id: registration.id,
     confirmationCode: registration.confirmationCode,
     status: registration.status,
     totalAmountCents,
+    deposit,
     paidCents,
     balanceCents,
     onlinePaymentUnavailable,
@@ -306,6 +324,7 @@ function serializeRegistration(registration: RegistrationWithRelations, director
       amountCents: moneyToCents(payment.amount),
       refundedCents: payment.refunds.reduce((total, refund) => total + moneyToCents(refund.amount), 0),
       method: payment.method,
+      isDeposit: payment.isDeposit,
       externalReference: payment.externalReference ?? "",
       receivedAt: payment.receivedAt?.toISOString() ?? null,
       refunds: payment.refunds.map((refund) => ({
@@ -374,7 +393,9 @@ function serializeRegistration(registration: RegistrationWithRelations, director
 }
 
 type SerializedRegistration = ReturnType<typeof serializeRegistration>;
-export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "publicSubmission" | "location" | "locationWaitlistPlace"> & {
+export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "publicSubmission" | "location" | "locationWaitlistPlace" | "deposit"> & {
+  /** The reservation deposit (#415); optional so records built before it existed still type-check. */
+  deposit?: SerializedRegistration["deposit"];
   /** Optional so records built before locations existed (#413) still type-check. */
   location?: { id: string; name: string } | null;
   /** Optional like `location`: the place in line at the location while waitlisted there (#599). */

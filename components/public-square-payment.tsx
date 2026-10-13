@@ -36,6 +36,18 @@ type SquareCheckout = {
   surchargeCents: number;
   currency: "USD";
   cardSelected: boolean;
+  /** What `amountCents` pays (#415): the whole balance, or the form's fixed reservation deposit. */
+  paymentKind: "BALANCE" | "DEPOSIT";
+  /** A deposit that can be paid now instead of the whole balance; null when none is on offer. */
+  deposit: {
+    depositCents: number;
+    surchargeCents: number;
+    chargeCents: number;
+    balanceAfterCents: number;
+    chosenOnForm: boolean;
+  } | null;
+  /** A deposit is already recorded, so the reservation is held. */
+  depositRecorded: boolean;
   /** The event offers "Pay on Square" and this registration can use it right now (#327). */
   hostedLink?: boolean;
   paymentChoice: {
@@ -152,8 +164,8 @@ function destroyPaymentMethod(method: SquarePaymentMethod | null) {
   if (method?.destroy) void method.destroy();
 }
 
-async function fetchCheckout(endpoint: string) {
-  const response = await fetch(endpoint, {
+async function fetchCheckout(endpoint: string, kind: "BALANCE" | "DEPOSIT" | null = null) {
+  const response = await fetch(kind ? `${endpoint}?kind=${kind}` : endpoint, {
     method: "GET",
     cache: "no-store",
   });
@@ -180,6 +192,9 @@ function unavailableCheckout(error: unknown): SquareCheckout {
     surchargeCents: 0,
     currency: "USD",
     cardSelected: false,
+    paymentKind: "BALANCE",
+    deposit: null,
+    depositRecorded: false,
     hostedLink: false,
     paymentChoice: null,
     square: null,
@@ -270,9 +285,11 @@ export function PublicSquarePayment({
     message: string;
   } | null>(null);
 
+  // The registrant's own pick between a deposit and the whole balance (#415); null leaves the server to choose.
+  const kindRef = useRef<"BALANCE" | "DEPOSIT" | null>(null);
   const loadCheckout = useCallback(async () => {
     try {
-      setCheckout(await fetchCheckout(paymentEndpoint));
+      setCheckout(await fetchCheckout(paymentEndpoint, kindRef.current));
     } catch (error) {
       setCheckout(unavailableCheckout(error));
     } finally {
@@ -485,6 +502,7 @@ export function PublicSquarePayment({
         body: JSON.stringify({
           sourceId,
           idempotencyKey: idempotencyKeyRef.current,
+          kind: checkout?.paymentKind,
         }),
       });
       const body = await response.json() as {
@@ -533,6 +551,7 @@ export function PublicSquarePayment({
         body: JSON.stringify({
           idempotencyKey: hostedKeyRef.current,
           returnId: hostedReturnRef.current,
+          kind: checkout.paymentKind,
         }),
       });
       const body = await response.json() as {
@@ -679,6 +698,17 @@ export function PublicSquarePayment({
     } finally {
       setChoiceSubmitting(null);
     }
+  }
+
+  /** Switches between the deposit and the whole balance; the quote, wallets and any Pay on Square link follow it. */
+  async function chooseKind(next: "BALANCE" | "DEPOSIT") {
+    if (submittingMethod || hostedSubmitting || checkout?.paymentKind === next) return;
+    kindRef.current = next;
+    clearPaymentAttempt();
+    hostedKeyRef.current = null;
+    hostedReturnRef.current = null;
+    setNotice(null);
+    await loadCheckout();
   }
 
   if (loading) {
@@ -850,11 +880,43 @@ export function PublicSquarePayment({
           message: "The secure Square payment service could not be loaded.",
         })}
       />
+      {checkout.deposit && (
+        <div className="public-square-deposit-choice" role="group" aria-label="What to pay now">
+          <button
+            type="button"
+            className={checkout.paymentKind === "DEPOSIT" ? "secondary-button is-selected" : "secondary-button"}
+            aria-pressed={checkout.paymentKind === "DEPOSIT"}
+            disabled={Boolean(submittingMethod) || hostedSubmitting}
+            onClick={() => void chooseKind("DEPOSIT")}
+          >
+            Pay a deposit now: <span translate="no">{money(checkout.deposit.chargeCents)}</span>
+          </button>
+          <button
+            type="button"
+            className={checkout.paymentKind === "BALANCE" ? "secondary-button is-selected" : "secondary-button"}
+            aria-pressed={checkout.paymentKind === "BALANCE"}
+            disabled={Boolean(submittingMethod) || hostedSubmitting}
+            onClick={() => void chooseKind("BALANCE")}
+          >
+            Pay the whole balance
+          </button>
+        </div>
+      )}
+      {checkout.depositRecorded && (
+        <p className="public-square-fee-breakdown">Your deposit is recorded and your reservation is held.</p>
+      )}
       <div className="public-square-heading">
         <span><CreditCard size={20} aria-hidden="true" /></span>
         <div>
-          <strong>Pay <span translate="no">{money(checkout.amountCents)}</span> securely with Square</strong>
-          {checkout.surchargeCents > 0 && (
+          <strong>{checkout.paymentKind === "DEPOSIT" ? "Pay the deposit of" : "Pay"} <span translate="no">{money(checkout.amountCents)}</span> securely with Square</strong>
+          {checkout.paymentKind === "DEPOSIT" && checkout.deposit && (
+            <p className="public-square-fee-breakdown">
+              Deposit <span translate="no">{money(checkout.deposit.depositCents)}</span> + card processing{" "}
+              <span translate="no">{money(checkout.deposit.surchargeCents)}</span>. The rest,{" "}
+              <span translate="no">{money(checkout.deposit.balanceAfterCents)}</span>, stays as your balance and is due later.
+            </p>
+          )}
+          {checkout.paymentKind !== "DEPOSIT" && checkout.surchargeCents > 0 && (
             <p className="public-square-fee-breakdown">
               Balance <span translate="no">{money(checkout.balanceCents)}</span> + card processing{" "}
               <span translate="no">{money(checkout.surchargeCents)}</span>. Paying by another method avoids
