@@ -286,6 +286,13 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   await tx.paymentAttempt.deleteMany({ where: inEvent });
   await tx.payment.deleteMany({ where: inEvent });
 
+  // 2b. Meals (#210): the ledger RESTRICTs the adjustment lines it posted and the selections RESTRICT services and
+  //     plans, so they go first, newest layer first. Their append-only triggers accept this transaction's deletes.
+  await tx.eventMealLedgerEntry.deleteMany({ where: inEvent });
+  await tx.eventMealSelectionChange.deleteMany({ where: inEvent });
+  await tx.eventMealSelection.deleteMany({ where: inEvent });
+  await tx.eventMealServiceChange.deleteMany({ where: inEvent });
+
   // 3. Promo redemptions and adjustments (redemptions RESTRICT the promo code).
   await tx.promoCodeRedemption.deleteMany({ where: inEvent });
   await tx.registrationAdjustment.deleteMany({ where: inEvent });

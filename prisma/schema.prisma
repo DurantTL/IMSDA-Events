@@ -1624,6 +1624,14 @@ model Event {
   lodgingAssignments                  EventLodgingAssignment[]
   lodgingAssignmentHistory            EventLodgingAssignmentHistory[]
   lodgingAssignmentNotices            EventLodgingAssignmentNotice[]
+  mealServices                        EventMealService[]
+  mealServiceChanges                  EventMealServiceChange[]
+  mealPlans                           EventMealPlan[]
+  mealPlanServices                    EventMealPlanService[]
+  mealPrices                          EventMealPrice[]
+  mealSelections                      EventMealSelection[]
+  mealSelectionChanges                EventMealSelectionChange[]
+  mealLedgerEntries                   EventMealLedgerEntry[]
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
   lodgingWaitlistHistory              EventLodgingWaitlistHistory[]
   notes                               StaffNote[]
@@ -1783,6 +1791,7 @@ model EventAttendeeType {
 
   event     Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   attendees RegistrationAttendee[]
+  mealPrices EventMealPrice[]
 
   @@unique([eventId, code])
   @@index([eventId, isActive, sortOrder, label])
@@ -2688,6 +2697,8 @@ model Registration {
   lodgingChangeRequests   EventLodgingChangeRequest[]
   lodgingWaitlistEntries  EventLodgingWaitlistEntry[]
   lodgingAssignmentNotices EventLodgingAssignmentNotice[]
+  mealSelections          EventMealSelection[]
+  mealLedgerEntries       EventMealLedgerEntry[]
   lodgingRoommateRequestsFrom EventLodgingRoommateRequest[] @relation("LodgingRoommateFrom")
   lodgingRoommateRequestsTo   EventLodgingRoommateRequest[] @relation("LodgingRoommateTarget")
   honorEnrollments        HonorEnrollment[]
@@ -2894,6 +2905,7 @@ model RegistrationAttendee {
   memberTransferMoves    MemberTransferRegistrationMove[]
   lodgingAssignments     EventLodgingAssignment[]
   lodgingPlaceholderLinks EventLodgingPlaceholder[]
+  mealSelections         EventMealSelection[]
 
   @@unique([registrationId, personId])
   @@index([registrationId, position])
@@ -2982,6 +2994,7 @@ model RegistrationAdjustment {
   attendee     RegistrationAttendee?   @relation(fields: [registrationAttendeeId], references: [id], onDelete: SetNull)
   reverses     RegistrationAdjustment? @relation("AdjustmentReversal", fields: [reversesAdjustmentId], references: [id], onDelete: Restrict)
   reversedBy   RegistrationAdjustment? @relation("AdjustmentReversal")
+  mealLedgerEntry EventMealLedgerEntry?
 
   @@index([registrationId, createdAt])
   @@index([eventId, kind])
@@ -2993,6 +3006,8 @@ enum RegistrationAdjustmentKind {
   DISCOUNT
   PROMO_CODE
   CORRECTION
+  /// A charge or credit posted by the meal ledger (#210). Never reversed by hand: change the meal order instead.
+  MEAL
 }
 
 model Payment {
@@ -7585,4 +7600,322 @@ model SystemReadinessTick {
   tickedByName     String
   tickedAt         DateTime @default(now())
   note             String?
+}
+
+
+// ---------------------------------------------------------------------------
+// Meals (#210): services, plans, pricing, selections and the meal ledger.
+// A selection is what was ordered or entitled. Redemption (#211) and kitchen
+// counts and preparation (#212) are separate and never live in these tables.
+// ---------------------------------------------------------------------------
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  SUPPER
+  SNACK
+  OTHER
+}
+
+enum MealServiceStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum MealTicketing {
+  TICKETED
+  /// No ticket is sold (Camp Meeting Sabbath lunch). Nothing can be selected for it.
+  DONATION_ONLY
+}
+
+enum MealPayer {
+  ATTENDEE
+  /// Staff, pastor and volunteer meals the conference pays for (#804): the attendee is never charged.
+  CONFERENCE
+}
+
+enum MealAgeGroup {
+  ADULT
+  CHILD
+}
+
+enum MealEntitlement {
+  PAID
+  INCLUDED
+}
+
+enum MealSelectionStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum MealSelectionSource {
+  REGISTRATION_FORM
+  STAFF
+  WALK_UP
+  PLAN_ASSIGNMENT
+}
+
+enum MealChangeType {
+  CREATED
+  QUANTITY_CHANGED
+  PLAN_CHANGED
+  SUBSTITUTED
+  CANCELLED
+  SERVICE_CANCELLED
+}
+
+enum MealServiceChangeType {
+  CREATED
+  UPDATED
+  CANCELLED
+  REINSTATED
+}
+
+enum MealLedgerKind {
+  CHARGE
+  CREDIT
+}
+
+enum MealSettlement {
+  /// Already inside the registration's priced total (the registration form priced it).
+  IN_REGISTRATION_PRICING
+  /// Posted to the registration as a MEAL adjustment line.
+  REGISTRATION_ADJUSTMENT
+  /// Paid or voided at the counter by staff (walk-up order); no registration.
+  AT_COUNTER
+  /// The registration is cancelled or waitlisted, so nothing is posted to it; the credit is on the ledger only.
+  REGISTRATION_NOT_LIVE
+}
+
+/// One meal occurrence: a date, a serving window, a place and a capacity. Dates and times are event-local text
+/// (YYYY-MM-DD, HH:mm), so they never shift with a time zone. Cancelling keeps the row and its history.
+model EventMealService {
+  id              String            @id @default(cuid())
+  eventId         String
+  name            String
+  mealType        MealType
+  serviceDate     String
+  startTime       String
+  endTime         String?
+  location        String?
+  ticketing       MealTicketing     @default(TICKETED)
+  capacity        Int?
+  status          MealServiceStatus @default(ACTIVE)
+  cancelledAt     DateTime?
+  cancelReason    String?
+  position        Int               @default(0)
+  createdByUserId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  event      Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  changes    EventMealServiceChange[]
+  planLinks  EventMealPlanService[]
+  selections EventMealSelection[]
+  ledger     EventMealLedgerEntry[]
+
+  @@unique([eventId, serviceDate, name])
+  @@index([eventId, serviceDate, startTime])
+  @@index([eventId, status])
+}
+
+/// Append-only history of a service: created, edited, cancelled, reinstated, with who and why.
+model EventMealServiceChange {
+  id          String                @id @default(cuid())
+  eventId     String
+  serviceId   String
+  type        MealServiceChangeType
+  actorUserId String?
+  reason      String?
+  before      Json?
+  after       Json?
+  createdAt   DateTime              @default(now())
+
+  event   Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  service EventMealService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId, createdAt])
+  @@index([eventId, createdAt])
+}
+
+/// A named bundle of meals with a payer. An ATTENDEE plan sells tickets at its prices; a CONFERENCE plan entitles
+/// people to meals the conference pays for. `isDefaultTicketPlan` marks the plan registration-form tickets use.
+model EventMealPlan {
+  id                  String          @id @default(cuid())
+  eventId             String
+  code                String
+  name                String
+  description         String          @default("")
+  payer               MealPayer       @default(ATTENDEE)
+  isDefaultTicketPlan Boolean         @default(false)
+  /// Every ticketed service of the event is covered, at `defaultEntitlement`, unless a plan service row says otherwise.
+  includesAllServices Boolean         @default(false)
+  defaultEntitlement  MealEntitlement @default(PAID)
+  isActive            Boolean         @default(true)
+  position            Int             @default(0)
+  createdByUserId     String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  event      Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  services   EventMealPlanService[]
+  prices     EventMealPrice[]
+  selections EventMealSelection[]
+
+  @@unique([eventId, code])
+  @@index([eventId, isActive, position])
+}
+
+/// A plan's entry for one service: PAID tickets or INCLUDED (complimentary).
+model EventMealPlanService {
+  id          String          @id @default(cuid())
+  eventId     String
+  planId      String
+  serviceId   String
+  entitlement MealEntitlement @default(PAID)
+  createdAt   DateTime        @default(now())
+
+  event   Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  plan    EventMealPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  service EventMealService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, serviceId])
+  @@index([eventId])
+  @@index([serviceId])
+}
+
+/// What a plan charges per meal type for an age group or an attendee type (a price for an attendee type wins;
+/// zero makes that role complimentary). Under a CONFERENCE plan the amount is the rate the conference is billed
+/// per meal used (read by #212); the attendee is never charged. A selection copies the amount, so editing a price
+/// never rewrites a past order.
+model EventMealPrice {
+  id              String        @id @default(cuid())
+  eventId         String
+  planId          String
+  mealType        MealType
+  ageGroup        MealAgeGroup?
+  attendeeTypeId  String?
+  amountCents     Int
+  updatedByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  event        Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  plan         EventMealPlan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  attendeeType EventAttendeeType? @relation(fields: [attendeeTypeId], references: [id], onDelete: Cascade)
+
+  /// The migration adds partial unique indexes (one price per plan, meal type and age group, or attendee type) and a
+  /// check that exactly one of age group and attendee type is set.
+  @@index([planId, mealType])
+  @@index([eventId])
+  @@index([attendeeTypeId])
+}
+
+/// What was ordered or entitled: `quantity` meals of a type for an age group under a plan, optionally pinned to one
+/// service (an unpinned selection is a ticket good for any service of that meal type, which is how Camp Meeting
+/// sells them). Never a redemption or a preparation count. Price, plan, payer and source form version are copied
+/// here when it is made. Rows are never deleted; a change is a new EventMealSelectionChange.
+model EventMealSelection {
+  id                     String              @id @default(cuid())
+  eventId                String
+  planId                 String
+  mealType               MealType
+  serviceId              String?
+  registrationId         String?
+  registrationAttendeeId String?
+  ageGroup               MealAgeGroup
+  attendeeTypeCode       String?
+  quantity               Int
+  status                 MealSelectionStatus @default(ACTIVE)
+  source                 MealSelectionSource
+  payer                  MealPayer
+  unitPriceCents         Int
+  /// The plan price a conference-paid selection would be billed at, per meal, when it is used (#212). Zero otherwise.
+  conferenceRateCents    Int                 @default(0)
+  pricingSnapshot        Json
+  sourceFormVersionId    String?
+  sourceFieldKey         String?
+  /// Configured, non-medical dietary categories only (see modules/meals/domain.ts). Never allergies or accommodation notes.
+  dietaryCategories      String[]            @default([])
+  /// A short label for a walk-up order. Never a medical or personal detail.
+  orderLabel             String?
+  clientRequestId        String?
+  replacesSelectionId    String?
+  createdByUserId        String?
+  cancelledAt            DateTime?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  event        Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  plan         EventMealPlan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  service      EventMealService?          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  registration Registration?              @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  attendee     RegistrationAttendee?      @relation(fields: [registrationAttendeeId], references: [id], onDelete: SetNull)
+  changes      EventMealSelectionChange[]
+  ledger       EventMealLedgerEntry[]
+
+  /// The migration adds: one active selection per registration, attendee, meal type, service and age group; a
+  /// unique client request id per event; and checks on quantity, price and the walk-up shape.
+  @@index([eventId, status, mealType])
+  @@index([registrationId, status])
+  @@index([registrationAttendeeId])
+  @@index([serviceId, status])
+  @@index([planId])
+}
+
+/// Append-only history of a selection: every creation, quantity change, plan change, substitution and
+/// cancellation, with who did it, why, and the selection before and after.
+model EventMealSelectionChange {
+  id          String         @id @default(cuid())
+  eventId     String
+  selectionId String
+  type        MealChangeType
+  actorUserId String?
+  actorName   String
+  reason      String?
+  before      Json?
+  after       Json
+  createdAt   DateTime       @default(now())
+
+  event     Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  selection EventMealSelection     @relation(fields: [selectionId], references: [id], onDelete: Cascade)
+  ledger    EventMealLedgerEntry[]
+
+  @@index([selectionId, createdAt])
+  @@index([eventId, createdAt])
+}
+
+/// Append-only meal charges and credits. A cancellation or a lower quantity is a CREDIT at the price that was
+/// charged; nothing is edited. `settlement` says where the money went: already in the registration's priced total,
+/// a MEAL adjustment line, or the counter (walk-up). The sum of a registration's entries is its meal total.
+model EventMealLedgerEntry {
+  id                       String         @id @default(cuid())
+  eventId                  String
+  selectionId              String
+  changeId                 String
+  registrationId           String?
+  serviceId                String?
+  mealType                 MealType
+  ageGroup                 MealAgeGroup
+  kind                     MealLedgerKind
+  quantity                 Int
+  unitPriceCents           Int
+  amountCents              Int
+  payer                    MealPayer
+  settlement               MealSettlement
+  registrationAdjustmentId String?        @unique
+  reason                   String?
+  createdAt                DateTime       @default(now())
+
+  event        Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  selection    EventMealSelection       @relation(fields: [selectionId], references: [id], onDelete: Cascade)
+  change       EventMealSelectionChange @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  registration Registration?            @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  service      EventMealService?        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  adjustment   RegistrationAdjustment?  @relation(fields: [registrationAdjustmentId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, createdAt])
+  @@index([registrationId, createdAt])
+  @@index([selectionId])
 }

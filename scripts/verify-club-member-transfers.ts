@@ -62,7 +62,13 @@ async function cleanup() {
   await prisma.honorClassWaitlistEntry.deleteMany({ where: { eventId } });
   await prisma.honorEnrollment.deleteMany({ where: { eventId } });
   await prisma.clubEventRegistration.deleteMany({ where: { eventId } });
-  await prisma.registration.deleteMany({ where: { eventId } });
+  await prisma.$transaction(async (tx) => {
+  // Meal rows are append-only (#210): they go only inside an event deletion, as the event deletion service does it.
+  await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+  await tx.eventMealSelectionChange.deleteMany({ where: { eventId } });
+  await tx.eventMealSelection.deleteMany({ where: { eventId } });
+});
+await prisma.registration.deleteMany({ where: { eventId } });
   await prisma.honorOffering.deleteMany({ where: { eventId } });
   await prisma.honorSession.deleteMany({ where: { eventId } });
   await prisma.event.deleteMany({ where: { id: eventId } });
@@ -261,6 +267,21 @@ async function main() {
   await prisma.honorOffering.update({ where: { id: offering.id }, data: { perClubLimit: 5 } });
   console.log("ok  refused: draft destination, clamped total, below paid, below $0, per-club class limit; each left the move pending");
 
+  // Meals (#210): a person with an active meal selection is not moved until it is cancelled (their selections and ledger rows cannot follow).
+  const mealPlan = await prisma.eventMealPlan.create({ data: { eventId, code: "tickets", name: "Tickets", isDefaultTicketPlan: true } });
+  const mealSelection = await prisma.eventMealSelection.create({
+    data: { eventId, planId: mealPlan.id, mealType: "LUNCH", registrationId: regA.id, registrationAttendeeId: adaAttendee.id, ageGroup: "CHILD", quantity: 1, source: "STAFF", payer: "ATTENDEE", unitPriceCents: 0, pricingSnapshot: {} },
+  });
+  const mealBlocked = await repo.approveRegistrationMove(pendingMove.id, "", staff, now).then(() => null, (caught: unknown) => caught);
+  assert(mealBlocked && (mealBlocked as { code?: string }).code === "MOVE_BLOCKED" && /meal/i.test((mealBlocked as Error).message), `an active meal selection blocks the move with a clear message, got ${String(mealBlocked)}`);
+  assert((await prisma.memberTransferRegistrationMove.findUniqueOrThrow({ where: { id: pendingMove.id } })).status === "PENDING", "the blocked move stays pending");
+  await prisma.eventMealSelection.update({ where: { id: mealSelection.id }, data: { status: "CANCELLED", cancelledAt: now } });
+  // A MEAL line stays with the registration it was ledgered on: it is neither moved nor part of the move's money.
+  await prisma.registrationAdjustment.create({
+    data: { eventId, registrationId: regA.id, registrationAttendeeId: adaAttendee.id, kind: "MEAL", amountCents: 300, reason: "Meal charge", createdByNameSnapshot: "Test Staff" },
+  });
+  console.log("ok  refused: an active meal selection; the move stays pending until it is cancelled");
+
   // A place on a full class's waitlist (#831), in a class where the receiving club is already at its per-club limit.
   const session2 = await prisma.honorSession.create({ data: { eventId, name: "Second session", normalizedName: "second session" } });
   const offering2 = await prisma.honorOffering.create({ data: { eventId, honorId: `${P}_honor`, sessionId: session2.id, span: "SINGLE_SESSION", capacity: 2, perClubLimit: 1 } });
@@ -274,7 +295,8 @@ async function main() {
   await prisma.honorOffering.delete({ where: { id: offering2.id } });
   const attendeeAfter = await prisma.registrationAttendee.findUniqueOrThrow({ where: { id: adaAttendee.id } });
   const enrollment = await prisma.honorEnrollment.findFirstOrThrow({ where: { registrationAttendeeId: adaAttendee.id } });
-  const adjustment = await prisma.registrationAdjustment.findFirstOrThrow({ where: { registrationAttendeeId: adaAttendee.id } });
+  const adjustment = await prisma.registrationAdjustment.findFirstOrThrow({ where: { registrationAttendeeId: adaAttendee.id, kind: "SCHOLARSHIP" } });
+  assert((await prisma.registrationAdjustment.findFirstOrThrow({ where: { kind: "MEAL", registrationAttendeeId: adaAttendee.id } })).registrationId === regA.id && moved.fromTotalCentsBefore === 7500, "a MEAL line stays on the old registration and is not counted in the move's money");
   assert(attendeeAfter.registrationId === regB.id && enrollment.registrationId === regB.id && enrollment.organizationId === clubs.b && adjustment.registrationId === regB.id, "attendee, class seat and adjustment moved together");
   assert((attendeeAfter.profileSnapshot as { clubRosterMemberId?: string }).clubRosterMemberId === accepted.rosterMemberId, "the snapshot points at the receiving roster row");
   const bWorkspace = await getClubEventWorkspace(clubs.b, eventId, now);

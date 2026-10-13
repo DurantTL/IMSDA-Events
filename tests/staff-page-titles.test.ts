@@ -49,6 +49,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/club-forms/sub_1")).toBe("Club form");
     expect(staffSubpageTitle("/more/merchandise")).toBe("Merchandise catalog");
     expect(staffSubpageTitle("/more/lodging")).toBe("Lodging");
+    expect(staffSubpageTitle("/more/meals")).toBe("Meals");
     expect(staffSubpageTitle("/more/lodging/requests")).toBe("Lodging requests");
     expect(staffSubpageTitle("/more/lodging/assignments")).toBe("Lodging assignments");
     expect(staffSubpageTitle("/more/program-assignments/run_1")).toBe("Assignment roster");
@@ -68,7 +69,7 @@ describe("staff page names (#685)", () => {
       clubMonthlyReport: "more/clubs/reports/[organizationId]/[month]", clubMonthlyReports: "more/clubs/reports",
       clubs: "more/clubs", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
       clubForms: "more/club-forms", eventHealth: "more/event-health", clubAssignments: "more/club-assignments", eventContent: "more/event-content",
-      eventPatches: "more/event-patches", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments",
+      eventPatches: "more/event-patches", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments",
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",
       teamResults: "more/team-results", teamForm: "more/reports/clubs/team-form",
     };

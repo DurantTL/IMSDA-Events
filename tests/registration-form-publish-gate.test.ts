@@ -11,7 +11,7 @@ vi.mock("@/modules/attendee-types/repository", () => ({
   listActiveAttendeeTypes: dependencies.listActiveAttendeeTypes,
 }));
 
-import { formTemplates } from "@/modules/forms/definition";
+import { formTemplates, getFormTemplate } from "@/modules/forms/definition";
 import {
   FormOperationError,
   publishRegistrationForm,
@@ -39,6 +39,7 @@ function version(overrides: Record<string, unknown> = {}) {
 function transactionClient(previouslyPublishedCount: number, validTests: number) {
   return {
     $executeRaw: vi.fn().mockResolvedValue(0),
+    eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     registrationForm: {
       findFirst: vi.fn().mockResolvedValue({
@@ -86,6 +87,23 @@ beforeEach(() => {
 });
 
 describe("registration form publish gate", () => {
+  it("refuses to publish a draft whose meal ticket prices differ from the meal plan, and publishes once they match (#210)", async () => {
+    const campMeeting = getFormTemplate("camp_meeting_export")!.definition;
+    const stale = transactionClient(0, 1);
+    stale.eventMealPlan.findFirst.mockResolvedValue({ prices: [{ mealType: "BREAKFAST", ageGroup: "ADULT", amountCents: 750 }] });
+    stale.registrationForm.findFirst.mockResolvedValue({ id: "form-1", eventId: "event-1", name: "Camp Meeting", versions: [version({ definition: campMeeting })] });
+    dependencies.getPrisma.mockReturnValue(prismaFor(stale));
+    await expect(publishRegistrationForm("event-1", "form-1", "user-1")).rejects.toMatchObject({ code: "MEAL_PRICE_DRIFT" });
+    expect(stale.registrationFormVersion.updateMany).not.toHaveBeenCalled();
+
+    const current = transactionClient(0, 1);
+    current.eventMealPlan.findFirst.mockResolvedValue({ prices: [{ mealType: "BREAKFAST", ageGroup: "ADULT", amountCents: 700 }] });
+    current.registrationForm.findFirst.mockResolvedValue({ id: "form-1", eventId: "event-1", name: "Camp Meeting", versions: [version({ definition: campMeeting })] });
+    dependencies.getPrisma.mockReturnValue(prismaFor(current));
+    await publishRegistrationForm("event-1", "form-1", "user-1");
+    expect(current.registrationFormVersion.updateMany).toHaveBeenCalled();
+  });
+
   it("requires a valid test submission for a form's first published version", async () => {
     const tx = transactionClient(0, 0);
     dependencies.getPrisma.mockReturnValue(prismaFor(tx));

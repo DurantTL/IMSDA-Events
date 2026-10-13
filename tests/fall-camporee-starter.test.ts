@@ -112,6 +112,7 @@ describe("Fall Camporee starter", () => {
       eventAttendeeType: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventAttendeeClassification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventLocation: { createMany: locationCreateMany },
+      eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
       registrationForm: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "form-1", name: "Fall Camporee" }) },
       eventMessageTemplate: { create: vi.fn().mockResolvedValue({}) },
       eventTemplateApplication: { create: vi.fn().mockResolvedValue({ id: "application-1" }) },

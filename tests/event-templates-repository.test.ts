@@ -142,6 +142,7 @@ function mockApply(options: {
     eventModule: { createMany: moduleCreateMany },
     eventAttendeeType: { createMany: attendeeTypeCreateMany },
     eventAttendeeClassification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
     registrationForm: { findUnique: vi.fn().mockResolvedValue(null), create: registrationFormCreate },
     eventMessageTemplate: { create: messageTemplateCreate },
     eventTemplateApplication: { create: applicationCreate },

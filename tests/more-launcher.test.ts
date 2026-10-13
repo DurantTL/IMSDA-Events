@@ -59,7 +59,7 @@ describe("launcher grouping", () => {
   it("leaves out the groups with nothing the viewer may open (finance staff: no Setup, no People & access)", () => {
     const groups = launcherGroups(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }));
     expect(groups.map((group) => group.group)).toEqual(["content-sales", "reports"]);
-    expect(keysOf(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }))).toEqual(["promo-codes", "health"]);
+    expect(keysOf(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }))).toEqual(["meals", "promo-codes", "health"]);
   });
 
   it("is empty for staff whose only permission opens no More destination", () => {
