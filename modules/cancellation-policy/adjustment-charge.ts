@@ -17,6 +17,7 @@ const kindWords: Record<string, string> = {
   PROMO_CODE: "Promo code",
   CORRECTION: "Correction",
   MEAL: "Meal",
+  ASSET: "Keys and items charge",
 };
 
 export type AdjustmentRow = {
@@ -34,6 +35,10 @@ function attendeeOf(id: string | null, attendeeIds: readonly string[]) {
 
 export function adjustmentCharge(adjustment: AdjustmentRow, attendeeIds: readonly string[]): ChargeEntry {
   const isMeal = adjustment.kind === "MEAL";
+  // A key or item charge (#214) is a fixed rule: never refunded when someone cancels, not prorated, attributed to no attendee.
+  if (adjustment.kind === "ASSET") {
+    return { id: `adjustment:${adjustment.id}`, source: "ADJUSTMENT", label: "Keys and items charge", amountCents: adjustment.amountCents, category: "ADJUSTMENT", fieldKey: null, attendeeId: null, fixedRule: "KEY_OR_ITEM_CHARGE" };
+  }
   return {
     id: `adjustment:${adjustment.id}`,
     source: "ADJUSTMENT",
