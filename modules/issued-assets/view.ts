@@ -340,6 +340,8 @@ export type HistoryEntry = {
   id: string;
   type: string;
   at: string;
+  /** When the server wrote it (later than `at` for an offline entry). */
+  recordedAt: string;
   actorName: string | null;
   reason: string | null;
   entryMethod: string;
@@ -355,12 +357,12 @@ export type HistoryEntry = {
 export async function listAssetHistory(eventId: string, assetId: string, client: Client = getPrisma()): Promise<HistoryEntry[]> {
   const rank: Record<string, number> = { ISSUED: 0, TRANSFERRED_OUT: 1, REPLACED_OUT: 1, TRANSFERRED_IN: 2, REPLACED_IN: 2, CORRECTED: 3 };
   // A transfer or replacement writes its OUT and IN rows at one instant: the OUT reads first.
-  const rows = (await client.assetIssuanceHistory.findMany({ where: { eventId, assetId }, orderBy: [{ at: "asc" }, { revision: "asc" }], take: 500 }))
-    .sort((a, b) => a.at.getTime() - b.at.getTime() || (rank[a.type] ?? 0) - (rank[b.type] ?? 0));
+  const rows = (await client.assetIssuanceHistory.findMany({ where: { eventId, assetId }, orderBy: [{ at: "asc" }, { recordedAt: "asc" }, { revision: "asc" }], take: 500 }))
+    .sort((a, b) => a.at.getTime() - b.at.getTime() || a.recordedAt.getTime() - b.recordedAt.getTime() || (rank[a.type] ?? 0) - (rank[b.type] ?? 0));
   const users = await client.user.findMany({ where: { id: { in: [...new Set(rows.map((row) => row.actorUserId))] } }, select: { id: true, displayName: true } });
   const names = new Map(users.map((row) => [row.id, row.displayName]));
   return rows.map((row) => ({
-    id: row.id, type: row.type, at: row.at.toISOString(), actorName: names.get(row.actorUserId) ?? null, reason: row.reason, entryMethod: row.entryMethod, quantity: row.quantity,
+    id: row.id, type: row.type, at: row.at.toISOString(), recordedAt: row.recordedAt.toISOString(), actorName: names.get(row.actorUserId) ?? null, reason: row.reason, entryMethod: row.entryMethod, quantity: row.quantity,
     holderKind: row.assigneeKind, sourceAssignmentId: row.sourceAssignmentId, roomUnitId: row.roomUnitId, issuanceId: row.issuanceId, relatedIssuanceId: row.relatedIssuanceId,
   }));
 }

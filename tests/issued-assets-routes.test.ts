@@ -142,6 +142,20 @@ describe("issued-asset route behaviour", () => {
     expect(mocks.issueAssets.mock.calls.map((call) => (call[2] as { entryMethod: string }).entryMethod)).toEqual(["MANUAL", "SCAN", "OFFLINE"]);
   });
 
+  it("tells the service whether the signed-in person also has event setup permission", async () => {
+    const call = () => issuanceRoute(request("POST", { action: "correct", reason: "Oops" }), { params: Promise.resolve({ ...params, issuanceId: "i1" }) });
+    await call();
+    expect(mocks.applyIssuanceAction.mock.calls[0]![4]).toEqual({ canConfigure: true });
+    mocks.findActiveMembership.mockResolvedValue(membership("CHECK_IN_STAFF"));
+    await call();
+    expect(mocks.applyIssuanceAction.mock.calls[1]![4]).toEqual({ canConfigure: false });
+  });
+
+  it("answers an older-correction refusal as forbidden", async () => {
+    mocks.applyIssuanceAction.mockRejectedValue(new AssetError("CONFIGURE_REQUIRED", "Ask an administrator."));
+    expect((await issuanceRoute(request("POST", { action: "correct", reason: "Oops" }), { params: Promise.resolve({ ...params, issuanceId: "i1" }) })).status).toBe(403);
+  });
+
   it("answers a refusal with its status, code and per-item detail", async () => {
     mocks.issueAssets.mockRejectedValue(new AssetError("ITEMS_REJECTED", "That item is already issued to someone else.", { items: [{ index: 0 }] }));
     const response = await issueRoute(request("POST", { items: [{ code: "K-214" }] }), { params: Promise.resolve(params) });

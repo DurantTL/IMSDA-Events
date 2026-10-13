@@ -41,6 +41,8 @@ export const MAX_RANGE_SIZE = 500;
 /** How far back an offline desk may say an issue happened, and how far ahead a skewed clock may be forgiven. */
 export const OFFLINE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 export const CLOCK_SKEW_MS = 5 * 60 * 1000;
+/** Check-in staff may correct (withdraw) an issue only this soon after the server recorded it; later needs event setup permission. */
+export const CORRECTION_WINDOW_MS = 30 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Codes
@@ -224,7 +226,8 @@ export type ItemErrorCode =
   | "ROOM_ASSIGNMENT_REQUIRED"
   | "ROOM_ASSIGNMENT_AMBIGUOUS"
   | "ROOM_ASSIGNMENT_INVALID"
-  | "ROOM_ASSIGNMENT_MOVED";
+  | "ROOM_ASSIGNMENT_MOVED"
+  | "OCCURRED_AT_INVALID";
 
 export type HolderKey = { kind: AssigneeKind; ref: string };
 

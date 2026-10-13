@@ -65,6 +65,28 @@ pointing at it. The desk compares it with where the holder stays now (current, m
 key opens a room the family has left. Replacing the key records a new issuance against the current assignment and ends
 the old one as replaced; `listRoomIssuances` returns the room's whole key history across moves.
 
+## Offline entries, backdating and corrections
+
+- An offline entry without a named assignment is linked to the assignment that covered the moment it happened,
+  including one a later move cancelled. The desk also sends the assignment it was showing when the request was queued.
+- An offline time cannot be earlier than the item's creation, than the previous holder giving a numbered item up, or
+  than the start of the lodging assignment it names. History rows carry `at` (when it happened) and `recordedAt` (when
+  the server wrote it); `listAssetHistory` orders by both. An issuance never ends before it began (database check),
+  so the end time is never earlier than the issue time even when a device clock ran fast.
+- **Correct** (withdraw an issue entered in error): check-in staff (`MANAGE_CHECK_IN`) may do it within 30 minutes of the
+  server recording the issue; later needs `CONFIGURE_EVENT`. Putting a replaced numbered item straight back in stock
+  (`originalAvailability: AVAILABLE`) also needs `CONFIGURE_EVENT`. This is a conservative default pending an owner
+  decision. **For #214:** a CORRECTED issue on a deposit-bearing type is an exception to reconcile (the deposit may
+  already be taken); do not treat it as an ordinary return.
+- Replacing a unit of a **quantity** lot ends the holder's issue and starts one from the replacement lot; it never
+  changes whether the original lot can be issued. A numbered original is held out or returned to stock as chosen.
+- A retried transfer or replacement (same saved key) returns the original result. Correct has no new issue to key on; a
+  second attempt answers "already ended".
+- The desk keeps queued offline requests per event and signed-in person, and keeps an offline entry the server refused,
+  with the reason, until it is dismissed. It records `SCAN` when every code arrived as a fast keyboard-wedge burst
+  ending in Enter, otherwise `MANUAL`; that is a heuristic, so treat the method as informational.
+- The room unit and source assignment references are `ON DELETE NO ACTION`, like the attendee and registration ones.
+
 ## Left for slice 2 (#214)
 
 Return, partial return, loss, damage, waiver, charge and closeout events; deposits and fees (use the append-only ledger);

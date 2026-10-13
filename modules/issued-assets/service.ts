@@ -18,6 +18,7 @@ import {
   issueRequestSchema,
   normalizeAssetCode,
   pickRoomCandidate,
+  CORRECTION_WINDOW_MS,
   plausibleOccurredAt,
   sameHolder,
   type AssetMode,
@@ -282,8 +283,14 @@ async function resolveRoomLink(tx: Tx, eventId: string, holder: Holder, assignme
     assertAssignmentUsable(assignment, issuedAt, entryMethod);
     return { roomUnitId: assignment.eventLodgingUnitId, sourceAssignmentId: assignment.id };
   }
+  // An offline entry is judged as of the moment it happened: the assignments that existed then, including one a later
+  // move cancelled. Everything else is judged as of now.
+  const offline = entryMethod === "OFFLINE";
   const rows = await tx.eventLodgingAssignment.findMany({
-    where: { eventId, attendeeId: { in: attendeeIds }, eventLodgingUnitId: { not: null }, cancelledAt: null },
+    where: {
+      eventId, attendeeId: { in: attendeeIds }, eventLodgingUnitId: { not: null },
+      ...(offline ? { createdAt: { lte: issuedAt }, OR: [{ cancelledAt: null }, { cancelledAt: { gt: issuedAt } }] } : { cancelledAt: null }),
+    },
     select: { id: true, eventLodgingUnitId: true, firstNight: true, lastNight: true },
   });
   const candidates: RoomCandidate[] = rows.map((row) => ({ assignmentId: row.id, unitId: row.eventLodgingUnitId!, firstNight: toNight(row.firstNight), lastNight: toNight(row.lastNight) }));
@@ -296,7 +303,10 @@ async function resolveRoomLink(tx: Tx, eventId: string, holder: Holder, assignme
   return { roomUnitId: picked.candidate.unitId, sourceAssignmentId: picked.candidate.assignmentId };
 }
 
-function assertAssignmentUsable(assignment: { cancelledAt: Date | null }, issuedAt: Date, entryMethod: EntryMethod) {
+function assertAssignmentUsable(assignment: { cancelledAt: Date | null; createdAt: Date }, issuedAt: Date, entryMethod: EntryMethod) {
+  if (assignment.createdAt.getTime() > issuedAt.getTime()) {
+    throw new AssetError("ROOM_ASSIGNMENT_INVALID", "That room assignment did not exist yet at the time of this entry.");
+  }
   if (!assignment.cancelledAt) return;
   if (entryMethod === "OFFLINE" && assignment.cancelledAt.getTime() > issuedAt.getTime()) return;
   throw new AssetError("ROOM_ASSIGNMENT_MOVED", "That room assignment has changed since. Choose the current one.");
@@ -424,6 +434,10 @@ export async function issueAssets(eventId: string, actorUserId: string, rawInput
     const assets = await tx.issuedAsset.findMany({ where: { eventId, id: { in: assetIds } }, include: { assetType: true } });
     const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
     const openRows = await tx.assetIssuance.findMany({ where: { eventId, assetId: { in: assetIds }, endedAt: null } });
+    // An offline entry cannot claim a moment before the item existed, or before its previous holder gave it up.
+    const lastEnded = input.entryMethod === "OFFLINE"
+      ? new Map((await tx.assetIssuance.groupBy({ by: ["assetId"], where: { eventId, assetId: { in: assetIds }, endedAt: { not: null } }, _max: { endedAt: true } })).map((row) => [row.assetId, row._max.endedAt]))
+      : new Map<string, Date | null>();
 
     const itemKeys = input.items.map((_, index) => (input.idempotencyKey ? `${input.idempotencyKey}:${index}` : null));
     const replayRows = input.idempotencyKey
@@ -484,6 +498,13 @@ export async function issueAssets(eventId: string, actorUserId: string, rawInput
         results.push({ ...base, ...named, status: "REJECTED", error: { code: decision.code, message: decision.message } });
         continue;
       }
+      if (input.entryMethod === "OFFLINE") {
+        const ended = lastEnded.get(asset.id);
+        if (issuedAt < asset.createdAt || (asset.assetType.mode === "SERIALIZED" && ended && issuedAt < ended)) {
+          results.push({ ...base, ...named, status: "REJECTED", error: { code: "OCCURRED_AT_INVALID", message: issuedAt < asset.createdAt ? "That item did not exist yet at the time of this entry." : "That item was still with someone else at the time of this entry." } });
+          continue;
+        }
+      }
       let itemLink: RoomLink = { roomUnitId: holder.kind === "ROOM" ? holder.roomUnitId : null, sourceAssignmentId: null };
       if (asset.assetType.roomLinked && (holder.kind === "ATTENDEE" || holder.kind === "REGISTRATION" || holder.kind === "ROOM")) {
         const resolvedLink = await needLink();
@@ -540,7 +561,7 @@ async function loadOpenIssuance(tx: Tx, eventId: string, issuanceId: string) {
  * Transfers, replaces or corrects one open issuance. None of them overwrites: the old issuance ends (with its reason
  * and actor) and, for a transfer or replacement, a new one starts that points back at it; both get history rows.
  */
-export async function applyIssuanceAction(eventId: string, actorUserId: string, issuanceId: string, rawInput: unknown) {
+export async function applyIssuanceAction(eventId: string, actorUserId: string, issuanceId: string, rawInput: unknown, options: { canConfigure: boolean; /** A test hook for the clock; production never passes it. */ now?: Date }) {
   const input = issuanceActionSchema.parse(rawInput);
   return transact(async (tx) => {
     await requireEvent(tx, eventId);
@@ -555,23 +576,32 @@ export async function applyIssuanceAction(eventId: string, actorUserId: string, 
     }
     await lockAssets(tx, eventId, [first.assetId, ...(replacement ? [replacement.id] : [])]);
     const old = await loadOpenIssuance(tx, eventId, issuanceId);
-    const now = new Date();
+    // Never before the issue itself (an offline entry, or a clock a few minutes fast, can put issuedAt ahead of now).
+    const clock = options.now ?? new Date();
+    const now = clock.getTime() < old.issuedAt.getTime() ? old.issuedAt : clock;
     const asset = await tx.issuedAsset.findFirstOrThrow({ where: { id: old.assetId, eventId }, include: { assetType: true } });
 
-    if (input.action === "correct") {
-      if (old.endedAt) throw new AssetError("ISSUANCE_NOT_OPEN", "That issue has already ended.");
-      await endIssuance(tx, old, { actorUserId, endReason: "CORRECTED", historyType: "CORRECTED", reason: input.reason, entryMethod: "MANUAL", relatedIssuanceId: null, at: now });
-      await writeAuditLog({ eventId, actorUserId, action: "ASSET_ISSUE_CORRECTED", entityType: "AssetIssuance", entityId: old.id, summary: "Corrected (withdrew) an issued item entered in error.", metadata: { assetId: old.assetId } }, tx);
-      return { endedIssuanceId: old.id, issuanceId: null as string | null };
-    }
-    if (old.endedAt) throw new AssetError("ISSUANCE_NOT_OPEN", "That issue has already ended.");
-
-    if (input.idempotencyKey) {
+    // A retry of a transfer or replacement returns the original result, even though its first attempt ended the issue.
+    if (input.action !== "correct" && input.idempotencyKey) {
       const replay = await tx.assetIssuance.findUnique({ where: { eventId_idempotencyKey: { eventId, idempotencyKey: input.idempotencyKey } } });
       if (replay) {
         if (replay.previousIssuanceId !== old.id) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different change.");
         return { endedIssuanceId: old.id, issuanceId: replay.id as string | null };
       }
+    }
+
+    if (input.action === "correct") {
+      if (old.endedAt) throw new AssetError("ISSUANCE_NOT_OPEN", "That issue has already ended.");
+      if (!options.canConfigure && clock.getTime() - old.createdAt.getTime() > CORRECTION_WINDOW_MS) {
+        throw new AssetError("CONFIGURE_REQUIRED", "This was issued more than 30 minutes ago. An event administrator has to withdraw it: it may already have a deposit or a lodging record attached.");
+      }
+      await endIssuance(tx, old, { actorUserId, endReason: "CORRECTED", historyType: "CORRECTED", reason: input.reason, entryMethod: "MANUAL", relatedIssuanceId: null, at: now });
+      await writeAuditLog({ eventId, actorUserId, action: "ASSET_ISSUE_CORRECTED", entityType: "AssetIssuance", entityId: old.id, summary: "Corrected (withdrew) an issued item entered in error.", metadata: { assetId: old.assetId } }, tx);
+      return { endedIssuanceId: old.id, issuanceId: null as string | null };
+    }
+    if (old.endedAt) throw new AssetError("ISSUANCE_NOT_OPEN", "That issue has already ended.");
+    if (input.action === "replace" && input.originalAvailability === "AVAILABLE" && !options.canConfigure) {
+      throw new AssetError("CONFIGURE_REQUIRED", "Putting the original straight back in stock needs an event administrator. Leave it unavailable until its return is recorded.");
     }
 
     if (input.action === "transfer") {
@@ -612,8 +642,11 @@ export async function applyIssuanceAction(eventId: string, actorUserId: string, 
       link = keepOld ? { roomUnitId: old.roomUnitId, sourceAssignmentId: old.sourceAssignmentId } : await resolveRoomLink(tx, eventId, holder, input.assignmentId, now, "MANUAL");
     }
     const created = await moveToNew(tx, old, next.assetType.mode === "SERIALIZED", next.id, holder, link, { actorUserId, reason: input.reason, endReason: "REPLACED", outType: "REPLACED_OUT", inType: "REPLACED_IN", idempotencyKey: input.idempotencyKey ?? null, now });
-    await tx.issuedAsset.update({ where: { id: asset.id }, data: { availability: input.originalAvailability } });
-    await writeAuditLog({ eventId, actorUserId, action: "ASSET_REPLACED", entityType: "AssetIssuance", entityId: created.id, summary: "Replaced an issued item.", metadata: { from: old.id, originalAssetId: asset.id, replacementAssetId: next.id, originalAvailability: input.originalAvailability } }, tx);
+    // A numbered original is held out (or put back) as chosen. A lot is shared stock: replacing one holder's units never
+    // changes whether the rest of the lot can be issued.
+    const originalAvailability = asset.assetType.mode === "SERIALIZED" ? input.originalAvailability : asset.availability;
+    if (asset.assetType.mode === "SERIALIZED") await tx.issuedAsset.update({ where: { id: asset.id }, data: { availability: input.originalAvailability } });
+    await writeAuditLog({ eventId, actorUserId, action: "ASSET_REPLACED", entityType: "AssetIssuance", entityId: created.id, summary: "Replaced an issued item.", metadata: { from: old.id, originalAssetId: asset.id, replacementAssetId: next.id, originalAvailability } }, tx);
     return { endedIssuanceId: old.id, issuanceId: created.id as string | null };
   });
 }
@@ -630,7 +663,7 @@ async function moveToNew(
       id: newId, eventId: old.eventId, assetId: newAssetId, serialized, quantity: old.quantity,
       assigneeKind: holder.kind, attendeeId: holder.attendeeId, registrationId: holder.registrationId, staffUserId: holder.staffUserId,
       roomUnitId: holder.kind === "ROOM" ? holder.roomUnitId : link.roomUnitId, sourceAssignmentId: link.sourceAssignmentId, assigneeLabel: holder.assigneeLabel,
-      purpose: old.purpose, expectedReturnAt: old.expectedReturnAt, issuedAt: p.now, issuedByUserId: p.actorUserId, entryMethod: "MANUAL",
+      purpose: old.purpose, expectedReturnAt: old.expectedReturnAt && old.expectedReturnAt >= p.now ? old.expectedReturnAt : null, issuedAt: p.now, issuedByUserId: p.actorUserId, entryMethod: "MANUAL",
       idempotencyKey: p.idempotencyKey, previousIssuanceId: old.id, revision: 1,
     },
   });

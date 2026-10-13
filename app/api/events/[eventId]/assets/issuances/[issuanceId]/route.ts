@@ -10,7 +10,7 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
   try {
     const { eventId, issuanceId } = await context.params;
     const staff = await requireAssetStaff(eventId, "MANAGE_CHECK_IN");
-    const result = await applyIssuanceAction(eventId, staff.userId, issuanceId, await request.json());
+    const result = await applyIssuanceAction(eventId, staff.userId, issuanceId, await request.json(), { canConfigure: staff.canConfigure });
     return assetJson(result, 200);
   } catch (error) {
     return assetApiError(error, "Changing the issue");

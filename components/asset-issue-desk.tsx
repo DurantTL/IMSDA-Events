@@ -14,25 +14,28 @@ type Assignee =
   | { kind: "VEHICLE" | "TEAM"; label: string };
 type IssueRequest = {
   assignee: Assignee; assignmentId?: string; items: Item[]; purpose: string; expectedReturnAt?: string;
-  entryMethod: "MANUAL" | "OFFLINE"; occurredAt?: string; idempotencyKey: string;
+  entryMethod: "MANUAL" | "SCAN" | "OFFLINE"; occurredAt?: string; idempotencyKey: string;
 };
+/** A request kept on this device. `rejected` is the server's reason when it refused an offline entry; it stays until dismissed. */
+type SavedRequest = IssueRequest & { rejected?: string };
 type ItemResult = { index: number; code: string; status: "ISSUED" | "DUPLICATE" | "REPLAYED" | "REJECTED"; identifier?: string; typeName?: string; error?: { message: string } };
 type IssueResponse = { holder: { display: string }; issued: number; duplicates: number; rejected: number; items: ItemResult[] };
 
-const queueKey = (eventId: string) => `imsda:issued-assets:queue:${eventId}`;
+/** Saved requests belong to one event and one signed-in person: a shared desk never replays someone else's entries. */
+const queueKey = (scope: string) => `imsda:issued-assets:queue:${scope}`;
 
 /** Only codes, opaque ids and a key: no names, contact details or form answers are kept on the device. */
-function readQueue(eventId: string): IssueRequest[] {
+function readQueue(scope: string): SavedRequest[] {
   try {
-    const raw = window.localStorage.getItem(queueKey(eventId));
+    const raw = window.localStorage.getItem(queueKey(scope));
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed as IssueRequest[] : [];
+    return Array.isArray(parsed) ? parsed as SavedRequest[] : [];
   } catch { return []; }
 }
-function writeQueue(eventId: string, queue: IssueRequest[]) {
+function writeQueue(scope: string, queue: SavedRequest[]) {
   try {
-    if (queue.length === 0) window.localStorage.removeItem(queueKey(eventId));
-    else window.localStorage.setItem(queueKey(eventId), JSON.stringify(queue));
+    if (queue.length === 0) window.localStorage.removeItem(queueKey(scope));
+    else window.localStorage.setItem(queueKey(scope), JSON.stringify(queue));
   } catch { /* private mode: the page still works, the retry just lives in memory */ }
 }
 
@@ -46,8 +49,10 @@ function lodgingNote(row: IssuanceRow) {
     : `Opens ${row.roomName}, but their room was released.`;
 }
 
-export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }: {
+export function AssetIssueDesk({ eventId, userId, types, lots, options, person, outNow }: {
   eventId: string;
+  /** The signed-in staff member: scopes the saved offline requests on this device. */
+  userId: string;
   types: DeskType[];
   lots: DeskLot[];
   options: AssigneeOptions;
@@ -56,6 +61,7 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
 }) {
   const router = useRouter();
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
+  const scope = `${eventId}:${userId}`;
   const [kind, setKind] = useState<AssigneeKind>(person ? "ATTENDEE" : "ROOM");
   const [other, setOther] = useState("");
   const [items, setItems] = useState<Item[]>([]);
@@ -66,7 +72,10 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<IssueResponse | null>(null);
-  const [queue, setQueue] = useState<IssueRequest[]>([]);
+  const [queue, setQueue] = useState<SavedRequest[]>([]);
+  // Codes that arrived the way a barcode scanner types (a fast burst ending in Enter); everything else was typed.
+  const [scanned, setScanned] = useState<ReadonlySet<string>>(new Set());
+  const keyTimes = useRef<number[]>([]);
   const [search, setSearch] = useState("");
   const [found, setFound] = useState<Array<{ attendeeId: string; name: string; confirmationCode: string }>>([]);
   const [lookupCode, setLookupCode] = useState("");
@@ -75,13 +84,21 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
 
   // Saved requests from an earlier visit (read after mount, so the server and first client render agree).
   useEffect(() => {
-    const timer = window.setTimeout(() => setQueue(readQueue(eventId)), 0);
+    const timer = window.setTimeout(() => setQueue(readQueue(scope)), 0);
     return () => window.clearTimeout(timer);
-  }, [eventId]);
+  }, [scope]);
 
-  function addCode(raw: string, quantity = 1) {
+  /** A scanner types the whole code in a few milliseconds per key; a person, or a paste (one event), does not. */
+  function arrivedLikeAScan() {
+    const times = keyTimes.current;
+    keyTimes.current = [];
+    return times.length >= 3 && (times[times.length - 1]! - times[0]!) / (times.length - 1) < 50;
+  }
+
+  function addCode(raw: string, quantity = 1, wasScanned = false) {
     const code = raw.trim();
     if (!code) return;
+    setScanned((current) => { const next = new Set(current); if (wasScanned) next.add(code.toUpperCase()); else next.delete(code.toUpperCase()); return next; });
     setItems((current) => current.some((item) => item.code.toUpperCase() === code.toUpperCase()) ? current : [...current, { code, quantity }]);
     setCodeText("");
     codeInput.current?.focus();
@@ -102,16 +119,26 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
     return json as IssueResponse;
   }
 
+  /** The one room the desk is showing for the person, when the holder is that person (or their registration). */
+  function lonePersonRoom(assignee: Assignee) {
+    if (!person || (assignee.kind !== "ATTENDEE" && assignee.kind !== "REGISTRATION")) return "";
+    return new Set(person.rooms.map((room) => room.roomName)).size === 1 ? person.rooms[0]!.assignmentId : "";
+  }
+
   async function submit() {
     const assignee = currentAssignee();
     if (!assignee) { setError("Choose who the items are for."); return; }
     if (items.length === 0) { setError("Scan or type at least one code."); return; }
     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    const allScanned = items.every((item) => scanned.has(item.code.toUpperCase()));
+    // The room the key is for. Online the server picks the current one; an entry made offline may be sent after a
+    // move, so it carries the assignment the desk was showing when the key was handed over.
+    const roomAssignment = assignmentId || (offline ? lonePersonRoom(assignee) : "");
     const request: IssueRequest = {
       assignee, items, purpose: purpose.trim() || "Issued at check-in", idempotencyKey: newKey(),
-      entryMethod: offline ? "OFFLINE" : "MANUAL",
+      entryMethod: offline ? "OFFLINE" : allScanned ? "SCAN" : "MANUAL",
       ...(offline ? { occurredAt: new Date().toISOString() } : {}),
-      ...(assignmentId ? { assignmentId } : {}),
+      ...(roomAssignment ? { assignmentId: roomAssignment } : {}),
       ...(expectedReturn ? { expectedReturnAt: new Date(expectedReturn).toISOString() } : {}),
     };
     await deliver(request);
@@ -120,29 +147,36 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
   /** Saves the request (so a closed tab or lost response can replay it with the same key) and sends it. */
   async function deliver(request: IssueRequest) {
     setBusy(true); setError(""); setResult(null);
-    const saved = [...readQueue(eventId).filter((entry) => entry.idempotencyKey !== request.idempotencyKey), request];
-    writeQueue(eventId, saved); setQueue(saved);
+    const saved = [...readQueue(scope).filter((entry) => entry.idempotencyKey !== request.idempotencyKey), request];
+    writeQueue(scope, saved); setQueue(saved);
     try {
       // A request first built offline keeps saying when it really happened when it is replayed later.
       const response = await send(request);
-      const remaining = readQueue(eventId).filter((entry) => entry.idempotencyKey !== request.idempotencyKey);
-      writeQueue(eventId, remaining); setQueue(remaining);
+      const refused = response.items.filter((item) => item.status === "REJECTED");
+      // An offline entry the server accepted only in part keeps the refused items, with why, until dismissed.
+      const remaining = readQueue(scope).flatMap((entry) => (entry.idempotencyKey !== request.idempotencyKey ? [entry]
+        : request.entryMethod === "OFFLINE" && refused.length > 0
+          ? [{ ...entry, items: refused.map((item) => request.items[item.index]!).filter(Boolean), rejected: refused.map((item) => `${item.identifier ?? item.code}: ${item.error?.message ?? "not issued"}`).join(" ") }]
+          : []));
+      writeQueue(scope, remaining); setQueue(remaining);
       setResult(response);
       setItems(response.items.filter((item) => item.status === "REJECTED").map((item) => ({ code: item.code, quantity: request.items[item.index]?.quantity ?? 1 })));
       router.refresh();
     } catch (cause) {
       const failure = cause as Error & { server?: boolean; details?: { items?: ItemResult[] } };
       if (failure.server) {
-        // The server answered: it will not accept this request as it is, so it is not kept for retry.
-        const remaining = readQueue(eventId).filter((entry) => entry.idempotencyKey !== request.idempotencyKey);
-        writeQueue(eventId, remaining); setQueue(remaining);
+        // The server answered and will not accept this request as it is, so it is never retried. An online request is
+        // simply shown the reason; an offline entry (which cannot be redone) stays here with the reason until dismissed.
+        const remaining = readQueue(scope).flatMap((entry) => (entry.idempotencyKey !== request.idempotencyKey ? [entry] : request.entryMethod === "OFFLINE" ? [{ ...entry, rejected: failure.message }] : []));
+        writeQueue(scope, remaining); setQueue(remaining);
         if (failure.details?.items) setResult({ holder: { display: "" }, issued: 0, duplicates: 0, rejected: failure.details.items.length, items: failure.details.items });
         setError(failure.message);
       } else {
         // Keep the moment it happened: a later replay is an offline entry, and the server records that time.
-        const offline: IssueRequest = { ...request, entryMethod: "OFFLINE", occurredAt: request.occurredAt ?? new Date().toISOString() };
-        const kept = readQueue(eventId).map((entry) => entry.idempotencyKey === request.idempotencyKey ? offline : entry);
-        writeQueue(eventId, kept); setQueue(kept);
+        const roomAssignment = request.assignmentId ?? lonePersonRoom(request.assignee);
+        const offline: IssueRequest = { ...request, entryMethod: "OFFLINE", occurredAt: request.occurredAt ?? new Date().toISOString(), ...(roomAssignment ? { assignmentId: roomAssignment } : {}) };
+        const kept = readQueue(scope).map((entry) => entry.idempotencyKey === request.idempotencyKey ? offline : entry);
+        writeQueue(scope, kept); setQueue(kept);
         setError("Not sent. The request is saved on this device; retry when you are connected. Nothing was issued yet.");
       }
     } finally { setBusy(false); }
@@ -195,10 +229,11 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
 
     {queue.length > 0 ? <section className="panel" role="status">
       <h3>Saved on this device, not confirmed</h3>
-      <p>{queue.length} request{queue.length === 1 ? "" : "s"} did not reach the server. Retrying is safe: the same saved key can never issue twice.</p>
+      <p>Requests that did not reach the server, or that it refused, stay here until you dismiss them. Retrying is safe: the same saved key can never issue twice.</p>
       <ul>{queue.map((entry) => <li key={entry.idempotencyKey}>{entry.items.map((item) => item.code).join(", ")}{" "}
-        <button type="button" disabled={busy} onClick={() => void deliver(entry)}>Retry</button>{" "}
-        <button type="button" disabled={busy} onClick={() => { const rest = readQueue(eventId).filter((other) => other.idempotencyKey !== entry.idempotencyKey); writeQueue(eventId, rest); setQueue(rest); }}>Discard</button></li>)}</ul>
+        {entry.rejected ? <strong>Not accepted by the server: {entry.rejected} </strong> : null}
+        {entry.rejected ? null : <button type="button" disabled={busy} onClick={() => void deliver(entry)}>Retry</button>}{" "}
+        <button type="button" disabled={busy} onClick={() => { const rest = readQueue(scope).filter((other) => other.idempotencyKey !== entry.idempotencyKey); writeQueue(scope, rest); setQueue(rest); }}>{entry.rejected ? "Dismiss" : "Discard"}</button></li>)}</ul>
     </section> : null}
 
     <section className="panel">
@@ -222,8 +257,8 @@ export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }
 
     <section className="panel">
       <h3>Items</h3>
-      <form onSubmit={(event) => { event.preventDefault(); addCode(codeText); }}>
-        <label>Scan or type a code (K-214) <input ref={codeInput} value={codeText} onChange={(event) => setCodeText(event.target.value)} autoComplete="off" autoCapitalize="characters" maxLength={64} /></label>
+      <form onSubmit={(event) => { event.preventDefault(); addCode(codeText, 1, arrivedLikeAScan()); }}>
+        <label>Scan or type a code (K-214) <input ref={codeInput} value={codeText} onChange={(event) => { keyTimes.current.push(Date.now()); setCodeText(event.target.value); }} autoComplete="off" autoCapitalize="characters" maxLength={64} /></label>
         <button type="submit">Add</button>
       </form>
       {lots.length > 0 ? <p>{lots.map((lot) => <button key={lot.code} type="button" className="secondary-button" disabled={lot.remaining <= 0} onClick={() => addCode(lot.code)}>{lot.typeName}: {lot.identifier} ({lot.remaining} left)</button>)}</p> : null}
@@ -283,12 +318,14 @@ function IssuanceActions({ row, busy, change }: { row: IssuanceRow; busy: boolea
   const [mode, setMode] = useState<"" | "replace" | "correct">("");
   const [reason, setReason] = useState("");
   const [code, setCode] = useState("");
+  // One key per attempt: sending the same form again after a lost response replays instead of replacing twice.
+  const pendingKey = useRef(newKey());
   return <div>
     <button type="button" disabled={busy} onClick={() => setMode(mode === "replace" ? "" : "replace")}>Replace</button>{" "}
     <button type="button" disabled={busy} onClick={() => setMode(mode === "correct" ? "" : "correct")}>Entered in error</button>
     {mode ? <form onSubmit={(event) => {
       event.preventDefault();
-      void change(row.id, mode === "replace" ? { action: "replace", replacementCode: code, reason, originalAvailability: "UNAVAILABLE" } : { action: "correct", reason }, mode === "replace" ? `${row.identifier} replaced` : `${row.identifier} withdrawn`).then(() => { setMode(""); setReason(""); setCode(""); });
+      void change(row.id, mode === "replace" ? { action: "replace", replacementCode: code, reason, originalAvailability: "UNAVAILABLE", idempotencyKey: pendingKey.current } : { action: "correct", reason }, mode === "replace" ? `${row.identifier} replaced` : `${row.identifier} withdrawn`).then(() => { setMode(""); setReason(""); setCode(""); pendingKey.current = newKey(); });
     }}>
       {mode === "replace" ? <label>Replacement code <input value={code} onChange={(event) => setCode(event.target.value)} required maxLength={64} /></label> : null}
       <label>Reason <input value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={300} /></label>

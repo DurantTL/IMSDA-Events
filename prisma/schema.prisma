@@ -7750,8 +7750,8 @@ model AssetIssuance {
   asset            IssuedAsset                  @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: Cascade)
   attendee         RegistrationAttendee?       @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
   registration     Registration?               @relation(fields: [registrationId], references: [id], onDelete: NoAction)
-  roomUnit         EventLodgingUnit?           @relation(fields: [roomUnitId, eventId], references: [id, eventId], onDelete: Cascade)
-  sourceAssignment EventLodgingAssignment?     @relation(fields: [sourceAssignmentId, eventId], references: [id, eventId], onDelete: Cascade)
+  roomUnit         EventLodgingUnit?           @relation(fields: [roomUnitId, eventId], references: [id, eventId], onDelete: NoAction)
+  sourceAssignment EventLodgingAssignment?     @relation(fields: [sourceAssignmentId, eventId], references: [id, eventId], onDelete: NoAction)
   history          AssetIssuanceHistory[]
 
   @@unique([eventId, idempotencyKey])
@@ -7770,6 +7770,8 @@ model AssetIssuanceHistory {
   assetId            String
   type               IssuedAssetEventType
   at                 DateTime                @default(now())
+  /// When the server wrote the row; `at` is when it happened (an offline desk sets it earlier).
+  recordedAt         DateTime                @default(now())
   actorUserId        String
   reason             String?
   entryMethod        IssuedAssetEntryMethod

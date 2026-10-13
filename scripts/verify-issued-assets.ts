@@ -25,7 +25,7 @@ import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { AssetError, type AssetErrorCode } from "@/modules/issued-assets/errors";
-import { applyAssetAction, applyAssetTypeAction, applyIssuanceAction, issueAssets, type IssueResult } from "@/modules/issued-assets/service";
+import { applyAssetAction, applyAssetTypeAction, applyIssuanceAction as applyIssuanceActionAs, issueAssets, type IssueResult } from "@/modules/issued-assets/service";
 import { getCatalogView, getDeskPerson, listAssetHistory, listOutNow, listRoomIssuances, lookupAsset } from "@/modules/issued-assets/view";
 import { applyAssignmentAction } from "@/modules/lodging/assignment-service";
 import { selectEventProperty } from "@/modules/lodging/service";
@@ -37,6 +37,9 @@ assertLocalDatabase(process.env, "run this verification");
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-issued-assets-synthetic-key-not-a-secret");
 
 const prisma = new PrismaClient();
+/** Most steps act as an event administrator; the permission steps pass their own options. */
+const applyIssuanceAction = (forEvent: string, actor: string, issuanceId: string, raw: unknown, options: { canConfigure: boolean; now?: Date } = { canConfigure: true }) => applyIssuanceActionAs(forEvent, actor, issuanceId, raw, options);
+const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const P = `asset213_${randomUUID().slice(0, 8)}`;
 const userId = `${P}_user`;
 const staffId = `${P}_staff`;
@@ -174,13 +177,13 @@ async function main() {
   await expectAssetError(applyAssetAction(eventId, userId, { action: "create", typeId: keyType, identifier: "K-301", scanCode: "K-214" }), "ASSET_EXISTS", "a scan value that is another item's identifier");
   await applyAssetAction(eventId, userId, { action: "create", typeId: packetType, identifier: "WP-27", quantityTotal: 5 });
   await applyAssetAction(eventId, userId, { action: "create", typeId: packetType, identifier: "TOWELS", quantityTotal: 3 });
-  for (const identifier of ["R-1", "R-2"]) await applyAssetAction(eventId, userId, { action: "create", typeId: radioType, identifier });
+  for (const identifier of ["R-1", "R-2", "R-3", "R-4", "R-5", "R-6", "R-7", "R-8"]) await applyAssetAction(eventId, userId, { action: "create", typeId: radioType, identifier });
   await applyAssetAction(eventId, userId, { action: "create", typeId: retiredType, identifier: "WB-1" });
   await applyAssetTypeAction(eventId, userId, { action: "update", typeId: retiredType, active: false });
   await expectAssetError(applyAssetAction(eventId, userId, { action: "create", typeId: keyType, identifier: "K-400", quantityTotal: 2 }), "QUANTITY_INVALID", "a numbered item that is two");
   await expectDatabaseRefusal(prisma.issuedAssetType.update({ where: { id: keyType }, data: { mode: "QUANTITY" } }), "changing a kind that has items from numbered to quantity")
   const catalog = await getCatalogView(eventId);
-  assert(catalog.assets.length === 62 + 1 + 2 + 2 + 1 && catalog.types.find((type) => type.id === keyType)!.assetCount === 63, "the catalog lists every item");
+  assert(catalog.assets.length === 62 + 1 + 2 + 8 + 1 && catalog.types.find((type) => type.id === keyType)!.assetCount === 63, "the catalog lists every item");
   assert(catalog.assets.findIndex((asset) => asset.identifier === "K-9" ) === -1 && catalog.assets.map((asset) => asset.identifier).indexOf("K-201") < catalog.assets.map((asset) => asset.identifier).indexOf("K-210"), "the catalog sorts numbers as numbers");
 
   // ---- Issue: two keys and a welcome packet, linked to the exact assignment ----
@@ -393,14 +396,17 @@ async function main() {
   const eve = (await makeReg(eventId)).people[0]!;
   const room221 = await place(eve, "girls-221");
   const e1 = await currentAssignment(eve);
+  await sleep(40);
+  const handedOver = new Date().toISOString();
+  await sleep(40);
   await place(eve, "girls-222", N[0], N[3], "MOVE", "Swapped rooms");
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const manualMoved = await issue(eve, ["K-255"], { assignmentId: e1.id });
   assert(manualMoved.items[0]!.error?.code === "ROOM_ASSIGNMENT_MOVED" && manualMoved.issued === 0, "a manual entry against an assignment that has since moved is refused");
-  const offline = await issue(eve, ["K-255"], { entryMethod: "OFFLINE", occurredAt: hourAgo, assignmentId: e1.id, idempotencyKey: `offline-${randomUUID()}` });
+  const offline = await issue(eve, ["K-255"], { entryMethod: "OFFLINE", occurredAt: handedOver, assignmentId: e1.id, idempotencyKey: `offline-${randomUUID()}` });
   assert(offline.issued === 1, "an offline entry made before the move is accepted");
   const offlineRow = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "K-255" } } });
-  assert(offlineRow.entryMethod === "OFFLINE" && offlineRow.issuedAt.toISOString() === hourAgo && offlineRow.sourceAssignmentId === e1.id && offlineRow.roomUnitId === room221.id, "it keeps when it happened and the room it was handed out for");
+  assert(offlineRow.entryMethod === "OFFLINE" && offlineRow.issuedAt.toISOString() === handedOver && offlineRow.sourceAssignmentId === e1.id && offlineRow.roomUnitId === room221.id, "it keeps when it happened and the room it was handed out for");
   assert(offlineRow.createdAt.getTime() > offlineRow.issuedAt.getTime(), "and the server records when it learned of it separately");
   const deskEve = await getDeskPerson(eventId, eve.attendeeId, prisma);
   assert(deskEve!.issuances[0]!.lodging?.status === "MOVED", "the desk flags the key as opening the old room");
@@ -411,6 +417,92 @@ async function main() {
   assert(nobody!.open.length === 1 && nobody!.open[0]!.holderLabel.includes(eve.first) && nobody!.history.length === 1, "manual lookup shows who holds a key");
   assert((await lookupAsset(eventId, "NO-SUCH", prisma)) === null, "manual lookup of an unknown code finds nothing");
   assert((await listOutNow(eventId, {}, prisma)).length > 10, "the out-now list shows what is issued");
+
+  // ---- Offline without naming an assignment, across a move ---------------------------------
+  const fay = (await makeReg(eventId)).people[0]!;
+  const room223 = await place(fay, "girls-223");
+  const f1 = await currentAssignment(fay);
+  await sleep(40);
+  const fayHandover = new Date().toISOString();
+  await sleep(40);
+  const room224 = await place(fay, "girls-224", N[0], N[3], "MOVE", "Swapped rooms");
+  const fayOffline = await issue(fay, ["K-258"], { entryMethod: "OFFLINE", occurredAt: fayHandover });
+  assert(fayOffline.issued === 1, `an offline entry with no assignment named is accepted: ${statuses(fayOffline)}`);
+  const fayKey = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "K-258" } } });
+  assert(fayKey.roomUnitId === room223.id && fayKey.sourceAssignmentId === f1.id, "it is linked to the room the person was in when the key was handed over, not the room they moved into");
+  const deskFay = await getDeskPerson(eventId, fay.attendeeId, prisma);
+  const fayRow = deskFay!.issuances.find((row) => row.identifier === "K-258")!;
+  assert(fayRow.lodging?.status === "MOVED" && fayRow.lodging.currentRooms.some((room) => room.startsWith(room224.unit.name)) && fayRow.roomName?.startsWith(room223.unit.name), "and the desk shows the swap warning");
+  const fayOnline = await issue(fay, ["K-257"]);
+  assert(fayOnline.issued === 1 && (await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "K-257" } } })).roomUnitId === room224.id, "an online issue after the move is linked to the new room");
+  const offlineHistory = (await listAssetHistory(eventId, fayKey.assetId, prisma))[0]!;
+  assert(new Date(offlineHistory.recordedAt).getTime() > new Date(offlineHistory.at).getTime(), "history shows both when it happened and when the server recorded it");
+
+  // ---- Backdating --------------------------------------------------------------------------
+  const radio = (code: string, extra: Record<string, unknown> = {}, label = "Gate") => issueAssets(eventId, userId, { assignee: { kind: "TEAM", label }, items: [{ code }], ...extra });
+  assert((await radio("R-3")).issued === 1, "a radio to the gate team");
+  const r3 = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "R-3" } } });
+  await applyIssuanceAction(eventId, userId, r3.id, { action: "correct", reason: "Wrong radio" });
+  const r3Ended = (await prisma.assetIssuance.findUniqueOrThrow({ where: { id: r3.id } })).endedAt!;
+  const tooEarly = await radio("R-3", { entryMethod: "OFFLINE", occurredAt: new Date(r3Ended.getTime() - 1).toISOString() }, "Parking");
+  assert(tooEarly.items[0]!.error?.code === "OCCURRED_AT_INVALID" && tooEarly.issued === 0, "an offline entry cannot claim a moment before the previous holder gave the item up");
+  assert((await radio("R-3", { entryMethod: "OFFLINE", occurredAt: new Date(r3Ended.getTime() + 1).toISOString() }, "Parking")).issued === 1, "but one after it is fine");
+  const r4 = await prisma.issuedAsset.findFirstOrThrow({ where: { eventId, identifier: "R-4" } });
+  const beforeExisted = await radio("R-4", { entryMethod: "OFFLINE", occurredAt: new Date(r4.createdAt.getTime() - 1000).toISOString() });
+  assert(beforeExisted.items[0]!.error?.code === "OCCURRED_AT_INVALID", "nor before the item existed");
+  const gus = (await makeReg(eventId)).people[0]!;
+  await place(gus, "girls-225");
+  const g1 = await currentAssignment(gus);
+  const beforeAssigned = new Date(g1.createdAt.getTime() - 1000).toISOString();
+  assert((await issue(gus, ["K-262"], { entryMethod: "OFFLINE", occurredAt: beforeAssigned })).items[0]!.error?.code === "ROOM_ASSIGNMENT_REQUIRED", "an offline room key cannot be linked to a room the person was not yet assigned to");
+  assert((await issue(gus, ["K-262"], { entryMethod: "OFFLINE", occurredAt: beforeAssigned, assignmentId: g1.id })).items[0]!.error?.code === "ROOM_ASSIGNMENT_INVALID", "nor to an assignment named before it began");
+  // A clock a few minutes fast must not let an issue end before it began.
+  const fast = await radio("R-5", { entryMethod: "OFFLINE", occurredAt: new Date(Date.now() + 3 * 60 * 1000).toISOString() });
+  assert(fast.issued === 1, "a device clock three minutes fast is forgiven");
+  const r5 = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "R-5" } } });
+  await applyIssuanceAction(eventId, userId, r5.id, { action: "correct", reason: "Entered on a fast clock" }, { canConfigure: false });
+  const r5After = await prisma.assetIssuance.findUniqueOrThrow({ where: { id: r5.id } });
+  assert(r5After.endedAt!.getTime() >= r5After.issuedAt.getTime(), "an issue never ends before it began");
+  const k231Open = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, endedAt: null, asset: { identifier: "K-231" } } });
+  await expectDatabaseMessage(prisma.assetIssuance.update({ where: { id: k231Open.id }, data: { endedAt: new Date(0), endReason: "CORRECTED", endedByUserId: userId, revision: { increment: 1 } } }), /ended_after_issued/, "an issue that ends before it began, written around the service");
+
+  // ---- Who may correct, and who may put a replaced item straight back in stock --------------------
+  assert((await radio("R-6", {}, "Medical")).issued === 1, "a radio to the medical team");
+  const r6 = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "R-6" } } });
+  await expectAssetError(applyIssuanceAction(eventId, userId, r6.id, { action: "correct", reason: "Late fix" }, { canConfigure: false, now: new Date(Date.now() + 31 * 60 * 1000) }), "CONFIGURE_REQUIRED", "check-in staff correcting an issue older than 30 minutes");
+  assert((await prisma.assetIssuance.findUniqueOrThrow({ where: { id: r6.id } })).endedAt === null, "and nothing changed");
+  await applyIssuanceAction(eventId, userId, r6.id, { action: "correct", reason: "Late fix" }, { canConfigure: true, now: new Date(Date.now() + 31 * 60 * 1000) });
+  assert((await prisma.assetIssuance.findUniqueOrThrow({ where: { id: r6.id } })).endReason === "CORRECTED", "an administrator can");
+  assert((await radio("R-7", {}, "Safety")).issued === 1, "a radio to the safety team");
+  const r7 = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, asset: { identifier: "R-7" } } });
+  await expectAssetError(applyIssuanceAction(eventId, userId, r7.id, { action: "replace", replacementCode: "R-8", reason: "Dead battery", originalAvailability: "AVAILABLE" }, { canConfigure: false }), "CONFIGURE_REQUIRED", "check-in staff putting a replaced radio straight back in stock");
+  assert((await prisma.assetIssuance.findUniqueOrThrow({ where: { id: r7.id } })).endedAt === null, "and nothing changed");
+
+  // ---- Retrying a transfer or a replacement returns the original result ------------------------------
+  const tKey = `transfer-${randomUUID()}`;
+  const t1 = await applyIssuanceAction(eventId, userId, r7.id, { action: "transfer", to: { kind: "VEHICLE", label: "Truck 2" }, reason: "Hand over", idempotencyKey: tKey });
+  const t2 = await applyIssuanceAction(eventId, userId, r7.id, { action: "transfer", to: { kind: "VEHICLE", label: "Truck 2" }, reason: "Hand over", idempotencyKey: tKey });
+  assert(t1.issuanceId && t2.issuanceId === t1.issuanceId, "a retried transfer returns the original new issue");
+  assert((await prisma.assetIssuance.count({ where: { eventId, previousIssuanceId: r7.id } })) === 1, "and writes nothing twice");
+  await expectAssetError(applyIssuanceAction(eventId, userId, r6.id, { action: "transfer", to: { kind: "TEAM", label: "Other" }, reason: "Wrong", idempotencyKey: tKey }), "IDEMPOTENCY_KEY_REUSED", "a retry key reused for another issue");
+  const rKey = `replace-${randomUUID()}`;
+  const rep1 = await applyIssuanceAction(eventId, userId, t1.issuanceId!, { action: "replace", replacementCode: "R-8", reason: "Dead battery", idempotencyKey: rKey }, { canConfigure: false });
+  const rep2 = await applyIssuanceAction(eventId, userId, t1.issuanceId!, { action: "replace", replacementCode: "R-8", reason: "Dead battery", idempotencyKey: rKey }, { canConfigure: false });
+  assert(rep1.issuanceId && rep2.issuanceId === rep1.issuanceId, "a retried replacement returns the original result");
+  assert((await prisma.assetIssuance.count({ where: { eventId, previousIssuanceId: t1.issuanceId! } })) === 1, "and writes nothing twice");
+
+  // ---- Replacing a quantity item never takes the lot out of stock ------------------------------------
+  await applyAssetAction(eventId, userId, { action: "create", typeId: packetType, identifier: "WP-A", quantityTotal: 10 });
+  await applyAssetAction(eventId, userId, { action: "create", typeId: packetType, identifier: "WP-B", quantityTotal: 10 });
+  const gina = (await makeReg(eventId)).people[0]!;
+  assert((await issue(gina, ["WP-A"], { items: [{ code: "WP-A", quantity: 2 }] })).issued === 1, "two packets from lot A");
+  const ginaIssue = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, attendeeId: gina.attendeeId, asset: { identifier: "WP-A" } } });
+  await applyIssuanceAction(eventId, userId, ginaIssue.id, { action: "replace", replacementCode: "WP-B", reason: "Lot A was the wrong colour", originalAvailability: "UNAVAILABLE" }, { canConfigure: false });
+  assert((await prisma.issuedAsset.findFirstOrThrow({ where: { eventId, identifier: "WP-A" } })).availability === "AVAILABLE", "replacing a family's packets leaves the lot available");
+  assert((await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, attendeeId: gina.attendeeId, endedAt: null } })).quantity === 2, "and the holder keeps the same number, from the other lot");
+  const hal = (await makeReg(eventId)).people[0]!;
+  assert((await issue(hal, ["WP-A"])).issued === 1, "lot A can still be issued to someone else");
+  await expectAssetError(applyAssetAction(eventId, userId, { action: "update", assetId: await assetId("WP-A"), availability: "UNAVAILABLE" }), "ASSET_IN_USE", "taking a lot out of stock while it is issued");
 
   // ---- Updates that would break an open issue -----------------------------------------
   await expectAssetError(applyAssetAction(eventId, userId, { action: "update", assetId: await assetId("K-255"), availability: "RETIRED" }), "ASSET_IN_USE", "retiring a key that is issued");
@@ -434,6 +526,18 @@ async function main() {
   await expectDatabaseRefusal(prisma.assetIssuance.update({ where: { id: openOne.id }, data: { endedAt: new Date(), endReason: "CORRECTED", endedByUserId: userId, revision: { increment: 1 } } }), "ending an issuance without its history row");
   const previousIds = (await prisma.assetIssuance.findMany({ where: { eventId, previousIssuanceId: { not: null } } })).length;
   assert(previousIds >= 3, "transfers and replacements point back at what they continue");
+
+  // ---- Nothing crosses events ----------------------------------------------------------------------
+  const otherKey = (await applyAssetTypeAction(otherEventId, userId, { action: "create", name: "Door key", mode: "SERIALIZED", assigneeKinds: ["ATTENDEE", "ROOM", "STAFF"], roomLinked: true })).id;
+  await applyAssetAction(otherEventId, userId, { action: "create", typeId: otherKey, identifier: "OK-1" });
+  const outsider2 = (await makeReg(otherEventId)).people[0]!;
+  await expectAssetError(issueAssets(otherEventId, userId, { assignee: { kind: "STAFF", userId: staffId }, items: [{ code: "OK-1" }] }), "STAFF_NOT_ON_EVENT", "another event's staff member");
+  await expectAssetError(issueAssets(otherEventId, userId, { assignee: { kind: "ROOM", eventUnitId: room203.id }, items: [{ code: "OK-1" }] }), "ASSIGNEE_NOT_FOUND", "another event's room");
+  const foreignAssignment = await issueAssets(otherEventId, userId, { assignee: { kind: "ATTENDEE", attendeeId: outsider2.attendeeId }, assignmentId: a1.id, items: [{ code: "OK-1" }] });
+  assert(foreignAssignment.items[0]!.error?.code === "ROOM_ASSIGNMENT_INVALID" && foreignAssignment.issued === 0, "another event's lodging assignment");
+  const foreignIssuance = await prisma.assetIssuance.findFirstOrThrow({ where: { eventId, endedAt: null } });
+  await expectAssetError(applyIssuanceAction(otherEventId, userId, foreignIssuance.id, { action: "correct", reason: "Not yours" }), "ISSUANCE_NOT_FOUND", "another event's issue");
+  assert((await prisma.assetIssuance.findUniqueOrThrow({ where: { id: foreignIssuance.id } })).endedAt === null, "and it is untouched");
 
   // ---- Deletion with the event ----------------------------------------------------------
   // The event deletion service deletes these rows in order, with the transaction-local setting.

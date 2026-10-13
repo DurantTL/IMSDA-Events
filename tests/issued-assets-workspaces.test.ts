@@ -66,7 +66,7 @@ const person = (issuances: IssuanceRow[], rooms: DeskPerson["rooms"]): DeskPerso
 describe("issued-assets check-in desk", () => {
   it("shows the attendee, their room and a one-tap welcome packet", () => {
     const html = renderToStaticMarkup(createElement(AssetIssueDesk, {
-      eventId: "ev1", types, lots, options, outNow: [],
+      eventId: "ev1", userId: "usr_1", types, lots, options, outNow: [],
       person: person([], [{ assignmentId: "as1", roomName: "214, Girls Dorm", firstNight: "2027-06-15", lastNight: "2027-06-18" }]),
     }));
     expect(html).toContain("Pat Example");
@@ -78,7 +78,7 @@ describe("issued-assets check-in desk", () => {
 
   it("says in words when a key opens a room the family has left", () => {
     const html = renderToStaticMarkup(createElement(AssetIssueDesk, {
-      eventId: "ev1", types, lots, options, outNow: [],
+      eventId: "ev1", userId: "usr_1", types, lots, options, outNow: [],
       person: person([row({ lodging: { status: "MOVED", currentRooms: ["213, Girls Dorm"] } })], [{ assignmentId: "as2", roomName: "213, Girls Dorm", firstNight: "2027-06-15", lastNight: "2027-06-18" }]),
     }));
     expect(html).toContain("Opens 214, Girls Dorm, but they now stay in 213, Girls Dorm. Replace the key.");
@@ -88,7 +88,7 @@ describe("issued-assets check-in desk", () => {
 
   it("keeps ended issues under a history note rather than deleting them", () => {
     const html = renderToStaticMarkup(createElement(AssetIssueDesk, {
-      eventId: "ev1", types, lots, options, outNow: [],
+      eventId: "ev1", userId: "usr_1", types, lots, options, outNow: [],
       person: person([row({ id: "i0", open: false, endReason: "REPLACED", endedAt: "2027-06-16T10:00:00.000Z", endNote: "Moved rooms" })], []),
     }));
     expect(html).toContain("1 earlier issue (history is kept)");
@@ -96,7 +96,7 @@ describe("issued-assets check-in desk", () => {
   });
 
   it("without a person, lists what is out now and asks for a lookup", () => {
-    const html = renderToStaticMarkup(createElement(AssetIssueDesk, { eventId: "ev1", types, lots, options, person: null, outNow: [row({})] }));
+    const html = renderToStaticMarkup(createElement(AssetIssueDesk, { eventId: "ev1", userId: "usr_1", types, lots, options, person: null, outNow: [row({})] }));
     expect(html).toContain("Out now");
     expect(html).toContain("K-214");
     expect(html).toContain("Find an attendee");

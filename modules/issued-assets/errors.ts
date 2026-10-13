@@ -18,7 +18,7 @@ export type AssetErrorCode =
   | "REPLACEMENT_TYPE_MISMATCH"
   | "IDEMPOTENCY_KEY_REUSED"
   | "ITEMS_REJECTED"
-  | "OCCURRED_AT_INVALID"
+  | "CONFIGURE_REQUIRED"
   | "RANGE_INVALID"
   | "BUSY";
 
@@ -63,6 +63,8 @@ export function assetErrorStatus(code: AssetErrorCode) {
     case "ROOM_ASSIGNMENT_INVALID":
     case "ROOM_ASSIGNMENT_MOVED":
       return 409;
+    case "CONFIGURE_REQUIRED":
+      return 403;
     case "BUSY":
       return 503;
     default:

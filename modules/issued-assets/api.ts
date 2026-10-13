@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { isLockTimeoutError, isSerializationFailure } from "@/lib/prisma-errors";
-import { AccessDeniedError, requirePermission } from "@/modules/access/authorization";
+import { AccessDeniedError, effectivePermissions, requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import type { EventPermission } from "@/modules/access/permissions";
 import { findActiveMembership } from "@/modules/events/repository";
@@ -16,7 +16,9 @@ const noStore = { "Cache-Control": "no-store" };
  */
 export async function requireAssetStaff(eventId: string, permission: Extract<EventPermission, "CONFIGURE_EVENT" | "MANAGE_CHECK_IN">) {
   const access = await requirePermission(await getCurrentSession(), eventId, permission, findActiveMembership);
-  return { userId: access.user.id };
+  // Corrections of older issues and putting a replaced item straight back in stock need event setup permission as well.
+  const canConfigure = new Set(effectivePermissions(access.user, access.membership)).has("CONFIGURE_EVENT");
+  return { userId: access.user.id, canConfigure };
 }
 
 export function assetApiError(error: unknown, action: string) {

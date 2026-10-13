@@ -97,6 +97,7 @@ CREATE TABLE "AssetIssuanceHistory" (
     "assetId" TEXT NOT NULL,
     "type" "IssuedAssetEventType" NOT NULL,
     "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "actorUserId" TEXT NOT NULL,
     "reason" TEXT,
     "entryMethod" "IssuedAssetEntryMethod" NOT NULL,
@@ -181,10 +182,10 @@ ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_attendeeId_fkey" FOREI
 ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_registrationId_fkey" FOREIGN KEY ("registrationId") REFERENCES "Registration"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_roomUnitId_eventId_fkey" FOREIGN KEY ("roomUnitId", "eventId") REFERENCES "EventLodgingUnit"("id", "eventId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_roomUnitId_eventId_fkey" FOREIGN KEY ("roomUnitId", "eventId") REFERENCES "EventLodgingUnit"("id", "eventId") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_sourceAssignmentId_eventId_fkey" FOREIGN KEY ("sourceAssignmentId", "eventId") REFERENCES "EventLodgingAssignment"("id", "eventId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_sourceAssignmentId_eventId_fkey" FOREIGN KEY ("sourceAssignmentId", "eventId") REFERENCES "EventLodgingAssignment"("id", "eventId") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AssetIssuanceHistory" ADD CONSTRAINT "AssetIssuanceHistory_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -276,6 +277,7 @@ ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_quantity" CHECK ("quan
 ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_purpose_present" CHECK (length(btrim("purpose")) > 0);
 ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_revision_positive" CHECK ("revision" >= 1);
 ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_expected_return_after_issue" CHECK ("expectedReturnAt" IS NULL OR "expectedReturnAt" >= "issuedAt");
+ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_ended_after_issued" CHECK ("endedAt" IS NULL OR "endedAt" >= "issuedAt");
 ALTER TABLE "AssetIssuance" ADD CONSTRAINT "AssetIssuance_end_fields" CHECK (
   ("endedAt" IS NULL) = ("endReason" IS NULL) AND ("endedAt" IS NULL) = ("endedByUserId" IS NULL)
 );
