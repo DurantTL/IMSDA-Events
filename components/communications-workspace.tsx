@@ -76,7 +76,7 @@ type CommunicationsWorkspaceProps = {
   initialAnnouncements: AnnouncementRecord[];
   initialMessaging: MessagingWorkspaceData | null;
   canManage: boolean;
-  /** Event manager and above: may mark an announcement essential, so it reaches people who opted out (#838). */
+  /** Communications managers and event managers: may mark an announcement essential, so it reaches people who opted out (#838). */
   canMarkEssential?: boolean;
   /** Registrations whose contact address opted out of announcements (#838). */
   announcementOptOuts?: EventAnnouncementOptOutRow[];
@@ -673,7 +673,7 @@ export function CommunicationsWorkspace({
     }
   }
 
-  /** Marks an announcement essential, or clears it (#838): an event manager's call, audited on the server. */
+  /** Marks an announcement essential, or clears it (#838): a communications or event manager's call, audited on the server. */
   async function setAnnouncementEssential(announcement: AnnouncementRecord, essential: boolean) {
     setSaving(true);
     setError("");
@@ -1378,16 +1378,16 @@ export function CommunicationsWorkspace({
                     <button className="secondary-button publish-button" type="button" disabled={saving || broadcastReviewLoading} onClick={() => void broadcastAnnouncement(announcement)}>
                       <Mail aria-hidden="true" size={16} /> Email active registrations
                     </button>
-                    {canMarkEssential && (
-                      <button className="text-button" type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
-                        {announcement.isEssential ? "Clear essential mark" : "Mark essential (reaches people who opted out)"}
-                      </button>
-                    )}
                     <button className="text-button" type="button" disabled={saving} onClick={() => startCorrection(announcement)}>
                       Send a correction
                     </button>
                     <p className="quiet-copy">Published announcements can&apos;t be edited. A correction creates a new draft; it needs its own publish and its own send review before anyone receives it.</p>
                   </>
+                )}
+                {canMarkEssential && announcement.status === "PUBLISHED" && (
+                  <button className="text-button" type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
+                    {announcement.isEssential ? "Clear essential mark" : "Mark essential (reaches people who opted out)"}
+                  </button>
                 )}
               </article>
             ))}

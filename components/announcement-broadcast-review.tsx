@@ -87,7 +87,7 @@ export function AnnouncementBroadcastReviewFacts({
             <dd>
               {preview.skippedOptedOutCount} contact{preview.skippedOptedOutCount === 1 ? " has" : "s have"} opted out of announcements:
               {" "}{preview.skippedOptedOutEventCount} for this event, {preview.skippedOptedOutAllCount} for all IMSDA Events announcements.
-              Mark the announcement essential (event managers) to reach them.
+              Mark the announcement essential (communications or event managers) to reach them.
             </dd>
           </div>
         )}
