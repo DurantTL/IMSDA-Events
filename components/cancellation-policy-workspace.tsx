@@ -332,7 +332,7 @@ function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone
             <label key={category}>{category.toLowerCase()}<input value={draft.classified[category] ?? ""} onChange={(event) => update({ classified: { ...draft.classified, [category]: event.target.value } })} /></label>
           ))}
           <p><small>Never refundable, by kind:</small></p>
-          {chargeCategories.filter((category) => category !== "FEE").map((category) => (
+          {classifiableCategories.map((category) => (
             <label className="cancel-policy-check" key={category}><input type="checkbox" checked={draft.nonrefundable.includes(category)} onChange={() => update({ nonrefundable: toggle(draft.nonrefundable, category) })} /> {category.toLowerCase()}</label>
           ))}
           <label>Never refundable, by form field keys<input value={draft.nonrefundableKeys} onChange={(event) => update({ nonrefundableKeys: event.target.value })} /></label>

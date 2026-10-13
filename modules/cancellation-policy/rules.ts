@@ -103,7 +103,13 @@ export const cancellationRulesSchema = z.object({
   }).strict()).max(20).default([]),
   /** Never refundable, by category or by form field. Withheld in full whatever window applies. */
   nonrefundable: z.object({
-    categories: z.array(z.enum(chargeCategories)).max(chargeCategories.length).default([]),
+    // Only kinds of purchase can be nonrefundable. Fees follow `cardFeeTreatment`; tax and adjustments (discounts,
+    // scholarships) follow the window, so ticking them would let a credit raise a refund. A stored version that lists
+    // them is read with those entries ignored.
+    categories: z.preprocess(
+      (value) => (Array.isArray(value) ? value.filter((item) => (classifiableCategories as readonly unknown[]).includes(item)) : value),
+      z.array(z.enum(classifiableCategories)).max(classifiableCategories.length),
+    ).default([]),
     fieldKeys: z.array(fieldKey).max(40).default([]),
   }).strict().default({ categories: [], fieldKeys: [] }),
   /**

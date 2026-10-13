@@ -201,10 +201,13 @@ function effectiveCategory(entry: ChargeEntry, rules: CancellationRules): Charge
 }
 
 function isNonrefundable(entry: ChargeEntry, category: ChargeCategory, rules: CancellationRules) {
-  // A credit in a nonrefundable class is nonrefundable too (eligible 0), so an unpaired credit still cancels its charge.
   if (entry.amountCents === 0) return false;
+  // A credit that belongs to a nonrefundable class (its own field or classified category, such as a meal credit) is
+  // nonrefundable too, so an unpaired credit still cancels its charge. Generic adjustments (discounts, scholarships)
+  // and the not-itemized remainder are never nonrefundable: they follow the window like everything else.
+  if (entry.amountCents < 0 && (entry.source === "UNRECONCILED" || SHARED_CATEGORIES.has(category))) return false;
   if (category === "FEE" && rules.cardFeeTreatment === "NONREFUNDABLE") return true;
-  if (rules.nonrefundable.categories.includes(category)) return true;
+  if ((rules.nonrefundable.categories as readonly ChargeCategory[]).includes(category)) return true;
   return entry.fieldKey !== null && rules.nonrefundable.fieldKeys.includes(entry.fieldKey);
 }
 
