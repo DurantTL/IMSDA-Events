@@ -357,7 +357,53 @@ A single failed guard run during a manual swap is expected and harmless: it can
 happen between the stop and the rename, and between the run and the network
 connect.
 
-#### Manual rebuild-and-swap
+#### Manual deploy script (use this)
+
+`scripts/manual-deploy.sh` does the whole swap below in one command, and replaces
+the hand-kept `/root/manual-deploy.sh`. That copy was written before the
+encryption key file (#876), the lodging sync and the GHCR images, so it can now
+start a container the app refuses to run. Run as `root` on the host, with the
+full SHA of a `main` commit whose CI and **Docker image** workflow are green:
+
+```bash
+cd /var/www/events.imsda.org
+git fetch origin && git checkout --detach origin/main     # gets the script itself
+sh scripts/manual-deploy.sh <full commit sha>
+```
+
+What it does, in order:
+
+1. Checks `/home/u_events/.xcloud/.env`, refreshes `.env.dburl` from the running
+   app when `DATABASE_URL` is not in `.env` (never printed), and picks how the
+   encryption key is supplied: the `/etc/imsda/secret-encryption-key` mount
+   when that file exists, otherwise `SECRET_ENCRYPTION_KEY` in `.env`. It stops
+   when both are present ("finish the move") or neither is.
+2. Pulls `ghcr.io/duranttl/imsda-events:<sha>`. With
+   `IMSDA_DEPLOY_SOURCE=build` it builds from the checkout instead (about 40
+   minutes).
+3. Runs the app's own production environment check **inside the new image**
+   with the same env files and key mount. A missing or conflicting variable is
+   listed by name and the deploy stops with the current site still running.
+4. Keeps the running app as `<name>-old` (removing the previous `-old` first),
+   starts the new container with the same port, networks, uploads volume and
+   restart policy, and waits up to 15 minutes for `/api/health` to report the
+   new SHA. If the container exits or never reports it, the script prints its
+   last log lines and puts the `-old` container back automatically.
+5. When `/home/u_events/.xcloud/.env.backup` exists, restarts `imsda-backup` on
+   the matching backup image (docs/BACKUPS.md). Skip with `IMSDA_SKIP_BACKUP=1`.
+   The `imsda-outbox-sweeper` container is not touched.
+
+The defaults match this server (`xcloud-site-239298-app-1`,
+`xcloud-site-239298_default`, `postgresql_9kgaw_239292_xcloud-network`,
+`127.0.0.1:8100:3100`). If the xCloud site is recreated with a new id or
+network, override them: `IMSDA_APP_CONTAINER`, `IMSDA_SITE_NETWORK`,
+`IMSDA_XCLOUD_EXPECTED_NETWORK`, `IMSDA_PUBLISH`, `IMSDA_HEALTH_URL`; and set
+the same container name in `/etc/default/imsda-xcloud-runtime-guard`.
+
+Afterwards still check `https://events.imsda.org` through the real domain and
+open one uploaded file (step 5 below). Remove `<name>-old` once you are happy.
+
+#### Manual rebuild-and-swap (what the script does, by hand)
 
 This builds a fresh image from the current checkout, keeps the old container
 as a renamed (not deleted) safety net, and starts the new one wired
