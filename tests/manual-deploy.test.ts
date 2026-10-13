@@ -58,6 +58,7 @@ function setup(envFile: string, keyFile?: string) {
         PATH: `${bin}:${process.env.PATH ?? ""}`,
         IMSDA_DEPLOY_ALLOW_NON_ROOT: "1",
         IMSDA_XCLOUD_RUNTIME_DIR: runtime,
+        IMSDA_ENV_FILE: path.join(runtime, ".env"),
         IMSDA_APP_CONTAINER: app,
         IMSDA_KEY_FILE: keyPath,
         IMSDA_HEALTH_TIMEOUT: "0",

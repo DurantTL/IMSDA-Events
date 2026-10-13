@@ -217,41 +217,56 @@ again. Resend's delivery and bounce webhooks stay in place but receive nothing
 while SES is active. SES bounce and complaint reporting (through SNS) is not
 built yet, so the delivery status for SES mail stops at "accepted".
 
-## xCloud Docker Compose site
+## xCloud site setup (current, October 2026)
 
-Use this when the site is an xCloud **Docker Compose** site (Git settings show a
-Deploy Script running `docker compose -f "$XCLOUD_COMPOSE_FILE" ...`).
+This is how production runs and deploys now. xCloud generates a minimal base
+file, `/home/u_events/239298/docker-compose.yml` (`$XCLOUD_COMPOSE_FILE`), with
+only the build, port `127.0.0.1:8100:3100` and `PORT`. It keeps the production
+environment from its dashboard in `/home/u_events/239298/.env`, but that file
+only fills `${...}` values in Compose files: **the app container does not get
+it unless the override lists it.** Started from the base file alone, the app
+has no secrets and refuses to start ("Invalid server environment").
 
-**Do not point that site at `docker-compose.yml`.** That file is the all-in-one
-stack: it starts its own new, empty Postgres instead of the production database,
-and builds Next on the server. Use `docker-compose.xcloud.yml`, which runs only
-the app and the outbox sweeper, joins the existing database network, attaches the
-existing `imsda_events_assets` uploads volume, and runs the image GitHub already
-built for the commit.
+The override [`deploy/xcloud/docker-compose.env.yml`](../deploy/xcloud/docker-compose.env.yml)
+lives at `/home/u_events/.xcloud/docker-compose.env.yml` (owner `u_events`, mode
+`600`). It loads `/home/u_events/239298/.env` and
+`/home/u_events/.xcloud/.env.dburl` (xCloud's `.env` has no `DATABASE_URL`),
+attaches the `imsda_events_assets` uploads volume and joins
+`postgresql_9kgaw_239292_xcloud-network`. Paths are absolute because Compose
+resolves relative ones against the first file's folder.
 
-1. **Docker Compose settings:** compose file `docker-compose.xcloud.yml`, and the
-   app port `8100` (or set `APP_PORT` in `.env` to the port xCloud's Nginx uses).
-2. **`.env`** in the site directory (next to the compose file): the production
-   environment, including `DATABASE_URL` for the existing database (copy it from
-   `/home/u_events/.xcloud/.env` and `.env.dburl` on the old site). It is
-   git-ignored, so the pull script's `git clean -df` keeps it.
-3. **Git settings → Deploy Script**, replacing the `down` / `up --build` lines,
-   and turn on **Stop the deployment when a command fails**:
+**xCloud Git settings → Deploy Script** (with **Stop the deployment when a
+command fails** turned on):
 
-   ```bash
-   sh "$XCLOUD_SITE_PATH/scripts/xcloud-compose-deploy.sh"
-   ```
+```bash
+export APP_RELEASE_SHA="$(git -C "$XCLOUD_SITE_PATH" rev-parse HEAD)"
+docker compose -f "$XCLOUD_COMPOSE_FILE" -f /home/u_events/.xcloud/docker-compose.env.yml build app
+docker compose -f "$XCLOUD_COMPOSE_FILE" -f /home/u_events/.xcloud/docker-compose.env.yml up -d app
+```
 
-   It waits up to 20 minutes for the commit's image from the Docker image
-   workflow, builds on the server only if it never appears, and replaces the
-   containers with `up -d` without a `down`, so the site stays up meanwhile.
-4. **Before the first deploy**, stop the old standalone containers that hold the
-   port and duplicate the sweeper (keep them, do not remove, until the new site
-   is confirmed): `docker stop xcloud-site-239298-app-1 imsda-outbox-sweeper`.
-   Also disable the runtime guard timer (`systemctl disable --now
-   imsda-xcloud-runtime-guard.timer`); it belongs to the old site type.
-5. **Verify:** `curl -s http://127.0.0.1:8100/api/health` shows the deployed
-   `release.sha` and `database` `ok`; sign in; open one uploaded file.
+It builds first and replaces the container only when the build succeeds, so the
+site stays up during the build. Never use `down`, and never start the app from
+the base file alone.
+
+By hand, as `root` (for example to restart without a build):
+
+```bash
+C="docker compose -f /home/u_events/239298/docker-compose.yml -f /home/u_events/.xcloud/docker-compose.env.yml"
+$C config --quiet && echo config-ok
+export APP_RELEASE_SHA="$(git -C /var/www/events.imsda.org rev-parse HEAD)"
+$C up -d --no-build app
+curl -s http://127.0.0.1:8100/api/health
+```
+
+To change a secret, edit it in the xCloud dashboard (or
+`/home/u_events/239298/.env`), then run the `up -d` line: a restart alone keeps
+the old values.
+
+The sections below describe the earlier setup (base file in
+`/home/u_events/.xcloud/`, settings in `/home/u_events/.xcloud/.env`). That
+`.env` is now unused: on 2026-10-13 the host cleanup deleted it, the daily
+touch job re-created it empty, and every container started from it had no
+secrets.
 
 ## Permanent xCloud Dockerfile-only runtime override
 

@@ -31,7 +31,8 @@ printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$' \
 SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-12)"
 
 RUNTIME_DIR="${IMSDA_XCLOUD_RUNTIME_DIR:-/home/u_events/.xcloud}"
-ENV_FILE="$RUNTIME_DIR/.env"
+# xCloud keeps the production environment beside its generated compose file.
+ENV_FILE="${IMSDA_ENV_FILE:-/home/u_events/239298/.env}"
 DBURL_FILE="$RUNTIME_DIR/.env.dburl"
 BACKUP_ENV_FILE="$RUNTIME_DIR/.env.backup"
 APP="${IMSDA_APP_CONTAINER:-xcloud-site-239298-app-1}"
