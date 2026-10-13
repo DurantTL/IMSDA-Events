@@ -207,3 +207,26 @@ describe("getBackupStatus", () => {
     expect(status.status).toBe("never");
   });
 });
+
+describe("assessBackupStatus rehearsal and offsite fields (#895)", () => {
+  it("reports the last successful rehearsal and whether one is overdue", () => {
+    const fresh = assessBackupStatus({ ...empty, latestRehearsal: { finishedAt: hoursAgo(30), ok: true }, latestRehearsalSuccess: { finishedAt: hoursAgo(30) }, migrationFinishedAt: hoursAgo(24 * 30) }, now);
+    expect(fresh).toMatchObject({ lastRehearsalSuccessAt: hoursAgo(30).toISOString(), rehearsalOverdue: false });
+
+    const old = assessBackupStatus({ ...empty, latestRehearsal: { finishedAt: hoursAgo(24 * 9), ok: true }, latestRehearsalSuccess: { finishedAt: hoursAgo(24 * 9) }, migrationFinishedAt: hoursAgo(24 * 30) }, now);
+    expect(old.rehearsalOverdue).toBe(true);
+
+    const none = assessBackupStatus({ ...empty, migrationFinishedAt: hoursAgo(24 * 30) }, now);
+    expect(none).toMatchObject({ lastRehearsalSuccessAt: null, rehearsalOverdue: true });
+  });
+
+  it("flags offsiteStopped only when copies worked before but not for 36 hours", () => {
+    const latest = run({ hours: 5, offsiteOk: false });
+    const stopped = assessBackupStatus({ ...empty, latest, latestSuccess: latest, latestOffsiteSuccess: { finishedAt: hoursAgo(40) }, migrationFinishedAt: hoursAgo(24 * 30) }, now);
+    expect(stopped.offsiteStopped).toBe(true);
+    const recent = assessBackupStatus({ ...empty, latest, latestSuccess: latest, latestOffsiteSuccess: { finishedAt: hoursAgo(10) }, migrationFinishedAt: hoursAgo(24 * 30) }, now);
+    expect(recent.offsiteStopped).toBe(false);
+    const never = assessBackupStatus({ ...empty, latest, latestSuccess: latest, migrationFinishedAt: hoursAgo(24 * 30) }, now);
+    expect(never.offsiteStopped).toBe(false);
+  });
+});

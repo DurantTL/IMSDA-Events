@@ -64,8 +64,13 @@ export type BackupStatus = {
   /** Latest run's off-site result; null when none is configured or no run yet. */
   offsiteOk: boolean | null;
   lastOffsiteSuccessAt: string | null;
+  /** Off-site copies worked before but none has succeeded for 36 hours. */
+  offsiteStopped: boolean;
   lastRehearsalAt: string | null;
   lastRehearsalOk: boolean | null;
+  lastRehearsalSuccessAt: string | null;
+  /** No successful restore test within the rehearsal window (anchored to the table's creation when none yet). */
+  rehearsalOverdue: boolean;
   /** True when staleness or any failure needs a human to look. */
   needsAttention: boolean;
 };
@@ -139,8 +144,11 @@ export function assessBackupStatus(
     assetsBytes: latestSuccess?.assetsBytes ?? null,
     offsiteOk,
     lastOffsiteSuccessAt: latestOffsiteSuccess?.finishedAt.toISOString() ?? null,
+    offsiteStopped,
     lastRehearsalAt: latestRehearsal?.finishedAt.toISOString() ?? null,
     lastRehearsalOk: latestRehearsal?.ok ?? null,
+    lastRehearsalSuccessAt: latestRehearsalSuccess?.finishedAt.toISOString() ?? null,
+    rehearsalOverdue,
     needsAttention:
       stale || failing || offsiteOk === false || offsiteStopped
       || rehearsalFailed || rehearsalOverdue,

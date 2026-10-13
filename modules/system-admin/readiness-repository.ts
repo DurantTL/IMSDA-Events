@@ -106,10 +106,7 @@ async function gatherFacts(now: Date): Promise<ReadinessFacts> {
       logError("System readiness could not read platform settings", error);
       return null;
     }),
-    getAutomaticBackupEvidence().catch((error) => {
-      logError("System readiness could not read backup status", error);
-      return null;
-    }),
+    getAutomaticBackupEvidence(now),
   ]);
   const senders = [env.ACCOUNT_EMAIL_SENDER_ADDRESS, settings?.defaultSenderEmail].filter(
     (value): value is string => Boolean(value),
