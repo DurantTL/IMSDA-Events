@@ -194,6 +194,7 @@ const pages: PageSpec[] = [
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),
   staff("finance-church-owed", "/finance/church-owed"),
+  staff("finance-cancellation-policy", "/finance/cancellation-policy"),
   staff("finance-square-payments", "/finance/square-payments"),
   staff("lodging", "/more/lodging"),
   staff("lodging-requests", "/more/lodging/requests"),
