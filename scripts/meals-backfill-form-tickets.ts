@@ -77,7 +77,7 @@ async function main() {
               eventId, action: "MEAL_FORM_TICKETS_BACKFILLED", entityType: "Registration", entityId: registration.id,
               correlationId: `meals-backfill-${registration.id}`,
               summary: "Backfill: recorded the registration's form meal tickets as meal selections (no total changed; run by an operator, not staff).",
-              metadata: { registrationId: registration.id, created: synced.created, operator: process.env.USER ?? "unknown", backfill: true },
+              metadata: { registrationId: registration.id, created: synced.created, backfill: true },
             },
           });
           return synced;

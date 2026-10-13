@@ -76,7 +76,7 @@ under More > Meals before publishing (pricing is a human decision).
 
 `entitleAttendeeToPlan` (and `POST /api/events/:id/meals/entitlements`) gives an attendee a selection per covered service,
 quantity 1, payer `CONFERENCE`, unit price 0, carrying the `conferenceRateCents` the conference is billed per meal used.
-Running it again adds only new services; a meal the attendee already holds under another plan moves to this one. #804
+Running it again adds only new services; a meal the attendee already holds as a paid order of one is replaced by the entitlement, and a paid order of several keeps all but one (credited for that one; that credit can be refused with TOTAL_BELOW_PAID when the registration has paid, so refund first). Moving an entitlement between conference plans replaces only the entitlement. An amendment that removes an attendee prices the credit for their paid meals in its quote (counted once, with the below-paid check) and the cancellation must post exactly that amount or the amendment rolls back. #804
 calls it for staff, pastor and volunteer registrations; #212's per-scan usage reporting counts café use against these rows.
 Invitations (#804) and scanning (#211) are not built.
 

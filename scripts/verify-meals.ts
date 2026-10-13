@@ -39,11 +39,12 @@ import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import { campMeetingMeals } from "@/modules/meals/camp-meeting";
 import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { createMealDefinitions } from "@/modules/meals/clone-repository";
-import { applyCampMeetingMealPreset, createMealService, loadTicketPrices, removeMealPrice, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
+import { applyCampMeetingMealPreset, createMealPlan, createMealService, loadTicketPrices, removeMealPrice, setMealPrice, updateMealService } from "@/modules/meals/config-repository";
 import { MealError } from "@/modules/meals/errors";
 import {
   cancelMealSelection,
   cancelMealSelectionsForAttendees,
+  plannedAttendeeMealCredit,
   cancelMealService,
   changeMealPlan,
   changeMealQuantity,
@@ -356,11 +357,31 @@ async function main() {
   const paidOne = await createMealOrder(eventId, userId, { registrationId: keepReg.id, registrationAttendeeId: keepReg.attendeeId, mealType: "BREAKFAST", serviceId: service("Thursday breakfast").id, ageGroup: "ADULT", quantity: 1, clientRequestId: randomUUID() });
   assert(await totalOf(keepReg.id) === 2800, "four paid breakfasts are $28");
   await entitleAttendeeToPlan(eventId, userId, { registrationAttendeeId: keepReg.attendeeId, planId: conferencePlan.id, ageGroup: "ADULT", reason: "Now a volunteer" });
+  const stillPaid0 = await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: paidThree } });
+  assert(stillPaid0.quantity === 2, "(entitled once)");
+  // Moving the entitlement to another conference plan replaces only the entitlement; the paid meals are left alone.
+  const conferenceTwo = await createMealPlan(eventId, userId, { code: "conference-two", name: "Conference two", payer: "CONFERENCE", includesAllServices: true, defaultEntitlement: "INCLUDED" });
+  await entitleAttendeeToPlan(eventId, userId, { registrationAttendeeId: keepReg.attendeeId, planId: conferenceTwo, ageGroup: "ADULT", reason: "Moved to the other conference plan" });
+  const wedSlot = await prisma.eventMealSelection.findMany({ where: { registrationId: keepReg.id, mealType: "BREAKFAST", serviceId: wedBreakfast.id, status: "ACTIVE" } });
+  assert(wedSlot.length === 2 && wedSlot.some((row) => row.payer === "ATTENDEE" && row.quantity === 2) && wedSlot.some((row) => row.payer === "CONFERENCE" && row.planId === conferenceTwo), "re-entitling to another plan keeps the paid meals at two");
+  assert(await totalOf(keepReg.id) === 1400, "and credits nothing more");
+  // Moving the paid order onto a conference plan while an entitlement holds that slot is a clear conflict, not a 500.
+  await expectMealError(changeMealPlan(eventId, paidThree, userId, { planId: conferencePlan.id, reason: "Try to move" }), "DUPLICATE", "a plan change into an occupied slot");
   const stillPaid = await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: paidThree } });
   assert(stillPaid.status === "ACTIVE" && stillPaid.quantity === 2 && stillPaid.payer === "ATTENDEE", "an order of three keeps two paid meals when one becomes the entitlement");
   assert((await prisma.eventMealSelection.findUniqueOrThrow({ where: { id: paidOne } })).status === "CANCELLED", "an order of one is replaced by the entitlement");
   assert(await totalOf(keepReg.id) === 1400, "the attendee is credited only for the two entitled meals ($28 to $14)");
   assert((await prisma.eventMealSelection.count({ where: { registrationId: keepReg.id, mealType: "BREAKFAST", serviceId: wedBreakfast.id, status: "ACTIVE" } })) === 2, "the paid meals and the entitlement sit side by side");
+
+  // ---- Cancelling or lowering an order on a cancelled registration is ledgered only ------------------------------------------
+  const ghost = await makeRegistration("ghost", { total: 0 });
+  const ghostOrder = await createMealOrder(eventId, userId, { registrationId: ghost.id, registrationAttendeeId: ghost.attendeeId, mealType: "SUPPER", serviceId: service("Thursday supper").id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID() });
+  await prisma.registration.update({ where: { id: ghost.id }, data: { status: "CANCELLED", cancelledAt: before } });
+  const ghostTotal = await totalOf(ghost.id);
+  await changeMealQuantity(eventId, ghostOrder, userId, { quantity: 1, reason: "Fewer meals" });
+  await cancelMealSelection(eventId, ghostOrder, userId, { reason: "Cancelled registration" });
+  assert(await totalOf(ghost.id) === ghostTotal, "nothing is posted to a cancelled registration");
+  assert((await prisma.eventMealLedgerEntry.count({ where: { selectionId: ghostOrder, kind: "CREDIT", settlement: "REGISTRATION_NOT_LIVE" } })) === 2, "both credits are on the ledger, marked not live");
 
   // ---- Removing an attendee (an amendment) cancels and credits their meals before the row goes ------------------------------
   const remReg = await makeRegistration("rem", { total: 0 });
@@ -370,8 +391,15 @@ async function main() {
   const removedPaid = await createMealOrder(eventId, userId, { registrationId: remReg.id, registrationAttendeeId: secondAttendee.id, mealType: "LUNCH", serviceId: service("Wednesday lunch").id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID() });
   const remBefore = await totalOf(remReg.id);
   assert(remBefore === 1600, "two adult lunches are $16");
+  // The amendment prices the credit first, read-only; the cancellation must post exactly that or the whole amendment rolls back.
+  const plannedCredit = await prisma.$transaction((tx) => plannedAttendeeMealCredit(tx, { registrationId: remReg.id, attendeeIds: [secondAttendee.id], registrationStatus: "CONFIRMED" }));
+  assert(plannedCredit === -1600, "the planned credit is exactly the paid meals (the conference entitlements add nothing)");
+  assert(await prisma.$transaction((tx) => plannedAttendeeMealCredit(tx, { registrationId: remReg.id, attendeeIds: [secondAttendee.id], registrationStatus: "CANCELLED" })) === 0, "nothing is planned for a registration that is not live");
+  const wrongExpectation = await caught(prisma.$transaction((tx) => cancelMealSelectionsForAttendees(tx, { eventId, registrationId: remReg.id, attendeeIds: [secondAttendee.id], actorUserId: userId, expectedCreditCents: -1500 })));
+  assert(wrongExpectation instanceof MealError && wrongExpectation.code === "CONFLICT", "a credit that differs from the quoted one refuses");
+  assert(await totalOf(remReg.id) === 1600 && (await prisma.eventMealSelection.count({ where: { registrationId: remReg.id, status: "ACTIVE" } })) > 1, "and the refused cancellation changed nothing");
   const removalCredit = await prisma.$transaction(async (tx) => {
-    const posted = await cancelMealSelectionsForAttendees(tx, { eventId, registrationId: remReg.id, attendeeIds: [secondAttendee.id], actorUserId: userId });
+    const posted = await cancelMealSelectionsForAttendees(tx, { eventId, registrationId: remReg.id, attendeeIds: [secondAttendee.id], actorUserId: userId, expectedCreditCents: plannedCredit });
     await tx.registrationAttendee.deleteMany({ where: { id: secondAttendee.id } });
     return posted;
   });
@@ -470,7 +498,7 @@ async function main() {
   assert(clonedServices.length === 13 && clonedServices[0]!.serviceDate === "2028-06-13", "the clone copies the services, dates moved with the event");
   assert(!clonedServices.some((row) => row.name === "Sunday breakfast" && row.status !== "ACTIVE") && clonedServices.every((row) => row.status === "ACTIVE"), "no cancelled service is copied");
   const clonedPlans = await prisma.eventMealPlan.findMany({ where: { eventId: cloneEventId }, include: { prices: true } });
-  assert(clonedPlans.length === 2 && clonedPlans.find((row) => row.code === "meal-tickets")!.prices.length === 6 && clonedPlans.find((row) => row.code === "conference-paid")!.payer === "CONFERENCE", "the clone copies plans, payers and prices");
+  assert(clonedPlans.length === 3 && clonedPlans.find((row) => row.code === "meal-tickets")!.prices.length === 6 && clonedPlans.find((row) => row.code === "conference-paid")!.payer === "CONFERENCE", "the clone copies plans, payers and prices");
   assert((await prisma.eventMealSelection.count({ where: { eventId: cloneEventId } })) === 0, "a clone never copies a selection");
   assert((await prisma.eventMealLedgerEntry.count({ where: { eventId: cloneEventId } })) === 0 && (await prisma.eventMealSelectionChange.count({ where: { eventId: cloneEventId } })) === 0, "a clone never copies the ledger or a selection's history");
   const staleFive = await prisma.eventMealService.count({ where: { eventId: cloneEventId, id: { in: services.map((row) => row.id) } } });

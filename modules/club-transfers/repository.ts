@@ -1168,7 +1168,8 @@ const moveSelect = {
       profileSnapshot: true,
       person: { select: { firstName: true, lastName: true } },
       // Filtered to the old registration in `describeMove`: exactly the lines the move carries.
-      adjustments: { select: { amountCents: true, registrationId: true } },
+      // MEAL lines (#210) are never moved with a person, so they are not part of the move's money.
+      adjustments: { where: { kind: { not: "MEAL" } }, select: { amountCents: true, registrationId: true } },
       honorEnrollments: { select: { offeringId: true, consumesSeat: true, offering: { select: { perClubLimit: true } } } },
     },
   },

@@ -347,7 +347,7 @@ export async function changeMealQuantity(eventId: string, selectionId: string, a
     const actor = await actorFor(tx, actorUserId);
     const selection = await loadSelection(tx, eventId, selectionId);
     assertManual(selection);
-    if (selection.registrationId) await lockRegistration(tx, eventId, selection.registrationId);
+    const registrationStatus = selection.registrationId ? await lockRegistration(tx, eventId, selection.registrationId) : null;
     if (input.quantity === selection.quantity) return;
     if (selection.serviceId && input.quantity > selection.quantity) {
       await lockService(tx, eventId, selection.serviceId);
@@ -358,7 +358,8 @@ export async function changeMealQuantity(eventId: string, selectionId: string, a
     const entries = quantityChangeEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer }, input.quantity);
     const updated = await tx.eventMealSelection.update({ where: { id: selectionId }, data: { quantity: input.quantity } });
     const change = await recordChange(tx, eventId, actor, { selectionId, type: "QUANTITY_CHANGED", reason: input.reason, before: view(selection), after: view(updated) });
-    await postEntries(tx, eventId, change.id, actor, entries.map((draft) => ({ draft, selection, settlement: settlementOf(selection), reason: input.reason })));
+    // A credit on a cancelled or waitlisted registration is ledgered only; a charge there is refused by the adjustment check.
+    await postEntries(tx, eventId, change.id, actor, entries.map((draft) => ({ draft, selection, settlement: draft.kind === "CREDIT" ? settlementForStatus(selection, registrationStatus) : settlementOf(selection), reason: input.reason })));
     await writeAuditLog({
       eventId, actorUserId, action: "MEAL_QUANTITY_CHANGED", entityType: "EventMealSelection", entityId: selectionId,
       summary: `Changed a meal selection from ${selection.quantity} to ${input.quantity}.`, metadata: { beforeQuantity: selection.quantity, afterQuantity: input.quantity },
@@ -386,8 +387,8 @@ export async function cancelMealSelection(eventId: string, selectionId: string, 
     const actor = await actorFor(tx, actorUserId);
     const selection = await loadSelection(tx, eventId, selectionId);
     assertManual(selection);
-    if (selection.registrationId) await lockRegistration(tx, eventId, selection.registrationId);
-    await cancelCore(tx, eventId, actor, selection, "CANCELLED", input.reason);
+    const registrationStatus = selection.registrationId ? await lockRegistration(tx, eventId, selection.registrationId) : null;
+    await cancelCore(tx, eventId, actor, selection, "CANCELLED", input.reason, settlementForStatus(selection, registrationStatus));
     await writeAuditLog({
       eventId, actorUserId, action: "MEAL_SELECTION_CANCELLED", entityType: "EventMealSelection", entityId: selectionId,
       summary: "Cancelled a meal selection.", metadata: { quantity: selection.quantity, unitPriceCents: selection.unitPriceCents },
@@ -413,13 +414,22 @@ export async function changeMealPlan(eventId: string, selectionId: string, actor
     const attendeeTypeId = selection.attendee?.attendeeTypeDefinitionId ?? null;
     const price = priceFor(plan, coverage, selection.mealType, selection.ageGroup, attendeeTypeId);
     const service = selection.serviceId ? await tx.eventMealService.findUniqueOrThrow({ where: { id: selection.serviceId }, select: { id: true, name: true, serviceDate: true } }) : null;
-    const updated = await tx.eventMealSelection.update({
-      where: { id: selectionId },
-      data: {
-        planId: plan.id, payer: plan.payer, unitPriceCents: price.unitPriceCents, conferenceRateCents: price.conferenceRateCents,
-        pricingSnapshot: pricingSnapshot({ plan, price, mealType: selection.mealType, ageGroup: selection.ageGroup, attendeeTypeCode: selection.attendeeTypeCode, service }),
-      },
-    });
+    let updated;
+    try {
+      updated = await tx.eventMealSelection.update({
+        where: { id: selectionId },
+        data: {
+          planId: plan.id, payer: plan.payer, unitPriceCents: price.unitPriceCents, conferenceRateCents: price.conferenceRateCents,
+          pricingSnapshot: pricingSnapshot({ plan, price, mealType: selection.mealType, ageGroup: selection.ageGroup, attendeeTypeCode: selection.attendeeTypeCode, service }),
+        },
+      });
+    } catch (error) {
+      // The new payer's slot already holds an active selection for this person and meal (for example an entitlement).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new MealError("DUPLICATE", "That person already has this meal under the other plan. Cancel one of them instead.");
+      }
+      throw error;
+    }
     const change = await recordChange(tx, eventId, actor, { selectionId, type: "PLAN_CHANGED", reason: input.reason, before: view(selection), after: view(updated) });
     const settlement = settlementOf(selection);
     const entries: EntryInput[] = [];
@@ -496,8 +506,9 @@ export async function entitleAttendeeToPlan(eventId: string, actorUserId: string
       if (entitled && entitled.planId === plan.id) continue;
       const paid = await tx.eventMealSelection.findFirst({ where: { ...slot, payer: "ATTENDEE" }, include });
       const price = priceFor(plan, coverage, service.mealType, input.ageGroup, attendee.attendeeTypeDefinition?.id ?? null);
+      // Moving between conference plans replaces the old entitlement only; paid meals are touched just when there was none.
       if (entitled) await cancelCore(tx, eventId, actor, entitled, "PLAN_CHANGED", input.reason);
-      if (paid) {
+      else if (paid) {
         // The conference pays for one meal: a paid order of one is replaced by the entitlement (credited in full); a paid
         // order of several keeps the rest and is credited only for the one the entitlement now covers.
         if (paid.quantity === 1) {
@@ -508,13 +519,13 @@ export async function entitleAttendeeToPlan(eventId: string, actorUserId: string
           await postEntries(tx, eventId, change.id, actor, quantityChangeEntries({ quantity: paid.quantity, unitPriceCents: paid.unitPriceCents, payer: paid.payer }, paid.quantity - 1)
             .map((draft) => ({ draft, selection: paid, settlement: settlementOf(paid), reason: input.reason })));
         }
-      } else if (!entitled) {
+      } else {
         await assertCapacity(tx, service, 1);
       }
       const selection = await createSelection(tx, {
         eventId, actor, plan, registrationId: attendee.registrationId, registrationAttendeeId: attendee.id, mealType: service.mealType, service,
         ageGroup: input.ageGroup, attendeeTypeCode: attendee.attendeeTypeDefinition?.code ?? null, quantity: 1, price, source: "PLAN_ASSIGNMENT",
-        settlement: "REGISTRATION_ADJUSTMENT", reason: input.reason, replacesSelectionId: paid?.quantity === 1 ? paid.id : entitled?.id ?? null,
+        settlement: "REGISTRATION_ADJUSTMENT", reason: input.reason, replacesSelectionId: entitled ? entitled.id : paid?.quantity === 1 ? paid.id : null,
       });
       created.push(selection.id);
     }
@@ -563,15 +574,39 @@ export async function cancelMealService(eventId: string, serviceId: string, acto
  * amendment can write the registration's final total with them in it. A credit that would take the registration below
  * what it paid throws a MealError (TOTAL_BELOW_PAID): refund first.
  */
+export async function plannedAttendeeMealCredit(tx: Tx, input: {
+  registrationId: string; attendeeIds: readonly string[]; registrationStatus: string;
+}) {
+  if (input.attendeeIds.length === 0 || !isLiveRegistrationStatus(input.registrationStatus)) return 0;
+  const rows = await tx.eventMealSelection.findMany({
+    where: { registrationId: input.registrationId, registrationAttendeeId: { in: [...input.attendeeIds] }, status: "ACTIVE" },
+    select: { quantity: true, unitPriceCents: true, payer: true, source: true },
+  });
+  return rows.reduce((total, row) => (
+    settlementOf({ registrationId: input.registrationId, source: row.source }) === "REGISTRATION_ADJUSTMENT"
+      ? total + cancellationEntries({ quantity: row.quantity, unitPriceCents: row.unitPriceCents, payer: row.payer }).reduce((sum, entry) => sum + entry.amountCents, 0)
+      : total
+  ), 0);
+}
+
+/**
+ * Cancels, and credits at the price charged, every active selection of attendees an amendment is removing (#210), inside
+ * the amendment's transaction and before the attendee row goes (their selections would otherwise be left charged with
+ * no attendee). The amendment priced this credit beforehand with `plannedAttendeeMealCredit`; the sum posted here must equal
+ * `expectedCreditCents` or a MealError (CONFLICT) rolls the whole amendment back. Returns the cents posted.
+ */
 export async function cancelMealSelectionsForAttendees(tx: Tx, input: {
-  eventId: string; registrationId: string; attendeeIds: readonly string[]; actorUserId: string | null;
+  eventId: string; registrationId: string; attendeeIds: readonly string[]; actorUserId: string | null; expectedCreditCents: number;
 }) {
   if (input.attendeeIds.length === 0) return 0;
   const rows = await tx.eventMealSelection.findMany({
     where: { registrationId: input.registrationId, registrationAttendeeId: { in: [...input.attendeeIds] }, status: "ACTIVE" },
     orderBy: { createdAt: "asc" }, include: { attendee: { select: { attendeeTypeDefinitionId: true } } },
   });
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) {
+    if (input.expectedCreditCents !== 0) throw new MealError("CONFLICT", "This registration's meal orders changed while the amendment was being saved. Review it and try again.");
+    return 0;
+  }
   const actor = await actorFor(tx, input.actorUserId, "Registration amendment");
   const registrationStatus = await lockRegistration(tx, input.eventId, input.registrationId);
   let postedCents = 0;
@@ -581,6 +616,9 @@ export async function cancelMealSelectionsForAttendees(tx: Tx, input: {
     if (settlement === "REGISTRATION_ADJUSTMENT") {
       postedCents += cancellationEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer }).reduce((total, entry) => total + entry.amountCents, 0);
     }
+  }
+  if (postedCents !== input.expectedCreditCents) {
+    throw new MealError("CONFLICT", "This registration's meal orders changed while the amendment was being saved. Review it and try again.");
   }
   return postedCents;
 }

@@ -38,7 +38,7 @@ import {
 } from "@/modules/promo-codes/domain";
 import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
 import { adjustmentTotalCents } from "@/modules/registrations/adjustments";
-import { cancelMealSelectionsForAttendees, syncFormMealSelections } from "@/modules/meals/selection-repository";
+import { cancelMealSelectionsForAttendees, plannedAttendeeMealCredit, syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { MealError } from "@/modules/meals/errors";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
 import { lockRegistrationLodging, recomputeChurchShare } from "@/modules/lodging/preferences-service";
@@ -1287,7 +1287,14 @@ async function prepareAmendment(
   // Card fees already added to the total by earlier card payments (a card deposit, a pay-later balance settled by
   // card) are not in the form's calculation; they stay on top of it like adjustments do.
   const appliedFeesCents = await appliedCardSurchargeCents(tx, registration.id);
-  const newTotalCents = Math.max(pricedCalculation.totalCents + adjustmentsCents + appliedFeesCents, 0);
+  // Meal credit (#210) for the attendees being removed: the cancellation posts it as MEAL lines, so the total is checked,
+  // quoted, fingerprinted and written once with it in.
+  const mealCreditCents = await plannedAttendeeMealCredit(tx, {
+    registrationId: registration.id,
+    attendeeIds: removedAttendees.map((attendee) => attendee.id),
+    registrationStatus: registration.status,
+  });
+  const newTotalCents = Math.max(pricedCalculation.totalCents + adjustmentsCents + appliedFeesCents + mealCreditCents, 0);
   if (newTotalCents < netPaidCents) {
     throw new RegistrationAmendmentError(
       "PAYMENT_ADJUSTMENT_REQUIRED",
@@ -1351,6 +1358,7 @@ async function prepareAmendment(
     quoteFingerprint,
     paidCents: netPaidCents,
     adjustmentsCents,
+    mealCreditCents,
     finalTotalCents: newTotalCents,
     addedAttendeeCount: input.attendees.filter((attendee) => !attendee.attendeeId).length,
     seminarPreferencesChanged,
@@ -1530,14 +1538,14 @@ export async function amendRegistration(
         });
         // Meals (#210): a removed attendee's active meal selections are cancelled and credited at the price charged, before the
         // attendee row goes. The credit posts to the registration as MEAL lines, so the final total below carries it.
-        let mealCreditCents = 0;
         if (prepared.removedAttendees.length > 0) {
           try {
-            mealCreditCents = await cancelMealSelectionsForAttendees(tx, {
+            await cancelMealSelectionsForAttendees(tx, {
               eventId,
               registrationId,
               attendeeIds: prepared.removedAttendees.map((attendee) => attendee.id),
               actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
+              expectedCreditCents: prepared.mealCreditCents,
             });
           } catch (error) {
             throw mealErrorToAmendment(error);
@@ -1720,7 +1728,7 @@ export async function amendRegistration(
         await tx.registration.update({
           where: { id: registrationId },
           data: {
-            totalAmount: Math.max(prepared.finalTotalCents + mealCreditCents, 0) / 100,
+            totalAmount: prepared.finalTotalCents / 100,
             ...(prepared.locationChange ? { locationId: prepared.locationChange.to } : {}),
           },
         });
