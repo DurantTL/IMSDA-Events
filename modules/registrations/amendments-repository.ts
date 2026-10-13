@@ -38,6 +38,7 @@ import {
 } from "@/modules/promo-codes/domain";
 import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
 import { adjustmentTotalCents } from "@/modules/registrations/adjustments";
+import { syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { lockRegistrationLodging, recomputeChurchShare } from "@/modules/lodging/preferences-service";
 import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/modules/registrations/amendment-answers";
 import { registrationOperationFingerprint } from "@/modules/registrations/operations-domain";
@@ -1661,6 +1662,18 @@ export async function amendRegistration(
             },
           });
         }
+
+        // Meal tickets (#210): the form re-priced them above, so the meal selections follow the answers (history and
+        // ledger entries only; the registration total is already the amended one).
+        await syncFormMealSelections(tx, {
+          eventId,
+          registrationId,
+          formVersionId: prepared.registration.publicFormSubmission!.formVersionId,
+          responses: prepared.prepared.registrationResponses,
+          lineItems: prepared.nextPricingSnapshot.lineItems,
+          previousResponses: prepared.currentRegistrationResponses,
+          actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
+        });
 
         if (serverOptions.inTransaction) await serverOptions.inTransaction(tx);
         // A team's registration keeps its event's team rules however it is changed, by a director or by staff (#809).

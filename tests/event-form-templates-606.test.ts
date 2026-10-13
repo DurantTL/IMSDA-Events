@@ -443,6 +443,7 @@ describe("the #606 starters", () => {
       eventAttendeeType: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventAttendeeClassification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventLocation: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
       registrationForm: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "form-1", name: starter.name }) },
       eventMessageTemplate: { create: vi.fn().mockResolvedValue({}) },
       eventTemplateApplication: { create: vi.fn().mockResolvedValue({ id: "application-1" }) },

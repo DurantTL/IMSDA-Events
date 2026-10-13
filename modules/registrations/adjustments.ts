@@ -309,6 +309,42 @@ export async function createRegistrationAdjustment(
   return getRegistrationById(eventId, registrationId);
 }
 
+/**
+ * Posts one meal charge or credit from the meal ledger (#210) to a registration as a MEAL adjustment line, inside the
+ * caller's transaction, with the same rules as any adjustment: submitted or confirmed registrations only, never below
+ * $0, never below what has been paid. Returns the adjustment id for the ledger entry to keep.
+ */
+export async function postMealAdjustment(
+  tx: Client,
+  input: { eventId: string; registrationId: string; actorUserId: string | null; amountCents: number; reason: string; attendeeId: string | null },
+) {
+  const registration = await loadRegistration(tx, input.eventId, input.registrationId);
+  const nextTotal = checkNewTotal(registration.totalCents, input.amountCents, registration.paidCents);
+  const adjustment = await tx.registrationAdjustment.create({
+    data: {
+      eventId: input.eventId,
+      registrationId: input.registrationId,
+      kind: "MEAL",
+      amountCents: input.amountCents,
+      reason: input.reason,
+      registrationAttendeeId: input.attendeeId,
+      createdByUserId: input.actorUserId,
+      createdByNameSnapshot: input.actorUserId ? await actorName(tx, input.actorUserId) : "Meal ledger",
+    },
+  });
+  await tx.registration.update({ where: { id: input.registrationId }, data: { totalAmount: nextTotal / 100 } });
+  await writeAuditLog({
+    eventId: input.eventId,
+    actorUserId: input.actorUserId ?? undefined,
+    action: "REGISTRATION_MEAL_ADJUSTMENT_POSTED",
+    entityType: "RegistrationAdjustment",
+    entityId: adjustment.id,
+    summary: `Posted a meal ${input.amountCents < 0 ? "credit" : "charge"} to registration ${registration.confirmationCode}.`,
+    metadata: { registrationId: input.registrationId, amountCents: input.amountCents, totalBeforeCents: registration.totalCents, totalAfterCents: nextTotal },
+  }, tx);
+  return adjustment.id;
+}
+
 /** Cancels an adjustment with an opposite line; the original stays on record. */
 export async function reverseRegistrationAdjustment(
   eventId: string,
@@ -325,6 +361,9 @@ export async function reverseRegistrationAdjustment(
     });
     if (!original || original.reversesAdjustmentId) {
       throw new AdjustmentError("ADJUSTMENT_NOT_FOUND", "That adjustment could not be found.");
+    }
+    if (original.kind === "MEAL") {
+      throw new AdjustmentError("ADJUSTMENT_NOT_FOUND", "A meal charge is changed by changing the meal order, not by reversing the line.");
     }
     if (original.reversedBy) {
       throw new AdjustmentError("ADJUSTMENT_ALREADY_REVERSED", "That adjustment was already reversed.");

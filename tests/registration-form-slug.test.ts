@@ -289,6 +289,7 @@ describe("a published form's slug never changes on its own", () => {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         update: vi.fn().mockResolvedValue({}),
       },
+      eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
       formTestSubmission: { count: vi.fn().mockResolvedValue(validTests) },
       auditLog: { create: vi.fn().mockResolvedValue({}) },
     };

@@ -1,0 +1,114 @@
+# Meals: services, plans, pricing, selections and the ledger (#210, slice 1 of #81)
+
+Staff set up meal services and plans on **More > Meals** (`/more/meals`) without code. What people ordered
+(**selections**) is kept apart from anything used or served: credential redemption and the café scanner (#211) and kitchen
+counts and preparation (#212) are not in these tables. Code is in `modules/meals/`.
+
+## Model
+
+| Table | What it is |
+| --- | --- |
+| `EventMealService` | One meal occurrence: event-local date (`YYYY-MM-DD`) and times (`HH:mm`), serving window, location, meal type, capacity, `TICKETED` or `DONATION_ONLY`, `ACTIVE` or `CANCELLED`. Never deleted. |
+| `EventMealServiceChange` | Append-only history of a service: created, edited, cancelled, reinstated, with actor, reason, before and after. |
+| `EventMealPlan` | A named bundle with a **payer**: `ATTENDEE` (sells tickets at its prices) or `CONFERENCE` (staff, pastor and volunteer meals the conference pays for, #804). One active attendee plan is the **ticket plan** (`isDefaultTicketPlan`), which the registration form's tickets use. `includesAllServices` covers every ticketed service at `defaultEntitlement`. |
+| `EventMealPlanService` | A plan's row for one service: `PAID` or `INCLUDED` (complimentary). Wins over the plan default. |
+| `EventMealPrice` | A price per plan and meal type, for an **age group** (adult, child) or an **attendee type** (#133). An attendee type's price wins; `$0` makes that role complimentary. Under a `CONFERENCE` plan the amount is the rate the conference is billed per meal used (read by #212); the attendee is never charged. |
+| `EventMealSelection` | What was ordered or entitled: quantity of a meal type for an age group under a plan, for a registration (optionally one attendee), optionally pinned to one service. Copies the plan, payer, unit price, pricing snapshot and source form version when made. A walk-up order has no registration. Never deleted. |
+| `EventMealSelectionChange` | Append-only: every creation, quantity change, plan change, substitution and cancellation, with actor, reason, selection before and after. |
+| `EventMealLedgerEntry` | Append-only meal charges and credits (`CHARGE` positive, `CREDIT` negative, at the price that was charged) with where the money went (`settlement`). |
+
+The migration (`20261018100000_meal_services_plans_selections`) is additive. It adds checks, partial unique indexes and
+triggers (the ledger and both histories are append-only, a selection is never deleted, rows cannot cross events); rows go
+only with their event.
+
+### Ticket vs pinned selections
+
+Camp Meeting sells tickets as quantities per **meal type** and age group, good for any service of that type. Those
+selections have no service (`serviceId` null). A selection pinned to a service (a late addition, a walk-up order, a
+conference entitlement) is counted against that service's capacity and credited if the service is cancelled.
+
+## Pricing and the ledger
+
+Every charge or credit is a ledger entry; a change never rewrites a price.
+
+- **Extra meals** are charged, and **removed meals** credited, at the selection's *own* copied price, so what someone
+  agreed to pay never shifts under them. A **plan change** credits the old price and charges the new plan's price at
+  today's prices. A **substitution** cancels the old selection (credit) and creates a new one (charge). A conference plan
+  never produces an entry.
+- Where the money lands (`settlement`):
+  - `IN_REGISTRATION_PRICING`: a registration form ticket. The form already priced it into the registration's total, so
+    nothing moves the total (this is the one shared pricing path for the form).
+  - `REGISTRATION_ADJUSTMENT`: a staff order or change. A `MEAL` adjustment line (`RegistrationAdjustment`) is appended and the
+    registration total moves, with the same rules as any adjustment (submitted or confirmed registrations only, never
+    below $0, never below what has been paid). A `MEAL` line is not reversed by hand; change the order instead.
+  - `AT_COUNTER`: a walk-up order. No registration, settled by staff at the counter. **No payment is taken here.**
+- A registration's meal ledger sum equals its `MEAL` adjustments plus the form tickets' entries.
+- Staff cannot edit a form-sourced ticket in the Meals screen: change the registration's answers (amendment), so the
+  form's price stays the one record. The amendment re-syncs the selections.
+- **Cancelling a service** cancels and credits every selection pinned to it, all or nothing: if a credit would take a
+  registration below what it paid, nothing changes and finance records the refund first. Refunds are not made here.
+  Tickets good for any service of the meal type are left alone.
+
+## Registration form tickets (the Camp Meeting template)
+
+The Camp Meeting template, and the "Meal ticket quantities" builder module, collect six registration-level NUMBER fields:
+`breakfast_adult_qty`, `breakfast_child_qty`, `lunch_adult_qty`, `lunch_child_qty`, `supper_adult_qty`,
+`supper_child_qty`. Those keys now **bind the field to the meal model**:
+
+- **Price**: when a draft form is created or saved, each bound field's price (and the "$7 each" in its label) is taken from
+  the event's ticket plan. Publishing refuses a draft whose prices differ from the plan (`MEAL_PRICE_DRIFT`); save the form
+  again to refresh. An event with no ticket plan is untouched.
+- **Selections**: submitting the form, and amending a registration, run `syncFormMealSelections` in the same transaction, so
+  the selections and their ledger entries follow the answers (history kept, nothing deleted).
+- **Existing registrations**: their stored forms, pricing snapshots and totals are never rewritten. Existing published forms
+  keep their prices until staff save and republish the form. `scripts/meals-backfill-form-tickets.ts` (dry run by default,
+  counts only, human-run) records existing registrations' tickets as selections without moving any total.
+
+## Camp Meeting 2026 defaults
+
+`modules/meals/camp-meeting.ts`, added by a person with finance access with **Add the Camp Meeting meals** on More > Meals (`POST /api/events/:id/meals/defaults`, only on an event with no meals; no starter template or seed applies it, because a price is a human decision): breakfast Wed to Sat
+($7 adult / $6 child), lunch Wed to Fri ($8 / $7), Saturday lunch donation-only (no ticket), supper Tue to Sat ($8 / $7).
+Day offsets count from the event's first day (a Tuesday). A **conference-paid** plan includes every ticketed meal, with the
+same per-meal rates as the conference billing rate. These are the 2026 prices the form already carried; staff review them
+under More > Meals before publishing (pricing is a human decision).
+
+## Conference-paid plans (#804) and café usage (#212)
+
+`entitleAttendeeToPlan` (and `POST /api/events/:id/meals/entitlements`) gives an attendee a selection per covered service,
+quantity 1, payer `CONFERENCE`, unit price 0, carrying the `conferenceRateCents` the conference is billed per meal used.
+Running it again adds only new services; a meal the attendee already holds under another plan moves to this one. #804
+calls it for staff, pastor and volunteer registrations; #212's per-scan usage reporting counts café use against these rows.
+Invitations (#804) and scanning (#211) are not built.
+
+## Meal tickets CSV (for the café's own scanner)
+
+`GET /api/events/:id/exports/meal-tickets` (VIEW_REPORTS, like the kitchen report; shared formula-safe CSV writer):
+one row per active selection of a submitted or confirmed registration, in a pinned service that is still active or good
+for any service: `Confirmation code, Attendee, Attendee type, Age group, Meal, Service date, Service, Quantity, Payer,
+Source, Ticket id`. A ticket bought as a quantity names the registration's contact (no attendee); `Service date` is empty
+when the ticket is good for any service of that meal. Walk-up orders are paid at the counter and are not listed.
+
+## Dietary categories and protected detail
+
+A selection may carry only the configured, non-medical categories in `mealDietaryCategories` (vegetarian, vegan,
+gluten-free); anything else is refused. Allergies and accommodation detail stay outside this module (the registration form
+keeps its own answers; the kitchen report is unchanged).
+
+## Access
+
+Server-side on every route: viewing and the CSV need `VIEW_REPORTS`; editing a service needs `CONFIGURE_EVENT`; plans,
+prices, orders, entitlements and cancelling a service (it moves money) need `MANAGE_FINANCE`. Prices are never seeded by
+the app; the Camp Meeting numbers come from the template a person applies. Every change is audited with actor and reason.
+
+## Clone and templates
+
+A clone with "Meal services and plans" selected copies active services (dates moved by the same number of days as the
+event's start date), active plans, which services each lists, and prices as they are (shown in the "prices copied" review
+line). It never copies a selection, an order, a ledger entry or any history; a price for an attendee type is copied only
+when the new event has a type with that code. A template payload can carry the same definitions as day offsets (`meals`); the built-in starters carry none.
+
+## Out of scope here
+
+Credentials and redemption (#211), kitchen counts and preparation (#212), the invitation flow for conference-paid
+registrations (#804), Camporee meal sponsorship (#409), protected allergy records, and collecting donations for
+donation-only meals.
