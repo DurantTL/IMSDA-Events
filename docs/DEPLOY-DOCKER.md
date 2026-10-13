@@ -217,6 +217,132 @@ again. Resend's delivery and bounce webhooks stay in place but receive nothing
 while SES is active. SES bounce and complaint reporting (through SNS) is not
 built yet, so the delivery status for SES mail stops at "accepted".
 
+## xCloud site setup (current, October 2026)
+
+This is how production runs and deploys now. xCloud's base compose file is
+`/home/u_events/239298/docker-compose.yml` (`$XCLOUD_COMPOSE_FILE`). As xCloud
+generates it, it has only the build, port `127.0.0.1:8100:3100` and `PORT`.
+xCloud keeps the production environment from its dashboard in
+`/home/u_events/239298/.env`, but that file only fills `${...}` values in the
+compose file: **the app container does not get it unless the compose file
+lists it under `env_file`.** A container started from the generated file has no
+secrets and refuses to start ("Invalid server environment" or "Environment
+variable not found: DATABASE_URL"), and nginx then returns 502.
+
+So the base file on the server is replaced with
+[`deploy/xcloud/docker-compose.yml`](../deploy/xcloud/docker-compose.yml). It
+runs the local tag `imsda-events:live` (`pull_policy: never`, no `build`), with
+`env_file` (xCloud's `.env` and `/home/u_events/.xcloud/.env.dburl`, which holds
+only `DATABASE_URL`), the `imsda_events_assets` uploads volume and the
+PostgreSQL network. Anything that starts the app from that file, xCloud
+included, gets its settings and the deployed version. Paste the same content
+into the site's **Docker Compose** page if xCloud offers an editor. If the file
+on the server shrinks back to about 250 bytes, xCloud has regenerated it: copy
+it in again (as `root`, `install -m 644 -o u_events -g u_events
+deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
+
+**Nothing builds on the server.** `.github/workflows/docker-image.yml` publishes
+`ghcr.io/duranttl/imsda-events:<sha>` about 10 minutes after each merge to
+`main` (see "Prebuilt images from GitHub"). Its public build values
+(`APP_BASE_URL`, `EMBED_ALLOWED_ORIGINS`, `SQUARE_ENVIRONMENT`,
+`SQUARE_ENABLE_PRODUCTION`) come from repository variables and must match the
+server `.env`.
+
+**How a new version goes live.** xCloud does not run the Git page's Deploy
+Script on this site: its deploy pulls `main` into `/var/www/events.imsda.org`
+and then runs `down` / `up` on the base file, which only restarts the image
+already tagged `imsda-events:live`. A systemd timer finishes the job:
+
+- [`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh), installed as
+  `/usr/local/bin/imsda-deploy`, waits up to 20 minutes for
+  `ghcr.io/duranttl/imsda-events:<checked-out sha>`, keeps the outgoing image as
+  `imsda-events:previous`, tags the new one `imsda-events:live` and runs
+  `up -d app`. If the image never appears it stops without changing anything.
+- [`deploy/xcloud/autodeploy.sh`](../deploy/xcloud/autodeploy.sh), installed as
+  `/usr/local/bin/imsda-autodeploy`, runs every 2 minutes from
+  `imsda-autodeploy.timer`. When the checked-out commit differs from the live
+  image's `org.opencontainers.image.revision` label and that commit's image is
+  published, it runs `imsda-deploy`.
+
+So after a merge: xCloud pulls the commit within a minute (and restarts the old
+version briefly), GitHub publishes the image about 10 minutes later, and the
+timer switches to it within 2 minutes. Watch it with
+`journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
+`imsda-deploy` as `root`.
+
+Install or update (as `root`, from a checkout of `main`):
+
+```bash
+install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
+cat > /etc/systemd/system/imsda-autodeploy.service <<'UNIT'
+[Unit]
+Description=Deploy the GitHub-built IMSDA Events image for the checked-out commit
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/imsda-autodeploy
+UNIT
+cat > /etc/systemd/system/imsda-autodeploy.timer <<'UNIT'
+[Unit]
+Description=Check for a new IMSDA Events release every 2 minutes
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload && systemctl enable --now imsda-autodeploy.timer
+```
+
+By hand, as `root`:
+
+```bash
+B=/home/u_events/239298/docker-compose.yml
+docker compose -f $B config --quiet && echo config-ok
+docker compose -f $B up -d app                        # restart on the live image
+curl -s http://127.0.0.1:8100/api/health
+docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
+```
+
+**Rollback** to the version before the last deploy:
+
+```bash
+docker tag imsda-events:previous imsda-events:live
+docker compose -f /home/u_events/239298/docker-compose.yml up -d app
+```
+
+Migrations only move forward; rolling back the image does not undo them.
+
+Old images pile up (about 1.9 GB each). Remove ones no longer needed with
+`docker image ls ghcr.io/duranttl/imsda-events` and `docker image rm <tag>`;
+Docker refuses to remove the one in use.
+
+To change a secret, edit it in the xCloud dashboard, then run the `up -d` line:
+a restart alone keeps the old values.
+
+`deploy/xcloud/docker-compose.env.yml` is the earlier override with the same
+settings. It is not used with this setup.
+
+The server-level runtime guard (`imsda-xcloud-runtime-guard.timer`) belongs to
+the earlier setup and is disabled; it cannot repair a container started from
+the new base file. If the app ever comes up without its settings (the log says
+"Invalid server environment" or "Environment variable not found:
+DATABASE_URL"), something started it from the base file alone: check xCloud's
+Recent Deployments and the Deploy Script, then run the `up -d` lines above.
+
+**Nginx is held at 1.31.3** (`apt-mark hold nginx`). On 2026-10-13 unattended
+upgrades moved it to 1.31.6, but xCloud's hand-installed headers-more module
+(`/usr/lib/nginx/modules`) is built for 1.31.3, so nginx refused to start and
+Cloudflare showed error 521. Release the hold (`apt-mark unhold nginx`) only
+after xCloud rebuilds the module for the newer version.
+
+The sections below describe the earlier setup (base file in
+`/home/u_events/.xcloud/`, settings in `/home/u_events/.xcloud/.env`). That
+`.env` is now unused: on 2026-10-13 the host cleanup deleted it, the daily
+touch job re-created it empty, and every container started from it had no
+secrets.
+
 ## Permanent xCloud Dockerfile-only runtime override
 
 xCloud's Dockerfile-only site type regenerates
@@ -233,26 +359,28 @@ Keep these server-owned files in `/home/u_events/.xcloud`:
 - `docker-compose.env.yml` — adds `.env` and `.env.dburl` through `env_file`
   and attaches the external PostgreSQL network.
 
-The app service in `docker-compose.env.yml` must also map the release value; an
-`env_file` alone cannot see xCloud’s shell-only deployment variable:
+The complete override is checked in at
+[`deploy/xcloud/docker-compose.env.yml`](../deploy/xcloud/docker-compose.env.yml).
+Copy it to the server (as `root`) and check it merges with xCloud's generated file:
 
-```yaml
-services:
-  app:
-    env_file:
-      - .env
-      - .env.dburl
-    environment:
-      APP_RELEASE_SHA: ${APP_RELEASE_SHA:-}
-    networks:
-      - default
-      - postgresql
-
-networks:
-  postgresql:
-    external: true
-    name: postgresql_9kgaw_239292_xcloud-network
+```bash
+cd /var/www/events.imsda.org && git fetch origin && git checkout --detach origin/main
+install -m 600 -o u_events -g u_events deploy/xcloud/docker-compose.env.yml \
+  /home/u_events/.xcloud/docker-compose.env.yml
+docker volume inspect imsda_events_assets >/dev/null && echo assets-volume-ok
+docker compose -f /home/u_events/.xcloud/docker-compose.yml \
+  -f /home/u_events/.xcloud/docker-compose.env.yml config --quiet && echo config-ok
 ```
+
+It loads `.env` and `.env.dburl`, maps `APP_RELEASE_SHA` (an `env_file` alone
+cannot see xCloud's shell-only deployment variable), attaches the existing
+`imsda_events_assets` uploads volume and the external PostgreSQL network, and
+carries the encryption key file mount (#876) commented out. Uncomment the two
+key-file parts only once the key has moved out of `.env` (see "Loading the
+encryption key from a protected file" below); with the key still in `.env`, leave
+them commented. If `docker volume inspect` fails, the uploads volume has a
+different name on this server (`docker volume ls`); change the `name:` under
+`volumes:` to match rather than creating an empty one.
 
 `.env.dburl` is a plain `env_file` entry, so it must exist; Compose refuses to
 start without it. If `DATABASE_URL` is in `.env`, you can omit the entry.
@@ -319,7 +447,7 @@ cat > /etc/cron.d/imsda-xcloud-touch <<'EOF'
 # Keep the persistent xCloud runtime override files from being swept by
 # /root/xcloud-cleanup.sh's blanket "delete anything in .xcloud/ older than
 # 30 days" logic — see docs/DEPLOY-DOCKER.md for why these files must persist.
-0 5 * * * root touch /home/u_events/.xcloud/.env /home/u_events/.xcloud/.env.dburl /home/u_events/.xcloud/docker-compose.yml /home/u_events/.xcloud/docker-compose.env.yml 2>/dev/null
+0 5 * * * root touch -c /home/u_events/.xcloud/.env /home/u_events/.xcloud/.env.dburl /home/u_events/.xcloud/docker-compose.yml /home/u_events/.xcloud/docker-compose.env.yml 2>/dev/null
 EOF
 chmod 644 /etc/cron.d/imsda-xcloud-touch
 ```
@@ -329,9 +457,11 @@ restart needed. Verify with `cat /etc/cron.d/imsda-xcloud-touch` (expect 4
 lines: 3 comment lines + 1 cron line) or `cat -A` if a terminal seems to be
 wrapping the line and you want to confirm it wasn't actually truncated.
 
-If `docker-compose.yml` doesn't currently exist on the host (see the
-incident below), that particular path in the `touch` command is a harmless
-no-op until the file is restored — leave it in the list as-is.
+`touch -c` never creates a file. A plain `touch` re-creates a file the
+cleanup already deleted as an **empty** file, which hides the loss: an empty
+`.env` starts an app with no secrets, and it refuses to run. That is how the
+2026-10-13 outage began. If an earlier version of this job is installed,
+replace its line with the one above.
 
 ### When the Dockerfile-only site stops regenerating `docker-compose.yml` at all
 
@@ -357,7 +487,55 @@ A single failed guard run during a manual swap is expected and harmless: it can
 happen between the stop and the rename, and between the run and the network
 connect.
 
-#### Manual rebuild-and-swap
+#### Manual deploy script
+
+Use this when the xCloud Deploy button cannot be used (for example, when the
+base Compose file is not regenerated). `scripts/manual-deploy.sh` does the
+whole swap below in one command, and replaces
+the hand-kept `/root/manual-deploy.sh`. That copy was written before the
+encryption key file (#876), the lodging sync and the GHCR images, so it can now
+start a container the app refuses to run. Run as `root` on the host, with the
+full SHA of a `main` commit whose CI and **Docker image** workflow are green:
+
+```bash
+cd /var/www/events.imsda.org
+git fetch origin && git checkout --detach origin/main     # gets the script itself
+sh scripts/manual-deploy.sh <full commit sha>
+```
+
+What it does, in order:
+
+1. Checks `/home/u_events/.xcloud/.env`, refreshes `.env.dburl` from the running
+   app when `DATABASE_URL` is not in `.env` (never printed), and picks how the
+   encryption key is supplied: the `/etc/imsda/secret-encryption-key` mount
+   when that file exists, otherwise `SECRET_ENCRYPTION_KEY` in `.env`. It stops
+   when both are present ("finish the move") or neither is.
+2. Pulls `ghcr.io/duranttl/imsda-events:<sha>`. With
+   `IMSDA_DEPLOY_SOURCE=build` it builds from the checkout instead (about 40
+   minutes).
+3. Runs the app's own production environment check **inside the new image**
+   with the same env files and key mount. A missing or conflicting variable is
+   listed by name and the deploy stops with the current site still running.
+4. Keeps the running app as `<name>-old` (removing the previous `-old` first),
+   starts the new container with the same port, networks, uploads volume and
+   restart policy, and waits up to 15 minutes for `/api/health` to report the
+   new SHA. If the container exits or never reports it, the script prints its
+   last log lines and puts the `-old` container back automatically.
+5. When `/home/u_events/.xcloud/.env.backup` exists, restarts `imsda-backup` on
+   the matching backup image (docs/BACKUPS.md). Skip with `IMSDA_SKIP_BACKUP=1`.
+   The `imsda-outbox-sweeper` container is not touched.
+
+The defaults match this server (`xcloud-site-239298-app-1`,
+`xcloud-site-239298_default`, `postgresql_9kgaw_239292_xcloud-network`,
+`127.0.0.1:8100:3100`). If the xCloud site is recreated with a new id or
+network, override them: `IMSDA_APP_CONTAINER`, `IMSDA_SITE_NETWORK`,
+`IMSDA_XCLOUD_EXPECTED_NETWORK`, `IMSDA_PUBLISH`, `IMSDA_HEALTH_URL`; and set
+the same container name in `/etc/default/imsda-xcloud-runtime-guard`.
+
+Afterwards still check `https://events.imsda.org` through the real domain and
+open one uploaded file (step 5 below). Remove `<name>-old` once you are happy.
+
+#### Manual rebuild-and-swap (what the script does, by hand)
 
 This builds a fresh image from the current checkout, keeps the old container
 as a renamed (not deleted) safety net, and starts the new one wired

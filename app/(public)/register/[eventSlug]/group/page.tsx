@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { EventInfoCards } from "@/components/event-info-cards";
 import { EventContentBlocks, publicEventAssetUrl } from "@/components/event-content-blocks";
@@ -13,19 +14,24 @@ export const dynamic = "force-dynamic";
 
 type GroupRegistrationPageProps = { params: Promise<{ eventSlug: string }> };
 
-export const metadata: Metadata = {
-  title: `${GROUP_LABEL} registration`,
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({ params }: GroupRegistrationPageProps): Promise<Metadata> {
+  const { eventSlug } = await params;
+  // The page calls notFound() when the event has no group experience, so the tab title says so.
+  const experience = await load(eventSlug);
+  return {
+    title: experience ? `${GROUP_LABEL} registration` : "Page not found",
+    robots: { index: false, follow: false },
+  };
+}
 
-async function load(eventSlug: string) {
+const load = cache(async (eventSlug: string) => {
   try {
     return await getGroupRegistrationExperience(eventSlug);
   } catch (error) {
     if (error instanceof GroupRegistrationError && error.code === "EVENT_NOT_FOUND") return null;
     throw error;
   }
-}
+});
 
 /**
  * /register/<eventSlug>/group (#650): people who are not in a club register

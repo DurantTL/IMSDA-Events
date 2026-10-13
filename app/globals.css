@@ -574,6 +574,8 @@ select:focus-visible {
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
+/* The visible "Event workspace" label above names the picker; this one is for screen readers only. */
+.event-picker-wrap label.sr-only { margin: -1px; }
 
 .select-shell { position: relative; }
 
@@ -8744,6 +8746,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
     .public-event-help-card a, .calendar-subscribe) {
     padding-inline: 6px;
   }
+  /* A link inside a sentence is inline text, not a stand-alone target: no side padding, so no gap before the full stop. */
+  :root .field-help a.inline-text-link { display: inline; min-height: 0; padding-inline: 0; }
   :root .public-event-details-link { min-width: var(--touch-target); }
   /* Tag chip remove buttons: a 32px visible button whose 44px hit area comes from
      a pseudo-element, so chips do not grow. */
@@ -10337,7 +10341,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   align-items: center;
 }
 .event-block-image figure { margin: 0; min-width: 0; }
-.event-block-image img { display: block; width: 100%; height: auto; border-radius: 10px; }
+.event-block-image img { display: block; width: 100%; height: auto; aspect-ratio: auto 4 / 3; object-fit: contain; border-radius: 10px; }
 .event-block-image figcaption { margin-top: 6px; color: var(--block-muted); font-size: var(--text-helper-min); }
 .event-block-image.is-right figure { order: 2; }
 @media (max-width: 700px) {
@@ -10556,6 +10560,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   .honors-table .honors-col-name { width: 22%; }
   .honors-table .honors-col-class { width: 14%; }
   .honors-table .honors-col-add { width: 6.5rem; }
+  .honors-table .honors-col-add.is-view-only { width: 9.5rem; }
   .honors-table th, .honors-table td { overflow-wrap: anywhere; word-break: normal; }
   .honors-table td.honors-col-honors { width: auto; }
   .report-table.honors-table td:last-child { width: 6.5rem; }

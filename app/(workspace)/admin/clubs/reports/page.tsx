@@ -9,7 +9,7 @@ import { calendarDateIn } from "@/modules/calendar/domain";
 import { listClubReportsForYear } from "@/modules/club-reports/repository";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 
-export const metadata: Metadata = { title: "Club monthly reports" };
+export const metadata: Metadata = { title: "Club Monthly Records" };
 export const dynamic = "force-dynamic";
 
 export default async function ClubReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {

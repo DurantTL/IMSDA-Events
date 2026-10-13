@@ -17,7 +17,7 @@ export const clubRoleDescriptions: Record<ClubRole, string> = {
   DIRECTOR: "Runs the club: roster, events, team, and club profile.",
   DEPUTY: "Same access as the director.",
   REGISTRAR: "Keeps the roster and registers the club for events. Sees ages, not full birth dates.",
-  REPORTER: "Submits the club's monthly reports. No roster access.",
+  REPORTER: "Submits the club's Monthly Records. No roster access.",
 };
 
 /**
