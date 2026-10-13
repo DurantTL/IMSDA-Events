@@ -644,6 +644,66 @@ async function main() {
   await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: dotLost, exceptionCode: "CHARGED_ON_CANCELLED_REGISTRATION", triggerId: dotCharge.chargeEntryId, reason: "Collect at the next event" }, FINANCE);
   assert((await dotCodes()).length === 0, "a review naming the charge clears it");
 
+
+  // The registration's payments, net of refunds, cover its posted key charges oldest first; only what they do not reach is flagged.
+  for (const identifier of ["L-12", "L-13", "L-14", "L-15", "L-16", "L-17", "L-18", "L-19"]) await applyAssetAction(eventId, adminId, { action: "create", typeId: lodgeType, identifier });
+  const lostKey = async (person: Person, identifier: string, post = true) => {
+    await issue(person, [identifier]);
+    await give([{ code: identifier, outcome: "LOST", note: "Lost at the lake" }]);
+    const issuanceId = (await issuanceOf(person, identifier)).id;
+    const charge = await postCharge(eventId, financeId, { action: "charge", issuanceId, category: "REPLACEMENT", amountCents: 2000, reason: "Key charge", post }, FINANCE);
+    return { issuanceId, chargeEntryId: charge.chargeEntryId };
+  };
+  const payAndRefund = async (person: Person, paid: number, refunded: number) => {
+    const payment = await prisma.payment.create({ data: { eventId, registrationId: person.registrationId, amount: paid, status: "SUCCEEDED", method: "CASH" } });
+    if (refunded > 0) await prisma.refund.create({ data: { eventId, paymentId: payment.id, amount: refunded, status: "SUCCEEDED" } });
+  };
+  const cancel = (person: Person) => prisma.registration.update({ where: { id: person.registrationId }, data: { status: "CANCELLED" } });
+  const flagged = async (...issuanceIds: string[]) => (await getCloseoutReport(eventId)).exceptions.filter((row) => row.code === "CHARGED_ON_CANCELLED_REGISTRATION" && issuanceIds.includes(row.refId));
+
+  const paidIn = await makeReg(eventId);
+  const paidInKey = await lostKey(paidIn, "L-12");
+  await payAndRefund(paidIn, 120, 100);
+  await cancel(paidIn);
+  assert((await flagged(paidInKey.issuanceId)).length === 0, "paid $120, the $100 fee refunded, the $20 key charge paid: not flagged");
+
+  const refundedAll = await makeReg(eventId);
+  const refundedKey = await lostKey(refundedAll, "L-13");
+  await payAndRefund(refundedAll, 120, 120);
+  await cancel(refundedAll);
+  const refundedOpen = await flagged(refundedKey.issuanceId);
+  assert(refundedOpen.length === 1 && refundedOpen[0]!.detail.includes("$20.00 of it is unpaid"), "paid $120 and refunded in full: the $20 key charge is flagged for $20.00");
+
+  const nothing = await makeReg(eventId);
+  const waivedKey = await lostKey(nothing, "L-14");
+  await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: waivedKey.chargeEntryId, reason: "Goodwill" }, FINANCE);
+  const recordOnlyKey = await lostKey(nothing, "L-15", false);
+  await cancel(nothing);
+  assert((await flagged(waivedKey.issuanceId, recordOnlyKey.issuanceId)).length === 0, "a waived charge and a record-only charge on a cancelled registration are not flagged");
+
+  const covered = await makeReg(eventId);
+  const olderKey = await lostKey(covered, "L-16");
+  const newerKey = await lostKey(covered, "L-17");
+  await payAndRefund(covered, 20, 0);
+  await cancel(covered);
+  const coveredOpen = await flagged(olderKey.issuanceId, newerKey.issuanceId);
+  assert(coveredOpen.length === 1 && coveredOpen[0]!.triggerId === newerKey.chargeEntryId, "two $20 charges and $20 paid: only the newer charge is flagged");
+
+  const twoOpen = await makeReg(eventId);
+  const firstOpen = await lostKey(twoOpen, "L-18");
+  const secondOpen = await lostKey(twoOpen, "L-19");
+  await cancel(twoOpen);
+  assert((await flagged(firstOpen.issuanceId, secondOpen.issuanceId)).length === 2, "never paid: both charges are flagged");
+  const review = (issuanceId: string, triggerId: string | undefined, actor: string, options: { canManageMoney: boolean }) =>
+    recordOutcomeCorrection(eventId, actor, { action: "review", issuanceId, exceptionCode: "CHARGED_ON_CANCELLED_REGISTRATION", ...(triggerId ? { triggerId } : {}), reason: "Collect later" }, options);
+  await expectAssetError(review(firstOpen.issuanceId, firstOpen.chargeEntryId, staffId, CHECK_IN), "MONEY_PERMISSION_REQUIRED", "check-in staff reviewing a key charge on a cancelled registration");
+  await expectAssetError(review(firstOpen.issuanceId, undefined, financeId, FINANCE), "CORRECTION_INVALID", "a review without the charge it answers");
+  await expectAssetError(review(firstOpen.issuanceId, secondOpen.chargeEntryId, financeId, FINANCE), "CORRECTION_INVALID", "a review naming another item's charge");
+  await review(firstOpen.issuanceId, firstOpen.chargeEntryId, financeId, FINANCE);
+  const stillOpen = await flagged(firstOpen.issuanceId, secondOpen.issuanceId);
+  assert(stillOpen.length === 1 && stillOpen[0]!.triggerId === secondOpen.chargeEntryId, "a review naming one charge leaves the other flagged");
+  await expectAssetError(review(waivedKey.issuanceId, waivedKey.chargeEntryId, financeId, FINANCE), "CORRECTION_INVALID", "a review naming a waived charge");
+
   // ---- A lot returned in part ---------------------------------------------------------------------
   const fay = await makeReg(eventId);
   const gus = await makeReg(eventId);
@@ -831,8 +891,8 @@ async function main() {
   const [received, handedBack, keptTotal] = await Promise.all([sumKind("DEPOSIT_RECEIVED"), sumKind("DEPOSIT_RETURNED"), sumKind("DEPOSIT_KEPT")]);
   const lateBack = (await prisma.assetLedgerEntry.aggregate({ where: { eventId, kind: "DEPOSIT_HANDED_BACK_LATE" }, _sum: { amountCents: true } }))._sum.amountCents ?? 0;
   assert(lateBack === 2000 && report.money.depositsReceivedCents === received && report.money.depositsHandedBackCents === handedBack + lateBack && report.money.depositsKeptCents === keptTotal - lateBack && report.money.depositsHeldCents === received - handedBack - keptTotal && report.money.depositsHeldCents === 2000, `deposits held versus returned reconcile (only Jules and Kim are still held): ${JSON.stringify(report.money)}`);
-  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 2500 + 1500 + 400 + 2500 + 1500 + 400 + 300 + 400 && report.money.waivedCents === 2500 + 1100 + 2500 + 2500 + 1500 + 400 + 400 + 300 && report.money.netChargedCents === 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 1500 + 400, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
-  assert(report.charges.length === 16 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 8, "charges list their waivers");
+  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 2500 + 1500 + 400 + 2500 + 1500 + 400 + 300 + 400 + 16_000 && report.money.waivedCents === 2500 + 1100 + 2500 + 2500 + 1500 + 400 + 400 + 300 + 2000 && report.money.netChargedCents === 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 1500 + 400 + 14_000, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
+  assert(report.charges.length === 24 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 9, "charges list their waivers");
   assert(report.exceptions.some((row) => row.code === "WAIVED_ON_INACTIVE_REGISTRATION" && row.subject.startsWith("K-244")), "a charge waived on a cancelled registration is flagged: the line is still on its total");
   assert(report.lost.find((row) => row.identifier === "TOWELS")?.quantity === 1, "a lot lost in part shows the quantity lost, not the quantity of the issue");
   assert(report.lost.some((row) => row.identifier === "K-241") && !report.lost.some((row) => row.identifier === "K-235" || row.identifier === "K-233"), "the closeout reads the corrected fates: a replaced original corrected to lost is lost, a found key is not");

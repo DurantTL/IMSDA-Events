@@ -96,7 +96,9 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
       if (input.exceptionCode === "CORRECTION_NEEDS_REVIEW") {
         triggerId = (corrRows ?? []).filter((entry) => entry.type === "OUTCOME_CORRECTED").slice(-1)[0]?.id ?? null;
       } else if (input.exceptionCode === "CHARGED_ON_CANCELLED_REGISTRATION") {
-        triggerId = (await tx.assetLedgerEntry.findFirst({ where: { eventId, kind: "CHARGE", issuanceId: row.id, ...(input.triggerId ? { id: input.triggerId } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id ?? null;
+        // The review must name the posted, unwaived charge it answers.
+        if (!input.triggerId) throw new AssetError("CORRECTION_INVALID", "Say which charge this review answers.");
+        triggerId = (await tx.assetLedgerEntry.findFirst({ where: { eventId, kind: "CHARGE", issuanceId: row.id, id: input.triggerId, registrationAdjustmentId: { not: null }, waivedBy: { none: {} } }, select: { id: true } }))?.id ?? null;
       } else {
         triggerId = (await tx.assetLedgerEntry.findFirst({ where: { eventId, kind: "WAIVER", issuanceId: row.id, ...(input.triggerId ? { id: input.triggerId } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id ?? null;
       }

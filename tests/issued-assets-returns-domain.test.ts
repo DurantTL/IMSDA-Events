@@ -15,6 +15,7 @@ import {
   keepFeesNeedsFee,
   depositHeldCents,
   lateRefundSchema,
+  unpaidChargeCents,
   decideDepositOutcome,
   depositActionSchema,
   facilityActionSchema,
@@ -235,6 +236,18 @@ describe("reviews and cash handed back after a correction", () => {
 
   it("lets a charge on a cancelled registration be reviewed by its charge id", () => {
     expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "CHARGED_ON_CANCELLED_REGISTRATION", triggerId: "c1", reason: "Collect later" }).success).toBe(true);
+  });
+
+  it("covers posted key charges with what was paid, oldest first", () => {
+    const one = [{ id: "c1", cents: 2000 }];
+    expect(unpaidChargeCents(2000, one).size).toBe(0);
+    expect(unpaidChargeCents(0, one).get("c1")).toBe(2000);
+    expect(unpaidChargeCents(-500, one).get("c1")).toBe(2000);
+    const two = [{ id: "old", cents: 2000 }, { id: "new", cents: 2000 }];
+    expect([...unpaidChargeCents(2000, two)]).toEqual([["new", 2000]]);
+    expect([...unpaidChargeCents(3000, two)]).toEqual([["new", 1000]]);
+    expect(unpaidChargeCents(4000, two).size).toBe(0);
+    expect(unpaidChargeCents(0, []).size).toBe(0);
   });
 
   it("names the exception a review answers", () => {

@@ -1,13 +1,13 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { registrationBalanceCents } from "@/modules/payments/square-domain";
 import { toCsv } from "@/modules/reporting/csv";
 import {
   applyOutcomeCorrections,
   chargeCategoryLabels,
   decideDepositOutcome,
   depositHeldCents,
+  unpaidChargeCents,
   formatCents,
   reconcileUnits,
   returnOutcomeLabels,
@@ -98,7 +98,7 @@ export const exceptionLabels: Record<ExceptionCode, string> = {
   CORRECTION_NEEDS_REVIEW: "Outcome corrected after money was recorded",
   WAIVED_ON_INACTIVE_REGISTRATION: "Waived after cancellation: the line is still on the registration total",
   WAIVED_AFTER_REFUND: "Charge waived after the deposit was refunded for it",
-  CHARGED_ON_CANCELLED_REGISTRATION: "Charged for a key or item, but the registration was cancelled before paying",
+  CHARGED_ON_CANCELLED_REGISTRATION: "Charged for a key or item, but the registration is no longer active and the charge is unpaid",
   FACILITY_OPEN: "Facility issue unresolved",
   BLOCK_ON_FINISHED_ISSUE: "Resolved issue still blocks a room",
   RECONCILIATION_MISMATCH: "Counts do not reconcile",
@@ -343,14 +343,21 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
       where: { eventId, id: { in: [...new Set(postedCharges.map((entry) => entry.registrationId as string))] }, status: { notIn: ["SUBMITTED", "CONFIRMED"] } },
       select: { id: true, totalAmount: true, payments: { where: { status: "SUCCEEDED" }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } } } },
     });
-    const owed = new Map(registrations.map((registration) => [registration.id, registrationBalanceCents(registration)]));
+    // What the registration paid, net of refunds, covers its posted charges oldest first; a charge is flagged for what is left.
+    const toCents = (value: { toString(): string }) => Math.round(Number(value.toString()) * 100);
+    const owedBy = new Map<string, number>();
+    for (const registration of registrations) {
+      const netPaid = registration.payments.reduce((total, payment) => total + toCents(payment.amount) - payment.refunds.reduce((sum, refund) => sum + toCents(refund.amount), 0), 0);
+      const own = postedCharges.filter((entry) => entry.registrationId === registration.id).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+      for (const [id, cents] of unpaidChargeCents(netPaid, own.map((entry) => ({ id: entry.id, cents: entry.amountCents })))) owedBy.set(id, cents);
+    }
     for (const charge of postedCharges) {
-      const balance = owed.get(charge.registrationId as string);
+      const unpaid = owedBy.get(charge.id);
       const row = described.get(charge.issuanceId as string);
-      if (!balance || balance <= 0 || !row || reviewedFor(charge.issuanceId as string, "CHARGED_ON_CANCELLED_REGISTRATION", charge.id)) continue;
+      if (!unpaid || !row || reviewedFor(charge.issuanceId as string, "CHARGED_ON_CANCELLED_REGISTRATION", charge.id)) continue;
       exceptions.push({
         code: "CHARGED_ON_CANCELLED_REGISTRATION", label: exceptionLabels.CHARGED_ON_CANCELLED_REGISTRATION, subject: subject(row),
-        detail: `${formatCents(charge.amountCents)} was charged to a registration that is no longer active and its balance still owes ${formatCents(Math.min(balance, charge.amountCents))} of it. Decide whether to collect it or write it off; nothing was changed automatically.`,
+        detail: `${formatCents(charge.amountCents)} was charged to a registration that is no longer active, and ${formatCents(unpaid)} of it is unpaid. Decide whether to collect it or write it off; nothing was changed automatically.`,
         holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: charge.issuanceId as string, triggerId: charge.id,
       });
     }

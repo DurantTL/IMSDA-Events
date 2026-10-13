@@ -224,9 +224,9 @@ describe("closeout reviews", () => {
   }));
 
   it("lists a key charge on a cancelled registration with a review form for finance only", () => {
-    const cancelled: CloseoutReport = { ...report, exceptions: [{ code: "CHARGED_ON_CANCELLED_REGISTRATION", label: "Charged for a key or item, but the registration was cancelled before paying", subject: "L-11 (Lodge key)", detail: "Decide.", holderLabel: "Pat Example", amountCents: 400, deskAttendeeId: "att1", refId: "i1", triggerId: "c1" }] };
+    const cancelled: CloseoutReport = { ...report, exceptions: [{ code: "CHARGED_ON_CANCELLED_REGISTRATION", label: "Charged for a key or item, but the registration is no longer active and the charge is unpaid", subject: "L-11 (Lodge key)", detail: "Decide.", holderLabel: "Pat Example", amountCents: 400, deskAttendeeId: "att1", refId: "i1", triggerId: "c1" }] };
     const html = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: cancelled, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true }));
-    expect(html(true)).toContain("registration was cancelled before paying");
+    expect(html(true)).toContain("no longer active and the charge is unpaid");
     expect(html(true)).toContain("Reviewed, nothing more to do");
     expect(html(false)).not.toContain("Reviewed, nothing more to do");
   });

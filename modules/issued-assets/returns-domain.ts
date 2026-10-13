@@ -144,6 +144,23 @@ export function depositHeldCents(input: { keptCents: number; lateCents: number; 
   return Math.max(0, input.keptCents - input.lateCents - input.offsetCents);
 }
 
+/**
+ * How much of each posted key or item charge is still unpaid on a registration that is no longer active. What the registration
+ * paid, net of refunds, covers its charges oldest first; a charge is owed what the cover does not reach. `charges` must already be
+ * in that order (oldest first, id as the tie-break). Returns the owed amount per charge id, only for charges that are owed.
+ */
+export function unpaidChargeCents(netPaidCents: number, charges: ReadonlyArray<{ id: string; cents: number }>) {
+  let cover = Math.max(0, netPaidCents);
+  const owed = new Map<string, number>();
+  for (const charge of charges) {
+    const used = Math.min(cover, Math.max(0, charge.cents));
+    cover -= used;
+    const rest = Math.max(0, charge.cents) - used;
+    if (rest > 0) owed.set(charge.id, rest);
+  }
+  return owed;
+}
+
 /** Corrections of a recorded outcome, and write-offs (#214): administrators and finance, with a reason. */
 export const correctionActionSchema = z.discriminatedUnion("action", [
   z.object({
