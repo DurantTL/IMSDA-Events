@@ -1559,9 +1559,7 @@ select:focus-visible {
   padding: 10px 11px;
   font: inherit;
   font-size: max(var(--type-body-floor, 0px), 0.77rem);
-  letter-spacing: 0.04em;
   outline: 0;
-  text-transform: uppercase;
 }
 .check-in-manual-form input:focus {
   border-color: var(--imsda-purple);
@@ -9228,6 +9226,11 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 @media (max-width: 600px) {
   .activity-row { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .activity-row code { grid-column: 2; justify-self: start; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+}
+
+/* The scanner's close button is a full-size tap target on a phone (#889). */
+@media screen and ((max-width: 768px) or (pointer: coarse)) {
+  :root .check-in-scanner-modal .modal-head .icon-button { min-width: 44px; min-height: 44px; }
 }
 
 /* Touch and click targets (#738). Screen only, and only the small controls

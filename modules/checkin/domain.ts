@@ -155,6 +155,10 @@ function searchWords(value: string) {
  * the club name and confirmation code. Email is deliberately left out: when
  * one email registered several people, it would match them all.
  */
+export function looksLikeConfirmationCode(query: string) {
+  return /[\d-]/.test(query.trim());
+}
+
 export function arrivalMatchesSearch(
   arrival: { firstName: string; lastName: string; confirmationCode: string },
   query: string,
@@ -164,7 +168,7 @@ export function arrivalMatchesSearch(
   if (!trimmed) return true;
   // The code only matches a query that looks like one (a digit or hyphen), so
   // typing the start of a name ("w", "wr") doesn't list every "WR26-…" arrival.
-  if (/[\d-]/.test(trimmed) && arrival.confirmationCode.toLowerCase().includes(trimmed.toLowerCase())) return true;
+  if (looksLikeConfirmationCode(trimmed) && arrival.confirmationCode.toLowerCase().includes(trimmed.toLowerCase())) return true;
   const queryWords = searchWords(trimmed);
   if (queryWords.length === 0) return false;
   const nameWords = searchWords(`${arrival.firstName} ${arrival.lastName}`);
@@ -173,4 +177,59 @@ export function arrivalMatchesSearch(
   const clubWords = searchWords(clubName);
   const words = [...nameWords, ...joinedNames, ...clubWords];
   return queryWords.every((word) => words.some((candidate) => candidate.startsWith(word)));
+}
+
+/** People the scanner's pick list shows at once; a longer match list asks staff to narrow the search. */
+export const scannerLookupListLimit = 8;
+
+export type ScannerLookupPerson = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  attendeeType: string;
+  checkedIn: boolean;
+  confirmationCode: string;
+};
+
+export type ScannerLookupMatches = {
+  /** Distinct registrations (confirmation codes) any match belongs to. */
+  confirmationCodes: string[];
+  /** Matching people, in roster order, capped at `scannerLookupListLimit`. */
+  people: ScannerLookupPerson[];
+  /** True when more people matched than `people` holds. */
+  truncated: boolean;
+};
+
+/**
+ * The scanner's manual lookup (#889) runs the same search as the check-in
+ * workspace (`arrivalMatchesSearch`) over the same server-projected arrivals,
+ * so it can show staff nothing the desk does not already show them: name,
+ * attendee type, checked-in state and confirmation code. A single matching
+ * registration opens directly; several are offered as a short list.
+ */
+export function findScannerLookupMatches(
+  arrivals: readonly ScannerLookupPerson[],
+  query: string,
+  clubNameByCode: Readonly<Record<string, { organizationName: string } | undefined>> = {},
+): ScannerLookupMatches {
+  if (!query.trim()) return { confirmationCodes: [], people: [], truncated: false };
+  // An exact confirmation code opens that registration, even when it is a prefix of another (WL-12 vs WL-123).
+  const exact = arrivals.filter((arrival) => arrival.confirmationCode.toLowerCase() === query.trim().toLowerCase());
+  const matched = exact.length > 0 ? exact : arrivals.filter((arrival) => arrivalMatchesSearch(
+    arrival,
+    query,
+    clubNameByCode[arrival.confirmationCode]?.organizationName,
+  ));
+  return {
+    confirmationCodes: [...new Set(matched.map((arrival) => arrival.confirmationCode))],
+    people: matched.slice(0, scannerLookupListLimit).map((arrival) => ({
+      id: arrival.id,
+      firstName: arrival.firstName,
+      lastName: arrival.lastName,
+      attendeeType: arrival.attendeeType,
+      checkedIn: arrival.checkedIn,
+      confirmationCode: arrival.confirmationCode,
+    })),
+    truncated: matched.length > scannerLookupListLimit,
+  };
 }

@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   QrCode,
   RefreshCw,
+  Search,
   ShieldCheck,
   X,
 } from "lucide-react";
@@ -34,6 +35,12 @@ import {
   type JsQrFunction,
   type ScanLoop,
 } from "@/components/check-in-qr-decoding";
+import {
+  findScannerLookupMatches,
+  looksLikeConfirmationCode,
+  type ScannerLookupMatches,
+  type ScannerLookupPerson,
+} from "@/modules/checkin/domain";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { CheckInActionResult } from "@/components/use-offline-check-in-queue";
 import type { ClubCheckInInfo } from "@/modules/club-registrations/repository";
@@ -126,6 +133,8 @@ export function CheckInScanner({
   backgroundFlaggedAttendeeIds = [],
   clubsByConfirmationCode = {},
   savedQueueUnreadable = false,
+  arrivals = [],
+  locationName,
 }: {
   eventId: string;
   onConfirmCheckIn: (
@@ -140,11 +149,25 @@ export function CheckInScanner({
   clubsByConfirmationCode?: Record<string, ClubCheckInInfo>;
   /** Unreadable saved-queue data blocks new club check-ins, as on the roster. */
   savedQueueUnreadable?: boolean;
+  /**
+   * The desk's own server-projected arrivals (#889). The manual lookup runs the
+   * check-in workspace search over these, so it shows no more than the desk does.
+   */
+  arrivals?: readonly ScannerLookupPerson[];
+  /** The location the desk is filtered to (#413); named when a name search finds no one. */
+  locationName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [cameraState, setCameraState] = useState<CameraState>("idle");
   const [manualCode, setManualCode] = useState("");
   const [resolution, setResolution] = useState<PassResolution | null>(null);
+  // Several people matched the typed name (#889): staff pick one; nothing opens until they do.
+  const [candidates, setCandidates] = useState<ScannerLookupMatches | null>(null);
+  const candidatesHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Move focus to the list's heading so a screen reader hears that several people matched.
+  useEffect(() => {
+    if (candidates) candidatesHeadingRef.current?.focus();
+  }, [candidates]);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -194,6 +217,7 @@ export function CheckInScanner({
     setOpen(false);
     setCameraState("idle");
     setResolution(null);
+    setCandidates(null);
     setError("");
     setNotice("");
     setActionStateById({});
@@ -264,6 +288,7 @@ export function CheckInScanner({
           payload?.message ?? "The attendee pass could not be found.",
         );
       }
+      setCandidates(null);
       setResolution(payload.resolution);
     } catch (caught) {
       setError(
@@ -288,6 +313,7 @@ export function CheckInScanner({
   async function startCamera() {
     stopCamera(false);
     setResolution(null);
+    setCandidates(null);
     setError("");
     setCameraState("starting");
     const startId = startIdRef.current;
@@ -408,7 +434,26 @@ export function CheckInScanner({
   function submitConfirmationCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     stopCamera();
-    void resolveLookup("confirmation", manualCode);
+    const query = manualCode.trim();
+    const matches = findScannerLookupMatches(arrivals, query, clubsByConfirmationCode);
+    if (matches.confirmationCodes.length > 1) {
+      // Several registrations match the name: staff pick one, then it opens the same view a scan opens.
+      setResolution(null);
+      setError("");
+      setNotice("");
+      setCandidates(matches);
+      return;
+    }
+    if (matches.confirmationCodes.length === 0 && !looksLikeConfirmationCode(query)) {
+      setResolution(null);
+      setCandidates(null);
+      setNotice("");
+      setError(`No one on this desk's list matches that name.${locationName ? ` The list is filtered to ${locationName}.` : ""}`);
+      return;
+    }
+    // One registration matched (or the query looks like a code): the server resolves the code
+    // with the same permission check and eligibility rules a scan uses.
+    void resolveLookup("confirmation", matches.confirmationCodes[0] ?? query);
   }
 
   async function confirmCheckIn(attendee: ResolvedAttendee) {
@@ -511,6 +556,7 @@ export function CheckInScanner({
         onClick={() => {
           setManualCode("");
           setResolution(null);
+          setCandidates(null);
           setError("");
           setNotice("");
           setActionStateById({});
@@ -632,7 +678,7 @@ export function CheckInScanner({
             </section>
 
             <div className="check-in-scanner-divider">
-              <span>or use a confirmation code</span>
+              <span>or search by name or confirmation code</span>
             </div>
 
             <form
@@ -642,14 +688,14 @@ export function CheckInScanner({
               <label>
                 <span>
                   <Keyboard size={16} aria-hidden="true" />
-                  Registration confirmation code
+                  Name or confirmation code
                 </span>
                 <input
-                  autoCapitalize="characters"
+                  autoCapitalize="off"
                   autoComplete="off"
                   maxLength={80}
                   onChange={(event) => setManualCode(event.target.value)}
-                  placeholder="REG-1234ABCD"
+                  placeholder="Sam Rivera or REG-1234ABCD"
                   required
                   spellCheck={false}
                   value={manualCode}
@@ -666,6 +712,48 @@ export function CheckInScanner({
                 {lookupBusy ? "Looking up…" : "Find registration"}
               </button>
             </form>
+
+            {candidates && (
+              <section aria-labelledby="check-in-candidates-title" className="check-in-review">
+                <div className="check-in-review-heading">
+                  <span><Search size={20} aria-hidden="true" /></span>
+                  <div>
+                    <h3 id="check-in-candidates-title" ref={candidatesHeadingRef} tabIndex={-1}>Several people match</h3>
+                    <p>
+                      Pick the right person to open their registration.
+                      {candidates.truncated && " Only the first few are shown; type more of the name to narrow the list."}
+                    </p>
+                  </div>
+                </div>
+                <div className="check-in-review-list">
+                  {candidates.people.map((person) => (
+                    <article key={person.id}>
+                      <span className={`person-avatar ${person.checkedIn ? "green" : "purple"}`}>
+                        {person.firstName[0]}{person.lastName[0]}
+                      </span>
+                      <div>
+                        <strong translate="no">{person.firstName} {person.lastName}</strong>
+                        <small>
+                          {attendeeTypeLabel(person.attendeeType)}
+                          {person.checkedIn ? " · Checked in" : ""}
+                          {" · "}
+                          <span translate="no">{person.confirmationCode}</span>
+                        </small>
+                      </div>
+                      <button
+                        aria-label={`Open registration for ${person.firstName} ${person.lastName}`}
+                        className="secondary-button"
+                        disabled={lookupBusy}
+                        onClick={() => void resolveLookup("confirmation", person.confirmationCode)}
+                        type="button"
+                      >
+                        Open
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {error && (
               <div className="inline-notice error check-in-scanner-error" role="alert">

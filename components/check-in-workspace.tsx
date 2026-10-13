@@ -419,6 +419,8 @@ export function CheckInWorkspace({
           conflictAttendeeIds={queue
             .filter((item) => item.state === "CONFLICT")
             .map((item) => item.attendeeId)}
+          arrivals={arrivals}
+          locationName={locationName}
           eventId={eventId}
           paymentDueByConfirmationCode={paymentDueByConfirmationCode}
           backgroundFlaggedAttendeeIds={backgroundFlaggedAttendeeIds}
