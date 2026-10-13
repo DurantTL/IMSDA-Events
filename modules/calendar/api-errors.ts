@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 import { AccessDeniedError } from "@/modules/access/authorization";
+import { DeadlineReminderError } from "@/modules/calendar/deadline-reminders";
 import { CalendarError } from "@/modules/calendar/repository";
 import { logError } from "@/lib/logger";
 
@@ -33,6 +34,15 @@ export function calendarFeedApiError(error: unknown, action: string) {
   return calendarApiError(error, action);
 }
 
+const reminderErrorStatus: Record<DeadlineReminderError["code"], number> = {
+  BATCH_NOT_FOUND: 404,
+  BATCH_NOT_PENDING: 409,
+  BATCH_WITHDRAWN: 409,
+  BATCH_CHANGED: 409,
+  EMAIL_NOT_CONFIGURED: 503,
+  NO_RECIPIENTS: 409,
+};
+
 export function calendarApiError(error: unknown, action: string) {
   if (error instanceof ZodError) {
     return Response.json(
@@ -42,6 +52,9 @@ export function calendarApiError(error: unknown, action: string) {
   }
   if (error instanceof AccessDeniedError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
+  }
+  if (error instanceof DeadlineReminderError) {
+    return Response.json({ error: error.code, message: error.message }, { status: reminderErrorStatus[error.code] });
   }
   if (error instanceof CalendarError) {
     return Response.json({ error: error.code, message: error.message }, { status: calendarErrorStatus[error.code] });

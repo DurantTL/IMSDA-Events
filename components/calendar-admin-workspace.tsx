@@ -3,8 +3,10 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
+import { DeadlineRemindersPanel } from "@/components/deadline-reminders-panel";
 import { ConfirmDialog, cancelUnlessBusy } from "@/components/confirm-dialog";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import type { PendingReminders } from "@/modules/calendar/deadline-reminders";
 import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import {
   bulkConfirmMessage,
@@ -106,12 +108,16 @@ export function CalendarAdminWorkspace({
   initialEntries,
   initialEvents,
   initialFeeds = [],
+  initialReminders = { batches: [], emailConfigured: true },
 }: {
   initialEntries: CalendarAdminEntry[];
   initialEvents: CalendarAdminEvent[];
   initialFeeds?: CalendarAdminFeed[];
+  /** Deadline reminder batches waiting for a send (#910). */
+  initialReminders?: PendingReminders;
 }) {
-  const [tab, setTab] = useState<"entries" | "events" | "imports">("entries");
+  const [tab, setTab] = useState<"entries" | "events" | "imports" | "reminders">("entries");
+  const [reminderCount, setReminderCount] = useState(initialReminders.batches.length);
   const [entries, setEntries] = useState(initialEntries);
   const [events, setEvents] = useState(initialEvents);
   const [editing, setEditing] = useState<CalendarAdminEntry | null>(null);
@@ -265,6 +271,7 @@ export function CalendarAdminWorkspace({
           <p>
             Published events appear on the public calendar automatically. Hide any that
             shouldn&apos;t, give them a category, and add dates for things registered elsewhere.
+            A date marked Deadline stays off the public calendar and shows to clubs and Area Coordinators as a deadline, with reminders.
           </p>
         </div>
         <a className="secondary-button" href="/calendar" rel="noreferrer" target="_blank">
@@ -286,6 +293,14 @@ export function CalendarAdminWorkspace({
         <button aria-selected={tab === "imports"} className={tab === "imports" ? "active" : ""} onClick={() => setTab("imports")} role="tab" type="button">
           Imported calendars <span>{initialFeeds.length}</span>
         </button>
+        <button aria-selected={tab === "reminders"} className={tab === "reminders" ? "active" : ""} onClick={() => setTab("reminders")} role="tab" type="button">
+          Deadline reminders <span>{reminderCount}</span>
+        </button>
+      </div>
+
+      {/* Kept mounted so a send in progress and its notice survive switching tabs. */}
+      <div hidden={tab !== "reminders"}>
+        <DeadlineRemindersPanel initial={initialReminders} onCountChange={setReminderCount} />
       </div>
 
       {/* Kept mounted so the list of feeds survives switching tabs. */}
@@ -365,6 +380,8 @@ export function CalendarAdminWorkspace({
                     <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "unpublish" })} type="button">Unpublish</button>
                     <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "hide" })} type="button">Hide</button>
                     <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "unhide" })} type="button">Unhide</button>
+                    <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "markDeadline" })} type="button">Mark as deadline</button>
+                    <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "clearDeadline" })} type="button">Clear deadline</button>
                     <button className="secondary-button" onClick={() => setSelected(new Set())} type="button">Clear selection</button>
                   </div>
                 )}
@@ -391,6 +408,7 @@ export function CalendarAdminWorkspace({
                         <span className={`status-chip ${entry.isPublished ? "green" : "gold"}`}>{entry.isPublished ? "On calendar" : "Draft"}</span>
                         {entry.status !== "SCHEDULED" && <span className="status-chip coral">{calendarStatusLabels[entry.status]}</span>}
                         {entry.entryType === "CLOSURE" && <span className="status-chip gold">{closureLabel}</span>}
+                        {entry.entryType === "DEADLINE" && <span className="status-chip purple">Deadline</span>}
                         {entry.sourceFeedName && <span className="status-chip">Imported from {entry.sourceFeedName}</span>}
                         {entry.sourceRemovedAt && <span className="status-chip coral">No longer in the source</span>}
                         {entry.isHiddenLocally && <span className="status-chip gold">Hidden here</span>}
@@ -576,7 +594,7 @@ type EntryBody = {
   linkUrl: string;
   status: string;
   isPublished: boolean;
-  entryType: "STANDARD" | "CLOSURE";
+  entryType: "STANDARD" | "CLOSURE" | "DEADLINE";
   repeat: RepeatRule | null;
   repeatExceptions: string[];
 };
@@ -628,7 +646,7 @@ function EntryForm({
       linkUrl: String(form.get("linkUrl") ?? ""),
       status: String(form.get("status") ?? "SCHEDULED"),
       isPublished: form.get("isPublished") === "on",
-      entryType: form.get("entryType") === "CLOSURE" ? "CLOSURE" : "STANDARD",
+      entryType: form.get("entryType") === "CLOSURE" ? "CLOSURE" : form.get("entryType") === "DEADLINE" ? "DEADLINE" : "STANDARD",
       repeat: draftToRepeat(repeat, start),
       repeatExceptions: repeat.frequency === "NEVER" ? [] : skipped,
     });
@@ -685,6 +703,7 @@ function EntryForm({
           <select defaultValue={entry?.entryType ?? "STANDARD"} name="entryType">
             <option value="STANDARD">Conference date</option>
             <option value="CLOSURE">{closureLabel} (e.g. conference office closed)</option>
+            <option value="DEADLINE">Deadline (clubs only, not on the public calendar)</option>
           </select>
         </label>
         <label>
@@ -964,6 +983,7 @@ function EntryFiltersBar({
           <option value="">Any type</option>
           <option value="STANDARD">Conference date</option>
           <option value="CLOSURE">{closureLabel}</option>
+          <option value="DEADLINE">Deadline</option>
         </select>
       </label>
       <label>

@@ -164,6 +164,8 @@ jobs:
       - run: npm run test:church-sponsor-lodging
       # Real-database check of calendar bulk changes (#796): the feed's advisory lock is taken and rows are read again under it, a racing feed sync never leaves a removed entry published and a bulk hide survives it, the 500-entry cap, and a refresh keeping a bulk-set category with no local-edit mark.
       - run: npm run test:calendar-bulk
+      # Real-database check of deadline reminders (#910): imported "due" items become Deadlines and a staff choice (single or bulk) survives refreshes, Deadlines never reach the public calendar data or the .ics feed, the upcoming deadlines list (7 days back to 90 ahead), the 14-day and 2-day reminder batches arriving at Chicago midnight across both daylight-saving changes, one batch per deadline and point under eight concurrent runs (and the database refusing a duplicate or another point), nothing queued before a staff send, a stale or racing send queueing one email per eligible person once, recipients (active club roles and lasting coordinators, one each, never revoked, ended, future, disabled, unverified, inactive-club, temporary or opted-out), and a changed, cancelled, hidden or un-marked deadline updating or withdrawing its waiting batch.
+      - run: npm run test:deadline-reminders
       # Real-database check of location waitlists: a full location waitlists the club there in per-location order, a freed seat promotes the next club at that location only and never overfills it under races, a busy location is skipped, and the daily digest reaches the active coordinator and event administrators once a day while an email failure changes nothing (#599).
       - run: npm run test:location-waitlist
 

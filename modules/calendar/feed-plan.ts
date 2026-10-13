@@ -6,6 +6,7 @@
  * anything linked to it (#445) survives and relinks if the item returns.
  */
 import { createHash } from "node:crypto";
+import { autoEntryType, refreshedEntryType, type EntryTypeName } from "@/modules/calendar/deadlines";
 import { importedFieldNames, type ImportedEntry, type ImportedEntryFields } from "@/modules/calendar/ics-import";
 
 /** A feed entry as stored: the mapped fields plus the bookkeeping the sync reads. */
@@ -18,15 +19,18 @@ export type StoredFeedEntry = ImportedEntryFields & {
   sourceRemovedWasPublished: boolean;
   locallyEditedFields: string[];
   isPublished: boolean;
+  /** Not an imported field: a refresh only moves it between Standard and Deadline (#910), and never once staff chose it. */
+  entryType: EntryTypeName;
 };
 
 export type FeedDefaults = {
   publishNewItems: boolean;
   defaultCategory: string;
-  defaultEntryType: "STANDARD" | "CLOSURE";
+  defaultEntryType: EntryTypeName;
 };
 
 export type FieldPatch = Partial<ImportedEntryFields> & {
+  entryType?: EntryTypeName;
   sourceHash?: string;
   sourceRemovedAt?: Date | null;
   sourceRemovedWasPublished?: boolean;
@@ -34,7 +38,7 @@ export type FieldPatch = Partial<ImportedEntryFields> & {
 };
 
 export type FeedPlan = {
-  creates: Array<{ entry: ImportedEntry; hash: string; data: ImportedEntryFields & { category: string; entryType: "STANDARD" | "CLOSURE"; isPublished: boolean } }>;
+  creates: Array<{ entry: ImportedEntry; hash: string; data: ImportedEntryFields & { category: string; entryType: EntryTypeName; isPublished: boolean } }>;
   updates: Array<{ id: string; title: string; kind: "UPDATE" | "REVIVE" | "RELINK"; changedFields: string[]; patch: FieldPatch }>;
   removals: Array<{ id: string; title: string; wasPublished: boolean }>;
   unchanged: number;
@@ -83,18 +87,31 @@ export function planFeedSync(existing: StoredFeedEntry[], parsed: ImportedEntry[
       plan.creates.push({
         entry,
         hash,
-        data: { ...importedFieldsOf(entry), category: defaults.defaultCategory, entryType: defaults.defaultEntryType, isPublished: defaults.publishNewItems },
+        // An item that says it is due starts as a Deadline (#910), unless the feed's own default type says otherwise.
+        data: { ...importedFieldsOf(entry), category: defaults.defaultCategory, entryType: autoEntryType(entry.title, defaults.defaultEntryType), isPublished: defaults.publishNewItems },
       });
       continue;
     }
     const returning = row.sourceRemovedAt !== null;
     const hashChanged = hash !== row.sourceHash;
+    // The type follows the title on its own (#910) until staff choose it; a staff-edited title does not drive it.
+    const typeTitle = row.locallyEditedFields.includes("title") ? row.title : entry.title;
+    const typeChange = refreshedEntryType(row, typeTitle, defaults.defaultEntryType);
     if (!returning && !hashChanged && !relink) {
-      plan.unchanged += 1;
+      if (typeChange) {
+        // The item is unchanged, but the rule now reads it differently (for example an item imported before deadlines existed).
+        plan.updates.push({ id: row.id, title: row.title, kind: "UPDATE", changedFields: ["entryType"], patch: { entryType: typeChange } });
+      } else {
+        plan.unchanged += 1;
+      }
       continue;
     }
     const patch: FieldPatch = {};
     const changedFields: string[] = [];
+    if (typeChange) {
+      patch.entryType = typeChange;
+      changedFields.push("entryType");
+    }
     if (hashChanged) {
       const fresh = importedFieldsOf(entry);
       for (const name of importedFieldNames) {

@@ -7946,6 +7946,20 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .calendar-admin-actions label + .secondary-button { flex: none; }
 }
 
+/* Deadline reminders (#910): the email preview wraps instead of scrolling sideways, and the buttons are touch size. */
+.deadline-reminder-preview { margin: 8px 0 0; padding: 12px; max-width: 100%; box-sizing: border-box; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; border: 1px solid var(--line); border-radius: 10px; }
+.deadline-reminder-row details > summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; }
+.deadline-reminder-row .calendar-admin-actions .primary-button,
+.deadline-reminder-row .calendar-admin-actions .secondary-button { min-height: 44px; }
+/* The entry list's tick box is a thumb target on phones (#910 put a real row in the audit's calendar page). */
+@media (max-width: 600px) {
+  .calendar-row-select { min-width: 44px; min-height: 44px; justify-content: center; }
+}
+@media (max-width: 580px) {
+  .deadline-reminder-row .calendar-admin-actions { flex-wrap: wrap; }
+  .deadline-reminder-row .calendar-admin-actions button { flex: 1 1 8rem; justify-content: center; }
+}
+
 /* Passkeys */
 .account-security-main { display: grid; gap: 16px; min-width: 0; }
 .passkey-unlock { display: grid; justify-items: start; gap: 8px; margin-top: 12px; }

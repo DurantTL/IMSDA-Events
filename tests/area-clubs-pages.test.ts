@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => { throw new Error("NOT_FOUND"); }),
   getAreaClubsSummary: vi.fn(),
   listAreaClubEvents: vi.fn(),
+  listUpcomingDeadlines: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -22,6 +23,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
+vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({
   getAreaClubsSummary: mocks.getAreaClubsSummary,
   listAreaClubEvents: mocks.listAreaClubEvents,
@@ -44,6 +46,7 @@ beforeEach(() => {
   mocks.currentStaffActingContext.mockResolvedValue(null);
   mocks.getAreaClubsSummary.mockResolvedValue([]);
   mocks.listAreaClubEvents.mockResolvedValue([]);
+  mocks.listUpcomingDeadlines.mockResolvedValue([]);
 });
 
 describe.each(Object.entries(pages))("area-clubs %s page (#657)", (_name, Page) => {
@@ -62,6 +65,18 @@ describe.each(Object.entries(pages))("area-clubs %s page (#657)", (_name, Page) 
     await expect(Page(props)).rejects.toThrow("NOT_FOUND");
     expect(mocks.getAreaClubsSummary).not.toHaveBeenCalled();
     expect(mocks.listAreaClubEvents).not.toHaveBeenCalled();
+    expect(mocks.listUpcomingDeadlines).not.toHaveBeenCalled();
+  });
+});
+
+describe("Upcoming deadlines for the Area Coordinator (#910)", () => {
+  it("shows the conference's deadlines on the overview, above the club list", async () => {
+    const deadline = { key: "d1", title: "Points Reports Due", dueOn: "2026-12-05", href: null, postponed: false, label: "Due in 20 days", overdue: false };
+    mocks.listUpcomingDeadlines.mockResolvedValue([deadline]);
+    const tree = await OverviewPage(props);
+    const text = JSON.stringify(tree);
+    expect(text).toContain("Points Reports Due");
+    expect(text.indexOf("Points Reports Due")).toBeLessThan(text.indexOf("area-overview-page"));
   });
 });
 

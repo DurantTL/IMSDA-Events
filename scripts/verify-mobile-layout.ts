@@ -503,6 +503,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.honorOffering.deleteMany({ where: { id: multiHonorOfferingId } }),
     prisma.honorSession.deleteMany({ where: { id: multiHonorSessionId } }),
     prisma.honor.deleteMany({ where: { id: { in: multiHonorIds } } }),
+    prisma.deadlineReminderBatch.deleteMany({ where: { title: { startsWith: "Mobilecheck" } } }),
+    prisma.calendarEntry.deleteMany({ where: { id: { startsWith: `${P}_deadline_` } } }),
     prisma.announcement.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.messageOutbox.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.eventMessageTemplate.deleteMany({ where: { eventId: blocksEventId } }),
@@ -739,6 +741,35 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedFailedDeliveries(prisma);
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
+  await seedDeadlines(prisma);
+}
+
+/**
+ * Two Deadlines (#910) so the club home's and the Area Coordinator overview's "Upcoming deadlines" list has
+ * an upcoming row (with a link) and an overdue one, and one prepared reminder batch for the calendar admin's
+ * "Deadline reminders" tab. Dates are relative to today, so the rows stay in the list's window.
+ */
+async function seedDeadlines(prisma: PrismaClient) {
+  const { calendarDateIn, addDays } = await import("../modules/calendar/domain");
+  const today = calendarDateIn(new Date());
+  const rows = [
+    { key: "soon", days: 9, title: "Mobilecheck Spring Camporee Registration Due and Every Other Long Title the Calendar Might Import", linkUrl: "https://calendar.mobilecheck.example.test/registration" },
+    { key: "overdue", days: -2, title: "Mobilecheck Points and Investiture Reports are Due", linkUrl: null },
+  ];
+  for (const row of rows) {
+    const date = addDays(today, row.days);
+    const data = { title: row.title, startsOn: date, endsOn: date, entryType: "DEADLINE" as const, isPublished: true, isHiddenLocally: false, status: "SCHEDULED" as const, linkUrl: row.linkUrl, repeatRule: null };
+    await prisma.calendarEntry.upsert({
+      where: { id: `${P}_deadline_${row.key}` },
+      update: data,
+      create: { id: `${P}_deadline_${row.key}`, ...data, createdByUserId: "usr_system_admin", updatedByUserId: "usr_system_admin" },
+    });
+  }
+  const soon = rows[0];
+  const batchData = { title: soon.title, dueOn: addDays(today, soon.days), linkUrl: soon.linkUrl, status: "PENDING" as const, statusReason: null, decidedAt: null };
+  const existing = await prisma.deadlineReminderBatch.findFirst({ where: { calendarEntryId: `${P}_deadline_soon`, daysBefore: 14 }, select: { id: true } });
+  if (existing) await prisma.deadlineReminderBatch.update({ where: { id: existing.id }, data: batchData });
+  else await prisma.deadlineReminderBatch.create({ data: { calendarEntryId: `${P}_deadline_soon`, daysBefore: 14, ...batchData } });
 }
 
 /**
@@ -1456,6 +1487,31 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
     await deleteLayoutNotes().catch((error: Error) => record("dialog-open-failed", savedName, width, `could not delete the synthetic note: ${error.message.split("\n")[0]}`));
+  }
+
+  // The calendar admin's Deadline reminders tab (#910): a prepared batch with its recipient chips, the opened email
+  // preview, and the Send and Don't send buttons. Nothing is sent: the buttons are only measured.
+  if (spec.name === "staff-calendar-admin") {
+    const stateName = `${spec.name} (deadline reminders)`;
+    try {
+      await page.getByRole("tab", { name: /Deadline reminders/ }).click({ timeout: 3000 });
+      await page.waitForTimeout(150);
+      const card = page.locator(".deadline-reminder-row:visible").first();
+      await card.waitFor({ state: "visible", timeout: 5000 });
+      const audit = async (state: string, shot: string) => {
+        const open = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
+        const name = `${stateName} ${state}`;
+        if (open.scrollWidth > open.innerWidth) record("horizontal-scroll", name, width, `page is ${open.scrollWidth}px wide in a ${open.innerWidth}px window; sticking out: ${open.overflowers.join("; ") || "(nothing identified)"}`);
+        for (const target of open.smallTargets) record("small-tap-target", name, width, target);
+        if (takeShots) await page.screenshot({ path: `${prefix}-${shot}.jpg`, type: "jpeg", quality: 60 });
+      };
+      await audit("closed", "deadline-reminders");
+      await card.locator("summary").first().click({ timeout: 3000 });
+      await page.waitForTimeout(150);
+      await audit("preview open", "deadline-reminders-preview");
+    } catch (error) {
+      record("dialog-open-failed", stateName, width, (error as Error).message.split("\n")[0] ?? "failed");
+    }
   }
 
   // The class builder with several honors chosen (#812): the add form with its honor search narrowed and

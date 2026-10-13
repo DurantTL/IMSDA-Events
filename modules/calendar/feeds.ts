@@ -165,7 +165,7 @@ async function loadAndParse(feed: { sealedUrl: string }, deps: Deps): Promise<Pa
 const storedSelect = {
   id: true, title: true, description: true, location: true, linkUrl: true, status: true, startsOn: true, endsOn: true,
   timeLabel: true, repeatRule: true, repeatExceptions: true, sourceUid: true, sourceRecurrenceId: true, sourceHash: true,
-  sourceRemovedAt: true, sourceRemovedWasPublished: true, locallyEditedFields: true, isPublished: true,
+  sourceRemovedAt: true, sourceRemovedWasPublished: true, locallyEditedFields: true, isPublished: true, entryType: true,
 } as const;
 
 type StoredRow = Prisma.CalendarEntryGetPayload<{ select: typeof storedSelect }>;

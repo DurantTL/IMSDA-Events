@@ -17,7 +17,7 @@ export type AdminListEntry = {
   category: string;
   startsOn: string;
   endsOn: string;
-  entryType: "STANDARD" | "CLOSURE";
+  entryType: "STANDARD" | "CLOSURE" | "DEADLINE";
   isPublished: boolean;
   isHiddenLocally: boolean;
   sourceFeedId: string | null;
@@ -41,7 +41,7 @@ export type EntryFilters = {
   source: string;
   state: EntryStateFilter;
   time: EntryTimeFilter;
-  entryType: "" | "STANDARD" | "CLOSURE";
+  entryType: "" | "STANDARD" | "CLOSURE" | "DEADLINE";
 };
 
 export const defaultEntryFilters: EntryFilters = { search: "", category: "", source: "", state: "all", time: "upcoming", entryType: "" };
@@ -139,22 +139,33 @@ export type BulkAction =
   | { action: "publish" }
   | { action: "unpublish" }
   | { action: "hide" }
-  | { action: "unhide" };
+  | { action: "unhide" }
+  /** Set or clear the Deadline type (#910). Clearing makes the entry Standard. */
+  | { action: "markDeadline" }
+  | { action: "clearDeadline" };
 
 export type BulkEntryRow = {
   id: string;
   title: string;
   category: string;
+  entryType: "STANDARD" | "CLOSURE" | "DEADLINE";
   isPublished: boolean;
   isHiddenLocally: boolean;
   sourceFeedId: string | null;
+  /** Kept after an item's feed is deleted; with `sourceFeedId` it says the entry came from a feed. */
+  sourceUid?: string | null;
   sourceRemovedAt: Date | string | null;
 };
 
 export type BulkChange = {
   id: string;
   title: string;
-  data: { category?: string; isPublished?: boolean; isHiddenLocally?: boolean };
+  data: { category?: string; isPublished?: boolean; isHiddenLocally?: boolean; entryType?: "STANDARD" | "DEADLINE" };
+  /**
+   * An imported entry whose type staff just chose: it gets the "staff chose it" mark in `locallyEditedFields`, so a
+   * refresh never undoes it (#910). Such a change is written row by row, since each row keeps its own marks.
+   */
+  markTypeEdited?: boolean;
 };
 export type BulkSkip = { id: string; title: string; reason: string };
 export type BulkPlan = { changes: BulkChange[]; skipped: BulkSkip[] };
@@ -168,6 +179,8 @@ export function bulkConfirmMessage(action: BulkAction, count: number) {
     case "unpublish": return `Unpublish ${entries}?`;
     case "hide": return `Hide ${entries} from the public calendar?`;
     case "unhide": return `Unhide ${entries}?`;
+    case "markDeadline": return `Mark ${entries} as deadlines? They leave the public calendar and show to clubs as deadlines.`;
+    case "clearDeadline": return `Make ${entries} ordinary calendar entries (not deadlines)?`;
   }
 }
 
@@ -205,6 +218,17 @@ export function planBulkAction(rows: BulkEntryRow[], request: BulkAction): BulkP
         if (!row.sourceFeedId) skip(row, "Only imported entries can be hidden or unhidden.");
         else if (row.isHiddenLocally === hide) skip(row, hide ? "Already hidden." : "Not hidden.");
         else plan.changes.push({ id: row.id, title: row.title, data: { isHiddenLocally: hide } });
+        break;
+      }
+      case "markDeadline":
+      case "clearDeadline": {
+        const marking = request.action === "markDeadline";
+        if (marking ? row.entryType === "DEADLINE" : row.entryType !== "DEADLINE") {
+          skip(row, marking ? "Already a deadline." : "Not a deadline.");
+          break;
+        }
+        const imported = Boolean(row.sourceFeedId || row.sourceUid);
+        plan.changes.push({ id: row.id, title: row.title, data: { entryType: marking ? "DEADLINE" : "STANDARD" }, ...(imported ? { markTypeEdited: true } : {}) });
         break;
       }
     }
