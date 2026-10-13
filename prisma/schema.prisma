@@ -7694,6 +7694,8 @@ enum IssuedAssetEventType {
   OUTCOME_CORRECTED
   /// A loss, or the original of a replacement, written off with a reason: nothing is charged and nothing more is owed.
   WRITTEN_OFF
+  /// Staff reviewed an exception the closeout raised (a correction after money was recorded, a waiver that left a line on a registration), with a reason.
+  EXCEPTION_REVIEWED
 }
 
 /// What happens to a cash deposit when a covered item does not come back (#214).
@@ -7710,6 +7712,8 @@ enum AssetLedgerKind {
   DEPOSIT_KEPT
   CHARGE
   WAIVER
+  /// Cash handed back at the desk after a correction showed an item a kept deposit was kept for had come back. Recorded, never a provider refund; capped at what was kept.
+  DEPOSIT_HANDED_BACK_LATE
 }
 
 enum AssetChargeCategory {

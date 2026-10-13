@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   applyFacilityAction: vi.fn(),
   getCloseoutReport: vi.fn(),
   recordOutcomeCorrection: vi.fn(),
+  recordLateDepositRefund: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -26,7 +27,7 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership }));
 vi.mock("@/modules/issued-assets/returns-service", () => ({ returnAssets: mocks.returnAssets }));
-vi.mock("@/modules/issued-assets/money-service", () => ({ recordDeposit: mocks.recordDeposit, settleDeposit: mocks.settleDeposit, postCharge: mocks.postCharge, waiveCharge: mocks.waiveCharge }));
+vi.mock("@/modules/issued-assets/money-service", () => ({ recordLateDepositRefund: mocks.recordLateDepositRefund, recordDeposit: mocks.recordDeposit, settleDeposit: mocks.settleDeposit, postCharge: mocks.postCharge, waiveCharge: mocks.waiveCharge }));
 vi.mock("@/modules/issued-assets/corrections", () => ({ recordOutcomeCorrection: mocks.recordOutcomeCorrection }));
 vi.mock("@/modules/issued-assets/facility-service", () => ({ applyFacilityAction: mocks.applyFacilityAction }));
 vi.mock("@/modules/issued-assets/closeout", () => ({
@@ -151,6 +152,18 @@ describe("correction routes", () => {
       expect((await correctionsRoute(request("POST", { action: "write_off" }), ctx)).status, role).toBe(403);
     }
     expect(mocks.recordOutcomeCorrection).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends cash handed back after a correction to its own service, for money managers only", async () => {
+    mocks.recordLateDepositRefund.mockResolvedValue({ entryId: "e1" });
+    mocks.findActiveMembership.mockResolvedValue(membership("FINANCE_MANAGER"));
+    expect((await correctionsRoute(request("POST", { action: "refund_after_correction" }), ctx)).status).toBe(200);
+    expect(mocks.recordLateDepositRefund).toHaveBeenCalledTimes(1);
+    expect(mocks.recordLateDepositRefund.mock.calls[0]![3]).toEqual({ canManageMoney: true });
+    expect(mocks.recordOutcomeCorrection).not.toHaveBeenCalled();
+    mocks.findActiveMembership.mockResolvedValue(membership("CHECK_IN_STAFF"));
+    expect((await correctionsRoute(request("POST", { action: "refund_after_correction" }), ctx)).status).toBe(403);
+    expect(mocks.recordLateDepositRefund).toHaveBeenCalledTimes(1);
   });
 
   it("answers an invalid correction as a conflict", async () => {

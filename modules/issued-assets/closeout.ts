@@ -72,6 +72,8 @@ export const exceptionCodes = [
   "DEPOSIT_UNSETTLED",
   "CORRECTED_WITH_DEPOSIT",
   "CORRECTION_NEEDS_REVIEW",
+  "WAIVED_ON_INACTIVE_REGISTRATION",
+  "WAIVED_AFTER_REFUND",
   "FACILITY_OPEN",
   "BLOCK_ON_FINISHED_ISSUE",
   "RECONCILIATION_MISMATCH",
@@ -85,6 +87,8 @@ export const exceptionLabels: Record<ExceptionCode, string> = {
   DEPOSIT_UNSETTLED: "Cash deposit not settled",
   CORRECTED_WITH_DEPOSIT: "Withdrawn as an error but a deposit is open",
   CORRECTION_NEEDS_REVIEW: "Outcome corrected after money was recorded",
+  WAIVED_ON_INACTIVE_REGISTRATION: "Waived after cancellation: the line is still on the registration total",
+  WAIVED_AFTER_REFUND: "Charge waived after the deposit was refunded for it",
   FACILITY_OPEN: "Facility issue unresolved",
   BLOCK_ON_FINISHED_ISSUE: "Resolved issue still blocks a room",
   RECONCILIATION_MISMATCH: "Counts do not reconcile",
@@ -99,6 +103,8 @@ export type ExceptionRow = {
   amountCents: number | null;
   deskAttendeeId: string | null;
   refId: string;
+  /** For an exception about a deposit: the deposit entry, so cash handed back after a correction can be recorded against it. */
+  depositId?: string | null;
 };
 
 export type TypeReconciliation = UnitCounts & { typeId: string; typeName: string; difference: number; balanced: boolean };
@@ -123,6 +129,8 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
   const limit = CLOSEOUT_ROW_LIMIT + 1;
   const corrections = await loadCorrectionRows(client, eventId);
   const correctedIds = [...corrections.keys()];
+  /** A review (money permission, a reason) recorded after the event the exception is about clears it. */
+  const reviewedAfter = (issuanceId: string, afterMs: number) => (corrections.get(issuanceId) ?? []).some((entry) => entry.type === "EXCEPTION_REVIEWED" && entry.recordedAt.getTime() > afterMs);
   const [types, assets, openRows, outcomeRows, replacedRows, correctedRows, ledger, historySums, openSums, facilityOpen, finishedWithBlock] = await Promise.all([
     client.issuedAssetType.findMany({ where: { eventId }, orderBy: { name: "asc" } }),
     client.issuedAsset.findMany({ where: { eventId }, select: { id: true, assetTypeId: true } }),
@@ -234,8 +242,9 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
   const sumOf = (kind: string) => ledger.filter((entry) => entry.kind === kind).reduce((total, entry) => total + entry.amountCents, 0);
   const charged = sumOf("CHARGE");
   const waived = sumOf("WAIVER");
+  const lateBack = sumOf("DEPOSIT_HANDED_BACK_LATE");
   const money = {
-    depositsReceivedCents: sumOf("DEPOSIT_RECEIVED"), depositsHandedBackCents: sumOf("DEPOSIT_RETURNED"), depositsKeptCents: sumOf("DEPOSIT_KEPT"),
+    depositsReceivedCents: sumOf("DEPOSIT_RECEIVED"), depositsHandedBackCents: sumOf("DEPOSIT_RETURNED") + lateBack, depositsKeptCents: sumOf("DEPOSIT_KEPT") - lateBack,
     depositsHeldCents: sumOf("DEPOSIT_RECEIVED") - sumOf("DEPOSIT_RETURNED") - sumOf("DEPOSIT_KEPT"),
     chargedCents: charged, waivedCents: waived, netChargedCents: charged - waived,
   };
@@ -282,11 +291,31 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
     const settledBefore = settledAt !== undefined && settledAt < lastCorrection.recordedAt.getTime();
     const staleCharge = chargedNow.has(issuanceId) && fate.endReason !== "LOST" && fate.endReason !== "DAMAGED";
     if (!settledBefore && !staleCharge) continue;
+    // Cleared by a recorded review (money permission and a reason) or by cash handed back against the deposit after the correction.
+    const handedBackAfter = depositId ? (settlementsByDeposit.get(depositId) ?? []).some((entry) => entry.kind === "DEPOSIT_HANDED_BACK_LATE" && entry.createdAt.getTime() > lastCorrection.recordedAt.getTime()) : false;
+    if (reviewedAfter(issuanceId, lastCorrection.recordedAt.getTime()) || handedBackAfter) continue;
     exceptions.push({
       code: "CORRECTION_NEEDS_REVIEW", label: exceptionLabels.CORRECTION_NEEDS_REVIEW, subject: subject(row),
       detail: `Corrected to ${(fate.endReason ?? "").toLowerCase()}: ${settledBefore ? "its cash deposit was settled on the earlier outcome" : "a charge was recorded on the earlier outcome"}. Review whether to refund, waive or charge; nothing was changed automatically.`,
-      holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: deskAttendee(row), refId: issuanceId,
+      holderLabel: row.holderLabel, amountCents: null, deskAttendeeId: deskAttendee(row), refId: issuanceId, depositId: settledBefore ? depositId ?? null : null,
     });
+  }
+  // A waiver that left money behind: the charge line is still on a cancelled registration's total, or the deposit was handed back because of a charge that was then waived (nobody paid for the loss).
+  const chargeById = new Map(chargeEntries.map((entry) => [entry.id, entry]));
+  for (const waiver of ledger.filter((entry) => entry.kind === "WAIVER")) {
+    const charge = waiver.waivesEntryId ? chargeById.get(waiver.waivesEntryId) : undefined;
+    const issuanceId = charge?.issuanceId;
+    if (!charge || !issuanceId || charge.registrationAdjustmentId === null) continue;
+    const row = described.get(issuanceId);
+    if (!row || reviewedAfter(issuanceId, waiver.createdAt.getTime())) continue;
+    if (waiver.registrationAdjustmentId === null) {
+      exceptions.push({ code: "WAIVED_ON_INACTIVE_REGISTRATION", label: exceptionLabels.WAIVED_ON_INACTIVE_REGISTRATION, subject: subject(row), detail: `${formatCents(charge.amountCents)} was waived in the asset ledger, but the registration is not active, so the charge line is still on its total. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId });
+    }
+    const depositId = heldDepositOf.get(issuanceId);
+    const refund = depositId ? (settlementsByDeposit.get(depositId) ?? []).find((entry) => entry.kind === "DEPOSIT_RETURNED") : undefined;
+    if (refund && refund.createdAt.getTime() > charge.createdAt.getTime() && waiver.createdAt.getTime() > refund.createdAt.getTime()) {
+      exceptions.push({ code: "WAIVED_AFTER_REFUND", label: exceptionLabels.WAIVED_AFTER_REFUND, subject: subject(row), detail: `The deposit was handed back because ${formatCents(charge.amountCents)} was charged for this loss, and the charge was then waived: nobody paid for it. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId });
+    }
   }
   for (const issue of facilityOpen) {
     exceptions.push({ code: "FACILITY_OPEN", label: exceptionLabels.FACILITY_OPEN, subject: `${issue.targetLabel}: ${issue.title}`, detail: `${issue.severity.toLowerCase()} severity, ${issue.status === "OPEN" ? "open" : "in progress"}${issue.assigneeName ? `, assigned to ${issue.assigneeName}` : ", not assigned"}.`, holderLabel: null, amountCents: null, deskAttendeeId: null, refId: issue.id });

@@ -147,8 +147,25 @@ export const correctionActionSchema = z.discriminatedUnion("action", [
     reason: reasonSchema,
     idempotencyKey: keySchema.optional(),
   }).strict(),
+  /** Staff looked at a closeout exception on this issue (a correction after money was recorded, a waiver that left a line on a cancelled registration) and accept it. */
+  z.object({
+    action: z.literal("review"),
+    issuanceId: idSchema,
+    reason: reasonSchema,
+    idempotencyKey: keySchema.optional(),
+  }).strict(),
 ]);
 export type CorrectionAction = z.infer<typeof correctionActionSchema>;
+
+/** Cash handed back at the desk after a correction showed that what a kept deposit was kept for had come back. Recorded only; capped at what was kept. */
+export const lateRefundSchema = z.object({
+  action: z.literal("refund_after_correction"),
+  depositEntryId: idSchema,
+  amountCents: z.number().int().min(1, "Enter the amount handed back.").max(MAX_DEPOSIT_CENTS),
+  reason: reasonSchema,
+  idempotencyKey: keySchema.optional(),
+}).strict();
+export type LateRefund = z.infer<typeof lateRefundSchema>;
 
 /** Keeping the replacement fee of a missing item needs a fee to keep. */
 export function keepFeesNeedsFee(policy: string, replacementFeeCents: number) {

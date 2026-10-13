@@ -210,3 +210,24 @@ describe("closeout corrections", () => {
     expect(checkIn).not.toContain("Found: it came back");
   });
 });
+
+describe("closeout reviews", () => {
+  const review: CloseoutReport = {
+    ...report,
+    exceptions: [
+      { code: "CORRECTION_NEEDS_REVIEW", label: "Outcome corrected after money was recorded", subject: "K-214 (Dorm room key)", detail: "Corrected to returned.", holderLabel: "Pat Example", amountCents: null, deskAttendeeId: "att1", refId: "l1", depositId: "d1" },
+      { code: "WAIVED_ON_INACTIVE_REGISTRATION", label: "Waived after cancellation: the line is still on the registration total", subject: "K-215 (Dorm room key)", detail: "Still on the total.", holderLabel: "Pat Example", amountCents: 2500, deskAttendeeId: "att1", refId: "l2" },
+    ],
+  };
+  const render = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, {
+    eventId: "ev1", eventName: "Camp Meeting 2027", report: review, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true,
+  }));
+
+  it("lets finance mark a review done or record cash handed back from the kept deposit, and nobody else", () => {
+    const finance = render(true);
+    expect(finance).toContain("Reviewed, nothing more to do");
+    expect(finance).toContain("Cash handed back from the kept deposit");
+    expect(finance).toContain("Waived after cancellation: the line is still on the registration total");
+    expect(render(false)).not.toContain("Reviewed, nothing more to do");
+  });
+});

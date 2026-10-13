@@ -90,7 +90,12 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Exception</th><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Detail</th>{canManageMoney ? <th role="columnheader" scope="col">Resolve</th> : null}</tr></thead>
         <tbody role="rowgroup">{report.exceptions.map((row) => <tr role="row" key={`${row.code}:${row.refId}`}>
           <th role="rowheader" scope="row">{row.label}</th><td {...cardCell("Item")}>{row.subject}</td><td {...cardCell("Holder")}>{row.holderLabel ? holder({ holderLabel: row.holderLabel, deskAttendeeId: row.deskAttendeeId }) : ""}</td><td {...cardCell("Detail")}>{row.detail}</td>
-          {canManageMoney ? <td {...cardCell(null)}>{row.code === "UNCHARGED_LOSS" || row.code === "REPLACED_UNACCOUNTED" ? <OutcomeForm busy={busy} current={row.code === "REPLACED_UNACCOUNTED" ? "REPLACED" : "LOST"} onSubmit={(body) => post("corrections", { ...body, issuanceId: row.refId }, "Saved. Nothing was refunded or charged.")} /> : null}</td> : null}
+          {canManageMoney ? <td {...cardCell(null)}>{row.code === "UNCHARGED_LOSS" || row.code === "REPLACED_UNACCOUNTED" ? <OutcomeForm busy={busy} current={row.code === "REPLACED_UNACCOUNTED" ? "REPLACED" : "LOST"} onSubmit={(body) => post("corrections", { ...body, issuanceId: row.refId }, "Saved. Nothing was refunded or charged.")} />
+            : row.code === "CORRECTION_NEEDS_REVIEW" || row.code === "WAIVED_ON_INACTIVE_REGISTRATION" || row.code === "WAIVED_AFTER_REFUND"
+              ? <ReviewForm busy={busy} depositId={row.code === "CORRECTION_NEEDS_REVIEW" ? row.depositId ?? null : null}
+                  onReview={(reason) => post("corrections", { action: "review", issuanceId: row.refId, reason }, "Marked as reviewed. Nothing was refunded or charged.")}
+                  onRefund={(depositEntryId, amountCents, reason) => post("corrections", { action: "refund_after_correction", depositEntryId, amountCents, reason }, `Recorded ${formatCents(amountCents)} of the kept deposit handed back at the desk.`)} />
+              : null}</td> : null}
         </tr>)}</tbody>
       </table></div>}
     </section>
@@ -169,6 +174,29 @@ function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOS
       <option value="DAMAGED">Returned damaged</option>
       <option value="WRITE_OFF">Write off, charge nothing</option>
     </select></label>
+    <label>Reason <input value={reason} minLength={3} maxLength={500} required onChange={(event) => setReason(event.target.value)} /></label>
+    <button className="secondary-button" type="submit" disabled={busy}>Save</button>
+  </form>;
+}
+
+/**
+ * An exception that needs a person's eyes: mark it reviewed with a reason, or (for a kept deposit whose key was found) record
+ * the cash handed back at the desk. Finance and administrators only. Recording cash is a record, never a provider refund.
+ */
+function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; depositId: string | null; onReview: (reason: string) => Promise<void>; onRefund: (depositEntryId: string, amountCents: number, reason: string) => Promise<void> }) {
+  const [choice, setChoice] = useState("REVIEWED");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  return <form onSubmit={(event) => {
+    event.preventDefault();
+    if (reason.trim().length < 3) return;
+    if (choice === "REFUND" && depositId) { const cents = Math.round(Number(amount) * 100); if (cents >= 1) void onRefund(depositId, cents, reason.trim()); } else void onReview(reason.trim());
+  }}>
+    <label>What was done <select value={choice} onChange={(event) => setChoice(event.target.value)}>
+      <option value="REVIEWED">Reviewed, nothing more to do</option>
+      {depositId ? <option value="REFUND">Cash handed back from the kept deposit</option> : null}
+    </select></label>
+    {choice === "REFUND" && depositId ? <label>Amount handed back (dollars) <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label> : null}
     <label>Reason <input value={reason} minLength={3} maxLength={500} required onChange={(event) => setReason(event.target.value)} /></label>
     <button className="secondary-button" type="submit" disabled={busy}>Save</button>
   </form>;

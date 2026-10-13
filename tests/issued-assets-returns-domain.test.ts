@@ -13,6 +13,7 @@ import {
   coverStateOf,
   effectiveEndReason,
   keepFeesNeedsFee,
+  lateRefundSchema,
   decideDepositOutcome,
   depositActionSchema,
   facilityActionSchema,
@@ -218,5 +219,20 @@ describe("corrections and policy rules", () => {
     expect(keepFeesNeedsFee("KEEP_FEES", 0)).toBe(true);
     expect(keepFeesNeedsFee("KEEP_FEES", 400)).toBe(false);
     expect(keepFeesNeedsFee("KEEP_ALL", 0)).toBe(false);
+  });
+});
+
+describe("reviews and cash handed back after a correction", () => {
+  it("needs a reason to mark an exception reviewed", () => {
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", reason: "" }).success).toBe(false);
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", reason: "Manager agreed" }).success).toBe(true);
+  });
+
+  it("needs a deposit, an amount and a reason to record cash handed back", () => {
+    const base = { action: "refund_after_correction", depositEntryId: "d1", amountCents: 600, reason: "Found; handed back at the desk" };
+    expect(lateRefundSchema.safeParse(base).success).toBe(true);
+    expect(lateRefundSchema.safeParse({ ...base, amountCents: 0 }).success).toBe(false);
+    expect(lateRefundSchema.safeParse({ ...base, reason: "" }).success).toBe(false);
+    expect(lateRefundSchema.safeParse({ ...base, amountCents: 5_000_000 }).success).toBe(false);
   });
 });

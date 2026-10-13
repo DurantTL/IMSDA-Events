@@ -13,6 +13,7 @@ import {
 import { lockAssets, requireEvent, rowHolderKey, transact, type Tx } from "@/modules/issued-assets/service";
 import { sameHolder } from "@/modules/issued-assets/domain";
 import { AdjustmentError, postAssetAdjustment } from "@/modules/registrations/adjustments";
+import { lateRefundSchema } from "@/modules/issued-assets/returns-domain";
 
 /**
  * Issued assets (#214, slice 2): cash deposits, charges and waivers.
@@ -199,6 +200,11 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
     if (input.category !== "OTHER" && !lostOrDamaged) throw new AssetError("CHARGE_NOT_ALLOWED", "A replacement or damage charge is for an item recorded as lost or damaged.");
     if (row.endReason === "CORRECTED") throw new AssetError("CHARGE_NOT_ALLOWED", "That issue was withdrawn as entered in error, so it cannot be charged.");
     const type = row.asset.assetType;
+    // A charge that is only recorded is never collected by anything, and it must not be mistaken for one that is: check-in
+    // staff may only post the standard fee to the registration; recording a charge without posting is a money decision.
+    if (!input.post && !options.canManageMoney) {
+      throw new AssetError("MONEY_PERMISSION_REQUIRED", "Check-in staff can only post the standard replacement fee to the registration. Recording a charge without posting it needs finance or an event administrator.");
+    }
     if (!options.canManageMoney) {
       const quantity = row.endQuantity ?? row.quantity;
       const standard = input.category === "REPLACEMENT" && lostOrDamaged && type.replacementFeeCents > 0 && input.amountCents === type.replacementFeeCents * quantity;
@@ -319,5 +325,55 @@ export async function waiveCharge(eventId: string, actorUserId: string, rawInput
       metadata: { chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, registrationInactive },
     }, tx);
     return { waiverEntryId: entry.id, chargeEntryId: charge.id, amountCents: charge.amountCents, reversedOnRegistration: reversal !== null, registrationInactive, replayed: false };
+  });
+}
+
+export type LateRefundRecorded = { entryId: string; amountCents: number; remainingKeptCents: number; replayed: boolean };
+
+/**
+ * Records cash handed back at the desk after a correction showed that something a kept deposit was kept for had come back
+ * (a lost key found). It is a ledger entry (who, why, when), never a provider refund, and it is capped at what the deposit
+ * kept. Finance or an event administrator only, with a reason. The deposit must already be settled with money kept, and one of
+ * the issues it covers must have been corrected.
+ */
+export async function recordLateDepositRefund(eventId: string, actorUserId: string, rawInput: unknown, options: { canManageMoney: boolean }): Promise<LateRefundRecorded> {
+  const input = lateRefundSchema.parse(rawInput);
+  if (!options.canManageMoney) throw new AssetError("MONEY_PERMISSION_REQUIRED", "Recording cash handed back after a correction needs finance (MANAGE_FINANCE) or an event administrator (CONFIGURE_EVENT).");
+  return transact(async (tx) => {
+    await requireEvent(tx, eventId);
+    if (input.idempotencyKey) {
+      const existing = await tx.assetLedgerEntry.findUnique({ where: { eventId_idempotencyKey: { eventId, idempotencyKey: input.idempotencyKey } } });
+      if (existing) {
+        if (existing.kind !== "DEPOSIT_HANDED_BACK_LATE" || existing.depositEntryId !== input.depositEntryId || existing.amountCents !== input.amountCents) {
+          throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different hand-back.");
+        }
+        return { entryId: existing.id, amountCents: existing.amountCents, remainingKeptCents: 0, replayed: true };
+      }
+    }
+    const found = await tx.assetLedgerEntry.findFirst({ where: { id: input.depositEntryId, eventId, kind: "DEPOSIT_RECEIVED" }, include: { covers: { select: { issuanceId: true } } } });
+    if (!found) throw new AssetError("DEPOSIT_NOT_FOUND", "That deposit was not found.");
+    const coveredIds = found.covers.map((cover) => cover.issuanceId);
+    const lockRows = await tx.assetIssuance.findMany({ where: { eventId, id: { in: coveredIds } }, select: { assetId: true } });
+    await lockAssets(tx, eventId, lockRows.map((row) => row.assetId));
+    const entries = await tx.assetLedgerEntry.findMany({ where: { eventId, depositEntryId: found.id }, select: { kind: true, amountCents: true } });
+    const kept = entries.filter((entry) => entry.kind === "DEPOSIT_KEPT").reduce((sum, entry) => sum + entry.amountCents, 0);
+    const late = entries.filter((entry) => entry.kind === "DEPOSIT_HANDED_BACK_LATE").reduce((sum, entry) => sum + entry.amountCents, 0);
+    if (kept === 0) throw new AssetError("CORRECTION_INVALID", "That deposit kept no money, so there is nothing to hand back after a correction.");
+    const corrections = await loadCorrectionRows(tx, eventId, coveredIds);
+    if (![...corrections.values()].some((rows) => rows.some((entry) => entry.type === "OUTCOME_CORRECTED"))) {
+      throw new AssetError("CORRECTION_INVALID", "None of the items this deposit covers has a corrected outcome, so the kept deposit stands.");
+    }
+    if (input.amountCents > kept - late) throw new AssetError("CORRECTION_INVALID", `Only ${formatCents(kept - late)} of the kept deposit can still be handed back.`);
+    const entry = await tx.assetLedgerEntry.create({
+      data: {
+        eventId, kind: "DEPOSIT_HANDED_BACK_LATE", amountCents: input.amountCents, assetTypeId: found.assetTypeId, registrationId: found.registrationId, depositEntryId: found.id,
+        settlement: "CASH_AT_DESK", reason: input.reason, actorUserId, actorNameSnapshot: await actorNameOf(tx, actorUserId), idempotencyKey: input.idempotencyKey ?? null,
+      },
+    });
+    await writeAuditLog({
+      eventId, actorUserId, action: "ASSET_DEPOSIT_HANDED_BACK_AFTER_CORRECTION", entityType: "AssetLedgerEntry", entityId: entry.id,
+      summary: `Recorded ${formatCents(input.amountCents)} of a kept deposit handed back after a correction.`, metadata: { depositEntryId: found.id, amountCents: input.amountCents },
+    }, tx);
+    return { entryId: entry.id, amountCents: input.amountCents, remainingKeptCents: kept - late - input.amountCents, replayed: false };
   });
 }

@@ -196,6 +196,11 @@ Migration `20261019130000_issued_assets_corrections`.
   deposit settles by them, so editing the kind mid-event never changes a deposit already held. A kind that keeps fees must have a
   fee above $0 (checked in the service and by the database).
 - A settled deposit, a charge or a write-off each resolve the "lost, nothing charged" exception.
+- **Only a charge actually posted to a registration excuses an item from the deposit.** A charge that was only recorded
+  (`post: false`) is never collected by anything, so the deposit is kept for the loss as normal. Recording a charge without
+  posting needs `MANAGE_FINANCE` or `CONFIGURE_EVENT`; check-in staff can only post the standard fee. A holder with no
+  registration (a room, staff member, vehicle or team) can only have record-only charges, so the deposit logic keeps money for
+  the loss.
 
 ### Corrections and write-offs (`/api/events/[eventId]/assets/corrections`, `modules/issued-assets/corrections.ts`)
 
@@ -213,6 +218,16 @@ fate: returned, lost or damaged) or `WRITTEN_OFF`, each with actor, reason and t
   was recorded on the earlier fate), nothing is refunded or re-charged automatically: the closeout lists a *corrected after money
   was recorded* exception for staff.
 - A waiver on a registration that is no longer active is recorded in the asset ledger without posting an adjustment, and says so.
+  The closeout flags it (*waived after cancellation: the line is still on the registration total*), and so it flags a charge waived
+  *after the deposit was handed back because of that charge* (nobody paid for the loss).
+- **Reviews and cash handed back** (migration `20261019140000_issued_assets_review`). Those exceptions, and *outcome corrected after
+  money was recorded*, never clear by themselves. Finance or an administrator clears one with an append-only **review** (history
+  `EXCEPTION_REVIEWED`, with a reason), or, for a kept deposit whose item was found, records **cash handed back after the
+  correction** (ledger `DEPOSIT_HANDED_BACK_LATE`: who, why, when; capped at what the deposit kept, enforced by the database; a
+  record of cash handed over at the desk, never a provider refund and never a registration change).
+- Correcting the outcome of a **lot** keeps its stock count right: LOST or DAMAGED to RETURNED adds the units back, the reverse
+  takes them off (under the asset lock). A damaged key corrected to returned loses its damaged mark. A correction retried with the
+  same key replays only if the action and the fate match, otherwise it is refused.
 - Blocks: the lodging hold and its link to the facility issue are written in one transaction (the issue row is locked first), so a
   block is never left unlinked and a closed issue cannot be blocked.
 

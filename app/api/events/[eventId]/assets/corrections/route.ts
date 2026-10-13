@@ -1,6 +1,7 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { assetApiError, assetJson, requireAnyAssetPermission } from "@/modules/issued-assets/api";
 import { recordOutcomeCorrection } from "@/modules/issued-assets/corrections";
+import { recordLateDepositRefund } from "@/modules/issued-assets/money-service";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
@@ -15,7 +16,11 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
   try {
     const { eventId } = await context.params;
     const staff = await requireAnyAssetPermission(eventId, ["MANAGE_FINANCE", "CONFIGURE_EVENT"]);
-    return assetJson(await recordOutcomeCorrection(eventId, staff.userId, await request.json(), { canManageMoney: staff.canManageMoney }));
+    const body: unknown = await request.json();
+    const options = { canManageMoney: staff.canManageMoney };
+    const action = typeof body === "object" && body !== null && "action" in body ? (body as { action: unknown }).action : null;
+    if (action === "refund_after_correction") return assetJson(await recordLateDepositRefund(eventId, staff.userId, body, options));
+    return assetJson(await recordOutcomeCorrection(eventId, staff.userId, body, options));
   } catch (error) {
     return assetApiError(error, "Correcting the outcome");
   }

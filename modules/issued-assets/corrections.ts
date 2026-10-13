@@ -20,12 +20,12 @@ import { lockAssets, requireEvent, transact, type Tx } from "@/modules/issued-as
 
 type Client = ReturnType<typeof getPrisma> | Tx;
 
-export type CorrectionRow = { issuanceId: string; assetId: string; type: "OUTCOME_CORRECTED" | "WRITTEN_OFF"; fate: string | null; at: Date; recordedAt: Date; reason: string | null; actorUserId: string; quantity: number };
+export type CorrectionRow = { issuanceId: string; assetId: string; type: "OUTCOME_CORRECTED" | "WRITTEN_OFF" | "EXCEPTION_REVIEWED"; fate: string | null; at: Date; recordedAt: Date; reason: string | null; actorUserId: string; quantity: number };
 
 /** Every correction and write-off of the given issuances (or of the whole event), oldest first. */
 export async function loadCorrectionRows(client: Client, eventId: string, issuanceIds?: readonly string[]): Promise<Map<string, CorrectionRow[]>> {
   const rows = await client.assetIssuanceHistory.findMany({
-    where: { eventId, type: { in: ["OUTCOME_CORRECTED", "WRITTEN_OFF"] }, ...(issuanceIds ? { issuanceId: { in: [...issuanceIds] } } : {}) },
+    where: { eventId, type: { in: ["OUTCOME_CORRECTED", "WRITTEN_OFF", "EXCEPTION_REVIEWED"] }, ...(issuanceIds ? { issuanceId: { in: [...issuanceIds] } } : {}) },
     orderBy: [{ recordedAt: "asc" }, { at: "asc" }],
     select: { issuanceId: true, assetId: true, type: true, correctedEndReason: true, at: true, recordedAt: true, reason: true, actorUserId: true, quantity: true },
   });
@@ -53,7 +53,7 @@ export function fateOf(row: { endedAt: Date | string | null; endReason: string |
   };
 }
 
-export type CorrectionResult = { issuanceId: string; kind: "CORRECTED" | "WRITTEN_OFF"; from: string | null; to: string | null; replayed: boolean };
+export type CorrectionResult = { issuanceId: string; kind: "CORRECTED" | "WRITTEN_OFF" | "REVIEWED"; from: string | null; to: string | null; replayed: boolean };
 
 /**
  * Corrects a recorded outcome (RETURNED, LOST, DAMAGED, or the original of a replacement) or writes a loss off. Event
@@ -68,15 +68,18 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
     if (input.idempotencyKey) {
       const replay = await tx.assetIssuanceHistory.findUnique({ where: { eventId_idempotencyKey: { eventId, idempotencyKey: input.idempotencyKey } } });
       if (replay) {
-        if (replay.issuanceId !== input.issuanceId) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different correction.");
-        return { issuanceId: replay.issuanceId, kind: replay.type === "WRITTEN_OFF" ? "WRITTEN_OFF" as const : "CORRECTED" as const, from: null, to: replay.correctedEndReason, replayed: true };
+        const sameAction = replay.issuanceId === input.issuanceId
+          && (input.action === "correct" ? replay.type === "OUTCOME_CORRECTED" && replay.correctedEndReason === input.fate
+            : input.action === "write_off" ? replay.type === "WRITTEN_OFF" : replay.type === "EXCEPTION_REVIEWED");
+        if (!sameAction) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different correction.");
+        return { issuanceId: replay.issuanceId, kind: replay.type === "WRITTEN_OFF" ? "WRITTEN_OFF" as const : replay.type === "EXCEPTION_REVIEWED" ? "REVIEWED" as const : "CORRECTED" as const, from: null, to: replay.correctedEndReason, replayed: true };
       }
     }
     const first = await tx.assetIssuance.findFirst({ where: { id: input.issuanceId, eventId }, select: { assetId: true } });
     if (!first) throw new AssetError("ISSUANCE_NOT_FOUND", "That issue was not found.");
     await lockAssets(tx, eventId, [first.assetId]);
     const row = await tx.assetIssuance.findFirstOrThrow({ where: { id: input.issuanceId, eventId }, include: { asset: true } });
-    if (!row.endedAt || !["RETURNED", "LOST", "DAMAGED", "REPLACED"].includes(row.endReason ?? "")) {
+    if (input.action !== "review" && (!row.endedAt || !["RETURNED", "LOST", "DAMAGED", "REPLACED"].includes(row.endReason ?? ""))) {
       throw new AssetError("CORRECTION_INVALID", "Only a recorded return, loss, damage or the original of a replacement can be corrected.");
     }
     const current = fateOf(row, (await loadCorrectionRows(tx, eventId, [row.id])).get(row.id));
@@ -85,6 +88,11 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
       assigneeKind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId, staffUserId: row.staffUserId, roomUnitId: row.roomUnitId,
       sourceAssignmentId: row.sourceAssignmentId, assigneeLabel: row.assigneeLabel, revision: row.revision, idempotencyKey: input.idempotencyKey ?? null,
     };
+    if (input.action === "review") {
+      await tx.assetIssuanceHistory.create({ data: { ...base, type: "EXCEPTION_REVIEWED" } });
+      await writeAuditLog({ eventId, actorUserId, action: "ASSET_EXCEPTION_REVIEWED", entityType: "AssetIssuance", entityId: row.id, summary: "Reviewed a closeout exception on an issued item.", metadata: { assetId: row.assetId } }, tx);
+      return { issuanceId: row.id, kind: "REVIEWED" as const, from: null, to: null, replayed: false };
+    }
     if (input.action === "write_off") {
       const lostOrDamaged = current.endReason === "LOST" || current.endReason === "DAMAGED";
       const replacedOriginal = row.endReason === "REPLACED" && !current.corrected && !current.writtenOff;
@@ -96,11 +104,24 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
     if (input.fate === current.endReason) throw new AssetError("CORRECTION_INVALID", `That is already recorded as ${input.fate.toLowerCase()}.`);
     await tx.assetIssuanceHistory.create({ data: { ...base, type: "OUTCOME_CORRECTED", correctedEndReason: input.fate } });
     // A numbered item follows its latest issue's fate: a found key is back in stock, a lost or damaged one is held out.
-    if (row.serialized) {
+    const wasLossy = current.endReason === "LOST" || current.endReason === "DAMAGED";
+    const nowLossy = input.fate === "LOST" || input.fate === "DAMAGED";
+    if (!row.serialized) {
+      // A lot follows the corrected fate: units lost or damaged come off the lot, a found one goes back on (under the asset lock).
+      const quantity = row.endQuantity ?? row.quantity;
+      const held = (await tx.assetIssuance.aggregate({ where: { assetId: row.assetId, endedAt: null }, _sum: { quantity: true } }))._sum.quantity ?? 0;
+      if (wasLossy && !nowLossy) {
+        await tx.issuedAsset.update({ where: { id: row.assetId }, data: { quantityTotal: row.asset.quantityTotal + quantity } });
+      } else if (!wasLossy && nowLossy) {
+        const next = row.asset.quantityTotal - quantity;
+        if (next >= 1 && next >= held) await tx.issuedAsset.update({ where: { id: row.assetId }, data: { quantityTotal: next } });
+      }
+    } else {
       const later = await tx.assetIssuance.count({ where: { assetId: row.assetId, createdAt: { gt: row.createdAt } } });
       if (later === 0) {
         if (input.fate === "RETURNED") {
-          if (row.asset.availability === "UNAVAILABLE") await tx.issuedAsset.update({ where: { id: row.assetId }, data: { availability: "AVAILABLE" } });
+          // A found or wrongly-damaged key is back in stock, and a damaged mark does not outlive the correction.
+          await tx.issuedAsset.update({ where: { id: row.assetId }, data: { ...(row.asset.availability === "UNAVAILABLE" ? { availability: "AVAILABLE" as const } : {}), ...(row.asset.condition === "DAMAGED" ? { condition: "GOOD" as const } : {}) } });
         } else {
           await tx.issuedAsset.update({ where: { id: row.assetId }, data: { availability: "UNAVAILABLE", ...(input.fate === "DAMAGED" ? { condition: "DAMAGED" as const } : {}) } });
         }
@@ -111,11 +132,15 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
   });
 }
 
-/** The issuances (of those given) that already carry an unwaived replacement or damage charge: the deposit is not kept for these as well. */
+/**
+ * The issuances (of those given) that carry an unwaived replacement or damage charge **posted to a registration**: the guest
+ * is actually billed for the loss, so the deposit is not kept for it as well. A charge that was only recorded (not posted)
+ * is never collected by anything, so it never excuses an item from the deposit.
+ */
 export async function loadChargedIssuances(client: Client, eventId: string, issuanceIds: readonly string[]): Promise<Set<string>> {
   if (issuanceIds.length === 0) return new Set();
   const rows = await client.assetLedgerEntry.findMany({
-    where: { eventId, kind: "CHARGE", chargeCategory: { in: ["REPLACEMENT", "DAMAGE"] }, issuanceId: { in: [...issuanceIds] }, waivedBy: { none: {} } },
+    where: { eventId, kind: "CHARGE", chargeCategory: { in: ["REPLACEMENT", "DAMAGE"] }, registrationAdjustmentId: { not: null }, issuanceId: { in: [...issuanceIds] }, waivedBy: { none: {} } },
     select: { issuanceId: true },
   });
   return new Set(rows.flatMap((row) => (row.issuanceId ? [row.issuanceId] : [])));
