@@ -1601,6 +1601,8 @@ model Event {
   memberTransferRegistrationMoves     MemberTransferRegistrationMove[]
   registrationOperations              RegistrationOperation[]
   registrationPaymentChoiceOperations RegistrationPaymentChoiceOperation[]
+  cancellationPolicyVersions          EventCancellationPolicyVersion[]
+  cancellationCalculations            CancellationCalculation[]
   communitySettings                   EventCommunitySettings?
   communityParticipations             CommunityParticipation[]
   communityPosts                      CommunityPost[]
@@ -3142,6 +3144,60 @@ model SquareDuplicateCharge {
   @@index([paymentAttemptId])
   @@index([eventId, status])
   @@index([registrationId])
+}
+
+/// One immutable version of an event's cancellation rules (#169). Changing the rules adds a new version with its own
+/// effective date; a version is never edited or deleted (a trigger rejects both, except while the whole event is being
+/// deleted). Calculations copy the rules they used, so a later version cannot change an earlier outcome. Separate from
+/// `Event.refundPolicy` (#891), which is display text only.
+model EventCancellationPolicyVersion {
+  id                    String   @id @default(cuid())
+  eventId               String
+  /// 1, 2, 3 ... per event.
+  version               Int
+  /// From this instant the version applies to new calculations.
+  effectiveFrom         DateTime
+  /// Shape of `rules`, so a later change to the rules format can read old rows.
+  rulesSchema           Int      @default(1)
+  rules                 Json
+  note                  String?
+  createdByUserId       String?
+  createdByNameSnapshot String
+  createdAt             DateTime @default(now())
+
+  event        Event                     @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  calculations CancellationCalculation[]
+
+  @@unique([eventId, version])
+  @@index([eventId, effectiveFrom])
+}
+
+/// A recorded cancellation calculation (#169): the policy version used, the facts it was computed from and the
+/// proposed outcome. Immutable, and never an instruction: recording one cancels nothing, refunds nothing and creates
+/// no credit. `registrationId` is deliberately not a foreign key so this history outlives the registration it describes.
+model CancellationCalculation {
+  id              String   @id @default(cuid())
+  eventId         String
+  registrationId  String?
+  /// Null when no version was in effect.
+  policyVersionId String?
+  policyVersion   Int?
+  /// REGISTRATION for an authorized registration, SYNTHETIC for staff-entered preview input.
+  source          String
+  status          String
+  scope           String
+  evaluatedAt     DateTime
+  facts           Json
+  result          Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  event         Event                           @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  policyVersionRow EventCancellationPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, createdAt])
+  @@index([registrationId, createdAt])
+  @@index([policyVersionId])
 }
 
 model Refund {

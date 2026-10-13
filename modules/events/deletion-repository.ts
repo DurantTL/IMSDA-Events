@@ -309,6 +309,10 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   // 6. Append-only registration ledgers (RESTRICT registration and attendee).
   await tx.registrationOperation.deleteMany({ where: inEvent });
   await tx.registrationPaymentChoiceOperation.deleteMany({ where: inEvent });
+  // Cancellation policy versions and the calculations that cite them (#169): append-only, so they are removed here,
+  // calculations first (they RESTRICT their version), under the same transaction-local setting as the ledgers above.
+  await tx.cancellationCalculation.deleteMany({ where: inEvent });
+  await tx.eventCancellationPolicyVersion.deleteMany({ where: inEvent });
 
   // 7. Forms: capacity reservations and submissions RESTRICT form versions.
   await tx.registrationCapacityReservation.deleteMany({ where: inEvent });

@@ -44,6 +44,7 @@
     "test:attendance-reconciliation": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-attendance-reconciliation.ts",
     "test:guardian-authority": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-guardian-authority.ts",
     "test:square-hosted-link": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-square-hosted-link.ts",
+    "test:cancellation-policy": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-cancellation-policy.ts",
     "test:reservation-deposit": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-reservation-deposit.ts",
     "test:invoices": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-invoices.ts",
     "test:announcement-email": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-announcement-email.ts",
