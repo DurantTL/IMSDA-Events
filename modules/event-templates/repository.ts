@@ -13,6 +13,8 @@ import {
   type ApplyEventTemplateInput,
   type EventTemplatePayload,
 } from "@/modules/event-templates/domain";
+import { createMealDefinitions } from "@/modules/meals/clone-repository";
+import { mealDefinitionsFromTemplate } from "@/modules/meals/clone-domain";
 import { activeCoordinatorAccountIds } from "@/modules/event-locations/coordinators";
 import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locations/domain";
 import { createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
@@ -458,6 +460,11 @@ export async function applyEventTemplate(
               : shiftCalendarDate(input.startsOn, location.registrationClosesOffset),
           })),
         });
+      }
+
+      // Meal definitions before the forms: a ticket field takes its price from the meal plan (#210).
+      if (payload.meals) {
+        await createMealDefinitions(tx, event.id, mealDefinitionsFromTemplate(payload.meals, input.startsOn), actorUserId);
       }
 
       for (const templateKey of payload.formTemplateKeys) {

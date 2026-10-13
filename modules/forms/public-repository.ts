@@ -70,6 +70,7 @@ import { recordRegistrationDeclarations } from "@/modules/guardian-authority/rep
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
 import { getPublicLodgingOffer, planRegistrationLodging, recordRegistrationLodging, type LodgingPlan, type PublicLodgingOffer } from "@/modules/lodging/registration-form";
+import { syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { eventStartDate, planPublicResponsibleAdults } from "@/modules/guardian-authority/domain";
 import { teamNameTakenMessage } from "@/modules/club-teams/domain";
 
@@ -1317,6 +1318,16 @@ async function createPublicRegistrationTransaction(
       attendeeResponses: attendeeResponseSnapshot as Prisma.InputJsonValue,
       pricingSnapshot: snapshot as unknown as Prisma.InputJsonValue,
     },
+  });
+
+  // Meal tickets (#210): the form priced them into the total above; the meal selections record what was ordered.
+  await syncFormMealSelections(tx, {
+    eventId: form.eventId,
+    registrationId: registration.id,
+    formVersionId: version.id,
+    responses: prepared.registrationResponses,
+    lineItems: admittedCalculation.lineItems,
+    previousResponses: null,
   });
 
   const choiceReservations = selectedCapacityChoices(definition, prepared.registrationResponses, createdAttendees);

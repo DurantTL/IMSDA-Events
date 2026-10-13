@@ -193,6 +193,8 @@ const pages: PageSpec[] = [
   staff("lodging", "/more/lodging"),
   staff("lodging-requests", "/more/lodging/requests"),
   staff("lodging-assignments", "/more/lodging/assignments"),
+  staff("issued-assets", "/more/issued-assets"),
+  staff("issued-assets-desk", "/check-in/assets"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("more-menu", "/more"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).

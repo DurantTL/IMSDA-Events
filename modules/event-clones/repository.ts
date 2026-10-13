@@ -29,6 +29,8 @@ import {
 } from "@/modules/event-clones/domain";
 import { classSlotConflict, normalizeHonorText } from "@/modules/honors/domain";
 import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
+import { loadMealDefinitions, createMealDefinitions } from "@/modules/meals/clone-repository";
+import { shiftMealDefinitions } from "@/modules/meals/clone-domain";
 import { calendarDayDifference, normalizeLocationName, shiftLocationsForClone } from "@/modules/event-locations/domain";
 import { activeCoordinatorAccountIds } from "@/modules/event-locations/coordinators";
 import { parseEventContentItems } from "@/modules/events/content-schemas";
@@ -191,6 +193,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
       discountValue: promo.discountValue, startsOn: promo.startsOn, endsOn: promo.endsOn,
       minimumSubtotalCents: promo.minimumSubtotalCents, maximumUses: promo.maximumUses, maximumDiscountCents: promo.maximumDiscountCents,
     })),
+    meals: await loadMealDefinitions(db, eventId),
     locations: locations.map((location) => ({
       name: location.name, address: location.address, capacity: location.capacity, sortOrder: location.sortOrder,
       firstDay: location.firstDay, lastDay: location.lastDay, registrationClosesOn: location.registrationClosesOn,
@@ -269,7 +272,7 @@ async function resolveExistingClone(actorUserId: string, input: ConfirmEventClon
 /** What the result screen shows after a clone (#157), kept in the clone record's snapshot. */
 export type CloneResultSummary = {
   copiedCounts: Record<string, number>;
-  skipped: { forms: number; messageTemplates: number; assetLinks: number; privateLinks: number; honorSessionsWithoutSite?: number; honorOfferingsDuplicate?: number };
+  skipped: { forms: number; messageTemplates: number; assetLinks: number; privateLinks: number; honorSessionsWithoutSite?: number; honorOfferingsDuplicate?: number; mealPrices?: number };
   pricing: ClonePricingSummary;
   pricingMessage: string | null;
 };
@@ -420,6 +423,16 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
           skipped.assetLinks += section.assetLinkCount;
         }
         copied.contentSections = copiedSections;
+      }
+
+      // Meal definitions before the forms: a copied ticket field takes its price from the new event's meal plan (#210).
+      // Definitions only; no order, ticket, ledger entry or history is ever read from the source.
+      if (include.meals && config.meals && (config.meals.services.length > 0 || config.meals.plans.length > 0)) {
+        const days = calendarDayDifference(config.event.startsOn, input.startsOn);
+        const created = await createMealDefinitions(tx, event.id, shiftMealDefinitions(config.meals, days), actorUserId);
+        copied.meals = created.services + created.plans;
+        // A price for an attendee type is copied only when the new event has a type with that code; say how many were not.
+        if (created.skippedPrices > 0) skipped.mealPrices = created.skippedPrices;
       }
 
       if (include.registrationForms) {

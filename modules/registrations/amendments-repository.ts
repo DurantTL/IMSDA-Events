@@ -38,6 +38,8 @@ import {
 } from "@/modules/promo-codes/domain";
 import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
 import { adjustmentTotalCents } from "@/modules/registrations/adjustments";
+import { cancelMealSelectionsForAttendees, plannedAttendeeMealCredit, syncFormMealSelections } from "@/modules/meals/selection-repository";
+import { MealError } from "@/modules/meals/errors";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
 import { lockRegistrationLodging, recomputeChurchShare } from "@/modules/lodging/preferences-service";
 import { issuesOnChangedAnswers, sameAnswer, splitUnconfiguredAnswers } from "@/modules/registrations/amendment-answers";
@@ -217,6 +219,13 @@ export type RegistrationAmendmentErrorCode =
   | "QUOTE_CHANGED"
   | "IDEMPOTENCY_KEY_REUSED"
   | "AMENDMENT_CONFLICT";
+
+/** A meal problem inside an amendment is a clear conflict (or "refund first"), never a 500. */
+function mealErrorToAmendment(error: unknown) {
+  if (!(error instanceof MealError)) return error;
+  const refundFirst = error.code === "TOTAL_BELOW_PAID" || error.code === "TOTAL_BELOW_ZERO";
+  return new RegistrationAmendmentError(refundFirst ? "PAYMENT_ADJUSTMENT_REQUIRED" : "AMENDMENT_CONFLICT", error.message);
+}
 
 export class RegistrationAmendmentError extends Error {
   constructor(
@@ -1278,7 +1287,14 @@ async function prepareAmendment(
   // Card fees already added to the total by earlier card payments (a card deposit, a pay-later balance settled by
   // card) are not in the form's calculation; they stay on top of it like adjustments do.
   const appliedFeesCents = await appliedCardSurchargeCents(tx, registration.id);
-  const newTotalCents = Math.max(pricedCalculation.totalCents + adjustmentsCents + appliedFeesCents, 0);
+  // Meal credit (#210) for the attendees being removed: the cancellation posts it as MEAL lines, so the total is checked,
+  // quoted, fingerprinted and written once with it in.
+  const mealCreditCents = await plannedAttendeeMealCredit(tx, {
+    registrationId: registration.id,
+    attendeeIds: removedAttendees.map((attendee) => attendee.id),
+    registrationStatus: registration.status,
+  });
+  const newTotalCents = Math.max(pricedCalculation.totalCents + adjustmentsCents + appliedFeesCents + mealCreditCents, 0);
   if (newTotalCents < netPaidCents) {
     throw new RegistrationAmendmentError(
       "PAYMENT_ADJUSTMENT_REQUIRED",
@@ -1342,6 +1358,7 @@ async function prepareAmendment(
     quoteFingerprint,
     paidCents: netPaidCents,
     adjustmentsCents,
+    mealCreditCents,
     finalTotalCents: newTotalCents,
     addedAttendeeCount: input.attendees.filter((attendee) => !attendee.attendeeId).length,
     seminarPreferencesChanged,
@@ -1368,7 +1385,10 @@ function amendmentPreview(prepared: PreparedAmendment) {
     attendeeCount: prepared.prepared.attendees.length,
     addedAttendeeCount: prepared.addedAttendeeCount,
     removedAttendeeCount: prepared.removedAttendees.length,
-    lineItems: prepared.pricedCalculation.lineItems,
+    // The meal credit for removed people is its own line, so the itemised quote adds up to the total (#210).
+    lineItems: prepared.mealCreditCents < 0
+      ? [...prepared.pricedCalculation.lineItems, { key: "meal_credit_removed", label: "Meals cancelled for removed people", amountCents: prepared.mealCreditCents }]
+      : prepared.pricedCalculation.lineItems,
     pricingDate: prepared.prepared.pricingDate,
   };
 }
@@ -1519,7 +1539,20 @@ export async function amendRegistration(
           where: { registrationId, releasedAt: null },
           data: { releasedAt: now },
         });
+        // Meals (#210): a removed attendee's active meal selections are cancelled and credited at the price charged, before the
+        // attendee row goes. The credit posts to the registration as MEAL lines, so the final total below carries it.
         if (prepared.removedAttendees.length > 0) {
+          try {
+            await cancelMealSelectionsForAttendees(tx, {
+              eventId,
+              registrationId,
+              attendeeIds: prepared.removedAttendees.map((attendee) => attendee.id),
+              actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
+              expectedCreditCents: prepared.mealCreditCents,
+            });
+          } catch (error) {
+            throw mealErrorToAmendment(error);
+          }
           try {
             await tx.registrationAttendee.deleteMany({
               where: {
@@ -1665,6 +1698,22 @@ export async function amendRegistration(
               ...selection,
             },
           });
+        }
+
+        // Meal tickets (#210): the form re-priced them above, so the meal selections follow the answers (history and
+        // ledger entries only; the registration total is already the amended one).
+        try {
+          await syncFormMealSelections(tx, {
+            eventId,
+            registrationId,
+            formVersionId: prepared.registration.publicFormSubmission!.formVersionId,
+            responses: prepared.prepared.registrationResponses,
+            lineItems: prepared.nextPricingSnapshot.lineItems,
+            previousResponses: prepared.currentRegistrationResponses,
+            actorUserId: actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? actor.id : null,
+          });
+        } catch (error) {
+          throw mealErrorToAmendment(error);
         }
 
         if (serverOptions.inTransaction) await serverOptions.inTransaction(tx);

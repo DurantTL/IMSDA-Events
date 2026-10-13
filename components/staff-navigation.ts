@@ -6,7 +6,9 @@ import {
   FileText,
   FileUp,
   BedDouble,
+  UtensilsCrossed,
   HeartPulse,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
   Megaphone,
@@ -134,8 +136,10 @@ export const staffPageTitles = {
   assignmentRoster: "Assignment roster",
   programAssignments: "Seminar assignments",
   lodging: "Lodging",
+  meals: "Meals",
   lodgingRequests: "Lodging requests",
   lodgingAssignments: "Lodging assignments",
+  issuedAssets: "Issued assets",
 } as const;
 
 type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", title: string];
@@ -170,9 +174,11 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/merchandise", "prefix", staffPageTitles.merchandise],
+  ["/more/meals", "prefix", staffPageTitles.meals],
   ["/more/lodging/assignments", "prefix", staffPageTitles.lodgingAssignments],
   ["/more/lodging/requests", "prefix", staffPageTitles.lodgingRequests],
   ["/more/lodging", "prefix", staffPageTitles.lodging],
+  ["/more/issued-assets", "prefix", staffPageTitles.issuedAssets],
   ["/more/program-assignments/", "under", staffPageTitles.assignmentRoster],
   ["/more/program-assignments", "exact", staffPageTitles.programAssignments],
 ];
@@ -447,7 +453,9 @@ export function buildMoreDirectoryCards({
     { key: "attendee-configuration", group: "setup", allowed: Boolean(attendeeConfigurationPermission && has(attendeeConfigurationPermission)), href: `/more/attendee-configuration${eventQuery}`, icon: Tags, title: "Attendee setup", description: "Define the attendee types and per-type pricing this event registers.", cta: "Open attendee setup" },
     { key: "tags", group: "setup", allowed: Boolean(tagsPermission && has(tagsPermission)), href: `/more/tags${eventQuery}`, icon: Tag, title: "Tags", description: "Create and color-code the tags staff use to mark and filter registrations.", cta: "Manage tags" },
     { key: "honors", group: "setup", allowed: has("CONFIGURE_EVENT"), href: `/more/honors${eventQuery}`, icon: Award, title: "Honors Weekend classes", description: "Name this site's sessions and set the honor classes, seats, and age limits it offers.", cta: "Set up classes" },
+    { key: "meals", group: "content-sales", allowed: has("CONFIGURE_EVENT") || has("MANAGE_FINANCE") || has("VIEW_REPORTS"), href: `/more/meals${eventQuery}`, icon: UtensilsCrossed, title: "Meals", description: "Set up meal services, plans and prices, take walk-up orders, and download meal tickets for the café scanner.", cta: "Open meals" },
     { key: "lodging", group: "setup", allowed: has("CONFIGURE_EVENT"), href: `/more/lodging${eventQuery}`, icon: BedDouble, title: "Lodging", description: "See rooms, beds and sites night by night, set capacity, mark units unavailable, and place holds.", cta: "Open lodging" },
+    { key: "issued-assets", group: "setup", allowed: has("CONFIGURE_EVENT"), href: `/more/issued-assets${eventQuery}`, icon: KeyRound, title: "Issued assets", description: "Set up keys, keycards, wristbands and welcome packets, add numbered ranges like K-201 to K-260, and see what is in stock.", cta: "Set up assets" },
     { key: "registration-builder", group: "setup", allowed: has("MANAGE_FORMS"), href: `/registration-builder${eventQuery}`, icon: PanelsTopLeft, title: "Registration forms", description: "Build, test, and publish the form people use to register.", cta: "Open form builder" },
     { key: "program-assignments", group: "setup", allowed: canManageProgramAssignments(permissions), href: `/more/program-assignments${eventQuery}`, icon: ListChecks, title: "Seminar assignments", description: "Turn attendee rankings and room limits into reviewed, printable session rosters.", cta: "Preview assignments" },
     { key: "event-content", group: "content-sales", allowed: has("CONFIGURE_EVENT"), href: `/more/event-content${eventQuery}`, icon: FileText, title: "Public content", description: "Speaker bios, seminar descriptions, lodging, schedules, and downloads shown publicly.", cta: "Edit page" },

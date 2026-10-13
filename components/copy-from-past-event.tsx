@@ -33,7 +33,7 @@ type CloneResult = {
   alreadyCloned: boolean;
   summary: {
     copiedCounts: Record<string, number>;
-    skipped: { forms: number; messageTemplates: number; assetLinks: number; privateLinks: number; honorSessionsWithoutSite?: number; honorOfferingsDuplicate?: number };
+    skipped: { forms: number; messageTemplates: number; assetLinks: number; privateLinks: number; honorSessionsWithoutSite?: number; honorOfferingsDuplicate?: number; mealPrices?: number };
     pricingMessage: string | null;
   } | null;
 };
@@ -229,6 +229,7 @@ export function CopyFromPastEvent({ sources }: CopyFromPastEventProps) {
               {summary.skipped.messageTemplates > 0 ? <li><strong>Message templates not copied</strong>: {summary.skipped.messageTemplates}</li> : null}
               {(summary.skipped.honorSessionsWithoutSite ?? 0) > 0 ? <li><strong>Honors sessions and classes copied with no site</strong>: {summary.skipped.honorSessionsWithoutSite} (the new event has no site with the same name; each is named after its old site)</li> : null}
               {(summary.skipped.honorOfferingsDuplicate ?? 0) > 0 ? <li><strong>Honors classes skipped as duplicates</strong>: {summary.skipped.honorOfferingsDuplicate}</li> : null}
+              {(summary.skipped.mealPrices ?? 0) > 0 ? <li><strong>Meal prices not copied</strong>: {summary.skipped.mealPrices} (for attendee types the new event does not have; add the type, then set the price on the Meals screen)</li> : null}
             </ul>
           ) : null}
         </section>

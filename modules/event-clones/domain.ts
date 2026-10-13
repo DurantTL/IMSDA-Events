@@ -3,6 +3,7 @@ import type { ClubClassLevel } from "@/modules/club-rosters/domain";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { isEventMessageTemplateKey, validateMessageTemplate } from "@/modules/communications/templates";
 import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/events/schemas";
+import { mealPriceCount, type MealDefinitions } from "@/modules/meals/clone-domain";
 import { privateLinkReasonLabels, privateLinkValue, stripPrivateLinks, type PrivateLinkContext, type PrivateLinkMatch } from "@/modules/event-clones/private-links";
 
 /**
@@ -21,6 +22,7 @@ import { privateLinkReasonLabels, privateLinkValue, stripPrivateLinks, type Priv
 export const cloneDomainKeys = [
   "eventDetails",
   "locations",
+  "meals",
   "moduleToggles",
   "contentSections",
   "registrationForms",
@@ -38,6 +40,10 @@ export const cloneDomainLabels: Record<CloneDomainKey, { label: string; descript
   eventDetails: {
     label: "Branding and event details",
     description: "Location, time zone, public info link, support contact, calendar category and whether it shows on the calendar, lodging, audience, and billing mode.",
+  },
+  meals: {
+    label: "Meal services and plans",
+    description: "Meal services with their dates moved by the same number of days as the event's start date, and the meal plans with who pays, which services each lists, and their prices as they are. Never meal orders, tickets, or anything used or served.",
   },
   locations: {
     label: "Locations",
@@ -93,6 +99,7 @@ export const cloneNeverCopied = [
   "Protected and medical records",
   "Assignments and rosters",
   "Merchandise orders",
+  "Meal orders, tickets, entitlements, and meal charge history",
   "Analytics",
   "Participant uploads",
   "Staff access grants (you become the event's administrator)",
@@ -233,6 +240,8 @@ export type SourceConfiguration = {
     maximumUses: number | null;
     maximumDiscountCents: number | null;
   }>;
+  /** Meal services and plans (#210), definitions only: never selections, orders or the ledger. Optional so older fixtures still type. */
+  meals?: MealDefinitions;
   /** Active locations of a multi-location event (#413); their dates move with the new event's start date. */
   locations: Array<{
     name: string;
@@ -532,6 +541,8 @@ export type ClonePricingSummary = {
   formsWithCardFees: number;
   /** Promo codes, each with its discount amount and limits. */
   promoCodes: number;
+  /** Meal prices across the copied meal plans (#210). */
+  mealPrices?: number;
 };
 
 /**
@@ -543,7 +554,7 @@ export type ClonePricingSummary = {
  */
 export function clonePricingSummary(
   config: SourceConfiguration,
-  include?: Pick<Record<CloneDomainKey, boolean>, "registrationForms" | "promoCodes">,
+  include?: Pick<Record<CloneDomainKey, boolean>, "registrationForms" | "promoCodes"> & Partial<Pick<Record<CloneDomainKey, boolean>, "meals">>,
 ): ClonePricingSummary {
   const summary: ClonePricingSummary = { pricedFormFields: 0, lateFormFields: 0, formsWithCardFees: 0, promoCodes: 0 };
   if (!include || include.registrationForms) {
@@ -557,6 +568,8 @@ export function clonePricingSummary(
     }
   }
   if (!include || include.promoCodes) summary.promoCodes = config.promoCodes.length;
+  const mealPrices = !include || include.meals ? mealPriceCount(config.meals ?? { services: [], plans: [] }) : 0;
+  if (mealPrices > 0) summary.mealPrices = mealPrices;
   return summary;
 }
 
@@ -567,6 +580,7 @@ export function pricingSummaryMessage(summary: ClonePricingSummary) {
     summary.lateFormFields > 0 ? plural(summary.lateFormFields, "late price", "late prices") : null,
     summary.formsWithCardFees > 0 ? plural(summary.formsWithCardFees, "form with card fees", "forms with card fees") : null,
     summary.promoCodes > 0 ? plural(summary.promoCodes, "promo code") : null,
+    summary.mealPrices ? plural(summary.mealPrices, "meal price") : null,
   ].filter((part): part is string => part !== null);
   if (parts.length === 0) return null;
   return `Prices copied, review before publishing: ${parts.join(", ")}.`;
@@ -685,6 +699,7 @@ export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: stri
   };
   const pricing = clonePricingSummary(config);
 
+  const typePrices = (config.meals?.plans ?? []).reduce((total, plan) => total + plan.prices.filter((price) => price.attendeeTypeCode !== null).length, 0);
   const notes: Record<CloneDomainKey, string[]> = {
     eventDetails: privateLinkNote("eventDetails"),
     moduleToggles: [
@@ -717,6 +732,10 @@ export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: stri
         ? ["Sessions follow their site by name. A session whose site has no same-named site in the new event is copied with no site, and the result says so."]
         : []),
     ],
+    meals: (config.meals?.services.length ?? 0) > 0 || (config.meals?.plans.length ?? 0) > 0
+      ? ["Services keep their names, times, and capacity; their dates move with the event's start date. Plans keep who pays and their prices as they are: review them before publishing. Orders and tickets are never copied, and a cancelled service is left behind.",
+        ...(typePrices > 0 ? [`${plural(typePrices, "price")} ${typePrices === 1 ? "is" : "are"} for an attendee type (including $0 complimentary roles): copied only when the new event has a type with the same code, so include attendee types too. The result says how many were left out.`] : [])]
+      : [],
     locations: config.locations.length > 0
       ? ["Name, address, capacity, and order are copied. Dates move by the same number of days as the event's start date; review them on the new event."]
       : [],
@@ -734,10 +753,11 @@ export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: stri
     promoCodes: config.promoCodes.length,
     honors: config.honorOfferings.length,
     locations: config.locations.length,
+    meals: (config.meals?.services.length ?? 0) + (config.meals?.plans.length ?? 0),
   };
   const skipped: Record<CloneDomainKey, ClonePlanDomain["skipped"]> = {
     eventDetails: [], moduleToggles: [], contentSections: [], registrationForms: skippedForms, attendeeTypes: [],
-    attendeeClassifications: [], messageTemplates: skippedMessages, tags: [], promoCodes: [], honors: [], locations: [],
+    attendeeClassifications: [], messageTemplates: skippedMessages, tags: [], promoCodes: [], honors: [], locations: [], meals: [],
   };
 
   const supportCounts: Record<CloneUnsupportedKey, number> = {
@@ -796,7 +816,7 @@ export const previewEventCloneInputSchema = z.object({
 const includeShape = Object.fromEntries(cloneDomainKeys.map((key) => [
   key,
   // `locations` (#413) is newer than the confirm bodies already in flight, so an absent value means "not selected".
-  key === "locations" ? z.boolean().default(false) : z.boolean(),
+  key === "locations" || key === "meals" ? z.boolean().default(false) : z.boolean(),
 ])) as Record<CloneDomainKey, z.ZodBoolean>;
 
 /**

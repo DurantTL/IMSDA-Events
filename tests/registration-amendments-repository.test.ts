@@ -299,6 +299,8 @@ function repositoryFixture() {
     },
     promoCodeRedemption: { update: vi.fn() },
     registrationAdjustment: { aggregate: vi.fn().mockResolvedValue({ _sum: { amountCents: null } }) },
+    // The removed attendees' active meal selections (#210); none unless a test supplies them.
+    eventMealSelection: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     // Card fees already applied by earlier card payments (#415); none unless a test supplies them.
     payment: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     person: { findUnique: vi.fn(), create: vi.fn() },
@@ -753,6 +755,83 @@ describe("registration amendments repository", () => {
       attendees: [{ attendeeId: "attendee-1", clientId: "attendee-row-1", responses: { ...attendeeResponses } }],
       previewOnly: true as const,
     })).rejects.toMatchObject({ code: "ATTENDEE_HAS_HISTORY", message: expect.stringContaining("Cancel the registration instead") });
+  });
+
+  describe("removing an attendee who has meal selections (#210)", () => {
+    function removalInput(registration: ReturnType<typeof repositoryFixture>["registration"]) {
+      const kept = registration.attendees[0]!;
+      if (!registration.attendees.some((attendee) => attendee.id === "attendee-2")) {
+        registration.attendees.push({ ...structuredClone(kept), id: "attendee-2", person: { ...kept.person, id: "person-attendee-2", firstName: "Riley", lastName: "Sample" } } as typeof kept);
+      }
+      return {
+        clientRequestId: "6e2f8b3f-4c5d-4e7f-9a01-b2c3d4e5f607",
+        expectedUpdatedAt: registration.updatedAt.toISOString(),
+        reason: "",
+        responses: { ...registrationResponses },
+        attendees: [{ attendeeId: "attendee-1", clientId: "attendee-row-1", responses: { ...attendeeResponses } }],
+        previewOnly: true as const,
+      };
+    }
+    const staffMeal = [{ quantity: 1, unitPriceCents: 800, payer: "ATTENDEE", source: "STAFF" }];
+
+    it("counts the meal credit once in the quote, so the total fits exactly", async () => {
+      const { registration, tx } = repositoryFixture();
+      registration.status = "CONFIRMED";
+      tx.registrationAdjustment.aggregate.mockResolvedValue({ _sum: { amountCents: 13000 } });
+      const baseline = await previewRegistrationAmendment("event-1", "registration-1", removalInput(registration));
+      tx.eventMealSelection.findMany.mockResolvedValue(staffMeal);
+      const withMeal = await previewRegistrationAmendment("event-1", "registration-1", removalInput(registration));
+      expect(withMeal.totalCents).toBe(baseline.totalCents - 800);
+      expect(withMeal.quoteFingerprint).not.toBe(baseline.quoteFingerprint);
+    });
+
+    it("shows the meal credit as its own line so the itemised quote adds up", async () => {
+      const { registration, tx } = repositoryFixture();
+      registration.status = "CONFIRMED";
+      tx.eventMealSelection.findMany.mockResolvedValue(staffMeal);
+      const preview = await previewRegistrationAmendment("event-1", "registration-1", removalInput(registration));
+      expect(preview.lineItems).toContainEqual({ key: "meal_credit_removed", label: "Meals cancelled for removed people", amountCents: -800 });
+    });
+
+    it("commits on a paid registration whose combined new total is fine: the per-line credit does not trip the stored total", async () => {
+      // Stored $100, paid $100; the amendment's total is $130 of adjustments (standing in for the new $30 item) minus the $8 meal = $122.
+      const { registration, tx } = repositoryFixture();
+      registration.status = "CONFIRMED";
+      registration.totalAmount = 100;
+      (registration.payments as unknown[]).push({ amount: 100, refunds: [] });
+      tx.registrationAdjustment.aggregate.mockResolvedValue({ _sum: { amountCents: 13000 } });
+      const selection = {
+        id: "selection-1", eventId: "event-1", planId: "plan-1", mealType: "LUNCH", serviceId: null, registrationId: "registration-1", registrationAttendeeId: "attendee-2",
+        ageGroup: "ADULT", quantity: 1, status: "ACTIVE", source: "STAFF", payer: "ATTENDEE", unitPriceCents: 800, conferenceRateCents: 0, dietaryCategories: [],
+        attendee: { attendeeTypeDefinitionId: null },
+      };
+      tx.eventMealSelection.findMany.mockResolvedValue([selection]);
+      Object.assign(tx, {
+        $queryRaw: vi.fn(async () => [{ status: "CONFIRMED" }]),
+        user: { findUnique: vi.fn(async () => ({ displayName: "Finance Staff" })) },
+        eventMealSelection: { findMany: tx.eventMealSelection.findMany, update: vi.fn(async () => ({ ...selection, status: "CANCELLED" })) },
+        eventMealSelectionChange: { create: vi.fn(async () => ({ id: "change-1" })) },
+        eventMealLedgerEntry: { create: vi.fn(async () => ({})) },
+      });
+      (tx.registrationAdjustment as Record<string, unknown>).create = vi.fn(async () => ({ id: "adjustment-1" }));
+      const input = removalInput(registration);
+      const preview = await previewRegistrationAmendment("event-1", "registration-1", input);
+      expect(preview.totalCents).toBe(12200);
+      await amendRegistration("event-1", "registration-1", { ...input, previewOnly: false as const, quoteFingerprint: preview.quoteFingerprint }, actor, new Date("2026-08-04T13:00:00.000Z"));
+      expect((tx.registrationAdjustment as unknown as { create: ReturnType<typeof vi.fn> }).create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "MEAL", amountCents: -800 }) });
+      expect(registration.totalAmount).toBe(122);
+    });
+
+    it("refuses with PAYMENT_ADJUSTMENT_REQUIRED when the meal credit would take the total below what was paid", async () => {
+      const { registration, tx } = repositoryFixture();
+      registration.status = "CONFIRMED";
+      tx.registrationAdjustment.aggregate.mockResolvedValue({ _sum: { amountCents: 13000 } });
+      const baseline = await previewRegistrationAmendment("event-1", "registration-1", removalInput(registration));
+      // Paid exactly what the amendment would otherwise leave: the $8 meal credit tips it below.
+      (registration.payments as unknown[]).push({ amount: baseline.totalCents / 100, refunds: [] });
+      tx.eventMealSelection.findMany.mockResolvedValue(staffMeal);
+      await expect(previewRegistrationAmendment("event-1", "registration-1", removalInput(registration))).rejects.toMatchObject({ code: "PAYMENT_ADJUSTMENT_REQUIRED" });
+    });
   });
 
   it("also refuses to remove an attendee linked from an expected-guest placeholder", async () => {
