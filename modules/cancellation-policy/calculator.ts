@@ -328,7 +328,10 @@ export function calculateCancellation(input: {
   const percent = refundPercent(terms);
 
   // ---- What is in scope ----
-  const direct = facts.charges.filter((entry) => !isShared(entry, categories.get(entry.id) as ChargeCategory));
+  // Shared charges (the registration's card fee, tax, adjustments) follow the registration's own price lines only;
+  // merchandise orders are separate purchases and never part of the base.
+  const isRegistrationSource = (entry: ChargeEntry) => !entry.moneySourceId && !entry.settledSeparately;
+  const direct = facts.charges.filter((entry) => isRegistrationSource(entry) && !isShared(entry, categories.get(entry.id) as ChargeCategory));
   const directBase = direct.reduce((total, entry) => total + Math.max(entry.amountCents, 0), 0);
   const directInScope = (entry: ChargeEntry) => {
     if (effectiveScope === "FULL_REGISTRATION") return true;
@@ -388,7 +391,9 @@ export function calculateCancellation(input: {
   const keptChargesCents = chargedCents - inScopeCents;
   const linesEligible = lines.reduce((total, line) => total + line.eligibleCents, 0);
   const linesWithheld = lines.reduce((total, line) => total + line.withheldCents, 0);
-  const flatApplied = Math.min(terms.flatWithholdCents, Math.max(linesEligible, 0));
+  // The flat fee comes out of registration money only, so it is capped at what registration charges leave eligible.
+  const registrationEligible = lines.reduce((total, line) => total + (isRegistrationSource(facts.charges.find((entry) => entry.id === line.chargeId) as ChargeEntry) ? line.eligibleCents : 0), 0);
+  const flatApplied = Math.min(terms.flatWithholdCents, Math.max(registrationEligible, 0));
   const cardFeeCents = lines.filter((line) => line.category === "FEE").reduce((total, line) => total + line.inScopeCents, 0);
 
   // ---- Cash, in a fixed order, separately for each place the money was paid ----

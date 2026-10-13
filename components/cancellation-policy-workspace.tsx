@@ -145,7 +145,7 @@ export function CancellationPolicyWorkspace({
         </div>
       </div>
       <VersionHistory timezone={timezone} versions={versions} inEffectVersionId={inEffectVersionId} />
-      <NewVersion eventId={eventId} timezone={timezone} />
+      <NewVersion eventId={eventId} timezone={timezone} versions={versions} />
       <Preview eventId={eventId} timezone={timezone} />
     </section>
   );
@@ -223,7 +223,7 @@ function TermsEditor({ legend, value, onChange }: { legend: string; value: Terms
   );
 }
 
-function NewVersion({ eventId, timezone }: { eventId: string; timezone: string }) {
+function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone: string; versions: PolicyVersionView[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [deadline, setDeadline] = useState("");
@@ -260,9 +260,15 @@ function NewVersion({ eventId, timezone }: { eventId: string; timezone: string }
 
   async function save() {
     if (!draft) return;
+    const request = draftToRequest(draft, timezone);
+    // A higher version replaces every lower one, so saving one that takes effect before a pending future-dated version
+    // means that pending version never takes effect. Say so before saving.
+    const effective = "effectiveFrom" in request ? new Date(request.effectiveFrom as string).getTime() : Date.now();
+    const pending = versions.filter((version) => new Date(version.effectiveFrom).getTime() > Date.now() && new Date(version.effectiveFrom).getTime() > effective);
+    if (pending.length > 0 && !window.confirm(`Version ${pending.map((version) => version.version).join(", ")} is saved but has not taken effect yet. A newer version replaces every older one, so it will never take effect if you save this. Save anyway?`)) return;
     setBusy(true);
     setError("");
-    const response = await postJson(`/api/events/${encodeURIComponent(eventId)}/cancellation-policy`, draftToRequest(draft, timezone), "The rules could not be saved.");
+    const response = await postJson(`/api/events/${encodeURIComponent(eventId)}/cancellation-policy`, request, "The rules could not be saved.");
     setBusy(false);
     if (!response.ok) {
       setError(typeof response.body.message === "string" ? response.body.message : "The rules could not be saved.");

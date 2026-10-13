@@ -609,3 +609,30 @@ describe("merchandise money stays with merchandise", () => {
     expect(result.money.bySource.map((source) => [source.refundCents, source.retainedCents])).toEqual([[19_000, 1000], [0, 3000]]);
   });
 });
+
+describe("merchandise stays out of registration-only calculations", () => {
+  const merch = (amountCents: number) => charge({
+    id: "m1", source: "MERCHANDISE_ORDER", category: "MERCHANDISE", fieldKey: null, amountCents, settledSeparately: true, moneySourceId: "merchandise-order:m1",
+  });
+
+  it("a free registration with $30 of paid merchandise shows no flat fee withheld, and the totals match the money", () => {
+    const result = run(facts({ charges: [charge({ id: "reg", amountCents: 0 }), merch(3000)] }), [campMeeting()]);
+    expect(result.flatFee?.cents).toBe(0);
+    expect(result.totals).toMatchObject({ chargedCents: 3000, eligibleCents: 3000, withheldCents: 0 });
+    expect(result.money).toMatchObject({ paidCents: 3000, refundCents: 3000, retainedCents: 0, unpaidWithholdingCents: 0 });
+    expect(result.explanation.join(" ")).not.toContain("including the");
+  });
+
+  it("prorates the card fee for one attendee by registration charges only", () => {
+    const charges = [
+      charge({ id: "a", amountCents: 10_000, attendeeId: "att_a" }),
+      charge({ id: "b", amountCents: 10_000, attendeeId: "att_b" }),
+      charge({ id: "fee", source: "PRICING_FEE", category: "FEE", fieldKey: null, amountCents: 1000 }),
+      merch(20_000),
+    ];
+    const result = run(facts({ charges, registrationPaidCents: 21_000 }), [campMeeting()], { scope: "ATTENDEE", attendeeIds: ["att_a"] });
+    // Half of the registration's price lines, not a quarter of everything: 500 of the 1000 fee.
+    expect(result.lines.find((line) => line.chargeId === "fee")?.inScopeCents).toBe(500);
+    expect(result.lines.find((line) => line.chargeId === "m1")?.treatment).toBe("KEPT");
+  });
+});
