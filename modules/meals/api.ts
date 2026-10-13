@@ -38,7 +38,7 @@ type Context<P> = { params: Promise<{ eventId: string } & P> };
  * event (never from the body), and one error shape. `permission` is what the verb needs: services need
  * CONFIGURE_EVENT; plans, prices, orders and anything that moves money need MANAGE_FINANCE.
  */
-export function mealRoute<P extends Record<string, string> = Record<string, never>>(
+export function mealRoute<P extends Record<string, string> = Record<never, never>>(
   permission: EventPermission,
   action: string,
   work: (input: { request: Request; eventId: string; userId: string; params: { eventId: string } & P }) => Promise<Response>,
