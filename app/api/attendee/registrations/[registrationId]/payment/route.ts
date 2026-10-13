@@ -69,14 +69,17 @@ function failure(error: unknown) {
   throw error;
 }
 
-async function getHandler(_request: Request, context: Context) {
+async function getHandler(request: Request, context: Context) {
   const result = await access(context);
   if ("blocked" in result) return result.blocked;
   const authorized = result.authorized;
   if (!authorized) {
     return json({ message: "This registration is unavailable." }, { status: 404 });
   }
-  const checkout = await getAttendeeSquareCheckout(authorized);
+  const kindParam = new URL(request.url).searchParams.get("kind");
+  const checkout = await getAttendeeSquareCheckout(authorized, {
+    kind: kindParam === "DEPOSIT" || kindParam === "BALANCE" ? kindParam : undefined,
+  });
   return checkout
     ? json({ checkout })
     : json({ message: "This registration is unavailable." }, { status: 404 });

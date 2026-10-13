@@ -257,6 +257,8 @@ function fixture({
     },
     promoCodeRedemption: { update: vi.fn() },
     registrationAdjustment: { aggregate: vi.fn().mockResolvedValue({ _sum: { amountCents: null } }) },
+    // Card fees already applied by earlier card payments (#415): none here.
+    payment: { findMany: vi.fn().mockResolvedValue([]) },
     person: {
       findUnique: vi.fn(async (): Promise<Record<string, unknown> | null> => null),
       create: vi.fn(async ({ data }: { data: { firstName: string; lastName: string } }) => ({ id: `person-new-${data.firstName.toLowerCase()}`, ...data })),

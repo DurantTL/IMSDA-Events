@@ -52,6 +52,7 @@ export const metadata: Metadata = {
 
 type PublicManagePageProps = {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 const moneyFormatter = new Intl.NumberFormat("en-US", {
@@ -90,9 +91,14 @@ function expiryLabel(expiresAt: string) {
 
 export default async function PublicManagePage({
   params,
+  searchParams,
 }: PublicManagePageProps) {
   await connection();
   const { token } = await params;
+  // A balance reminder links here with `?pay=balance` (#415): it opens the pay page on the whole balance rather than
+  // on the deposit the registrant chose on the form.
+  const { pay } = await searchParams;
+  const initialPaymentKind = pay === "balance" ? "BALANCE" : undefined;
   const view = await resolveRegistrationAccessToken(token);
   if (!view) notFound();
   // Someone already signed in has an account; the optional-account offer is for signed-out visitors (#854).
@@ -385,7 +391,7 @@ export default async function PublicManagePage({
             {(view.registration.status === "SUBMITTED" || view.registration.status === "CONFIRMED") && (
               <EventRefundPolicy policy={view.event.refundPolicy} headingLevel={3} />
             )}
-            {!view.perPerson && !view.isGroup && <PublicSquarePayment token={token} />}
+            {!view.perPerson && !view.isGroup && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
           </section>
         </div>
 

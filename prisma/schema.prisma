@@ -3003,6 +3003,10 @@ model Payment {
   status            PaymentStatus
   method            PaymentMethod
   externalReference String?
+  /// The registration's reservation deposit (#415): at most one per registration counts at a time.
+  /// Set on a card payment whose attempt was a deposit and on a staff-recorded deposit. A
+  /// reservation counts as held exactly while a deposit payment's net amount is above zero.
+  isDeposit         Boolean       @default(false)
   receivedAt        DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -3034,6 +3038,9 @@ model PaymentAttempt {
   /// kept as PENDING and a `SquareDuplicateCharge` holds the evidence; it never counts toward the
   /// balance and sends no receipt.
   duplicateReason           String?
+  /// This attempt pays the form's fixed reservation deposit, not the whole balance (#415). The
+  /// resulting payment is marked `isDeposit`. The surcharge below is the card fee on the deposit.
+  isDeposit                 Boolean              @default(false)
   amountCents               Int
   /// The card processing surcharge inside `amountCents`, for a registration
   /// whose total did not already price one in — a pay-later registrant

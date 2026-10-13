@@ -7,6 +7,7 @@ import {
 import type {
   PromotedWaitlistPaymentChoiceView,
 } from "@/modules/payments/payment-choice-domain";
+import { paymentKinds, type PaymentKind } from "@/modules/payments/deposit-domain";
 
 export const squarePaymentInputSchema = z.strictObject({
   sourceId: z.string().trim().min(3).max(512).refine(
@@ -14,6 +15,11 @@ export const squarePaymentInputSchema = z.strictObject({
     "The payment token is invalid.",
   ),
   idempotencyKey: z.uuid(),
+  /**
+   * What this payment is for (#415): the whole balance or the form's fixed deposit. Left out, the server picks what
+   * the registrant chose on the form. Never an amount: the server prices both.
+   */
+  kind: z.enum(paymentKinds).optional(),
 });
 
 export type SquarePaymentInput = z.infer<typeof squarePaymentInputSchema>;
@@ -27,6 +33,8 @@ export const squarePaymentLinkInputSchema = z.strictObject({
    * hash is stored. It grants a status view and nothing else.
    */
   returnId: z.string().regex(/^[A-Za-z0-9_-]{43}$/, "The return id is invalid."),
+  /** The whole balance or the form's deposit (#415), as for an embedded payment. */
+  kind: z.enum(paymentKinds).optional(),
 });
 
 export type SquarePaymentLinkInput = z.infer<typeof squarePaymentLinkInputSchema>;
@@ -85,6 +93,24 @@ export type SquarePayableCheckoutView = {
   surchargeCents: number;
   currency: "USD";
   cardSelected: boolean;
+  /**
+   * What `amountCents` pays (#415): the whole balance, or the form's fixed deposit. A deposit's surcharge is the card
+   * fee on the deposit only.
+   */
+  paymentKind: PaymentKind;
+  /**
+   * The deposit that can be paid now, when the form offers one and none is recorded yet; null otherwise. Offered
+   * beside the balance so a pay-later registrant can turn to a deposit.
+   */
+  deposit: {
+    depositCents: number;
+    surchargeCents: number;
+    chargeCents: number;
+    balanceAfterCents: number;
+    chosenOnForm: boolean;
+  } | null;
+  /** A deposit is already recorded, so the reservation is held. */
+  depositRecorded: boolean;
   /**
    * Whether the event offers "Pay on Square" (#327) and this registration can use it right now.
    * Carries no address: a link is created on request, for the amount quoted at that moment.
@@ -212,7 +238,8 @@ export function providerHostedLinkIdempotencyKey(
 export type HostedLinkStaleReason =
   | "REGISTRATION_NOT_PAYABLE"
   | "BALANCE_ALREADY_PAID"
-  | "BALANCE_CHANGED";
+  | "BALANCE_CHANGED"
+  | "DEPOSIT_ALREADY_RECORDED";
 
 /**
  * Whether a payment quoted for `quotedBalanceCents` can still be applied to the registration.
@@ -226,6 +253,8 @@ export function hostedPaymentStaleReason(input: {
   registrationStatus: string;
   balanceCents: number;
   quotedBalanceCents: number;
+  /** The payment is a reservation deposit (#415) and the registration already has one recorded. */
+  duplicateDeposit?: boolean;
 }): HostedLinkStaleReason | null {
   if (
     input.registrationStatus !== "SUBMITTED"
@@ -234,6 +263,7 @@ export function hostedPaymentStaleReason(input: {
     return "REGISTRATION_NOT_PAYABLE";
   }
   if (input.balanceCents <= 0) return "BALANCE_ALREADY_PAID";
+  if (input.duplicateDeposit) return "DEPOSIT_ALREADY_RECORDED";
   if (input.balanceCents < input.quotedBalanceCents) return "BALANCE_CHANGED";
   return null;
 }
