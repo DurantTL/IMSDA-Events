@@ -26,7 +26,7 @@ import {
 
 type PaymentRecord = RegistrationRecord["payments"][number];
 type AdjustmentRecord = RegistrationRecord["adjustments"][number];
-type AdjustmentKind = "SCHOLARSHIP" | "DISCOUNT" | "PROMO_CODE" | "CORRECTION" | "MEAL";
+type AdjustmentKind = "SCHOLARSHIP" | "DISCOUNT" | "PROMO_CODE" | "CORRECTION" | "MEAL" | "ASSET";
 
 const adjustmentKindLabels: Record<AdjustmentKind, string> = {
   SCHOLARSHIP: "Scholarship",
@@ -34,6 +34,7 @@ const adjustmentKindLabels: Record<AdjustmentKind, string> = {
   PROMO_CODE: "Promo code",
   CORRECTION: "Correction",
   MEAL: "Meals",
+  ASSET: "Keys and items",
 };
 
 function money(cents: number) {
@@ -274,7 +275,7 @@ export function FinanceWorkspace({
                           </strong>
                           <small>{adjustment.reason} · {adjustment.createdBy} · {new Date(adjustment.createdAt).toLocaleDateString()}</small>
                         </span>
-                        {canManage && adjustment.kind !== "MEAL" && !adjustment.reversesAdjustmentId && !adjustment.reversed && activeFinancialStatuses.has(selected.status) && (
+                        {canManage && adjustment.kind !== "MEAL" && adjustment.kind !== "ASSET" && !adjustment.reversesAdjustmentId && !adjustment.reversed && activeFinancialStatuses.has(selected.status) && (
                           <button className="text-button" type="button" onClick={() => { setSelectedAdjustment(adjustment); setError(""); setModal("reverse"); }}>Reverse</button>
                         )}
                       </div>

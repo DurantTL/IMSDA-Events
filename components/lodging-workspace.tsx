@@ -147,7 +147,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
     </tr>
     {open ? <tr><td colSpan={6}>
       {unit.holds.length === 0 ? <p>No holds yet.</p> : <ul>{unit.holds.map((hold) => <li key={hold.id}>
-        <strong>{hold.kind === "STAFF" ? "Staff hold" : "Maintenance"}</strong>: {hold.reason}, {hold.firstNight} to {hold.lastNight}{hold.active ? "" : ` (released: ${hold.releaseReason})`}
+        <strong>{({ STAFF: "Staff hold", MAINTENANCE: "Maintenance", SAFETY: "Safety", DAMAGE: "Damage" } as Record<string, string>)[hold.kind] ?? hold.kind}</strong>: {hold.reason}, {hold.firstNight} to {hold.lastNight}{hold.active ? "" : ` (released: ${hold.releaseReason})`}
         {hold.staleDefault ? <span role="alert"> This default hold no longer covers every night of the event. <button type="button" disabled={busy || nights.length === 0} onClick={() => void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "change_window", firstNight: nights[0], lastNight: nights[nights.length - 1] }), "Hold extended to cover the event.")}>Extend to cover the event</button></span> : null}
         <ul>{hold.history.map((entry, index) => <li key={index}>{entry.type.toLowerCase().replace("_", " ")} on {entry.at.slice(0, 10)}{entry.reason ? `: ${entry.reason}` : ""}{entry.firstNight ? ` (${entry.firstNight} to ${entry.lastNight})` : ""}</li>)}</ul>
         {hold.active ? <form onSubmit={(event) => {
@@ -166,7 +166,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
           kind: form.get("kind"), reason: form.get("reason"), firstNight: form.get("firstNight"), lastNight: form.get("lastNight"),
         }), `Hold placed on ${unit.name}.`);
       }}>
-        <label>Kind <select name="kind"><option value="STAFF">Staff hold</option><option value="MAINTENANCE">Maintenance</option></select></label>
+        <label>Kind <select name="kind"><option value="STAFF">Staff hold</option><option value="MAINTENANCE">Maintenance</option><option value="SAFETY">Safety</option><option value="DAMAGE">Damage</option></select></label>
         <label>Reason <input name="reason" required maxLength={300} /></label>
         <label>First night <input name="firstNight" type="date" required defaultValue={nights[0]} /></label>
         <label>Last night <input name="lastNight" type="date" required defaultValue={nights[nights.length - 1]} /></label>

@@ -10,6 +10,7 @@ import {
   type AssetCondition,
   type AssigneeKind,
 } from "@/modules/issued-assets/domain";
+import { depositShortfalls, depositShortfallLabels, formatCents } from "@/modules/issued-assets/returns-domain";
 import type { CatalogAsset, CatalogType, CatalogView } from "@/modules/issued-assets/view";
 
 type Result = { created?: number; skipped?: number };
@@ -47,7 +48,7 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
     <div className="page-intro"><div>
       <p className="eyebrow">Event configuration</p>
       <h2 className="duplicate-page-title">Issued assets</h2>
-      <p>Keys, keycards, wristbands, radios, welcome packets and other items {eventName} hands out. A <strong>numbered</strong> kind (a key) has one holder at a time; a <strong>quantity</strong> kind (a welcome packet) is a lot of identical items. Staff issue them from the <a href={`/check-in/assets?event=${encodeURIComponent(eventId)}`}>check-in issue desk</a>. Deposits, returns and charges are not handled here.</p>
+      <p>Keys, keycards, wristbands, radios, welcome packets and other items {eventName} hands out. A <strong>numbered</strong> kind (a key) has one holder at a time; a <strong>quantity</strong> kind (a welcome packet) is a lot of identical items. Staff issue them from the <a href={`/check-in/assets?event=${encodeURIComponent(eventId)}`}>check-in issue desk</a>. Check-out, cash key deposits, charges and room problems are on the same desk; the <a href={`/more/issued-assets/closeout?event=${encodeURIComponent(eventId)}`}>closeout</a> lists everything still out, lost, charged, held or unresolved.</p>
     </div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
@@ -61,6 +62,7 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
         void run(`${base}/types`, {
           action: "create", name: data.get("name"), mode: data.get("mode"), assigneeKinds: data.getAll("kinds"), roomLinked: data.get("roomLinked") === "on",
           depositPolicyRef: data.get("depositPolicyRef"), replacementPolicyRef: data.get("replacementPolicyRef"),
+          depositCents: dollarsToCents(data.get("depositDollars")), depositShortfall: data.get("depositShortfall"), replacementFeeCents: dollarsToCents(data.get("replacementDollars")),
         }, () => "Kind of item added.").then((ok) => { if (ok) form.reset(); });
       }}>
         <label>Name <input name="name" required maxLength={80} placeholder="Dorm room key" /></label>
@@ -74,6 +76,7 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
         <label className="checkbox-label"><input type="checkbox" name="roomLinked" /> Room-linked: remember the room and the exact lodging assignment it was issued against</label>
         <label>Deposit policy reference (optional) <input name="depositPolicyRef" maxLength={120} placeholder="CM26 key deposit" /></label>
         <label>Replacement policy reference (optional) <input name="replacementPolicyRef" maxLength={120} /></label>
+        <MoneyFields />
         <button className="primary-button" type="submit" disabled={busy}>Add kind of item</button>
       </form>
     </section>
@@ -83,6 +86,23 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
     />)}
     {catalog.truncated ? <p role="status">Only the first items are listed. Narrow the catalog before adding more.</p> : null}
   </div>;
+}
+
+/** Dollars typed by staff to whole cents; blank is zero. */
+function dollarsToCents(value: FormDataEntryValue | null) {
+  const cents = Math.round(Number(String(value ?? "").trim() || 0) * 100);
+  return Number.isFinite(cents) && cents >= 0 ? cents : 0;
+}
+
+/** The kind's money policy (#214): the usual cash deposit, what happens to it when an item is missing, and the replacement fee. */
+function MoneyFields({ type }: { type?: CatalogType }) {
+  return <>
+    <label>Usual cash deposit per holder (dollars, 0 for none) <input name="depositDollars" type="number" min="0" step="0.01" style={{ width: "100%" }} defaultValue={((type?.depositCents ?? 0) / 100).toFixed(2)} /></label>
+    <label>If an item is missing or damaged <select name="depositShortfall" defaultValue={type?.depositShortfall ?? "KEEP_ALL"}>
+      {depositShortfalls.map((value) => <option key={value} value={value}>{depositShortfallLabels[value]}</option>)}
+    </select></label>
+    <label>Replacement fee for one item (dollars, 0 for none) <input name="replacementDollars" type="number" min="0" step="0.01" style={{ width: "100%" }} defaultValue={((type?.replacementFeeCents ?? 0) / 100).toFixed(2)} /></label>
+  </>;
 }
 
 type Run = (url: string, body: unknown, success: (result: Result) => string) => Promise<boolean>;
@@ -96,7 +116,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
   };
   return <section className="panel">
     <h3>{type.name}{type.active ? "" : " (switched off)"}</h3>
-    <p>{serialized ? "Numbered" : "Quantity"}. {type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.{type.roomLinked ? " Room-linked." : ""}{type.depositPolicyRef ? ` Deposit policy: ${type.depositPolicyRef}.` : ""}{type.replacementPolicyRef ? ` Replacement policy: ${type.replacementPolicyRef}.` : ""}</p>
+    <p>{serialized ? "Numbered" : "Quantity"}. {type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.{type.roomLinked ? " Room-linked." : ""}{type.depositPolicyRef ? ` Deposit policy: ${type.depositPolicyRef}.` : ""}{type.replacementPolicyRef ? ` Replacement policy: ${type.replacementPolicyRef}.` : ""}{type.depositCents > 0 ? ` Usual cash deposit ${formatCents(type.depositCents)}.` : ""}{type.replacementFeeCents > 0 ? ` Replacement fee ${formatCents(type.replacementFeeCents)}.` : ""}</p>
     <div>
       <label className="checkbox-label"><input type="checkbox" checked={type.active} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, active: event.target.checked }, () => `${type.name} ${event.target.checked ? "switched on" : "switched off"}.`)} /> Active</label>{" "}
       <label className="checkbox-label"><input type="checkbox" checked={type.roomLinked} disabled={busy} onChange={(event) => void run(`${base}/types`, { action: "update", typeId: type.id, roomLinked: event.target.checked }, () => `${type.name} updated.`)} /> Room-linked</label>
@@ -107,11 +127,15 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
     <form onSubmit={(event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
-      void run(`${base}/types`, { action: "update", typeId: type.id, depositPolicyRef: data.get("depositPolicyRef"), replacementPolicyRef: data.get("replacementPolicyRef") }, () => `${type.name} updated.`);
+      void run(`${base}/types`, {
+        action: "update", typeId: type.id, depositPolicyRef: data.get("depositPolicyRef"), replacementPolicyRef: data.get("replacementPolicyRef"),
+        depositCents: dollarsToCents(data.get("depositDollars")), depositShortfall: data.get("depositShortfall"), replacementFeeCents: dollarsToCents(data.get("replacementDollars")),
+      }, () => `${type.name} updated.`);
     }}>
       <label>Deposit policy reference <input name="depositPolicyRef" maxLength={120} defaultValue={type.depositPolicyRef ?? ""} /></label>
       <label>Replacement policy reference <input name="replacementPolicyRef" maxLength={120} defaultValue={type.replacementPolicyRef ?? ""} /></label>
-      <button className="secondary-button" type="submit" disabled={busy}>Save references</button>
+      <MoneyFields type={type} />
+      <button className="secondary-button" type="submit" disabled={busy}>Save policy</button>
     </form>
 
     <form onSubmit={(event) => {
@@ -127,7 +151,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       <h4>{serialized ? "Add one item" : "Add a lot"}</h4>
       <label>{serialized ? "Number or identifier" : "Lot name"} <input name="identifier" required maxLength={64} placeholder={serialized ? "K-214" : "WELCOME-PACKETS"} /></label>
       <label>Barcode or QR value (defaults to the identifier) <input name="scanCode" maxLength={64} /></label>
-      {serialized ? null : <label>Quantity <input name="quantityTotal" type="number" min={1} max={100000} defaultValue={100} required /></label>}
+      {serialized ? null : <label>Quantity <input name="quantityTotal" type="number" style={{ width: "100%" }} min={1} max={100000} defaultValue={100} required /></label>}
       <label>Condition <select name="condition" defaultValue="GOOD">{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></label>
       <label>Location <input name="location" maxLength={120} placeholder="Front desk" /></label>
       <button className="secondary-button" type="submit" disabled={busy}>Add</button>
@@ -144,9 +168,9 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       <h4>Add a numbered range</h4>
       <p>For example prefix K-, from 201 to 260 adds K-201 through K-260. Numbers that already exist are skipped, so it is safe to run twice.</p>
       <label>Prefix <input name="prefix" maxLength={32} placeholder="K-" /></label>
-      <label>From <input name="from" type="number" min={0} required defaultValue={1} /></label>
-      <label>To <input name="to" type="number" min={0} required defaultValue={60} /></label>
-      <label>Zero-pad to width (0 for none) <input name="width" type="number" min={0} max={8} defaultValue={0} /></label>
+      <label>From <input name="from" type="number" style={{ width: "100%" }} min={0} required defaultValue={1} /></label>
+      <label>To <input name="to" type="number" style={{ width: "100%" }} min={0} required defaultValue={60} /></label>
+      <label>Zero-pad to width (0 for none) <input name="width" type="number" style={{ width: "100%" }} min={0} max={8} defaultValue={0} /></label>
       <input name="condition" type="hidden" value="GOOD" />
       <input name="location" type="hidden" value="" />
       <button className="secondary-button" type="submit" disabled={busy}>Add range</button>

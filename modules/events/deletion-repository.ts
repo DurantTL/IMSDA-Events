@@ -293,6 +293,12 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   await tx.eventMealSelection.deleteMany({ where: inEvent });
   await tx.eventMealServiceChange.deleteMany({ where: inEvent });
 
+  // 2c. Issued-asset money (#214): the ledger points at the registration adjustment lines it posted, at issuances and
+  //     at registrations, and a deposit's coverage points at both, so they go before all of those. Their append-only
+  //     triggers accept this transaction's deletes.
+  await tx.assetDepositCover.deleteMany({ where: inEvent });
+  await tx.assetLedgerEntry.deleteMany({ where: inEvent });
+
   // 3. Promo redemptions and adjustments (redemptions RESTRICT the promo code).
   await tx.promoCodeRedemption.deleteMany({ where: inEvent });
   await tx.registrationAdjustment.deleteMany({ where: inEvent });
@@ -340,6 +346,9 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   //     NO ACTION keys, so they go first. Their delete triggers accept this transaction's deletes (see
   //     `imsda.event_deletion` above) and refuse every other delete.
   // Issued assets (#213) point at attendees, registrations and lodging assignments, so they go before all of those.
+  // Slice 2 (#214): facility issues point at units, holds and assets, so they go before those.
+  await tx.facilityIssueHistory.deleteMany({ where: inEvent });
+  await tx.facilityIssue.deleteMany({ where: inEvent });
   await tx.assetIssuanceHistory.deleteMany({ where: inEvent });
   await tx.assetIssuance.deleteMany({ where: inEvent });
   await tx.issuedAsset.deleteMany({ where: inEvent });

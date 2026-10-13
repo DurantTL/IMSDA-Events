@@ -1626,6 +1626,9 @@ model Event {
   issuedAssets                        IssuedAsset[]
   assetIssuances                      AssetIssuance[]
   assetIssuanceHistory                AssetIssuanceHistory[]
+  assetLedgerEntries                  AssetLedgerEntry[]
+  facilityIssues                      FacilityIssue[]
+  facilityIssueHistory                FacilityIssueHistory[]
   lodgingAssignmentHistory            EventLodgingAssignmentHistory[]
   lodgingAssignmentNotices            EventLodgingAssignmentNotice[]
   mealServices                        EventMealService[]
@@ -2704,6 +2707,7 @@ model Registration {
   lodgingAssignmentNotices EventLodgingAssignmentNotice[]
   mealSelections          EventMealSelection[]
   mealLedgerEntries       EventMealLedgerEntry[]
+  assetLedgerEntries      AssetLedgerEntry[]
   lodgingRoommateRequestsFrom EventLodgingRoommateRequest[] @relation("LodgingRoommateFrom")
   lodgingRoommateRequestsTo   EventLodgingRoommateRequest[] @relation("LodgingRoommateTarget")
   honorEnrollments        HonorEnrollment[]
@@ -3001,6 +3005,7 @@ model RegistrationAdjustment {
   reverses     RegistrationAdjustment? @relation("AdjustmentReversal", fields: [reversesAdjustmentId], references: [id], onDelete: Restrict)
   reversedBy   RegistrationAdjustment? @relation("AdjustmentReversal")
   mealLedgerEntry EventMealLedgerEntry?
+  assetLedgerEntry AssetLedgerEntry?
 
   @@index([registrationId, createdAt])
   @@index([eventId, kind])
@@ -3014,6 +3019,8 @@ enum RegistrationAdjustmentKind {
   CORRECTION
   /// A charge or credit posted by the meal ledger (#210). Never reversed by hand: change the meal order instead.
   MEAL
+  /// A charge posted for a lost or damaged issued item, or its waiver (#214). Never reversed by hand: waive it from the issued-asset closeout.
+  ASSET
 }
 
 model Payment {
@@ -6685,6 +6692,10 @@ enum LodgingRateBasis {
 enum LodgingHoldKind {
   STAFF
   MAINTENANCE
+  /// A room or site blocked for safety (#214). Like every hold it blocks availability only; assignments are never touched.
+  SAFETY
+  /// A room or site blocked for damage found at check-out (#214).
+  DAMAGE
 }
 
 enum LodgingHoldHistoryType {
@@ -6841,6 +6852,7 @@ model EventLodgingUnit {
   unit         LodgingUnit        @relation(fields: [unitId], references: [id], onDelete: Restrict)
   holds        EventLodgingHold[]
   assignments  EventLodgingAssignment[]
+  facilityIssues FacilityIssue[]
   assetIssuances AssetIssuance[]
 
   @@unique([eventLodgingId, unitId])
@@ -6866,6 +6878,7 @@ model EventLodgingHold {
 
   eventUnit EventLodgingUnit          @relation(fields: [eventLodgingUnitId, eventId], references: [id, eventId], onDelete: Cascade)
   history   EventLodgingHoldHistory[]
+  facilityIssues FacilityIssue[]
 
   @@unique([id, eventId])
   @@index([eventLodgingUnitId, releasedAt])
@@ -7658,6 +7671,11 @@ enum IssuedAssetEndReason {
   TRANSFERRED
   REPLACED
   CORRECTED
+  /// Slice 2 (#214): the holder gave it back. `endQuantity` says how many of a lot.
+  RETURNED
+  LOST
+  /// Given back, but damaged beyond ordinary wear.
+  DAMAGED
 }
 
 enum IssuedAssetEventType {
@@ -7667,6 +7685,76 @@ enum IssuedAssetEventType {
   REPLACED_OUT
   REPLACED_IN
   CORRECTED
+  RETURNED
+  LOST
+  DAMAGED
+  /// The part of a lot that stayed out after a partial return or loss: a new issuance continuing the old one.
+  REMAINDER_ISSUED
+}
+
+/// What happens to a cash deposit when a covered item does not come back (#214).
+enum AssetDepositShortfall {
+  /// The whole deposit is kept.
+  KEEP_ALL
+  /// The replacement fee of each missing or damaged item is kept (never more than the deposit); the rest is handed back.
+  KEEP_FEES
+}
+
+enum AssetLedgerKind {
+  DEPOSIT_RECEIVED
+  DEPOSIT_RETURNED
+  DEPOSIT_KEPT
+  CHARGE
+  WAIVER
+}
+
+enum AssetChargeCategory {
+  REPLACEMENT
+  DAMAGE
+  OTHER
+}
+
+enum AssetLedgerSettlement {
+  /// Cash taken, handed back or kept at the desk. Recorded here; no money moves through the system.
+  CASH_AT_DESK
+  /// Posted to the registration as an ASSET adjustment line (or reversed by one).
+  REGISTRATION_ADJUSTMENT
+  /// Recorded only: the holder has no registration to post to, or staff chose not to post.
+  RECORD_ONLY
+}
+
+enum FacilityTargetKind {
+  /// A room or RV site of the event's lodging.
+  UNIT
+  ASSET
+  OTHER
+}
+
+enum FacilityIssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FacilityIssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+enum FacilityIssueSource {
+  REPORT
+  CHECKOUT_INSPECTION
+}
+
+enum FacilityIssueHistoryType {
+  REPORTED
+  UPDATED
+  BLOCK_PLACED
+  RESOLVED
+  DISMISSED
 }
 
 model IssuedAssetType {
@@ -7678,9 +7766,15 @@ model IssuedAssetType {
   assigneeKinds        IssuedAssetAssigneeKind[]
   /// Issuing to an attendee or registration records the lodging room and the exact assignment it came from.
   roomLinked           Boolean                   @default(false)
-  /// A reference (a name or code staff recognise) to the deposit and replacement policy. No amounts: money is slice 2.
+  /// A reference (a name or code staff recognise) to the deposit and replacement policy.
   depositPolicyRef     String?
   replacementPolicyRef String?
+  /// Slice 2 (#214): the usual cash deposit for one holder's items of this kind (zero: no deposit), what happens to it when
+  /// an item is missing or damaged, and the fee for replacing one item. Amounts are in cents; staff may take a different
+  /// deposit amount at the desk.
+  depositCents         Int                       @default(0)
+  depositShortfall     AssetDepositShortfall     @default(KEEP_ALL)
+  replacementFeeCents  Int                       @default(0)
   createdByUserId      String?
   updatedByUserId      String?
   createdAt            DateTime                  @default(now())
@@ -7688,6 +7782,7 @@ model IssuedAssetType {
 
   event  Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   assets IssuedAsset[]
+  ledgerEntries AssetLedgerEntry[]
 
   @@unique([eventId, name])
   @@unique([id, eventId])
@@ -7716,6 +7811,7 @@ model IssuedAsset {
   event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
   assetType IssuedAssetType       @relation(fields: [assetTypeId, eventId], references: [id, eventId], onDelete: NoAction)
   issuances AssetIssuance[]
+  facilityIssues FacilityIssue[]
 
   @@unique([eventId, identifier])
   @@unique([eventId, scanCode])
@@ -7757,6 +7853,9 @@ model AssetIssuance {
   endReason          IssuedAssetEndReason?
   endedByUserId      String?
   endNote            String?
+  /// How many of the issuance the ending outcome applies to (a return, loss or damage). A partial outcome ends the
+  /// issuance and a new one continues the remainder.
+  endQuantity        Int?
   revision           Int                     @default(1)
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
@@ -7768,6 +7867,8 @@ model AssetIssuance {
   roomUnit         EventLodgingUnit?           @relation(fields: [roomUnitId, eventId], references: [id, eventId], onDelete: NoAction)
   sourceAssignment EventLodgingAssignment?     @relation(fields: [sourceAssignmentId, eventId], references: [id, eventId], onDelete: NoAction)
   history          AssetIssuanceHistory[]
+  deposits         AssetDepositCover[]
+  ledgerEntries    AssetLedgerEntry[]
 
   @@unique([eventId, idempotencyKey])
   @@unique([id, eventId])
@@ -7801,13 +7902,139 @@ model AssetIssuanceHistory {
   /// The paired issuance of a transfer or replacement.
   relatedIssuanceId  String?
   revision           Int
+  /// Slice 2 (#214): the saved retry key of a return, so a repeated or replayed offline return writes nothing twice.
+  idempotencyKey     String?
+  /// A reference to the evidence of the item's condition (a photo number, an incident or work-order number). Text only.
+  evidenceRef        String?
+  /// The condition the item was found in (a return, loss or damage).
+  condition          IssuedAssetCondition?
 
   event    Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   issuance AssetIssuance @relation(fields: [issuanceId, eventId], references: [id, eventId], onDelete: Cascade)
 
+  @@unique([eventId, idempotencyKey])
   @@index([eventId, at])
   @@index([issuanceId, at])
   @@index([assetId, at])
+}
+
+/// Append-only money record for issued assets (#214), in the pattern of the meal ledger: cash deposits received,
+/// handed back or kept at the desk (recorded, never moved), and charges and waivers. A charge may also be posted to the
+/// registration as an ASSET adjustment line (`registrationAdjustmentId`); a waiver of a posted charge is the reversing line.
+/// Nothing is edited or deleted; the follow-up entries of a deposit or charge are its state.
+model AssetLedgerEntry {
+  id                       String                  @id @default(cuid())
+  eventId                  String
+  kind                     AssetLedgerKind
+  /// Always positive; the kind gives the direction.
+  amountCents              Int
+  assetTypeId              String?
+  issuanceId               String?
+  registrationId           String?
+  /// A return or keep points at the deposit it settles.
+  depositEntryId           String?
+  /// A waiver points at the charge it waives.
+  waivesEntryId            String?
+  chargeCategory           AssetChargeCategory?
+  settlement               AssetLedgerSettlement
+  registrationAdjustmentId String?                 @unique
+  reason                   String
+  actorUserId              String
+  actorNameSnapshot        String
+  idempotencyKey           String?
+  createdAt                DateTime                @default(now())
+
+  event        Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assetType    IssuedAssetType?        @relation(fields: [assetTypeId, eventId], references: [id, eventId], onDelete: NoAction)
+  issuance     AssetIssuance?          @relation(fields: [issuanceId, eventId], references: [id, eventId], onDelete: NoAction)
+  registration Registration?           @relation(fields: [registrationId], references: [id], onDelete: NoAction)
+  adjustment   RegistrationAdjustment? @relation(fields: [registrationAdjustmentId], references: [id], onDelete: NoAction)
+  depositEntry AssetLedgerEntry?       @relation("AssetDepositSettlement", fields: [depositEntryId, eventId], references: [id, eventId], onDelete: NoAction)
+  settlements  AssetLedgerEntry[]      @relation("AssetDepositSettlement")
+  waivesEntry  AssetLedgerEntry?       @relation("AssetChargeWaiver", fields: [waivesEntryId, eventId], references: [id, eventId], onDelete: NoAction)
+  waivedBy     AssetLedgerEntry[]      @relation("AssetChargeWaiver")
+  covers       AssetDepositCover[]
+
+  @@unique([eventId, idempotencyKey])
+  @@unique([id, eventId])
+  @@index([eventId, createdAt])
+  @@index([registrationId, createdAt])
+  @@index([issuanceId])
+}
+
+/// The issuances a cash deposit covers (#214). An issuance is covered by at most one deposit, and whatever continues it
+/// (a transfer, replacement or the remainder of a partial return) is covered by the same one. Insert-only.
+model AssetDepositCover {
+  issuanceId     String
+  eventId        String
+  depositEntryId String
+  createdAt      DateTime @default(now())
+
+  issuance AssetIssuance    @relation(fields: [issuanceId, eventId], references: [id, eventId], onDelete: NoAction)
+  deposit  AssetLedgerEntry @relation(fields: [depositEntryId, eventId], references: [id, eventId], onDelete: NoAction)
+
+  @@id([issuanceId])
+  @@index([depositEntryId])
+}
+
+/// A problem with a room, site, item or place found at check-out or reported any time (#214). The issue is a ticket
+/// (status, severity, assignee and resolution change); every change appends a full snapshot to FacilityIssueHistory.
+/// `holdId` links the lodging hold that blocks the room, when staff blocked it: blocking never touches assignments.
+model FacilityIssue {
+  id               String                @id @default(cuid())
+  eventId          String
+  targetKind       FacilityTargetKind
+  eventUnitId      String?
+  assetId          String?
+  targetLabel      String?
+  title            String
+  description      String?
+  severity         FacilityIssueSeverity
+  status           FacilityIssueStatus   @default(OPEN)
+  source           FacilityIssueSource
+  /// The issuance being checked out when an inspection found it.
+  sourceIssuanceId String?
+  assigneeUserId   String?
+  resolution       String?
+  holdId           String?
+  reportedByUserId String
+  reportedAt       DateTime              @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  revision         Int                   @default(1)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  event   Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  unit    EventLodgingUnit?      @relation(fields: [eventUnitId, eventId], references: [id, eventId], onDelete: NoAction)
+  asset   IssuedAsset?           @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: NoAction)
+  hold    EventLodgingHold?      @relation(fields: [holdId, eventId], references: [id, eventId], onDelete: NoAction)
+  history FacilityIssueHistory[]
+
+  @@unique([id, eventId])
+  @@index([eventId, status])
+  @@index([eventUnitId])
+}
+
+/// Append-only: one row per change to a facility issue, with the fields as they were after it.
+model FacilityIssueHistory {
+  id             String                   @id @default(cuid())
+  eventId        String
+  issueId        String
+  type           FacilityIssueHistoryType
+  at             DateTime                 @default(now())
+  actorUserId    String
+  status         FacilityIssueStatus
+  severity       FacilityIssueSeverity
+  assigneeUserId String?
+  note           String?
+  holdId         String?
+  revision       Int
+
+  event Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  issue FacilityIssue @relation(fields: [issueId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@index([issueId, at])
 }
 
 // ---------------------------------------------------------------------------

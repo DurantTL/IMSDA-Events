@@ -1,7 +1,8 @@
 # Issued assets (#213, slice 1)
 
 Keys, keycards, wristbands, radios, welcome packets and other items an event hands out. Code lives in
-`modules/issued-assets/`. Returns, deposits, loss, damage and charges are slice 2 (#214) and are not built here.
+`modules/issued-assets/`. Slice 1 (#213) is the catalog and issuing; slice 2 (#214) is check-out: returns, loss and damage, the
+cash key deposit, charges and waivers, facility issues and room blocks, and the closeout. Slice 2 is described at the end.
 
 ## Who can do what
 
@@ -9,6 +10,10 @@ Keys, keycards, wristbands, radios, welcome packets and other items an event han
 | --- | --- | --- |
 | Set up kinds of item, add items, add a numbered range, change condition, location, status | `CONFIGURE_EVENT` | More > Issued assets (`/more/issued-assets`) |
 | Issue, transfer, replace, correct, look up | `MANAGE_CHECK_IN` | Check-in > Issue keys and items (`/check-in/assets`) |
+| Check out: return, lose or damage an item, swap or replace a key; take and settle a cash deposit; record the standard replacement fee; report a room problem | `MANAGE_CHECK_IN` | the same desk, once a person is chosen |
+| Any other charge; waive a charge (a reason is required) | `MANAGE_FINANCE` or `CONFIGURE_EVENT` | check-out (charge) and the closeout (waive) |
+| Block a room or site for a window of nights | `CONFIGURE_EVENT` (the permission every lodging hold needs) | report a problem, or the closeout |
+| Read the closeout and export its CSVs | `MANAGE_CHECK_IN`, `MANAGE_FINANCE`, `CONFIGURE_EVENT` or `VIEW_REPORTS` | More > Issued assets > closeout (`/more/issued-assets/closeout`) |
 
 Every route checks the permission on the server and refuses a cross-origin mutation.
 
@@ -89,9 +94,97 @@ the old one as replaced; `listRoomIssuances` returns the room's whole key histor
   ending in Enter, otherwise `MANUAL`; that is a heuristic, so treat the method as informational.
 - The room unit and source assignment references are `ON DELETE NO ACTION`, like the attendee and registration ones.
 
-## Left for slice 2 (#214)
+## Slice 2 (#214): check-out, money, facility issues and the closeout
 
-Return, partial return, loss, damage, waiver, charge and closeout events; deposits and fees (use the append-only ledger);
-outstanding reports; offline return sheets. The model leaves room: new `endReason` and history types are additive enum
-values, a quantity partial return can end an issuance and start a remainder, and `AssetIssuance.sourceAssignmentId` and
-`roomUnitId` are what checkout and room-damage reports join on.
+Migration `20261019120000_issued_assets_returns_charges`. Real-database proof: `npm run test:issued-assets-returns`
+(`scripts/verify-issued-assets-returns.ts`, in CI), plus the unit, route and screen tests `tests/issued-assets-returns-*.test.ts`.
+
+### The Camp Meeting key deposit, end to end
+
+1. **Check-in** issues the two numbered keys of a dorm room (`K-214`, `K-215`) as before, then **Cash key deposit** records the cash
+   the desk took: a $5 to $10 amount staff type in (the kind's "usual deposit" is only the suggestion). It is one append-only
+   ledger entry (`AssetLedgerEntry`, `DEPOSIT_RECEIVED`, settlement `CASH_AT_DESK`) with the actor, the reason and the time, plus the
+   issues it covers (`AssetDepositCover`). One deposit covers one holder's items of one kind.
+2. **Check-out** (the same desk, a person chosen) offers each open item: *Not back yet*, *Returned*, *Returned damaged* or *Lost*.
+   Two keys can come back one at a time (a partial group checkout) or together.
+3. **Settling the deposit** is only possible once every covered item has a recorded outcome. The server decides the amounts and the
+   desk only confirms it handed the cash back: the deposit is **handed back in full only when every covered item came back in good
+   order**. Otherwise the kind's policy applies: *keep all* (the whole deposit is kept) or *keep fees* (the replacement fee of each
+   missing or damaged item is kept, never more than the deposit, and the rest is handed back; a fee above the deposit is shown as a
+   shortfall for staff to charge, never charged automatically). It records `DEPOSIT_RETURNED` and/or `DEPOSIT_KEPT` entries. A
+   deposit settles once; the database enforces that, and that the two never add up to more than was received.
+4. A lost key can be **replaced in the same step**: the replacement is issued to the same holder for the same room and covered by
+   the same deposit, and the lost key still counts against the deposit, so a lost key is never a full refund. A key that does not
+   work is swapped the same way (returned, with a new key to hand over).
+
+**Record, don't move money.** Nothing here calls a payment provider, refunds a card or changes a registration's balance for a
+deposit. A cash deposit is a ledger record that staff took or handed back cash. It is deliberately **not** posted to the
+registration (it is refundable money held at the desk, not an amount owed). Refunds stay a human decision (AGENTS.md).
+
+### Returns (`returnAssets`, `/api/events/[eventId]/assets/returns`)
+
+A return, a loss and a damage are the same write as every other change: the issuance **ends** (new end reasons `RETURNED`, `LOST`,
+`DAMAGED`, added with `ALTER TYPE ... ADD VALUE`), its `endQuantity` says how many of a lot, and one history row is appended
+(`RETURNED`, `LOST`, `DAMAGED`, with the reason, actor, time, condition and a text **evidence reference**: a photo or incident
+number). An ended issuance never changes. It runs in the same SERIALIZABLE, ordered-lock transaction as issuing.
+
+- A **partial return of a lot** ends the issue and starts the remainder as a new issue pointing back at it (history
+  `REMAINDER_ISSUED`). A lost or damaged unit comes off the lot's total when the lot can spare it.
+- A numbered item that is lost or damaged is held out of stock (`UNAVAILABLE`; damaged is also marked `DAMAGED`); a returned one
+  keeps or takes the condition it came back in.
+- **Duplicate returns** (the same key scanned twice, two staff at once) are a `DUPLICATE` that writes nothing. A key that is not out
+  is `NOT_OUT`; a lot held by two people cannot be returned by its code alone.
+- **Offline / manual return sheets** reuse slice 1's pattern: the desk saves the sheet on the device with an idempotency key (kept
+  per event and signed-in person), sends it when connected, and a replay changes nothing (the key is stored on the history row). An
+  offline return says when it happened (at most 14 days back) and cannot be dated before the item was issued; anything the server
+  refuses stays on the device with the reason until it is dismissed, so conflicts are visible.
+- The **older `replace`** (slice 1) still works and now carries the deposit to the replacement, but it records no outcome for the
+  original, so the closeout lists it as *replaced, original not accounted for*. The desk uses check-out instead.
+- A **CORRECTED** issue on a kind with a deposit does not settle the deposit: while the deposit is unsettled it is a closeout
+  exception for a person to decide (it is not an ordinary return).
+
+### Charges and waivers (`/api/events/[eventId]/assets/charges`)
+
+- A charge (`REPLACEMENT`, `DAMAGE`, `OTHER`) is an `AssetLedgerEntry` and, when posted, **an `ASSET` registration adjustment line**
+  (`postAssetAdjustment`, the same rules as every adjustment: submitted or confirmed registrations only, never below $0 or below
+  what was paid), so it shows in the balance. The line has no attendee, so it never moves with a person. A charge may instead be
+  recorded without posting.
+- **Check-in staff may record only the kind's standard replacement fee** for a lost or damaged numbered item. **Any other amount and
+  every waiver need `MANAGE_FINANCE` or `CONFIGURE_EVENT`**, and every charge and waiver needs a reason. The service enforces this
+  again after the route.
+- A **waiver** covers a whole charge, is its own ledger entry (the charge stays on record), and for a posted charge is the reversing
+  `ASSET` line. It is refused if the guest already paid the charge (record the refund first: that is a human decision). An `ASSET`
+  line cannot be reversed from the finance screen, only waived from here.
+- One charge per category per issue and one waiver per charge (the database enforces both). The ledger is append-only: the database
+  refuses an update or a delete, and the event deletion service removes it in order (before registration adjustments).
+
+### Facility issues and room blocks (`/api/events/[eventId]/assets/facility`)
+
+A **facility issue** is a ticket about a room, site, item or place (found at a check-out inspection or reported any time):
+severity, status (open, in progress, resolved, dismissed), assignee, resolution. Every change appends a full snapshot to
+`FacilityIssueHistory` (database triggers: append-only history, a finished issue never changes, every change has its history row).
+
+A **block** (maintenance, safety, damage or staff hold) is an ordinary **lodging hold** (`EventLodgingHold`, `modules/lodging`) with
+two new kinds, `SAFETY` and `DAMAGE`. Lodging availability already reads holds (`projectAvailability`, step 4 *HELD*), so a block
+takes the room or site out of availability for its nights and nothing else: **no existing assignment is changed**. The rooming
+report lists a person still placed in a blocked room as a "room closed or held after assignment" conflict, as it does for any
+hold. Check-in staff report and update issues; placing a block needs `CONFIGURE_EVENT`. Resolving an issue does not release its
+block (an administrator does that in Lodging); a resolved issue that still blocks a room is a closeout exception.
+
+### Closeout (`getCloseoutReport`, `/more/issued-assets/closeout`, `/api/events/[eventId]/assets/closeout`)
+
+Reads only. It lists what is still out, lost, damaged, charged and waived, the cash deposits (held, handed back, kept, partly
+kept) and the open facility issues, with a link to each holder's desk, and **reconciles** every kind: units that went out (issued,
+plus the new key of a replacement) equal returned + lost + damaged + withdrawn in error + replaced originals not accounted for +
+still out. A mismatch is itself an exception. `exceptions` is the list a financial closeout consumes (`getCloseoutExceptions`):
+still out, replaced-unaccounted, lost or damaged with nothing charged or kept, an unsettled deposit, a corrected issue with an open
+deposit, an open facility issue, a resolved issue that still blocks a room, a reconciliation mismatch. It never charges, waives,
+settles or releases anything. Each list downloads as CSV through the shared `csvCell`, which prefixes `=`, `+`, `-`, `@`, tab and
+return, so a name or a note cannot run as a formula.
+
+### Not built (follow-ups)
+
+Recording that a lost key was found later (a "found" event needs its own table), procurement and inventory purchasing, incident
+records beyond a text reference, and anything that moves money (card refunds, provider calls). Decisions for the owner are listed
+in the pull request: the standard-fee permission for check-in staff, keeping the cash deposit out of the registration balance, and
+what a corrected deposit-bearing issue should do.

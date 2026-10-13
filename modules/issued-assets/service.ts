@@ -21,6 +21,7 @@ import {
   CORRECTION_WINDOW_MS,
   plausibleOccurredAt,
   sameHolder,
+  type AssetCondition,
   type AssetMode,
   type AssigneeInput,
   type AssigneeKind,
@@ -43,12 +44,12 @@ import { AssetError } from "@/modules/issued-assets/errors";
  * The history is append-only (triggers) and every writer appends exactly one history row per change.
  */
 
-type Tx = Prisma.TransactionClient;
+export type Tx = Prisma.TransactionClient;
 
 const busy = () => new AssetError("BUSY", "Several people are issuing at once and this could not settle. Nothing was saved. Try again.");
 
 /** SERIALIZABLE with retries (the shared helper), and a few more rounds with a pause for a crowded desk. */
-async function transact<T>(operation: (tx: Tx) => Promise<T>): Promise<T> {
+export async function transact<T>(operation: (tx: Tx) => Promise<T>): Promise<T> {
   for (let round = 0; round < 4; round += 1) {
     try {
       return await runSerializableTransaction(operation, busy);
@@ -61,17 +62,17 @@ async function transact<T>(operation: (tx: Tx) => Promise<T>): Promise<T> {
 }
 
 const toNight = (date: Date) => date.toISOString().slice(0, 10);
-const clean = (value: string | undefined) => (value && value.trim() ? value.trim() : null);
+export const clean = (value: string | undefined) => (value && value.trim() ? value.trim() : null);
 
 /** Lock the asset rows in id order and bump their version: a stale reader in another transaction is rolled back and retried. */
-async function lockAssets(tx: Tx, eventId: string, ids: readonly string[]) {
+export async function lockAssets(tx: Tx, eventId: string, ids: readonly string[]) {
   const sorted = [...new Set(ids)].sort();
   if (sorted.length === 0) return;
   await tx.$queryRaw`SELECT "id" FROM "IssuedAsset" WHERE "eventId" = ${eventId} AND "id" = ANY(${sorted}::text[]) ORDER BY "id" FOR UPDATE`;
   await tx.$executeRaw`UPDATE "IssuedAsset" SET "issueVersion" = "issueVersion" + 1 WHERE "eventId" = ${eventId} AND "id" = ANY(${sorted}::text[])`;
 }
 
-async function requireEvent(tx: Tx, eventId: string) {
+export async function requireEvent(tx: Tx, eventId: string) {
   const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true } });
   if (!event) throw new AssetError("EVENT_NOT_FOUND", "That event was not found.");
 }
@@ -91,6 +92,7 @@ export async function applyAssetTypeAction(eventId: string, actorUserId: string,
           data: {
             eventId, name: input.name, mode: input.mode, assigneeKinds: [...new Set(input.assigneeKinds)], roomLinked: input.roomLinked,
             depositPolicyRef: clean(input.depositPolicyRef), replacementPolicyRef: clean(input.replacementPolicyRef),
+            depositCents: input.depositCents, depositShortfall: input.depositShortfall, replacementFeeCents: input.replacementFeeCents,
             createdByUserId: actorUserId, updatedByUserId: actorUserId,
           },
         });
@@ -106,6 +108,9 @@ export async function applyAssetTypeAction(eventId: string, actorUserId: string,
       if (input.roomLinked !== undefined) data.roomLinked = input.roomLinked;
       if (input.depositPolicyRef !== undefined) data.depositPolicyRef = clean(input.depositPolicyRef);
       if (input.replacementPolicyRef !== undefined) data.replacementPolicyRef = clean(input.replacementPolicyRef);
+      if (input.depositCents !== undefined) data.depositCents = input.depositCents;
+      if (input.depositShortfall !== undefined) data.depositShortfall = input.depositShortfall;
+      if (input.replacementFeeCents !== undefined) data.replacementFeeCents = input.replacementFeeCents;
       await tx.issuedAssetType.update({ where: { id: existing.id }, data });
       await writeAuditLog({ eventId, actorUserId, action: "ASSET_TYPE_UPDATED", entityType: "IssuedAssetType", entityId: existing.id, summary: "Updated an issued-asset type.", metadata: { fields: Object.keys(input).filter((key) => key !== "action" && key !== "typeId") } }, tx);
       return { id: existing.id };
@@ -213,7 +218,7 @@ export async function resolveAssetByCode(client: Tx | ReturnType<typeof getPrism
 // Holders and lodging references
 // ---------------------------------------------------------------------------
 
-type Holder = {
+export type Holder = {
   kind: AssigneeKind;
   attendeeId: string | null;
   registrationId: string | null;
@@ -226,7 +231,7 @@ type Holder = {
 
 const holderKey = (holder: Holder): HolderKey => holderKeyOf(holder);
 
-async function resolveHolder(tx: Tx, eventId: string, input: AssigneeInput): Promise<Holder> {
+export async function resolveHolder(tx: Tx, eventId: string, input: AssigneeInput): Promise<Holder> {
   const blank = { attendeeId: null, registrationId: null, staffUserId: null, roomUnitId: null, assigneeLabel: null };
   const active = new Set<string>(activeRegistrationStatuses);
   if (input.kind === "ATTENDEE") {
@@ -257,7 +262,7 @@ async function resolveHolder(tx: Tx, eventId: string, input: AssigneeInput): Pro
   return { ...blank, kind: input.kind, assigneeLabel: input.label, display: input.label };
 }
 
-type RoomLink = { roomUnitId: string | null; sourceAssignmentId: string | null };
+export type RoomLink = { roomUnitId: string | null; sourceAssignmentId: string | null };
 
 /**
  * The room a room-linked item opens and the exact lodging assignment it is issued against. Read under the same
@@ -265,7 +270,7 @@ type RoomLink = { roomUnitId: string | null; sourceAssignmentId: string | null }
  * offline entry may name an assignment that was moved after the moment it happened: that is the correct historical
  * reference, so it is kept.
  */
-async function resolveRoomLink(tx: Tx, eventId: string, holder: Holder, assignmentId: string | undefined, issuedAt: Date, entryMethod: EntryMethod): Promise<RoomLink> {
+export async function resolveRoomLink(tx: Tx, eventId: string, holder: Holder, assignmentId: string | undefined, issuedAt: Date, entryMethod: EntryMethod): Promise<RoomLink> {
   if (holder.kind === "ROOM") {
     if (!assignmentId) return { roomUnitId: holder.roomUnitId, sourceAssignmentId: null };
     const assignment = await tx.eventLodgingAssignment.findFirst({ where: { id: assignmentId, eventId, eventLodgingUnitId: holder.roomUnitId } });
@@ -316,12 +321,12 @@ function assertAssignmentUsable(assignment: { cancelledAt: Date | null; createdA
 // Writing issuances
 // ---------------------------------------------------------------------------
 
-type OpenIssuance = Prisma.AssetIssuanceGetPayload<Record<string, never>>;
+export type OpenIssuance = Prisma.AssetIssuanceGetPayload<Record<string, never>>;
 
 /** The holder of a stored issuance. For a ROOM holder `roomUnitId` is the holder; for anyone else it is only the room a key opens. */
-const rowHolderKey = (row: OpenIssuance): HolderKey => holderKeyOf({ kind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId, staffUserId: row.staffUserId, roomUnitId: row.roomUnitId, assigneeLabel: row.assigneeLabel });
+export const rowHolderKey = (row: OpenIssuance): HolderKey => holderKeyOf({ kind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId, staffUserId: row.staffUserId, roomUnitId: row.roomUnitId, assigneeLabel: row.assigneeLabel });
 
-type NewIssuance = {
+export type NewIssuance = {
   eventId: string;
   assetId: string;
   serialized: boolean;
@@ -335,11 +340,11 @@ type NewIssuance = {
   entryMethod: EntryMethod;
   idempotencyKey: string | null;
   previousIssuanceId: string | null;
-  historyType: "ISSUED" | "TRANSFERRED_IN" | "REPLACED_IN";
+  historyType: "ISSUED" | "TRANSFERRED_IN" | "REPLACED_IN" | "REMAINDER_ISSUED";
   reason: string | null;
 };
 
-async function writeNewIssuance(tx: Tx, p: NewIssuance) {
+export async function writeNewIssuance(tx: Tx, p: NewIssuance) {
   const id = randomUUID();
   const issuance = await tx.assetIssuance.create({
     data: {
@@ -362,21 +367,38 @@ async function writeNewIssuance(tx: Tx, p: NewIssuance) {
 }
 
 /** Ends an open issuance and appends its history row. The `endedAt IS NULL` condition makes a double end impossible. */
-async function endIssuance(tx: Tx, row: OpenIssuance, p: { actorUserId: string; endReason: "TRANSFERRED" | "REPLACED" | "CORRECTED"; historyType: "TRANSFERRED_OUT" | "REPLACED_OUT" | "CORRECTED"; reason: string; entryMethod: EntryMethod; relatedIssuanceId: string | null; at: Date }) {
+export type EndExtras = {
+  /** How many the outcome covers (a return, loss or damage); the history row carries it as its quantity. */
+  endQuantity?: number;
+  idempotencyKey?: string | null;
+  evidenceRef?: string | null;
+  condition?: AssetCondition | null;
+};
+
+export async function endIssuance(tx: Tx, row: OpenIssuance, p: { actorUserId: string; endReason: "TRANSFERRED" | "REPLACED" | "CORRECTED" | "RETURNED" | "LOST" | "DAMAGED"; historyType: "TRANSFERRED_OUT" | "REPLACED_OUT" | "CORRECTED" | "RETURNED" | "LOST" | "DAMAGED"; reason: string; entryMethod: EntryMethod; relatedIssuanceId: string | null; at: Date } & EndExtras) {
   const revision = row.revision + 1;
   const ended = await tx.assetIssuance.updateMany({
     where: { id: row.id, endedAt: null },
-    data: { endedAt: p.at, endReason: p.endReason, endedByUserId: p.actorUserId, endNote: p.reason, revision },
+    data: { endedAt: p.at, endReason: p.endReason, endedByUserId: p.actorUserId, endNote: p.reason, revision, endQuantity: p.endQuantity ?? null },
   });
   if (ended.count !== 1) throw new AssetError("ISSUANCE_NOT_OPEN", "That issue was already ended by someone else.");
   await tx.assetIssuanceHistory.create({
     data: {
       eventId: row.eventId, issuanceId: row.id, assetId: row.assetId, type: p.historyType, at: p.at, actorUserId: p.actorUserId, reason: p.reason,
-      entryMethod: p.entryMethod, quantity: row.quantity, assigneeKind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId,
+      entryMethod: p.entryMethod, quantity: p.endQuantity ?? row.quantity, assigneeKind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId,
       staffUserId: row.staffUserId, roomUnitId: row.roomUnitId, sourceAssignmentId: row.sourceAssignmentId, assigneeLabel: row.assigneeLabel,
-      relatedIssuanceId: p.relatedIssuanceId, revision,
+      relatedIssuanceId: p.relatedIssuanceId, revision, idempotencyKey: p.idempotencyKey ?? null, evidenceRef: p.evidenceRef ?? null, condition: p.condition ?? null,
     },
   });
+}
+
+/**
+ * Whatever continues an issuance (a transfer, a replacement, the remainder of a partial return) is covered by the same
+ * cash deposit as the issuance it continues.
+ */
+export async function inheritDepositCover(tx: Tx, eventId: string, fromIssuanceId: string, toIssuanceId: string) {
+  const cover = await tx.assetDepositCover.findUnique({ where: { issuanceId: fromIssuanceId } });
+  if (cover) await tx.assetDepositCover.create({ data: { eventId, issuanceId: toIssuanceId, depositEntryId: cover.depositEntryId } });
 }
 
 // ---------------------------------------------------------------------------
@@ -681,5 +703,7 @@ async function moveToNew(
       roomUnitId: created.roomUnitId, sourceAssignmentId: created.sourceAssignmentId, assigneeLabel: created.assigneeLabel, relatedIssuanceId: old.id, revision: 1,
     },
   });
+  // The deposit follows the item: what continues a covered issue is covered too (#214).
+  await inheritDepositCover(tx, old.eventId, old.id, newId);
   return created;
 }

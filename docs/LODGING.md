@@ -88,7 +88,7 @@ with:
 - a **capacity override** (null uses the default);
 - an **unavailable** flag, which starts from the template's default;
 - **holds**: whole-unit, for a window of nights (both ends inclusive), with a
-  required reason, a kind (staff or maintenance), and the actor. A unit's default
+  required reason, a kind (staff, maintenance, safety or damage; the last two are the facility blocks of issued assets, #214, which block availability and never change an assignment), and the actor. A unit's default
   hold (the cooks' and the nurse's rooms) is placed when the property is
   chosen, as a *system-placed* hold covering the event's nights.
 
