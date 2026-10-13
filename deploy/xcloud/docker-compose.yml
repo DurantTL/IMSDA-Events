@@ -1,18 +1,21 @@
 # Base compose file for the events.imsda.org xCloud site
 # (/home/u_events/239298/docker-compose.yml, $XCLOUD_COMPOSE_FILE).
 #
-# xCloud generates this file with only the build and the port, so a container
-# started from it has no secrets and no database and refuses to start. This
-# version is the generated file plus the settings, uploads and database network.
-# Keep it in place on the server, and paste it into the site's Docker Compose
-# page if xCloud offers an editor, so a regenerated file keeps it.
+# The app runs the image GitHub builds for each merge to main
+# (ghcr.io/duranttl/imsda-events:<sha>). deploy/xcloud/deploy.sh pulls the image
+# for the deployed commit and tags it imsda-events:live; this file only ever
+# runs that tag, so nothing builds on the 4 GB server and a restart by xCloud
+# keeps the deployed version. The release SHA is baked into the image.
+#
+# xCloud's generated version of this file has no settings, so a container
+# started from it refuses to start. Keep this version in place on the server,
+# and paste it into the site's Docker Compose page if xCloud offers an editor.
 # See docs/DEPLOY-DOCKER.md, "xCloud site setup".
 name: xcloud-site-239298
 services:
   app:
-    build:
-      context: '${XCLOUD_SITE_PATH:-/var/www/events.imsda.org}'
-      dockerfile: Dockerfile
+    image: imsda-events:live
+    pull_policy: never
     ports:
       - '127.0.0.1:8100:3100'
     env_file:
@@ -22,7 +25,6 @@ services:
       - /home/u_events/.xcloud/.env.dburl
     environment:
       PORT: '3100'
-      APP_RELEASE_SHA: ${APP_RELEASE_SHA:-}
       ASSET_STORAGE_DIR: /app/storage/event-assets
     volumes:
       # Uploaded event files; without this every uploaded file returns 404.

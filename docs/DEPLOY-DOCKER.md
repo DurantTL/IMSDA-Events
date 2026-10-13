@@ -230,46 +230,65 @@ secrets and refuses to start ("Invalid server environment" or "Environment
 variable not found: DATABASE_URL"), and nginx then returns 502.
 
 So the base file on the server is replaced with
-[`deploy/xcloud/docker-compose.yml`](../deploy/xcloud/docker-compose.yml): the
-generated file plus `env_file` (xCloud's `.env` and
-`/home/u_events/.xcloud/.env.dburl`, which holds only `DATABASE_URL`), the
-`imsda_events_assets` uploads volume and the PostgreSQL network. Anything that
-starts the app from that file, xCloud included, then gets its settings. Paste
-the same content into the site's **Docker Compose** page if xCloud offers an
-editor. If the file on the server shrinks back to about 250 bytes, xCloud has
-regenerated it: copy it in again (as `root`, `install -m 644 -o u_events -g
-u_events deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
+[`deploy/xcloud/docker-compose.yml`](../deploy/xcloud/docker-compose.yml). It
+runs the local tag `imsda-events:live` (`pull_policy: never`, no `build`), with
+`env_file` (xCloud's `.env` and `/home/u_events/.xcloud/.env.dburl`, which holds
+only `DATABASE_URL`), the `imsda_events_assets` uploads volume and the
+PostgreSQL network. Anything that starts the app from that file, xCloud
+included, gets its settings and the deployed version. Paste the same content
+into the site's **Docker Compose** page if xCloud offers an editor. If the file
+on the server shrinks back to about 250 bytes, xCloud has regenerated it: copy
+it in again (as `root`, `install -m 644 -o u_events -g u_events
+deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
+
+**Nothing builds on the server.** `.github/workflows/docker-image.yml` publishes
+`ghcr.io/duranttl/imsda-events:<sha>` about 10 minutes after each merge to
+`main` (see "Prebuilt images from GitHub"). Its public build values
+(`APP_BASE_URL`, `EMBED_ALLOWED_ORIGINS`, `SQUARE_ENVIRONMENT`,
+`SQUARE_ENABLE_PRODUCTION`) come from repository variables and must match the
+server `.env`.
 
 **xCloud Git settings → Deploy Script** (with **Stop the deployment when a
 command fails** turned on):
 
 ```bash
-export APP_RELEASE_SHA="$(git -C "$XCLOUD_SITE_PATH" rev-parse HEAD)"
-docker compose -f "$XCLOUD_COMPOSE_FILE" build app
-docker compose -f "$XCLOUD_COMPOSE_FILE" up -d app
+sh "$XCLOUD_SITE_PATH/deploy/xcloud/deploy.sh"
 ```
 
-It builds first and replaces the container only when the build succeeds, so the
-site stays up during the build. Never use `down`.
+[`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh) waits up to 20 minutes
+for the pulled commit's image, keeps the outgoing image as
+`imsda-events:previous`, tags the new one `imsda-events:live` and runs
+`up -d app`. If the image never appears it stops without changing anything.
 
-By hand, as `root` (for example to restart without a build):
+By hand, as `root`:
 
 ```bash
 B=/home/u_events/239298/docker-compose.yml
 docker compose -f $B config --quiet && echo config-ok
-export APP_RELEASE_SHA="$(git -C /var/www/events.imsda.org rev-parse HEAD)"
-docker compose -f $B up -d --no-build app
+docker compose -f $B up -d app                        # restart on the live image
 curl -s http://127.0.0.1:8100/api/health
 docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep -cE '^(DATABASE_URL|MANAGE_LINK_DERIVATION_SECRET)='   # expect 2
 ```
 
+**Rollback** to the version before the last deploy:
+
+```bash
+docker tag imsda-events:previous imsda-events:live
+docker compose -f /home/u_events/239298/docker-compose.yml up -d app
+```
+
+Migrations only move forward; rolling back the image does not undo them.
+
+Old images pile up (about 1.9 GB each). Remove ones no longer needed with
+`docker image ls ghcr.io/duranttl/imsda-events` and `docker image rm <tag>`;
+Docker refuses to remove the one in use.
+
 To change a secret, edit it in the xCloud dashboard, then run the `up -d` line:
 a restart alone keeps the old values.
 
 `deploy/xcloud/docker-compose.env.yml` is the earlier override with the same
-additions. It is not needed while the base file carries them; passing it as a
-second `-f` file is harmless.
+settings. It is not used with this setup.
 
 The server-level runtime guard (`imsda-xcloud-runtime-guard.timer`) belongs to
 the earlier setup and is disabled; it cannot repair a container started from
