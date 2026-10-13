@@ -248,17 +248,51 @@ deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
 `SQUARE_ENABLE_PRODUCTION`) come from repository variables and must match the
 server `.env`.
 
-**xCloud Git settings → Deploy Script** (with **Stop the deployment when a
-command fails** turned on):
+**How a new version goes live.** xCloud does not run the Git page's Deploy
+Script on this site: its deploy pulls `main` into `/var/www/events.imsda.org`
+and then runs `down` / `up` on the base file, which only restarts the image
+already tagged `imsda-events:live`. A systemd timer finishes the job:
+
+- [`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh), installed as
+  `/usr/local/bin/imsda-deploy`, waits up to 20 minutes for
+  `ghcr.io/duranttl/imsda-events:<checked-out sha>`, keeps the outgoing image as
+  `imsda-events:previous`, tags the new one `imsda-events:live` and runs
+  `up -d app`. If the image never appears it stops without changing anything.
+- [`deploy/xcloud/autodeploy.sh`](../deploy/xcloud/autodeploy.sh), installed as
+  `/usr/local/bin/imsda-autodeploy`, runs every 2 minutes from
+  `imsda-autodeploy.timer`. When the checked-out commit differs from the live
+  image's `org.opencontainers.image.revision` label and that commit's image is
+  published, it runs `imsda-deploy`.
+
+So after a merge: xCloud pulls the commit within a minute (and restarts the old
+version briefly), GitHub publishes the image about 10 minutes later, and the
+timer switches to it within 2 minutes. Watch it with
+`journalctl -u imsda-autodeploy.service -f`. To deploy by hand, run
+`imsda-deploy` as `root`.
+
+Install or update (as `root`, from a checkout of `main`):
 
 ```bash
-sh "$XCLOUD_SITE_PATH/deploy/xcloud/deploy.sh"
+install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
+install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
+cat > /etc/systemd/system/imsda-autodeploy.service <<'UNIT'
+[Unit]
+Description=Deploy the GitHub-built IMSDA Events image for the checked-out commit
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/imsda-autodeploy
+UNIT
+cat > /etc/systemd/system/imsda-autodeploy.timer <<'UNIT'
+[Unit]
+Description=Check for a new IMSDA Events release every 2 minutes
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload && systemctl enable --now imsda-autodeploy.timer
 ```
-
-[`deploy/xcloud/deploy.sh`](../deploy/xcloud/deploy.sh) waits up to 20 minutes
-for the pulled commit's image, keeps the outgoing image as
-`imsda-events:previous`, tags the new one `imsda-events:live` and runs
-`up -d app`. If the image never appears it stops without changing anything.
 
 By hand, as `root`:
 
