@@ -228,6 +228,10 @@ fate: returned, lost or damaged) or `WRITTEN_OFF`, each with actor, reason and t
 - **Reviews name their exception** (migration `20261019150000_issued_assets_held_deposit`): a review stores the exception code and
   the id of the entry that raised it (the correction's history row, or the waiver's ledger entry), clears only that one, and a later
   correction or waiver raises it again. Two open exceptions on one key are cleared one at a time.
+- **A record-only charge never takes an offset.** Only a posted charge counts against a kept deposit (`depositOffsetCents` is 0
+  unless the charge posts; the database refuses an offset on a charge with no registration adjustment, migration
+  `20261019160000_issued_assets_record_only_no_offset`). Recording a charge without posting it records the full amount and leaves
+  held unchanged. Every waiver on an item raises its own exception, and a review names the waiver (`triggerId`).
 - **One definition of "held"**: what a deposit kept, less what was handed back late, less the offsets of posted, unwaived charges on
   its covered items, never below zero. The charge offset, the late hand-back cap, the desk, the closeout and the database guard
   (`AssetDeposit_held`, with the deposit row locked) all use it, so a late hand-back above held, or a charge offset above held, is

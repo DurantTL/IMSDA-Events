@@ -236,9 +236,10 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
       }
     }
     // A deposit that already kept money for this loss must not be taken again as a charge: only a money manager, with
-    // a confirmation, may charge the part above what the deposit kept.
+    // a confirmation, may charge the part above what the deposit kept. Only a POSTED charge counts against the deposit (held
+    // subtracts posted offsets only), so a record-only charge never takes an offset: it always records the full amount.
     let offset = 0;
-    if (input.category !== "OTHER" && lostOrDamaged) {
+    if (input.post && input.category !== "OTHER" && lostOrDamaged) {
       const cover = await tx.assetDepositCover.findUnique({ where: { issuanceId: row.id } });
       if (cover) {
         const held = await depositHeldCents(tx, eventId, cover.depositEntryId);

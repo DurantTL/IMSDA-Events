@@ -110,6 +110,8 @@ export type ExceptionRow = {
   amountCents: number | null;
   deskAttendeeId: string | null;
   refId: string;
+  /** For a waiver exception: the waiver entry it is about, so a review answers exactly that waiver. */
+  triggerId?: string;
   /** For an exception about a deposit: the deposit entry, so cash handed back after a correction can be recorded against it. */
   depositId?: string | null;
 };
@@ -315,24 +317,19 @@ export async function getCloseoutReport(eventId: string, now: Date = new Date(),
   }
   // A waiver that left money behind: the charge line is still on a cancelled registration's total, or the deposit was handed back because of a charge that was then waived (nobody paid for the loss).
   const chargeById = new Map(chargeEntries.map((entry) => [entry.id, entry]));
-  const latestWaiver = new Map<string, (typeof ledger)[number]>();
   for (const waiver of ledger.filter((entry) => entry.kind === "WAIVER")) {
-    const issuanceId = waiver.waivesEntryId ? chargeById.get(waiver.waivesEntryId)?.issuanceId : null;
-    if (issuanceId) latestWaiver.set(issuanceId, waiver);
-  }
-  for (const waiver of latestWaiver.values()) {
     const charge = waiver.waivesEntryId ? chargeById.get(waiver.waivesEntryId) : undefined;
     const issuanceId = charge?.issuanceId;
     if (!charge || !issuanceId || charge.registrationAdjustmentId === null) continue;
     const row = described.get(issuanceId);
     if (!row) continue;
     if (waiver.registrationAdjustmentId === null && !reviewedFor(issuanceId, "WAIVED_ON_INACTIVE_REGISTRATION", waiver.id)) {
-      exceptions.push({ code: "WAIVED_ON_INACTIVE_REGISTRATION", label: exceptionLabels.WAIVED_ON_INACTIVE_REGISTRATION, subject: subject(row), detail: `${formatCents(charge.amountCents)} was waived in the asset ledger, but the registration is not active, so the charge line is still on its total. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId });
+      exceptions.push({ code: "WAIVED_ON_INACTIVE_REGISTRATION", label: exceptionLabels.WAIVED_ON_INACTIVE_REGISTRATION, subject: subject(row), detail: `${formatCents(charge.amountCents)} was waived in the asset ledger, but the registration is not active, so the charge line is still on its total. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
     }
     const depositId = heldDepositOf.get(issuanceId);
     const refund = depositId ? (settlementsByDeposit.get(depositId) ?? []).find((entry) => entry.kind === "DEPOSIT_RETURNED") : undefined;
     if (refund && refund.createdAt.getTime() > charge.createdAt.getTime() && waiver.createdAt.getTime() > refund.createdAt.getTime() && !reviewedFor(issuanceId, "WAIVED_AFTER_REFUND", waiver.id)) {
-      exceptions.push({ code: "WAIVED_AFTER_REFUND", label: exceptionLabels.WAIVED_AFTER_REFUND, subject: subject(row), detail: `The deposit was handed back because ${formatCents(charge.amountCents)} was charged for this loss, and the charge was then waived: nobody paid for it. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId });
+      exceptions.push({ code: "WAIVED_AFTER_REFUND", label: exceptionLabels.WAIVED_AFTER_REFUND, subject: subject(row), detail: `The deposit was handed back because ${formatCents(charge.amountCents)} was charged for this loss, and the charge was then waived: nobody paid for it. Review it.`, holderLabel: row.holderLabel, amountCents: charge.amountCents, deskAttendeeId: deskAttendee(row), refId: issuanceId, triggerId: waiver.id });
     }
   }
   for (const issue of facilityOpen) {

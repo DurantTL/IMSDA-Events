@@ -70,7 +70,7 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
       if (replay) {
         const sameAction = replay.issuanceId === input.issuanceId
           && (input.action === "correct" ? replay.type === "OUTCOME_CORRECTED" && replay.correctedEndReason === input.fate
-            : input.action === "write_off" ? replay.type === "WRITTEN_OFF" : replay.type === "EXCEPTION_REVIEWED" && replay.reviewedCode === input.exceptionCode);
+            : input.action === "write_off" ? replay.type === "WRITTEN_OFF" : replay.type === "EXCEPTION_REVIEWED" && replay.reviewedCode === input.exceptionCode && (!input.triggerId || replay.reviewedRefId === input.triggerId));
         if (!sameAction) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different correction.");
         return { issuanceId: replay.issuanceId, kind: replay.type === "WRITTEN_OFF" ? "WRITTEN_OFF" as const : replay.type === "EXCEPTION_REVIEWED" ? "REVIEWED" as const : "CORRECTED" as const, from: null, to: replay.correctedEndReason, replayed: true };
       }
@@ -96,7 +96,7 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
       if (input.exceptionCode === "CORRECTION_NEEDS_REVIEW") {
         triggerId = (corrRows ?? []).filter((entry) => entry.type === "OUTCOME_CORRECTED").slice(-1)[0]?.id ?? null;
       } else {
-        triggerId = (await tx.assetLedgerEntry.findFirst({ where: { eventId, kind: "WAIVER", issuanceId: row.id }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id ?? null;
+        triggerId = (await tx.assetLedgerEntry.findFirst({ where: { eventId, kind: "WAIVER", issuanceId: row.id, ...(input.triggerId ? { id: input.triggerId } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id ?? null;
       }
       if (!triggerId) throw new AssetError("CORRECTION_INVALID", "That item has nothing of that kind to review.");
       await tx.assetIssuanceHistory.create({ data: { ...base, type: "EXCEPTION_REVIEWED", reviewedCode: input.exceptionCode, reviewedRefId: triggerId } });

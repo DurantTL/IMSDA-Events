@@ -88,12 +88,12 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       {report.exceptions.length === 0 ? <p>Every key and item is accounted for, every deposit is settled and no facility issue is open.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
         <caption className="sr-only">Unresolved items</caption>
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Exception</th><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Detail</th>{canManageMoney ? <th role="columnheader" scope="col">Resolve</th> : null}</tr></thead>
-        <tbody role="rowgroup">{report.exceptions.map((row) => <tr role="row" key={`${row.code}:${row.refId}`}>
+        <tbody role="rowgroup">{report.exceptions.map((row) => <tr role="row" key={`${row.code}:${row.refId}:${row.triggerId ?? ""}`}>
           <th role="rowheader" scope="row">{row.label}</th><td {...cardCell("Item")}>{row.subject}</td><td {...cardCell("Holder")}>{row.holderLabel ? holder({ holderLabel: row.holderLabel, deskAttendeeId: row.deskAttendeeId }) : ""}</td><td {...cardCell("Detail")}>{row.detail}</td>
           {canManageMoney ? <td {...cardCell(null)}>{row.code === "UNCHARGED_LOSS" || row.code === "REPLACED_UNACCOUNTED" ? <OutcomeForm busy={busy} current={row.code === "REPLACED_UNACCOUNTED" ? "REPLACED" : "LOST"} onSubmit={(body) => post("corrections", { ...body, issuanceId: row.refId }, "Saved. Nothing was refunded or charged.")} />
             : row.code === "CORRECTION_NEEDS_REVIEW" || row.code === "WAIVED_ON_INACTIVE_REGISTRATION" || row.code === "WAIVED_AFTER_REFUND"
               ? <ReviewForm busy={busy} depositId={row.code === "CORRECTION_NEEDS_REVIEW" ? row.depositId ?? null : null}
-                  onReview={(reason) => post("corrections", { action: "review", issuanceId: row.refId, exceptionCode: row.code, reason }, "Marked as reviewed. Nothing was refunded or charged.")}
+                  onReview={(reason) => post("corrections", { action: "review", issuanceId: row.refId, exceptionCode: row.code, ...(row.triggerId ? { triggerId: row.triggerId } : {}), reason }, "Marked as reviewed. Nothing was refunded or charged.")}
                   onRefund={(depositEntryId, amountCents, reason) => post("corrections", { action: "refund_after_correction", depositEntryId, amountCents, reason }, `Recorded ${formatCents(amountCents)} of the kept deposit handed back at the desk.`)} />
               : null}</td> : null}
         </tr>)}</tbody>

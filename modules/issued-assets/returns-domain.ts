@@ -166,6 +166,8 @@ export const correctionActionSchema = z.discriminatedUnion("action", [
     issuanceId: idSchema,
     /** Which exception is being reviewed: a review clears only that one. */
     exceptionCode: z.enum(reviewableExceptionCodes),
+    /** For a waiver exception: the waiver entry it answers (an item can have several). Omitted, the latest waiver. */
+    triggerId: idSchema.optional(),
     reason: reasonSchema,
     idempotencyKey: keySchema.optional(),
   }).strict(),

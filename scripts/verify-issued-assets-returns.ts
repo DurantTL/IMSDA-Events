@@ -328,14 +328,15 @@ async function main() {
   // Settle, then charge (keep-fees): the deposit already kept $4 for the damaged key, so the same loss is not charged in full as well.
   const erinL1 = (await issuanceOf(erin, "L-1")).id;
   await expectAssetError(postCharge(eventId, staffId, { action: "charge", issuanceId: erinL1, category: "REPLACEMENT", amountCents: 400, reason: "Standard fee", post: true }, CHECK_IN), "DEPOSIT_ALREADY_KEPT", "check-in staff charging the standard fee for a loss the deposit already kept money for");
-  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: false }, FINANCE), "DEPOSIT_ALREADY_KEPT", "finance charging without confirming the kept deposit");
-  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 300, reason: "Bent key", post: false, confirmKeptDeposit: true }, FINANCE), "CHARGE_NOT_ALLOWED", "a charge the kept deposit already covers");
+  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: true }, FINANCE), "DEPOSIT_ALREADY_KEPT", "finance charging without confirming the kept deposit");
+  await expectAssetError(postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 300, reason: "Bent key", post: true, confirmKeptDeposit: true }, FINANCE), "CHARGE_NOT_ALLOWED", "a charge the kept deposit already covers");
   assert((await prisma.assetLedgerEntry.count({ where: { eventId, kind: "CHARGE", issuanceId: erinL1 } })) === 0, "refused charges wrote nothing");
-  const recordOnly = await postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: false, confirmKeptDeposit: true }, FINANCE);
+  const erinTotalBefore = await registrationTotal(erin);
+  const recordOnly = await postCharge(eventId, financeId, { action: "charge", issuanceId: erinL1, category: "DAMAGE", amountCents: 1500, reason: "Bent key", post: true, confirmKeptDeposit: true }, FINANCE);
   const recordOnlyEntry = await prisma.assetLedgerEntry.findUniqueOrThrow({ where: { id: recordOnly.chargeEntryId } });
-  assert(!recordOnly.posted && recordOnly.offsetCents === 400 && recordOnlyEntry.amountCents === 1100 && recordOnlyEntry.depositOffsetCents === 400 && (await registrationTotal(erin)) === 0, "a confirmed charge is only the part above what the deposit kept, and recording it without posting leaves the registration alone");
+  assert(recordOnly.posted && recordOnly.offsetCents === 400 && recordOnlyEntry.amountCents === 1100 && recordOnlyEntry.depositOffsetCents === 400 && (await registrationTotal(erin)) === erinTotalBefore + 11, "a confirmed charge is only the part above what the deposit kept");
   const recordOnlyWaiver = await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: recordOnly.chargeEntryId, reason: "Within normal wear" }, FINANCE);
-  assert(!recordOnlyWaiver.reversedOnRegistration && (await registrationTotal(erin)) === 0, "waiving a record-only charge posts nothing");
+  assert(recordOnlyWaiver.reversedOnRegistration && (await registrationTotal(erin)) === erinTotalBefore, "waiving the charge takes it off the registration and restores what it offset");
   // Settle, then charge (keep-all): Bob's deposit was kept for the lost K-217.
   const bobTotal = await registrationTotal(bob);
   const bobLost = (await issuanceOf(bob, "K-217")).id;
@@ -591,6 +592,42 @@ async function main() {
   await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: inesLost, fate: "LOST", reason: "Not that key after all" }, FINANCE);
   assert((await inesCodes()).includes("CORRECTION_NEEDS_REVIEW"), "a later correction raises the exception again; the old review does not clear it");
 
+
+  // A record-only charge never takes a deposit offset: only posted charges count against what a deposit holds.
+  const kay = ada;
+  await issue(kay, ["K-258", "K-259"]);
+  const kayDeposit = await takeDeposit(kay, ["K-258", "K-259"], 1000);
+  await give([{ code: "K-258", outcome: "LOST", note: "Lost" }, { code: "K-259", outcome: "LOST", note: "Lost" }]);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: kayDeposit.depositEntryId })).keepCents === 1000, "two lost keys: $10 kept");
+  const kayK1 = (await issuanceOf(kay, "K-258")).id;
+  const kayK2 = (await issuanceOf(kay, "K-259")).id;
+  const kayRecorded = await postCharge(eventId, financeId, { action: "charge", issuanceId: kayK1, category: "REPLACEMENT", amountCents: 2500, reason: "Recorded only", post: false }, FINANCE);
+  assert(!kayRecorded.posted && kayRecorded.offsetCents === 0 && kayRecorded.amountCents === 2500 && (await chargeEntryOf(kayRecorded.chargeEntryId)).depositOffsetCents === 0, "a record-only charge takes no offset and records the full amount");
+  assert((await heldOf(kayDeposit.depositEntryId)) === 1000, "and the kept $10 is still held");
+  const kayTotalBefore = await registrationTotal(kay);
+  const kayPosted = await postCharge(eventId, financeId, { action: "charge", issuanceId: kayK2, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key", post: true, confirmKeptDeposit: true }, FINANCE);
+  assert(kayPosted.posted && kayPosted.amountCents === 1500 && kayPosted.offsetCents === 1000 && (await registrationTotal(kay)) - kayTotalBefore === 15 && (await heldOf(kayDeposit.depositEntryId)) === 0, "posting the second: $15 posted, $10 offset, nothing held");
+  await expectDatabaseRefusal(prisma.assetLedgerEntry.create({ data: { eventId, kind: "CHARGE", amountCents: 100, depositOffsetCents: 100, issuanceId: kayK1, chargeCategory: "DAMAGE", settlement: "RECORD_ONLY", reason: "Offset without posting", actorUserId: financeId, actorNameSnapshot: "Finance person", registrationId: kay.registrationId } }), "the database refusing an offset on a charge that was not posted");
+
+  // Two waivers on one item, both after the deposit was handed back: two exceptions, each cleared by its own review.
+  for (const identifier of ["L-9", "L-10"]) await applyAssetAction(eventId, adminId, { action: "create", typeId: lodgeType, identifier });
+  const jo = await makeReg(eventId);
+  await issue(jo, ["L-9", "L-10"]);
+  const joDeposit = await takeDeposit(jo, ["L-9", "L-10"], 1000);
+  await give([{ code: "L-9", outcome: "LOST", note: "Lost at the lake" }, { code: "L-10" }]);
+  const joLost = (await issuanceOf(jo, "L-9")).id;
+  const joReplace = await postCharge(eventId, financeId, { action: "charge", issuanceId: joLost, category: "REPLACEMENT", amountCents: 400, reason: "Standard fee", post: true }, FINANCE);
+  const joDamage = await postCharge(eventId, financeId, { action: "charge", issuanceId: joLost, category: "DAMAGE", amountCents: 300, reason: "Bent first", post: true }, FINANCE);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: joDeposit.depositEntryId })).outcome === "FULL_REFUND", "both charges excuse the loss: the deposit goes back");
+  const joWaiverA = await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: joReplace.chargeEntryId, reason: "Goodwill" }, FINANCE);
+  const joWaiverB = await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: joDamage.chargeEntryId, reason: "Goodwill too" }, FINANCE);
+  const joOpen = async () => (await getCloseoutReport(eventId)).exceptions.filter((row) => row.code === "WAIVED_AFTER_REFUND" && row.refId === joLost).map((row) => row.triggerId).sort();
+  assert(JSON.stringify(await joOpen()) === JSON.stringify([joWaiverA.waiverEntryId, joWaiverB.waiverEntryId].sort()), "two waivers after the refund: two exceptions");
+  await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: joLost, exceptionCode: "WAIVED_AFTER_REFUND", triggerId: joWaiverA.waiverEntryId, reason: "First waiver approved" }, FINANCE);
+  assert(JSON.stringify(await joOpen()) === JSON.stringify([joWaiverB.waiverEntryId]), "reviewing one waiver leaves the other");
+  await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: joLost, exceptionCode: "WAIVED_AFTER_REFUND", triggerId: joWaiverB.waiverEntryId, reason: "Second waiver approved" }, FINANCE);
+  assert((await joOpen()).length === 0, "reviewing the other clears it");
+
   // ---- A lot returned in part ---------------------------------------------------------------------
   const fay = await makeReg(eventId);
   const gus = await makeReg(eventId);
@@ -778,8 +815,8 @@ async function main() {
   const [received, handedBack, keptTotal] = await Promise.all([sumKind("DEPOSIT_RECEIVED"), sumKind("DEPOSIT_RETURNED"), sumKind("DEPOSIT_KEPT")]);
   const lateBack = (await prisma.assetLedgerEntry.aggregate({ where: { eventId, kind: "DEPOSIT_HANDED_BACK_LATE" }, _sum: { amountCents: true } }))._sum.amountCents ?? 0;
   assert(lateBack === 2000 && report.money.depositsReceivedCents === received && report.money.depositsHandedBackCents === handedBack + lateBack && report.money.depositsKeptCents === keptTotal - lateBack && report.money.depositsHeldCents === received - handedBack - keptTotal && report.money.depositsHeldCents === 2000, `deposits held versus returned reconcile (only Jules and Kim are still held): ${JSON.stringify(report.money)}`);
-  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 2500 + 1500 + 400 && report.money.waivedCents === 2500 + 1100 + 2500 + 2500 + 1500 + 400 && report.money.netChargedCents === 1500 + 2500 + 400 + 2500 + 2500, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
-  assert(report.charges.length === 11 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 6, "charges list their waivers");
+  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 2500 + 1500 + 400 + 2500 + 1500 + 400 + 300 && report.money.waivedCents === 2500 + 1100 + 2500 + 2500 + 1500 + 400 + 400 + 300 && report.money.netChargedCents === 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 1500, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
+  assert(report.charges.length === 15 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 8, "charges list their waivers");
   assert(report.exceptions.some((row) => row.code === "WAIVED_ON_INACTIVE_REGISTRATION" && row.subject.startsWith("K-244")), "a charge waived on a cancelled registration is flagged: the line is still on its total");
   assert(report.lost.find((row) => row.identifier === "TOWELS")?.quantity === 1, "a lot lost in part shows the quantity lost, not the quantity of the issue");
   assert(report.lost.some((row) => row.identifier === "K-241") && !report.lost.some((row) => row.identifier === "K-235" || row.identifier === "K-233"), "the closeout reads the corrected fates: a replaced original corrected to lost is lost, a found key is not");
