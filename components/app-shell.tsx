@@ -413,7 +413,7 @@ export function AppShell({
             );
           }
           return (
-            <Link className={isActive ? "active" : undefined} href={`${href}${eventQuery}`} key={href} aria-current={isActive ? "page" : undefined}>
+            <Link className={isActive ? "active" : undefined} href={`${href}${eventQuery}`} key={href} aria-current={isActive ? "page" : undefined} {...(mobileNavigationLabels[href] && mobileNavigationLabels[href] !== label ? { "aria-label": label, title: label } : {})}>
               <Icon aria-hidden="true" size={22} /><span>{mobileNavigationLabels[href] ?? label}</span>
             </Link>
           );

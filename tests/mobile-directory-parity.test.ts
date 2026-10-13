@@ -373,21 +373,21 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
       ),
     );
     const mobileNav = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
-    // At most five tabs (#711); Payments and Promo codes live in More.
+    // Five tabs (#711), plus Payments for finance staff (#890); Promo codes live in More.
     const hrefs = [...mobileNav.matchAll(/<a [^>]*href="([^"?]+)\?/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/overview", "/people", "/check-in", "/communications", "/more"]);
+    expect(hrefs).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
     const labels = [...mobileNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    expect(labels).toEqual(["Home", "People", "Check-in", "Emails", "More"]);
-    expect(mobileNav).not.toContain("/finance");
+    expect(labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
     expect(mobileNav).not.toContain("promo-codes");
   });
 
-  it("keeps Payments and Promo codes one tap from More, behind MANAGE_FINANCE (#711)", () => {
+  it("has no Payments card in More (it is a phone tab, #890); Promo codes stay behind MANAGE_FINANCE", () => {
     const base = { clubOversight: false, clubEvent: false, isSystemAdmin: false, clubFormsAccess: false, eventQuery: "?event=e1" };
-    const withFinance = buildMoreDirectoryCards({ ...base, permissions: ["MANAGE_FINANCE"] }).filter((card) => card.allowed);
-    expect(withFinance.map((card) => card.href)).toEqual(expect.arrayContaining(["/finance?event=e1", "/more/promo-codes?event=e1"]));
+    const withFinance = buildMoreDirectoryCards({ ...base, permissions: ["MANAGE_FINANCE"] });
+    const allowed = withFinance.filter((card) => card.allowed).map((card) => card.href);
+    expect(allowed).toContain("/more/promo-codes?event=e1");
+    expect(withFinance.map((card) => card.href)).not.toContain("/finance?event=e1");
     const without = buildMoreDirectoryCards({ ...base, permissions: ["VIEW_REPORTS"] }).filter((card) => card.allowed);
-    expect(without.map((card) => card.href)).not.toContain("/finance?event=e1");
     expect(without.map((card) => card.href)).not.toContain("/more/promo-codes?event=e1");
   });
 });

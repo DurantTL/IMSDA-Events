@@ -189,23 +189,23 @@ describe("System management and the event picker (#741 slice 4)", () => {
 });
 
 describe("phone tabs (#741 slice 4)", () => {
-  it("is Home, People, Check-in, Emails, More; People is the Registrations page", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/communications", "/more"]);
+  it("is Home, People, Check-in, Payments (finance only), Emails, More; People is the Registrations page", () => {
+    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
     expect(mobileNavigationLabels["/people"]).toBe("People");
     expect(navigation.find((item) => item.href === "/people")?.label).toBe("Registrations");
-    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "People", "Check-in", "Emails", "More"]);
-    expect(phoneTabs(systemAdmin).labels).toEqual(["Home", "People", "Check-in", "Emails", "More"]);
+    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
+    expect(phoneTabs(systemAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
   });
 
   it("hides tabs the viewer may not open, keeping the order", () => {
     expect(phoneTabs({ permissions: rolePermissions.CHECK_IN_STAFF }).labels).toEqual(["Home", "People", "Check-in", "More"]);
-    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "People", "More"]);
+    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "People", "Pay", "More"]);
     expect(phoneTabs({ permissions: rolePermissions.COMMUNICATIONS_MANAGER }).labels).toEqual(["Home", "Emails", "More"]);
     expect(phoneTabs({ permissions: rolePermissions.READ_ONLY_STAFF }).labels).toEqual(["Home"]);
   });
 
   it("selects More on child routes, Team and the other desktop-only pages included", () => {
-    for (const pathname of ["/more/event-settings", "/more/tags", "/more/reports", "/more/health", "/more/promo-codes", "/staff", "/imports", "/finance", "/registration-builder", "/community", "/more/clubs"]) {
+    for (const pathname of ["/more/event-settings", "/more/tags", "/more/reports", "/more/health", "/more/promo-codes", "/staff", "/imports", "/registration-builder", "/community", "/more/clubs"]) {
       expect(phoneTabs({ ...eventAdmin, pathname }).active, pathname).toEqual(["More"]);
     }
   });
@@ -213,6 +213,7 @@ describe("phone tabs (#741 slice 4)", () => {
   it("keeps a real tab selected on its own page and children", () => {
     expect(phoneTabs({ ...eventAdmin, pathname: "/people/abc" }).active).toEqual(["People"]);
     expect(phoneTabs({ ...eventAdmin, pathname: "/check-in" }).active).toEqual(["Check-in"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/finance/invoices" }).active).toEqual(["Pay"]);
     expect(mobileActiveTabHref("/more/health")).toBe("/more");
   });
 });

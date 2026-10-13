@@ -7,6 +7,8 @@ import {
   mobileActiveTabHref,
   mobileNavigationOrder,
   navigation,
+  orderedMobileTabs,
+  orderedSidebarItems,
 } from "@/components/staff-navigation";
 import { rolePermissions, type EventPermission } from "@/modules/access/permissions";
 import { areaClubPortalNavItems, clubPortalNavItems, clubReporterNavItems } from "@/modules/club-rosters/portal-nav";
@@ -51,14 +53,29 @@ describe("More launcher follows permitted destinations (#737)", () => {
 });
 
 describe("phone tab for child routes (#737)", () => {
-  it("keeps the five tabs in their order", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/communications", "/more"]);
+  it("keeps the tabs in their order, Payments being for finance staff (#890)", () => {
+    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
   });
 
   it("lights More for Settings, builder and other pages without a tab", () => {
-    for (const href of ["/more/event-settings", "/registration-builder", "/more/tags", "/more/attendee-configuration", "/more", "/more/promo-codes", "/finance", "/staff", "/imports"]) {
+    for (const href of ["/more/event-settings", "/registration-builder", "/more/tags", "/more/attendee-configuration", "/more", "/more/promo-codes", "/staff", "/imports"]) {
       expect(mobileActiveTabHref(href)).toBe("/more");
     }
+  });
+
+  it("shows the Payments tab only with MANAGE_FINANCE and keeps the phone bar to five tabs otherwise (#890)", () => {
+    const tabsFor = (permissions: EventPermission[]) =>
+      orderedMobileTabs(orderedSidebarItems(new Set(permissions), true)).map((item) => item.href);
+    expect(tabsFor(["MANAGE_FINANCE"])).toContain("/finance");
+    expect(tabsFor(["MANAGE_CHECK_IN", "MANAGE_COMMUNICATIONS", "VIEW_SENSITIVE_DATA"])).not.toContain("/finance");
+    expect(tabsFor(["MANAGE_CHECK_IN", "MANAGE_COMMUNICATIONS", "VIEW_SENSITIVE_DATA"])).toHaveLength(5);
+  });
+
+  it("lights Payments on /finance and its child pages, and More on Promo codes for a finance viewer (#890)", () => {
+    expect(mobileActiveTabHref("/finance", "/finance/invoices")).toBe("/finance");
+    expect(mobileActiveTabHref("/more/promo-codes", "/more/promo-codes")).toBe("/more");
+    const finance = orderedSidebarItems(new Set<EventPermission>(["MANAGE_FINANCE"]), true);
+    expect(finance.some((item) => item.href === "/more")).toBe(true);
   });
 
   it("leaves real tabs alone", () => {
