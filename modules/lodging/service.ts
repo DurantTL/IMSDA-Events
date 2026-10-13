@@ -148,7 +148,7 @@ export async function selectEventProperty(eventId: string, actorUserId: string, 
     const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true } });
     if (!event) throw new LodgingError("EVENT_NOT_FOUND", "That event was not found.");
     const property = await tx.lodgingProperty.findUnique({ where: { key: input.propertyKey } });
-    if (!property) throw new LodgingError("PROPERTY_UNKNOWN", "That lodging property is not set up. Run npm run lodging:sync.");
+    if (!property) throw new LodgingError("PROPERTY_UNKNOWN", "That lodging property is not set up. Ask a system administrator to load the lodging properties.");
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`lodging-select:${eventId}`}))`;
     const eventInclude = { event: { select: { startsAt: true, endsAt: true, timezone: true } } } as const;
     let eventLodging = await tx.eventLodging.findUnique({ where: { eventId }, include: eventInclude });

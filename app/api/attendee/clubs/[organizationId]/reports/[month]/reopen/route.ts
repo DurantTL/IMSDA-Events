@@ -15,7 +15,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
     if (!isReportMonth(month)) return Response.json({ error: "CLUB_REPORT_MONTH_INVALID", message: "That month isn't valid." }, { status: 400 });
     return Response.json({ report: await reopenClubReport(organizationId, month, actorAttribution(access.actor)) });
   } catch (error) {
-    return clubReportApiError(error, "Reopening the monthly report");
+    return clubReportApiError(error, "Reopening the Monthly Record");
   }
 }
 

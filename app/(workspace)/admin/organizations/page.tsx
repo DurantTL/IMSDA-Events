@@ -36,7 +36,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
         <Link className="secondary-button" href="/admin/organizations/import">Import from eAdventist</Link>
         <Link className="secondary-button" href="/admin/clubs/invites">Club invites</Link>
         <Link className="secondary-button" href="/admin/clubs/applications">New club applications</Link>
-        <Link className="secondary-button" href="/admin/clubs/reports">Monthly reports</Link>
+        <Link className="secondary-button" href="/admin/clubs/reports">Monthly Records</Link>
         <Link className="secondary-button" href="/admin/clubs/summary">Club summary</Link>
         <Link className="secondary-button" href="/admin/clubs/transfers">Member transfers</Link>
         <Link className="secondary-button" href="/admin/organizations/background-checks">Sterling Volunteers</Link>

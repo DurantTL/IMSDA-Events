@@ -28,7 +28,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
     <section className="page-stack">
       <div className="intro-actions club-admin-links">
         <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-        <Link className="secondary-button" href="/admin/clubs/reports">Monthly reports</Link>
+        <Link className="secondary-button" href="/admin/clubs/reports">Monthly Records</Link>
       </div>
       <div className="page-intro">
         <div>
@@ -44,7 +44,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       </div>
       <h3>Overview</h3>
       <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
-      <h3>Monthly reports</h3>
+      <h3>Monthly Records</h3>
       <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} />
       <h3>Points</h3>
       <AreaPointsChart basePath="/admin/clubs/summary" clubYear={clubYear} clubs={clubs} sort={parseLeaderboardSort(params.sort)} />

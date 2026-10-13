@@ -6,7 +6,7 @@ import { formatDueDate, noSubmittedReportMessage, isReportMonth, reportDueDate, 
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 
-export const metadata: Metadata = { title: "Monthly report", robots: { index: false, follow: false, nocache: true } };
+export const metadata: Metadata = { title: "Monthly Record", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
 /** A club's submitted monthly report, view only, for an Area Coordinator (#387). */

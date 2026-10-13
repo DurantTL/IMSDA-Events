@@ -101,7 +101,7 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clu
   return (
     <div className="report-table-wrap club-reports-grid">
       <table role="table" className="report-table table-cards">
-        <caption className="sr-only">Monthly report status and points by club for {clubYear}</caption>
+        <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
             <th role="columnheader" scope="col">Club</th>

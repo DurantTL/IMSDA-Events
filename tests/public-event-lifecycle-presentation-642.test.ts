@@ -30,6 +30,19 @@ describe("one lifecycle presentation per state (#642)", () => {
     expect(summary.emptyForms.title).toBe("Registration forms are being prepared");
   });
 
+  it("OPEN with no forms listed does not say registration is open", () => {
+    const summary = describePublicEventLifecycle(baseEvent, 96, openAt, false);
+    expect(summary).toMatchObject({
+      state: "OPEN",
+      statusLabel: "Registration opening soon",
+      ctaEnabled: false,
+    });
+    expect(summary.emptyForms.title).toBe("Registration forms are being prepared");
+    expect(summary.availability.heading).toBe("Registration opening soon");
+    expect(rendered(summary)).not.toContain("Registration open\"");
+    expect(rendered(summary)).not.toContain("Start registration");
+  });
+
   it("OPEN without a capacity limit lists none", () => {
     const summary = describePublicEventLifecycle({ ...baseEvent, capacity: null }, 96, openAt);
     expect(summary.availability.body).toBe("No event-wide capacity limit is listed.");
