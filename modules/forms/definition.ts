@@ -315,7 +315,7 @@ export const registrationFormDefinitionSchema = z.object({
     deposit: z.object({
       enabled: z.boolean(),
       amountCents: z.number().int().min(100).max(10_000_000),
-      optionValue: z.string().trim().min(1).max(120),
+      optionValue: z.string().trim().min(1, "Choose the payment option that means \"Pay a deposit now\".").max(120),
     }).optional(),
   }).optional(),
 }).superRefine((definition, context) => {

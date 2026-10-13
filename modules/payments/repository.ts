@@ -55,44 +55,52 @@ export async function recordManualPayment(
   if (registration.status !== "SUBMITTED" && registration.status !== "CONFIRMED") {
     throw new PaymentOperationError("REGISTRATION_NOT_PAYABLE");
   }
-  const netPaidCents = registration.payments.reduce((total, payment) => {
-    const refunds = payment.refunds.reduce((sum, refund) => sum + Math.round(Number(refund.amount) * 100), 0);
-    return total + Math.round(Number(payment.amount) * 100) - refunds;
-  }, 0);
-  const balanceCents = Math.max(Math.round(Number(registration.totalAmount) * 100) - netPaidCents, 0);
-  if (input.amountCents > balanceCents) throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");
   const isDeposit = input.isDeposit === true;
-  if (isDeposit) {
-    const problem = staffDepositProblem({
-      definition: registration.publicFormSubmission?.formVersion.definition,
-      balanceCents,
-      amountCents: input.amountCents,
-      payments: registration.payments,
-    });
-    if (problem) throw new PaymentOperationError(problem);
-  }
-
-  await prisma.$transaction(async (tx) => {
+  const definition = registration.publicFormSubmission?.formVersion.definition;
+  // The same checks, run twice: once here to refuse a bad request without opening a transaction, and again below
+  // against the rows read under the registration lock, which are the ones that decide.
+  function check(snapshot: { totalAmount: { toString(): string } | number; payments: NonNullable<typeof registration>["payments"] }) {
+    const netPaidCents = snapshot.payments.reduce((total, payment) => {
+      const refunds = payment.refunds.reduce((sum, refund) => sum + Math.round(Number(refund.amount) * 100), 0);
+      return total + Math.round(Number(payment.amount) * 100) - refunds;
+    }, 0);
+    const balanceCents = Math.max(Math.round(Number(snapshot.totalAmount) * 100) - netPaidCents, 0);
+    if (input.amountCents > balanceCents) throw new PaymentOperationError("PAYMENT_EXCEEDS_BALANCE");
     if (isDeposit) {
-      // Serializes deposits on this registration: a repeated submission (a double click, a retry after a timeout)
-      // waits here, then finds the deposit the first one recorded and is refused instead of holding it twice.
-      await tx.$queryRaw`
-        SELECT "id" FROM "Registration"
-        WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
-        FOR NO KEY UPDATE
-      `;
-      const recorded = await tx.payment.findMany({
-        where: { registrationId, status: "SUCCEEDED", isDeposit: true },
-        include: { refunds: { where: { status: "SUCCEEDED" } } },
-      });
       const problem = staffDepositProblem({
-        definition: registration.publicFormSubmission?.formVersion.definition,
+        definition,
         balanceCents,
         amountCents: input.amountCents,
-        payments: recorded,
+        payments: snapshot.payments,
       });
       if (problem) throw new PaymentOperationError(problem);
     }
+    return balanceCents;
+  }
+  check(registration);
+
+  await prisma.$transaction(async (tx) => {
+    // Serializes money movement on this registration. A repeated submission (a double click, a retry after a
+    // timeout), a second staff member, and a card payment finishing at the same moment all wait here, then see what
+    // the first recorded: the balance is recomputed from the locked rows, and a deposit cannot be recorded twice.
+    await tx.$queryRaw`
+      SELECT "id" FROM "Registration"
+      WHERE "id" = ${registrationId} AND "eventId" = ${eventId}
+      FOR NO KEY UPDATE
+    `;
+    const locked = await tx.registration.findFirst({
+      where: { id: registrationId, eventId },
+      select: { status: true, totalAmount: true },
+    });
+    if (!locked) throw new PaymentOperationError("REGISTRATION_NOT_FOUND");
+    if (locked.status !== "SUBMITTED" && locked.status !== "CONFIRMED") {
+      throw new PaymentOperationError("REGISTRATION_NOT_PAYABLE");
+    }
+    const lockedPayments = await tx.payment.findMany({
+      where: { registrationId, status: "SUCCEEDED" },
+      include: { refunds: { where: { status: "SUCCEEDED" } } },
+    });
+    const balanceCents = check({ totalAmount: locked.totalAmount, payments: lockedPayments });
     const payment = await tx.payment.create({
       data: {
         eventId,

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getRegistrationById: vi.fn(),
   invalidateHosted: vi.fn(),
   flushHosted: vi.fn(),
+  dispatchAlerts: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -23,6 +24,7 @@ vi.mock("@/modules/communications/transactional-messages", () => ({
 vi.mock("@/modules/communications/messaging-repository", () => ({
   processQueuedMessageIdsAfterCommit: mocks.processQueuedMessageIdsAfterCommit,
 }));
+vi.mock("@/modules/operations/alerting", () => ({ dispatchAlerts: mocks.dispatchAlerts }));
 vi.mock("@/modules/registrations/repository", () => ({
   getRegistrationById: mocks.getRegistrationById,
 }));
@@ -37,6 +39,7 @@ import {
   createPublicSquarePayment,
   getPublicSquareCheckout,
 } from "@/modules/payments/square-repository";
+import { createPublicSquarePaymentLink } from "@/modules/payments/square-hosted-repository";
 
 const configuration: SquareRuntimeConfiguration = {
   environment: "sandbox",
@@ -99,7 +102,7 @@ function registration(over: {
     confirmationCode: "CM27-ONE",
     status: "SUBMITTED",
     totalAmount: over.totalAmount ?? 300,
-    event: { billingMode: "ATTENDEE_PAY", hostedPaymentLinkEnabled: false },
+    event: { billingMode: "ATTENDEE_PAY", hostedPaymentLinkEnabled: true },
     contactSnapshot: { firstName: "Test", lastName: "Registrant", email: "test.registrant@example.test", phone: "" },
     accountHolderPerson: { firstName: "Test", lastName: "Registrant", normalizedEmail: "test.registrant@example.test", phone: null },
     payments: over.payments ?? [],
@@ -154,6 +157,7 @@ function attemptFor(over: Record<string, unknown> = {}) {
 
 function transactionClient(loaded = registration()) {
   return {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     registration: {
       findUnique: vi.fn().mockResolvedValue(loaded),
       update: vi.fn().mockResolvedValue({ totalAmount: 302.26 }),
@@ -161,17 +165,20 @@ function transactionClient(loaded = registration()) {
     paymentAttempt: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       update: vi.fn(),
     },
     payment: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-    squareDuplicateCharge: {
-      findUnique: vi.fn().mockResolvedValue(null),
-      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
     squareHostedCheckout: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(null),
+      update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    squareDuplicateCharge: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
@@ -351,35 +358,38 @@ describe("card deposit checkout (#415)", () => {
   });
 });
 
-describe("staff-recorded check deposit (#415)", () => {
-  function staffClient(options: { payments?: PaymentRow[]; recorded?: PaymentRow[]; definition?: unknown } = {}) {
-    const tx = {
-      $queryRaw: vi.fn().mockResolvedValue([]),
-      payment: {
-        findMany: vi.fn().mockResolvedValue(options.recorded ?? []),
-        create: vi.fn().mockResolvedValue({ id: "payment-new" }),
-      },
-      auditLog: { create: vi.fn().mockResolvedValue({}) },
-    };
-    const prisma = {
-      registration: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: "registration-1",
-          eventId: "event-1",
-          confirmationCode: "CM27-ONE",
-          status: "SUBMITTED",
-          totalAmount: 300,
-          payments: options.payments ?? [],
-          publicFormSubmission: { formVersion: { definition: options.definition ?? formDefinition } },
-        }),
-      },
-      $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
-    };
-    mocks.getPrisma.mockReturnValue(prisma);
-    mocks.getRegistrationById.mockResolvedValue({ id: "registration-1" });
-    return { tx, prisma };
-  }
+function staffClient(options: { payments?: PaymentRow[]; locked?: PaymentRow[]; lockedTotal?: number; definition?: unknown } = {}) {
+  const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    registration: {
+      findFirst: vi.fn().mockResolvedValue({ status: "SUBMITTED", totalAmount: options.lockedTotal ?? 300 }),
+    },
+    payment: {
+      findMany: vi.fn().mockResolvedValue(options.locked ?? options.payments ?? []),
+      create: vi.fn().mockResolvedValue({ id: "payment-new" }),
+    },
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
+  };
+  const prisma = {
+    registration: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: "registration-1",
+        eventId: "event-1",
+        confirmationCode: "CM27-ONE",
+        status: "SUBMITTED",
+        totalAmount: 300,
+        payments: options.payments ?? [],
+        publicFormSubmission: { formVersion: { definition: options.definition ?? formDefinition } },
+      }),
+    },
+    $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
+  };
+  mocks.getPrisma.mockReturnValue(prisma);
+  mocks.getRegistrationById.mockResolvedValue({ id: "registration-1" });
+  return { tx, prisma };
+}
 
+describe("staff-recorded check deposit (#415)", () => {
   it("records the mailed check as the deposit, audited, and leaves the rest as the balance", async () => {
     const { tx } = staffClient();
     await recordManualPayment("event-1", "registration-1", "user-1", {
@@ -415,7 +425,7 @@ describe("staff-recorded check deposit (#415)", () => {
     expect(first.prisma.$transaction).not.toHaveBeenCalled();
 
     // The locked re-read inside the transaction is what stops two simultaneous submissions.
-    const raced = staffClient({ recorded: [{ amount: 65, isDeposit: true, refunds: [] }] });
+    const raced = staffClient({ locked: [{ amount: 65, isDeposit: true, refunds: [] }] });
     await expect(recordManualPayment("event-1", "registration-1", "user-1", {
       amountCents: 6500, method: "CHECK", reference: "", isDeposit: true,
     })).rejects.toMatchObject({ code: "DEPOSIT_ALREADY_RECORDED" });
@@ -433,5 +443,193 @@ describe("staff-recorded check deposit (#415)", () => {
     await expect(recordManualPayment("event-1", "registration-1", "user-1", {
       amountCents: 6500, method: "CHECK", reference: "", isDeposit: true,
     })).rejects.toMatchObject({ code: "DEPOSIT_NOT_OFFERED" });
+  });
+});
+
+describe("money movement under the registration lock (#415)", () => {
+  function staffInputs(over: Partial<{ amountCents: number; isDeposit: boolean }> = {}) {
+    return { amountCents: 6500, method: "CHECK" as const, reference: "", isDeposit: false, ...over };
+  }
+
+  it("recomputes the balance from the locked rows, not the pre-transaction read", async () => {
+    // Nothing paid when the request was first checked, but $280 landed before the lock was taken.
+    const { tx } = staffClient({ locked: [{ amount: 280, refunds: [] }] });
+    await expect(recordManualPayment("event-1", "registration-1", "user-1", staffInputs()))
+      .rejects.toMatchObject({ code: "PAYMENT_EXCEEDS_BALANCE" });
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.payment.create).not.toHaveBeenCalled();
+  });
+
+  it("takes the lock for an ordinary payment too, and audits the balance it actually saw", async () => {
+    const { tx } = staffClient({ locked: [{ amount: 100, refunds: [] }] });
+    await recordManualPayment("event-1", "registration-1", "user-1", staffInputs({ isDeposit: true }));
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({ balanceBeforeCents: 20_000, balanceAfterCents: 13_500 }),
+      }),
+    });
+  });
+
+  it("holds a card deposit that finishes after a check deposit as a duplicate: no fee, no second hold", async () => {
+    const checkDeposit = { id: "payment-check", amount: 65, isDeposit: true, refunds: [] };
+    const tx = transactionClient(registration({ method: "Pay later" }));
+    const attempt = attemptFor();
+    tx.registration.findUnique
+      .mockResolvedValueOnce(registration({ method: "Pay later" }) as never)
+      // Under the lock, the success path sees the check deposit staff recorded meanwhile.
+      .mockResolvedValue({ ...registration({ method: "Pay later" }), payments: [checkDeposit] } as never);
+    tx.paymentAttempt.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(attempt);
+    tx.paymentAttempt.create.mockResolvedValue(attempt);
+    tx.paymentAttempt.update.mockResolvedValue({ ...attempt, status: "SUCCEEDED", duplicateReason: "DEPOSIT_ALREADY_RECORDED" });
+    tx.payment.create.mockResolvedValue({ id: "payment-card" });
+    mocks.getPrisma.mockReturnValue(prismaFor(tx));
+
+    await createPublicSquarePayment(
+      token,
+      { sourceId: "cnon:card-nonce-ok", idempotencyKey: attempt.clientIdempotencyKey, kind: "DEPOSIT" },
+      {
+        configuration,
+        createPayment: vi.fn().mockResolvedValue({
+          id: "square-payment-9", status: "COMPLETED", amountCents: 6726, currency: "USD",
+          createdAt: "2027-03-30T13:00:00.000Z", updatedAt: "2027-03-30T13:00:01.000Z",
+        }),
+        now: new Date("2027-03-30T13:00:01.000Z"),
+      },
+    );
+
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    expect(tx.squareDuplicateCharge.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reason: "DEPOSIT_ALREADY_RECORDED", winningPaymentId: "payment-check" }),
+    });
+    // Held for review: pending payment (not counted), no fee on the total, no receipt, staff paged.
+    expect(tx.payment.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "PENDING" }) });
+    expect(tx.registration.update).not.toHaveBeenCalled();
+    expect(mocks.enqueuePaymentReceiptMessage).not.toHaveBeenCalled();
+    expect(mocks.dispatchAlerts).toHaveBeenCalled();
+  });
+
+  it("audits a completed card deposit as the deposit, and words the fee for a deposit", async () => {
+    const tx = transactionClient(registration({ method: "Pay later" }));
+    const attempt = attemptFor();
+    const succeeded = {
+      ...attempt, paymentId: "payment-1", activeRegistrationKey: null, status: "SUCCEEDED",
+      providerPaymentId: "square-payment-1", providerStatus: "COMPLETED",
+      payment: { id: "payment-1", amount: 67.26, isDeposit: true, status: "SUCCEEDED", method: "CARD_REFERENCE", receivedAt: new Date() },
+    };
+    tx.paymentAttempt.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(attempt);
+    tx.paymentAttempt.create.mockResolvedValue(attempt);
+    tx.paymentAttempt.update.mockResolvedValue(succeeded);
+    tx.payment.create.mockResolvedValue(succeeded.payment);
+    mocks.getPrisma.mockReturnValue(prismaFor(tx));
+    await createPublicSquarePayment(
+      token,
+      { sourceId: "cnon:card-nonce-ok", idempotencyKey: attempt.clientIdempotencyKey, kind: "DEPOSIT" },
+      {
+        configuration,
+        createPayment: vi.fn().mockResolvedValue({
+          id: "square-payment-1", status: "COMPLETED", amountCents: 6726, currency: "USD",
+          createdAt: "2027-03-30T13:00:00.000Z", updatedAt: "2027-03-30T13:00:01.000Z",
+        }),
+        now: new Date("2027-03-30T13:00:01.000Z"),
+      },
+    );
+    const audits = tx.auditLog.create.mock.calls.map((call) => (call[0] as { data: Record<string, unknown> }).data);
+    expect(audits.find((data) => data.action === "SQUARE_PAYMENT_COMPLETED")?.metadata)
+      .toMatchObject({ isDeposit: true, paymentKind: "DEPOSIT" });
+    const fee = audits.find((data) => data.action === "REGISTRATION_CARD_SURCHARGE_APPLIED");
+    expect(fee?.summary).toContain("reservation deposit");
+    expect(fee?.metadata).toMatchObject({ isDeposit: true, paymentKind: "DEPOSIT", surchargeCents: 226 });
+  });
+});
+
+describe("Pay on Square deposit links (#415)", () => {
+  const returnId = "R".repeat(43);
+  const linkKey = "11111111-2222-4333-8444-555555555555";
+  const appBaseUrl = "https://events.imsda.test";
+
+  function hostedAttempt(over: Record<string, unknown> = {}) {
+    return attemptFor({
+      channel: "HOSTED_LINK",
+      activeRegistrationKey: null,
+      hostedCheckout: {
+        id: "hosted-1", status: "CREATING", checkoutUrl: null,
+        expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+        returnTokenHash: "hash",
+      },
+      ...over,
+    }) as ReturnType<typeof attemptFor> & { hostedCheckout: Record<string, unknown> };
+  }
+
+  function hostedTx(loaded = registration({ method: "Pay later" })) {
+    const tx = transactionClient(loaded);
+    tx.paymentAttempt.findUnique.mockResolvedValue(null);
+    mocks.getPrisma.mockReturnValue(prismaFor(tx));
+    return tx;
+  }
+
+  it("creates a deposit link for the deposit plus its fee, marked as the deposit", async () => {
+    const tx = hostedTx();
+    const created = hostedAttempt();
+    tx.paymentAttempt.create.mockResolvedValue(created);
+    tx.paymentAttempt.findUnique.mockImplementation(async ({ where }: { where: { id?: string } }) => (where.id ? created : null));
+    tx.squareHostedCheckout.update.mockResolvedValue({ ...created.hostedCheckout, status: "ACTIVE", checkoutUrl: "https://sandbox.square.link/u/dep" });
+    const createLink = vi.fn().mockResolvedValue({ id: "LINK-1", orderId: "ORDER-1", url: "https://sandbox.square.link/u/dep" });
+
+    const link = await createPublicSquarePaymentLink(
+      token,
+      { idempotencyKey: linkKey, returnId, kind: "DEPOSIT" },
+      { configuration, createLink, appBaseUrl, now: new Date("2027-03-30T13:00:00.000Z") },
+    );
+
+    expect(tx.paymentAttempt.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ channel: "HOSTED_LINK", isDeposit: true, amountCents: 6726, surchargeCents: 226 }),
+    }));
+    expect(createLink).toHaveBeenCalledWith(configuration, expect.objectContaining({ amountCents: 6726 }));
+    expect(link).toMatchObject({ amountCents: 6726, surchargeCents: 226 });
+  });
+
+  it("does not reuse an open balance link for a deposit, but reuses an open deposit link", async () => {
+    const openBalance = hostedAttempt({
+      id: "attempt-balance", isDeposit: false, amountCents: 30_927, surchargeCents: 927,
+      hostedCheckout: { id: "hosted-b", status: "ACTIVE", checkoutUrl: "https://sandbox.square.link/u/bal", expiresAt: new Date("2099-01-01T00:00:00.000Z"), returnTokenHash: "hash" },
+    });
+    const tx = hostedTx();
+    tx.paymentAttempt.findMany.mockResolvedValue([openBalance]);
+    const fresh = hostedAttempt({ id: "attempt-new" });
+    tx.paymentAttempt.create.mockResolvedValue(fresh);
+    tx.paymentAttempt.findUnique.mockImplementation(async ({ where }: { where: { id?: string } }) => (where.id ? fresh : null));
+    tx.squareHostedCheckout.update.mockResolvedValue({ ...fresh.hostedCheckout, status: "ACTIVE", checkoutUrl: "https://sandbox.square.link/u/dep" });
+    const createLink = vi.fn().mockResolvedValue({ id: "LINK-2", orderId: "ORDER-2", url: "https://sandbox.square.link/u/dep" });
+    await createPublicSquarePaymentLink(token, { idempotencyKey: linkKey, returnId, kind: "DEPOSIT" }, { configuration, createLink, appBaseUrl });
+    expect(tx.paymentAttempt.create).toHaveBeenCalledTimes(1);
+    expect(mocks.invalidateHosted).toHaveBeenCalledWith(tx, expect.objectContaining({ reason: "SUPERSEDED_BY_NEW_LINK" }));
+
+    const openDeposit = hostedAttempt({
+      id: "attempt-deposit",
+      hostedCheckout: { id: "hosted-d", status: "ACTIVE", checkoutUrl: "https://sandbox.square.link/u/dep", expiresAt: new Date("2099-01-01T00:00:00.000Z"), returnTokenHash: "hash" },
+    });
+    const again = hostedTx();
+    again.paymentAttempt.findMany.mockResolvedValue([openDeposit]);
+    const reuseLink = vi.fn();
+    const reused = await createPublicSquarePaymentLink(token, { idempotencyKey: "99999999-2222-4333-8444-555555555555", returnId, kind: "DEPOSIT" }, { configuration, createLink: reuseLink, appBaseUrl });
+    expect(reused).toMatchObject({ url: "https://sandbox.square.link/u/dep", amountCents: 6726 });
+    expect(again.paymentAttempt.create).not.toHaveBeenCalled();
+    expect(reuseLink).not.toHaveBeenCalled();
+  });
+
+  it("refuses a deposit link once the deposit is recorded instead of linking the whole balance", async () => {
+    const tx = hostedTx(registration({
+      method: "Pay later", totalAmount: 302.26,
+      payments: [{ amount: 67.26, isDeposit: true, refunds: [] }],
+    }));
+    const createLink = vi.fn();
+    await expect(createPublicSquarePaymentLink(token, { idempotencyKey: linkKey, returnId, kind: "DEPOSIT" }, { configuration, createLink, appBaseUrl }))
+      .rejects.toMatchObject({ code: "DEPOSIT_UNAVAILABLE" });
+    expect(tx.paymentAttempt.create).not.toHaveBeenCalled();
+    expect(createLink).not.toHaveBeenCalled();
   });
 });

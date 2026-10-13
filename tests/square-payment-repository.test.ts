@@ -154,6 +154,7 @@ function processingAttempt() {
 
 function transactionClient() {
   return {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     registration: {
       findUnique: vi.fn().mockResolvedValue(registration()),
       update: vi.fn().mockResolvedValue({ totalAmount: 102.7 }),

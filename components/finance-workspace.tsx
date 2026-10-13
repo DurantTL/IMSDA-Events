@@ -242,9 +242,12 @@ export function FinanceWorkspace({
                 )}
                 {selected.deposit && !selected.isDeferredOrganizationBilling && (
                   <div className="inline-notice" data-testid="reservation-deposit">
+                    {/* "Held" means a deposit is recorded. Whether paying in full also holds the reservation is an owner decision (#415), so a fully paid registration with no deposit says so rather than "not held". */}
                     {selected.deposit.held
                       ? <><strong>Reservation held.</strong> Deposit recorded: {money(selected.deposit.recordedCents)}.</>
-                      : <><strong>Reservation not held yet.</strong> The deposit of {money(selected.deposit.dueCents)} has not been recorded.</>}
+                      : selected.balanceCents <= 0
+                        ? <><strong>Paid in full.</strong> No separate deposit was recorded.</>
+                        : <><strong>Reservation not held yet.</strong> The deposit of {money(selected.deposit.dueCents)} has not been recorded.</>}
                     {canManage && !selected.deposit.held && selected.deposit.dueCents > 0 && activeFinancialStatuses.has(selected.status) && (
                       <> <button className="text-button" type="button" onClick={() => { setDepositFirst(true); setError(""); setModal("payment"); }}>Record deposit</button></>
                     )}

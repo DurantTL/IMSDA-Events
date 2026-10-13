@@ -200,6 +200,8 @@ export async function prepareEmailBodyForDelivery(
     renewExpired: input.templateKey === "REGISTRATION_ACCESS_RECOVERY",
   });
   const manageUrl = new URL(access.managePath, appBaseUrl).toString();
+  // A balance reminder opens the pay page on the whole balance, not on the deposit a registrant chose on the form (#415).
+  const manageLinkUrl = input.templateKey === "BALANCE_REMINDER" ? `${manageUrl}?pay=balance` : manageUrl;
   // One token serves both the page a registrant opens and the pass image their
   // mail client fetches, so a confirmation carries a single grant of access.
   const manageApiUrl = new URL(
@@ -208,7 +210,7 @@ export async function prepareEmailBodyForDelivery(
   ).toString();
   const resolveSentinels = (value: string) => value
     .replaceAll(REGISTRATION_MANAGE_API_SENTINEL, manageApiUrl)
-    .replaceAll(REGISTRATION_MANAGE_LINK_SENTINEL, manageUrl);
+    .replaceAll(REGISTRATION_MANAGE_LINK_SENTINEL, manageLinkUrl);
   return {
     bodyText: resolveSentinels(input.bodyText),
     bodyHtml: input.bodyHtml ? resolveSentinels(input.bodyHtml) : null,

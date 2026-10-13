@@ -716,6 +716,14 @@ async function successConflict(
   tx: Prisma.TransactionClient,
   attempt: AttemptRecord,
 ) {
+  // The same row lock staff payment recording takes (`recordManualPayment`): a card payment finishing while staff
+  // record a check deposit waits for it, then reads the deposit it recorded and is held as a duplicate, so the
+  // reservation is never held twice.
+  await tx.$queryRaw`
+    SELECT "id" FROM "Registration"
+    WHERE "id" = ${attempt.registrationId}
+    FOR NO KEY UPDATE
+  `;
   const registration = await tx.registration.findUnique({
     where: { id: attempt.registrationId },
     select: {
@@ -1014,6 +1022,8 @@ async function applyProviderPayment(
           amountCents: attempt.amountCents,
           currency: attempt.currency,
           paymentAttemptId: attempt.id,
+          isDeposit: attempt.isDeposit,
+          paymentKind: attempt.isDeposit ? "DEPOSIT" : "BALANCE",
           source,
         },
       },
@@ -1055,10 +1065,14 @@ async function applyProviderPayment(
         entityType: "Registration",
         entityId: attempt.registrationId,
         correlationId: randomUUID(),
-        summary: `Added the card processing fee to registration ${attempt.registration.confirmationCode} when its pay-later balance was settled by card.`,
+        summary: attempt.isDeposit
+          ? `Added the card processing fee on the reservation deposit to registration ${attempt.registration.confirmationCode} when the deposit was paid by card.`
+          : `Added the card processing fee to registration ${attempt.registration.confirmationCode} when its pay-later balance was settled by card.`,
         metadata: {
           paymentAttemptId: attempt.id,
           paymentId: payment.id,
+          isDeposit: attempt.isDeposit,
+          paymentKind: attempt.isDeposit ? "DEPOSIT" : "BALANCE",
           surchargeCents: attempt.surchargeCents,
           chargedAmountCents: attempt.amountCents,
           resultingTotalCents: moneyToCents(registration.totalAmount),

@@ -368,3 +368,16 @@ deposit now"). The logic lives in `modules/payments/deposit-domain.ts`.
   deposit payment's net amount (after refunds) is above zero. It cannot be set
   without a recorded deposit. Forfeiting a deposit belongs to the cancellation
   rules (#169-#171) and is not built here.
+- "Held" means a recorded deposit and nothing else for now. A registration
+  paid in full with no deposit payment shows "Paid in full" on Payments, not
+  "held"; whether full payment should also hold the reservation is an owner
+  decision.
+- Balance reminders open the pay page with `?pay=balance`, so it quotes the
+  whole balance; the deposit is the default only when the registrant arrives
+  from the form's deposit choice.
+- Fees already added by earlier card payments (a card deposit, a pay-later
+  settlement) stay in the total when an amendment re-prices the registration
+  (`applied-surcharge.ts`).
+- Staff payment recording and the card success path both take a
+  `FOR NO KEY UPDATE` lock on the registration and read the balance and deposit
+  under it, so a check deposit and a card deposit cannot both be recorded.

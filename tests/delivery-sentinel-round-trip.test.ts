@@ -188,3 +188,18 @@ describe("delivery sentinel round trip", () => {
     expect(forged).not.toContain("<img");
   });
 });
+
+describe("balance reminder link (#415)", () => {
+  const bodyText = `Pay here: ${REGISTRATION_MANAGE_LINK_SENTINEL}`;
+  const base = { messageId: "message-balance", registrationId: "registration-1", bodyText, now: new Date("2026-08-01T00:00:00.000Z") };
+
+  it("opens the pay page on the balance, not on the deposit chosen on the form", async () => {
+    const reminder = await prepareEmailBodyForDelivery({ ...base, templateKey: "BALANCE_REMINDER" });
+    expect(reminder.bodyText).toBe(`Pay here: https://events.imsda.test/manage/${issuedToken}?pay=balance`);
+  });
+
+  it("leaves every other message's private link untouched", async () => {
+    const other = await prepareEmailBodyForDelivery({ ...base, templateKey: "REGISTRATION_CONFIRMATION_PAID" });
+    expect(other.bodyText).toBe(`Pay here: https://events.imsda.test/manage/${issuedToken}`);
+  });
+});

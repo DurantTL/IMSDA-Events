@@ -235,9 +235,12 @@ export function PublicSquarePayment({
   token,
   manageEndpoint: explicitManageEndpoint,
   staffPreview = false,
+  initialKind,
 }: {
   token?: string;
   manageEndpoint?: string;
+  /** Open on the whole balance (a balance reminder link) instead of the deposit the form chose (#415). */
+  initialKind?: "BALANCE" | "DEPOSIT";
   /** True only in a staff preview session; the public never sees the test-mode line. */
   staffPreview?: boolean;
 }) {
@@ -286,7 +289,7 @@ export function PublicSquarePayment({
   } | null>(null);
 
   // The registrant's own pick between a deposit and the whole balance (#415); null leaves the server to choose.
-  const kindRef = useRef<"BALANCE" | "DEPOSIT" | null>(null);
+  const kindRef = useRef<"BALANCE" | "DEPOSIT" | null>(initialKind ?? null);
   const loadCheckout = useCallback(async () => {
     try {
       setCheckout(await fetchCheckout(paymentEndpoint, kindRef.current));
@@ -299,7 +302,7 @@ export function PublicSquarePayment({
 
   useEffect(() => {
     let active = true;
-    void fetchCheckout(paymentEndpoint).then(
+    void fetchCheckout(paymentEndpoint, kindRef.current).then(
       (nextCheckout) => {
         if (!active) return;
         setReturnId(readReturnId());
