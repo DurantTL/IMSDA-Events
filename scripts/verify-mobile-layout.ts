@@ -1216,16 +1216,24 @@ function coveredByBarInPage() {
   return lowest > barTop + 1 ? `${lowestName} ends at ${Math.round(lowest)}px, under a bar starting at ${Math.round(barTop)}px` : null;
 }
 
-/** Runs in the page with a dialog open: does it fit the screen, or scroll inside itself? */
 /**
  * Form-field boundaries (WCAG 2.2 SC 1.4.11, 3:1): every visible text-like input, select, textarea and
  * search box has a boundary, either its own border or the border of its nearest wrapper within two
  * levels (the wrapper IS the field for `.search-field`, `.money-input` and the like), and that border
  * is at least `minRatio`:1 against the background behind it. Colours come from computed styles; a
  * translucent border is composited over that background first, and a gradient background (the sidebar)
- * is tested at each of its colour stops.
+ * is tested at each of its colour stops. With `dialogOnly`, only fields inside an open dialog
+ * (`[role="dialog"], [aria-modal="true"]`) are scanned; the page behind it was already checked.
+ *
+ * Known blind spots (a pass is not a guarantee): the check measures the border against what is
+ * behind the field, not the fill (a field whose white fill sits on a white page relies on the border
+ * alone, which is the point, but a border that is fine against the page and weak against the fill is
+ * not reported); `background-image: url(...)` backgrounds are ignored, only gradient colour stops
+ * count; a field with only an underline (a bottom border) is reported as having no boundary rather
+ * than measured; custom widgets that draw their own box with no input inside (a div acting as a
+ * textbox) are not found because only input, select and textarea elements are scanned.
  */
-function fieldBoundaryInPage(args: { minRatio: number }) {
+function fieldBoundaryInPage(args: { minRatio: number; dialogOnly?: boolean }) {
   type Rgba = { r: number; g: number; b: number; a: number };
   const parse = (value: string): Rgba | null => {
     const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/.exec(value);
@@ -1318,7 +1326,10 @@ function fieldBoundaryInPage(args: { minRatio: number }) {
   const skipTypes = new Set(["checkbox", "radio", "range", "file", "color", "hidden", "button", "submit", "reset", "image"]);
   const problems: string[] = [];
   let checked = 0;
-  for (const el of Array.from(document.querySelectorAll("input, select, textarea"))) {
+  const roots: ParentNode[] = args.dialogOnly ? Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')) : [document];
+  const candidates = new Set<Element>();
+  for (const root of roots) for (const found of Array.from(root.querySelectorAll("input, select, textarea"))) candidates.add(found);
+  for (const el of Array.from(candidates)) {
     const field = el as HTMLInputElement;
     if (el.tagName === "INPUT" && skipTypes.has(field.type)) continue;
     if (field.disabled || !visible(el) || hiddenTree(el)) continue;
@@ -1345,6 +1356,7 @@ function fieldBoundaryInPage(args: { minRatio: number }) {
   return { checked, problems: problems.slice(0, 12) };
 }
 
+/** Runs in the page with a dialog open: does it fit the screen, or scroll inside itself? */
 function dialogFitInPage() {
   const h = window.innerHeight;
   const w = window.innerWidth;
@@ -1490,7 +1502,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       if (fit.count === 0) console.log(`  note  ${label}: "${name}" opened no dialog`);
       for (const problem of fit.problems) record("dialog-too-tall", spec.name, width, `"${name}": ${problem}`);
       if (fit.count > 0) {
-        const dialogFields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
+        const dialogFields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio, dialogOnly: true });
         fieldsChecked += dialogFields.checked;
         for (const problem of dialogFields.problems) record("field-boundary", `${spec.name} (dialog "${name}")`, width, problem);
       }

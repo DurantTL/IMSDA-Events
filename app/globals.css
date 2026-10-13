@@ -66,13 +66,15 @@
 
 /* Form fields on the staff workspace and the account portal: every text-like
    input, select and textarea has a visible boundary by default (WCAG 2.2 SC
-   1.4.11, 3:1). Specificity is zero (:where), so the component rules below
-   still set size, padding and state colours; they take their border colour
-   from --field-border. Checkbox, radio, range, file, colour, button-like and
-   hidden inputs keep their native look. Wrappers that draw the border for a
-   borderless inner input (.search-field, .filter-field, .money-input, ...)
-   carry the same border. scripts/verify-mobile-layout.ts checks every field
-   of every audited page. */
+   1.4.11, 3:1). Every rule in this block has zero specificity (the whole
+   selector, :not() and :hover included, sits inside :where()), so component
+   rules below still set size, padding, hover and state colours (invalid,
+   focus) and always win; they take their border colour from --field-border.
+   Checkbox, radio, range, file, colour, button-like and hidden inputs keep
+   their native look. Wrappers that draw the border for a borderless inner
+   input (.search-field, .filter-field, .money-input, ...) carry the same
+   border. scripts/verify-mobile-layout.ts checks every field of every audited
+   page. */
 :where(.app-shell, .account-portal, .auth-form, [role="dialog"])
   :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea) {
   border: 1px solid var(--field-border);
@@ -83,11 +85,11 @@
   font-size: max(var(--type-body-floor, 0px), 0.875rem);
   line-height: 1.4;
 }
-:where(.app-shell, .account-portal, .auth-form, [role="dialog"])
-  :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea):not(:disabled, :focus, [aria-invalid="true"], [readonly], .select-shell select):hover {
+:where(:is(.app-shell, .account-portal, .auth-form, [role="dialog"])
+  :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea):not(:disabled, :focus, [aria-invalid="true"], [readonly], .select-shell select):hover) {
   border-color: var(--field-border-hover);
 }
-:where(.app-shell, .account-portal, .auth-form, [role="dialog"]) :where(input, select, textarea):disabled {
+:where(:is(.app-shell, .account-portal, .auth-form, [role="dialog"]) :is(input, select, textarea):disabled) {
   background-color: var(--paper);
 }
 
@@ -1184,7 +1186,7 @@ select:focus-visible {
 .search-field { display: flex; min-width: 0; flex: 1; align-items: center; gap: 9px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); color: #5a6e79; padding: 0 12px; }
 .search-field:hover { border-color: var(--field-border-hover); }
 .search-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
-.search-field input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); outline: 0; padding-block: 9px; }
+.search-field input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--ink); outline: 0; padding: 9px 0; }
 .search-field input::placeholder { color: #5a6e79; }
 .secondary-button,
 .primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
@@ -1206,7 +1208,7 @@ select:focus-visible {
 .filter-field:hover { border-color: var(--field-border-hover); }
 .filter-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
 
-.filter-field select { border: 0; background: transparent; padding-block: 9px; color: var(--imsda-navy); font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; outline: 0; }
+.filter-field select { border: 0; background: transparent; padding: 9px 4px 9px 0; color: var(--imsda-navy); font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; outline: 0; }
 .result-summary { margin: -9px 2px 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.68rem); }
 
 .finance-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -1437,7 +1439,7 @@ select:focus-visible {
 .scan-card small { display: block; }
 .scan-card strong { font-size: 0.78rem; }
 .scan-card small { margin-top: 3px; color: #dfd2eb; font-size: max(var(--type-floor, 0px), 0.63rem); }
-.checkin-tools .search-field { padding: 18px; }
+.checkin-tools .search-field { padding: 9px 18px; }
 .arrival-row { grid-template-columns: auto 1fr auto auto; }
 .arrival-time { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.67rem); }
 .arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
@@ -2402,7 +2404,7 @@ select:focus-visible {
 .preview-field legend > span { color: var(--ink); font-size: max(var(--type-floor, 0px), 0.59rem); font-weight: 700; }
 .preview-field > small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.53rem); font-weight: 500; line-height: 1.4; }
 .preview-field.invalid input,
-.preview-field.invalid select { border-color: var(--coral); }
+.preview-field.invalid select { border-color: var(--coral); box-shadow: 0 0 0 1px var(--coral); }
 .preview-field .field-error { color: var(--coral); }
 .preview-calculated-field { border: 1px solid #ded2e9; border-radius: 8px; background: var(--imsda-purple-soft); padding: 8px; }
 .preview-check { display: flex; align-items: center; gap: 5px; font-weight: 500; }
@@ -3535,7 +3537,7 @@ select:focus-visible {
 .public-registration-field textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 4px rgba(88, 44, 131, 0.1); }
 .public-registration-field-invalid input:not([type="checkbox"]):not([type="radio"]),
 .public-registration-field-invalid select,
-.public-registration-field-invalid textarea { border-color: var(--coral); background: #fffdfc; }
+.public-registration-field-invalid textarea { border-color: var(--coral); box-shadow: 0 0 0 1px var(--coral); background: #fffdfc; } /* 2px in all: the box-shadow keeps the invalid state distinct from the grey field border */
 .public-registration-field .public-registration-field-error { color: var(--coral); font-weight: 700; }
 
 .searchable-select { position: relative; display: grid; min-width: 0; gap: 5px; font-weight: 400; }
@@ -3583,6 +3585,7 @@ select:focus-visible {
 .searchable-select-control > button:hover { background: var(--imsda-purple-soft); color: var(--imsda-purple); }
 .public-registration-field-invalid .searchable-select-control {
   border-color: var(--coral);
+  box-shadow: 0 0 0 1px var(--coral);
   background: #fffdfc;
 }
 .searchable-select-options {
@@ -9126,7 +9129,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   padding: 8px 10px; font-size: 1rem;
 }
 .club-going-list .club-roster-age-input:focus-visible { border-color: var(--imsda-purple); }
-.club-going-list .club-roster-age-input[aria-invalid="true"] { border-color: var(--coral); }
+.club-going-list .club-roster-age-input[aria-invalid="true"] { border-color: var(--coral); box-shadow: 0 0 0 1px var(--coral); }
 .club-going-list .club-roster-age-control span { color: var(--muted); font-size: var(--text-helper-min); }
 .club-going-list .club-roster-age .field-help { margin: 0; }
 .club-going-list .club-roster-age .inline-notice { margin: 0; }
@@ -9780,7 +9783,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 
 /* --- More: compact groups and the optional task search ----------------------- */
 .more-task-search { display: grid; gap: 4px; }
-.more-task-search .search-field { padding: 10px 14px; border: 1px solid var(--field-border); border-radius: 12px; background: #fff; }
+.more-task-search .search-field { padding: 0 14px; border-radius: 12px; }
 .more-task-search .search-field input { font-size: max(var(--type-body-floor, 0px), 0.9rem); }
 .more-task-search-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8rem); }
 .event-modules-page .more-task-groups { display: grid; gap: 14px; }
@@ -9837,7 +9840,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 
 /* --- Class tracking: long member lists scroll inside their block and can be searched --- */
 .earned-member-search { display: grid; gap: 4px; margin: 6px 0 8px; }
-.earned-member-search .search-field { padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 10px; background: #fff; }
+.earned-member-search .search-field { padding: 0 12px; }
 .earned-member-search .search-field input { font-size: max(var(--type-body-floor, 0px), 0.9rem); }
 .earned-scroll-list { max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .earned-scroll-list li + li { margin-top: 2px; }
@@ -10098,7 +10101,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* Class history link under a roster name (#791). */
 .roster-class-history-link { display: block; margin-top: 2px; padding: 0; font-size: 0.8rem; }
 .area-club-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.area-club-search .search-field { max-width: 360px; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 10px; background: #fff; }
+.area-club-search .search-field { max-width: 360px; padding: 0 12px; }
 
 /* Lodging assignments (#200). Household colours come with a name in the text: colour is never the only cue. */
 .lodging-assign {
