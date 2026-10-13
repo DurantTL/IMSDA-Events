@@ -3,7 +3,7 @@ import { AccountSectionNav, type AccountNavItem } from "@/components/account-sec
 export const areaClubsNavItems: AccountNavItem[] = [
   { href: "/account/clubs", label: "All clubs" },
   { href: "/account/area-clubs/overview", label: "Overview" },
-  { href: "/account/area-clubs/reports", label: "Monthly reports" },
+  { href: "/account/area-clubs/reports", label: "Monthly Records" },
   { href: "/account/area-clubs/points", label: "Points" },
   { href: "/account/area-clubs/events", label: "Club events" },
   { href: "/account/area-clubs/team-permissions", label: "Team permissions" },

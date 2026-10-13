@@ -47,7 +47,7 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
         <section className="public-manage-card" aria-labelledby="club-role-heading">
           <div className="public-manage-card-heading">
             <p className="public-registration-eyebrow">Your role: {clubDirectorRoleLabels[access.club.role]}</p>
-            <h2 id="club-role-heading">Monthly reports</h2>
+            <h2 id="club-role-heading">Monthly Records</h2>
           </div>
           <p className="public-manage-empty">
             <FileText size={17} aria-hidden="true" /> {clubRoleDescriptions[access.club.role]}
@@ -100,7 +100,7 @@ export default async function ClubHomePage({ params }: { params: Promise<{ organ
       if (submitted.has(month) || isLockedForClub(month, now) || reportDueDate(month).slice(0, 7) !== calendarDateIn(now).slice(0, 7)) continue;
       steps.push({
         key: `report-${month}`,
-        text: `The ${reportMonthLabel(month)} monthly report is due ${formatDueDate(reportDueDate(month))}.`,
+        text: `The ${reportMonthLabel(month)} Monthly Record is due ${formatDueDate(reportDueDate(month))}.`,
         href: `${base}/records?month=${month}`,
         action: "Open report",
       });

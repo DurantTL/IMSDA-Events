@@ -11,7 +11,7 @@ import { ON_TIME_POINTS, formatDueDate, isLockedForClub, isReportMonth, reportDu
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 
-export const metadata: Metadata = { title: "Club monthly report" };
+export const metadata: Metadata = { title: "Club Monthly Record" };
 export const dynamic = "force-dynamic";
 
 /**
@@ -41,11 +41,11 @@ export default async function StaffClubReportPage({
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
   const clubHref = `/admin/organizations/${organizationId}/club`;
   const backHref = allowedReturnTo(from, [clubHref], `/admin/clubs/reports?year=${clubYear}`);
-  const backLabel = backHref === clubHref ? `Back to ${club.name}` : "Back to monthly reports";
+  const backLabel = backHref === clubHref ? `Back to ${club.name}` : "Back to Monthly Records";
   return (
     <section className="page-stack">
       <BackLink href={backHref} variant="staff">{backLabel}</BackLink>
-      <div className="page-intro"><div><p className="eyebrow">Monthly report</p><h2 translate="no">{club.name}</h2></div></div>
+      <div className="page-intro"><div><p className="eyebrow">Monthly Record</p><h2 translate="no">{club.name}</h2></div></div>
       <ClubReportForm
         dueLabel={formatDueDate(reportDueDate(month))}
         endpoint={`/api/admin/club-reports/${encodeURIComponent(organizationId)}/${month}`}

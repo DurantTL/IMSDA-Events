@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { DetailsOpenOnHash } from "@/components/details-open-on-hash";
 import { EventActivityPanel } from "@/components/event-activity-panel";
 import { EventModuleToggle } from "@/components/event-module-toggle";
 import { MoreTaskSearch } from "@/components/more-task-search";
@@ -25,8 +24,6 @@ import { eventKindFromAudience, selectActivity } from "@/modules/events/settings
 import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { canAccessOperationalHealth, operationalHealthAccessFor } from "@/modules/operations/access";
 import { getOperationalHealth } from "@/modules/operations/repository";
-
-const signInAnchors = ["two-step-verification", "passkeys"] as const;
 
 /**
  * `/more` is the Event modules page (#741): which features this event uses and,
@@ -220,13 +217,6 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
       </div>
 
       {permissions.includes("VIEW_REPORTS") && <EventActivityPanel eventId={event.id} kind={kind} selection={activity} showAll={showAllActivity} />}
-      {/* Two-step verification, passkeys and signed-in devices are on the one Edit profile page (#543, #741). The anchors keep older links to them landing here. */}
-      <DetailsOpenOnHash anchors={signInAnchors} className="panel activity-disclosure" id="two-step-verification">
-        <summary><h2>Sign-in settings</h2><small>Two-step verification, passkeys and signed-in devices</small></summary>
-        <span id="passkeys" />
-        <p className="quiet-copy">Set up two-step verification and passkeys, or review your signed-in devices, on your profile page.</p>
-        <Link className="secondary-button" href="/profile" aria-label="Edit profile: two-step verification, passkeys and signed-in devices">Edit profile</Link>
-      </DetailsOpenOnHash>
       {process.env.NODE_ENV !== "production" && <section className="panel review-gate"><div><p className="eyebrow">Testing status</p><h2>This local workspace uses test data</h2><p>Changes stay in the local IMSDA Events database. Live card charging and external delivery remain off until their configured test connections are ready.</p></div><span className="review-badge">Local testing</span></section>}
     </section>
   );

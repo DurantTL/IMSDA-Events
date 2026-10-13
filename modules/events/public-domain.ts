@@ -185,6 +185,7 @@ function presentPublicEventLifecycle(
   phase: EventRegistrationPhase,
   remainingSpots: number | null,
   now: Date,
+  formsListed: boolean,
 ): LifecyclePresentation {
   const preparing = {
     title: "Registration forms are being prepared",
@@ -309,6 +310,26 @@ function presentPublicEventLifecycle(
   const availability = remainingSpots === null
     ? "Choose the form that best matches who you are registering."
     : `${spotsPhrase(remainingSpots)} currently remain.`;
+  // Open with no forms to choose from yet: say so, rather than "Registration open"
+  // beside "Registration forms are being prepared".
+  if (!formsListed) {
+    return {
+      state: "OPEN",
+      statusLabel: "Registration opening soon",
+      detail: "Registration forms are not listed yet. Check back soon.",
+      ctaLabel: "Registration opening soon",
+      ctaEnabled: false,
+      ended: false,
+      heroTagline: "Event details are available now. Registration forms are coming soon.",
+      formsHeading: "Registration options",
+      emptyForms: preparing,
+      availability: {
+        heading: "Registration opening soon",
+        body: "Registration forms are not listed yet.",
+      },
+      showCapacity: true,
+    };
+  }
   return {
     state: "OPEN",
     statusLabel: "Registration open",
@@ -333,6 +354,8 @@ export function describePublicEventLifecycle(
   event: PublicEventLifecycleInput,
   occupiedSpots: number,
   now = new Date(),
+  /** False when the event page lists no registration forms (an open event with none says so). */
+  formsListed = true,
 ): PublicEventLifecycleSummary {
   const phase = evaluateEventRegistrationPhase(event, now);
   const capacityLeft = remainingEventCapacity(event.capacity, occupiedSpots);
@@ -341,6 +364,7 @@ export function describePublicEventLifecycle(
     phase,
     capacityLeft,
     now,
+    formsListed,
   );
 
   return {

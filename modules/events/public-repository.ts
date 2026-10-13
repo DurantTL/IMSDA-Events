@@ -98,7 +98,6 @@ async function loadPublicEventLanding(
       registration: { status: { in: [...activeRegistrationStatuses] } },
     },
   });
-  const lifecycle = describePublicEventLifecycle(event, occupiedSpots, now);
   const schedule = formatPublicEventSchedule(
     event.startsAt,
     event.endsAt,
@@ -151,6 +150,7 @@ async function loadPublicEventLanding(
   });
   const differentiators = publicFormDifferentiators(publicForms);
   const forms = publicForms.map((form, index) => ({ ...form, differentiator: differentiators[index] ?? null }));
+  const lifecycle = describePublicEventLifecycle(event, occupiedSpots, now, forms.length > 0);
 
   // "Register as a group or individual" (#650): a club event also takes people who are not in a
   // club, when one of its published forms can be used for them. Labelled only "Group".

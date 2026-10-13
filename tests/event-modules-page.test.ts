@@ -26,9 +26,6 @@ vi.mock("@/modules/event-modules/requests", () => ({ listModuleRequestsForEvent:
 vi.mock("@/modules/audit/audit-service", () => ({ listRecentAuditActivity: mocks.listRecentAuditActivity }));
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/components/event-activity-panel", () => ({ EventActivityPanel: () => createElement("div", { "data-panel": "activity" }) }));
-vi.mock("@/components/details-open-on-hash", () => ({
-  DetailsOpenOnHash: (props: { children: React.ReactNode }) => createElement("details", null, props.children),
-}));
 
 import MorePage from "@/app/(workspace)/more/page";
 import { buildEventModulesView, healthStripState } from "@/components/event-modules-page-model";
@@ -196,7 +193,7 @@ describe("/more as the Event modules page", () => {
     const markup = await render();
     expect(markup).not.toContain("Your signed-in devices");
     expect(markup).not.toContain("Sign out 1 other device");
-    expect(markup).toContain("review your signed-in devices, on your profile page");
+    expect(markup).not.toContain("Sign-in settings");
   });
 
   it("keeps the universal tools on the page for a phone, with club forms for conference staff", async () => {
