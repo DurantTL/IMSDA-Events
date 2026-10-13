@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AccountSectionNav } from "@/components/account-section-nav";
 import Link from "next/link";
+import { BackToTopButton } from "@/components/back-to-top-button";
 import { ClubAccessGate } from "@/components/club-access-gate";
 import { ClubGateSlot, ClubRecordsHint } from "@/components/club-gate-slot";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
@@ -86,6 +87,7 @@ export default async function ClubLayout({
         )}
         {children}
       </div>
+      <BackToTopButton />
     </>
   );
 }
