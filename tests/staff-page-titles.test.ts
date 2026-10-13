@@ -52,6 +52,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/meals")).toBe("Meals");
     expect(staffSubpageTitle("/more/lodging/requests")).toBe("Lodging requests");
     expect(staffSubpageTitle("/more/lodging/assignments")).toBe("Lodging assignments");
+    expect(staffSubpageTitle("/more/issued-assets")).toBe("Issued assets");
     expect(staffSubpageTitle("/more/program-assignments/run_1")).toBe("Assignment roster");
     // /more is the Event modules page (#810): its header names it, while the tab keeps "More".
     expect(staffSubpageTitle("/more")).toBe("Event modules");
@@ -69,7 +70,7 @@ describe("staff page names (#685)", () => {
       clubMonthlyReport: "more/clubs/reports/[organizationId]/[month]", clubMonthlyReports: "more/clubs/reports",
       clubs: "more/clubs", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
       clubForms: "more/club-forms", eventHealth: "more/event-health", clubAssignments: "more/club-assignments", eventContent: "more/event-content",
-      eventPatches: "more/event-patches", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments",
+      eventPatches: "more/event-patches", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments", issuedAssets: "more/issued-assets",
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",
       teamResults: "more/team-results", teamForm: "more/reports/clubs/team-form",
     };
