@@ -143,7 +143,7 @@ type EntryInput = {
 };
 
 /** Writes ledger entries for a change, charges first so a substitution never dips the registration below what it paid. */
-async function postEntries(tx: Tx, eventId: string, changeId: string, actor: Actor, entries: EntryInput[]) {
+async function postEntries(tx: Tx, eventId: string, changeId: string, actor: Actor, entries: EntryInput[], options: { skipBelowPaidCheck?: boolean } = {}) {
   const ordered = [...entries].sort((a, b) => b.draft.amountCents - a.draft.amountCents);
   for (const entry of ordered) {
     let adjustmentId: string | null = null;
@@ -152,6 +152,7 @@ async function postEntries(tx: Tx, eventId: string, changeId: string, actor: Act
         adjustmentId = await postMealAdjustment(tx, {
           eventId, registrationId: entry.selection.registrationId, actorUserId: actor.userId, amountCents: entry.draft.amountCents,
           reason: entry.reason.length >= 3 ? entry.reason.slice(0, 500) : "Meal order change", attendeeId: entry.selection.registrationAttendeeId,
+          skipBelowPaidCheck: options.skipBelowPaidCheck,
         });
       } catch (error) {
         adjustmentError(error);
@@ -373,11 +374,11 @@ function settlementForStatus(selection: { registrationId: string | null; source:
   return base === "REGISTRATION_ADJUSTMENT" && registrationStatus !== null && !isLiveRegistrationStatus(registrationStatus) ? "REGISTRATION_NOT_LIVE" : base;
 }
 
-async function cancelCore(tx: Tx, eventId: string, actor: Actor, selection: SelectionRow, type: MealChangeType, reason: string, settlement: MealSettlement = settlementOf(selection)) {
+async function cancelCore(tx: Tx, eventId: string, actor: Actor, selection: SelectionRow, type: MealChangeType, reason: string, settlement: MealSettlement = settlementOf(selection), options: { skipBelowPaidCheck?: boolean } = {}) {
   const updated = await tx.eventMealSelection.update({ where: { id: selection.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
   const change = await recordChange(tx, eventId, actor, { selectionId: selection.id, type, reason, before: view(selection), after: view(updated) });
   await postEntries(tx, eventId, change.id, actor, cancellationEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer })
-    .map((draft) => ({ draft, selection, settlement, reason })));
+    .map((draft) => ({ draft, selection, settlement, reason })), options);
   return updated;
 }
 
@@ -612,7 +613,8 @@ export async function cancelMealSelectionsForAttendees(tx: Tx, input: {
   let postedCents = 0;
   for (const selection of rows) {
     const settlement = settlementForStatus(selection, registrationStatus);
-    await cancelCore(tx, input.eventId, actor, selection, "CANCELLED", "The attendee was removed from the registration.", settlement);
+    // The amendment priced the combined new total against what was paid (`prepareAmendment`), so only that comparison is skipped here.
+    await cancelCore(tx, input.eventId, actor, selection, "CANCELLED", "The attendee was removed from the registration.", settlement, { skipBelowPaidCheck: true });
     if (settlement === "REGISTRATION_ADJUSTMENT") {
       postedCents += cancellationEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer }).reduce((total, entry) => total + entry.amountCents, 0);
     }

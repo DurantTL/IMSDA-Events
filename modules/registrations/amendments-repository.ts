@@ -1385,7 +1385,10 @@ function amendmentPreview(prepared: PreparedAmendment) {
     attendeeCount: prepared.prepared.attendees.length,
     addedAttendeeCount: prepared.addedAttendeeCount,
     removedAttendeeCount: prepared.removedAttendees.length,
-    lineItems: prepared.pricedCalculation.lineItems,
+    // The meal credit for removed people is its own line, so the itemised quote adds up to the total (#210).
+    lineItems: prepared.mealCreditCents < 0
+      ? [...prepared.pricedCalculation.lineItems, { key: "meal_credit_removed", label: "Meals cancelled for removed people", amountCents: prepared.mealCreditCents }]
+      : prepared.pricedCalculation.lineItems,
     pricingDate: prepared.prepared.pricingDate,
   };
 }

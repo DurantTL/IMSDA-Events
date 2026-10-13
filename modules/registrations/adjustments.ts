@@ -317,10 +317,17 @@ export async function createRegistrationAdjustment(
  */
 export async function postMealAdjustment(
   tx: Client,
-  input: { eventId: string; registrationId: string; actorUserId: string | null; amountCents: number; reason: string; attendeeId: string | null },
+  input: {
+    eventId: string; registrationId: string; actorUserId: string | null; amountCents: number; reason: string; attendeeId: string | null;
+    /**
+     * Skips only the "not below what was paid" comparison. For the amendment that removes an attendee, whose combined new
+     * total `prepareAmendment` already checked against what was paid; every other check still applies.
+     */
+    skipBelowPaidCheck?: boolean;
+  },
 ) {
   const registration = await loadRegistration(tx, input.eventId, input.registrationId);
-  const nextTotal = checkNewTotal(registration.totalCents, input.amountCents, registration.paidCents);
+  const nextTotal = checkNewTotal(registration.totalCents, input.amountCents, input.skipBelowPaidCheck ? 0 : registration.paidCents);
   const adjustment = await tx.registrationAdjustment.create({
     data: {
       eventId: input.eventId,

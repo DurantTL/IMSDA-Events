@@ -409,6 +409,20 @@ async function main() {
   assert((await prisma.eventMealSelectionChange.count({ where: { selectionId: removedPaid, type: "CANCELLED" } })) === 1, "the removal is in the history");
   assert(!(await loadMealTicketRows(eventId)).some((row) => row.confirmationCode === remReg.code), "a removed attendee's meals are not in the café CSV");
 
+  // A paid registration: the amendment already checked its combined new total, so the per-line credit skips only the below-paid comparison.
+  const paidRem = await makeRegistration("prem", { total: 0 });
+  const paidPerson = await prisma.person.create({ data: { firstName: "Cedar", lastName: surname, normalizedEmail: `${P}.cedar@meals.example.test` } });
+  const paidAttendee = await prisma.registrationAttendee.create({ data: { eventId, registrationId: paidRem.id, personId: paidPerson.id, attendeeType: "adult", position: 1, profileSnapshot: { firstName: "Cedar", lastName: surname } } });
+  await createMealOrder(eventId, userId, { registrationId: paidRem.id, registrationAttendeeId: paidAttendee.id, mealType: "LUNCH", serviceId: service("Wednesday lunch").id, ageGroup: "ADULT", quantity: 1, clientRequestId: randomUUID() });
+  await prisma.payment.create({ data: { eventId, registrationId: paidRem.id, amount: 8, status: "SUCCEEDED", method: "CASH", receivedAt: before } });
+  await expectMealError(cancelMealSelection(eventId, (await prisma.eventMealSelection.findFirstOrThrow({ where: { registrationId: paidRem.id, status: "ACTIVE" } })).id, userId, { reason: "Cancel on a paid registration" }), "TOTAL_BELOW_PAID", "an ordinary cancellation below what was paid");
+  const paidCredit = await prisma.$transaction(async (tx) => {
+    const posted = await cancelMealSelectionsForAttendees(tx, { eventId, registrationId: paidRem.id, attendeeIds: [paidAttendee.id], actorUserId: userId, expectedCreditCents: -800 });
+    await tx.registrationAttendee.deleteMany({ where: { id: paidAttendee.id } });
+    return posted;
+  });
+  assert(paidCredit === -800 && await totalOf(paidRem.id) === 0, "an amendment's removal credits the meal on a paid registration (its combined total was already checked); every other caller is still refused");
+
   // ---- Ticket CSV ---------------------------------------------------------------------------------------------------------
   const ticketRows = await loadMealTicketRows(eventId);
   const csv = await mealTicketsCsv(eventId);

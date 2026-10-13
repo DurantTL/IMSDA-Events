@@ -785,6 +785,43 @@ describe("registration amendments repository", () => {
       expect(withMeal.quoteFingerprint).not.toBe(baseline.quoteFingerprint);
     });
 
+    it("shows the meal credit as its own line so the itemised quote adds up", async () => {
+      const { registration, tx } = repositoryFixture();
+      registration.status = "CONFIRMED";
+      tx.eventMealSelection.findMany.mockResolvedValue(staffMeal);
+      const preview = await previewRegistrationAmendment("event-1", "registration-1", removalInput(registration));
+      expect(preview.lineItems).toContainEqual({ key: "meal_credit_removed", label: "Meals cancelled for removed people", amountCents: -800 });
+    });
+
+    it("commits on a paid registration whose combined new total is fine: the per-line credit does not trip the stored total", async () => {
+      // Stored $100, paid $100; the amendment's total is $130 of adjustments (standing in for the new $30 item) minus the $8 meal = $122.
+      const { registration, tx } = repositoryFixture();
+      registration.status = "CONFIRMED";
+      registration.totalAmount = 100;
+      (registration.payments as unknown[]).push({ amount: 100, refunds: [] });
+      tx.registrationAdjustment.aggregate.mockResolvedValue({ _sum: { amountCents: 13000 } });
+      const selection = {
+        id: "selection-1", eventId: "event-1", planId: "plan-1", mealType: "LUNCH", serviceId: null, registrationId: "registration-1", registrationAttendeeId: "attendee-2",
+        ageGroup: "ADULT", quantity: 1, status: "ACTIVE", source: "STAFF", payer: "ATTENDEE", unitPriceCents: 800, conferenceRateCents: 0, dietaryCategories: [],
+        attendee: { attendeeTypeDefinitionId: null },
+      };
+      tx.eventMealSelection.findMany.mockResolvedValue([selection]);
+      Object.assign(tx, {
+        $queryRaw: vi.fn(async () => [{ status: "CONFIRMED" }]),
+        user: { findUnique: vi.fn(async () => ({ displayName: "Finance Staff" })) },
+        eventMealSelection: { findMany: tx.eventMealSelection.findMany, update: vi.fn(async () => ({ ...selection, status: "CANCELLED" })) },
+        eventMealSelectionChange: { create: vi.fn(async () => ({ id: "change-1" })) },
+        eventMealLedgerEntry: { create: vi.fn(async () => ({})) },
+      });
+      (tx.registrationAdjustment as Record<string, unknown>).create = vi.fn(async () => ({ id: "adjustment-1" }));
+      const input = removalInput(registration);
+      const preview = await previewRegistrationAmendment("event-1", "registration-1", input);
+      expect(preview.totalCents).toBe(12200);
+      await amendRegistration("event-1", "registration-1", { ...input, previewOnly: false as const, quoteFingerprint: preview.quoteFingerprint }, actor, new Date("2026-08-04T13:00:00.000Z"));
+      expect((tx.registrationAdjustment as unknown as { create: ReturnType<typeof vi.fn> }).create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "MEAL", amountCents: -800 }) });
+      expect(registration.totalAmount).toBe(122);
+    });
+
     it("refuses with PAYMENT_ADJUSTMENT_REQUIRED when the meal credit would take the total below what was paid", async () => {
       const { registration, tx } = repositoryFixture();
       registration.status = "CONFIRMED";
