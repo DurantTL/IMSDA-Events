@@ -67,6 +67,7 @@
     "test:lodging-preferences": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-preferences.ts",
     "test:lodging-assignment": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-assignment.ts",
     "report:church-share-drift": "tsx --require ./scripts/support/allow-server-only.cjs scripts/report-church-share-drift.ts",
+    "test:issued-assets": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-issued-assets.ts",
     "test:church-sponsor-lodging": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-church-sponsor-lodging.ts",
     "test:single-account-dry-run": "tsx scripts/verify-single-account-dry-run.ts",
     "test:honor-instructors-http": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-honor-instructors-http.ts",

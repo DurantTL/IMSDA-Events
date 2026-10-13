@@ -1,0 +1,298 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { assigneeKindLabels, type AssigneeKind } from "@/modules/issued-assets/domain";
+import type { AssetLookup, AssigneeOptions, DeskLot, DeskPerson, DeskType, IssuanceRow } from "@/modules/issued-assets/view";
+
+type Item = { code: string; quantity: number };
+type Assignee =
+  | { kind: "ATTENDEE"; attendeeId: string }
+  | { kind: "REGISTRATION"; registrationId: string }
+  | { kind: "STAFF"; userId: string }
+  | { kind: "ROOM"; eventUnitId: string }
+  | { kind: "VEHICLE" | "TEAM"; label: string };
+type IssueRequest = {
+  assignee: Assignee; assignmentId?: string; items: Item[]; purpose: string; expectedReturnAt?: string;
+  entryMethod: "MANUAL" | "OFFLINE"; occurredAt?: string; idempotencyKey: string;
+};
+type ItemResult = { index: number; code: string; status: "ISSUED" | "DUPLICATE" | "REPLAYED" | "REJECTED"; identifier?: string; typeName?: string; error?: { message: string } };
+type IssueResponse = { holder: { display: string }; issued: number; duplicates: number; rejected: number; items: ItemResult[] };
+
+const queueKey = (eventId: string) => `imsda:issued-assets:queue:${eventId}`;
+
+/** Only codes, opaque ids and a key: no names, contact details or form answers are kept on the device. */
+function readQueue(eventId: string): IssueRequest[] {
+  try {
+    const raw = window.localStorage.getItem(queueKey(eventId));
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed as IssueRequest[] : [];
+  } catch { return []; }
+}
+function writeQueue(eventId: string, queue: IssueRequest[]) {
+  try {
+    if (queue.length === 0) window.localStorage.removeItem(queueKey(eventId));
+    else window.localStorage.setItem(queueKey(eventId), JSON.stringify(queue));
+  } catch { /* private mode: the page still works, the retry just lives in memory */ }
+}
+
+const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(16).slice(2)}`);
+
+function lodgingNote(row: IssuanceRow) {
+  if (!row.roomName) return null;
+  if (!row.lodging || row.lodging.status === "CURRENT") return `Opens ${row.roomName}`;
+  return row.lodging.status === "MOVED"
+    ? `Opens ${row.roomName}, but they now stay in ${row.lodging.currentRooms.join(", ")}. Replace the key.`
+    : `Opens ${row.roomName}, but their room was released.`;
+}
+
+export function AssetIssueDesk({ eventId, types, lots, options, person, outNow }: {
+  eventId: string;
+  types: DeskType[];
+  lots: DeskLot[];
+  options: AssigneeOptions;
+  person: DeskPerson | null;
+  outNow: IssuanceRow[];
+}) {
+  const router = useRouter();
+  const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
+  const [kind, setKind] = useState<AssigneeKind>(person ? "ATTENDEE" : "ROOM");
+  const [other, setOther] = useState("");
+  const [items, setItems] = useState<Item[]>([]);
+  const [codeText, setCodeText] = useState("");
+  const [assignmentId, setAssignmentId] = useState("");
+  const [purpose, setPurpose] = useState("Issued at check-in");
+  const [expectedReturn, setExpectedReturn] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<IssueResponse | null>(null);
+  const [queue, setQueue] = useState<IssueRequest[]>([]);
+  const [search, setSearch] = useState("");
+  const [found, setFound] = useState<Array<{ attendeeId: string; name: string; confirmationCode: string }>>([]);
+  const [lookupCode, setLookupCode] = useState("");
+  const [lookup, setLookup] = useState<AssetLookup | null | "none">(null);
+  const codeInput = useRef<HTMLInputElement>(null);
+
+  // Saved requests from an earlier visit (read after mount, so the server and first client render agree).
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQueue(readQueue(eventId)), 0);
+    return () => window.clearTimeout(timer);
+  }, [eventId]);
+
+  function addCode(raw: string, quantity = 1) {
+    const code = raw.trim();
+    if (!code) return;
+    setItems((current) => current.some((item) => item.code.toUpperCase() === code.toUpperCase()) ? current : [...current, { code, quantity }]);
+    setCodeText("");
+    codeInput.current?.focus();
+  }
+
+  function currentAssignee(): Assignee | null {
+    if (kind === "ATTENDEE") return person ? { kind, attendeeId: person.attendeeId } : null;
+    if (kind === "REGISTRATION") return person ? { kind, registrationId: person.registrationId } : null;
+    if (kind === "ROOM") return other ? { kind, eventUnitId: other } : null;
+    if (kind === "STAFF") return other ? { kind, userId: other } : null;
+    return other.trim() ? { kind, label: other.trim() } : null;
+  }
+
+  async function send(request: IssueRequest) {
+    const response = await fetch(`${base}/issue`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request) });
+    const json = await response.json();
+    if (!response.ok) throw Object.assign(new Error(json.message ?? "That could not be issued."), { server: true, details: json.details });
+    return json as IssueResponse;
+  }
+
+  async function submit() {
+    const assignee = currentAssignee();
+    if (!assignee) { setError("Choose who the items are for."); return; }
+    if (items.length === 0) { setError("Scan or type at least one code."); return; }
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    const request: IssueRequest = {
+      assignee, items, purpose: purpose.trim() || "Issued at check-in", idempotencyKey: newKey(),
+      entryMethod: offline ? "OFFLINE" : "MANUAL",
+      ...(offline ? { occurredAt: new Date().toISOString() } : {}),
+      ...(assignmentId ? { assignmentId } : {}),
+      ...(expectedReturn ? { expectedReturnAt: new Date(expectedReturn).toISOString() } : {}),
+    };
+    await deliver(request);
+  }
+
+  /** Saves the request (so a closed tab or lost response can replay it with the same key) and sends it. */
+  async function deliver(request: IssueRequest) {
+    setBusy(true); setError(""); setResult(null);
+    const saved = [...readQueue(eventId).filter((entry) => entry.idempotencyKey !== request.idempotencyKey), request];
+    writeQueue(eventId, saved); setQueue(saved);
+    try {
+      // A request first built offline keeps saying when it really happened when it is replayed later.
+      const response = await send(request);
+      const remaining = readQueue(eventId).filter((entry) => entry.idempotencyKey !== request.idempotencyKey);
+      writeQueue(eventId, remaining); setQueue(remaining);
+      setResult(response);
+      setItems(response.items.filter((item) => item.status === "REJECTED").map((item) => ({ code: item.code, quantity: request.items[item.index]?.quantity ?? 1 })));
+      router.refresh();
+    } catch (cause) {
+      const failure = cause as Error & { server?: boolean; details?: { items?: ItemResult[] } };
+      if (failure.server) {
+        // The server answered: it will not accept this request as it is, so it is not kept for retry.
+        const remaining = readQueue(eventId).filter((entry) => entry.idempotencyKey !== request.idempotencyKey);
+        writeQueue(eventId, remaining); setQueue(remaining);
+        if (failure.details?.items) setResult({ holder: { display: "" }, issued: 0, duplicates: 0, rejected: failure.details.items.length, items: failure.details.items });
+        setError(failure.message);
+      } else {
+        // Keep the moment it happened: a later replay is an offline entry, and the server records that time.
+        const offline: IssueRequest = { ...request, entryMethod: "OFFLINE", occurredAt: request.occurredAt ?? new Date().toISOString() };
+        const kept = readQueue(eventId).map((entry) => entry.idempotencyKey === request.idempotencyKey ? offline : entry);
+        writeQueue(eventId, kept); setQueue(kept);
+        setError("Not sent. The request is saved on this device; retry when you are connected. Nothing was issued yet.");
+      }
+    } finally { setBusy(false); }
+  }
+
+  async function runSearch(value: string) {
+    setSearch(value);
+    if (value.trim().length < 2) { setFound([]); return; }
+    try {
+      const response = await fetch(`${base}/lookup?person=${encodeURIComponent(value.trim())}`);
+      const json = await response.json();
+      setFound(response.ok ? json.people : []);
+    } catch { setFound([]); }
+  }
+
+  async function runLookup() {
+    if (!lookupCode.trim()) return;
+    setLookup(null); setError("");
+    try {
+      const response = await fetch(`${base}/lookup?code=${encodeURIComponent(lookupCode.trim())}`);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.message ?? "Lookup failed.");
+      setLookup(json.asset ?? "none");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Lookup failed."); }
+  }
+
+  async function change(issuanceId: string, body: unknown, done: string) {
+    setBusy(true); setError(""); setResult(null);
+    try {
+      const response = await fetch(`${base}/issuances/${encodeURIComponent(issuanceId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.message ?? "That could not be saved.");
+      setResult({ holder: { display: "" }, issued: 0, duplicates: 0, rejected: 0, items: [{ index: 0, code: done, status: "ISSUED" }] });
+      router.refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "That could not be saved."); }
+    finally { setBusy(false); }
+  }
+
+  const openForPerson = person?.issuances.filter((row) => row.open) ?? [];
+  const endedForPerson = person?.issuances.filter((row) => !row.open) ?? [];
+  const kinds = [...new Set(types.flatMap((type) => type.assigneeKinds))];
+
+  return <div className="settings-stack">
+    <div className="page-intro"><div>
+      <p className="eyebrow">Check-in</p>
+      <h2 className="duplicate-page-title">Issue keys and items</h2>
+      <p>Scan or type each code. A typed code and a scanned code are checked the same way. Returns, lost keys and deposits are not handled here.</p>
+    </div></div>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+
+    {queue.length > 0 ? <section className="panel" role="status">
+      <h3>Saved on this device, not confirmed</h3>
+      <p>{queue.length} request{queue.length === 1 ? "" : "s"} did not reach the server. Retrying is safe: the same saved key can never issue twice.</p>
+      <ul>{queue.map((entry) => <li key={entry.idempotencyKey}>{entry.items.map((item) => item.code).join(", ")}{" "}
+        <button type="button" disabled={busy} onClick={() => void deliver(entry)}>Retry</button>{" "}
+        <button type="button" disabled={busy} onClick={() => { const rest = readQueue(eventId).filter((other) => other.idempotencyKey !== entry.idempotencyKey); writeQueue(eventId, rest); setQueue(rest); }}>Discard</button></li>)}</ul>
+    </section> : null}
+
+    <section className="panel">
+      <h3>Who is it for?</h3>
+      {person ? <p><strong>{person.name}</strong>, registration {person.confirmationCode}.{" "}
+        {person.rooms.length === 0 ? "Not placed in a room." : `Room: ${person.rooms.map((room) => room.roomName).join("; ")}.`}
+        {person.registrationActive ? "" : " This registration is not active."}</p> : <p>Find an attendee, or choose a room, staff member, vehicle or team below.</p>}
+      <label>Find an attendee (name or confirmation code) <input value={search} onChange={(event) => void runSearch(event.target.value)} /></label>
+      {found.length > 0 ? <ul>{found.map((row) => <li key={row.attendeeId}><a href={`/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(row.attendeeId)}`}>{row.name} ({row.confirmationCode})</a></li>)}</ul> : null}
+      <label>Issue to <select value={kind} onChange={(event) => { setKind(event.target.value as AssigneeKind); setOther(""); }}>
+        {(["ATTENDEE", "REGISTRATION", "ROOM", "STAFF", "VEHICLE", "TEAM"] as const).filter((value) => kinds.includes(value) || kinds.length === 0).map((value) => <option key={value} value={value}>{assigneeKindLabels[value]}</option>)}
+      </select></label>
+      {kind === "ROOM" ? <label>Room <select value={other} onChange={(event) => setOther(event.target.value)}><option value="">Choose a room</option>{options.rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label> : null}
+      {kind === "STAFF" ? <label>Staff member <select value={other} onChange={(event) => setOther(event.target.value)}><option value="">Choose a person</option>{options.staff.map((member) => <option key={member.userId} value={member.userId}>{member.name}</option>)}</select></label> : null}
+      {kind === "VEHICLE" || kind === "TEAM" ? <label>{assigneeKindLabels[kind]} name <input value={other} maxLength={80} onChange={(event) => setOther(event.target.value)} /></label> : null}
+      {(kind === "ATTENDEE" || kind === "REGISTRATION") && !person ? <p>Search above to choose the attendee.</p> : null}
+      {person && person.rooms.length > 1 ? <label>Room the key is for <select value={assignmentId} onChange={(event) => setAssignmentId(event.target.value)}>
+        <option value="">Choose a room</option>{person.rooms.map((room) => <option key={room.assignmentId} value={room.assignmentId}>{room.roomName}, {room.firstNight} to {room.lastNight}</option>)}
+      </select></label> : null}
+    </section>
+
+    <section className="panel">
+      <h3>Items</h3>
+      <form onSubmit={(event) => { event.preventDefault(); addCode(codeText); }}>
+        <label>Scan or type a code (K-214) <input ref={codeInput} value={codeText} onChange={(event) => setCodeText(event.target.value)} autoComplete="off" autoCapitalize="characters" maxLength={64} /></label>
+        <button type="submit">Add</button>
+      </form>
+      {lots.length > 0 ? <p>{lots.map((lot) => <button key={lot.code} type="button" className="secondary-button" disabled={lot.remaining <= 0} onClick={() => addCode(lot.code)}>{lot.typeName}: {lot.identifier} ({lot.remaining} left)</button>)}</p> : null}
+      {items.length === 0 ? <p>Nothing added yet.</p> : <ul>{items.map((item) => <li key={item.code}>{item.code}{" "}
+        <label>Quantity <input type="number" min={1} max={100000} value={item.quantity} onChange={(event) => setItems((current) => current.map((row) => row.code === item.code ? { ...row, quantity: Math.max(1, Number(event.target.value) || 1) } : row))} /></label>{" "}
+        <button type="button" onClick={() => setItems((current) => current.filter((row) => row.code !== item.code))}>Remove</button></li>)}</ul>}
+      <label>Purpose <input value={purpose} maxLength={200} onChange={(event) => setPurpose(event.target.value)} /></label>
+      <label>Expected back (optional) <input type="datetime-local" value={expectedReturn} onChange={(event) => setExpectedReturn(event.target.value)} /></label>
+      <button className="primary-button" type="button" disabled={busy || items.length === 0} onClick={() => void submit()}>Issue {items.length > 0 ? `${items.length} item${items.length === 1 ? "" : "s"}` : ""}</button>
+      {result ? <div role="status">
+        <p>{result.issued} issued{result.duplicates ? `, ${result.duplicates} already issued to this holder` : ""}{result.rejected ? `, ${result.rejected} not issued` : ""}.</p>
+        <ul>{result.items.map((item) => <li key={`${item.index}:${item.code}`}>{item.identifier ?? item.code}: {item.status === "ISSUED" ? "issued" : item.status === "DUPLICATE" || item.status === "REPLAYED" ? "already issued to this holder, nothing changed" : item.error?.message ?? "not issued"}</li>)}</ul>
+      </div> : null}
+    </section>
+
+    {person ? <section className="panel">
+      <h3>Issued to {person.name}</h3>
+      {openForPerson.length === 0 ? <p>Nothing issued yet.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Issued</th><th scope="col">Room</th><th scope="col">Change</th></tr></thead>
+        <tbody>{openForPerson.map((row) => <tr key={row.id}>
+          <th scope="row">{row.identifier} <small>{row.typeName}</small></th>
+          <td>{row.quantity}</td>
+          <td>{new Date(row.issuedAt).toLocaleString()}{row.entryMethod === "OFFLINE" ? " (entered offline)" : ""}</td>
+          <td>{lodgingNote(row) ?? "Not room-linked"}</td>
+          <td><IssuanceActions row={row} busy={busy} change={change} /></td>
+        </tr>)}</tbody>
+      </table></div>}
+      {endedForPerson.length > 0 ? <details><summary>{endedForPerson.length} earlier issue{endedForPerson.length === 1 ? "" : "s"} (history is kept)</summary>
+        <ul>{endedForPerson.map((row) => <li key={row.id}>{row.identifier} ({row.typeName}), {row.endReason?.toLowerCase()} {row.endedAt ? new Date(row.endedAt).toLocaleString() : ""}{row.endNote ? `: ${row.endNote}` : ""}{row.roomName ? `. Opened ${row.roomName}.` : ""}</li>)}</ul></details> : null}
+    </section> : null}
+
+    <section className="panel">
+      <h3>Look up an item</h3>
+      <form onSubmit={(event) => { event.preventDefault(); void runLookup(); }}>
+        <label>Code <input value={lookupCode} onChange={(event) => setLookupCode(event.target.value)} maxLength={64} /></label>
+        <button type="submit">Look up</button>
+      </form>
+      {lookup === "none" ? <p role="status">No item has that code.</p> : lookup ? <div role="status">
+        <p><strong>{lookup.asset.identifier}</strong> ({lookup.asset.typeName}), {lookup.asset.availability.toLowerCase()}, {lookup.asset.outQuantity} of {lookup.asset.quantityTotal} out.</p>
+        {lookup.open.length === 0 ? <p>Not issued to anyone.</p> : <ul>{lookup.open.map((row) => <li key={row.id}>With {row.holderLabel} ({assigneeKindLabels[row.holderKind].toLowerCase()}){row.quantity > 1 ? `, ${row.quantity}` : ""}. {lodgingNote(row) ?? ""}</li>)}</ul>}
+        {lookup.history.length > lookup.open.length ? <details><summary>History ({lookup.history.length})</summary><ul>{lookup.history.map((row) => <li key={row.id}>{row.holderLabel}, {new Date(row.issuedAt).toLocaleString()}{row.open ? " (current)" : `, ${row.endReason?.toLowerCase() ?? "ended"}`}{row.roomName ? `, ${row.roomName}` : ""}</li>)}</ul></details> : null}
+      </div> : null}
+    </section>
+
+    {!person ? <section className="panel">
+      <h3>Out now</h3>
+      {outNow.length === 0 ? <p>Nothing is issued right now.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+        <caption>The most recent {outNow.length} open issues</caption>
+        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Holder</th><th scope="col">Room</th></tr></thead>
+        <tbody>{outNow.map((row) => <tr key={row.id}><th scope="row">{row.identifier} <small>{row.typeName}</small></th><td>{row.quantity}</td><td>{row.holderLabel}</td><td>{lodgingNote(row) ?? ""}</td></tr>)}</tbody>
+      </table></div>}
+    </section> : null}
+  </div>;
+}
+
+function IssuanceActions({ row, busy, change }: { row: IssuanceRow; busy: boolean; change: (id: string, body: unknown, done: string) => Promise<void> }) {
+  const [mode, setMode] = useState<"" | "replace" | "correct">("");
+  const [reason, setReason] = useState("");
+  const [code, setCode] = useState("");
+  return <div>
+    <button type="button" disabled={busy} onClick={() => setMode(mode === "replace" ? "" : "replace")}>Replace</button>{" "}
+    <button type="button" disabled={busy} onClick={() => setMode(mode === "correct" ? "" : "correct")}>Entered in error</button>
+    {mode ? <form onSubmit={(event) => {
+      event.preventDefault();
+      void change(row.id, mode === "replace" ? { action: "replace", replacementCode: code, reason, originalAvailability: "UNAVAILABLE" } : { action: "correct", reason }, mode === "replace" ? `${row.identifier} replaced` : `${row.identifier} withdrawn`).then(() => { setMode(""); setReason(""); setCode(""); });
+    }}>
+      {mode === "replace" ? <label>Replacement code <input value={code} onChange={(event) => setCode(event.target.value)} required maxLength={64} /></label> : null}
+      <label>Reason <input value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={300} /></label>
+      <button type="submit" disabled={busy}>{mode === "replace" ? "Replace" : "Withdraw"}</button>
+    </form> : null}
+  </div>;
+}

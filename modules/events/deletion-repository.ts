@@ -332,6 +332,11 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   // 9b. Lodging assignments, the lodging waitlist and room notices (#200) point at registrations and attendees with
   //     NO ACTION keys, so they go first. Their delete triggers accept this transaction's deletes (see
   //     `imsda.event_deletion` above) and refuse every other delete.
+  // Issued assets (#213) point at attendees, registrations and lodging assignments, so they go before all of those.
+  await tx.assetIssuanceHistory.deleteMany({ where: inEvent });
+  await tx.assetIssuance.deleteMany({ where: inEvent });
+  await tx.issuedAsset.deleteMany({ where: inEvent });
+  await tx.issuedAssetType.deleteMany({ where: inEvent });
   await tx.eventLodgingAssignmentNotice.deleteMany({ where: inEvent });
   await tx.eventLodgingWaitlistHistory.deleteMany({ where: inEvent });
   await tx.eventLodgingWaitlistEntry.deleteMany({ where: inEvent });
