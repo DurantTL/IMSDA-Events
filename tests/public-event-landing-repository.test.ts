@@ -16,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { getPublicEventLanding } from "@/modules/events/public-repository";
+import { getFormTemplate } from "@/modules/forms/definition";
 
 const now = new Date("2026-07-23T18:00:00.000Z");
 
@@ -129,5 +130,38 @@ describe("public event landing repository announcements", () => {
     expect(JSON.stringify(landing?.announcements)).not.toContain(
       "Future message",
     );
+  });
+});
+
+describe("public event landing repository forms and lifecycle", () => {
+  async function landingWith(registrationForms: unknown[]) {
+    const current = await prismaMocks.eventFindFirst();
+    prismaMocks.eventFindFirst.mockResolvedValue({ ...current, registrationForms });
+    return getPublicEventLanding("public-retreat", now);
+  }
+
+  it("does not say registration is open when an open event lists no forms", async () => {
+    const landing = await landingWith([]);
+    expect(landing?.lifecycle.state).toBe("OPEN");
+    expect(landing?.lifecycle.statusLabel).toBe("Registration opening soon");
+    expect(landing?.lifecycle.emptyForms.title).toBe("Registration forms are being prepared");
+  });
+
+  it("treats a form with an invalid definition as not listed", async () => {
+    const landing = await landingWith([
+      { id: "f1", name: "Broken", slug: "broken", createdAt: new Date("2026-01-01"), versions: [{ id: "v1", versionNumber: 1, status: "PUBLISHED", definition: { nonsense: true } }] },
+    ]);
+    expect(landing?.forms).toHaveLength(0);
+    expect(landing?.lifecycle.statusLabel).toBe("Registration opening soon");
+  });
+
+  it("keeps Registration open when a valid published form is listed", async () => {
+    const template = getFormTemplate("honors_weekend");
+    if (!template) throw new Error("honors_weekend template missing");
+    const landing = await landingWith([
+      { id: "f2", name: "Honors", slug: "honors", createdAt: new Date("2026-01-01"), versions: [{ id: "v2", versionNumber: 1, status: "PUBLISHED", definition: structuredClone(template.definition) }] },
+    ]);
+    expect(landing?.forms).toHaveLength(1);
+    expect(landing?.lifecycle.statusLabel).toBe("Registration open");
   });
 });

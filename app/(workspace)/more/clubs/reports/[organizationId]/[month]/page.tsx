@@ -37,11 +37,11 @@ export default async function EventClubReportPage({
   const rosterPrefill = await reportPrefill(organizationId, new Date());
   const clubHref = `/more/clubs/${organizationId}?event=${event.id}`;
   const backHref = allowedReturnTo(from, [clubHref], `/more/clubs/reports?event=${event.id}`);
-  const backLabel = backHref === clubHref ? `Back to ${club.name}` : "Back to monthly reports";
+  const backLabel = backHref === clubHref ? `Back to ${club.name}` : "Back to Monthly Records";
   return (
     <section className="page-stack">
       <BackLink href={backHref} variant="staff">{backLabel}</BackLink>
-      <div className="page-intro"><div><p className="eyebrow">Monthly report · view only</p><h2 translate="no">{club.name}</h2></div></div>
+      <div className="page-intro"><div><p className="eyebrow">Monthly Record · view only</p><h2 translate="no">{club.name}</h2></div></div>
       <ClubReportForm
         dueLabel={formatDueDate(reportDueDate(month))}
         endpoint="/api/admin/club-reports/view-only"

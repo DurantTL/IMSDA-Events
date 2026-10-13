@@ -142,7 +142,7 @@ export function PublicRegistrationRecoveryForm({
           {busy === "email" ? "Requesting…" : "Email a private link"}
         </button>
         <p className="field-help">
-          No account is required. If you have one, you can also <Link href="/account/sign-in">sign in</Link>.
+          No account is required. If you have one, you can also <Link className="inline-text-link" href="/account/sign-in">sign in</Link>.
         </p>
       </form>
     </div>

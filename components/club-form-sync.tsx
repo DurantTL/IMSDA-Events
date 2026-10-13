@@ -58,7 +58,7 @@ export function ClubFormSync({ pendingCount }: { pendingCount: number }) {
     <section aria-labelledby="club-form-sync-heading" className="panel form-stack club-form-sync">
       <h3 id="club-form-sync-heading">Sync templates</h3>
       <p className="field-help">
-        Brings each built-in form up to the version in the code, the same step as <code>npm run club-forms:sync</code>.
+        Brings each built-in form up to the version in the code.
         A form edited in the app is skipped, and a change that would make an answer less protected is refused. {pendingCount > 0
           ? `${pendingCount} form${pendingCount === 1 ? " is" : "s are"} waiting for a sync.`
           : "Every built-in form is up to date."}

@@ -34,9 +34,6 @@ vi.mock("@/modules/event-modules/service", () => ({ moduleState: mocks.moduleSta
 vi.mock("@/modules/audit/audit-service", () => ({ listRecentAuditActivity: mocks.listRecentAuditActivity }));
 vi.mock("@/modules/operations/repository", () => ({ getOperationalHealth: mocks.getOperationalHealth }));
 vi.mock("@/components/event-activity-panel", () => ({ EventActivityPanel: () => createElement("div", { "data-panel": "activity" }) }));
-vi.mock("@/components/details-open-on-hash", () => ({
-  DetailsOpenOnHash: (props: { children: React.ReactNode }) => createElement("details", null, props.children),
-}));
 vi.mock("@/modules/events/repository", () => ({ getEventOverview: mocks.getEventOverview }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
 vi.mock("@/modules/background-checks/repository", () => ({ listEventBackgroundFlags: mocks.listEventBackgroundFlags }));

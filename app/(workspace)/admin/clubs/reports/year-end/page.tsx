@@ -24,7 +24,7 @@ export default async function ClubYearEndReportsAdminPage({ searchParams }: { se
   return (
     <>
       <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/clubs/reports" variant="staff">Back to monthly reports</BackLink>
+        <BackLink href="/admin/clubs/reports" variant="staff">Back to Monthly Records</BackLink>
         <Link className="secondary-button" href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start - 1)}`}>← {reportYearLabel(start - 1)}</Link>
         {reportYear !== current && <Link className="secondary-button" href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start + 1)}`}>{reportYearLabel(start + 1)} →</Link>}
       </div>

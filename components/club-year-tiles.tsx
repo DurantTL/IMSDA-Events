@@ -107,7 +107,7 @@ export function ClubYearTiles({
 
       {reports && (
         <div className="club-year-tile">
-          <Heading className="club-year-tile-heading"><FileText size={16} aria-hidden="true" /> Monthly reports</Heading>
+          <Heading className="club-year-tile-heading"><FileText size={16} aria-hidden="true" /> Monthly Records</Heading>
           <p className="club-year-tile-stat">{reports.filed}</p>
           <p className="club-year-tile-detail">
             filed this club year
@@ -115,7 +115,7 @@ export function ClubYearTiles({
             {reports.dueSoon && ` · ${reports.dueSoon.count} due ${formatDueDate(reports.dueSoon.dueDate)}`}
             {reports.missing === 0 && !reports.dueSoon && " · none missing"}
           </p>
-          <Link className="secondary-button club-year-tile-link" href={reportsHref}>Open monthly reports</Link>
+          <Link className="secondary-button club-year-tile-link" href={reportsHref}>Open Monthly Records</Link>
         </div>
       )}
     </div>

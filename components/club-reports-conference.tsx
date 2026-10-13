@@ -53,7 +53,7 @@ export function ClubReportsConference({
       <div className="page-intro">
         <div>
           <p className="eyebrow">Clubs · {clubYear}</p>
-          <h2>Monthly reports</h2>
+          <h2>Monthly Records</h2>
           <p>
             Points per club and month. <strong>Missing</strong> means the due date (the 10th of the next month) has passed with no
             report. Tick <em>Registration</em> when a club&apos;s yearly registration came in on time; it adds 1,500 points.
@@ -75,7 +75,7 @@ export function ClubReportsConference({
       ) : (
         <div className="report-table-wrap club-reports-grid">
           <table role="table" className="report-table table-cards">
-            <caption className="sr-only">Monthly report points by club for {clubYear}</caption>
+            <caption className="sr-only">Monthly Record points by club for {clubYear}</caption>
             <thead role="rowgroup">
               <tr role="row">
                 <th role="columnheader" scope="col">Club</th>

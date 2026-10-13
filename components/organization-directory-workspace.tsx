@@ -529,7 +529,7 @@ export function OrganizationDirectoryWorkspace({
                         <>
                           <li>{editor.check.removes.rosterMembers} roster {editor.check.removes.rosterMembers === 1 ? "entry" : "entries"}, with their birth dates</li>
                           <li>{editor.check.removes.clubRoles} club admin {editor.check.removes.clubRoles === 1 ? "role" : "roles"} and {editor.check.removes.invites} {editor.check.removes.invites === 1 ? "invite" : "invites"}</li>
-                          <li>{editor.check.removes.monthlyReports} monthly {editor.check.removes.monthlyReports === 1 ? "report" : "reports"} and the club profile</li>
+                          <li>{editor.check.removes.monthlyReports} {editor.check.removes.monthlyReports === 1 ? "Monthly Record" : "Monthly Records"} and the club profile</li>
                         </>
                       )}
                       <li>{editor.check.removes.providerIdentifiers} provider {editor.check.removes.providerIdentifiers === 1 ? "identifier" : "identifiers"}</li>

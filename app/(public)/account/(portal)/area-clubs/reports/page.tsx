@@ -6,7 +6,7 @@ import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 
-export const metadata: Metadata = { title: "Monthly reports summary", robots: { index: false, follow: false, nocache: true } };
+export const metadata: Metadata = { title: "Monthly Records summary", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
 export default async function AreaMonthlyReportsPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string }> }) {
@@ -19,7 +19,7 @@ export default async function AreaMonthlyReportsPage({ searchParams }: { searchP
   const clubs = filterClubsByName(allClubs, query);
   return (
     <section className="public-manage-card page-stack">
-      <h2>Monthly reports, {clubYear}</h2>
+      <h2>Monthly Records, {clubYear}</h2>
       <p className="field-help">
         Points for each submitted month. <strong>Missing</strong> means the due date (the 10th of the next month) has passed.
         Select a submitted month to read that report.
