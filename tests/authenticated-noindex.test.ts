@@ -16,5 +16,6 @@ describe("authenticated pages are noindex (#108)", () => {
   ])("%s sets robots index: false", async (_name, load) => {
     const { metadata } = await load();
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
-  });
+    // Each case loads a large page graph cold; the default 5 s limit is borderline on a loaded machine.
+  }, 30_000);
 });

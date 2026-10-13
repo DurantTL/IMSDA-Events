@@ -210,3 +210,16 @@ never a bare rem under 0.75.
   replaces it (#685). At 768 px it is a desktop layout with 28-30 px controls;
   the audit applies tap targets to phones only.
 - Sorting on tables that became cards (above).
+
+## Form field outlines
+
+Every text input, select, textarea and search box on the staff workspace and the
+account portal shows a boundary of at least 3:1 against the background behind it
+(WCAG 2.2 SC 1.4.11). The colour is `--field-border` (`#6f8591`, 3.86:1 on white,
+3.59:1 on the page background). A zero-specificity base rule in `app/globals.css`
+gives each field that border by default; component rules take the colour from the
+token rather than a pale hex. A control whose inner input is borderless (`.search-field`,
+`.filter-field`, `.money-input`, the searchable select) draws the border on its wrapper.
+The audit reports a `field-boundary` finding for any visible field with no border of its
+own or on a wrapper within two levels, or with a boundary under 3:1;
+`tests/field-outline-contrast.test.ts` guards the token.

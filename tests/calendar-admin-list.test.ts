@@ -158,6 +158,7 @@ describe("bulk action planning", () => {
     id: `r-${++counter}`,
     title: "Row",
     category: "",
+    entryType: "STANDARD",
     isPublished: false,
     isHiddenLocally: false,
     sourceFeedId: null,
@@ -203,6 +204,35 @@ describe("bulk action planning", () => {
     expect(hide.skipped.map((item) => item.reason)).toEqual(["Only imported entries can be hidden or unhidden.", "Already hidden."]);
     const unhide = planBulkAction([staff, imported, hidden], { action: "unhide" });
     expect(unhide.changes.map((change) => change.title)).toEqual(["Hidden"]);
+  });
+
+  it("marks and clears Deadline on any entry, recording staff's choice on imported ones only (#910)", () => {
+    const staff = row({ title: "Staff" });
+    const imported = row({ title: "Imported", sourceFeedId: "f" });
+    const detached = row({ title: "Detached", sourceUid: "u-1" });
+    const already = row({ title: "Already", entryType: "DEADLINE" });
+    const closure = row({ title: "Closure", entryType: "CLOSURE" });
+    const mark = planBulkAction([staff, imported, detached, already, closure], { action: "markDeadline" });
+    expect(mark.changes.map((change) => [change.title, change.data.entryType, change.markTypeEdited ?? false])).toEqual([
+      ["Staff", "DEADLINE", false],
+      ["Imported", "DEADLINE", true],
+      ["Detached", "DEADLINE", true],
+      ["Closure", "DEADLINE", false],
+    ]);
+    expect(mark.skipped).toEqual([{ id: already.id, title: "Already", reason: "Already a deadline." }]);
+    const clear = planBulkAction([staff, already, row({ title: "Imported deadline", entryType: "DEADLINE", sourceFeedId: "f" })], { action: "clearDeadline" });
+    expect(clear.changes.map((change) => [change.title, change.data.entryType, change.markTypeEdited ?? false])).toEqual([
+      ["Already", "STANDARD", false],
+      ["Imported deadline", "STANDARD", true],
+    ]);
+    expect(clear.skipped[0].reason).toBe("Not a deadline.");
+    expect(bulkConfirmMessage({ action: "markDeadline" }, 3)).toContain("Mark 3 entries as deadlines?");
+    expect(bulkConfirmMessage({ action: "clearDeadline" }, 1)).toContain("1 entry");
+  });
+
+  it("filters the list by the Deadline type (#910)", () => {
+    const list = [entry({ title: "Registration Due", entryType: "DEADLINE" }), entry({ title: "Camporee" })];
+    expect(filterAndSortEntries(list, { ...defaultEntryFilters, time: "all", entryType: "DEADLINE" }, "date", today).map((item) => item.title)).toEqual(["Registration Due"]);
   });
 
   it("words the confirm step and the skipped summary", () => {

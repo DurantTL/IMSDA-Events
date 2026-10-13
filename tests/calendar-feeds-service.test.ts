@@ -288,6 +288,17 @@ describe("imported calendar feeds", () => {
     expect(camporee.title).toBe("Synthetic Camporee");
   });
 
+  it("keeps a staff-chosen Deadline/Standard type through a reset (#910), and forgets the other edits", async () => {
+    const feedId = await addFeed();
+    await syncCalendarFeed(feedId, deps);
+    const camporee = entriesOf(feedId).find((entry) => entry.sourceUid === "allday-1@synthetic.test")!;
+    Object.assign(camporee, { title: "Edited", entryType: "DEADLINE", locallyEditedFields: ["title", "entryType"] });
+    await resetCalendarEntryToSource(camporee.id, "admin-1", deps);
+    expect(camporee).toMatchObject({ title: "Synthetic Camporee", entryType: "DEADLINE", locallyEditedFields: ["entryType"] });
+    await syncCalendarFeed(feedId, deps);
+    expect(camporee.entryType).toBe("DEADLINE");
+  });
+
   it("refuses to connect the same calendar twice, however it is spelled, without echoing the address", async () => {
     await addFeed();
     for (const url of [privateUrl, privateUrl.replace("https://", "webcal://")]) {

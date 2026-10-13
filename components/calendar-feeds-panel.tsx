@@ -13,14 +13,14 @@ type FeedResponse = {
   feeds?: CalendarAdminFeed[];
   entries?: CalendarAdminEntry[];
   preview?: FeedPreview;
-  summary?: { create: number; update: number; revive: number; relink: number; remove: number; unchanged: number; warnings: string[] };
+  summary?: { create: number; update: number; revive: number; relink: number; remove: number; unchanged: number; markedDeadline?: number; warnings: string[] };
   message?: string;
 };
 
 const actionLabels = { CREATE: "New", UPDATE: "Updated", REVIVE: "Back in feed", RELINK: "Re-linked", REMOVE: "Left the feed" } as const;
 const fieldLabels: Record<string, string> = {
   title: "title", description: "description", location: "location", linkUrl: "link", status: "status", startsOn: "start date",
-  endsOn: "end date", timeLabel: "time", repeatRule: "repeat", repeatExceptions: "skipped dates",
+  endsOn: "end date", timeLabel: "time", repeatRule: "repeat", repeatExceptions: "skipped dates", entryType: "type (deadline)",
 };
 
 function when(value: string | null) {
@@ -112,8 +112,8 @@ export function CalendarFeedsPanel({
   async function runSync(feed: CalendarAdminFeed, body?: { allowEmpty: boolean }) {
     const result = await call(`/api/admin/calendar/feeds/${encodeURIComponent(feed.id)}/sync`, "POST", body);
     if (result?.summary) {
-      const { create, update, revive, relink, remove, unchanged } = result.summary;
-      setNotice(`Imported: ${create} new, ${update + revive} updated, ${relink} re-linked, ${remove} removed, ${unchanged} unchanged.`);
+      const { create, update, revive, relink, remove, unchanged, markedDeadline = 0 } = result.summary;
+      setNotice(`Imported: ${create} new, ${update + revive} updated, ${relink} re-linked, ${remove} removed, ${unchanged} unchanged.${markedDeadline > 0 ? ` ${markedDeadline} marked as ${markedDeadline === 1 ? "a deadline" : "deadlines"} because the title says it is due, so ${markedDeadline === 1 ? "it stays" : "they stay"} off the public calendar. Change the type on any entry if that is wrong.` : ""}`);
       setPreview(null);
     }
   }
@@ -263,6 +263,7 @@ export function CalendarFeedsPanel({
               <p>
                 {preview.data.totalInFeed} items in the feed: {preview.data.counts.create} new, {preview.data.counts.update + preview.data.counts.revive} updated, {preview.data.counts.relink} re-linked,{" "}
                 {preview.data.counts.remove} leaving, {preview.data.counts.unchanged} unchanged.
+                {preview.data.counts.markedDeadline > 0 && ` ${preview.data.counts.markedDeadline} will be marked as ${preview.data.counts.markedDeadline === 1 ? "a deadline" : "deadlines"} (title says due) and kept off the public calendar.`}
                 {" "}New items arrive as {previewFeed.publishNewItems ? "published items" : "drafts"}.
               </p>
             </div>
