@@ -313,6 +313,7 @@ export function checkoutFromRegistration(
         balanceCents,
         payments: registration.payments,
         cardSelected: paymentSelection.cardSelected,
+        totalCents: moneyToCents(registration.totalAmount),
       })
     : null;
   // The kind asked for wins; otherwise a registrant who chose "Pay a deposit now" is quoted the deposit. A deposit

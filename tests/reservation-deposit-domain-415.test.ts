@@ -182,12 +182,37 @@ describe("balance after a deposit is right everywhere (#415)", () => {
 });
 
 describe("held reservation (#415)", () => {
-  it("is held exactly while a deposit stands, never from other payments", () => {
-    expect(reservationHeld(none)).toBe(false);
-    expect(reservationHeld([{ isDeposit: false, amount: 65, refunds: [] }])).toBe(false);
-    expect(reservationHeld([deposit(65)])).toBe(true);
+  const config = { amountCents: 6500, totalCents: 30_000 };
+  const ordinary = (amount: number, refunded = 0) => ({ isDeposit: false, amount, refunds: refunded ? [{ amount: refunded }] : [] });
+
+  it("is held by a recorded deposit", () => {
+    expect(reservationHeld(none, config)).toBe(false);
+    expect(reservationHeld([deposit(65)], config)).toBe(true);
     expect(recordedDepositCents([deposit(65, 15)])).toBe(5000);
-    expect(reservationHeld([deposit(65, 65)])).toBe(false);
+    expect(reservationHeld([deposit(65, 65)], config)).toBe(false);
+  });
+
+  it("is held once payments of any kind total at least the deposit, so paid in full is held (owner decision)", () => {
+    expect(reservationHeld([ordinary(64.99)], config)).toBe(false);
+    expect(reservationHeld([ordinary(65)], config)).toBe(true);
+    expect(reservationHeld([ordinary(40), ordinary(25)], config)).toBe(true);
+    expect(reservationHeld([ordinary(300)], config)).toBe(true);
+    // Refunds count against it.
+    expect(reservationHeld([ordinary(100, 40)], config)).toBe(false);
+  });
+
+  it("caps the deposit at the registration total, so a small registration paid in full is held", () => {
+    expect(reservationHeld([ordinary(40)], { amountCents: 6500, totalCents: 4000 })).toBe(true);
+    expect(reservationHeld([ordinary(39)], { amountCents: 6500, totalCents: 4000 })).toBe(false);
+    expect(reservationHeld([ordinary(10)], { amountCents: 6500, totalCents: 0 })).toBe(false);
+  });
+
+  it("is not offered a deposit once the registration has already paid that much", () => {
+    const offer = (payments: Parameters<typeof depositOffer>[0]["payments"]) => depositOffer({
+      definition: definition(), responses: {}, balanceCents: 20_000, payments, cardSelected: false, totalCents: 30_000,
+    });
+    expect(offer([ordinary(100)])).toBeNull();
+    expect(offer([ordinary(20)])).not.toBeNull();
   });
 });
 

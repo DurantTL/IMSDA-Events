@@ -254,14 +254,20 @@ function serializeRegistration(registration: RegistrationWithRelations, director
     && registration.event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE"
     && !cardPaymentConfigured;
   // The reservation deposit (#415): offered by the submitted form, recorded as an ordinary payment marked as the
-  // deposit, and "held" exactly while that payment stands. Null when the form offers no deposit.
+  // deposit, and "held" once the registration has paid at least the deposit (a recorded deposit, or payments that
+  // total it, so paid in full is held). Display only: confirmation, capacity and housing never depend on it. Null
+  // when the form offers no deposit.
   const depositConfig = depositConfigurationFromValue(registration.publicFormSubmission?.formVersion.definition);
+  const held = depositConfig
+    ? reservationHeld(registration.payments, { amountCents: depositConfig.amountCents, totalCents: totalAmountCents })
+    : false;
   const deposit = depositConfig
     ? {
         amountCents: depositConfig.amountCents,
-        dueCents: reservationHeld(registration.payments) ? 0 : depositDueCents(depositConfig, balanceCents),
+        dueCents: held ? 0 : depositDueCents(depositConfig, balanceCents),
         recordedCents: recordedDepositCents(registration.payments),
-        held: reservationHeld(registration.payments),
+        held,
+        paidInFull: balanceCents <= 0 && totalAmountCents > 0,
       }
     : null;
   return {

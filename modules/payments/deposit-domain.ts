@@ -18,9 +18,12 @@ import {
  *   offered a deposit.
  * - The deposit is capped at the balance: a deposit larger than what is owed is just the balance.
  *
- * A reservation is "held" exactly while a deposit payment's net amount (after refunds) is above zero. That is derived,
- * never stored, so it cannot disagree with the ledger and cannot be set without a recorded deposit. Forfeiting a
- * deposit is the cancellation rules' job (#169-#171) and is not modelled here.
+ * A reservation is "held" once the registration has paid at least the deposit, however it was paid: net succeeded
+ * payments after refunds of at least the deposit amount (capped at the registration total, so a small registration is
+ * held when paid in full), or a recorded deposit payment whose net is above zero. A registration paid in full is
+ * therefore held. That is derived, never stored, so it cannot disagree with the ledger. It is a label for staff only:
+ * every registration is confirmed and counts toward capacity and housing whether or not it is held, so nothing gates
+ * on it. Forfeiting a deposit is the cancellation rules' job (#169-#171) and is not modelled here.
  */
 
 export const paymentKinds = ["BALANCE", "DEPOSIT"] as const;
@@ -84,9 +87,32 @@ export function depositRecorded(payments: readonly DepositPaymentLike[]) {
   return recordedDepositCents(payments) > 0;
 }
 
-/** The held state shown to staff: derived from the recorded deposit, never stored. */
-export function reservationHeld(payments: readonly DepositPaymentLike[]) {
-  return depositRecorded(payments);
+/** Net succeeded payments after refunds, deposit or not. */
+export function netPaidCents(payments: readonly DepositPaymentLike[]) {
+  return payments.reduce((total, payment) => {
+    const refunded = payment.refunds.reduce((sum, refund) => sum + cents(refund.amount), 0);
+    return total + Math.max(cents(payment.amount) - refunded, 0);
+  }, 0);
+}
+
+/** Whether the registration has already paid the deposit amount, capped at what it owes in total. */
+export function paidAtLeastDeposit(
+  payments: readonly DepositPaymentLike[],
+  deposit: { amountCents: number; totalCents: number },
+) {
+  const requiredCents = Math.min(deposit.amountCents, deposit.totalCents);
+  return requiredCents > 0 && netPaidCents(payments) >= requiredCents;
+}
+
+/**
+ * The held state shown to staff, derived and never stored: a recorded deposit, or payments that already total at
+ * least the deposit (so a registration paid in full is held). Display only; nothing gates on it.
+ */
+export function reservationHeld(
+  payments: readonly DepositPaymentLike[],
+  deposit: { amountCents: number; totalCents: number },
+) {
+  return depositRecorded(payments) || paidAtLeastDeposit(payments, deposit);
 }
 
 /** The deposit actually due: the fixed amount, but never more than what is still owed. */
@@ -117,9 +143,12 @@ export function depositOffer(input: {
   balanceCents: number;
   payments: readonly DepositPaymentLike[];
   cardSelected: boolean;
+  /** The registration total; when given, a registration that has already paid the deposit is not offered one. */
+  totalCents?: number;
 }): DepositOffer | null {
   const config = depositConfiguration(input.definition);
   if (!config || input.cardSelected || depositRecorded(input.payments)) return null;
+  if (input.totalCents !== undefined && paidAtLeastDeposit(input.payments, { amountCents: config.amountCents, totalCents: input.totalCents })) return null;
   const depositCents = depositDueCents(config, input.balanceCents);
   if (depositCents <= 0 || depositCents >= input.balanceCents) return null;
   const surchargeCents = processingFeeForSubtotal(input.definition.payment, depositCents, true);

@@ -364,14 +364,18 @@ deposit now"). The logic lives in `modules/payments/deposit-domain.ts`.
   audited as `RESERVATION_DEPOSIT_RECORDED`, serialized per registration, and a
   repeat is refused (`DEPOSIT_ALREADY_RECORDED`). A check below the deposit is
   refused (`DEPOSIT_AMOUNT_TOO_LOW`) and is recorded as an ordinary payment.
-- "Held" is derived, never stored: a reservation is held exactly while a
-  deposit payment's net amount (after refunds) is above zero. It cannot be set
-  without a recorded deposit. Forfeiting a deposit belongs to the cancellation
-  rules (#169-#171) and is not built here.
-- "Held" means a recorded deposit and nothing else for now. A registration
-  paid in full with no deposit payment shows "Paid in full" on Payments, not
-  "held"; whether full payment should also hold the reservation is an owner
-  decision.
+- "Held" is derived, never stored (owner decision, Oct 13): a registration is
+  held once it has paid at least the deposit, however it was paid. That is a
+  recorded deposit payment with a net amount above zero, or net succeeded
+  payments after refunds that total at least the deposit amount (capped at the
+  registration total). A registration paid in full is therefore held, and
+  Payments shows "Reservation held — paid in full". A registration that has
+  already paid that much is not offered a deposit. Forfeiting a deposit belongs
+  to the cancellation rules (#169-#171) and is not built here.
+- "Held" is a label for staff and gates nothing. Every registration is
+  confirmed and counts toward capacity and housing whether or not it has paid,
+  so confirmation, capacity and housing never read it (it is computed only for
+  the Payments screen).
 - Balance reminders open the pay page with `?pay=balance`, so it quotes the
   whole balance; the deposit is the default only when the registrant arrives
   from the form's deposit choice.
