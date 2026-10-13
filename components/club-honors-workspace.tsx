@@ -362,7 +362,7 @@ export function ClubHonorsWorkspace({
                   <SortableHeader active className="honors-col-name" direction={nameDirection} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />
                   <th className="honors-col-class" role="columnheader" scope="col">Current class</th>
                   <th className="honors-col-honors" role="columnheader" scope="col">Honors</th>
-                  <th className="honors-col-add" role="columnheader" scope="col"><span className="sr-only">Add honor and history</span></th>
+                  <th className={readOnly ? "honors-col-add is-view-only" : "honors-col-add"} role="columnheader" scope="col"><span className="sr-only">{readOnly ? "View honor history" : "Add honor and history"}</span></th>
                 </tr>
               </thead>
               <tbody role="rowgroup">
@@ -374,8 +374,8 @@ export function ClubHonorsWorkspace({
                       <HonorPillList honors={row.honors} showStatus />
                     </td>
                     <td {...cardCell(null)}>
-                      <button aria-label={`Add or view honors for ${row.firstName} ${row.lastName}`} className="secondary-button honor-add-button" onClick={() => openHistory(row)} type="button">
-                        <Plus aria-hidden="true" size={13} /> Add
+                      <button aria-label={`${readOnly ? "View honor history for" : "Add or view honors for"} ${row.firstName} ${row.lastName}`} className="secondary-button honor-add-button" onClick={() => openHistory(row)} type="button">
+                        {readOnly ? "View history" : <><Plus aria-hidden="true" size={13} /> Add</>}
                       </button>
                     </td>
                   </tr>

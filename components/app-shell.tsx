@@ -267,7 +267,7 @@ export function AppShell({
 
         {!eventlessProfile && <span className="event-workspace-label">Event workspace</span>}
         {!eventlessProfile && <div className="event-picker-wrap">
-          <label htmlFor="event-picker">Current event</label>
+          <label className="sr-only" htmlFor="event-picker">Current event</label>
           <div className="select-shell">
             <select
               id="event-picker"

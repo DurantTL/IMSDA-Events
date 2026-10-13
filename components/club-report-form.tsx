@@ -231,7 +231,7 @@ export function ClubReportForm({
         )}
         {asDialog && !inDialog && (
           <button className="primary-button" data-monthly-report-open="" onClick={() => setOpen(true)} type="button">
-            <FileText aria-hidden="true" size={16} /> {readOnly ? "View report" : report ? (isDraft ? "Continue report" : "Edit report") : "Open monthly report"}
+            <FileText aria-hidden="true" size={16} /> {readOnly ? "View report" : report ? (isDraft ? "Continue report" : "Edit report") : "Open monthly record"}
           </button>
         )}
       </div>
@@ -389,7 +389,7 @@ export function ClubReportForm({
           <div className="modal-head">
             <div>
               <p className={eyebrow}>{monthLabel}</p>
-              <h2 id="monthly-report-dialog-title">Monthly report</h2>
+              <h2 id="monthly-report-dialog-title">Monthly Record</h2>
             </div>
             <button aria-label="Close" className="icon-button modal-close-button" disabled={saving} onClick={() => setOpen(false)} type="button">
               <X aria-hidden="true" size={18} />

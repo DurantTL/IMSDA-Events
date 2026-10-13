@@ -13,10 +13,15 @@ export const dynamic = "force-dynamic";
 
 type GroupRegistrationPageProps = { params: Promise<{ eventSlug: string }> };
 
-export const metadata: Metadata = {
-  title: `${GROUP_LABEL} registration`,
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({ params }: GroupRegistrationPageProps): Promise<Metadata> {
+  const { eventSlug } = await params;
+  // The page calls notFound() when the event has no group experience, so the tab title says so.
+  const experience = await load(eventSlug);
+  return {
+    title: experience ? `${GROUP_LABEL} registration` : "Page not found",
+    robots: { index: false, follow: false },
+  };
+}
 
 async function load(eventSlug: string) {
   try {

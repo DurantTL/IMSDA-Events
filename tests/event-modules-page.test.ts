@@ -196,7 +196,7 @@ describe("/more as the Event modules page", () => {
     const markup = await render();
     expect(markup).not.toContain("Your signed-in devices");
     expect(markup).not.toContain("Sign out 1 other device");
-    expect(markup).toContain("review your signed-in devices, on your profile page");
+    expect(markup).not.toContain("Sign-in settings");
   });
 
   it("keeps the universal tools on the page for a phone, with club forms for conference staff", async () => {
