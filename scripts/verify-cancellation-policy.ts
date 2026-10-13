@@ -428,6 +428,29 @@ async function main() {
   }
   console.log("ok: previews stay inside the event, and zero-dollar and synthetic input calculate");
 
+  // ---- A staff meal order posts a MEAL adjustment; the policy treats it as a meal. ----
+  {
+    const meals = await createFixture();
+    // What the meal ledger posts for a staff meal order (#210): a MEAL adjustment for the attendee, added to the total.
+    await base.registrationAdjustment.create({
+      data: { eventId, registrationId: meals.registrationId, kind: "MEAL", amountCents: 2000, reason: "Synthetic staff meal order", registrationAttendeeId: meals.attendeeIds[0], createdByNameSnapshot: "Check" },
+    });
+    await base.registration.update({ where: { id: meals.registrationId }, data: { totalAmount: 462 } });
+    const v3 = await repo.createPolicyVersion(eventId, adminId, {
+      rules: { ...campMeetingRules("2028-05-25"), nonrefundable: { categories: ["MEAL"], fieldKeys: [] } },
+      effectiveFrom: "2028-05-01T00:00:00.000Z",
+      note: "Meals nonrefundable",
+    }, new Date("2028-04-20T12:00:00.000Z"));
+    assert(v3.version === 3, "meals policy is version 3");
+    const result = (await repo.previewCancellation(eventId, request(meals.code), new Date("2028-05-02T12:00:00.000Z"))).result;
+    const mealLine = result.lines.find((line) => line.category === "MEAL" && line.source === "ADJUSTMENT");
+    assert(mealLine?.treatment === "NONREFUNDABLE" && mealLine.withheldCents === 2000 && mealLine.attendeeId === meals.attendeeIds[0], "the staff meal order is a nonrefundable meal charge for its attendee");
+    assert(!JSON.stringify(result).includes("Synthetic staff meal order"), "the meal order's free text is not copied");
+    const others = await repo.previewCancellation(eventId, request(meals.code, "ATTENDEE", { attendeeIds: [meals.attendeeIds[1] as string] }), new Date("2028-05-02T12:00:00.000Z"));
+    assert(others.result.lines.find((line) => line.category === "MEAL" && line.source === "ADJUSTMENT")?.treatment === "KEPT", "removing the other attendee keeps this attendee's meal charge");
+  }
+  console.log("ok: a staff meal order is a nonrefundable meal charge for its attendee");
+
   // ---- A card deposit is forfeited without its card fee. ----
   {
     const card = await createCardDepositFixture();

@@ -25,6 +25,7 @@ import {
 import { isValidTimeZone } from "@/modules/cancellation-policy/event-time";
 import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge";
 import { depositConfigurationFromValue, netPaidCents } from "@/modules/payments/deposit-domain";
+import { adjustmentCharge } from "@/modules/cancellation-policy/adjustment-charge";
 import { forfeitableDeposit } from "@/modules/cancellation-policy/deposit-facts";
 
 /**
@@ -251,12 +252,6 @@ function personName(attendee: { profileSnapshot: unknown; person: { firstName: s
   return `${first} ${last}`.trim();
 }
 
-const adjustmentKindWords: Record<string, string> = {
-  SCHOLARSHIP: "Scholarship",
-  DISCOUNT: "Discount",
-  PROMO_CODE: "Promo code",
-  CORRECTION: "Correction",
-};
 
 async function loadRegistrationRows(client: Client, eventId: string, reference: string) {
   return client.registration.findFirst({
@@ -337,17 +332,7 @@ function buildCharges(registration: RegistrationRows, appliedSurchargeCents: num
   if (appliedSurchargeCents > 0) {
     charges.push({ id: "fee:applied-surcharge", source: "APPLIED_SURCHARGE", label: "Card processing fee on a card payment", amountCents: appliedSurchargeCents, category: "FEE", fieldKey: null, attendeeId: null });
   }
-  for (const adjustment of registration.adjustments) {
-    charges.push({
-      id: `adjustment:${adjustment.id}`,
-      source: "ADJUSTMENT",
-      label: `${adjustmentKindWords[adjustment.kind] ?? "Adjustment"} (adjustment)`,
-      amountCents: adjustment.amountCents,
-      category: "ADJUSTMENT",
-      fieldKey: null,
-      attendeeId: adjustment.registrationAttendeeId && attendeeIds.includes(adjustment.registrationAttendeeId) ? adjustment.registrationAttendeeId : null,
-    });
-  }
+  for (const adjustment of registration.adjustments) charges.push(adjustmentCharge(adjustment, attendeeIds));
   // What the stored total holds that the lines above do not explain (a registration entered without itemized pricing,
   // or a discount applied to the whole registration at checkout). Shown, so the lines always add up to the total.
   const explained = charges.reduce((total, entry) => total + entry.amountCents, 0);
