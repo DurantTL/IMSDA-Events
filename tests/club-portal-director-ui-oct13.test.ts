@@ -8,6 +8,7 @@ vi.mock("server-only", () => ({}));
 import { BACK_TO_TOP_HIDE_AT, BACK_TO_TOP_SHOW_AT, BackToTopButton, backToTopVisible } from "@/components/back-to-top-button";
 import { ClubOrderWorkspace, orderSectionLinks, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
 import { HonorCombobox } from "@/components/honor-combobox";
+import { bottomBarTop } from "@/components/fixed-bottom-bars";
 import { COMBOBOX_LIST_MAX_HEIGHT, COMBOBOX_LIST_MIN_HEIGHT, comboboxPopoverPlacement } from "@/modules/honors/honor-search";
 
 /**
@@ -37,23 +38,37 @@ describe("Orders button descriptions", () => {
   });
 
   it("describes what each part does today, without jargon", () => {
-    const text = (label: string) => orderSectionLinks(true).find((link) => link.label === label)?.description ?? "";
+    const text = (label: string) => orderSectionLinks(true, false).find((link) => link.label === label)?.description ?? "";
     expect(text("Order list")).toMatch(/AdventSource/);
     expect(text("Order list")).toMatch(/export or print/);
     expect(text("Supplies")).toMatch(/already has on hand/);
     expect(text("Supplies")).toMatch(/come off what you need to order/);
-    expect(text("Ready to hand out")).toMatch(/already covered by supplies/);
-    expect(text("Ready to hand out")).toMatch(/mark it handed out/);
+    expect(text("Ready to hand out")).toBe("Members whose honor, award or uniform item is already in your supplies. When you give it to them, mark it handed out; it leaves this list and comes off your supplies.");
     expect(text("Uniforms")).toMatch(/who needs which uniform items/i);
     expect(text("Waiting to arrive")).toMatch(/Mark one received/);
-    for (const link of orderSectionLinks(true)) expect(link.description, link.label).not.toMatch(/SKU|backorder|inventory|helper list|sync|CSV|API/i);
+    for (const readOnly of [false, true]) {
+      for (const link of orderSectionLinks(true, readOnly)) expect(link.description, link.label).not.toMatch(/SKU|backorder|inventory|helper list|sync|CSV|API/i);
+    }
+  });
+
+  it("describes rather than instructs for a view-only registrar or Area Coordinator", () => {
+    const directors = orderSectionLinks(true, false);
+    const viewers = orderSectionLinks(true, true);
+    expect(viewers.map((link) => link.id)).toEqual(directors.map((link) => link.id));
+    for (const link of viewers) {
+      expect(link.description, link.label).not.toMatch(/\b(your|you|keep|change|add or remove|mark one|tick|hand it out)\b/i);
+      expect(link.description.length, link.label).toBeLessThan(220);
+    }
+    const text = (label: string) => viewers.find((link) => link.label === label)?.description ?? "";
+    expect(text("Ready to hand out")).toMatch(/Once it is given to them it is marked handed out/);
+    expect(text("Uniforms")).toMatch(/^Who needs which uniform items\./);
   });
 
   it("shows each description inside its button, for a director and a view-only registrar", () => {
     for (const readOnly of [false, true]) {
       const html = renderOrders(readOnly);
       const nav = html.slice(html.indexOf('<nav aria-label="Jump to a part of this page"'), html.indexOf("</nav>"));
-      for (const link of orderSectionLinks(false)) {
+      for (const link of orderSectionLinks(false, readOnly)) {
         expect(nav).toContain(`href="#${link.id}"`);
         expect(nav).toContain(`<small class="`);
         expect(nav).toContain(link.description.replace(/'/g, "&#x27;"));
@@ -187,5 +202,48 @@ describe("Back to top", () => {
     const layout = read("app/(public)/account/(portal)/clubs/[organizationId]/layout.tsx");
     expect(layout).toContain('import { BackToTopButton } from "@/components/back-to-top-button"');
     expect(layout).toContain("<BackToTopButton />");
+  });
+});
+
+describe("floating controls stay clear of bottom bars", () => {
+  const phone = { h: 844, w: 390 };
+
+  it("finds a stuck sticky bar or a fixed tab bar along the bottom, and the highest one", () => {
+    // The 67px staff tab bar, and a taller sticky Save classes bar that also reaches the bottom.
+    expect(bottomBarTop([{ top: 777, bottom: 844, width: 390 }], phone.h, phone.w)).toBe(777);
+    expect(bottomBarTop([{ top: 777, bottom: 844, width: 390 }, { top: 713, bottom: 844, width: 390 }], phone.h, phone.w)).toBe(713);
+    expect(bottomBarTop([{ top: 780, bottom: 844, width: 390 }, { top: 700, bottom: 844, width: 390 }], phone.h, phone.w)).toBe(700);
+  });
+
+  it("lets a floating control also clear a sticky bar resting just above the bottom edge", () => {
+    // Not stuck yet: it ends at 729 of 768, inside the 72px corner the button would sit in.
+    const resting = [{ top: 665, bottom: 729, width: 1024 }];
+    expect(bottomBarTop(resting, 768, 1024)).toBeNull();
+    expect(bottomBarTop(resting, 768, 1024, 768 - 72)).toBe(665);
+    // One that ends well above the corner is left alone.
+    expect(bottomBarTop([{ top: 600, bottom: 660, width: 1024 }], 768, 1024, 768 - 72)).toBeNull();
+  });
+
+  it("ignores things that are not a bottom bar", () => {
+    expect(bottomBarTop([], phone.h, phone.w)).toBeNull();
+    // A sticky bar that is not stuck (it still sits mid-page), a header, a narrow chip, a full-screen backdrop, and one scrolled off.
+    expect(bottomBarTop([
+      { top: 500, bottom: 560, width: 390 },
+      { top: 0, bottom: 60, width: 390 },
+      { top: 790, bottom: 844, width: 120 },
+      { top: 0, bottom: 844, width: 390 },
+      { top: 844, bottom: 900, width: 390 },
+    ], phone.h, phone.w)).toBeNull();
+  });
+
+  it("is used by Back to top and by the honor list", () => {
+    const back = read("components/back-to-top-button.tsx");
+    expect(back).toContain("bottomBarTopOf");
+    expect(back).toContain("style={lift > 0 ? { bottom: lift } : undefined}");
+    const combo = read("components/honor-combobox.tsx");
+    expect(combo).toContain("visibleBottomBarTop()");
+    expect(combo).toContain("requestAnimationFrame");
+    expect(combo).toContain("event.target === listRef.current");
+    expect(combo).toContain('visualViewport?.addEventListener("scroll"');
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { visibleBottomBarTop } from "@/components/fixed-bottom-bars";
 import { comboboxKeyResult, comboboxPopoverPlacement, filterHonorsByWordPrefix, type ComboboxPlacement } from "@/modules/honors/honor-search";
 
 export type HonorComboboxOption = { id: string; name: string };
@@ -10,6 +11,8 @@ function visibleBounds(from: HTMLElement) {
   const viewport = window.visualViewport;
   let top = viewport ? viewport.offsetTop : 0;
   let bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+  const barTop = visibleBottomBarTop();
+  if (barTop !== null) bottom = Math.min(bottom, barTop);
   for (let node = from.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
     if (window.getComputedStyle(node).overflowY === "visible") continue;
     const rect = node.getBoundingClientRect();
@@ -101,14 +104,23 @@ export function HonorCombobox({
       };
       setPlacement((current) => (current.side === next.side && current.maxHeight === next.maxHeight && current.lift === next.lift ? current : next));
     }
+    // Re-measure at most once per frame, and not for the list's own scrolling.
+    let pending = 0;
+    function schedule(event?: Event) {
+      if (event && event.target === listRef.current) return;
+      if (pending === 0) pending = window.requestAnimationFrame(() => { pending = 0; place(); });
+    }
     place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    window.visualViewport?.addEventListener("resize", place);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true);
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("scroll", schedule);
     return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-      window.visualViewport?.removeEventListener("resize", place);
+      if (pending !== 0) window.cancelAnimationFrame(pending);
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("scroll", schedule);
     };
   }, [open, choices.length]);
 

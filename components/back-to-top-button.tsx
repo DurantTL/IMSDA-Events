@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
+import { bottomBarTopOf, findFixedOrStickyElements } from "@/components/fixed-bottom-bars";
 
 /** The button appears once the page is scrolled past this many screen heights... */
 export const BACK_TO_TOP_SHOW_AT = 1.5;
@@ -28,25 +29,43 @@ export function backToTopVisible(scrollY: number, viewportHeight: number, wasVis
  */
 export function BackToTopButton() {
   const [visible, setVisible] = useState(false);
+  // How far to lift the button so it sits above a fixed or sticky bar along the bottom (0 when there is none).
+  const [lift, setLift] = useState(0);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let frame = 0;
+    let candidates: HTMLElement[] = [];
+    let scannedAt = -Infinity;
     function update() {
       frame = 0;
       setVisible((current) => {
         const next = backToTopVisible(window.scrollY, window.innerHeight, current);
         return next === current ? current : next;
       });
+      // The list of fixed and sticky elements is rescanned about once a second; their positions are read every frame.
+      const now = performance.now();
+      if (now - scannedAt > 1000) {
+        candidates = findFixedOrStickyElements(buttonRef.current);
+        scannedAt = now;
+      }
+      const barTop = bottomBarTopOf(candidates.filter((el) => !buttonRef.current?.contains(el)), window.innerHeight - 72);
+      const next = barTop === null ? 0 : Math.max(0, Math.ceil(window.innerHeight - barTop + 12));
+      setLift((current) => (current === next ? current : next));
     }
     function onScroll() {
       if (frame === 0) frame = window.requestAnimationFrame(update);
     }
+    function onResize() {
+      scannedAt = -Infinity;
+      onScroll();
+    }
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
   }, []);
@@ -66,7 +85,15 @@ export function BackToTopButton() {
 
   if (!visible) return null;
   return (
-    <button aria-label="Back to top" className="back-to-top-button" onClick={goToTop} title="Back to top" type="button">
+    <button
+      aria-label="Back to top"
+      className="back-to-top-button"
+      onClick={goToTop}
+      ref={buttonRef}
+      style={lift > 0 ? { bottom: lift } : undefined}
+      title="Back to top"
+      type="button"
+    >
       <ArrowUp aria-hidden="true" size={20} />
     </button>
   );
