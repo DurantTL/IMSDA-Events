@@ -54,7 +54,8 @@ function setup(envFile: string, keyFile?: string) {
     const result = spawnSync("sh", [script, ...args], {
       encoding: "utf8",
       env: {
-        PATH: `${bin}:${process.env.PATH}`,
+        NODE_ENV: "test",
+        PATH: `${bin}:${process.env.PATH ?? ""}`,
         IMSDA_DEPLOY_ALLOW_NON_ROOT: "1",
         IMSDA_XCLOUD_RUNTIME_DIR: runtime,
         IMSDA_APP_CONTAINER: app,
