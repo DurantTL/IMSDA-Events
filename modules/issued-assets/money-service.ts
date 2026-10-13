@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AssetError } from "@/modules/issued-assets/errors";
 import { coverInputs, fateOf, loadChargedIssuances, loadCorrectionRows } from "@/modules/issued-assets/corrections";
@@ -13,7 +14,8 @@ import {
 import { lockAssets, requireEvent, rowHolderKey, transact, type Tx } from "@/modules/issued-assets/service";
 import { sameHolder } from "@/modules/issued-assets/domain";
 import { AdjustmentError, postAssetAdjustment } from "@/modules/registrations/adjustments";
-import { lateRefundSchema } from "@/modules/issued-assets/returns-domain";
+import { depositHeldCents as heldFrom, lateRefundSchema } from "@/modules/issued-assets/returns-domain";
+import { foundAfterKept } from "@/modules/issued-assets/corrections";
 
 /**
  * Issued assets (#214, slice 2): cash deposits, charges and waivers.
@@ -24,6 +26,25 @@ import { lateRefundSchema } from "@/modules/issued-assets/returns-domain";
  * shows in balances); a waiver of a posted charge is the reversing line. No provider is called and no card is refunded:
  * refunds stay a human decision.
  */
+
+/**
+ * How much of the money a deposit kept is still held. The one definition (see `depositHeldCents` in returns-domain, and the
+ * database function `AssetDeposit_held` that enforces it): what it kept, less what was handed back late, less what posted and
+ * unwaived charges on its covered items already counted against it, never below zero. Waiving a charge restores its offset.
+ * Read under the deposit's covered-asset locks.
+ */
+export async function depositHeldCents(client: Tx | ReturnType<typeof getPrisma>, eventId: string, depositEntryId: string) {
+  const [entries, covers] = await Promise.all([
+    client.assetLedgerEntry.findMany({ where: { eventId, depositEntryId }, select: { kind: true, amountCents: true } }),
+    client.assetDepositCover.findMany({ where: { eventId, depositEntryId }, select: { issuanceId: true } }),
+  ]);
+  const charges = await client.assetLedgerEntry.aggregate({
+    where: { eventId, kind: "CHARGE", registrationAdjustmentId: { not: null }, issuanceId: { in: covers.map((cover) => cover.issuanceId) }, waivedBy: { none: {} } },
+    _sum: { depositOffsetCents: true },
+  });
+  const total = (kind: string) => entries.filter((entry) => entry.kind === kind).reduce((sum, entry) => sum + entry.amountCents, 0);
+  return heldFrom({ keptCents: total("DEPOSIT_KEPT"), lateCents: total("DEPOSIT_HANDED_BACK_LATE"), offsetCents: charges._sum.depositOffsetCents ?? 0 });
+}
 
 const actorNameOf = async (tx: Tx, actorUserId: string) => (await tx.user.findUnique({ where: { id: actorUserId }, select: { displayName: true } }))?.displayName ?? "Staff";
 
@@ -220,21 +241,13 @@ export async function postCharge(eventId: string, actorUserId: string, rawInput:
     if (input.category !== "OTHER" && lostOrDamaged) {
       const cover = await tx.assetDepositCover.findUnique({ where: { issuanceId: row.id } });
       if (cover) {
-        const settlements = await tx.assetLedgerEntry.findMany({ where: { eventId, depositEntryId: cover.depositEntryId, kind: "DEPOSIT_KEPT" }, select: { amountCents: true } });
-        const kept = settlements.reduce((sum, entry) => sum + entry.amountCents, 0);
-        if (kept > 0) {
-          const siblings = await tx.assetDepositCover.findMany({ where: { depositEntryId: cover.depositEntryId }, select: { issuanceId: true } });
-          const used = (await tx.assetLedgerEntry.aggregate({
-            where: { eventId, kind: "CHARGE", issuanceId: { in: siblings.map((entry) => entry.issuanceId) }, waivedBy: { none: {} } }, _sum: { depositOffsetCents: true },
-          }))._sum.depositOffsetCents ?? 0;
-          const remaining = Math.max(0, kept - used);
-          if (remaining > 0) {
-            if (!options.canManageMoney || !input.confirmKeptDeposit) {
-              throw new AssetError("DEPOSIT_ALREADY_KEPT", `The cash deposit already kept ${formatCents(remaining)} for lost or damaged items, so charging the full amount would take the guest's money twice. ${options.canManageMoney ? "Confirm to charge only the part above what the deposit kept." : "Finance or an event administrator can charge only the part above it."}`);
-            }
-            offset = Math.min(input.amountCents, remaining);
-            if (offset >= input.amountCents) throw new AssetError("CHARGE_NOT_ALLOWED", "The deposit that was kept already covers that amount. Nothing more is charged.");
+        const held = await depositHeldCents(tx, eventId, cover.depositEntryId);
+        if (held > 0) {
+          if (!options.canManageMoney || !input.confirmKeptDeposit) {
+            throw new AssetError("DEPOSIT_ALREADY_KEPT", `The cash deposit still holds ${formatCents(held)} that it kept for lost or damaged items, so charging the full amount would take the guest's money twice. ${options.canManageMoney ? "Confirm to charge only the part above what the deposit holds." : "Finance or an event administrator can charge only the part above it."}`);
           }
+          offset = Math.min(input.amountCents, held);
+          if (offset >= input.amountCents) throw new AssetError("CHARGE_NOT_ALLOWED", "The deposit that was kept already covers that amount. Nothing more is charged.");
         }
       }
     }
@@ -355,15 +368,16 @@ export async function recordLateDepositRefund(eventId: string, actorUserId: stri
     const coveredIds = found.covers.map((cover) => cover.issuanceId);
     const lockRows = await tx.assetIssuance.findMany({ where: { eventId, id: { in: coveredIds } }, select: { assetId: true } });
     await lockAssets(tx, eventId, lockRows.map((row) => row.assetId));
-    const entries = await tx.assetLedgerEntry.findMany({ where: { eventId, depositEntryId: found.id }, select: { kind: true, amountCents: true } });
-    const kept = entries.filter((entry) => entry.kind === "DEPOSIT_KEPT").reduce((sum, entry) => sum + entry.amountCents, 0);
-    const late = entries.filter((entry) => entry.kind === "DEPOSIT_HANDED_BACK_LATE").reduce((sum, entry) => sum + entry.amountCents, 0);
-    if (kept === 0) throw new AssetError("CORRECTION_INVALID", "That deposit kept no money, so there is nothing to hand back after a correction.");
+    const kept = await tx.assetLedgerEntry.findMany({ where: { eventId, depositEntryId: found.id, kind: "DEPOSIT_KEPT" }, select: { createdAt: true } });
+    if (kept.length === 0) throw new AssetError("CORRECTION_INVALID", "That deposit kept no money, so there is nothing to hand back after a correction.");
+    // Only a key that was lost or damaged when the deposit was kept and has since been corrected to returned unlocks a hand-back.
+    const covered = await tx.assetIssuance.findMany({ where: { eventId, id: { in: coveredIds } }, select: { id: true, endedAt: true, endReason: true } });
     const corrections = await loadCorrectionRows(tx, eventId, coveredIds);
-    if (![...corrections.values()].some((rows) => rows.some((entry) => entry.type === "OUTCOME_CORRECTED"))) {
-      throw new AssetError("CORRECTION_INVALID", "None of the items this deposit covers has a corrected outcome, so the kept deposit stands.");
+    if (!foundAfterKept(covered, corrections, Math.min(...kept.map((entry) => entry.createdAt.getTime())))) {
+      throw new AssetError("CORRECTION_INVALID", "No item this deposit covers was corrected from lost or damaged to returned after the deposit was kept, so the kept deposit stands.");
     }
-    if (input.amountCents > kept - late) throw new AssetError("CORRECTION_INVALID", `Only ${formatCents(kept - late)} of the kept deposit can still be handed back.`);
+    const held = await depositHeldCents(tx, eventId, found.id);
+    if (input.amountCents > held) throw new AssetError("CORRECTION_INVALID", `Only ${formatCents(held)} of the kept deposit is still held (some may already be handed back or counted against a charge).`);
     const entry = await tx.assetLedgerEntry.create({
       data: {
         eventId, kind: "DEPOSIT_HANDED_BACK_LATE", amountCents: input.amountCents, assetTypeId: found.assetTypeId, registrationId: found.registrationId, depositEntryId: found.id,
@@ -374,6 +388,6 @@ export async function recordLateDepositRefund(eventId: string, actorUserId: stri
       eventId, actorUserId, action: "ASSET_DEPOSIT_HANDED_BACK_AFTER_CORRECTION", entityType: "AssetLedgerEntry", entityId: entry.id,
       summary: `Recorded ${formatCents(input.amountCents)} of a kept deposit handed back after a correction.`, metadata: { depositEntryId: found.id, amountCents: input.amountCents },
     }, tx);
-    return { entryId: entry.id, amountCents: input.amountCents, remainingKeptCents: kept - late - input.amountCents, replayed: false };
+    return { entryId: entry.id, amountCents: input.amountCents, remainingKeptCents: held - input.amountCents, replayed: false };
   });
 }

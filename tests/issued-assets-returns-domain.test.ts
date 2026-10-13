@@ -13,6 +13,7 @@ import {
   coverStateOf,
   effectiveEndReason,
   keepFeesNeedsFee,
+  depositHeldCents,
   lateRefundSchema,
   decideDepositOutcome,
   depositActionSchema,
@@ -224,8 +225,20 @@ describe("corrections and policy rules", () => {
 
 describe("reviews and cash handed back after a correction", () => {
   it("needs a reason to mark an exception reviewed", () => {
-    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", reason: "" }).success).toBe(false);
-    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", reason: "Manager agreed" }).success).toBe(true);
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "CORRECTION_NEEDS_REVIEW", reason: "" }).success).toBe(false);
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "CORRECTION_NEEDS_REVIEW", reason: "Manager agreed" }).success).toBe(true);
+  });
+
+  it("names the exception a review answers", () => {
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", reason: "Manager agreed" }).success).toBe(false);
+    expect(correctionActionSchema.safeParse({ action: "review", issuanceId: "i1", exceptionCode: "UNCHARGED_LOSS", reason: "Manager agreed" }).success).toBe(false);
+  });
+
+  it("defines held as kept less late hand-backs less offsets, never below zero", () => {
+    expect(depositHeldCents({ keptCents: 1000, lateCents: 0, offsetCents: 0 })).toBe(1000);
+    expect(depositHeldCents({ keptCents: 1000, lateCents: 600, offsetCents: 0 })).toBe(400);
+    expect(depositHeldCents({ keptCents: 1000, lateCents: 0, offsetCents: 1000 })).toBe(0);
+    expect(depositHeldCents({ keptCents: 1000, lateCents: 600, offsetCents: 600 })).toBe(0);
   });
 
   it("needs a deposit, an amount and a reason to record cash handed back", () => {

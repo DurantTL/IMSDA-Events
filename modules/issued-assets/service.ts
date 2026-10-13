@@ -378,6 +378,8 @@ export type EndExtras = {
   idempotencyKey?: string | null;
   evidenceRef?: string | null;
   condition?: AssetCondition | null;
+  /** The change this ending made to a lot's stock count (negative: units taken off), so a later correction reverses exactly that. */
+  stockDelta?: number;
 };
 
 export async function endIssuance(tx: Tx, row: OpenIssuance, p: { actorUserId: string; endReason: "TRANSFERRED" | "REPLACED" | "CORRECTED" | "RETURNED" | "LOST" | "DAMAGED"; historyType: "TRANSFERRED_OUT" | "REPLACED_OUT" | "CORRECTED" | "RETURNED" | "LOST" | "DAMAGED"; reason: string; entryMethod: EntryMethod; relatedIssuanceId: string | null; at: Date } & EndExtras) {
@@ -392,7 +394,7 @@ export async function endIssuance(tx: Tx, row: OpenIssuance, p: { actorUserId: s
       eventId: row.eventId, issuanceId: row.id, assetId: row.assetId, type: p.historyType, at: p.at, actorUserId: p.actorUserId, reason: p.reason,
       entryMethod: p.entryMethod, quantity: p.endQuantity ?? row.quantity, assigneeKind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId,
       staffUserId: row.staffUserId, roomUnitId: row.roomUnitId, sourceAssignmentId: row.sourceAssignmentId, assigneeLabel: row.assigneeLabel,
-      relatedIssuanceId: p.relatedIssuanceId, revision, idempotencyKey: p.idempotencyKey ?? null, evidenceRef: p.evidenceRef ?? null, condition: p.condition ?? null,
+      relatedIssuanceId: p.relatedIssuanceId, revision, idempotencyKey: p.idempotencyKey ?? null, evidenceRef: p.evidenceRef ?? null, condition: p.condition ?? null, stockDelta: p.stockDelta ?? 0,
     },
   });
 }

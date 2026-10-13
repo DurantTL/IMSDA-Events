@@ -20,19 +20,19 @@ import { lockAssets, requireEvent, transact, type Tx } from "@/modules/issued-as
 
 type Client = ReturnType<typeof getPrisma> | Tx;
 
-export type CorrectionRow = { issuanceId: string; assetId: string; type: "OUTCOME_CORRECTED" | "WRITTEN_OFF" | "EXCEPTION_REVIEWED"; fate: string | null; at: Date; recordedAt: Date; reason: string | null; actorUserId: string; quantity: number };
+export type CorrectionRow = { id: string; issuanceId: string; assetId: string; type: "OUTCOME_CORRECTED" | "WRITTEN_OFF" | "EXCEPTION_REVIEWED"; fate: string | null; at: Date; recordedAt: Date; reason: string | null; actorUserId: string; quantity: number; reviewedCode: string | null; reviewedRefId: string | null };
 
 /** Every correction and write-off of the given issuances (or of the whole event), oldest first. */
 export async function loadCorrectionRows(client: Client, eventId: string, issuanceIds?: readonly string[]): Promise<Map<string, CorrectionRow[]>> {
   const rows = await client.assetIssuanceHistory.findMany({
     where: { eventId, type: { in: ["OUTCOME_CORRECTED", "WRITTEN_OFF", "EXCEPTION_REVIEWED"] }, ...(issuanceIds ? { issuanceId: { in: [...issuanceIds] } } : {}) },
     orderBy: [{ recordedAt: "asc" }, { at: "asc" }],
-    select: { issuanceId: true, assetId: true, type: true, correctedEndReason: true, at: true, recordedAt: true, reason: true, actorUserId: true, quantity: true },
+    select: { id: true, issuanceId: true, assetId: true, type: true, correctedEndReason: true, at: true, recordedAt: true, reason: true, actorUserId: true, quantity: true, reviewedCode: true, reviewedRefId: true },
   });
   const byIssuance = new Map<string, CorrectionRow[]>();
   for (const row of rows) {
     byIssuance.set(row.issuanceId, [...(byIssuance.get(row.issuanceId) ?? []), {
-      issuanceId: row.issuanceId, assetId: row.assetId, type: row.type as CorrectionRow["type"], fate: row.correctedEndReason, at: row.at, recordedAt: row.recordedAt, reason: row.reason, actorUserId: row.actorUserId, quantity: row.quantity,
+      id: row.id, issuanceId: row.issuanceId, assetId: row.assetId, type: row.type as CorrectionRow["type"], fate: row.correctedEndReason, at: row.at, recordedAt: row.recordedAt, reason: row.reason, actorUserId: row.actorUserId, quantity: row.quantity, reviewedCode: row.reviewedCode, reviewedRefId: row.reviewedRefId,
     }]);
   }
   return byIssuance;
@@ -70,7 +70,7 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
       if (replay) {
         const sameAction = replay.issuanceId === input.issuanceId
           && (input.action === "correct" ? replay.type === "OUTCOME_CORRECTED" && replay.correctedEndReason === input.fate
-            : input.action === "write_off" ? replay.type === "WRITTEN_OFF" : replay.type === "EXCEPTION_REVIEWED");
+            : input.action === "write_off" ? replay.type === "WRITTEN_OFF" : replay.type === "EXCEPTION_REVIEWED" && replay.reviewedCode === input.exceptionCode);
         if (!sameAction) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different correction.");
         return { issuanceId: replay.issuanceId, kind: replay.type === "WRITTEN_OFF" ? "WRITTEN_OFF" as const : replay.type === "EXCEPTION_REVIEWED" ? "REVIEWED" as const : "CORRECTED" as const, from: null, to: replay.correctedEndReason, replayed: true };
       }
@@ -82,14 +82,24 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
     if (input.action !== "review" && (!row.endedAt || !["RETURNED", "LOST", "DAMAGED", "REPLACED"].includes(row.endReason ?? ""))) {
       throw new AssetError("CORRECTION_INVALID", "Only a recorded return, loss, damage or the original of a replacement can be corrected.");
     }
-    const current = fateOf(row, (await loadCorrectionRows(tx, eventId, [row.id])).get(row.id));
+    const corrRows = (await loadCorrectionRows(tx, eventId, [row.id])).get(row.id);
+    const current = fateOf(row, corrRows);
     const base = {
       eventId, issuanceId: row.id, assetId: row.assetId, actorUserId, reason: input.reason, entryMethod: "MANUAL" as const, quantity: row.endQuantity ?? row.quantity,
       assigneeKind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId, staffUserId: row.staffUserId, roomUnitId: row.roomUnitId,
       sourceAssignmentId: row.sourceAssignmentId, assigneeLabel: row.assigneeLabel, revision: row.revision, idempotencyKey: input.idempotencyKey ?? null,
     };
     if (input.action === "review") {
-      await tx.assetIssuanceHistory.create({ data: { ...base, type: "EXCEPTION_REVIEWED" } });
+      // The review names the exception it answers and the entry that raised it, so it clears only that one, and a later
+      // correction or waiver raises the exception again.
+      let triggerId: string | null = null;
+      if (input.exceptionCode === "CORRECTION_NEEDS_REVIEW") {
+        triggerId = (corrRows ?? []).filter((entry) => entry.type === "OUTCOME_CORRECTED").slice(-1)[0]?.id ?? null;
+      } else {
+        triggerId = (await tx.assetLedgerEntry.findFirst({ where: { eventId, kind: "WAIVER", issuanceId: row.id }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id ?? null;
+      }
+      if (!triggerId) throw new AssetError("CORRECTION_INVALID", "That item has nothing of that kind to review.");
+      await tx.assetIssuanceHistory.create({ data: { ...base, type: "EXCEPTION_REVIEWED", reviewedCode: input.exceptionCode, reviewedRefId: triggerId } });
       await writeAuditLog({ eventId, actorUserId, action: "ASSET_EXCEPTION_REVIEWED", entityType: "AssetIssuance", entityId: row.id, summary: "Reviewed a closeout exception on an issued item.", metadata: { assetId: row.assetId } }, tx);
       return { issuanceId: row.id, kind: "REVIEWED" as const, from: null, to: null, replayed: false };
     }
@@ -102,21 +112,25 @@ export async function recordOutcomeCorrection(eventId: string, actorUserId: stri
       return { issuanceId: row.id, kind: "WRITTEN_OFF" as const, from: current.endReason, to: null, replayed: false };
     }
     if (input.fate === current.endReason) throw new AssetError("CORRECTION_INVALID", `That is already recorded as ${input.fate.toLowerCase()}.`);
-    await tx.assetIssuanceHistory.create({ data: { ...base, type: "OUTCOME_CORRECTED", correctedEndReason: input.fate } });
-    // A numbered item follows its latest issue's fate: a found key is back in stock, a lost or damaged one is held out.
-    const wasLossy = current.endReason === "LOST" || current.endReason === "DAMAGED";
     const nowLossy = input.fate === "LOST" || input.fate === "DAMAGED";
+    // A lot follows the corrected fate by exactly what was applied: every history row of this issue records the stock change it
+    // made, a correction moves the lot from what is applied to what the new fate calls for, and never adds back what was never
+    // removed (a lot lost entirely could not be shortened below one, so nothing was removed and nothing is added back).
+    let stockDelta = 0;
     if (!row.serialized) {
-      // A lot follows the corrected fate: units lost or damaged come off the lot, a found one goes back on (under the asset lock).
       const quantity = row.endQuantity ?? row.quantity;
-      const held = (await tx.assetIssuance.aggregate({ where: { assetId: row.assetId, endedAt: null }, _sum: { quantity: true } }))._sum.quantity ?? 0;
-      if (wasLossy && !nowLossy) {
-        await tx.issuedAsset.update({ where: { id: row.assetId }, data: { quantityTotal: row.asset.quantityTotal + quantity } });
-      } else if (!wasLossy && nowLossy) {
-        const next = row.asset.quantityTotal - quantity;
-        if (next >= 1 && next >= held) await tx.issuedAsset.update({ where: { id: row.assetId }, data: { quantityTotal: next } });
+      const applied = (await tx.assetIssuanceHistory.aggregate({ where: { issuanceId: row.id }, _sum: { stockDelta: true } }))._sum.stockDelta ?? 0;
+      stockDelta = (nowLossy ? -quantity : 0) - applied;
+      if (stockDelta < 0) {
+        const held = (await tx.assetIssuance.aggregate({ where: { assetId: row.assetId, endedAt: null }, _sum: { quantity: true } }))._sum.quantity ?? 0;
+        const next = row.asset.quantityTotal + stockDelta;
+        if (!(next >= 1 && next >= held)) stockDelta = 0;
       }
-    } else {
+      if (stockDelta !== 0) await tx.issuedAsset.update({ where: { id: row.assetId }, data: { quantityTotal: row.asset.quantityTotal + stockDelta } });
+    }
+    await tx.assetIssuanceHistory.create({ data: { ...base, type: "OUTCOME_CORRECTED", correctedEndReason: input.fate, stockDelta } });
+    // A numbered item follows its latest issue's fate: a found key is back in stock, a lost or damaged one is held out.
+    if (row.serialized) {
       const later = await tx.assetIssuance.count({ where: { assetId: row.assetId, createdAt: { gt: row.createdAt } } });
       if (later === 0) {
         if (input.fate === "RETURNED") {
@@ -157,4 +171,27 @@ export function coverInputs(
     quantity: row.endQuantity ?? row.quantity,
     charged: charged.has(row.id),
   }));
+}
+
+
+/**
+ * Whether some item the deposit covers was lost or damaged when the deposit was kept and has since been corrected to returned,
+ * by a correction made after the deposit was kept. Only that unlocks cash handed back after a correction: a correction in the
+ * other direction (returned to lost) or one made before the deposit was kept does not.
+ */
+export function foundAfterKept(
+  rows: ReadonlyArray<{ id: string; endedAt: Date | string | null; endReason: string | null }>,
+  corrections: Map<string, CorrectionRow[]>,
+  keptAtMs: number,
+) {
+  return rows.some((row) => {
+    const entries = (corrections.get(row.id) ?? []).filter((entry) => entry.type === "OUTCOME_CORRECTED");
+    if (entries.length === 0 || fateOf(row, corrections.get(row.id)).endReason !== "RETURNED") return false;
+    let before = row.endReason;
+    for (const entry of entries) {
+      if ((before === "LOST" || before === "DAMAGED") && entry.fate === "RETURNED" && entry.recordedAt.getTime() > keptAtMs) return true;
+      before = entry.fate;
+    }
+    return false;
+  });
 }

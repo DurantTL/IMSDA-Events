@@ -93,7 +93,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
           {canManageMoney ? <td {...cardCell(null)}>{row.code === "UNCHARGED_LOSS" || row.code === "REPLACED_UNACCOUNTED" ? <OutcomeForm busy={busy} current={row.code === "REPLACED_UNACCOUNTED" ? "REPLACED" : "LOST"} onSubmit={(body) => post("corrections", { ...body, issuanceId: row.refId }, "Saved. Nothing was refunded or charged.")} />
             : row.code === "CORRECTION_NEEDS_REVIEW" || row.code === "WAIVED_ON_INACTIVE_REGISTRATION" || row.code === "WAIVED_AFTER_REFUND"
               ? <ReviewForm busy={busy} depositId={row.code === "CORRECTION_NEEDS_REVIEW" ? row.depositId ?? null : null}
-                  onReview={(reason) => post("corrections", { action: "review", issuanceId: row.refId, reason }, "Marked as reviewed. Nothing was refunded or charged.")}
+                  onReview={(reason) => post("corrections", { action: "review", issuanceId: row.refId, exceptionCode: row.code, reason }, "Marked as reviewed. Nothing was refunded or charged.")}
                   onRefund={(depositEntryId, amountCents, reason) => post("corrections", { action: "refund_after_correction", depositEntryId, amountCents, reason }, `Recorded ${formatCents(amountCents)} of the kept deposit handed back at the desk.`)} />
               : null}</td> : null}
         </tr>)}</tbody>
@@ -145,7 +145,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Deposit</th><th role="columnheader" scope="col">State</th><th role="columnheader" scope="col">Items</th></tr></thead>
         <tbody role="rowgroup">{report.deposits.map((row) => <tr role="row" key={row.entryId}>
           <th role="rowheader" scope="row">{holder(row)}</th><td {...cardCell("Kind")}>{row.typeName}</td><td {...cardCell("Deposit")}>{formatCents(row.amountCents)}</td>
-          <td {...cardCell("State")}>{row.state === "HELD" ? (row.readyToSettle ? "Held, ready to settle at the desk" : "Held") : row.state === "HANDED_BACK" ? "Handed back in full" : row.state === "KEPT" ? "Kept" : `${formatCents(row.refundCents)} handed back, ${formatCents(row.keepCents)} kept`}</td>
+          <td {...cardCell("State")}>{row.state === "HELD" ? (row.readyToSettle ? "Held, ready to settle at the desk" : "Held") : row.state === "HANDED_BACK" ? "Handed back in full" : row.state === "KEPT" ? "Kept" : row.state === "PARTLY_HANDED_BACK" ? `Partly handed back: ${formatCents(row.refundCents)} handed back (${formatCents(row.lateHandedBackCents)} of it after a found item), ${formatCents(row.keepCents)} kept, ${formatCents(row.stillHeldCents)} of that still held` : `${formatCents(row.refundCents)} handed back, ${formatCents(row.keepCents)} kept`}</td>
           <td {...cardCell("Items")}>{row.covered} covered{row.stillOut > 0 ? `, ${row.stillOut} still out` : ""}</td>
         </tr>)}</tbody>
       </table></div>}

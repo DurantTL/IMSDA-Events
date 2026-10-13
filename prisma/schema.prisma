@@ -7914,6 +7914,11 @@ model AssetIssuanceHistory {
   idempotencyKey     String?
   /// The corrected fate of an OUTCOME_CORRECTED row (RETURNED, LOST or DAMAGED). The ended issuance itself never changes.
   correctedEndReason IssuedAssetEndReason?
+  /// An EXCEPTION_REVIEWED row names the closeout exception it answers (its code) and the entry that raised it (a correction's history id or a waiver's ledger id): a review clears only that one.
+  reviewedCode       String?
+  reviewedRefId      String?
+  /// The change this row made to a lot's stock count (negative: units taken off the lot). A correction reverses exactly what was applied, never more.
+  stockDelta         Int                   @default(0)
   /// A reference to the evidence of the item's condition (a photo number, an incident or work-order number). Text only.
   evidenceRef        String?
   /// The condition the item was found in (a return, loss or damage).

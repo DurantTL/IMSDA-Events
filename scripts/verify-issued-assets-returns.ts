@@ -35,7 +35,7 @@ import { AssetError, type AssetErrorCode } from "@/modules/issued-assets/errors"
 import { closeoutCsv, closeoutSections, getCloseoutReport } from "@/modules/issued-assets/closeout";
 import { applyFacilityAction } from "@/modules/issued-assets/facility-service";
 import { recordOutcomeCorrection } from "@/modules/issued-assets/corrections";
-import { postCharge, recordDeposit, recordLateDepositRefund, settleDeposit, waiveCharge } from "@/modules/issued-assets/money-service";
+import { depositHeldCents, postCharge, recordDeposit, recordLateDepositRefund, settleDeposit, waiveCharge } from "@/modules/issued-assets/money-service";
 import { returnAssets, type ReturnItemResult } from "@/modules/issued-assets/returns-service";
 import { getDeskMoney, listFacilityIssues } from "@/modules/issued-assets/returns-view";
 import { applyAssetAction, applyAssetTypeAction, applyIssuanceAction, issueAssets } from "@/modules/issued-assets/service";
@@ -495,6 +495,8 @@ async function main() {
   const lateKey = `late-${randomUUID()}`;
   assert((await recordLateDepositRefund(eventId, financeId, { ...handBack, idempotencyKey: lateKey }, FINANCE)).remainingKeptCents === 400, "finance records $6 of the $10 kept deposit handed back");
   assert((await recordLateDepositRefund(eventId, financeId, { ...handBack, idempotencyKey: lateKey }, FINANCE)).replayed, "the same hand-back sent again replays");
+  const zedPartly = (await getCloseoutReport(eventId)).deposits.find((row) => row.entryId === zedDeposit.depositEntryId);
+  assert(zedPartly?.state === "PARTLY_HANDED_BACK" && zedPartly.refundCents === 600 && zedPartly.keepCents === 400 && zedPartly.stillHeldCents === 400, `the closeout shows the deposit partly handed back: ${JSON.stringify(zedPartly)}`);
   await expectAssetError(recordLateDepositRefund(eventId, financeId, { ...handBack, amountCents: 500, idempotencyKey: `late-${randomUUID()}` }, FINANCE), "CORRECTION_INVALID", "more than is left of the kept deposit");
   await recordLateDepositRefund(eventId, financeId, { ...handBack, amountCents: 400 }, FINANCE);
   await expectDatabaseRefusal(prisma.assetLedgerEntry.create({ data: { eventId, kind: "DEPOSIT_HANDED_BACK_LATE", amountCents: 1, depositEntryId: zedDeposit.depositEntryId, assetTypeId: keyType, settlement: "CASH_AT_DESK", reason: "Past the cap", actorUserId: financeId, actorNameSnapshot: "Finance person" } }), "the database refusing more than the kept amount handed back");
@@ -513,12 +515,81 @@ async function main() {
   await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: willCharge.chargeEntryId, reason: "Goodwill" }, FINANCE);
   const afterWaiver = await getCloseoutReport(eventId);
   assert(afterWaiver.exceptions.some((row) => row.code === "WAIVED_AFTER_REFUND" && row.subject.startsWith("K-250")), "a charge waived after the deposit was refunded for it is flagged");
-  await expectAssetError(recordOutcomeCorrection(eventId, staffId, { action: "review", issuanceId: willLost, reason: "Seen" }, CHECK_IN), "MONEY_PERMISSION_REQUIRED", "check-in staff marking an exception reviewed");
+  await expectAssetError(recordOutcomeCorrection(eventId, staffId, { action: "review", issuanceId: willLost, exceptionCode: "WAIVED_AFTER_REFUND", reason: "Seen" }, CHECK_IN), "MONEY_PERMISSION_REQUIRED", "check-in staff marking an exception reviewed");
   const reviewKey = `review-${randomUUID()}`;
-  await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: willLost, reason: "Manager agreed to waive the fee", idempotencyKey: reviewKey }, FINANCE);
-  assert((await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: willLost, reason: "Manager agreed to waive the fee", idempotencyKey: reviewKey }, FINANCE)).replayed, "a review sent again replays");
+  await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: willLost, exceptionCode: "WAIVED_AFTER_REFUND", reason: "Manager agreed to waive the fee", idempotencyKey: reviewKey }, FINANCE);
+  assert((await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: willLost, exceptionCode: "WAIVED_AFTER_REFUND", reason: "Manager agreed to waive the fee", idempotencyKey: reviewKey }, FINANCE)).replayed, "a review sent again replays");
   assert(!(await getCloseoutReport(eventId)).exceptions.some((row) => row.code === "WAIVED_AFTER_REFUND"), "a recorded review clears the exception");
   assert((await historyOf(willLost)).some((row) => row.type === "EXCEPTION_REVIEWED" && row.actorUserId === financeId && (row.reason ?? "").length > 0), "the review is an append-only history row with actor and reason");
+
+
+  // ---- One definition of "held": kept, less handed back late, less charge offsets (#214 review) -------------
+  const heldOf = (depositEntryId: string) => depositHeldCents(prisma, eventId, depositEntryId);
+  const chargeEntryOf = (chargeEntryId: string) => prisma.assetLedgerEntry.findUniqueOrThrow({ where: { id: chargeEntryId } });
+  // The one free room holds one guest, so the three deposit scenarios below share that guest (one deposit each).
+  // A: a key found, the kept deposit handed back in full, and then a loss charged in full posts with no offset (nothing is held).
+  const ada = await makeReg(eventId);
+  await place(ada, "girls-213");
+  await issue(ada, ["K-251", "K-252", "K-253"]);
+  const adaDeposit = await takeDeposit(ada, ["K-251", "K-252", "K-253"], 1000);
+  await give([{ code: "K-251", outcome: "LOST", note: "Lost" }, { code: "K-253", outcome: "LOST", note: "Lost" }, { code: "K-252" }]);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: adaDeposit.depositEntryId })).outcome === "KEPT", "A: two lost keys, the deposit is kept");
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: (await issuanceOf(ada, "K-251")).id, fate: "RETURNED", reason: "Found behind the bed" }, FINANCE);
+  await recordLateDepositRefund(eventId, financeId, { action: "refund_after_correction", depositEntryId: adaDeposit.depositEntryId, amountCents: 1000, reason: "Key found; handed the whole deposit back" }, FINANCE);
+  assert((await heldOf(adaDeposit.depositEntryId)) === 0, "A: nothing is held once the kept deposit was handed back");
+  const adaTotalBefore = await registrationTotal(ada);
+  const adaCharge = await postCharge(eventId, financeId, { action: "charge", issuanceId: (await issuanceOf(ada, "K-253")).id, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key", post: true, confirmKeptDeposit: true }, FINANCE);
+  assert(adaCharge.offsetCents === 0 && (await chargeEntryOf(adaCharge.chargeEntryId)).depositOffsetCents === 0 && (await registrationTotal(ada)) - adaTotalBefore === 25, `A: the $25 charge posts in full, nothing offset against a deposit already handed back: ${JSON.stringify(adaCharge)}`);
+  const adaRow = (await getCloseoutReport(eventId)).deposits.find((row) => row.entryId === adaDeposit.depositEntryId);
+  assert(adaRow?.state === "HANDED_BACK" && adaRow.refundCents === 1000 && adaRow.keepCents === 0 && adaRow.stillHeldCents === 0, `A: the closeout row counts the late hand-back: ${JSON.stringify(adaRow)}`);
+
+  // B: a charge that offset the kept deposit leaves nothing held, so a later hand-back is refused; waiving the charge restores it.
+  const bea = ada;
+  await issue(bea, ["K-254", "K-255"]);
+  const beaDeposit = await takeDeposit(bea, ["K-254", "K-255"], 1000);
+  await give([{ code: "K-254", outcome: "LOST", note: "Lost" }, { code: "K-255" }]);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: beaDeposit.depositEntryId })).keepCents === 1000, "B: the lost key keeps the deposit");
+  const beaLost = (await issuanceOf(bea, "K-254")).id;
+  const beaCharge = await postCharge(eventId, financeId, { action: "charge", issuanceId: beaLost, category: "REPLACEMENT", amountCents: 2500, reason: "Lost key, beyond the kept deposit", post: true, confirmKeptDeposit: true }, FINANCE);
+  assert(beaCharge.offsetCents === 1000 && (await heldOf(beaDeposit.depositEntryId)) === 0, "B: the charge counts the whole kept deposit against it, so nothing is held");
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: beaLost, fate: "RETURNED", reason: "Found later" }, FINANCE);
+  await expectAssetError(recordLateDepositRefund(eventId, financeId, { action: "refund_after_correction", depositEntryId: beaDeposit.depositEntryId, amountCents: 100, reason: "Found; handed back at the desk" }, FINANCE), "CORRECTION_INVALID", "B: a hand-back above what is held (nothing)");
+  await expectDatabaseRefusal(prisma.assetLedgerEntry.create({ data: { eventId, kind: "DEPOSIT_HANDED_BACK_LATE", amountCents: 100, depositEntryId: beaDeposit.depositEntryId, assetTypeId: keyType, settlement: "CASH_AT_DESK", reason: "Past what is held", actorUserId: financeId, actorNameSnapshot: "Finance person" } }), "D: the database refusing a late hand-back above what is held");
+  const beaBefore = (await getCloseoutReport(eventId)).deposits.find((row) => row.entryId === beaDeposit.depositEntryId);
+  assert(beaBefore?.stillHeldCents === 0, `B: the closeout shows nothing still held: ${JSON.stringify(beaBefore)}`);
+  await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: beaCharge.chargeEntryId, reason: "Goodwill" }, FINANCE);
+  assert((await heldOf(beaDeposit.depositEntryId)) === 1000, "B: waiving the charge restores what it offset");
+  assert((await getCloseoutReport(eventId)).deposits.find((row) => row.entryId === beaDeposit.depositEntryId)?.stillHeldCents === 1000, "B: and the closeout reflects it");
+
+  // C: a returned key corrected to lost does not unlock a hand-back.
+  const cy = ada;
+  await issue(cy, ["K-256", "K-257"]);
+  const cyDeposit = await takeDeposit(cy, ["K-256", "K-257"], 1000);
+  await give([{ code: "K-256", outcome: "LOST", note: "Lost" }, { code: "K-257" }]);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: cyDeposit.depositEntryId })).keepCents === 1000, "C: the deposit is kept");
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: (await issuanceOf(cy, "K-257")).id, fate: "LOST", reason: "It was never handed in" }, FINANCE);
+  await expectAssetError(recordLateDepositRefund(eventId, financeId, { action: "refund_after_correction", depositEntryId: cyDeposit.depositEntryId, amountCents: 500, reason: "Handed back at the desk" }, FINANCE), "CORRECTION_INVALID", "C: no item was found after the deposit was kept");
+  // D: straight into the table, a charge counting more than is held against a deposit is refused too.
+  await expectDatabaseRefusal(prisma.assetLedgerEntry.create({ data: { eventId, kind: "CHARGE", amountCents: 2500, depositOffsetCents: 2000, issuanceId: (await issuanceOf(cy, "K-256")).id, chargeCategory: "REPLACEMENT", settlement: "RECORD_ONLY", reason: "Past what is held", actorUserId: financeId, actorNameSnapshot: "Finance person", registrationId: cy.registrationId } }), "D: the database refusing a charge offset above what is held");
+
+  // Two open exceptions on one key: a review clears only the one it names.
+  const ines = await makeReg(eventId);
+  await issue(ines, ["L-3", "L-8"]);
+  const inesDeposit = await takeDeposit(ines, ["L-3", "L-8"], 1000);
+  await give([{ code: "L-8", outcome: "LOST", note: "Lost at the lake" }, { code: "L-3" }]);
+  const inesLost = (await issuanceOf(ines, "L-8")).id;
+  const inesCharge = await postCharge(eventId, financeId, { action: "charge", issuanceId: inesLost, category: "REPLACEMENT", amountCents: 400, reason: "Standard fee", post: true }, FINANCE);
+  assert((await settleDeposit(eventId, staffId, { action: "settle", depositEntryId: inesDeposit.depositEntryId })).outcome === "FULL_REFUND", "the charged loss does not keep the deposit");
+  await waiveCharge(eventId, financeId, { action: "waive", chargeEntryId: inesCharge.chargeEntryId, reason: "Goodwill" }, FINANCE);
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: inesLost, fate: "RETURNED", reason: "Found in the boat house" }, FINANCE);
+  const inesCodes = async () => (await getCloseoutReport(eventId)).exceptions.filter((row) => row.refId === inesLost).map((row) => row.code).sort();
+  assert((await inesCodes()).join() === "CORRECTION_NEEDS_REVIEW,WAIVED_AFTER_REFUND", `two exceptions are open on one key: ${(await inesCodes()).join()}`);
+  await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: inesLost, exceptionCode: "WAIVED_AFTER_REFUND", reason: "Manager approved the waiver" }, FINANCE);
+  assert((await inesCodes()).join() === "CORRECTION_NEEDS_REVIEW", "reviewing the waiver leaves the correction exception open");
+  await recordOutcomeCorrection(eventId, financeId, { action: "review", issuanceId: inesLost, exceptionCode: "CORRECTION_NEEDS_REVIEW", reason: "Deposit already handed back in full" }, FINANCE);
+  assert((await inesCodes()).length === 0, "reviewing the correction clears the other one");
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: inesLost, fate: "LOST", reason: "Not that key after all" }, FINANCE);
+  assert((await inesCodes()).includes("CORRECTION_NEEDS_REVIEW"), "a later correction raises the exception again; the old review does not clear it");
 
   // ---- A lot returned in part ---------------------------------------------------------------------
   const fay = await makeReg(eventId);
@@ -540,6 +611,23 @@ async function main() {
   assert((await assetOf("TOWELS")).quantityTotal === 10, "a lost unit found later goes back on the lot");
   await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: remainder.id, fate: "LOST", reason: "It was another lot's towel after all" }, FINANCE);
   assert((await assetOf("TOWELS")).quantityTotal === 9, "and a returned unit corrected to lost comes off it again");
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: remainder.id, fate: "RETURNED", reason: `Found again, round ${cycle}` }, FINANCE);
+    assert((await assetOf("TOWELS")).quantityTotal === 10, "repeated corrections: back on the lot");
+    await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: remainder.id, fate: "LOST", reason: `Lost again, round ${cycle}` }, FINANCE);
+    assert((await assetOf("TOWELS")).quantityTotal === 9, "repeated corrections: off the lot again, with no drift");
+  }
+  assert((await historyOf(remainder.id)).find((row) => row.type === "LOST")?.stockDelta === -1, "the loss records the stock change it made");
+  // A lot lost entirely cannot be shortened below one, so nothing came off it and nothing is added back by a correction.
+  const blanketsType = (await applyAssetTypeAction(eventId, adminId, { action: "create", name: "Blankets", mode: "QUANTITY", assigneeKinds: ["ATTENDEE"] })).id;
+  await applyAssetAction(eventId, adminId, { action: "create", typeId: blanketsType, identifier: "BLANKETS", quantityTotal: 3 });
+  const lou = await makeReg(eventId);
+  assert((await issue(lou, ["BLANKETS"], { items: [{ code: "BLANKETS", quantity: 3 }] })).issued === 1, "all three blankets are out");
+  const blankets = await openIssuanceOf(lou, "BLANKETS");
+  assert((await give([{ issuanceId: blankets.id, outcome: "LOST", quantity: 3, note: "Gone" }])).lost === 1, "all three are lost");
+  assert((await assetOf("BLANKETS")).quantityTotal === 3, "a lot lost entirely keeps its count (it cannot go below one)");
+  await recordOutcomeCorrection(eventId, financeId, { action: "correct", issuanceId: blankets.id, fate: "RETURNED", reason: "They were in the van" }, FINANCE);
+  assert((await assetOf("BLANKETS")).quantityTotal === 3, "and correcting it does not add three that never came off");
   assert((await prisma.assetIssuance.aggregate({ where: { eventId, attendeeId: fay.attendeeId, endedAt: null, asset: { identifier: "TOWELS" } }, _sum: { quantity: true } }))._sum.quantity === 1, "one is still out");
   assert((await issue(gus, ["TOWELS"], { items: [{ code: "TOWELS", quantity: 2 }] })).issued === 1, "another holder has towels too");
   assert(statusOf((await give([{ code: "TOWELS" }])).items[0]) === "REJECTED/AMBIGUOUS_HOLDER", "a lot held by two people cannot be returned by its code alone");
@@ -689,9 +777,9 @@ async function main() {
   const sumKind = async (kind: "DEPOSIT_RECEIVED" | "DEPOSIT_RETURNED" | "DEPOSIT_KEPT") => (await prisma.assetLedgerEntry.aggregate({ where: { eventId, kind }, _sum: { amountCents: true } }))._sum.amountCents ?? 0;
   const [received, handedBack, keptTotal] = await Promise.all([sumKind("DEPOSIT_RECEIVED"), sumKind("DEPOSIT_RETURNED"), sumKind("DEPOSIT_KEPT")]);
   const lateBack = (await prisma.assetLedgerEntry.aggregate({ where: { eventId, kind: "DEPOSIT_HANDED_BACK_LATE" }, _sum: { amountCents: true } }))._sum.amountCents ?? 0;
-  assert(lateBack === 1000 && report.money.depositsReceivedCents === received && report.money.depositsHandedBackCents === handedBack + lateBack && report.money.depositsKeptCents === keptTotal - lateBack && report.money.depositsHeldCents === received - handedBack - keptTotal && report.money.depositsHeldCents === 2000, `deposits held versus returned reconcile (only Jules and Kim are still held): ${JSON.stringify(report.money)}`);
-  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 + 2500 + 2500 && report.money.waivedCents === 2500 + 1100 + 2500 + 2500 && report.money.netChargedCents === 1500 + 2500 + 400 + 2500, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
-  assert(report.charges.length === 8 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 4, "charges list their waivers");
+  assert(lateBack === 2000 && report.money.depositsReceivedCents === received && report.money.depositsHandedBackCents === handedBack + lateBack && report.money.depositsKeptCents === keptTotal - lateBack && report.money.depositsHeldCents === received - handedBack - keptTotal && report.money.depositsHeldCents === 2000, `deposits held versus returned reconcile (only Jules and Kim are still held): ${JSON.stringify(report.money)}`);
+  assert(report.money.chargedCents === 2500 + 1100 + 1500 + 2500 + 400 + 2500 + 2500 + 2500 + 2500 + 1500 + 400 && report.money.waivedCents === 2500 + 1100 + 2500 + 2500 + 1500 + 400 && report.money.netChargedCents === 1500 + 2500 + 400 + 2500 + 2500, `charged and waived totals reconcile: ${JSON.stringify(report.money)}`);
+  assert(report.charges.length === 11 && report.charges.filter((row) => row.state === "WAIVED" && row.waiver).length === 6, "charges list their waivers");
   assert(report.exceptions.some((row) => row.code === "WAIVED_ON_INACTIVE_REGISTRATION" && row.subject.startsWith("K-244")), "a charge waived on a cancelled registration is flagged: the line is still on its total");
   assert(report.lost.find((row) => row.identifier === "TOWELS")?.quantity === 1, "a lot lost in part shows the quantity lost, not the quantity of the issue");
   assert(report.lost.some((row) => row.identifier === "K-241") && !report.lost.some((row) => row.identifier === "K-235" || row.identifier === "K-233"), "the closeout reads the corrected fates: a replaced original corrected to lost is lost, a found key is not");

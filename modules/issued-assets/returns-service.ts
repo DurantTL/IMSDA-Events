@@ -81,6 +81,7 @@ type Plan = {
   itemKey: string | null;
   at: Date;
   replacement: null | { assetId: string; identifier: string; serialized: boolean; link: RoomLink };
+  stockDelta?: number;
   asset: { id: string; identifier: string; typeName: string; mode: AssetMode; quantityTotal: number };
 };
 
@@ -232,10 +233,20 @@ export async function returnAssets(eventId: string, actorUserId: string, rawInpu
 
     for (const plan of plans) {
       const { row } = plan;
+      // A lost or damaged unit of a lot comes off the lot when the lot can spare it; the change is recorded on the history row
+      // so a later correction reverses exactly that.
+      let stockDelta = 0;
+      if (plan.asset.mode !== "SERIALIZED" && plan.outcome !== "RETURNED") {
+        const heldNow = (await tx.assetIssuance.aggregate({ where: { assetId: row.assetId, endedAt: null }, _sum: { quantity: true } }))._sum.quantity ?? 0;
+        const total = (await tx.issuedAsset.findUniqueOrThrow({ where: { id: plan.asset.id }, select: { quantityTotal: true } })).quantityTotal;
+        const next = total - plan.quantity;
+        if (next >= 1 && next >= heldNow - row.quantity + plan.remainder) stockDelta = -plan.quantity;
+      }
+      plan.stockDelta = stockDelta;
       // End first, so the freed quantity is visible to the remainder's own checks (the database sums open quantities).
       await endIssuance(tx, row, {
         actorUserId, endReason: plan.outcome, historyType: plan.outcome, reason: plan.note, entryMethod: input.entryMethod,
-        relatedIssuanceId: null, at: plan.at, endQuantity: plan.quantity, idempotencyKey: plan.itemKey, evidenceRef: plan.evidenceRef, condition: plan.condition,
+        relatedIssuanceId: null, at: plan.at, endQuantity: plan.quantity, idempotencyKey: plan.itemKey, evidenceRef: plan.evidenceRef, condition: plan.condition, stockDelta,
       });
       const remainderId = plan.remainder > 0 ? await startRemainder(tx, plan, actorUserId, input.entryMethod) : null;
       let replacementId: string | null = null;
@@ -299,9 +310,6 @@ async function updateStock(tx: Tx, plan: Plan) {
     if (Object.keys(data).length > 0) await tx.issuedAsset.update({ where: { id: plan.asset.id }, data });
     return;
   }
-  if (plan.outcome === "RETURNED") return;
-  const held = (await tx.assetIssuance.aggregate({ where: { assetId: plan.asset.id, endedAt: null }, _sum: { quantity: true } }))._sum.quantity ?? 0;
-  const current = (await tx.issuedAsset.findUniqueOrThrow({ where: { id: plan.asset.id }, select: { quantityTotal: true } })).quantityTotal;
-  const next = current - plan.quantity;
-  if (next >= 1 && next >= held) await tx.issuedAsset.update({ where: { id: plan.asset.id }, data: { quantityTotal: next } });
+  if (plan.outcome === "RETURNED" || !plan.stockDelta) return;
+  await tx.issuedAsset.update({ where: { id: plan.asset.id }, data: { quantityTotal: { increment: plan.stockDelta } } });
 }

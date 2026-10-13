@@ -97,7 +97,7 @@ describe("check-out panel", () => {
       deposits: [{
         entryId: "d1", amountCents: 1000, typeName: "Dorm room key", takenAt: "2027-06-15T18:05:00.000Z", takenByName: "Synthetic Staff", keptRemainingCents: 1000,
         covers: [{ issuanceId: "i3", identifier: "K-214", state: "LOST", quantity: 1, charged: false }],
-        settled: { refundCents: 0, keepCents: 1000, at: "2027-06-18T11:00:00.000Z", byName: "Synthetic Staff" }, outcome: null,
+        settled: { refundCents: 0, keepCents: 1000, at: "2027-06-18T11:00:00.000Z", byName: "Synthetic Staff", lateHandedBackCents: 0 }, outcome: null,
       }],
     };
     const checkIn = panel(person([lostRow]), money);
@@ -139,7 +139,7 @@ const report: CloseoutReport = {
   lost: [closeoutRow({ id: "l1", identifier: "K-214", open: false, endReason: "LOST", endedAt: "2027-06-18T10:00:00.000Z", endNote: "Not found in the room" })],
   damaged: [],
   charges: [{ entryId: "c1", issuanceId: "l1", identifier: "K-214", typeName: "Dorm room key", holderLabel: "Pat Example", deskAttendeeId: "att1", category: "REPLACEMENT", amountCents: 2500, posted: true, reason: "Replacement fee", actorName: "Synthetic Staff", at: "2027-06-18T10:05:00.000Z", state: "CHARGED", waiver: null }],
-  deposits: [{ entryId: "d1", typeName: "Dorm room key", holderLabel: "Pat Example", deskAttendeeId: "att1", amountCents: 1000, takenAt: "2027-06-15T18:05:00.000Z", takenByName: "Synthetic Staff", state: "HELD", refundCents: 0, keepCents: 0, covered: 2, stillOut: 1, readyToSettle: false }],
+  deposits: [{ entryId: "d1", typeName: "Dorm room key", holderLabel: "Pat Example", deskAttendeeId: "att1", amountCents: 1000, takenAt: "2027-06-15T18:05:00.000Z", takenByName: "Synthetic Staff", state: "HELD", refundCents: 0, keepCents: 0, lateHandedBackCents: 0, stillHeldCents: 0, covered: 2, stillOut: 1, readyToSettle: false }],
   facility: [{
     id: "f1", title: "Window will not close", description: null, severity: "HIGH", status: "OPEN", source: "CHECKOUT_INSPECTION", targetKind: "UNIT", targetLabel: "214, Girls Dorm", eventUnitId: "u1", assigneeUserId: null, assigneeName: null,
     reportedAt: "2027-06-18T10:10:00.000Z", reportedByName: "Synthetic Staff", resolution: null, resolvedAt: null, block: null, history: [],
@@ -222,6 +222,13 @@ describe("closeout reviews", () => {
   const render = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, {
     eventId: "ev1", eventName: "Camp Meeting 2027", report: review, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true,
   }));
+
+  it("shows a deposit partly handed back, and what is still held", () => {
+    const partly: CloseoutReport = { ...report, deposits: [{ ...report.deposits[0]!, state: "PARTLY_HANDED_BACK", refundCents: 600, keepCents: 400, lateHandedBackCents: 600, stillHeldCents: 400 }] };
+    const html = renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: partly, staff: [], canManageMoney: true, canConfigure: false, canUpdateFacility: true }));
+    expect(html).toContain("Partly handed back");
+    expect(html).toContain("$4.00 of that still held");
+  });
 
   it("lets finance mark a review done or record cash handed back from the kept deposit, and nobody else", () => {
     const finance = render(true);

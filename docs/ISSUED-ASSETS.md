@@ -225,8 +225,19 @@ fate: returned, lost or damaged) or `WRITTEN_OFF`, each with actor, reason and t
   `EXCEPTION_REVIEWED`, with a reason), or, for a kept deposit whose item was found, records **cash handed back after the
   correction** (ledger `DEPOSIT_HANDED_BACK_LATE`: who, why, when; capped at what the deposit kept, enforced by the database; a
   record of cash handed over at the desk, never a provider refund and never a registration change).
-- Correcting the outcome of a **lot** keeps its stock count right: LOST or DAMAGED to RETURNED adds the units back, the reverse
-  takes them off (under the asset lock). A damaged key corrected to returned loses its damaged mark. A correction retried with the
+- **Reviews name their exception** (migration `20261019150000_issued_assets_held_deposit`): a review stores the exception code and
+  the id of the entry that raised it (the correction's history row, or the waiver's ledger entry), clears only that one, and a later
+  correction or waiver raises it again. Two open exceptions on one key are cleared one at a time.
+- **One definition of "held"**: what a deposit kept, less what was handed back late, less the offsets of posted, unwaived charges on
+  its covered items, never below zero. The charge offset, the late hand-back cap, the desk, the closeout and the database guard
+  (`AssetDeposit_held`, with the deposit row locked) all use it, so a late hand-back above held, or a charge offset above held, is
+  refused by the database too. Waiving an offset charge restores its offset, and the closeout shows it. A late hand-back is allowed
+  only when a covered item was corrected from lost or damaged to returned after the deposit was kept. The closeout's deposit rows count
+  late hand-backs (*partly handed back*) and show what is still held.
+- Correcting the outcome of a **lot** keeps its stock count right by exactly what was applied: each ending or correction records the
+  stock change it made (`stockDelta` on the history row) and a correction moves the lot from what is applied to what the new fate
+  calls for. A lot lost entirely (it cannot go below one) takes nothing off, so correcting it adds nothing back; repeated
+  corrections do not drift. A damaged key corrected to returned loses its damaged mark. A correction retried with the
   same key replays only if the action and the fate match, otherwise it is refused.
 - Blocks: the lodging hold and its link to the facility issue are written in one transaction (the issue row is locked first), so a
   block is never left unlinked and a closed issue cannot be blocked.

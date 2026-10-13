@@ -131,6 +131,19 @@ export const chargeActionSchema = z.discriminatedUnion("action", [
 ]);
 export type ChargeAction = z.infer<typeof chargeActionSchema>;
 
+/** The closeout exceptions a person can mark reviewed. */
+export const reviewableExceptionCodes = ["CORRECTION_NEEDS_REVIEW", "WAIVED_ON_INACTIVE_REGISTRATION", "WAIVED_AFTER_REFUND"] as const;
+export type ReviewableExceptionCode = (typeof reviewableExceptionCodes)[number];
+
+/**
+ * How much of the money a deposit kept is still held: what it kept, less what was handed back late, less what posted and
+ * unwaived charges already counted against it. Never below zero. The one definition: the charge offset, the late hand-back
+ * cap, the desk, the closeout and the database guard (`AssetDeposit_held`) all mean exactly this.
+ */
+export function depositHeldCents(input: { keptCents: number; lateCents: number; offsetCents: number }) {
+  return Math.max(0, input.keptCents - input.lateCents - input.offsetCents);
+}
+
 /** Corrections of a recorded outcome, and write-offs (#214): administrators and finance, with a reason. */
 export const correctionActionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -151,6 +164,8 @@ export const correctionActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("review"),
     issuanceId: idSchema,
+    /** Which exception is being reviewed: a review clears only that one. */
+    exceptionCode: z.enum(reviewableExceptionCodes),
     reason: reasonSchema,
     idempotencyKey: keySchema.optional(),
   }).strict(),

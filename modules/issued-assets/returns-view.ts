@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { depositHeldCents } from "@/modules/issued-assets/money-service";
 import { coverInputs, fateOf, loadChargedIssuances, loadCorrectionRows } from "@/modules/issued-assets/corrections";
 import {
   decideDepositOutcome,
@@ -36,7 +37,7 @@ export type DepositView = {
   /** What the deposit kept that no charge has offset yet. Above zero, charging the same loss in full would take the money twice. */
   keptRemainingCents: number;
   /** Set once the deposit has been settled (handed back and/or kept). */
-  settled: null | { refundCents: number; keepCents: number; at: string; byName: string };
+  settled: null | { refundCents: number; keepCents: number; at: string; byName: string; lateHandedBackCents: number };
   /** What settling it would do now (null once settled). */
   outcome: DepositOutcome | null;
 };
@@ -89,21 +90,21 @@ export async function getDeskMoney(eventId: string, issuanceIds: readonly string
       fates[id] = { endReason: fate.endReason, corrected: fate.corrected, writtenOff: fate.writtenOff };
     }
   }
+  const heldBy = new Map<string, number>();
+  for (const row of depositRows) heldBy.set(row.id, await depositHeldCents(client, eventId, row.id));
   const deposits: DepositView[] = depositRows.map((row) => {
     const inputs = coverInputs(row.covers.map((cover) => cover.issuance), corrections, charged);
     const covers = row.covers.map((cover, index) => ({
       issuanceId: cover.issuance.id, identifier: cover.issuance.asset.identifier, state: inputs[index]!.state, quantity: inputs[index]!.quantity, charged: inputs[index]!.charged,
     }));
-    const keptTotal = row.settlements.filter((entry) => entry.kind === "DEPOSIT_KEPT").reduce((sum, entry) => sum + entry.amountCents, 0);
-    const coverIds = new Set(row.covers.map((cover) => cover.issuance.id));
-    const offsets = chargeRows.filter((charge) => charge.issuanceId && coverIds.has(charge.issuanceId) && charge.waivedBy.length === 0).reduce((sum, charge) => sum + charge.depositOffsetCents, 0);
+    const late = row.settlements.filter((entry) => entry.kind === "DEPOSIT_HANDED_BACK_LATE").reduce((sum, entry) => sum + entry.amountCents, 0);
     const refund = row.settlements.find((entry) => entry.kind === "DEPOSIT_RETURNED");
     const keep = row.settlements.find((entry) => entry.kind === "DEPOSIT_KEPT");
     const settledAt = [refund, keep].filter((entry) => entry).map((entry) => entry!.createdAt).sort((a, b) => a.getTime() - b.getTime())[0];
     return {
       entryId: row.id, amountCents: row.amountCents, typeName: row.assetType?.name ?? "", takenAt: row.createdAt.toISOString(), takenByName: row.actorNameSnapshot, covers,
-      keptRemainingCents: Math.max(0, keptTotal - offsets),
-      settled: settledAt ? { refundCents: refund?.amountCents ?? 0, keepCents: keep?.amountCents ?? 0, at: settledAt.toISOString(), byName: (refund ?? keep)!.actorNameSnapshot } : null,
+      keptRemainingCents: heldBy.get(row.id) ?? 0,
+      settled: settledAt ? { refundCents: refund?.amountCents ?? 0, keepCents: keep?.amountCents ?? 0, at: settledAt.toISOString(), byName: (refund ?? keep)!.actorNameSnapshot, lateHandedBackCents: late } : null,
       outcome: settledAt ? null : decideDepositOutcome({
         depositCents: row.amountCents, policy: row.depositShortfallSnapshot ?? row.assetType?.depositShortfall ?? "KEEP_ALL", replacementFeeCents: row.replacementFeeSnapshotCents ?? row.assetType?.replacementFeeCents ?? 0,
         covers: covers.map((cover) => ({ state: cover.state, quantity: cover.quantity, charged: cover.charged })),
