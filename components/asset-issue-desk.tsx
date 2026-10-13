@@ -121,7 +121,8 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
   /** The one room the desk is showing for the person, when the holder is that person (or their registration). */
   function lonePersonRoom(assignee: Assignee) {
-    if (!person || (assignee.kind !== "ATTENDEE" && assignee.kind !== "REGISTRATION")) return "";
+    // Only for the person themselves: a registration may be split across rooms, which the server must ask about.
+    if (!person || assignee.kind !== "ATTENDEE" || assignee.attendeeId !== person.attendeeId) return "";
     return new Set(person.rooms.map((room) => room.roomName)).size === 1 ? person.rooms[0]!.assignmentId : "";
   }
 
@@ -173,7 +174,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
         setError(failure.message);
       } else {
         // Keep the moment it happened: a later replay is an offline entry, and the server records that time.
-        const roomAssignment = request.assignmentId ?? lonePersonRoom(request.assignee);
+        const roomAssignment = request.assignmentId;
         const offline: IssueRequest = { ...request, entryMethod: "OFFLINE", occurredAt: request.occurredAt ?? new Date().toISOString(), ...(roomAssignment ? { assignmentId: roomAssignment } : {}) };
         const kept = readQueue(scope).map((entry) => entry.idempotencyKey === request.idempotencyKey ? offline : entry);
         writeQueue(scope, kept); setQueue(kept);

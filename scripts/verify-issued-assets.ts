@@ -491,6 +491,14 @@ async function main() {
   assert(rep1.issuanceId && rep2.issuanceId === rep1.issuanceId, "a retried replacement returns the original result");
   assert((await prisma.assetIssuance.count({ where: { eventId, previousIssuanceId: t1.issuanceId! } })) === 1, "and writes nothing twice");
 
+  await expectAssetError(applyIssuanceAction(eventId, userId, t1.issuanceId!, { action: "transfer", to: { kind: "TEAM", label: "Other" }, reason: "x", idempotencyKey: rKey }, { canConfigure: false }), "IDEMPOTENCY_KEY_REUSED", "a replacement's key reused for a transfer");
+  await expectAssetError(applyIssuanceAction(eventId, userId, r7.id, { action: "replace", replacementCode: "R-6", reason: "x", idempotencyKey: tKey }, { canConfigure: false }), "IDEMPOTENCY_KEY_REUSED", "a transfer's key reused for a replacement");
+  await expectAssetError(applyIssuanceAction(eventId, userId, t1.issuanceId!, { action: "replace", replacementCode: "R-6", reason: "x", idempotencyKey: rKey }, { canConfigure: false }), "IDEMPOTENCY_KEY_REUSED", "a replacement's key reused for another replacement item");
+  // The 30-minute window cannot be restarted by transferring or replacing an old issue.
+  await expectAssetError(applyIssuanceAction(eventId, userId, rep1.issuanceId!, { action: "correct", reason: "Fresh row, old issue" }, { canConfigure: false }), "CONFIGURE_REQUIRED", "check-in staff correcting an issue made by a replacement");
+  await expectAssetError(applyIssuanceAction(eventId, userId, t1.issuanceId!, { action: "correct", reason: "x" }, { canConfigure: false }), "ISSUANCE_NOT_OPEN", "the replaced issue is already ended");
+  assert((await prisma.assetIssuance.findUniqueOrThrow({ where: { id: rep1.issuanceId! } })).endedAt === null, "and the replacement is untouched");
+
   // ---- Replacing a quantity item never takes the lot out of stock ------------------------------------
   await applyAssetAction(eventId, userId, { action: "create", typeId: packetType, identifier: "WP-A", quantityTotal: 10 });
   await applyAssetAction(eventId, userId, { action: "create", typeId: packetType, identifier: "WP-B", quantityTotal: 10 });

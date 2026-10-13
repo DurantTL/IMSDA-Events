@@ -78,6 +78,8 @@ the old one as replaced; `listRoomIssuances` returns the room's whole key histor
   (`originalAvailability: AVAILABLE`) also needs `CONFIGURE_EVENT`. This is a conservative default pending an owner
   decision. **For #214:** a CORRECTED issue on a deposit-bearing type is an exception to reconcile (the deposit may
   already be taken); do not treat it as an ordinary return.
+- An issue made by a transfer or replacement can only be corrected by an administrator (it continues an older issue).
+- A CORRECTED earlier holder still blocks backdating before its end: staff re-enter such an item at the current time.
 - Replacing a unit of a **quantity** lot ends the holder's issue and starts one from the replacement lot; it never
   changes whether the original lot can be issued. A numbered original is held out or returned to stock as chosen.
 - A retried transfer or replacement (same saved key) returns the original result. Correct has no new issue to key on; a

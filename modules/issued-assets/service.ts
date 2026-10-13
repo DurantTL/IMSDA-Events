@@ -585,15 +585,22 @@ export async function applyIssuanceAction(eventId: string, actorUserId: string, 
     if (input.action !== "correct" && input.idempotencyKey) {
       const replay = await tx.assetIssuance.findUnique({ where: { eventId_idempotencyKey: { eventId, idempotencyKey: input.idempotencyKey } } });
       if (replay) {
-        if (replay.previousIssuanceId !== old.id) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different change.");
+        const sameChange = replay.previousIssuanceId === old.id
+          && old.endReason === (input.action === "replace" ? "REPLACED" : "TRANSFERRED")
+          && (input.action !== "replace" || replay.assetId === replacement!.id);
+        if (!sameChange) throw new AssetError("IDEMPOTENCY_KEY_REUSED", "That saved retry key was already used for a different change.");
         return { endedIssuanceId: old.id, issuanceId: replay.id as string | null };
       }
     }
 
     if (input.action === "correct") {
       if (old.endedAt) throw new AssetError("ISSUANCE_NOT_OPEN", "That issue has already ended.");
-      if (!options.canConfigure && clock.getTime() - old.createdAt.getTime() > CORRECTION_WINDOW_MS) {
-        throw new AssetError("CONFIGURE_REQUIRED", "This was issued more than 30 minutes ago. An event administrator has to withdraw it: it may already have a deposit or a lodging record attached.");
+      // An issue made by a transfer or replacement continues an older one, so its own age says nothing: only an event
+      // administrator may withdraw it.
+      if (!options.canConfigure && (old.previousIssuanceId !== null || clock.getTime() - old.createdAt.getTime() > CORRECTION_WINDOW_MS)) {
+        throw new AssetError("CONFIGURE_REQUIRED", old.previousIssuanceId !== null
+          ? "This continues an earlier issue (a transfer or replacement). An event administrator has to withdraw it."
+          : "This was issued more than 30 minutes ago. An event administrator has to withdraw it: it may already have a deposit or a lodging record attached.");
       }
       await endIssuance(tx, old, { actorUserId, endReason: "CORRECTED", historyType: "CORRECTED", reason: input.reason, entryMethod: "MANUAL", relatedIssuanceId: null, at: now });
       await writeAuditLog({ eventId, actorUserId, action: "ASSET_ISSUE_CORRECTED", entityType: "AssetIssuance", entityId: old.id, summary: "Corrected (withdrew) an issued item entered in error.", metadata: { assetId: old.assetId } }, tx);
