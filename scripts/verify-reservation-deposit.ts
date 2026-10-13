@@ -68,6 +68,13 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAILED: ${message}`);
 }
 
+function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string) {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`FAILED: ${message} within ${milliseconds} ms`)), milliseconds).unref()),
+  ]);
+}
+
 function arm() {
   let release!: () => void;
   pause.release = new Promise<void>((resolve) => { release = resolve; });
@@ -248,9 +255,20 @@ async function main() {
     const fixture = await createFixture();
     const gate = arm();
     const card = cardWebhook(fixture);
-    await gate.reached; // the card transaction has read (its snapshot is taken) and is about to lock
-    await staffDeposit(fixture); // staff lock, write the check deposit, commit
+    // The card transaction has read (its snapshot is taken) and is about to lock. If the card path ever stops
+    // issuing the lock query this fails fast with a clear message instead of hanging the CI step.
+    await withTimeout(gate.reached, 10_000, "the card transaction never reached its registration row lock");
+    // Start staff, and release the card transaction the moment the staff payment row has committed: it sits inside
+    // Prisma's default 5 s interactive-transaction timeout, so nothing slow (the post-commit read) may run first.
+    const staff = staffDeposit(fixture);
+    staff.catch(() => undefined);
+    const deadline = Date.now() + 10_000;
+    while (!(await base.payment.findFirst({ where: { registrationId: fixture.registrationId, isDeposit: true, status: "SUCCEEDED" }, select: { id: true } }))) {
+      assert(Date.now() < deadline, "the staff deposit never committed");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     gate.release();
+    await staff;
     await card;
     const result = await state(fixture);
     assert(result.counted.length === 1, `exactly one deposit counts, found ${result.counted.length}`);
