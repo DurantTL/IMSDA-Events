@@ -428,7 +428,7 @@ async function main() {
   await reconcileDeadlineReminders(new Date("2026-11-25T18:00:00Z"));
   assert((await shape(weekly.id)).length === 1, "no duplicate batch for the same occurrence");
   await reconcileDeadlineReminders(new Date("2026-11-28T18:00:00Z")); // Sat: Nov 27 has passed
-  assert(JSON.stringify(await shape(weekly.id)) === JSON.stringify(["2026-11-27:2:WITHDRAWN", "2026-12-04:14:PENDING"]), `the passed occurrence is withdrawn and the next prepared, got ${JSON.stringify(await shape(weekly.id))}`);
+  assert(JSON.stringify(await shape(weekly.id)) === JSON.stringify(["2026-11-27:2:WITHDRAWN"]), `the passed occurrence is withdrawn and a weekly deadline gets no 14-day batch, got ${JSON.stringify(await shape(weekly.id))}`);
   await reconcileDeadlineReminders(new Date("2026-12-02T18:00:00Z")); // Dec 15 minus 14 days is Dec 1
   assert(JSON.stringify(await shape(monthly.id)) === JSON.stringify(["2026-12-15:14:PENDING"]), `a monthly deadline gets its own batch for its occurrence, got ${JSON.stringify(await shape(monthly.id))}`);
   const monthlyBatch = (await batchesOf(monthly.id))[0];
@@ -439,7 +439,9 @@ async function main() {
   await reconcileDeadlineReminders(new Date("2026-11-01T04:59:00Z"));
   assert(JSON.stringify(await shape(saturdays.id)) === JSON.stringify(["2026-10-31:2:PENDING"]), `Oct 31 11:59 PM CDT is still the Oct 31 occurrence, got ${JSON.stringify(await shape(saturdays.id))}`);
   await reconcileDeadlineReminders(new Date("2026-11-01T05:00:00Z"));
-  assert(JSON.stringify(await shape(saturdays.id)) === JSON.stringify(["2026-10-31:2:WITHDRAWN", "2026-11-07:14:PENDING"]), `midnight CDT on Nov 1 moves to Nov 7, got ${JSON.stringify(await shape(saturdays.id))}`);
+  assert(JSON.stringify(await shape(saturdays.id)) === JSON.stringify(["2026-10-31:2:WITHDRAWN"]), `midnight CDT on Nov 1 withdraws Oct 31 (Nov 7 has no 14-day batch), got ${JSON.stringify(await shape(saturdays.id))}`);
+  await reconcileDeadlineReminders(new Date("2026-11-05T06:00:00Z")); // Thu Nov 5, midnight CST: Nov 7's 2-day point
+  assert(JSON.stringify(await shape(saturdays.id)) === JSON.stringify(["2026-10-31:2:WITHDRAWN", "2026-11-07:2:PENDING"]), `Nov 7's 2-day batch arrives at midnight CST, got ${JSON.stringify(await shape(saturdays.id))}`);
   console.log("ok  repeating deadlines: a batch per occurrence, the passed one withdrawn, no duplicates, across daylight saving");
   await prisma.deadlineReminderBatch.deleteMany({ where: { title: { startsWith: "DLR Repeat" } } });
   await prisma.calendarEntry.deleteMany({ where: { title: { startsWith: "DLR Repeat" } } });

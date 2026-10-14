@@ -98,6 +98,7 @@ vi.mock("@/modules/communications/account-email", () => ({
   getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
 }));
 
+import { expansionDiagnostics } from "@/modules/calendar/recurrence";
 import {
   DeadlineReminderError,
   dismissReminderBatch,
@@ -493,19 +494,30 @@ describe("repeating deadlines: a reminder for each occurrence (#915)", () => {
   const key = (batch: Record<string, unknown>) => `${batch.dueOn}:${batch.daysBefore}:${batch.status}`;
   const keys = () => state.batches.map(key).sort();
 
-  it("gives a weekly deadline a batch per occurrence: only the next one, and a passed one is withdrawn", async () => {
-    // Every Friday from Oct 2, 2026.
+  it("gives a weekly deadline only 2-day batches, one per occurrence; a passed one is withdrawn", async () => {
+    // Every Friday from Oct 2, 2026. The 14-day point is before the previous Friday, so it is never prepared.
     state.entries = [entry({ startsOn: "2026-10-02", endsOn: "2026-10-02", repeatRule: "FREQ=WEEKLY;BYDAY=FR;WKST=SU" })];
     await reconcileDeadlineReminders(at("2026-11-25T18:00:00Z")); // Wed: next is Fri Nov 27, 2 days out
     expect(keys()).toEqual(["2026-11-27:2:PENDING"]);
     await reconcileDeadlineReminders(at("2026-11-27T18:00:00Z")); // due today: still that occurrence
     expect(keys()).toEqual(["2026-11-27:2:PENDING"]);
-    // Sat Nov 28: Nov 27 has passed; Dec 4's 14-day point (Nov 20) is reached, its 2-day point (Dec 2) is not.
-    expect(await reconcileDeadlineReminders(at("2026-11-28T18:00:00Z"))).toMatchObject({ prepared: 1, withdrawn: 1 });
-    expect(keys()).toEqual(["2026-11-27:2:WITHDRAWN", "2026-12-04:14:PENDING"]);
-    expect(state.batches.find((batch) => batch.dueOn === "2026-11-27")).toMatchObject({ statusReason: expect.stringMatching(/occurrence/i) });
-    await reconcileDeadlineReminders(at("2026-12-02T18:00:00Z"));
-    expect(keys()).toEqual(["2026-11-27:2:WITHDRAWN", "2026-12-04:14:WITHDRAWN", "2026-12-04:2:PENDING"]);
+    // Sat Nov 28: Nov 27 has passed; Dec 4's reached point is the 14-day one, which a weekly deadline does not get.
+    expect(await reconcileDeadlineReminders(at("2026-11-28T18:00:00Z"))).toMatchObject({ prepared: 0, withdrawn: 1 });
+    expect(keys()).toEqual(["2026-11-27:2:WITHDRAWN"]);
+    expect(state.batches[0]).toMatchObject({ statusReason: expect.stringMatching(/occurrence/i) });
+    await reconcileDeadlineReminders(at("2026-12-02T18:00:00Z")); // Dec 4's 2-day point
+    expect(keys()).toEqual(["2026-11-27:2:WITHDRAWN", "2026-12-04:2:PENDING"]);
+    expect(state.batches.every((batch) => batch.daysBefore === 2)).toBe(true);
+  });
+
+  it("gives an every-other-week deadline only the 2-day batch, and a daily deadline none", async () => {
+    state.entries = [entry({ id: "biweekly", startsOn: "2026-10-02", endsOn: "2026-10-02", repeatRule: "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR;WKST=SU" })];
+    await reconcileDeadlineReminders(at("2026-11-27T18:00:00Z")); // Oct 2 + 8 weeks = Nov 27: the 14-day point equals the previous due date
+    expect(keys()).toEqual(["2026-11-27:2:PENDING"]);
+    state.batches = [];
+    state.entries = [entry({ id: "daily", startsOn: "2026-10-02", endsOn: "2026-10-02", repeatRule: "FREQ=DAILY" })];
+    for (const day of ["2026-11-25", "2026-11-26", "2026-11-27"]) await reconcileDeadlineReminders(at(`${day}T18:00:00Z`));
+    expect(keys()).toEqual([]);
   });
 
   it("gives a monthly deadline its own batches each month, keeping a sent one as history", async () => {
@@ -535,16 +547,77 @@ describe("repeating deadlines: a reminder for each occurrence (#915)", () => {
   });
 
   it("expands occurrences by conference calendar date across the November daylight-saving change", async () => {
-    // Every Saturday from Oct 24. Chicago leaves daylight time on Sun Nov 1 at 2 AM.
+    // Every Saturday from Oct 24 (2-day batches only). Chicago leaves daylight time on Sun Nov 1 at 2 AM.
     state.entries = [entry({ startsOn: "2026-10-24", endsOn: "2026-10-24", repeatRule: "FREQ=WEEKLY;BYDAY=SA;WKST=SU" })];
     await reconcileDeadlineReminders(at("2026-11-01T04:59:00Z")); // Sat Oct 31, 11:59 PM CDT: that Saturday is still due today
     expect(keys()).toEqual(["2026-10-31:2:PENDING"]);
     await reconcileDeadlineReminders(at("2026-11-01T05:00:00Z")); // Sun Nov 1, midnight CDT: Oct 31 has passed
-    expect(keys()).toEqual(["2026-10-31:2:WITHDRAWN", "2026-11-07:14:PENDING"]);
+    expect(keys()).toEqual(["2026-10-31:2:WITHDRAWN"]);
     await reconcileDeadlineReminders(at("2026-11-05T05:59:00Z")); // Wed Nov 4, 11:59 PM CST: Nov 7's 2-day point is Nov 5
-    expect(keys()).toEqual(["2026-10-31:2:WITHDRAWN", "2026-11-07:14:PENDING"]);
+    expect(keys()).toEqual(["2026-10-31:2:WITHDRAWN"]);
     await reconcileDeadlineReminders(at("2026-11-05T06:00:00Z")); // Thu Nov 5, midnight CST
-    expect(keys()).toEqual(["2026-10-31:2:WITHDRAWN", "2026-11-07:14:WITHDRAWN", "2026-11-07:2:PENDING"]);
+    expect(keys()).toEqual(["2026-10-31:2:WITHDRAWN", "2026-11-07:2:PENDING"]);
+  });
+
+  it("holds a monthly occurrence's 14-day point at the daylight-saving change (Nov 15's is Nov 1)", async () => {
+    state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=MONTHLY" })];
+    await reconcileDeadlineReminders(at("2026-11-01T04:59:00Z")); // Oct 31, 11:59 PM CDT
+    expect(keys()).toEqual([]);
+    await reconcileDeadlineReminders(at("2026-11-01T05:00:00Z")); // Nov 1, midnight CDT
+    expect(keys()).toEqual(["2026-11-15:14:PENDING"]);
+  });
+
+  it("expands only a window around today: a daily rule started in 2020 costs a bounded number of steps", async () => {
+    state.entries = [entry({ startsOn: "2020-01-01", endsOn: "2020-01-01", repeatRule: "FREQ=DAILY" })];
+    expansionDiagnostics.steps = 0;
+    await reconcileDeadlineReminders(at("2026-11-25T18:00:00Z"));
+    expect(expansionDiagnostics.steps).toBeLessThan(100);
+    expect(keys()).toEqual([]); // daily: no point falls after the previous day's due date
+    // Nothing in range (a yearly deadline far off) is also cheap and prepares nothing.
+    state.entries = [entry({ startsOn: "2020-03-01", endsOn: "2020-03-01", repeatRule: "FREQ=YEARLY" })];
+    expansionDiagnostics.steps = 0;
+    await reconcileDeadlineReminders(at("2026-11-25T18:00:00Z"));
+    expect(expansionDiagnostics.steps).toBeLessThan(100);
+    expect(keys()).toEqual([]);
+  });
+
+  it("withdraws a waiting batch with the 'moved later' reason when nothing is left in range", async () => {
+    state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=MONTHLY" })];
+    await reconcileDeadlineReminders(at("2026-11-02T18:00:00Z"));
+    state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=MONTHLY;UNTIL=20261101" })];
+    await reconcileDeadlineReminders(at("2026-11-02T18:00:00Z"));
+    expect(state.batches[0]).toMatchObject({ status: "WITHDRAWN", statusReason: "The due date moved later; a reminder is prepared when its time comes." });
+  });
+
+  it("follows a one-off deadline that becomes repeating while its batch waits", async () => {
+    const now = at("2026-11-25T18:00:00Z");
+    await reconcileDeadlineReminders(now);
+    expect(keys()).toEqual(["2026-12-05:14:PENDING"]);
+    state.entries = [entry({ startsOn: "2026-10-02", endsOn: "2026-10-02", repeatRule: "FREQ=WEEKLY;BYDAY=FR;WKST=SU" })];
+    await reconcileDeadlineReminders(now);
+    expect(keys()).toEqual(["2026-11-27:2:PENDING", "2026-12-05:14:WITHDRAWN"]);
+  });
+
+  it("moves the waiting batch along when a repeating deadline becomes one-off", async () => {
+    const now = at("2026-11-25T18:00:00Z");
+    state.entries = [entry({ startsOn: "2026-10-28", endsOn: "2026-10-28", repeatRule: "FREQ=MONTHLY" })];
+    await reconcileDeadlineReminders(now);
+    expect(keys()).toEqual(["2026-11-28:14:PENDING"]);
+    const id = state.batches[0].id;
+    state.entries = [entry({ startsOn: "2026-12-05", endsOn: "2026-12-05" })];
+    await reconcileDeadlineReminders(now);
+    expect(keys()).toEqual(["2026-12-05:14:PENDING"]);
+    expect(state.batches[0].id).toBe(id);
+  });
+
+  it("follows the series when its start moves", async () => {
+    const now = at("2026-11-26T18:00:00Z");
+    state.entries = [entry({ startsOn: "2026-10-02", endsOn: "2026-10-02", repeatRule: "FREQ=WEEKLY;BYDAY=FR;WKST=SU" })];
+    await reconcileDeadlineReminders(now);
+    expect(keys()).toEqual(["2026-11-27:2:PENDING"]);
+    state.entries = [entry({ startsOn: "2026-10-03", endsOn: "2026-10-03", repeatRule: "FREQ=WEEKLY;BYDAY=SA;WKST=SU" })];
+    await reconcileDeadlineReminders(now);
+    expect(keys()).toEqual(["2026-11-27:2:WITHDRAWN", "2026-11-28:2:PENDING"]);
   });
 
   it("skips occurrences staff skipped, and withdraws a waiting batch whose occurrence is then skipped", async () => {

@@ -5640,8 +5640,9 @@ model DeadlineReminderBatch {
   preparedAt        DateTime               @default(now())
   decidedAt         DateTime?
   decidedByUserId   String?
-  /// Set when it is sent: how many emails were queued, and how many people were left out for opting out.
+  /// Set when it is sent: how many emails were queued.
   recipientCount    Int?
+  /// No longer written since #915 (deadline reminders go to people who opted out of announcements); null on new rows.
   optedOutCount     Int?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt

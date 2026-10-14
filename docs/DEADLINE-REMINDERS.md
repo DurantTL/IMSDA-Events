@@ -65,7 +65,13 @@ and prepares that occurrence's latest reached point, exactly as for a one-off
 deadline. The batch is keyed on (entry, point, due date), so each occurrence has
 its own batch and the same occurrence is never prepared twice. A waiting batch for
 an occurrence that has passed (or was skipped, or whose rule changed) is withdrawn;
-a sent or dismissed one stays as history. Occurrences are never moved onto one
+a sent or dismissed one stays as history. Only a 28-day window around
+today is expanded (a point is reached at most 14 days before its due date), so a
+long-running daily rule is cheap. A repeating deadline's point is prepared only if
+the point's date falls after the previous occurrence's due date, so closely spaced
+occurrences do not produce a batch that is withdrawn days later: a weekly (or
+every-other-week) deadline gets only the 2-day reminder, a daily one none, and a
+monthly one both. The reminders tab says so. Occurrences are never moved onto one
 another the way a one-off deadline's waiting batch follows a new date. Existing
 calendar items are not re-typed: staff mark an existing "due" item as a Deadline
 themselves.

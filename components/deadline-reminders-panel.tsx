@@ -71,6 +71,8 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
       </div>
       <p className="field-help">
         Two weeks and two days before each deadline, a reminder is prepared for every club director and Area Coordinator.
+        A deadline that repeats is reminded for each occurrence, but only at the points that fall after the previous occurrence
+        (a weekly deadline gets the 2-day reminder only, and a daily one none).
         Nothing is emailed until you send it here. If a deadline changes or is cancelled first, its reminder follows or is withdrawn.
       </p>
       {!state.emailConfigured && (
