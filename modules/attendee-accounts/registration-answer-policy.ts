@@ -72,12 +72,17 @@ function fieldSemantics(field: RegistrationFormField) {
   return `${field.key.replaceAll("_", " ")} ${field.label}`;
 }
 
+/** ADR 0005 protected categories (medical, guardian, minor, age, birth, gender, sex ...) by key or label. */
+export function isProtectedAnswerField(field: Pick<RegistrationFormField, "key" | "label">) {
+  return sensitiveFieldPattern.test(fieldSemantics(field as RegistrationFormField));
+}
+
 export function isTieredAttendeeFieldEditable(field: RegistrationFormField) {
   if (
     field.scope !== "ATTENDEE"
     || !editableFieldTypes.has(field.type)
     || protectedAttendeeKeys.has(field.key)
-    || sensitiveFieldPattern.test(fieldSemantics(field))
+    || isProtectedAnswerField(field)
   ) {
     return false;
   }

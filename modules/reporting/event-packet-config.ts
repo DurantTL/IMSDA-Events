@@ -40,16 +40,21 @@ export const defaultEventPacketConfig: EventPacketConfig = {
   },
 };
 
-const storedSchema = z.object({
-  groupingFieldKey: z.string().trim().min(1).max(120).nullish(),
-  sections: z.partialRecord(z.enum(eventPacketSectionKeys), z.boolean()).optional(),
-});
+const groupingFieldSchema = z.string().trim().min(1).max(120);
 
+/** Parsed per part: an unknown key or one bad part never wipes the rest. */
 export function parseEventPacketConfig(value: unknown): EventPacketConfig {
-  const parsed = storedSchema.safeParse(value);
-  if (!parsed.success) return defaultEventPacketConfig;
-  return {
-    groupingFieldKey: parsed.data.groupingFieldKey ?? null,
-    sections: { ...defaultEventPacketConfig.sections, ...parsed.data.sections },
-  };
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const grouping = groupingFieldSchema.safeParse(record.groupingFieldKey);
+  const storedSections = record.sections && typeof record.sections === "object" && !Array.isArray(record.sections)
+    ? record.sections as Record<string, unknown>
+    : {};
+  const sections = { ...defaultEventPacketConfig.sections };
+  for (const key of eventPacketSectionKeys) {
+    const flag = z.boolean().safeParse(storedSections[key]);
+    if (flag.success) sections[key] = flag.data;
+  }
+  return { groupingFieldKey: grouping.success ? grouping.data : null, sections };
 }

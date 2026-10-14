@@ -206,6 +206,28 @@ describe("event-neutral packets (#155)", () => {
     expect(sensitive.rosterGroups[0].label).toBe("Central");
   });
 
+  it("parses stored config per part, so one bad part or an unknown key keeps the rest", () => {
+    const config = parseEventPacketConfig({
+      groupingFieldKey: "club",
+      unknownTopLevel: true,
+      sections: { shirtSize: false, coverNotes: "yes", mystery: false, planningTotals: false },
+    });
+    expect(config.groupingFieldKey).toBe("club");
+    expect(config.sections).toEqual({
+      ...defaultEventPacketConfig.sections,
+      shirtSize: false,
+      planningTotals: false,
+    });
+    expect(parseEventPacketConfig({ groupingFieldKey: 42, sections: { shirtSize: false } })).toEqual({
+      groupingFieldKey: null,
+      sections: { ...defaultEventPacketConfig.sections, shirtSize: false },
+    });
+    expect(parseEventPacketConfig({ groupingFieldKey: "club", sections: "bad" })).toEqual({
+      ...defaultEventPacketConfig,
+      groupingFieldKey: "club",
+    });
+  });
+
   it("defaults unreadable stored config to the Women's Retreat layout", () => {
     expect(parseEventPacketConfig(null)).toEqual(defaultEventPacketConfig);
     expect(parseEventPacketConfig({ sections: { shirtSize: "yes" } })).toEqual(defaultEventPacketConfig);
@@ -215,5 +237,88 @@ describe("event-neutral packets (#155)", () => {
 
   it("keeps the pre-#155 retreat names resolvable", () => {
     expect(legacyPackets.buildRetreatPacketGroups).toBe(currentPackets.buildEventPacketGroups);
+  });
+});
+
+describe("pinned grouping field privacy (#155)", () => {
+  type Field = Record<string, unknown>;
+  function pinnedRegistration(pinned: Field, answer: string, otherFlag?: Field) {
+    const source = registration();
+    const fields = [
+      { id: "club", key: "club", label: "Club name", helpText: "", type: "SELECT", scope: "REGISTRATION", required: false, options: ["Eagles", "Falcons"] },
+      { helpText: "", scope: "REGISTRATION", required: false, options: [], ...pinned },
+    ];
+    const registrations = [{
+      ...source,
+      publicSubmission: {
+        ...source.publicSubmission!,
+        responses: { club: "Eagles", [pinned.key as string]: answer },
+        definition: { ...definition, sections: [{ ...definition.sections[0], fields }] } as never,
+      },
+    }];
+    if (otherFlag) {
+      // A second form version that flags the same key sensitive.
+      registrations.push({
+        ...registrations[0],
+        id: "registration-2",
+        publicSubmission: {
+          ...registrations[0].publicSubmission!,
+          definition: {
+            ...definition,
+            sections: [{ ...definition.sections[0], fields: [fields[0], { ...fields[1], ...otherFlag }] }],
+          } as never,
+        },
+      });
+    }
+    return registrations as OperationalReportRegistration[];
+  }
+  const groupLabels = (registrations: OperationalReportRegistration[], key: string) => (
+    buildOperationalReport(registrations, { groupingFieldKey: key }).rosterGroups.map((group) => group.label)
+  );
+
+  it("accepts a plain SELECT field", () => {
+    const registrations = pinnedRegistration(
+      { id: "troop", key: "troop", label: "Troop", type: "SELECT", options: ["North", "South"] },
+      "North",
+    );
+    expect(groupLabels(registrations, "troop")).toEqual(["North"]);
+  });
+
+  it("refuses a neutral-labelled field flagged sensitive, and falls back to automatic grouping", () => {
+    const registrations = pinnedRegistration(
+      { id: "troop", key: "troop", label: "Troop", type: "SELECT", options: ["North", "South"], sensitive: true },
+      "North",
+    );
+    expect(groupLabels(registrations, "troop")).toEqual(["Eagles"]);
+  });
+
+  it("refuses a field flagged sensitive in any form version", () => {
+    const registrations = pinnedRegistration(
+      { id: "troop", key: "troop", label: "Troop", type: "SELECT", options: ["North", "South"] },
+      "North",
+      { sensitive: true },
+    );
+    expect(groupLabels(registrations, "troop").every((label) => label === "Eagles")).toBe(true);
+  });
+
+  it("refuses DATE and EMAIL fields", () => {
+    const dob = pinnedRegistration(
+      { id: "dob", key: "date_of_birth", label: "Date of birth", type: "DATE" },
+      "2010-01-01",
+    );
+    expect(groupLabels(dob, "date_of_birth")).toEqual(["Eagles"]);
+    const email = pinnedRegistration(
+      { id: "contact", key: "contact_email", label: "Contact", type: "EMAIL" },
+      "synthetic@example.test",
+    );
+    expect(groupLabels(email, "contact_email")).toEqual(["Eagles"]);
+  });
+
+  it("refuses ADR 0005 protected wording even on a groupable type", () => {
+    const registrations = pinnedRegistration(
+      { id: "gender", key: "gender", label: "Gender", type: "SELECT", options: ["X", "Y"] },
+      "X",
+    );
+    expect(groupLabels(registrations, "gender")).toEqual(["Eagles"]);
   });
 });

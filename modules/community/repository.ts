@@ -65,7 +65,7 @@ async function attendeeEventAccess(account: AttendeeIdentity, eventIdOrSlug: {
 }) {
   const registrationIds = await matchingRegistrationIdsForVerifiedEmail(account.verifiedEmail);
   if (registrationIds.length === 0) {
-    throw new CommunityError("COMMUNITY_NOT_FOUND", "No active retreat registration was found.", 404);
+    throw new CommunityError("COMMUNITY_NOT_FOUND", "No active event registration was found.", 404);
   }
   const event = await getPrisma().event.findFirst({
     where: {
@@ -87,7 +87,7 @@ async function attendeeEventAccess(account: AttendeeIdentity, eventIdOrSlug: {
     },
   });
   if (!event) {
-    throw new CommunityError("COMMUNITY_NOT_FOUND", "No active retreat registration was found.", 404);
+    throw new CommunityError("COMMUNITY_NOT_FOUND", "No active event registration was found.", 404);
   }
   return event;
 }

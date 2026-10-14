@@ -1,3 +1,4 @@
+import { isProtectedAnswerField } from "@/modules/attendee-accounts/registration-answer-policy";
 import { isHealthTypeField } from "@/modules/forms/field-flags";
 import {
   registrationFormDefinitionSchema,
@@ -149,6 +150,7 @@ type MutableSeminarField = {
 };
 
 const activeStatusSet = new Set(["SUBMITTED", "CONFIRMED"]);
+const groupingFieldTypeSet = new Set(["TEXT", "SELECT", "RADIO"]);
 const choiceFieldTypeSet = new Set(["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE"]);
 const sensitiveSemanticPattern = /\b(?:medical|medication|diagnos\w*|health|allerg\w*|special\s*needs?|accessib\w*|disabil\w*|emergency|injur\w*|condition)\b/i;
 const mealSemanticPattern = /\b(?:meal|food|dietary|breakfast|brunch|lunch|supper|dinner|snack)\b/i;
@@ -233,10 +235,16 @@ function registrationGrouping(
   if (groupingFieldKey) {
     // An event-owned grouping choice (#155). Sensitive fields can never group, and a registration
     // that left the chosen answer blank falls back to the automatic choice below.
+    // The pinned field obeys the same type filter and ADR 0005 protected wording as automatic grouping;
+    // a refused field falls back to the automatic choice.
     const chosen = fields.find(({ field }) => (
       field.key === groupingFieldKey && field.scope === "REGISTRATION"
     ));
-    const answer = chosen && !isSensitiveField(chosen) ? stringAnswer(responses[groupingFieldKey]) : null;
+    const allowed = chosen
+      && groupingFieldTypeSet.has(chosen.field.type)
+      && !isSensitiveField(chosen)
+      && !isProtectedAnswerField(chosen.field);
+    const answer = chosen && allowed ? stringAnswer(responses[groupingFieldKey]) : null;
     if (chosen && answer) {
       return {
         key: `${normalizedIdentity(chosen.field.label)}::${normalizedIdentity(answer)}`,
@@ -248,7 +256,7 @@ function registrationGrouping(
   const candidates = fields
     .filter(({ field }) => (
       field.scope === "REGISTRATION"
-      && ["TEXT", "SELECT", "RADIO"].includes(field.type)
+      && groupingFieldTypeSet.has(field.type)
     ))
     .filter((metadata) => !isSensitiveField(metadata))
     .map((metadata) => ({

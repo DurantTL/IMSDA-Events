@@ -17,7 +17,10 @@ import { describe, expect, it } from "vitest";
  */
 const modulesRoot = path.join(process.cwd(), "modules");
 
-const eventSpecificToken = /(wr26|womens|retreat|camporee|campmeeting|camp-meeting)/i;
+const eventSpecificToken = /(wr\d{2}|womens|retreat|camporee|campmeeting|camp-meeting)/i;
+
+/** Quoted event slugs and labels in shared code. */
+const eventSpecificLiteral = /["'`][^"'`\n]*(womens-retreat|camp-meeting|wr\d{2})[^"'`\n]*["'`]/gi;
 
 /** Legitimately event-specific: importers, import profiles, starters and seeded template data. */
 const approvedPaths = [
@@ -56,6 +59,21 @@ const grandfathered: Record<string, string[]> = {
 };
 const grandfatheredFiles = new Set(["meals/camp-meeting.ts"]);
 
+/**
+ * Pre-existing event-specific string literals in shared modules, grandfathered by file (a ratchet:
+ * new entries are not accepted). Each value is the exact literal text matched.
+ */
+const grandfatheredLiterals: Record<string, string[]> = {
+  "checkin/domain.ts": ['"WR26-…"'],
+  "event-clones/private-links.ts": ["`https://imsda.org/camp-meeting-2027/photos`"],
+  "events/last-used-event-cookie.ts": ["`evt_wr26`"],
+  "events/public-domain.ts": ['"womens-retreat-2026"', '"https://imsda.org/event/womens-retreat-3/"'],
+  "organizations/domain.ts": ['"WR26"'],
+  "organizations/schemas.ts": ['"WR26"'],
+  "payments/square-match-repository.ts": ["`wr26-bundle.ts`"],
+  "system-admin/readiness-items.ts": ['"wr26-signed-off"', '"WR26 sign-off"'],
+};
+
 function listFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
     const full = path.join(directory, entry);
@@ -68,7 +86,25 @@ const relativeFiles = listFiles(modulesRoot)
   .filter((file) => /\.(ts|tsx)$/.test(file))
   .filter((file) => !approvedPaths.some((approved) => file.startsWith(approved)));
 
-const exportPattern = /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|function\*?|class|type|interface|enum)\s+([A-Za-z0-9_$]+)/gm;
+const exportPattern = /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|let|var|function\*?|class|type|interface|enum)\s+([A-Za-z0-9_$]+)/gm;
+const defaultExportPattern = /^export\s+default\s+(?:async\s+)?(?:function\*?|class)?\s*([A-Za-z0-9_$]+)?/gm;
+const exportListPattern = /^export\s+(?:type\s+)?\{([^}]*)\}/gm;
+
+/** Every exported name in a source file, including `export { x as y }`, re-exports, and default exports. */
+function exportedNames(source: string) {
+  const names: string[] = [];
+  for (const match of source.matchAll(exportPattern)) names.push(match[1]);
+  for (const match of source.matchAll(defaultExportPattern)) if (match[1]) names.push(match[1]);
+  for (const match of source.matchAll(exportListPattern)) {
+    for (const part of match[1].split(",")) {
+      const piece = part.trim().replace(/^type\s+/, "");
+      if (!piece) continue;
+      // `a as b` exports b but also names a; check both sides.
+      names.push(...piece.split(/\s+as\s+/).map((name) => name.trim()));
+    }
+  }
+  return names;
+}
 
 describe("shared modules stay event-neutral (#155)", () => {
   it("has no event-specific file or directory names", () => {
@@ -88,8 +124,7 @@ describe("shared modules stay event-neutral (#155)", () => {
         ...(compatibilityAliasExports[file] ?? []),
         ...(grandfathered[file] ?? []),
       ]);
-      for (const match of source.matchAll(exportPattern)) {
-        const name = match[1];
+      for (const name of exportedNames(source)) {
         if (eventSpecificToken.test(name) && !allowed.has(name)) {
           offenders.push(`${file}: ${name}`);
         }
@@ -98,16 +133,44 @@ describe("shared modules stay event-neutral (#155)", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("has no event-specific string literals", () => {
+    const offenders: string[] = [];
+    for (const file of relativeFiles) {
+      if (grandfatheredFiles.has(file) || compatibilityAliasFiles.has(file) || file in grandfathered) continue;
+      const source = readFileSync(path.join(modulesRoot, file), "utf8");
+      for (const match of source.matchAll(eventSpecificLiteral)) {
+        if (!(grandfatheredLiterals[file] ?? []).includes(match[0])) offenders.push(`${file}: ${match[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("flags a new event-specific name (the guard itself works)", () => {
     expect(eventSpecificToken.test("reporting/womens-retreat-sheet.ts")).toBe(true);
     expect(eventSpecificToken.test("buildWr26Packets")).toBe(true);
+    expect(eventSpecificToken.test("buildWr27Packets")).toBe(true);
     expect(eventSpecificToken.test("buildEventPacketGroups")).toBe(false);
+    const names = exportedNames([
+      "const retreatThing = 1;",
+      "export { retreatThing };",
+      "export { a as womensExport } from \"./x\";",
+      "export default function campMeetingHome() {}",
+      "export let wr27State = 0;",
+    ].join("\n"));
+    expect(names).toEqual(expect.arrayContaining(["wr27State", "campMeetingHome", "womensExport", "retreatThing"]));
+    expect(`const slug = "womens-retreat";`.match(eventSpecificLiteral)).toHaveLength(1);
+    expect(`const slug = "camp-meeting";`.match(eventSpecificLiteral)).toHaveLength(1);
   });
 
   it("keeps every allowlisted alias real, so the list cannot go stale", () => {
     const all = new Set(listFiles(modulesRoot)
       .map((file) => path.relative(modulesRoot, file).split(path.sep).join("/")));
     for (const file of compatibilityAliasFiles) expect(all.has(file)).toBe(true);
+    for (const [file, literals] of Object.entries(grandfatheredLiterals)) {
+      expect(all.has(file)).toBe(true);
+      const source = readFileSync(path.join(modulesRoot, file), "utf8");
+      for (const literal of literals) expect(source).toContain(literal);
+    }
     for (const [file, names] of Object.entries({ ...compatibilityAliasExports, ...grandfathered })) {
       expect(all.has(file)).toBe(true);
       const source = readFileSync(path.join(modulesRoot, file), "utf8");
