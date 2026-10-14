@@ -34,15 +34,16 @@ import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { evaluateLocationPhase, locationLifecycleSource } from "@/modules/event-locations/domain";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { preparePublicRegistration, type PublicRegistrationInput } from "@/modules/forms/public-domain";
+import { attendeePromoCodeField, promoCodeField } from "@/modules/promo-codes/domain";
 import {
   getPublicRegistrationExperience,
   PublicRegistrationError,
   submitPublicRegistration,
+  usageFromReservations,
   type ClubSubmissionContext,
   type PublicRegistrationConfirmation,
 } from "@/modules/forms/public-repository";
 import {
-  attachedDirectorEmail,
   generalLinkClubAnswer,
   generalLinkFormProblem,
   GENERAL_LINK_RECEIVED_MESSAGE,
@@ -412,7 +413,6 @@ function receivedConfirmation(input: {
   attendeeCount: number;
   attendeeNames: string[];
   pricingDate: string;
-  emailSent: boolean;
   rejected?: boolean;
 }): GeneralLinkConfirmation {
   return {
@@ -427,10 +427,11 @@ function receivedConfirmation(input: {
     lineItems: [],
     pricingDate: input.pricingDate,
     cardSelected: false,
-    emailSent: input.emailSent,
+    // Constants: whether and when an email went out must not differ between a matched and a waiting team.
+    emailSent: false,
     paymentCollected: false,
-    notificationQueued: input.emailSent,
-    notificationStatus: input.emailSent ? "SENT" : "PENDING",
+    notificationQueued: true,
+    notificationStatus: "PENDING",
     managePath: null,
     manageLinkExpiresAt: null,
     attendeeCount: input.attendeeCount,
@@ -449,7 +450,6 @@ function replayConfirmation(row: SubmissionRow, pricingDate: string, attendeeNam
     attendeeCount: row.attendeeCount,
     attendeeNames,
     pricingDate,
-    emailSent: false,
     rejected: row.status === "REJECTED",
   });
 }
@@ -488,6 +488,10 @@ async function validateGeneralLinkRequest(
     pickedOrganizationId: string | null;
     allowMultipleTeams: boolean;
     now: Date;
+    /** For the choice-capacity check the club transaction makes, with the same real reservation usage. */
+    definition: RegistrationFormDefinition;
+    formSlug: string;
+    submission: PublicRegistrationInput;
   },
 ) {
   const db = client as Tx;
@@ -528,6 +532,28 @@ async function validateGeneralLinkRequest(
     const remaining = admission.remainingSpots ?? 0;
     throw new PublicRegistrationError("EVENT_FULL", `Only ${remaining} attendee spot${remaining === 1 ? "" : "s"} remain for this event, and its waitlist is not enabled.`);
   }
+  // Limited choices on the form (a seminar, a meal) that just became full: the club transaction refuses them, so every request
+  // is checked the same way here, on the real reservation usage. A registration that will be waitlisted is not held to them.
+  if (!(admission.capacityDecision === "WAITLIST" || admitted?.waitlisted === true)) {
+    const formRow = await db.registrationForm.findFirst({ where: { eventId: input.event.id, slug: input.formSlug }, select: { id: true } });
+    const reservations = formRow
+      ? await db.registrationCapacityReservation.findMany({ where: { formId: formRow.id, releasedAt: null }, select: { fieldId: true, optionValue: true, rank: true } })
+      : [];
+    const checked = preparePublicRegistration(input.definition, input.submission, {
+      timeZone: input.event.timezone,
+      now: input.now,
+      usage: usageFromReservations(input.definition, reservations),
+      ignoreAvailability: false,
+    });
+    if (!checked.isValid) {
+      const capacityIssue = checked.issues.some((issue) => issue.message.includes("reached its limit"));
+      throw new PublicRegistrationError(
+        capacityIssue ? "CAPACITY_REACHED" : "INVALID_SUBMISSION",
+        capacityIssue ? "One of your selections just became full. Review the highlighted choice and submit again." : "Review the highlighted fields and submit again.",
+        checked.issues,
+      );
+    }
+  }
 
   if (input.team) {
     // A team name is unique in the event whichever club holds it, registered or waiting. Read in the caller's transaction when
@@ -550,6 +576,23 @@ async function validateGeneralLinkRequest(
       })).conflicts);
     }
   }
+}
+
+/** Answers a team registration never takes, whatever the email: lodging, responsible adults and promo codes. Null when none. */
+function unsupportedFieldProblem(definition: RegistrationFormDefinition, input: PublicRegistrationInput) {
+  const issue = (key: string, message: string) => ({
+    message,
+    issues: [{ kind: "validation" as const, code: "INVALID_RESPONSE" as const, fieldId: null, key, path: key, attendeeIndex: null, message }],
+  });
+  if (input.lodging) return issue("lodging", "Lodging step: Lodging is not chosen on this kind of registration.");
+  if (input.responsibleAdults && Object.keys(input.responsibleAdults).length > 0) return issue("responsibleAdults", "Responsible adults are not chosen on this kind of registration.");
+  const registrationPromo = promoCodeField(definition);
+  if (registrationPromo && String(input.responses[registrationPromo.key] ?? "").trim() !== "") return issue(registrationPromo.key, "Promo codes are not used when registering a team.");
+  const attendeePromo = attendeePromoCodeField(definition);
+  if (attendeePromo && (input.attendees ?? []).some((attendee) => String(attendee.responses[attendeePromo.key] ?? "").trim() !== "")) {
+    return issue(attendeePromo.key, "Promo codes are not used when registering a team.");
+  }
+  return null;
 }
 
 /**
@@ -605,6 +648,11 @@ export async function submitGeneralLinkRegistration(
     throw error;
   };
 
+  // What the club registration refuses for any email (lodging, responsible adults, promo codes) is refused here for every email,
+  // in the same words, so no field can tell a director from anyone else.
+  const unsupported = unsupportedFieldProblem(definition, input);
+  if (unsupported) throw new PublicRegistrationError("INVALID_SUBMISSION", unsupported.message, unsupported.issues);
+
   // The same checks the club submit makes, on the answers as typed, so a team that can never be registered is refused now.
   const prepared = preparePublicRegistration(definition, input, { timeZone: event.timezone, now, ignoreAvailability: true });
   if (!prepared.isValid || !prepared.identity) {
@@ -620,6 +668,7 @@ export async function submitGeneralLinkRegistration(
   await validateGeneralLinkRequest(prisma, {
     event, locationId, team: teamIdentity, attendeeCount: input.attendees?.length ?? 0, people: typed.people,
     pickedOrganizationId: picked?.id ?? null, allowMultipleTeams: teamSettings?.allowMultipleTeams === true, now,
+    definition, formSlug: form.slug, submission: input,
   });
   const matches = picked ? await emailIsDirectorOrDeputyOf(prisma, picked.id, directorEmail, now) : false;
   const directorName = `${prepared.identity.firstName} ${prepared.identity.lastName}`.trim();
@@ -632,7 +681,7 @@ export async function submitGeneralLinkRegistration(
     }).catch(answerFromWinner);
   }
   return createPending({
-    event, definition, input, hash, team: teamIdentity, locationId, now, pricingDate: experience.pricingDate,
+    event, definition, input, hash, formSlug: form.slug, team: teamIdentity, locationId, now, pricingDate: experience.pricingDate,
     directorName,
     directorEmail,
     clubNameAsEntered: answer.asEntered || answer.directoryName || "",
@@ -666,12 +715,12 @@ async function submitMatched(input: {
   const submissionId = randomUUID();
   // The reference the screen shows and the email repeats: the same format as a waiting team's, so the screen never differs.
   const reference = pendingConfirmationCode(randomUUID().replaceAll("-", ""));
-  const confirmation = await submitPublicRegistration(input.event.slug, input.form.slug, input.input, input.now, {
+  await submitPublicRegistration(input.event.slug, input.form.slug, input.input, input.now, {
     ...clubContext({ organizationId: input.organizationId, team: input.team, locationId: input.locationId, seed: input.input.idempotencyKey }),
     auditMetadata: { generalLinkSubmissionId: submissionId, matchBasis: "DIRECTOR_EMAIL" },
     // One email to the director: the ordinary confirmation, with the club the team was attached to as its first line. A team
     // that lands on the event's waitlist gets the ordinary waitlist notice instead, which never says "attached".
-    confirmationNote: () => matchedConfirmationNote({ teamName: input.team?.name ?? "your team", clubName: input.clubName, confirmationCode: reference }),
+    confirmationNote: ({ waitlisted }) => matchedConfirmationNote({ teamName: input.team?.name ?? "your team", clubName: input.clubName, confirmationCode: reference, waitlisted }),
     inTransaction: async (tx, created) => {
       await tx.generalLinkSubmission.create({
         data: {
@@ -722,7 +771,6 @@ async function submitMatched(input: {
     attendeeCount: input.input.attendees?.length ?? 0,
     attendeeNames: input.attendeeNames,
     pricingDate: input.pricingDate,
-    emailSent: confirmation.emailSent,
   });
 }
 
@@ -731,6 +779,7 @@ async function createPending(input: {
   definition: RegistrationFormDefinition;
   input: PublicRegistrationInput;
   hash: string;
+  formSlug: string;
   team: { name: string; key: string } | null;
   locationId: string | null;
   now: Date;
@@ -763,6 +812,7 @@ async function createPending(input: {
         await validateGeneralLinkRequest(tx, {
           event: input.event, locationId: input.locationId, team: input.team, attendeeCount: input.input.attendees?.length ?? 0,
           people: input.typedPeople, pickedOrganizationId: input.suggestedOrganizationId, allowMultipleTeams: input.allowMultipleTeams, now: input.now,
+          definition: input.definition, formSlug: input.formSlug, submission: input.input,
         });
         const created = await tx.generalLinkSubmission.create({
           data: {
@@ -835,14 +885,13 @@ async function createPending(input: {
         });
         return { row: created, created: true };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: locationTransactionTimeoutMs });
-      const { sent } = row.created ? await sendAfterCommit(noticeIds) : { sent: false };
+      if (row.created) await sendAfterCommit(noticeIds);
       return receivedConfirmation({
         reference: row.row.confirmationCode,
         email: row.row.directorEmail,
         attendeeCount: row.row.attendeeCount,
         attendeeNames: input.attendeeNames,
         pricingDate: input.pricingDate,
-        emailSent: sent,
       });
     } catch (error) {
       // Two waiting teams with one name racing: the partial unique index decides.
@@ -1066,7 +1115,6 @@ export async function resolvePendingTeam(
   if (!experience) throw new GeneralLinkError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
   const stored = row.payload as { responses?: Record<string, unknown>; attendees?: Array<{ clientId: string; responses: Record<string, unknown> }> };
   const resolution = row.suggestedOrganizationId === club.id ? "STAFF_CONFIRMED" as const : "STAFF_REASSIGNED" as const;
-  let noticeIds: string[] = [];
   let attachedHere = false;
   try {
     await submitPublicRegistration(
@@ -1093,6 +1141,8 @@ export async function resolvePendingTeam(
         auditActorUserId: actorUserId,
         // This submission's own waiting name is released by this very confirmation; every other waiting name stays reserved.
         confirmsPendingSubmissionId: row.id,
+        // One email to the director: the ordinary confirmation (or the waitlist notice) with the club as its first line.
+        confirmationNote: ({ waitlisted }) => matchedConfirmationNote({ teamName: row.teamName || club.name, clubName: club.name, confirmationCode: row.confirmationCode, waitlisted }),
         inTransaction: async (tx, created) => {
           attachedHere = true;
           const updated = await tx.generalLinkSubmission.updateMany({
@@ -1123,18 +1173,6 @@ export async function resolvePendingTeam(
               },
             },
           });
-          noticeIds = await queueNotices(tx, {
-            eventId,
-            registrationId: created.registrationId,
-            submissionId: row.id,
-            notices: [{
-              kind: "ATTACHED",
-              recipientKind: "REGISTRANT",
-              email: row.directorEmail,
-              name: row.directorName || null,
-              ...attachedDirectorEmail({ eventName: row.event.name, teamName: row.teamName || club.name, clubName: club.name, confirmationCode: row.confirmationCode, waitlisted: created.waitlisted }),
-            }],
-          });
         },
       },
     );
@@ -1148,7 +1186,6 @@ export async function resolvePendingTeam(
     }
     throw error;
   }
-  await sendAfterCommit(noticeIds);
   // A replay (a lost response on the first click, or the same click twice) commits nothing new: the row says what happened.
   const done = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true } });
   if (done?.status !== "CONFIRMED" || done.organizationId !== club.id) {
@@ -1212,15 +1249,21 @@ export async function setGeneralRegistrationLink(eventId: string, enabled: boole
 // Retention and the old generic page
 // ---------------------------------------------------------------------------------------------
 
+/** What a retained row keeps once its people are removed: ids, status and dates. Every name, email and team name is blank. */
+const BLANKED = { directorName: "", directorEmail: "", teamName: "", teamKey: "", clubNameAsEntered: "" } as const;
+
 /**
- * Removes the typed answers (the team members' names and ages) of teams still waiting 30 days after their event ended, marking
- * them EXPIRED so the table's own check holds (a submission that is not PENDING has no payload and a resolution). Run by the
- * outbox sweep; safe to repeat. One audit entry per event, with the submission ids and a count, never any answer.
+ * The retention sweep, 30 days after an event ends (run by the outbox sweep; safe to repeat):
+ * - a team still waiting loses its typed answers and is marked EXPIRED, and
+ * - every EXPIRED or REJECTED submission has its director's name and email, the team name and the club as entered blanked.
+ * The row keeps its ids, status, dates and the registration link. One audit entry per event and kind, with the submission ids and
+ * a count, never any of the removed text. The partial unique index on a waiting team's name only covers PENDING rows.
  */
 export async function expireStalePendingTeams(now = new Date(), options: { eventId?: string } = {}) {
   const prisma = getPrisma();
+  const eventFilter = { event: { endsAt: { lt: pendingRetentionCutoff(now) } }, ...(options.eventId ? { eventId: options.eventId } : {}) };
   const stale = await prisma.generalLinkSubmission.findMany({
-    where: { status: "PENDING", ...(options.eventId ? { eventId: options.eventId } : {}), event: { endsAt: { lt: pendingRetentionCutoff(now) } } },
+    where: { status: "PENDING", ...eventFilter },
     select: { id: true, eventId: true },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take: 500,
@@ -1233,7 +1276,7 @@ export async function expireStalePendingTeams(now = new Date(), options: { event
       const updated = await tx.generalLinkSubmission.findMany({ where: { id: { in: ids }, status: "PENDING" }, select: { id: true } });
       const done = await tx.generalLinkSubmission.updateMany({
         where: { id: { in: updated.map((row) => row.id) }, status: "PENDING" },
-        data: { status: "EXPIRED", resolution: "RETENTION_EXPIRED", resolvedAt: now, payload: Prisma.DbNull },
+        data: { status: "EXPIRED", resolution: "RETENTION_EXPIRED", resolvedAt: now, payload: Prisma.DbNull, ...BLANKED },
       });
       if (done.count > 0) {
         await tx.auditLog.create({
@@ -1243,7 +1286,7 @@ export async function expireStalePendingTeams(now = new Date(), options: { event
             entityType: "GeneralLinkSubmission",
             entityId: updated[0]!.id,
             correlationId: randomUUID(),
-            summary: "Waiting general-link teams that nobody resolved had their typed answers removed 30 days after the event ended.",
+            summary: "Waiting general-link teams that nobody resolved had their typed answers and contact details removed 30 days after the event ended.",
             metadata: { generalLinkSubmissionIds: updated.map((row) => row.id), count: done.count },
           },
         });
@@ -1251,7 +1294,36 @@ export async function expireStalePendingTeams(now = new Date(), options: { event
       return done.count;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
-  return { expired, events: byEvent.size };
+  // Rejected teams, and any expired earlier with details still on them, lose their contact details too.
+  const toBlank = await prisma.generalLinkSubmission.findMany({
+    where: { status: { in: ["REJECTED", "EXPIRED"] }, OR: [{ directorEmail: { not: "" } }, { directorName: { not: "" } }, { teamName: { not: "" } }, { clubNameAsEntered: { not: "" } }], ...eventFilter },
+    select: { id: true, eventId: true },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: 500,
+  });
+  const blankByEvent = new Map<string, string[]>();
+  for (const row of toBlank) blankByEvent.set(row.eventId, [...(blankByEvent.get(row.eventId) ?? []), row.id]);
+  let blanked = 0;
+  for (const [eventId, ids] of blankByEvent) {
+    blanked += await prisma.$transaction(async (tx) => {
+      const done = await tx.generalLinkSubmission.updateMany({ where: { id: { in: ids }, status: { in: ["REJECTED", "EXPIRED"] } }, data: BLANKED });
+      if (done.count > 0) {
+        await tx.auditLog.create({
+          data: {
+            eventId,
+            action: "GENERAL_LINK_TEAMS_BLANKED",
+            entityType: "GeneralLinkSubmission",
+            entityId: ids[0]!,
+            correlationId: randomUUID(),
+            summary: "Rejected or expired general-link submissions had their contact details removed 30 days after the event ended.",
+            metadata: { generalLinkSubmissionIds: ids, count: done.count },
+          },
+        });
+      }
+      return done.count;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+  return { expired, events: byEvent.size, blanked };
 }
 
 /**

@@ -148,36 +148,12 @@ export function pendingDirectorEmail(input: { eventName: string; teamName: strin
   };
 }
 
-/** The line at the top of the director's one confirmation email when the team was attached at once (#931). */
-export function matchedConfirmationNote(input: { teamName: string; clubName: string; confirmationCode: string }) {
-  return `Your team "${teamNameForEmail(input.teamName)}" is attached to ${input.clubName}. Reference: ${input.confirmationCode}.`;
-}
-
-/** The email after staff attach a waiting team. A team that landed on the event's waitlist says so, and is not "attached". */
-export function attachedDirectorEmail(input: { eventName: string; teamName: string; clubName: string; confirmationCode: string; waitlisted?: boolean }) {
+/** The line at the top of the director's one email (#931): attached to the club, or, when there was no room, on the waitlist. */
+export function matchedConfirmationNote(input: { teamName: string; clubName: string; confirmationCode: string; waitlisted?: boolean }) {
   const team = teamNameForEmail(input.teamName);
-  if (input.waitlisted) {
-    return {
-      subject: `Your team is on the waitlist for ${input.eventName}`,
-      bodyText: [
-        `The team "${team}" for ${input.eventName} was matched to ${input.clubName}, but there is no room right now, so it is on the waitlist. It is not a confirmed registration yet.`,
-        "",
-        "The event team will email you if a place opens.",
-        "",
-        `Reference: ${input.confirmationCode}`,
-      ].join("\n"),
-    };
-  }
-  return {
-    subject: `Your team is attached to ${input.clubName}`,
-    bodyText: [
-      `The team "${team}" for ${input.eventName} is attached to ${input.clubName}.`,
-      "",
-      "When the club's director or deputy signs in to the club portal, the team appears under the club's registrations and can be viewed or changed there.",
-      "",
-      `Reference: ${input.confirmationCode}`,
-    ].join("\n"),
-  };
+  return input.waitlisted
+    ? `Your team "${team}" was matched to ${input.clubName}, but there is no room right now, so it is on the waitlist. It is not a confirmed registration yet. Reference: ${input.confirmationCode}.`
+    : `Your team "${team}" is attached to ${input.clubName}. Reference: ${input.confirmationCode}.`;
 }
 
 export function rejectedDirectorEmail(input: { eventName: string; teamName: string; confirmationCode: string; reason: string }) {

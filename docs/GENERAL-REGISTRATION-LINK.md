@@ -28,7 +28,7 @@ format, no manage link, no club name and no waitlist place, so nobody can use th
 director. The details go to the email address typed. Every refusal that does not depend on the email (the hourly cap, the
 site, the closing date, capacity, the team name, the team rules, the picked club's own conflicts) is decided once, by the same
 function, before the email is looked at, so the status, the words and the order of those refusals are identical for a
-matching and a non-matching email (`validateGeneralLinkRequest`, tested for each). Timing is not made identical (a matched
+matching and a non-matching email (`validateGeneralLinkRequest`, tested for each). The same holds for fields only the matched path would refuse: lodging, responsible adults and promo codes are refused for every email, and a limited choice that just became full is checked on the real reservation usage for every email. Timing is not made identical (a matched
 team does more work); the same-origin, size and rate limits above are what bound probing.
 
 Staff see waiting teams under **Registrations > Actions > Teams waiting for a club**
@@ -39,10 +39,12 @@ and other answers are not shown, and the audit never holds any of it). The page 
 club picked; the club menu attaches the team to a different club; Reject needs a reason. Confirm and reassign run the club
 registration once, with the club's own name in the club question, and the team then appears in that club's portal for its
 directors and deputies like any registration. Emails: a matched director gets **one** email, the ordinary
-registration confirmation with a first line saying the team is attached to the club (a team that lands on the event waitlist
-gets the ordinary waitlist notice, never "attached"). A waiting team's submitter gets one email saying it waits for staff
-(the team name cut at 60 characters, nothing else they typed). After staff attach it, one "attached" email (or "waitlisted" when
-there was no room) follows; a rejection email gives the reason. The event's registration staff addresses are sent a **digest**,
+registration confirmation with a first line saying the team is attached to the club; a team that lands on the event waitlist
+gets the ordinary waitlist notice with a first line saying it is matched to the club but on the waitlist and not a confirmed
+registration, never "attached". A waiting team's submitter gets one email saying it waits for staff (the team name cut at
+60 characters, nothing else they typed). When staff attach a waiting team the director gets **one** message in the same way
+(the confirmation or the waitlist notice led by the club line; there is no separate "attached" email). A rejection email gives
+the reason. The event's registration staff addresses are sent a **digest**,
 at most one email per event per 15 minutes, with the count and the review link (the count is as of the first team in that window).
 
 ## How a pending team is stored
@@ -60,14 +62,18 @@ choice: no existing query, report or export had to learn about a new registratio
   transactions, so a registered and a waiting team, or two of either, racing for one name give one winner.
 - **Retention.** A team still waiting 30 days after its event ends has its payload removed by the outbox sweep and is marked
   `EXPIRED` (resolution `RETENTION_EXPIRED`; migration `20261025300000_general_link_submission_expiry` adds the two enum
-  values), with one audit entry per event holding the submission ids and a count. Its name is released.
+  values), with one audit entry per event holding the submission ids and a count. Its name is released. The same sweep blanks the
+  director's name and email, the team name (and its key) and the club as entered on every `EXPIRED` **and `REJECTED`**
+  submission 30 days after the event ends (audit `GENERAL_LINK_TEAMS_BLANKED`, ids and a count); ids, status, dates, the
+  rejection reason and the registration link stay. The partial unique index on a waiting team's name covers only `PENDING`
+  rows, so blanking does not conflict with it.
 - Every club submission, including one from the club portal, is refused when its team name is held by a *waiting* general-link
   team (case-insensitive); only staff confirming that same waiting team are exempt.
 - Confirm, reassign and reject move the row out of `PENDING` with a guarded update inside the same SERIALIZABLE transaction as
   the club registration, so a second click, a second staff member or a retry can never create a second registration. Racing
   actions give one winner; the others are told it was handled.
-- A team attached after the December 18 deadline that was received before it is not refused: the confirmation runs as of the
-  day the director submitted. Seats at a site with a limit are taken when the team is attached, not when it waits.
+- A team attached after the December 18 deadline, or after the event, that was received before it is not refused: staff
+  confirmation uses the **received date**, so a team that arrived in time can be attached later. Seats at a site with a limit are taken when the team is attached, not when it waits.
 
 ## Protections
 

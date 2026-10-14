@@ -105,6 +105,8 @@ type TransactionalMessageInput = {
   /** An announcement's own attachments, sent alongside the template version's (#824). */
   announcementFileIds?: readonly string[];
   metadata?: Record<string, string | number | boolean | null>;
+  /** One plain line placed at the top of the message (#931: the club a team was attached to). Braces are removed. */
+  leadNote?: string | null;
 };
 
 export type RegistrationUpdateCategory =
@@ -605,7 +607,7 @@ async function enqueueTransactionalMessage(
   const rendered = renderMessageTemplate(
     {
       subject: unescapeTokenUnderscores(source?.subjectTemplate ?? fallback.subject),
-      body: bodyTemplate,
+      body: input.leadNote?.replace(/[{}]/g, "").trim() ? `${input.leadNote.replace(/[{}]/g, "").trim()}\n\n${bodyTemplate}` : bodyTemplate,
     },
     context,
   );

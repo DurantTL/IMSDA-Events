@@ -137,10 +137,10 @@ export type ClubSubmissionContext = {
    */
   confirmsPendingSubmissionId?: string;
   /**
-   * A line added to the top of the registrant's confirmation email (#931), decided inside the transaction once it is known
-   * whether the registration was waitlisted. Not used for a waitlisted registration, whose email is the waitlist notice.
+   * A line added to the top of the registrant's one email (#931), decided inside the transaction once it is known whether the
+   * registration was waitlisted: the ordinary confirmation, or the waitlist notice.
    */
-  confirmationNote?: () => string | null;
+  confirmationNote?: (outcome: { waitlisted: boolean }) => string | null;
   /** Extra ids for the club registration's audit entry (#931): ids and flags only, never names. */
   auditMetadata?: Record<string, string | number | boolean | null>;
   /** The staff user behind this submission for the audit entry when staff confirmed a waiting team (#931); never an act-as. */
@@ -391,7 +391,7 @@ function attendeeResponsesFromJson(value: Prisma.JsonValue): PublicRegistrationI
   });
 }
 
-function usageFromReservations(
+export function usageFromReservations(
   definition: RegistrationFormDefinition,
   reservations: Array<{ fieldId: string; optionValue: string; rank: number | null }>,
 ) {
@@ -1441,6 +1441,7 @@ async function createPublicRegistrationTransaction(
         recipientEmail: identity.email,
         recipientName: `${identity.firstName} ${identity.lastName}`.trim(),
         waitlistPosition,
+        ...(club?.confirmationNote ? { leadNote: club.confirmationNote({ waitlisted: true }) } : {}),
         metadata: {
           source: "PUBLIC_REGISTRATION",
           formVersionId: version.id,
@@ -1466,7 +1467,7 @@ async function createPublicRegistrationTransaction(
         calculation: admittedCalculation,
         location: registrationLocation,
         billedToGroup: Boolean(group),
-        ...(club?.confirmationNote ? { registrantNote: club.confirmationNote() } : {}),
+        ...(club?.confirmationNote ? { registrantNote: club.confirmationNote({ waitlisted: false }) } : {}),
       });
   await tx.auditLog.create({
     data: {

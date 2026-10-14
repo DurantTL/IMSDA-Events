@@ -2,7 +2,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  attachedDirectorEmail,
   EMAIL_TEAM_NAME_MAX,
   GENERAL_LINK_RECEIVED_MESSAGE,
   GENERAL_LINK_TOO_MANY_MESSAGE,
@@ -33,7 +32,7 @@ describe("the words that reach the person who submitted", () => {
     expect(pending.bodyText).toContain("PBE-ABC");
     const rejected = rejectedDirectorEmail({ eventName: "Synthetic Event", teamName: long, confirmationCode: "PBE-ABC", reason: "Not a conference club." });
     expect(rejected.bodyText).not.toContain("A".repeat(61));
-    expect(attachedDirectorEmail({ eventName: "Synthetic Event", teamName: long, clubName: "Synthetic Club", confirmationCode: "PBE-ABC" }).bodyText).not.toContain("A".repeat(61));
+    expect(matchedConfirmationNote({ teamName: long, clubName: "Synthetic Club", confirmationCode: "PBE-ABC" })).not.toContain("A".repeat(61));
   });
 
   it("tells a waiting submitter one thing: it waits for staff, and nothing about a director match", () => {
@@ -49,12 +48,10 @@ describe("the words that reach the person who submitted", () => {
   });
 
   it("says waitlisted, never attached, when a confirmed team landed on the waitlist", () => {
-    const waitlisted = attachedDirectorEmail({ eventName: "Synthetic Event", teamName: "Bible Bees", clubName: "Synthetic Club", confirmationCode: "PBE-ABC", waitlisted: true });
-    expect(waitlisted.subject).toMatch(/waitlist/i);
-    expect(`${waitlisted.subject} ${waitlisted.bodyText}`).not.toMatch(/is attached to/i);
-    expect(waitlisted.bodyText).toMatch(/not a confirmed registration/);
-    const attached = attachedDirectorEmail({ eventName: "Synthetic Event", teamName: "Bible Bees", clubName: "Synthetic Club", confirmationCode: "PBE-ABC" });
-    expect(attached.subject).toBe("Your team is attached to Synthetic Club");
+    const waitlisted = matchedConfirmationNote({ teamName: "Bible Bees", clubName: "Synthetic Club", confirmationCode: "PBE-ABC", waitlisted: true });
+    expect(waitlisted).toMatch(/on the waitlist/);
+    expect(waitlisted).toMatch(/not a confirmed registration/);
+    expect(waitlisted).not.toMatch(/is attached to/i);
   });
 
   it("answers every accepted submission with the same words, naming no club", () => {
