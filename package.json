@@ -68,6 +68,7 @@
     "test:form-revisions": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-form-revisions.ts",
     "test:lodging": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-inventory.ts",
     "test:meals": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-meals.ts",
+    "test:meal-ticket-export": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-meal-ticket-export.ts",
     "test:lodging-preferences": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-preferences.ts",
     "test:lodging-assignment": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-assignment.ts",
     "report:church-share-drift": "tsx --require ./scripts/support/allow-server-only.cjs scripts/report-church-share-drift.ts",

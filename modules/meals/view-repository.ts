@@ -1,9 +1,16 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
+
 import { getPrisma } from "@/lib/prisma";
+import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { MealError } from "@/modules/meals/errors";
 import { loadTicketPrices } from "@/modules/meals/config-repository";
-import { mealPriceDrift, mealTicketCsvHeader, mealTicketCsvRow, type MealTicketRow } from "@/modules/meals/domain";
+import {
+  mealPriceDrift, mealTicketCsvHeader, mealTicketCsvRow, scannerMealTypes, scannerTicketCsvHeader, scannerTicketCsvRows,
+  type MealTicketRow, type ScannerTicket,
+} from "@/modules/meals/domain";
+import { repairEventTickets, selectionsMissingTickets } from "@/modules/meals/ticket-repository";
 import { toCsv } from "@/modules/reporting/csv";
 
 function record(value: unknown): Record<string, unknown> {
@@ -138,7 +145,67 @@ export async function loadMealTicketRows(eventId: string): Promise<MealTicketRow
   });
 }
 
-export async function mealTicketsCsv(eventId: string) {
+/** The per-selection summary CSV (one row per selection with a quantity): the export #905 first shipped. */
+export async function mealTicketSummaryCsv(eventId: string) {
   const rows = await loadMealTicketRows(eventId);
   return toCsv([[...mealTicketCsvHeader], ...rows.map(mealTicketCsvRow)]);
+}
+
+/**
+ * The tickets behind the café scanner's file (#916): one per unit of an active, ticketed selection of a submitted or
+ * confirmed registration, each with its stored number. Selections written outside the repository are given any missing
+ * tickets first (a read-only check, then a serializable repair only on a mismatch), so every row has a number and re-exporting never renumbers.
+ */
+export async function loadScannerTickets(eventId: string): Promise<ScannerTicket[]> {
+  const prisma = getPrisma();
+  // A read-only check first: a normal export writes nothing. Only a mismatch is repaired, serializably and with retry.
+  if ((await selectionsMissingTickets(prisma, eventId)).length > 0) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await prisma.$transaction((tx) => repairEventTickets(tx, eventId), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000, maxWait: 10_000 });
+        break;
+      } catch (error) {
+        if (isSerializationFailure(error) && attempt < 4) { await pauseBeforeRetry(attempt); continue; }
+        throw error;
+      }
+    }
+  }
+  const tickets = await prisma.eventMealTicket.findMany({
+    where: {
+      eventId, cancelledAt: null,
+      selection: {
+        is: {
+          status: "ACTIVE", registration: liveRegistration, mealType: { in: [...scannerMealTypes] },
+          OR: [{ serviceId: null }, { service: { is: { status: "ACTIVE", ticketing: "TICKETED" } } }],
+        },
+      },
+    },
+    orderBy: { number: "asc" },
+    select: {
+      number: true,
+      selection: {
+        select: {
+          mealType: true, ageGroup: true, unitPriceCents: true, payer: true,
+          registration: { select: { confirmationCode: true, contactSnapshot: true } },
+          attendee: { select: { profileSnapshot: true, person: { select: { firstName: true, lastName: true } } } },
+          service: { select: { serviceDate: true } },
+        },
+      },
+    },
+  });
+  return tickets.map(({ number, selection: row }) => {
+    const contact = record(row.registration?.contactSnapshot);
+    const profile = record(row.attendee?.profileSnapshot);
+    const first = typeof profile.firstName === "string" ? profile.firstName : row.attendee?.person.firstName ?? (typeof contact.firstName === "string" ? contact.firstName : "");
+    const last = typeof profile.lastName === "string" ? profile.lastName : row.attendee?.person.lastName ?? (typeof contact.lastName === "string" ? contact.lastName : "");
+    return {
+      number, confirmationCode: row.registration?.confirmationCode ?? "", guestName: `${first} ${last}`.trim(), mealType: row.mealType,
+      serviceDate: row.service?.serviceDate ?? "", ageGroup: row.ageGroup, unitPriceCents: row.unitPriceCents, payer: row.payer,
+    } satisfies ScannerTicket;
+  });
+}
+
+/** The café scanner's import file: exactly its columns, one row per ticket, with stable `MT-` ids. */
+export async function mealTicketsCsv(eventId: string) {
+  return toCsv([[...scannerTicketCsvHeader], ...scannerTicketCsvRows(await loadScannerTickets(eventId))], { minimalQuoting: true });
 }
