@@ -64,6 +64,54 @@ The Camp Meeting template, and the "Meal ticket quantities" builder module, coll
   keep their prices until staff save and republish the form. `scripts/meals-backfill-form-tickets.ts` (dry run by default,
   counts only, human-run) records existing registrations' tickets as selections without moving any total.
 
+## Simultaneous submissions (#920)
+
+When registration opens, many families submit at the same moment. Every individual public submission runs in one
+SERIALIZABLE transaction (`submitPublicRegistration`, 4 attempts). Measured with
+`npm run benchmark:meal-submit-contention` on PostgreSQL 16 (the benchmark and its modes are described in the script):
+
+| 25 rounds of N simultaneous submissions for the same meal | first try fails | exhausted all 4 attempts |
+| --- | --- | --- |
+| before, 10 at once | 80.0% | 52.4% |
+| before, 20 at once | 87.2% | 59.2% |
+| after, 10 at once | 0% | 0% |
+| after, 20 at once | 0% | 0% |
+
+**Root cause.** The conflict is not specific to meals. A submission reads the event's attendee count (the capacity check),
+the form's capacity reservations, the meal plan and selections, the person directory and the message outbox, then writes rows
+into the same ranges, so two overlapping submissions depend on each other both ways and PostgreSQL cancels one
+(`Canceled on identification as a pivot`). `pg_locks` shows the predicate (`SIReadLock`) locks: EventMealSelection
+(tuple, page, relation), RegistrationAttendee, Person, MessageOutbox, PublicRegistrationSubmission, Registration, Event. The same
+benchmark with **no meal tickets** fails 80.0% / 87.2% on the first try and exhausts 39.2% / 57.4%: the meals add the
+EventMealSelection, ticket, change and ledger inserts as one more place a cancelled transaction can land (the meal repository alone,
+`syncFormMealSelections` with 4 attempts, fails 80.0% / 83.8% first try and exhausts 0.8% / 4.8%, which is the 1 to 25 of 250 in #920).
+The partial unique indexes (`EventMealSelection_one_active_slot`, `_client_request`) and the ticket sequence are not the cause: they never wait
+on or cancel another submission. Retrying cannot fix a stampede, so submissions now queue.
+
+**The fix: the submission gate.** An individual submission's first statement is
+`LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE` (the table never holds a row). A table lock, not `pg_advisory_xact_lock`,
+because a SERIALIZABLE transaction's snapshot is frozen when its first query starts: an advisory lock is a query, so the waiter
+would hold a snapshot from before the submission it waited for and still be cancelled (measured: 80% first-try failures with an advisory
+lock first). `LOCK TABLE` waits without taking the snapshot, so a submission that queued reads everything the earlier ones committed.
+Nothing else changes: the same reads and writes, capacity checks, one-active-slot indexes, ledger, ticket numbers and atomicity with the
+registration. The SERIALIZABLE retry stays as the backstop for a conflict with a transaction that does not use the gate. The gate is global
+(one queue for every event) because a table lock cannot be keyed; a submission holds it for about 65 ms in the benchmark, so a few hundred
+simultaneous submissions drain in well under the 30 s transaction timeout (`submissionGateTimeoutMs`). Club and group submissions keep their own
+location lock and do not use the gate. Amendments (which also call `syncFormMealSelections`) and staff orders do not use it either; they are
+rarely simultaneous and keep their own retries (8 attempts for staff orders).
+
+**Lock order** (take them in this order; never wait for the gate while holding anything below it):
+
+1. `PublicSubmissionGate` table lock, the first statement of an individual public submission. Only that transaction ever takes it, so no
+   other transaction can wait on something a gate holder holds while waiting for the gate: it cannot be part of a deadlock cycle.
+2. Reads, then the person and registration rows the submission writes, promo code claim.
+3. Lodging, when chosen: advisory locks `lodging-select:<event>`, `lodging-roommates:<event>`, `lodging-rate:<id>`, then unit rows (#199).
+4. Meals (`syncFormMealSelections`): the new selection row, its ticket rows (numbers from the sequence, which never blocks), the change and ledger rows.
+5. Capacity reservations.
+
+Amendments and staff orders never take the gate: registration row, then service row (`lockService`), then selection rows. Keep it that way:
+a transaction that holds anything above must not wait for the gate.
+
 ## Camp Meeting 2026 defaults
 
 `modules/meals/camp-meeting.ts`, added by a person with finance access with **Add the Camp Meeting meals** on More > Meals (`POST /api/events/:id/meals/defaults`, only on an event with no meals; no starter template or seed applies it, because a price is a human decision): breakfast Wed to Sat

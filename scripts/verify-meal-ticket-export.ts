@@ -19,8 +19,8 @@ import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
+import { createContentionHarness } from "./support/meal-submit-contention";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
-import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { applyCampMeetingMealPreset } from "@/modules/meals/config-repository";
 import { cancelMealSelection, changeMealQuantity, createMealOrder, entitleAttendeeToPlan, syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { loadScannerTickets, mealTicketSummaryCsv, mealTicketsCsv } from "@/modules/meals/view-repository";
@@ -62,22 +62,6 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: userId } });
 }
 
-/**
- * Retries a unit of work that lost a serialization conflict. This is MORE generous than production (the public form path
- * tries 4 times): simultaneous same-meal submissions already conflict before #916 (#920), and this script checks ticket
- * numbering, not that contention. Remove it once #920 makes those submissions queue instead of abort.
- */
-async function withRetry<T>(work: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await work();
-    } catch (error) {
-      if (isSerializationFailure(error) && attempt < 12) { await pauseBeforeRetry(attempt); continue; }
-      throw error;
-    }
-  }
-}
-
 let counter = 0;
 async function makeRegistration(tag: string, status: "CONFIRMED" | "SUBMITTED" | "CANCELLED" = "CONFIRMED") {
   counter += 1;
@@ -92,6 +76,7 @@ async function makeRegistration(tag: string, status: "CONFIRMED" | "SUBMITTED" |
   return { id: registration.id, code, attendeeId: attendee.id };
 }
 
+let contention: Awaited<ReturnType<typeof createContentionHarness>> | undefined;
 const everIssued = new Set<string>();
 /** The export, parsed: one object per data row, keyed by the scanner's columns. Records every id ever seen. */
 async function exportRows() {
@@ -224,10 +209,10 @@ async function main() {
   const raceServices = services.filter((row) => row.ticketing === "TICKETED" && row.status === "ACTIVE" && ["BREAKFAST", "LUNCH", "SUPPER"].includes(row.mealType)).slice(0, 8);
   assert(raceServices.length === 8, "the preset has eight ticketed services to race on");
   const racers = await Promise.all(raceServices.map((_, index) => makeRegistration(`k${index + 1}`)));
-  // Overlapping meal inserts can lose a serialization conflict (existing contention, #920); `withRetry` absorbs it here.
-  const results = await Promise.allSettled(racers.map((racer, index) => withRetry(() => createMealOrder(eventId, userId, {
+  // `createMealOrder` is the production staff order path: SERIALIZABLE, retried 8 times on a serialization failure. No extra retry here.
+  const results = await Promise.allSettled(racers.map((racer, index) => createMealOrder(eventId, userId, {
     registrationId: racer.id, registrationAttendeeId: racer.attendeeId, mealType: raceServices[index]!.mealType, serviceId: raceServices[index]!.id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID(),
-  }))));
+  })));
   assert(results.every((result) => result.status === "fulfilled"), `${racers.length} concurrent orders all succeed (${results.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)).join("; ")})`);
   ({ rows } = await exportRows());
   assert(racers.every((racer) => idsOf(rows, racer.code).length === 2), "each concurrent order got its two tickets, with unique ids");
@@ -236,18 +221,20 @@ async function main() {
   assert(new Set(rows.map((row) => row.ticket_id)).size === rows.length, "every exported id is unique");
   assert((await loadScannerTickets(eventId)).length === rows.length, "the loader and the file agree");
 
-  // ---- concurrent meal-bearing form submissions: no write to any event-wide row -----------------------------------------------
-  const eventBefore = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${eventId}`;
-  const more = await Promise.all(["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10"].map((tag) => makeRegistration(tag)));
-  // Like the public form path: SERIALIZABLE, retried on a serialization failure (more attempts than production, see #920).
-  const submitForm = (racer: { id: string }) => withRetry(() => prisma.$transaction((tx) => syncFormMealSelections(tx, {
-    eventId, registrationId: racer.id, formVersionId: `${P}_fv`, responses: { supper_adult_qty: 2 }, lineItems: [{ key: "supper_adult_qty", amountCents: 1500 }], previousResponses: null,
-  }), { isolationLevel: "Serializable" }));
-  const formResults = await Promise.allSettled(more.map(submitForm));
-  assert(formResults.every((result) => result.status === "fulfilled"), `ten concurrent serializable form submissions with meals all succeed (${formResults.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)).join("; ")})`);
-  ({ rows } = await exportRows());
-  assert(more.every((racer) => idsOf(rows, racer.code).length === 2) && new Set(rows.map((row) => row.ticket_id)).size === rows.length, "the form submissions each got two tickets, all ids unique");
-  const eventAfter = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${eventId}`;
+  // ---- concurrent meal-bearing form submissions: no write to any event-wide row ----------------------------------------------
+  // Through the production public path (`submitPublicRegistration`: SERIALIZABLE, its own 4 attempts, no extra retry), on an event of
+  // their own: simultaneous submissions queue at the submission gate rather than abort (#920).
+  contention = await createContentionHarness();
+  await contention.setup();
+  const formEventId = contention.eventId;
+  const eventBefore = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${formEventId}`;
+  const round = await contention.submitSimultaneously(10);
+  assert(round.outcomes.every((outcome) => outcome.ok), `ten concurrent form submissions with meals all succeed (${round.outcomes.filter((o) => !o.ok).map((o) => o.error).join("; ")})`);
+  const formCsv = (await mealTicketsCsv(formEventId)).trimEnd().split("\r\n").slice(1).map((line) => line.split(","));
+  const formIdColumn = scannerTicketCsvHeader.indexOf("ticket_id");
+  const formRegColumn = scannerTicketCsvHeader.indexOf("reg_id");
+  assert(formCsv.length === 20 && new Set(formCsv.map((row) => row[formIdColumn])).size === 20 && new Set(formCsv.map((row) => row[formRegColumn])).size === 10, "the form submissions each got two tickets, all ids unique");
+  const eventAfter = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${formEventId}`;
   assert(eventBefore[0]!.xmin === eventAfter[0]!.xmin, "meal-bearing writes never touch the event row");
 
   // ---- the export-time repair under concurrency ---------------------------------------------------------------------------------
@@ -303,5 +290,6 @@ main()
   })
   .finally(async () => {
     await cleanup().catch((error) => console.error("Cleanup failed", error));
+    await contention?.cleanup().catch((error) => console.error("Cleanup failed", error));
     await prisma.$disconnect();
   });

@@ -64,6 +64,8 @@ const input = publicRegistrationInputSchema.parse({
 
 function transactionFixture() {
   const tx = {
+    // The submission gate (#920): the first statement of an individual submission.
+    $executeRaw: vi.fn(),
     registrationForm: {
       findFirst: vi.fn().mockResolvedValue({
         id: "form-1",
@@ -173,6 +175,11 @@ describe("public event waitlist transaction", () => {
     );
 
     expect(prisma.$transaction).toHaveBeenCalledOnce();
+    // The submission gate (#920) is taken exactly once, before any read, and the transaction stays SERIALIZABLE with room to queue.
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.registrationForm.findFirst.mock.invocationCallOrder[0]!);
+    expect(String((tx.$executeRaw.mock.calls[0] as unknown as [TemplateStringsArray])[0].join(""))).toContain('LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE');
+    expect(vi.mocked(prisma.$transaction).mock.calls[0]![1]).toMatchObject({ isolationLevel: "Serializable", timeout: 30_000, maxWait: 30_000 });
     expect(tx.registration.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         status: "WAITLISTED",

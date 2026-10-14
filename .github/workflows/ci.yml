@@ -208,6 +208,9 @@ jobs:
       # Real-database check of the café scanner's meal ticket export (#916): one row per ticket in the scanner's columns, stable MT- ids across exports, quantity increases and decreases, cancellation and concurrent orders (a number is never reused or duplicated), day and date in event time, a repaired selection with no tickets, the kept summary CSV and event deletion.
       - run: npm run test:meal-ticket-export
 
+      # Real-database check that simultaneous meal-bearing registration submissions queue instead of abort (#920): 20 submissions for the same meal at once through the production public path (its own 4 attempts, no extra retry), 20 runs in a row, all succeed and none even loses a serialization conflict; the selections, tickets and ledger are exactly what one at a time would write, and a staff order and a form-answer change racing them neither deadlock nor fail.
+      - run: npm run test:meal-submit-contention
+
       # Real-database check of the reservation deposit (#415): a staff check deposit and a card deposit racing for one registration (including a card transaction that read first while the check commits) leave exactly one counted deposit, the late one held as a duplicate charge or refused, the card fee only on the deposit, and one audit row.
       - run: npm run test:reservation-deposit
 
