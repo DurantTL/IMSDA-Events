@@ -57,7 +57,7 @@ function TeamRow({ eventId, team, clubs }: { eventId: string; team: PendingTeamV
             {team.locationName ? ` · ${team.locationName}` : ""}
           </p>
           <p className="field-help">
-            Submitted {new Date(team.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} by {team.directorName || "the director"}
+            Submitted {team.createdAt.slice(0, 16).replace("T", " ")} UTC by {team.directorName || "the director"}
             {" "}({team.directorEmail})
           </p>
           {team.emailClubs.length > 0 && (
