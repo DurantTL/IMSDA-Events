@@ -179,7 +179,7 @@ describe("public event waitlist transaction", () => {
     expect(tx.$executeRaw).toHaveBeenCalledOnce();
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.registrationForm.findFirst.mock.invocationCallOrder[0]!);
     expect(String((tx.$executeRaw.mock.calls[0] as unknown as [TemplateStringsArray])[0].join(""))).toContain('LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE');
-    expect(vi.mocked(prisma.$transaction).mock.calls[0]![1]).toMatchObject({ isolationLevel: "Serializable", timeout: 30_000, maxWait: 30_000 });
+    expect((prisma.$transaction.mock.calls[0] as unknown[])[1]).toMatchObject({ isolationLevel: "Serializable", timeout: 30_000, maxWait: 30_000 });
     expect(tx.registration.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         status: "WAITLISTED",
