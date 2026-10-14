@@ -201,6 +201,9 @@ const pages: PageSpec[] = [
   staff("lodging-assignments", "/more/lodging/assignments"),
   staff("issued-assets", "/more/issued-assets"),
   staff("issued-assets-desk", "/check-in/assets"),
+  // Check-out for a person with keys out, a held cash deposit, a lost key and a charge (#214), and the closeout.
+  staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
+  staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("more-menu", "/more"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -489,7 +492,17 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   // The message files' bytes (#824) live on disk, outside the database; their keys are read before the rows go.
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
+  const mine = { startsWith: `${P}_` };
   await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
+    prisma.assetDepositCover.deleteMany({ where: { issuanceId: mine } }),
+    prisma.assetLedgerEntry.deleteMany({ where: { id: mine } }),
+    prisma.facilityIssueHistory.deleteMany({ where: { issueId: mine } }),
+    prisma.facilityIssue.deleteMany({ where: { id: mine } }),
+    prisma.assetIssuanceHistory.deleteMany({ where: { issuanceId: mine } }),
+    prisma.assetIssuance.deleteMany({ where: { id: mine } }),
+    prisma.issuedAsset.deleteMany({ where: { id: mine } }),
+    prisma.issuedAssetType.deleteMany({ where: { id: mine } }),
     prisma.attendeeSession.deleteMany({ where: { accountId: { in: accountIds } } }),
     prisma.clubInvite.deleteMany({ where: { OR: [orgs, { id: { startsWith: `${P}_` } }] } }),
     prisma.newClubApplication.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
@@ -752,6 +765,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedFailedDeliveries(prisma);
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
+  await seedIssuedAssets(prisma);
   await seedDeadlines(prisma);
 }
 
@@ -781,6 +795,69 @@ async function seedDeadlines(prisma: PrismaClient) {
   const existing = await prisma.deadlineReminderBatch.findFirst({ where: { calendarEntryId: `${P}_deadline_soon`, daysBefore: 14 }, select: { id: true } });
   if (existing) await prisma.deadlineReminderBatch.update({ where: { id: existing.id }, data: batchData });
   else await prisma.deadlineReminderBatch.create({ data: { calendarEntryId: `${P}_deadline_soon`, daysBefore: 14, ...batchData } });
+}
+
+/**
+ * Issued assets (#214): one person with two keys out under a held cash deposit, a lost key with a recorded charge and
+ * a facility issue, so the check-out panel and the closeout have every kind of row to lay out. Inserted directly, the
+ * way the services write them (an issuance always comes with its history row). Idempotent.
+ */
+async function seedIssuedAssets(prisma: PrismaClient) {
+  const typeId = `${P}_asset_type`;
+  if (await prisma.issuedAssetType.findUnique({ where: { id: typeId } })) return;
+  const attendeeId = `${P}_reg_attendee_3_0`;
+  const registrationId = `${P}_reg_3`;
+  const actor = "usr_system_admin";
+  const unit = await prisma.eventLodgingUnit.findFirst({ where: { eventId }, select: { id: true } });
+  await prisma.issuedAssetType.create({
+    data: {
+      id: typeId, eventId, name: "Mobilecheck dorm room key with a long descriptive kind name", mode: "SERIALIZED", assigneeKinds: ["ATTENDEE", "REGISTRATION"],
+      roomLinked: false, depositCents: 1000, depositShortfall: "KEEP_FEES", replacementFeeCents: 2500,
+    },
+  });
+  const issuedAt = new Date("2026-09-24T15:00:00Z");
+  const endedAt = new Date("2026-09-27T15:00:00Z");
+  for (const [index, identifier] of ["MC-K-214", "MC-K-215", "MC-K-216"].entries()) {
+    const assetId = `${P}_asset_${index}`;
+    await prisma.issuedAsset.create({ data: { id: assetId, eventId, assetTypeId: typeId, identifier, scanCode: identifier, quantityTotal: 1 } });
+    const issuanceId = `${P}_asset_issuance_${index}`;
+    const lost = index === 2;
+    await prisma.$transaction(async (tx) => {
+      await tx.assetIssuance.create({
+        data: { id: issuanceId, eventId, assetId, serialized: true, quantity: 1, assigneeKind: "ATTENDEE", attendeeId, purpose: "Issued at check-in", issuedAt, issuedByUserId: actor, entryMethod: "MANUAL", revision: 1 },
+      });
+      await tx.assetIssuanceHistory.create({
+        data: { eventId, issuanceId, assetId, type: "ISSUED", at: issuedAt, actorUserId: actor, entryMethod: "MANUAL", quantity: 1, assigneeKind: "ATTENDEE", attendeeId, revision: 1 },
+      });
+      if (lost) {
+        await tx.assetIssuance.update({ where: { id: issuanceId }, data: { endedAt, endReason: "LOST", endedByUserId: actor, endNote: "Not found in the room at check-out", endQuantity: 1, revision: 2 } });
+        await tx.assetIssuanceHistory.create({
+          data: { eventId, issuanceId, assetId, type: "LOST", at: endedAt, actorUserId: actor, reason: "Not found in the room at check-out", entryMethod: "MANUAL", quantity: 1, assigneeKind: "ATTENDEE", attendeeId, revision: 2 },
+        });
+      }
+    });
+    // A lost key is held out of stock (it could not be issued while unavailable, so it is marked after).
+    if (lost) await prisma.issuedAsset.update({ where: { id: assetId }, data: { availability: "UNAVAILABLE" } });
+  }
+  await prisma.assetLedgerEntry.create({
+    data: { id: `${P}_asset_deposit`, eventId, kind: "DEPOSIT_RECEIVED", amountCents: 800, assetTypeId: typeId, registrationId, settlement: "CASH_AT_DESK", depositShortfallSnapshot: "KEEP_FEES", replacementFeeSnapshotCents: 2500, reason: "Cash key deposit taken at check-in", actorUserId: actor, actorNameSnapshot: "System Administrator" },
+  });
+  for (const index of [0, 1, 2]) await prisma.assetDepositCover.create({ data: { eventId, issuanceId: `${P}_asset_issuance_${index}`, depositEntryId: `${P}_asset_deposit` } });
+  await prisma.assetLedgerEntry.create({
+    data: {
+      id: `${P}_asset_charge`, eventId, kind: "CHARGE", amountCents: 2500, assetTypeId: typeId, issuanceId: `${P}_asset_issuance_2`, registrationId, chargeCategory: "REPLACEMENT",
+      settlement: "RECORD_ONLY", reason: "Replacement fee for MC-K-216", actorUserId: actor, actorNameSnapshot: "System Administrator",
+    },
+  });
+  await prisma.$transaction(async (tx) => {
+    await tx.facilityIssue.create({
+      data: {
+        id: `${P}_asset_facility`, eventId, targetKind: unit ? "UNIT" : "OTHER", eventUnitId: unit?.id ?? null, targetLabel: unit ? null : "Mobilecheck dining hall",
+        title: "Window will not close and the latch is bent beyond repair", description: "Found at check-out.", severity: "HIGH", source: "CHECKOUT_INSPECTION", reportedByUserId: actor, revision: 1,
+      },
+    });
+    await tx.facilityIssueHistory.create({ data: { eventId, issueId: `${P}_asset_facility`, type: "REPORTED", actorUserId: actor, status: "OPEN", severity: "HIGH", revision: 1 } });
+  });
 }
 
 /**

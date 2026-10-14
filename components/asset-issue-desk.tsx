@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { assigneeKindLabels, type AssigneeKind } from "@/modules/issued-assets/domain";
+import { AssetReturnPanel } from "@/components/asset-return-panel";
+import { cardCell } from "@/components/table-card-labels";
+import type { DeskMoney } from "@/modules/issued-assets/returns-view";
 import type { AssetLookup, AssigneeOptions, DeskLot, DeskPerson, DeskType, IssuanceRow } from "@/modules/issued-assets/view";
 
 type Item = { code: string; quantity: number };
@@ -45,11 +48,11 @@ function lodgingNote(row: IssuanceRow) {
   if (!row.roomName) return null;
   if (!row.lodging || row.lodging.status === "CURRENT") return `Opens ${row.roomName}`;
   return row.lodging.status === "MOVED"
-    ? `Opens ${row.roomName}, but they now stay in ${row.lodging.currentRooms.join(", ")}. Replace the key.`
+    ? `Opens ${row.roomName}, but they now stay in ${row.lodging.currentRooms.join(", ")}. Swap the key in Check out.`
     : `Opens ${row.roomName}, but their room was released.`;
 }
 
-export function AssetIssueDesk({ eventId, userId, types, lots, options, person, outNow }: {
+export function AssetIssueDesk({ eventId, userId, types, lots, options, person, outNow, money = null, canConfigure = false, canManageMoney = false }: {
   eventId: string;
   /** The signed-in staff member: scopes the saved offline requests on this device. */
   userId: string;
@@ -58,6 +61,10 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
   options: AssigneeOptions;
   person: DeskPerson | null;
   outNow: IssuanceRow[];
+  /** Deposits and charges for the person (check-out, #214). */
+  money?: DeskMoney | null;
+  canConfigure?: boolean;
+  canManageMoney?: boolean;
 }) {
   const router = useRouter();
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
@@ -224,7 +231,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
     <div className="page-intro"><div>
       <p className="eyebrow">Check-in</p>
       <h2 className="duplicate-page-title">Issue keys and items</h2>
-      <p>Scan or type each code. A typed code and a scanned code are checked the same way. Returns, lost keys and deposits are not handled here.</p>
+      <p>Scan or type each code. A typed code and a scanned code are checked the same way. Once a person is chosen, Check out records returns, lost or damaged keys and the cash key deposit. The <a href={`/more/issued-assets/closeout?event=${encodeURIComponent(eventId)}`}>closeout</a> lists everything still out or unresolved.</p>
     </div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
 
@@ -277,19 +284,22 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
     {person ? <section className="panel">
       <h3>Issued to {person.name}</h3>
-      {openForPerson.length === 0 ? <p>Nothing issued yet.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
-        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Issued</th><th scope="col">Room</th><th scope="col">Change</th></tr></thead>
-        <tbody>{openForPerson.map((row) => <tr key={row.id}>
-          <th scope="row">{row.identifier} <small>{row.typeName}</small></th>
-          <td>{row.quantity}</td>
-          <td>{new Date(row.issuedAt).toLocaleString()}{row.entryMethod === "OFFLINE" ? " (entered offline)" : ""}</td>
-          <td>{lodgingNote(row) ?? "Not room-linked"}</td>
-          <td><IssuanceActions row={row} busy={busy} change={change} /></td>
+      {openForPerson.length === 0 ? <p>Nothing issued yet.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+        <caption className="sr-only">Open items issued to {person.name}</caption>
+        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Issued</th><th role="columnheader" scope="col">Room</th><th role="columnheader" scope="col">Change</th></tr></thead>
+        <tbody role="rowgroup">{openForPerson.map((row) => <tr role="row" key={row.id}>
+          <th role="rowheader" scope="row">{row.identifier} <small>{row.typeName}</small></th>
+          <td {...cardCell("Qty")}>{row.quantity}</td>
+          <td {...cardCell("Issued")}>{new Date(row.issuedAt).toLocaleString()}{row.entryMethod === "OFFLINE" ? " (entered offline)" : ""}</td>
+          <td {...cardCell("Room")}>{lodgingNote(row) ?? "Not room-linked"}</td>
+          <td {...cardCell(null)}><IssuanceActions row={row} busy={busy} change={change} /></td>
         </tr>)}</tbody>
       </table></div>}
       {endedForPerson.length > 0 ? <details><summary>{endedForPerson.length} earlier issue{endedForPerson.length === 1 ? "" : "s"} (history is kept)</summary>
         <ul>{endedForPerson.map((row) => <li key={row.id}>{row.identifier} ({row.typeName}), {row.endReason?.toLowerCase()} {row.endedAt ? new Date(row.endedAt).toLocaleString() : ""}{row.endNote ? `: ${row.endNote}` : ""}{row.roomName ? `. Opened ${row.roomName}.` : ""}</li>)}</ul></details> : null}
     </section> : null}
+
+    {person && money ? <AssetReturnPanel eventId={eventId} userId={userId} person={person} money={money} types={types} canConfigure={canConfigure} canManageMoney={canManageMoney} /> : null}
 
     <section className="panel">
       <h3>Look up an item</h3>
@@ -306,31 +316,28 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
     {!person ? <section className="panel">
       <h3>Out now</h3>
-      {outNow.length === 0 ? <p>Nothing is issued right now.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
-        <caption>The most recent {outNow.length} open issues</caption>
-        <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Holder</th><th scope="col">Room</th></tr></thead>
-        <tbody>{outNow.map((row) => <tr key={row.id}><th scope="row">{row.identifier} <small>{row.typeName}</small></th><td>{row.quantity}</td><td>{row.holderLabel}</td><td>{lodgingNote(row) ?? ""}</td></tr>)}</tbody>
+      {outNow.length === 0 ? <p>Nothing is issued right now.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+        <caption className="sr-only">The most recent {outNow.length} open issues</caption>
+        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Room</th></tr></thead>
+        <tbody role="rowgroup">{outNow.map((row) => <tr role="row" key={row.id}><th role="rowheader" scope="row">{row.identifier} <small>{row.typeName}</small></th><td {...cardCell("Qty")}>{row.quantity}</td><td {...cardCell("Holder")}>{row.holderLabel}</td><td {...cardCell("Room")}>{lodgingNote(row) ?? ""}</td></tr>)}</tbody>
       </table></div>}
     </section> : null}
   </div>;
 }
 
 function IssuanceActions({ row, busy, change }: { row: IssuanceRow; busy: boolean; change: (id: string, body: unknown, done: string) => Promise<void> }) {
-  const [mode, setMode] = useState<"" | "replace" | "correct">("");
+  const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [code, setCode] = useState("");
-  // One key per attempt: sending the same form again after a lost response replays instead of replacing twice.
-  const pendingKey = useRef(newKey());
+  // Replacing or swapping a key is part of Check out (the original's return, loss or damage is recorded with it).
   return <div>
-    <button className="secondary-button" type="button" disabled={busy} onClick={() => setMode(mode === "replace" ? "" : "replace")}>Replace</button>{" "}
-    <button className="secondary-button" type="button" disabled={busy} onClick={() => setMode(mode === "correct" ? "" : "correct")}>Entered in error</button>
-    {mode ? <form onSubmit={(event) => {
+    <button className="secondary-button" type="button" disabled={busy} onClick={() => setOpen(!open)}>Entered in error</button>
+    {open ? <form onSubmit={(event) => {
       event.preventDefault();
-      void change(row.id, mode === "replace" ? { action: "replace", replacementCode: code, reason, originalAvailability: "UNAVAILABLE", idempotencyKey: pendingKey.current } : { action: "correct", reason }, mode === "replace" ? `${row.identifier} replaced` : `${row.identifier} withdrawn`).then(() => { setMode(""); setReason(""); setCode(""); pendingKey.current = newKey(); });
+      void change(row.id, { action: "correct", reason }, `${row.identifier} withdrawn`).then(() => { setOpen(false); setReason(""); });
     }}>
-      {mode === "replace" ? <label>Replacement code <input value={code} onChange={(event) => setCode(event.target.value)} required maxLength={64} /></label> : null}
+      {row.depositEntryId ? <p>A cash deposit covers this item. Withdrawing it does not settle the deposit: it is listed in the closeout for a decision.</p> : null}
       <label>Reason <input value={reason} onChange={(event) => setReason(event.target.value)} required maxLength={300} /></label>
-      <button className="secondary-button" type="submit" disabled={busy}>{mode === "replace" ? "Replace" : "Withdraw"}</button>
+      <button className="secondary-button" type="submit" disabled={busy}>Withdraw</button>
     </form> : null}
   </div>;
 }

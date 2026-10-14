@@ -49,7 +49,8 @@ export function describeRate(rate: { amountCents: number; basis: LodgingRateBasi
   return `$${(rate.amountCents / 100).toFixed(2)} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
 }
 
-export const lodgingHoldKinds = ["STAFF", "MAINTENANCE"] as const;
+/** SAFETY and DAMAGE (#214) are facility blocks: like any hold they close the room or site for the nights and never touch assignments. */
+export const lodgingHoldKinds = ["STAFF", "MAINTENANCE", "SAFETY", "DAMAGE"] as const;
 export type LodgingHoldKind = (typeof lodgingHoldKinds)[number];
 
 // ---------------------------------------------------------------------------

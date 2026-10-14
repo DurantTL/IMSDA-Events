@@ -497,6 +497,34 @@ async function main() {
   }
   console.log("ok: staff meal orders are netted per selection and follow the meal rules");
 
+  // ---- A key or item charge (an ASSET adjustment, #214) is never refunded, never prorated, and not a component. ----
+  {
+    const keyed = await createFixture();
+    const waived = await createFixture();
+    const post = (fixture: Fixture, amountCents: number) => base.registrationAdjustment.create({
+      data: { eventId, registrationId: fixture.registrationId, kind: "ASSET", amountCents, reason: "Synthetic key charge", registrationAttendeeId: fixture.attendeeIds[0], createdByNameSnapshot: "Check" },
+    });
+    const keyCharge = await post(keyed, 2500);
+    await post(waived, 2500);
+    await post(waived, -2500);
+    await base.registration.update({ where: { id: keyed.registrationId }, data: { totalAmount: 442 + 25 } });
+    const plain = await createFixture();
+    for (const [name, at] of [["a 50% window", "2028-04-10T12:00:00.000Z"], ["meals nonrefundable", "2028-05-02T12:00:00.000Z"]] as const) {
+      const whole = (await repo.previewCancellation(eventId, request(keyed.code), new Date(at))).result;
+      const line = whole.lines.find((entry) => entry.chargeId === `adjustment:${keyCharge.id}`);
+      assert(line?.label === "Keys and items charge" && line.treatment === "NONREFUNDABLE" && line.withheldCents === 2500 && line.eligibleCents === 0 && line.attendeeId === null && line.reason === "Key or item charge, not refundable.", `${name}: the key charge is withheld in full, not at the window's percentage`);
+      const none = (await repo.previewCancellation(eventId, request(plain.code), new Date(at))).result;
+      const nets = (await repo.previewCancellation(eventId, request(waived.code), new Date(at))).result;
+      assert(nets.money.refundCents === none.money.refundCents, `${name}: a waived key charge nets out (${nets.money.refundCents} vs ${none.money.refundCents})`);
+    }
+    const at = new Date("2028-05-02T12:00:00.000Z");
+    const removed = (await repo.previewCancellation(eventId, request(keyed.code, "ATTENDEE", { attendeeIds: [keyed.attendeeIds[0] as string] }), at)).result;
+    assert(removed.lines.find((entry) => entry.chargeId === `adjustment:${keyCharge.id}`)?.treatment === "KEPT", "removing the attendee it names does not cancel or prorate the key charge");
+    const component = await repo.previewCancellation(eventId, request(keyed.code, "COMPONENT", { chargeIds: [`adjustment:${keyCharge.id}`] }), at);
+    assert(component.result.status === "COMPONENT_NOT_SUPPORTED", `a key charge is never a cancellable component, got ${component.result.status}`);
+  }
+  console.log("ok: key and item charges are withheld in full, never prorated, never a component");
+
   // ---- A card deposit is forfeited without its card fee. ----
   {
     const card = await createCardDepositFixture();

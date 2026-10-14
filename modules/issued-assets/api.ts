@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { isLockTimeoutError, isSerializationFailure } from "@/lib/prisma-errors";
-import { AccessDeniedError, effectivePermissions, requirePermission } from "@/modules/access/authorization";
+import { AccessDeniedError, effectivePermissions, requireEventMembership, requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import type { EventPermission } from "@/modules/access/permissions";
 import { findActiveMembership } from "@/modules/events/repository";
@@ -19,6 +19,26 @@ export async function requireAssetStaff(eventId: string, permission: Extract<Eve
   // Corrections of older issues and putting a replaced item straight back in stock need event setup permission as well.
   const canConfigure = new Set(effectivePermissions(access.user, access.membership)).has("CONFIGURE_EVENT");
   return { userId: access.user.id, canConfigure };
+}
+
+/**
+ * The check for routes several kinds of staff may use (#214): the person needs at least one of `permissions`, and the
+ * result says which of the finer permissions they hold so the service can apply the finer rules (a charge beyond the
+ * standard fee and any waiver need `canManageMoney`: MANAGE_FINANCE or CONFIGURE_EVENT; blocking a room needs
+ * `canConfigure`).
+ */
+export async function requireAnyAssetPermission(eventId: string, permissions: readonly Extract<EventPermission, "CONFIGURE_EVENT" | "MANAGE_CHECK_IN" | "MANAGE_FINANCE" | "VIEW_REPORTS">[]) {
+  const access = await requireEventMembership(await getCurrentSession(), eventId, findActiveMembership);
+  const held = new Set(effectivePermissions(access.user, access.membership));
+  if (!permissions.some((permission) => held.has(permission))) {
+    throw new AccessDeniedError(`One of these permissions is required for this event: ${permissions.join(", ")}.`, 403, "PERMISSION_DENIED");
+  }
+  return {
+    userId: access.user.id,
+    canConfigure: held.has("CONFIGURE_EVENT"),
+    canManageMoney: held.has("MANAGE_FINANCE") || held.has("CONFIGURE_EVENT"),
+    canCheckIn: held.has("MANAGE_CHECK_IN"),
+  };
 }
 
 export function assetApiError(error: unknown, action: string) {

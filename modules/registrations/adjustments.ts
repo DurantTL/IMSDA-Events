@@ -53,6 +53,7 @@ export type AdjustmentErrorCode =
   | "ADJUSTMENT_NOT_FOUND"
   | "ADJUSTMENT_ALREADY_REVERSED"
   | "MEAL_ADJUSTMENT_NOT_REVERSIBLE"
+  | "ASSET_ADJUSTMENT_NOT_REVERSIBLE"
   | "TOTAL_BELOW_ZERO"
   | "TOTAL_BELOW_PAID"
   | "PROMO_ALREADY_APPLIED"
@@ -353,6 +354,44 @@ export async function postMealAdjustment(
   return adjustment.id;
 }
 
+/**
+ * Posts one issued-asset charge (positive) or its waiver (negative, `reversesAdjustmentId` naming the charge's line) to a
+ * registration as an ASSET adjustment line (#214), inside the caller's transaction, with the same rules as any
+ * adjustment: submitted or confirmed registrations only, never below $0, never below what has been paid (a charge that
+ * was already paid cannot be waived here: record the refund first, which is a human decision). The line carries no
+ * attendee, so it never moves with a person. Returns the adjustment id for the asset ledger entry to keep.
+ */
+export async function postAssetAdjustment(
+  tx: Client,
+  input: { eventId: string; registrationId: string; actorUserId: string; amountCents: number; reason: string; reversesAdjustmentId?: string },
+) {
+  const registration = await loadRegistration(tx, input.eventId, input.registrationId);
+  const nextTotal = checkNewTotal(registration.totalCents, input.amountCents, registration.paidCents);
+  const adjustment = await tx.registrationAdjustment.create({
+    data: {
+      eventId: input.eventId,
+      registrationId: input.registrationId,
+      kind: "ASSET",
+      amountCents: input.amountCents,
+      reason: input.reason,
+      reversesAdjustmentId: input.reversesAdjustmentId ?? null,
+      createdByUserId: input.actorUserId,
+      createdByNameSnapshot: await actorName(tx, input.actorUserId),
+    },
+  });
+  await tx.registration.update({ where: { id: input.registrationId }, data: { totalAmount: nextTotal / 100 } });
+  await writeAuditLog({
+    eventId: input.eventId,
+    actorUserId: input.actorUserId,
+    action: input.amountCents < 0 ? "REGISTRATION_ASSET_ADJUSTMENT_WAIVED" : "REGISTRATION_ASSET_ADJUSTMENT_POSTED",
+    entityType: "RegistrationAdjustment",
+    entityId: adjustment.id,
+    summary: `${input.amountCents < 0 ? "Waived" : "Posted"} an issued-item charge ${input.amountCents < 0 ? "on" : "to"} registration ${registration.confirmationCode}.`,
+    metadata: { registrationId: input.registrationId, amountCents: input.amountCents, totalBeforeCents: registration.totalCents, totalAfterCents: nextTotal },
+  }, tx);
+  return adjustment.id;
+}
+
 /** Cancels an adjustment with an opposite line; the original stays on record. */
 export async function reverseRegistrationAdjustment(
   eventId: string,
@@ -372,6 +411,9 @@ export async function reverseRegistrationAdjustment(
     }
     if (original.kind === "MEAL") {
       throw new AdjustmentError("MEAL_ADJUSTMENT_NOT_REVERSIBLE", "A meal charge is changed by changing the meal order, not by reversing the line.");
+    }
+    if (original.kind === "ASSET") {
+      throw new AdjustmentError("ASSET_ADJUSTMENT_NOT_REVERSIBLE", "A key or item charge is waived from the issued-asset closeout, which records who approved it and why.");
     }
     if (original.reversedBy) {
       throw new AdjustmentError("ADJUSTMENT_ALREADY_REVERSED", "That adjustment was already reversed.");

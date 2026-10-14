@@ -90,6 +90,7 @@ const textSchema = (max: number) => z.string().trim().max(max);
 const reasonSchema = z.string().trim().min(1, "Give a reason.").max(300);
 const isoSchema = z.string().datetime({ offset: true });
 const keySchema = z.string().trim().min(8).max(100);
+const moneyCents = z.number().int().min(0).max(10_000_000);
 
 export const assetTypeCreateSchema = z.object({
   action: z.literal("create"),
@@ -99,6 +100,10 @@ export const assetTypeCreateSchema = z.object({
   roomLinked: z.boolean().default(false),
   depositPolicyRef: textSchema(120).optional(),
   replacementPolicyRef: textSchema(120).optional(),
+  /** Slice 2 (#214), in cents: the usual cash deposit for one holder's items of this kind, and the fee to replace one. */
+  depositCents: moneyCents.default(0),
+  depositShortfall: z.enum(["KEEP_ALL", "KEEP_FEES"]).default("KEEP_ALL"),
+  replacementFeeCents: moneyCents.default(0),
 }).strict();
 
 export const assetTypeUpdateSchema = z.object({
@@ -110,6 +115,9 @@ export const assetTypeUpdateSchema = z.object({
   roomLinked: z.boolean().optional(),
   depositPolicyRef: textSchema(120).optional(),
   replacementPolicyRef: textSchema(120).optional(),
+  depositCents: moneyCents.optional(),
+  depositShortfall: z.enum(["KEEP_ALL", "KEEP_FEES"]).optional(),
+  replacementFeeCents: moneyCents.optional(),
 }).strict();
 
 export const assetTypeActionSchema = z.discriminatedUnion("action", [assetTypeCreateSchema, assetTypeUpdateSchema]);

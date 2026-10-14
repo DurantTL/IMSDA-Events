@@ -40,6 +40,8 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -160,6 +162,8 @@ jobs:
       - run: npm run test:lodging-assignment
       # Real-database check of issued assets (#213): a numbered range (K-201..K-260) that is safe to run twice, two room keys and a welcome packet issued in one request and linked to the exact lodging assignment, a repeated scan that is a duplicate and writes nothing, a key held by someone else refused, partial and all-or-nothing group issue, saved retry keys, eight staff racing for one key (one holder), a lot of three never over-issued by eight racers, overlapping group issues in opposite orders without a deadlock, a key that keeps its room and assignment after the family moves with the desk showing the move, replacement keys that follow the new assignment, transfers and corrections that end the old issue and append history, offline entries that keep when they happened and the assignment as it was then, the database refusing a second open issue, an over-issue, a rewrite and a delete even around the service, no change to any charge, and every row going with its event.
       - run: npm run test:issued-assets
+      # Real-database check of issued assets slice 2 (#214), the Camp Meeting key deposit: a partial group checkout that leaves the cash deposit unsettled until both keys are back, a full hand-back recorded only then, a lost key replaced in the same step whose deposit is kept (never a full refund), a damaged key under the keep-fees policy, a charge posted as an append-only ASSET line that check-in staff may record only at the standard fee, a waiver that needs finance or an administrator and a reason and is the reversing line, a lot returned in part that ends the issue and continues the remainder, duplicate, offline and racing returns that write one return, a facility issue with a room block that takes the room out of availability without touching the assignment, a closeout that lists what is out, lost, charged, held and unresolved, reconciles and exports formula-safe CSV while writing nothing, the database refusing a rewrite, a delete and an over-settlement of the money ledger, and every row going with its event.
+      - run: npm run test:issued-assets-returns
       # Real-database check that a lodging change on a church-sponsored registration updates the church's bill automatically (#813): the sponsor's share of each staff edit moves the church's amount owed in the same transaction (increase, decrease and revert, 50% and 100% codes, an approved change request), the registrant's total and recorded discount are untouched, an amendment never erases it, the church-owed lines, CSV and overview agree, every change is audited with ids and amounts only, concurrent edits never double count, and a finalized church invoice is never revised or moved but flagged for the finance office, who see and clear the flag.
       - run: npm run test:church-sponsor-lodging
       # Real-database check of calendar bulk changes (#796): the feed's advisory lock is taken and rows are read again under it, a racing feed sync never leaves a removed entry published and a bulk hide survives it, the 500-entry cap, and a refresh keeping a bulk-set category with no local-edit mark.
@@ -350,6 +354,8 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

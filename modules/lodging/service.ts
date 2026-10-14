@@ -341,23 +341,29 @@ async function insertHold(
   }
 }
 
-export async function createHold(eventId: string, eventUnitId: string, actorUserId: string, rawInput: unknown, client: PrismaClient = getPrisma()) {
+/**
+ * The body of `createHold`, for a caller that already has a transaction (issued-asset facility blocks, #214, place the
+ * hold and link it to the issue in one transaction). Locks the unit, bumps the capacity version, inserts the hold.
+ */
+export async function createHoldInTransaction(tx: Tx, eventId: string, eventUnitId: string, actorUserId: string, rawInput: unknown) {
   const input = holdCreateSchema.parse(rawInput);
-  return client.$transaction(async (tx) => {
-    const lodging = await eventLodgingFor(tx, eventId);
-    assertWithin(nightsFor(lodging), input.firstNight, input.lastNight);
-    await lockEventLodgingUnits(tx, eventId, [eventUnitId]);
-    const unit = await tx.eventLodgingUnit.findFirst({ where: { id: eventUnitId, eventId }, include: { unit: { select: { key: true, name: true } } } });
-    if (!unit) throw new LodgingError("UNIT_NOT_FOUND", "That lodging unit was not found for this event.");
-    await touchEventLodgingCapacity(tx, lodging.id);
-    const hold = await insertHold(tx, eventId, eventUnitId, input, actorUserId);
-    await writeAuditLog({
-      eventId, actorUserId, action: "LODGING_HOLD_CREATED", entityType: "EventLodgingHold", entityId: hold.id,
-      summary: `Placed a ${input.kind.toLowerCase()} hold on ${unit.unit.name}.`,
-      metadata: { unitKey: unit.unit.key, kind: input.kind, firstNight: input.firstNight, lastNight: input.lastNight },
-    }, tx);
-    return { id: hold.id };
-  }, { timeout: lodgingTransactionTimeoutMs });
+  const lodging = await eventLodgingFor(tx, eventId);
+  assertWithin(nightsFor(lodging), input.firstNight, input.lastNight);
+  await lockEventLodgingUnits(tx, eventId, [eventUnitId]);
+  const unit = await tx.eventLodgingUnit.findFirst({ where: { id: eventUnitId, eventId }, include: { unit: { select: { key: true, name: true } } } });
+  if (!unit) throw new LodgingError("UNIT_NOT_FOUND", "That lodging unit was not found for this event.");
+  await touchEventLodgingCapacity(tx, lodging.id);
+  const hold = await insertHold(tx, eventId, eventUnitId, input, actorUserId);
+  await writeAuditLog({
+    eventId, actorUserId, action: "LODGING_HOLD_CREATED", entityType: "EventLodgingHold", entityId: hold.id,
+    summary: `Placed a ${input.kind.toLowerCase()} hold on ${unit.unit.name}.`,
+    metadata: { unitKey: unit.unit.key, kind: input.kind, firstNight: input.firstNight, lastNight: input.lastNight },
+  }, tx);
+  return { id: hold.id };
+}
+
+export async function createHold(eventId: string, eventUnitId: string, actorUserId: string, rawInput: unknown, client: PrismaClient = getPrisma()) {
+  return client.$transaction((tx) => createHoldInTransaction(tx, eventId, eventUnitId, actorUserId, rawInput), { timeout: lodgingTransactionTimeoutMs });
 }
 
 export async function changeHold(eventId: string, holdId: string, actorUserId: string, rawInput: unknown, client: PrismaClient = getPrisma()) {

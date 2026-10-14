@@ -52,8 +52,8 @@ card fee a card deposit carried; that fee is its own charge and follows the card
 every attendee counts as that). Shared charges (card fee, tax, registration-wide adjustments) follow a partial
 cancellation by price share, rounded half away from zero.
 
-Not yet modelled: meals (#210) and issued items (#213) lines (they classify through the same categories when they
-land), and the first-night no-show is a staff-supplied fact, not derived from check-in.
+A key or item charge (an `ASSET` adjustment, #214) is never refunded, prorated or a component: it is always withheld
+(`KEY_OR_ITEM_CHARGE`). Meal orders (#210) are netted per meal selection into one charge. The first-night no-show is a staff-supplied fact, not derived from check-in.
 
 Capacity: SUBMITTED and CONFIRMED registrations hold seats; cancelling a WAITLISTED registration releases a waitlist
 place and frees no capacity. Component scope is limited to meal, lodging, merchandise, registration and other charges

@@ -49,6 +49,12 @@ export type ChargeEntry = {
   /** The form field a priced line came from, so a policy can classify or exclude it. */
   fieldKey: string | null;
   attendeeId: string | null;
+  /**
+   * A fixed rule, not an owner-configurable one: a key or item charge (an issued-asset ASSET adjustment, #214) is never
+   * refundable, never prorated to an attendee, and never a cancellable component. Its reversal (a waiver) carries the same
+   * mark, so a waived charge nets out.
+   */
+  fixedRule?: "KEY_OR_ITEM_CHARGE";
   /** Paid at the time it was ordered, outside the registration's payments (a merchandise order). Counted as paid. */
   settledSeparately?: boolean;
   /** Which separately paid order this entry belongs to (so money is never mixed across orders); unset means the registration's payments. */
@@ -190,7 +196,7 @@ export function mulDivRound(a: number, b: number, c: number) {
 const SHARED_CATEGORIES: ReadonlySet<ChargeCategory> = new Set<ChargeCategory>(["FEE", "TAX", "ADJUSTMENT"]);
 
 function isShared(entry: ChargeEntry, category: ChargeCategory) {
-  return entry.attendeeId === null && SHARED_CATEGORIES.has(category);
+  return !entry.fixedRule && entry.attendeeId === null && SHARED_CATEGORIES.has(category);
 }
 
 function effectiveCategory(entry: ChargeEntry, rules: CancellationRules): ChargeCategory {
@@ -202,6 +208,7 @@ function effectiveCategory(entry: ChargeEntry, rules: CancellationRules): Charge
 
 function isNonrefundable(entry: ChargeEntry, category: ChargeCategory, rules: CancellationRules) {
   if (entry.amountCents === 0) return false;
+  if (entry.fixedRule) return true;
   // A credit that belongs to a nonrefundable class (its own field or classified category, such as a meal credit) is
   // nonrefundable too, so an unpaired credit still cancels its charge. Generic adjustments (discounts, scholarships)
   // and the not-itemized remainder are never nonrefundable: they follow the window like everything else.
@@ -212,6 +219,7 @@ function isNonrefundable(entry: ChargeEntry, category: ChargeCategory, rules: Ca
 }
 
 function isSupportedComponent(entry: ChargeEntry, category: ChargeCategory, rules: CancellationRules) {
+  if (entry.fixedRule) return false;
   const supported = rules.supportedComponents;
   return (supported.categories as readonly ChargeCategory[]).includes(category) || (entry.fieldKey !== null && supported.fieldKeys.includes(entry.fieldKey));
 }
@@ -335,10 +343,11 @@ export function calculateCancellation(input: {
   // Shared charges (the registration's card fee, tax, adjustments) follow the registration's own price lines only;
   // merchandise orders are separate purchases and never part of the base.
   const isRegistrationSource = (entry: ChargeEntry) => !entry.moneySourceId && !entry.settledSeparately;
-  const direct = facts.charges.filter((entry) => isRegistrationSource(entry) && !isShared(entry, categories.get(entry.id) as ChargeCategory));
+  const direct = facts.charges.filter((entry) => isRegistrationSource(entry) && !entry.fixedRule && !isShared(entry, categories.get(entry.id) as ChargeCategory));
   const directBase = direct.reduce((total, entry) => total + Math.max(entry.amountCents, 0), 0);
   const directInScope = (entry: ChargeEntry) => {
     if (effectiveScope === "FULL_REGISTRATION") return true;
+    if (entry.fixedRule) return false;
     if (effectiveScope === "ATTENDEE") return entry.attendeeId !== null && attendeeIds.includes(entry.attendeeId);
     return chargeIds.includes(entry.id);
   };
@@ -374,7 +383,8 @@ export function calculateCancellation(input: {
     let reason: string;
     if (nonrefundable) {
       eligibleCents = 0;
-      reason = category === "FEE" ? "Card processing fees are nonrefundable under this policy." : `Nonrefundable under this policy (${categoryWords(category)}).`;
+      reason = entry.fixedRule ? (entry.amountCents < 0 ? "Key or item charge waived; it nets out." : "Key or item charge, not refundable.")
+        : category === "FEE" ? "Card processing fees are nonrefundable under this policy." : `Nonrefundable under this policy (${categoryWords(category)}).`;
     } else {
       eligibleCents = mulDivRound(inScopeCents, percent, 100);
       reason = percent === 100

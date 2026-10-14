@@ -35,6 +35,9 @@ export type CatalogType = {
   assigneeKinds: AssigneeKind[];
   roomLinked: boolean;
   depositPolicyRef: string | null;
+  depositCents: number;
+  depositShortfall: "KEEP_ALL" | "KEEP_FEES";
+  replacementFeeCents: number;
   replacementPolicyRef: string | null;
   assetCount: number;
   /** Items (or units of a lot) in stock and not out. */
@@ -82,6 +85,7 @@ export async function getCatalogView(eventId: string, client: Client = getPrisma
       return {
         id: type.id, name: type.name, mode: type.mode, active: type.active, assigneeKinds: type.assigneeKinds, roomLinked: type.roomLinked,
         depositPolicyRef: type.depositPolicyRef, replacementPolicyRef: type.replacementPolicyRef,
+        depositCents: type.depositCents, depositShortfall: type.depositShortfall, replacementFeeCents: type.replacementFeeCents,
         assetCount: own.length, outQuantity, availableQuantity: Math.max(0, inStock - outQuantity),
       };
     }),
@@ -100,6 +104,8 @@ export type IssuanceRow = {
   serialized: boolean;
   quantity: number;
   holderKind: AssigneeKind;
+  attendeeId: string | null;
+  registrationId: string | null;
   holderLabel: string;
   purpose: string;
   issuedAt: string;
@@ -107,7 +113,11 @@ export type IssuanceRow = {
   entryMethod: "MANUAL" | "SCAN" | "OFFLINE";
   expectedReturnAt: string | null;
   open: boolean;
-  endReason: "TRANSFERRED" | "REPLACED" | "CORRECTED" | null;
+  endReason: "TRANSFERRED" | "REPLACED" | "CORRECTED" | "RETURNED" | "LOST" | "DAMAGED" | null;
+  /** How many an outcome (return, loss, damage) covered; null for the other ends. */
+  endQuantity: number | null;
+  /** The cash deposit covering this issue, when one was taken (#214). */
+  depositEntryId: string | null;
   endedAt: string | null;
   endNote: string | null;
   previousIssuanceId: string | null;
@@ -118,7 +128,7 @@ export type IssuanceRow = {
   lodging: { status: LodgingReferenceStatus; currentRooms: string[] } | null;
 };
 
-async function describeIssuances(client: Client, eventId: string, rows: Array<Awaited<ReturnType<Client["assetIssuance"]["findMany"]>>[number]>): Promise<IssuanceRow[]> {
+export async function describeIssuances(client: Client, eventId: string, rows: Array<Awaited<ReturnType<Client["assetIssuance"]["findMany"]>>[number]>): Promise<IssuanceRow[]> {
   if (rows.length === 0) return [];
   const uniq = <T,>(values: Array<T | null | undefined>) => [...new Set(values.filter((value): value is T => value != null))];
   const assetIds = uniq(rows.map((row) => row.assetId));
@@ -127,15 +137,17 @@ async function describeIssuances(client: Client, eventId: string, rows: Array<Aw
   const userIds = uniq(rows.flatMap((row) => [row.staffUserId, row.issuedByUserId]));
   const unitIds = uniq(rows.map((row) => row.roomUnitId));
   const assignmentIds = uniq(rows.map((row) => row.sourceAssignmentId));
-  const [assets, attendees, registrations, users, units, assignments] = await Promise.all([
+  const [assets, attendees, registrations, users, units, assignments, covers] = await Promise.all([
     client.issuedAsset.findMany({ where: { eventId, id: { in: assetIds } }, select: { id: true, identifier: true, assetType: { select: { name: true } } } }),
     client.registrationAttendee.findMany({ where: { eventId, id: { in: attendeeIds } }, select: { id: true, profileSnapshot: true, person: { select: { firstName: true, lastName: true } } } }),
     client.registration.findMany({ where: { eventId, id: { in: registrationIds } }, select: { id: true, confirmationCode: true } }),
     client.user.findMany({ where: { id: { in: userIds } }, select: { id: true, displayName: true } }),
     client.eventLodgingUnit.findMany({ where: { eventId, id: { in: unitIds } }, select: { id: true, unit: { select: { name: true, building: { select: { name: true } } } } } }),
     client.eventLodgingAssignment.findMany({ where: { eventId, id: { in: assignmentIds } }, select: { id: true, cancelledAt: true } }),
+    client.assetDepositCover.findMany({ where: { eventId, issuanceId: { in: rows.map((row) => row.id) } }, select: { issuanceId: true, depositEntryId: true } }),
   ]);
   const assetById = new Map(assets.map((row) => [row.id, row]));
+  const coverByIssuance = new Map(covers.map((row) => [row.issuanceId, row.depositEntryId]));
   const attendeeById = new Map(attendees.map((row) => [row.id, attendeeName(row)]));
   const registrationById = new Map(registrations.map((row) => [row.id, `Registration ${row.confirmationCode}`]));
   const userById = new Map(users.map((row) => [row.id, row.displayName]));
@@ -176,9 +188,9 @@ async function describeIssuances(client: Client, eventId: string, rows: Array<Aw
     }
     return {
       id: row.id, assetId: row.assetId, identifier: asset?.identifier ?? "", typeName: asset?.assetType.name ?? "", serialized: row.serialized, quantity: row.quantity,
-      holderKind: row.assigneeKind, holderLabel, purpose: row.purpose, issuedAt: row.issuedAt.toISOString(), issuedByName: userById.get(row.issuedByUserId) ?? null,
+      holderKind: row.assigneeKind, attendeeId: row.attendeeId, registrationId: row.registrationId, holderLabel, purpose: row.purpose, issuedAt: row.issuedAt.toISOString(), issuedByName: userById.get(row.issuedByUserId) ?? null,
       entryMethod: row.entryMethod, expectedReturnAt: row.expectedReturnAt?.toISOString() ?? null, open: row.endedAt === null, endReason: row.endReason,
-      endedAt: row.endedAt?.toISOString() ?? null, endNote: row.endNote, previousIssuanceId: row.previousIssuanceId,
+      endedAt: row.endedAt?.toISOString() ?? null, endNote: row.endNote, endQuantity: row.endQuantity, depositEntryId: coverByIssuance.get(row.id) ?? null, previousIssuanceId: row.previousIssuanceId,
       roomName: row.roomUnitId ? unitName.get(row.roomUnitId) ?? null : null, sourceAssignmentId: row.sourceAssignmentId, lodging,
     };
   });
@@ -188,9 +200,9 @@ async function describeIssuances(client: Client, eventId: string, rows: Array<Aw
 // The issue desk
 // ---------------------------------------------------------------------------
 
-export type DeskType = { id: string; name: string; mode: AssetMode; assigneeKinds: AssigneeKind[]; roomLinked: boolean; depositPolicyRef: string | null };
+export type DeskType = { id: string; name: string; mode: AssetMode; assigneeKinds: AssigneeKind[]; roomLinked: boolean; depositPolicyRef: string | null; depositCents: number; depositShortfall: "KEEP_ALL" | "KEEP_FEES"; replacementFeeCents: number };
 
-export type DeskRoomAssignment = { assignmentId: string; roomName: string; firstNight: string; lastNight: string };
+export type DeskRoomAssignment = { assignmentId: string; unitId: string; roomName: string; firstNight: string; lastNight: string };
 
 export type DeskPerson = {
   attendeeId: string;
@@ -218,7 +230,7 @@ export async function getAssigneeOptions(eventId: string, client: Client = getPr
 
 export async function getDeskTypes(eventId: string, client: Client = getPrisma()): Promise<DeskType[]> {
   const types = await client.issuedAssetType.findMany({ where: { eventId, active: true }, orderBy: { name: "asc" } });
-  return types.map((type) => ({ id: type.id, name: type.name, mode: type.mode, assigneeKinds: type.assigneeKinds, roomLinked: type.roomLinked, depositPolicyRef: type.depositPolicyRef }));
+  return types.map((type) => ({ id: type.id, name: type.name, mode: type.mode, assigneeKinds: type.assigneeKinds, roomLinked: type.roomLinked, depositPolicyRef: type.depositPolicyRef, depositCents: type.depositCents, depositShortfall: type.depositShortfall, replacementFeeCents: type.replacementFeeCents }));
 }
 
 export type DeskLot = { code: string; identifier: string; typeName: string; remaining: number };
@@ -247,7 +259,7 @@ export async function getDeskPerson(eventId: string, attendeeId: string, client:
     client.eventLodgingAssignment.findMany({
       where: { eventId, attendeeId, cancelledAt: null, eventLodgingUnitId: { not: null } },
       orderBy: { firstNight: "asc" },
-      select: { id: true, firstNight: true, lastNight: true, eventUnit: { select: { unit: { select: { name: true, building: { select: { name: true } } } } } } },
+      select: { id: true, eventLodgingUnitId: true, firstNight: true, lastNight: true, eventUnit: { select: { unit: { select: { name: true, building: { select: { name: true } } } } } } },
     }),
     client.assetIssuance.findMany({
       where: { eventId, OR: [{ attendeeId: { in: siblings.map((row) => row.id) } }, { registrationId: attendee.registrationId }] },
@@ -263,6 +275,7 @@ export async function getDeskPerson(eventId: string, attendeeId: string, client:
     registrationActive: active.has(attendee.registration.status),
     rooms: assignments.map((row) => ({
       assignmentId: row.id,
+      unitId: row.eventLodgingUnitId!,
       roomName: `${row.eventUnit!.unit.name}${row.eventUnit!.unit.building.name !== row.eventUnit!.unit.name ? `, ${row.eventUnit!.unit.building.name}` : ""}`,
       firstNight: toNight(row.firstNight),
       lastNight: toNight(row.lastNight),
@@ -355,7 +368,7 @@ export type HistoryEntry = {
 
 /** The append-only history of one item, oldest first. */
 export async function listAssetHistory(eventId: string, assetId: string, client: Client = getPrisma()): Promise<HistoryEntry[]> {
-  const rank: Record<string, number> = { ISSUED: 0, TRANSFERRED_OUT: 1, REPLACED_OUT: 1, TRANSFERRED_IN: 2, REPLACED_IN: 2, CORRECTED: 3 };
+  const rank: Record<string, number> = { ISSUED: 0, TRANSFERRED_OUT: 1, REPLACED_OUT: 1, RETURNED: 1, LOST: 1, DAMAGED: 1, TRANSFERRED_IN: 2, REPLACED_IN: 2, REMAINDER_ISSUED: 2, CORRECTED: 3 };
   // A transfer or replacement writes its OUT and IN rows at one instant: the OUT reads first.
   const rows = (await client.assetIssuanceHistory.findMany({ where: { eventId, assetId }, orderBy: [{ at: "asc" }, { recordedAt: "asc" }, { revision: "asc" }], take: 500 }))
     .sort((a, b) => a.at.getTime() - b.at.getTime() || a.recordedAt.getTime() - b.recordedAt.getTime() || (rank[a.type] ?? 0) - (rank[b.type] ?? 0));
