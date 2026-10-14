@@ -51,3 +51,25 @@ export function effectiveChoice(chosenId: string, listed: ReadonlyArray<{ id: st
   if (chosenId && listed.some((entry) => entry.id === chosenId)) return chosenId;
   return hasSearchText(query) && listed.length === 1 ? listed[0]!.id : "";
 }
+
+/**
+ * What a picker's search says it found (#918), shown next to the search box. A closed native
+ * <select> (iPad Safari) gives no sign it was narrowed, so typing looked like it did nothing.
+ * Empty while nothing is typed.
+ */
+export function searchResultSummary(count: number, query: string, noun: string, nounPlural = `${noun}s`) {
+  if (!hasSearchText(query)) return "";
+  const typed = query.trim();
+  if (count === 0) return `No ${nounPlural} match \u201c${typed}\u201d. Clear the search to see every ${noun}.`;
+  return count === 1 ? `1 ${noun} matches \u201c${typed}\u201d.` : `${count} ${nounPlural} match \u201c${typed}\u201d.`;
+}
+
+/**
+ * Rows to show for a narrowed picker (#918): while a search has several matches the <select> is
+ * drawn as an open list so the narrowed matches are visible without tapping it. Undefined otherwise
+ * (a dropdown), and capped so a long match list scrolls inside the box.
+ */
+export function narrowedListSize(count: number, query: string, maxRows = 6) {
+  if (!hasSearchText(query) || count < 2) return undefined;
+  return Math.min(count + 1, maxRows);
+}

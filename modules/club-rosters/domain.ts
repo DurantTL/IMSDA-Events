@@ -137,6 +137,18 @@ export function ageOn(birthDate: string, onDate: string) {
   return age;
 }
 
+/**
+ * Whether a roster person is an adult (#918): registered staff and adults are, and so is anyone whose
+ * birth date makes them 18 or over on `today`. Used to word the contact section "Emergency contact"
+ * for adults and "Guardian" only for a minor.
+ */
+export function isAdultRosterPerson(attendeeType: string | null | undefined, birthDate?: string | null, today?: string) {
+  if (attendeeType === "STAFF" || attendeeType === "ADULT") return true;
+  if (!birthDate || !today) return false;
+  const age = ageOn(birthDate, today);
+  return age !== null && age >= youngestAdultAge && age <= 120;
+}
+
 export function calendarDateOf(date: Date) {
   return date.toISOString().slice(0, 10);
 }

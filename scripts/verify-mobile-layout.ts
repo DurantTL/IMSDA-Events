@@ -24,6 +24,9 @@
  *  - form fields: every visible text input, select, textarea and search box has a boundary (its own
  *    border, or its nearest bordered wrapper within two levels, such as the `.search-field` box) with at
  *    least 3:1 contrast against the background behind it (WCAG 2.2 SC 1.4.11);
+ *  - date fields (#918): every date, time and datetime-local input in an opened dialog (the honor history
+ *    dialog's Completion date) sits inside its own label and form, is as tall as the dialog's other
+ *    single-line fields, and overlaps no other field, helper text or label;
  *  - a full-page screenshot of every page and width, saved as an artifact.
  *
  * Every layout assertion is made for every page at every width. A finding that
@@ -310,6 +313,12 @@ const findings: Finding[] = [];
 const accepted: Finding[] = [];
 const pagesVisited: string[] = [];
 let dialogsOpened = 0;
+/** Date, time and datetime-local fields checked inside open dialogs (#918). */
+let dateFieldsChecked = 0;
+/** The widths at which a dialog date field was checked (#918), so a run that never opened the honor history dialog fails. */
+const dateFieldWidths = new Set<number>();
+/** How far a date field's height may differ from the dialog's other single-line fields, in px. */
+const dateFieldHeightTolerance = 2;
 /** The widths at which Back to top was really exercised (a page long enough to scroll). */
 const backToTopChecked = new Set<number>();
 /** Cases that could not be exercised (kept visible in the output rather than silently skipped). */
@@ -1469,6 +1478,70 @@ function fieldBoundaryInPage(args: { minRatio: number; dialogOnly?: boolean }) {
   return { checked, problems: problems.slice(0, 12) };
 }
 
+/**
+ * Runs in the page with a dialog open (#918): every visible date, time and datetime-local input in an
+ * open dialog must (1) sit inside its own label box and its own grid column, (2) be as tall as the
+ * dialog's other single-line fields (a Safari date control renders as an empty tall box or a short
+ * sliver), and (3) not overlap any other field, helper text or label in the dialog. The honor history
+ * dialog's "Completion date" is the case that broke on an iPad.
+ */
+function dateFieldsInDialogInPage(args: { heightTolerance: number }) {
+  const dateTypes = ["date", "time", "datetime-local", "month", "week"];
+  const visible = (el: Element) => {
+    const style = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"]')).filter(visible);
+  const problems: string[] = [];
+  let checked = 0;
+  for (const dialog of dialogs) {
+    const inputs = Array.from(dialog.querySelectorAll<HTMLInputElement>("input")).filter(visible);
+    const dateInputs = inputs.filter((input) => dateTypes.includes(input.type));
+    if (dateInputs.length === 0) continue;
+    const referenceHeights = [
+      ...inputs.filter((input) => ["text", "search", "email", "tel", "number", "url", ""].includes(input.type) || !input.getAttribute("type")),
+      ...Array.from(dialog.querySelectorAll<HTMLElement>("select")).filter(visible),
+    ].map((field) => field.getBoundingClientRect().height).filter((height) => height > 0);
+    const referenceHeight = referenceHeights.length > 0 ? Math.min(...referenceHeights) : null;
+    const others = [
+      ...Array.from(dialog.querySelectorAll<HTMLElement>("input, select, textarea, small, .field-help, label")),
+    ].filter(visible);
+    for (const input of dateInputs) {
+      checked += 1;
+      const rect = input.getBoundingClientRect();
+      const name = `${input.type} input "${input.name || input.id || "unnamed"}"`;
+      const label = input.closest("label");
+      const box = label ? label.getBoundingClientRect() : null;
+      if (box && (rect.left < box.left - 1 || rect.right > box.right + 1)) {
+        problems.push(`${name} spans ${Math.round(rect.left)}..${Math.round(rect.right)}px but its label box is ${Math.round(box.left)}..${Math.round(box.right)}px`);
+      }
+      if (box && (rect.top < box.top - 1 || rect.bottom > box.bottom + 1)) {
+        problems.push(`${name} spans ${Math.round(rect.top)}..${Math.round(rect.bottom)}px but its label box is ${Math.round(box.top)}..${Math.round(box.bottom)}px`);
+      }
+      const grid = input.closest(".form-grid, .form-stack, form") ?? dialog;
+      const gridBox = grid.getBoundingClientRect();
+      if (rect.left < gridBox.left - 1 || rect.right > gridBox.right + 1) {
+        problems.push(`${name} sticks out of its form (${Math.round(rect.left)}..${Math.round(rect.right)}px in ${Math.round(gridBox.left)}..${Math.round(gridBox.right)}px)`);
+      }
+      if (referenceHeight !== null && Math.abs(rect.height - referenceHeight) > args.heightTolerance) {
+        problems.push(`${name} is ${Math.round(rect.height)}px tall, the dialog's other single-line fields are ${Math.round(referenceHeight)}px`);
+      }
+      for (const other of others) {
+        if (other === input || other.contains(input) || input.contains(other)) continue;
+        const o = other.getBoundingClientRect();
+        const across = Math.min(rect.right, o.right) - Math.max(rect.left, o.left);
+        const down = Math.min(rect.bottom, o.bottom) - Math.max(rect.top, o.top);
+        if (across > 1 && down > 1) {
+          const what = other.tagName.toLowerCase() === "label" ? `label "${(other.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 30)}"` : `${other.tagName.toLowerCase()}${other.className ? `.${String(other.className).split(/\s+/)[0]}` : ""}`;
+          problems.push(`${name} overlaps ${what} by ${Math.round(across)}x${Math.round(down)}px`);
+        }
+      }
+    }
+  }
+  return { checked, problems };
+}
+
 /** Runs in the page with a dialog open: does it fit the screen, or scroll inside itself? */
 function dialogFitInPage() {
   const h = window.innerHeight;
@@ -1880,6 +1953,11 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
         const dialogFields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio, dialogOnly: true });
         fieldsChecked += dialogFields.checked;
         for (const problem of dialogFields.problems) record("field-boundary", `${spec.name} (dialog "${name}")`, width, problem);
+        // Date fields (#918): inside their box, as tall as the other fields, overlapping nothing.
+        const dates = await page.evaluate(dateFieldsInDialogInPage, { heightTolerance: dateFieldHeightTolerance });
+        dateFieldsChecked += dates.checked;
+        if (dates.checked > 0) dateFieldWidths.add(width);
+        for (const problem of dates.problems) record("date-field-layout", `${spec.name} (dialog "${name}")`, width, problem);
       }
       if (takeShots && fit.count > 0) {
         dialogShots += 1;
@@ -2343,11 +2421,18 @@ async function main() {
     }
   }
   for (const note of untestedNotes) console.log(`  NOTE (untested): ${note}`);
+  // The honor history dialog's Completion date (#918) is a required part of this audit: at the phone (360) and
+  // desktop (1024) widths it must have been opened and measured, or the run fails rather than pass without it.
+  if (!only) {
+    for (const width of [360, 1024].filter((required) => widths.includes(required))) {
+      if (!dateFieldWidths.has(width)) record("date-field-layout", "honor history dialog", width, "no dialog date field was found to check (is the roster Honors button reachable?)");
+    }
+  }
 
   writeFileSync(path.join(outDir, "report.json"), JSON.stringify({ widths, pages: pages.map((spec) => spec.name), findings, accepted, pageErrors }, null, 2));
   const byKind = new Map<string, Finding[]>();
   for (const finding of findings) byKind.set(finding.kind, [...(byKind.get(finding.kind) ?? []), finding]);
-  console.log(`\n${pagesVisited.length} page/width combinations audited, ${dialogsOpened} dialogs opened, ${fieldsChecked} form fields checked for a 3:1 boundary, ${accepted.length} accepted findings, ${pageErrors.length} page script errors (informational).`);
+  console.log(`\n${pagesVisited.length} page/width combinations audited, ${dialogsOpened} dialogs opened, ${fieldsChecked} form fields checked for a 3:1 boundary, ${dateFieldsChecked} dialog date fields checked for overlap and height, ${accepted.length} accepted findings, ${pageErrors.length} page script errors (informational).`);
   if (findings.length > 0) {
     console.error(`\n${findings.length} layout finding(s):`);
     for (const [kind, rows] of byKind) {

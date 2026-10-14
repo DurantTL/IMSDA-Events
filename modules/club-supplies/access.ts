@@ -48,8 +48,28 @@ export async function requireClubSupplyEditAccess(organizationId: string, now = 
   return actorAttribution(access.actor);
 }
 
-/** For routes that a club role (edit or read-only) and an Area Coordinator (read-only) may reach. */
-export async function requireClubSupplyAccess(organizationId: string, now = new Date()): Promise<ClubSupplyAccess> {
+/**
+ * For the club's Orders screen and everything it reads (the helper list, its exports, supplies on
+ * hand, uniform needs) (#918). Owner decision, Oct 14, 2026: Area Coordinators do not see club
+ * Orders. The club's own roles keep exactly the access `requireClubSupplyAccess` gives them (a
+ * director or deputy edits, a registrar views); an Area Coordinator, whether signed in as
+ * themselves or acting as one, is refused here the way any non-member is (404), and a signed-out
+ * request is still 401.
+ */
+export async function requireClubOrdersAccess(organizationId: string, now = new Date()): Promise<ClubSupplyAccess> {
+  return requireClubSupplyAccess(organizationId, now, { areaCoordinator: false });
+}
+
+/**
+ * For routes that a club role (edit or read-only) and, unless `areaCoordinator` is false, an Area
+ * Coordinator (read-only) may reach. Earned awards and class tracking keep the coordinator's
+ * read; Orders do not (`requireClubOrdersAccess`).
+ */
+export async function requireClubSupplyAccess(
+  organizationId: string,
+  now = new Date(),
+  options: { areaCoordinator?: boolean } = {},
+): Promise<ClubSupplyAccess> {
   try {
     return { mode: "EDIT", actor: await requireClubSupplyEditAccess(organizationId, now) };
   } catch (error) {
@@ -61,6 +81,7 @@ export async function requireClubSupplyAccess(organizationId: string, now = new 
       return { mode: "READ", viewer: actorAttribution(access.actor) };
     }
     if (!FALLBACK_CODES.has(error.code)) throw error;
+    if (options.areaCoordinator === false) throw error;
     const viewer = await areaCoordinatorViewer();
     if (!viewer) throw error;
     if (!(await isActiveClub(organizationId))) {

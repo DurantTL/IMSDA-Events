@@ -146,12 +146,15 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
     expect(mocks.syncHonorOrderNeeds).not.toHaveBeenCalled();
   });
 
-  it("an Area Coordinator views read-only and can't change a line or award", async () => {
+  it("an Area Coordinator is refused the order list and its exports, and can't change a line or award (#918)", async () => {
     mocks.listDirectedClubs.mockResolvedValue([]);
     mocks.findAreaGrant.mockResolvedValue({ revokedAt: null, expiresAt: null });
-    const read = await GET(getRequest(), ctx());
-    expect(read.status).toBe(200);
-    expect(await read.json()).toMatchObject({ canEdit: false });
+    expect((await GET(getRequest(), ctx())).status).toBe(404);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=list"), ctx())).status).toBe(404);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=picklist"), ctx())).status).toBe(404);
+    expect(mocks.loadOrderWorkspace).not.toHaveBeenCalled();
+    expect(mocks.listHelperLines).not.toHaveBeenCalled();
+    expect(mocks.listPickList).not.toHaveBeenCalled();
     expect(mocks.syncHonorOrderNeeds).not.toHaveBeenCalled();
     expect((await PUT_LINE(putRequest({ quantity: 1 }), lineCtx())).status).toBe(404);
     expect((await POST_AWARD(postRequest({ needIds: ["need-1"] }), ctx())).status).toBe(404);

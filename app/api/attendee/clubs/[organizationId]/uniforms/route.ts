@@ -1,7 +1,7 @@
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubOrderApiError } from "@/modules/club-orders/api-errors";
-import { requireClubSupplyAccess, requireClubSupplyEditAccess } from "@/modules/club-supplies/access";
+import { requireClubOrdersAccess, requireClubSupplyEditAccess } from "@/modules/club-supplies/access";
 import { loadUniformWorkspace, recordUniformNeeds } from "@/modules/uniforms/order-source";
 import { recordUniformNeedsSchema } from "@/modules/uniforms/schemas";
 
@@ -10,13 +10,13 @@ type RouteContext = { params: Promise<{ organizationId: string }> };
 /**
  * A club's uniform needs (#497): who needs what and where it stands, names
  * and the item and size only. Directors and deputies also get the catalog
- * picker and the member list; registrars and Area Coordinators read the open
- * needs, the same gate as the order list. Reads only.
+ * picker and the member list; registrars read the open
+ * needs, the same gate as the order list (Area Coordinators have none, #918). Reads only.
  */
 async function getHandler(_request: Request, context: RouteContext) {
   try {
     const { organizationId } = await context.params;
-    const access = await requireClubSupplyAccess(organizationId);
+    const access = await requireClubOrdersAccess(organizationId);
     return Response.json({
       ...(await loadUniformWorkspace(organizationId, { forEditing: access.mode === "EDIT" })),
       canEdit: access.mode === "EDIT",

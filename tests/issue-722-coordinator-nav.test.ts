@@ -20,9 +20,13 @@ describe("area coordinator club menu (#722)", () => {
       `Events -> ${base}#open-club-events`,
       `Club forms -> ${base}/forms`,
       `Monthly Records -> ${base}#open-club-reports`,
-      `Orders -> ${base}/orders`,
       `Earned awards -> ${base}/awards`,
     ]);
+  });
+
+  it("has no Orders entry: club Orders are not an Area Coordinator's to see (#918)", () => {
+    expect(items.map((item) => item.label)).not.toContain("Orders");
+    expect(items.some((item) => item.href.includes("/orders") || item.href.includes("/supplies"))).toBe(false);
   });
 
   it("never lists a director-only destination", () => {

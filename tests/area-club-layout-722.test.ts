@@ -90,7 +90,6 @@ describe("area club menu markup (#722)", () => {
       "/account/area/club-1#open-club-events",
       "/account/area/club-1/forms",
       "/account/area/club-1#open-club-reports",
-      "/account/area/club-1/orders",
       "/account/area/club-1/awards",
     ]);
     expect(html).toContain('aria-current="page" href="/account/area/club-1/honors"');

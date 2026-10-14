@@ -1,0 +1,64 @@
+import {
+  GUARDIAN_SLOTS,
+  guardianFieldLabels,
+  guardianSlotValues,
+  guardianTerm,
+  type GuardianFormErrors,
+  type GuardianRecord,
+} from "@/modules/club-rosters/guardians-domain";
+
+/**
+ * The contact fieldset in the roster add/edit dialog (#510). An adult (staff, an adult member, or anyone 18 or
+ * over) names an emergency contact; only a minor has a guardian (#918). Same two slots and fields either way.
+ */
+export function RosterGuardianFields({ adult, errors: guardianErrors, guardianState, records }: {
+  adult: boolean;
+  errors: GuardianFormErrors;
+  guardianState: "ready" | "loading" | "failed";
+  records: GuardianRecord[] | undefined;
+}) {
+  const term = guardianTerm(adult);
+  return (
+    <fieldset className="roster-guardians">
+      <legend>{term.plural} (optional)</legend>
+      <p className="field-help">
+        {adult ? "Up to two emergency contacts for this adult. " : "Up to two guardians. "}Your club&apos;s director and deputy, Area Coordinators and conference staff with
+        sensitive-data access can see them. They are erased when this person is removed from the roster.
+      </p>
+      {guardianState === "failed" && (
+        <p className="field-help" role="status">{term.singular} contacts couldn&apos;t be loaded, so saving won&apos;t change them. Close and reopen this person to try again.</p>
+      )}
+      {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
+        const slot = index + 1;
+        const stored = guardianSlotValues(records)[index]!;
+        const emailError = guardianErrors[`g${slot as 1 | 2}Email`];
+        const phoneError = guardianErrors[`g${slot as 1 | 2}Phone`];
+        return (
+          <div className="roster-guardian-slot" key={slot} role="group" aria-label={`${term.singular} ${slot}`}>
+            <h3>{term.singular} {slot}</h3>
+            <div className="form-grid two-column">
+              <label>
+                {guardianFieldLabels.name}
+                <input autoComplete="off" defaultValue={stored.name} readOnly={guardianState !== "ready"} maxLength={120} name={`g${slot}Name`} />
+              </label>
+              <label>
+                {guardianFieldLabels.relationship}
+                <input autoComplete="off" defaultValue={stored.relationship} readOnly={guardianState !== "ready"} maxLength={60} name={`g${slot}Relationship`} placeholder={adult ? "e.g. Spouse" : "e.g. Mother"} />
+              </label>
+              <label>
+                {guardianFieldLabels.email}
+                <input aria-describedby={emailError ? `roster-g${slot}Email-error` : undefined} aria-invalid={emailError ? true : undefined} autoComplete="off" defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={254} name={`g${slot}Email`} type="text" />
+                {emailError && <span className="roster-field-error" id={`roster-g${slot}Email-error`} role="alert">{emailError}</span>}
+              </label>
+              <label>
+                {guardianFieldLabels.phone}
+                <input aria-describedby={phoneError ? `roster-g${slot}Phone-error` : undefined} aria-invalid={phoneError ? true : undefined} autoComplete="off" defaultValue={stored.phone} readOnly={guardianState !== "ready"} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="text" />
+                {phoneError && <span className="roster-field-error" id={`roster-g${slot}Phone-error`} role="alert">{phoneError}</span>}
+              </label>
+            </div>
+          </div>
+        );
+      })}
+    </fieldset>
+  );
+}

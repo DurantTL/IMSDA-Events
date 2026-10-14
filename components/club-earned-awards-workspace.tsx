@@ -11,7 +11,7 @@ import type { EarnedAwardsWorkspaceData } from "@/modules/earned-awards/order-so
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
-import { effectiveChoice, makeSearchMatcher, matchesSearch } from "@/lib/search-match";
+import { effectiveChoice, makeSearchMatcher, matchesSearch, narrowedListSize, searchResultSummary } from "@/lib/search-match";
 
 export type ClubEarnedAwardsData = EarnedAwardsWorkspaceData;
 
@@ -127,7 +127,8 @@ export function ClubEarnedAwardsWorkspace({
 }: {
   organizationId: string;
   initial: ClubEarnedAwardsData;
-  ordersHref: string;
+  /** Where the club's Orders screen is; left out for an Area Coordinator, who cannot see Orders (#918). */
+  ordersHref?: string;
   /** The class tracking CSV and printable report (#701); omitted where the export isn't offered. */
   exportCsvHref?: string;
   exportPrintHref?: string;
@@ -353,7 +354,7 @@ export function ClubEarnedAwardsWorkspace({
       {readOnly ? (
         <p className="inline-notice" role="status"><Eye aria-hidden="true" size={14} /> View only. Shows what&apos;s on file. The club director or deputy records and confirms awards.</p>
       ) : (
-        <p className={`field-help earned-help ${styles.helpText}`}>Class insignia, event patches, Good Conduct and TLT items, and Master Awards. They join the order list on <Link href={ordersHref}>Orders</Link> with honors and uniforms.</p>
+        <p className={`field-help earned-help ${styles.helpText}`}>Class insignia, event patches, Good Conduct and TLT items, and Master Awards. They join the club&apos;s order list{ordersHref ? <> on <Link href={ordersHref}>Orders</Link></> : null} with honors and uniforms.</p>
       )}
       {notice && <p className="inline-notice success" role="status">{notice}</p>}
       {error && <p className="inline-notice error" role="alert">{error}</p>}
@@ -498,7 +499,7 @@ export function ClubEarnedAwardsWorkspace({
                 )}
                 <span className={styles.pickerField}>
                   <label htmlFor="earned-item">Item</label>
-                  <select className={styles.select} id="earned-item" onChange={(event) => setItemId(event.target.value)} value={chosenItemId}>
+                  <select className={styles.select} id="earned-item" size={narrowedListSize(matchingCatalog.length, itemQuery)} onChange={(event) => setItemId(event.target.value)} value={chosenItemId}>
                     <option value="">Choose an item</option>
                     {sections.map(([section, { label, items }]) => (
                       <optgroup key={section} label={label}>
@@ -511,6 +512,7 @@ export function ClubEarnedAwardsWorkspace({
                   <Plus aria-hidden="true" size={14} /> Add item
                 </button>
               </div>
+              <p aria-live="polite" className={`field-help ${styles.helpText}`} id="earned-item-results" role="status">{searchResultSummary(matchingCatalog.length, itemQuery, "item")}</p>
               {chosen.length > 0 && (
                 <ul aria-label="Items to record" className={styles.chips}>
                   {chosen.map((entry) => (

@@ -8,7 +8,7 @@ import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/co
 import { ORDER_LIST_SECTIONS, activeHelperLines, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
 import type { AwardableNeed, OrderBatchSummary, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
-import { effectiveChoice, makeSearchMatcher } from "@/lib/search-match";
+import { effectiveChoice, makeSearchMatcher, narrowedListSize, searchResultSummary } from "@/lib/search-match";
 
 export type ClubOrderWorkspaceData = {
   helper: HelperLine[];
@@ -559,7 +559,7 @@ export function ClubOrderWorkspace({
               </label>
               <label className={styles.pickerField} htmlFor="club-order-picker-item">
                 Item
-                <select className={styles.select} id="club-order-picker-item" onChange={(event) => setPickerItem(event.target.value)} value={chosenItem}>
+                <select className={styles.select} id="club-order-picker-item" size={narrowedListSize(shownPickerItems.length, pickerQuery)} onChange={(event) => setPickerItem(event.target.value)} value={chosenItem}>
                   <option value="">Choose an item</option>
                   {shownPickerItems.map((row) => (
                     <option key={row.itemId} value={row.itemId}>
@@ -576,6 +576,7 @@ export function ClubOrderWorkspace({
                 <Plus aria-hidden="true" size={14} /> Add to list
               </button>
             </div>
+            <p aria-live="polite" className="field-help" id="club-order-picker-results" role="status">{searchResultSummary(pickerItems.length, pickerQuery, "item")}</p>
           </div>
         )}
 
