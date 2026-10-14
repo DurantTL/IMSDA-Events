@@ -62,7 +62,11 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: userId } });
 }
 
-/** Retries a caller-owned unit of work that lost a serialization conflict, like the production callers do. */
+/**
+ * Retries a unit of work that lost a serialization conflict. This is MORE generous than production (the public form path
+ * tries 4 times): simultaneous same-meal submissions already conflict before #916 (#920), and this script checks ticket
+ * numbering, not that contention. Remove it once #920 makes those submissions queue instead of abort.
+ */
 async function withRetry<T>(work: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt += 1) {
     try {
@@ -220,8 +224,7 @@ async function main() {
   const raceServices = services.filter((row) => row.ticketing === "TICKETED" && row.status === "ACTIVE" && ["BREAKFAST", "LUNCH", "SUPPER"].includes(row.mealType)).slice(0, 8);
   assert(raceServices.length === 8, "the preset has eight ticketed services to race on");
   const racers = await Promise.all(raceServices.map((_, index) => makeRegistration(`k${index + 1}`)));
-  // On these tiny test tables PostgreSQL takes relation-level predicate locks, so overlapping inserts can lose a
-  // serialization conflict that a production-sized table would not; the caller's retry (as in production) absorbs it.
+  // Overlapping meal inserts can lose a serialization conflict (existing contention, #920); `withRetry` absorbs it here.
   const results = await Promise.allSettled(racers.map((racer, index) => withRetry(() => createMealOrder(eventId, userId, {
     registrationId: racer.id, registrationAttendeeId: racer.attendeeId, mealType: raceServices[index]!.mealType, serviceId: raceServices[index]!.id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID(),
   }))));
@@ -236,7 +239,7 @@ async function main() {
   // ---- concurrent meal-bearing form submissions: no write to any event-wide row -----------------------------------------------
   const eventBefore = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${eventId}`;
   const more = await Promise.all(["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10"].map((tag) => makeRegistration(tag)));
-  // Like the public form path: SERIALIZABLE with a bounded retry on a serialization failure.
+  // Like the public form path: SERIALIZABLE, retried on a serialization failure (more attempts than production, see #920).
   const submitForm = (racer: { id: string }) => withRetry(() => prisma.$transaction((tx) => syncFormMealSelections(tx, {
     eventId, registrationId: racer.id, formVersionId: `${P}_fv`, responses: { supper_adult_qty: 2 }, lineItems: [{ key: "supper_adult_qty", amountCents: 1500 }], previousResponses: null,
   }), { isolationLevel: "Serializable" }));
