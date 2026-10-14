@@ -40,7 +40,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/reports/clubs")).toBe("Camporee club reports");
     expect(staffSubpageTitle("/more/reports/clubs/check-in-book")).toBe("Check-in book");
     expect(staffSubpageTitle("/more/reports/clubs/packet/org_1")).toBe("Club packet");
-    expect(staffSubpageTitle("/more/reports/packets")).toBe("Grouped retreat packets");
+    expect(staffSubpageTitle("/more/reports/packets")).toBe("Grouped event packets");
     expect(staffSubpageTitle("/more/clubs")).toBe("Clubs");
     expect(staffSubpageTitle("/more/clubs/org_1")).toBe("Club");
     expect(staffSubpageTitle("/more/clubs/reports")).toBe("Club Monthly Records");

@@ -11,7 +11,7 @@ vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({ matchin
 
 import { ClubEarnedAwardsWorkspace, emptyEarnedAwardsData, memberMatchesSearch } from "@/components/club-earned-awards-workspace";
 import { selectAccountBannerAnnouncements, type AccountBannerCandidate } from "@/modules/communications/account-banner-domain";
-import { retreatHubAnnouncementRecords } from "@/modules/attendee-accounts/retreat-hub-repository";
+import { eventHubAnnouncementRecords } from "@/modules/attendee-accounts/event-hub-repository";
 import { buildPublicEventAnnouncementFeed } from "@/modules/events/public-domain";
 import { areaClubPortalNavItems, clubPortalNavItems, clubReporterNavItems } from "@/modules/club-rosters/portal-nav";
 import { CLUB_REGISTRATION_CARD_NOTE } from "@/modules/club-registrations/entry-path";
@@ -84,7 +84,7 @@ describe("club notice privacy across signed-out, attendee, director and coordina
   });
 
   it("attendees: the hub (and the staff preview of it) drops club-directed notices and the audience field", () => {
-    const records = retreatHubAnnouncementRecords({ announcements: hubRows });
+    const records = eventHubAnnouncementRecords({ announcements: hubRows });
     expect(records.map((item) => item.title)).toEqual(["Open to all"]);
     expect(JSON.stringify(records)).not.toContain(secret);
     expect(JSON.stringify(records)).not.toContain("audience");

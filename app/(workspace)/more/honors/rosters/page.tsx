@@ -84,7 +84,7 @@ export default async function HonorRostersPage({
         </p>
       </div>
 
-      <nav className="retreat-packet-selector" aria-label="Roster view">
+      <nav className="event-packet-selector" aria-label="Roster view">
         <Link className={view === "classes" ? "active" : ""} href={`/more/honors/rosters?${eventQuery}`}>Classes ({classRosters.length})</Link>
         <Link className={view === "site" ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=site`}>Site roster ({siteRoster.totals.total})</Link>
         <Link className={view === "clubs" ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>Club schedules ({data.clubs.length})</Link>
@@ -216,7 +216,7 @@ export default async function HonorRostersPage({
       {view === "clubs" && (
         <>
           {data.clubs.length > 1 && (
-            <nav className="retreat-packet-selector" aria-label="Choose club">
+            <nav className="event-packet-selector" aria-label="Choose club">
               <Link className={!query.club ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>All clubs</Link>
               {data.clubs.map((club) => (
                 <Link className={query.club === club.id ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=clubs&club=${encodeURIComponent(club.id)}`} key={club.id}>

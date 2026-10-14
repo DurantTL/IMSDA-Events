@@ -228,7 +228,23 @@ function groupingScore(metadata: FieldMetadata) {
 function registrationGrouping(
   fields: FieldMetadata[],
   responses: JsonRecord,
+  groupingFieldKey: string | null = null,
 ) {
+  if (groupingFieldKey) {
+    // An event-owned grouping choice (#155). Sensitive fields can never group, and a registration
+    // that left the chosen answer blank falls back to the automatic choice below.
+    const chosen = fields.find(({ field }) => (
+      field.key === groupingFieldKey && field.scope === "REGISTRATION"
+    ));
+    const answer = chosen && !isSensitiveField(chosen) ? stringAnswer(responses[groupingFieldKey]) : null;
+    if (chosen && answer) {
+      return {
+        key: `${normalizedIdentity(chosen.field.label)}::${normalizedIdentity(answer)}`,
+        label: answer,
+        fieldLabel: chosen.field.label,
+      };
+    }
+  }
   const candidates = fields
     .filter(({ field }) => (
       field.scope === "REGISTRATION"
@@ -527,6 +543,7 @@ function volunteerQuestions(fields: FieldMetadata[]) {
 
 export function buildOperationalReport(
   registrations: OperationalReportRegistration[],
+  options: { groupingFieldKey?: string | null } = {},
 ): OperationalReport {
   const activeRegistrations = registrations.filter((registration) => (
     activeStatusSet.has(registration.status)
@@ -560,7 +577,7 @@ export function buildOperationalReport(
       : null;
     const fields = definition ? definitionFields(definition, flaggedKeys) : [];
     const registrationResponses = registration.publicSubmission?.responses ?? {};
-    const grouping = registrationGrouping(fields, registrationResponses);
+    const grouping = registrationGrouping(fields, registrationResponses, options.groupingFieldKey ?? null);
     let group = rosterGroups.get(grouping.key);
     if (!group) {
       group = {

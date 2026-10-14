@@ -29,8 +29,8 @@ export default async function StaffTeamFormPage({
   if (!form) notFound();
   const query = `event=${encodeURIComponent(event.id)}`;
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <p className="eyebrow">{form.eventName}</p>
           <h2>{form.title}</h2>
