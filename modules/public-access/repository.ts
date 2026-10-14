@@ -32,7 +32,7 @@ import {
   shirtSizeConfirmedAtFromResponses,
   shirtSizeFromResponses,
   type PublicShirtSizeConfirmationInput,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 import {
   formatPublicEventSchedule,
   publicEventWebsiteLinks,

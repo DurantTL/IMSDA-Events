@@ -8,7 +8,7 @@ import {
   type OperationalReadinessFacts,
 } from "@/modules/events/operational-readiness";
 import { getSquareConfiguration } from "@/modules/payments/square-config-domain";
-import { shirtSizeFromResponses } from "@/modules/registrations/shirt-sizes";
+import { shirtSizeFromResponses } from "@/modules/merchandise/legacy-shirt-size-compat";
 
 export const REQUIRED_READINESS_TEMPLATE_KEYS = [
   "REGISTRATION_CONFIRMATION_PAID",

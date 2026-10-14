@@ -1485,6 +1485,10 @@ model Event {
   subtitle             String?
   /// Where the event's help card and notices send people (#651); club events fall back to youth@imsda.org.
   helpEmail            String?
+  /// Heading of the attendee event hub (#104). Null shows the default, "Event hub".
+  hubTitle             String?
+  /// Intro paragraph under the hub heading (#104). Null shows the default intro.
+  hubIntro             String?
   /// Refund policy shown to registrants (#891): plain text, paragraphs split on blank lines. Display only; refund rules and processing live elsewhere. Blank hides it.
   refundPolicy         String?
   isPublished          Boolean            @default(false)

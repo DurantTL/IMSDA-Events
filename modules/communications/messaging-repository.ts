@@ -95,7 +95,7 @@ import {
   shirtSizeAttendeeSummary,
   type ShirtSizeCandidate,
   type ShirtSizePreviewContext,
-} from "@/modules/communications/shirt-size-audience";
+} from "@/modules/merchandise/legacy-shirt-size-audience-compat";
 import {
   computeSelectedAudiencePreview,
   type SelectedAudienceBatchInput,
@@ -108,7 +108,7 @@ import { enqueueSelectedAudienceMessage, isRegistrationConfirmation } from "@/mo
 import {
   eventCollectsShirtSizes,
   shirtSizeFromResponses,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 import type {
   BalanceReminderPreview,
   MessageOutboxRecord,

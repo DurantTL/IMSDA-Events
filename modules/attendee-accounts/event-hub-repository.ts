@@ -21,6 +21,8 @@ const eventHubEventSelect = {
   timezone: true,
   location: true,
   supportContact: true,
+  hubTitle: true,
+  hubIntro: true,
   announcements: {
     where: { status: "PUBLISHED" as const },
     orderBy: [
@@ -68,6 +70,8 @@ function eventHubEventRecord(event: {
   timezone: string;
   location: string | null;
   supportContact: string | null;
+  hubTitle: string | null;
+  hubIntro: string | null;
 }) {
   return {
     slug: event.slug,
@@ -77,7 +81,34 @@ function eventHubEventRecord(event: {
     timezone: event.timezone,
     location: event.location,
     supportContact: event.supportContact,
+    hubTitle: event.hubTitle,
+    hubIntro: event.hubIntro,
   };
+}
+
+/**
+ * The hub title a particular viewer may see in the document title, or null (the default title applies).
+ * A draft or private event's custom title is never revealed to an unrelated visitor, so this mirrors
+ * the hub page's own access rules: a staff preview needs access to the event (the same check as the
+ * preview page), and an attendee needs to be registered for a published event.
+ */
+export async function getEventHubTitleForViewer(input: {
+  eventSlug: string;
+  staffUser?: { id: string; globalRole?: "SYSTEM_ADMIN" | null } | null;
+  attendeeEmail?: string | null;
+}) {
+  if (input.staffUser) {
+    const preview = await getStaffEventHubPreview(input.staffUser, input.eventSlug);
+    return preview?.hub.event.hubTitle ?? null;
+  }
+  if (!input.attendeeEmail) return null;
+  const hub = await getAttendeeEventHub(input.attendeeEmail, input.eventSlug);
+  if (!hub) return null;
+  const published = await getPrisma().event.findFirst({
+    where: { slug: input.eventSlug, isPublished: true },
+    select: { hubTitle: true },
+  });
+  return published?.hubTitle ?? null;
 }
 
 /**

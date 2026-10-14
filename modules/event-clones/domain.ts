@@ -138,6 +138,9 @@ export type SourceEventDetails = {
   tagline: string | null;
   subtitle: string | null;
   helpEmail: string | null;
+  /** Attendee event hub heading and intro (#104). Optional so older sources read as the defaults. */
+  hubTitle?: string | null;
+  hubIntro?: string | null;
   refundPolicy: string | null;
   calendarCategory: string | null;
   showOnCalendar: boolean;
@@ -466,6 +469,8 @@ export function sanitizeSourceForClone(
     tagline: optionalText("eventDetails", "Tagline", config.eventDetails.tagline),
     subtitle: optionalText("eventDetails", "Subtitle", config.eventDetails.subtitle),
     helpEmail: optionalText("eventDetails", "Help email", config.eventDetails.helpEmail),
+    hubTitle: optionalText("eventDetails", "Hub title", config.eventDetails.hubTitle ?? null),
+    hubIntro: optionalText("eventDetails", "Hub intro", config.eventDetails.hubIntro ?? null),
     refundPolicy: optionalText("eventDetails", "Refund policy", config.eventDetails.refundPolicy ?? null),
     hotelName: optionalText("eventDetails", "Lodging name", config.eventDetails.hotelName),
     hotelPhone: optionalText("eventDetails", "Lodging phone", config.eventDetails.hotelPhone),

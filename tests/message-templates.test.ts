@@ -227,7 +227,7 @@ describe("message templates", () => {
       expect(rendered.isComplete).toBe(true);
       expect(rendered.missingTokens).toEqual([]);
       expect(rendered.unresolvedTokens).toEqual([]);
-      expect(rendered.subject).toContain("IMSDA Women's Retreat 2026");
+      expect(rendered.subject).toContain("IMSDA Sample Event 2026");
       expect(rendered.body).not.toMatch(/\{\{[^{}]+\}\}/);
     }
   });

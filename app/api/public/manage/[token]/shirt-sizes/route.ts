@@ -6,7 +6,7 @@ import {
 } from "@/modules/public-access/repository";
 import {
   publicShirtSizeConfirmationSchema,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 import {
   applyRateLimitHeaders,
   type RateLimitOutcome,
