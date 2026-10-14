@@ -98,30 +98,80 @@ export function pendingConfirmationCode(randomHex: string) {
 // Words the director and staff read
 // ---------------------------------------------------------------------------------------------
 
-export const GENERAL_LINK_PENDING_MESSAGE =
-  "We have your team's registration, and it is saved. We could not match your email to a director or deputy of the club you chose, so the event team will confirm which club it belongs to. You will get an email when it is attached to your club. There is no fee.";
+/**
+ * What the public page says after any accepted submission, whatever the team's club or email. It is the same words, reference
+ * format, price and fields for a team attached at once and one waiting for staff, so the answer never tells a visitor whether an
+ * email is a club's director. The details go to the email address that was typed.
+ */
+export const GENERAL_LINK_RECEIVED_MESSAGE =
+  "We have your team's registration, and it is saved. Check the email address you entered for the details; the event team confirms which club it belongs to when that is needed. There is no fee.";
 
-export const GENERAL_LINK_ATTACHED_MESSAGE = (clubName: string) =>
-  `Your team's registration has been received and attached to ${clubName}. There is no fee.`;
+export const GENERAL_LINK_TOO_MANY_MESSAGE = "Too many registrations right now; please try again later.";
+
+/** Most waiting teams one event takes in a rolling hour, from anyone: a cap on what a flood can queue for staff. */
+export const PENDING_SUBMISSIONS_PER_HOUR = 60;
+
+/** Staff are told about waiting teams in one digest per event per window, never one email per team. */
+export const STAFF_DIGEST_WINDOW_MS = 15 * 60 * 1000;
+
+/** A waiting team's answers are kept until this many days after the event ends, then removed (the submission is marked EXPIRED). */
+export const PENDING_RETENTION_DAYS = 30;
+
+/** The team name as it appears in an email to whoever submitted: cut at 60 characters, with nothing else they typed. */
+export const EMAIL_TEAM_NAME_MAX = 60;
+
+export function teamNameForEmail(name: string) {
+  const trimmed = name.replace(/\s+/g, " ").trim();
+  return trimmed.length > EMAIL_TEAM_NAME_MAX ? `${trimmed.slice(0, EMAIL_TEAM_NAME_MAX - 1).trimEnd()}\u2026` : trimmed;
+}
+
+/** The fixed 15-minute window a moment falls in, for the staff digest's one-per-window key. */
+export function staffDigestWindow(now: Date) {
+  return Math.floor(now.getTime() / STAFF_DIGEST_WINDOW_MS);
+}
+
+/** The day after which a still-waiting team's answers are removed: 30 days after the event's end. */
+export function pendingRetentionCutoff(now: Date) {
+  return new Date(now.getTime() - PENDING_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+}
 
 export function pendingDirectorEmail(input: { eventName: string; teamName: string; confirmationCode: string }) {
   return {
     subject: `We have your team registration for ${input.eventName}`,
     bodyText: [
-      `Thank you. We received the registration for the team "${input.teamName}" for ${input.eventName}.`,
+      `Thank you. We received the registration for the team "${teamNameForEmail(input.teamName)}" for ${input.eventName}.`,
       "",
-      "We could not match this email to a current director or deputy of the club you chose, so the event team will confirm which club the team belongs to. Nothing more is needed from you. You will get another email when the team is attached to its club.",
+      "The event team will confirm which club the team belongs to. Nothing more is needed from you. You will get another email when the team is attached to its club.",
       "",
       `Reference: ${input.confirmationCode}`,
     ].join("\n"),
   };
 }
 
-export function attachedDirectorEmail(input: { eventName: string; teamName: string; clubName: string; confirmationCode: string }) {
+/** The line at the top of the director's one confirmation email when the team was attached at once (#931). */
+export function matchedConfirmationNote(input: { teamName: string; clubName: string; confirmationCode: string }) {
+  return `Your team "${teamNameForEmail(input.teamName)}" is attached to ${input.clubName}. Reference: ${input.confirmationCode}.`;
+}
+
+/** The email after staff attach a waiting team. A team that landed on the event's waitlist says so, and is not "attached". */
+export function attachedDirectorEmail(input: { eventName: string; teamName: string; clubName: string; confirmationCode: string; waitlisted?: boolean }) {
+  const team = teamNameForEmail(input.teamName);
+  if (input.waitlisted) {
+    return {
+      subject: `Your team is on the waitlist for ${input.eventName}`,
+      bodyText: [
+        `The team "${team}" for ${input.eventName} was matched to ${input.clubName}, but there is no room right now, so it is on the waitlist. It is not a confirmed registration yet.`,
+        "",
+        "The event team will email you if a place opens.",
+        "",
+        `Reference: ${input.confirmationCode}`,
+      ].join("\n"),
+    };
+  }
   return {
     subject: `Your team is attached to ${input.clubName}`,
     bodyText: [
-      `The team "${input.teamName}" for ${input.eventName} is attached to ${input.clubName}.`,
+      `The team "${team}" for ${input.eventName} is attached to ${input.clubName}.`,
       "",
       "When the club's director or deputy signs in to the club portal, the team appears under the club's registrations and can be viewed or changed there.",
       "",
@@ -134,7 +184,7 @@ export function rejectedDirectorEmail(input: { eventName: string; teamName: stri
   return {
     subject: `Your team registration for ${input.eventName} was not accepted`,
     bodyText: [
-      `The registration for the team "${input.teamName}" for ${input.eventName} was not accepted by the event team.`,
+      `The registration for the team "${teamNameForEmail(input.teamName)}" for ${input.eventName} was not accepted by the event team.`,
       "",
       `Reason: ${input.reason}`,
       "",
@@ -145,15 +195,16 @@ export function rejectedDirectorEmail(input: { eventName: string; teamName: stri
   };
 }
 
-export function staffPendingNotice(input: { eventName: string; clubNameAsEntered: string; reviewUrl: string }) {
+/** One digest for all the teams waiting in an event: the count and the review link, nothing a submitter typed. */
+export function staffPendingDigestNotice(input: { eventName: string; waitingCount: number; reviewUrl: string }) {
   return {
-    subject: `A team is waiting for club confirmation: ${input.eventName}`,
+    subject: `Teams waiting for club confirmation: ${input.eventName}`,
     bodyText: [
-      `A team registered through the general registration link for ${input.eventName} could not be matched to a club automatically.`,
-      "",
-      `The club named: ${input.clubNameAsEntered || "not listed"}`,
+      `${input.waitingCount} ${input.waitingCount === 1 ? "team is" : "teams are"} waiting for club confirmation for ${input.eventName} (registered through the general registration link).`,
       "",
       `Confirm or change the club: ${input.reviewUrl}`,
+      "",
+      "You get at most one of these emails every 15 minutes for the event.",
     ].join("\n"),
   };
 }
@@ -162,4 +213,5 @@ export const GENERAL_LINK_STATUS_LABEL = {
   PENDING: "Waiting for staff",
   CONFIRMED: "Attached to a club",
   REJECTED: "Rejected",
+  EXPIRED: "Expired",
 } as const;

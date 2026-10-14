@@ -14,6 +14,10 @@
  *   team's name is reserved, and racing submissions for one name give one winner;
  * - two teams of one club go through one link; the generic public route refuses a club form; the honeypot, the rate limit and the
  *   idempotency key hold; the director can link an extra person to the roster without changing the registration.
+ * - the screen never says which path was taken: a matching and a non-matching email get identical answers, and every refusal that
+ *   does not depend on the email (bad site, closed, full, duplicate team name, team rules, the hourly cap) is identical for both;
+ *   a waiting team's name is reserved against the club portal too; staff see the members' names, not the audit; one email goes to a
+ *   matched director, staff get a digest; old waiting teams are expired 30 days after the event.
  * Uses fictitious rows it creates and removes itself.
  *
  *   npm run test:general-link-registration
@@ -211,6 +215,8 @@ async function main() {
   const submit = (members: Array<ReturnType<typeof typedMember>>, teamName: string, answers: Record<string, unknown> = {}, site = missouri!.id, key = randomUUID()) =>
     link.submitGeneralLinkRegistration(eventSlug, request(members, answers, key), { locationId: site, teamName }, now);
   const registrationCount = () => prisma.clubEventRegistration.count({ where: { eventId } });
+  // The public answer never says which path a team took; the database does.
+  const kind = async (result: { confirmationCode: string }) => (await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { confirmationCode: result.confirmationCode } })).status === "CONFIRMED" ? "ATTACHED" : "PENDING";
   const pendingCount = () => prisma.generalLinkSubmission.count({ where: { eventId, status: "PENDING" } });
   const submissionOf = (teamName: string) => prisma.generalLinkSubmission.findFirstOrThrow({ where: { eventId, teamName }, orderBy: { createdAt: "desc" } });
   const teamRow = (clubKey: string, teamName: string) => prisma.clubEventRegistration.findFirstOrThrow({
@@ -220,8 +226,9 @@ async function main() {
   // 3. A matching director email attaches the team at once as an ordinary club registration.
   const members1 = [typedMember("GlAlex", "Alpha", 14), typedMember("GlBlake", "Bravo", 15, "TLT", true), typedMember("GlCoach", "Charlie", 40, "Coach")];
   const attached = await submit(members1, "  Bible   Bees ", { email: emailOf("dira").toUpperCase().replace("@", "@") });
-  assert(attached.outcome === "ATTACHED" && attached.clubName === clubName("a"), `a matching email attaches the team, got ${attached.outcome}`);
-  assert(attached.message.includes(clubName("a")), "the confirmation says which club it is attached to");
+  assert(await kind(attached) === "ATTACHED", "a matching email attaches the team");
+  assert(attached.outcome === "RECEIVED" && attached.clubName === null && !attached.message.includes(clubName("a")) && /^PBE-[0-9A-F]{10}$/.test(attached.confirmationCode), "the screen says only that the team was received, with no club and a PBE reference");
+  assert(attached.managePath === null && attached.manageLinkExpiresAt === null && attached.waitlistPosition === null && attached.registrationStatus === "SUBMITTED", "and no manage link, no waitlist place");
   const bees = await teamRow("a", "Bible Bees");
   assert(bees.teamKey === "bible bees" && Number(bees.registration.totalAmount) === 0 && bees.registration.status === "SUBMITTED", "an ordinary free club registration with a cleaned team name");
   assert(bees.registration.locationId === missouri!.id, "at the site the director picked");
@@ -248,25 +255,26 @@ async function main() {
   const otherPortal = await club.getClubEventWorkspace(clubOf("b"), eventId, now, { teamKey: "bible bees" });
   assert(otherPortal.registration === null, "another club's portal does not");
   const messages = await prisma.messageOutbox.findMany({ where: { eventId }, select: { recipientEmail: true, recipientKind: true, subjectSnapshot: true, status: true, bodyTextSnapshot: true } });
-  assert(messages.some((message) => message.recipientEmail === emailOf("dira") && /attached to Gl Club a/.test(message.subjectSnapshot) && message.status !== "FAILED"), "the director is told the team is attached to the club");
-  assert(messages.some((message) => message.recipientEmail === emailOf("dira") && message.recipientKind === "REGISTRANT" && !/attached to/.test(message.subjectSnapshot)), "and gets the ordinary confirmation email");
+  const toDirector = messages.filter((message) => message.recipientEmail === emailOf("dira"));
+  assert(toDirector.length === 1 && toDirector[0]!.recipientKind === "REGISTRANT" && !/attached to/.test(toDirector[0]!.subjectSnapshot), `the matched director gets ONE email, the ordinary confirmation, got ${toDirector.length}`);
+  assert(/^Your team "Bible Bees" is attached to Gl Club a/.test(toDirector[0]!.bodyTextSnapshot) && toDirector[0]!.bodyTextSnapshot.includes(attached.confirmationCode), "whose first line says the team is attached to the club, with the reference");
   assert(messages.some((message) => message.recipientEmail === staffNoticeEmail && message.recipientKind === "INTERNAL"), "the event's registration staff address is told of the new registration as for any registration");
   console.log("ok  a matching director email attaches the team as an ordinary club registration, church-billed, with its people as extra people");
 
   // 4. Matching: a deputy matches; a registrar, a revoked or expired role, a disabled account, another club's director and
   // "Not listed" do not. The email must belong to the club picked, not just to some club.
   const deputy = await submit(youth("Dep"), "Deputy Team", { club_name: clubName("b"), email: emailOf("depb") }, iowa!.id);
-  assert(deputy.outcome === "ATTACHED" && deputy.clubName === clubName("b"), "a deputy's email attaches the team");
+  assert(await kind(deputy) === "ATTACHED" && (await submissionOf("Deputy Team")).organizationId === clubOf("b"), "a deputy's email attaches the team");
   const waiting: Record<string, Awaited<ReturnType<typeof submit>>> = {};
   const cases: Array<[string, string, string]> = [
     ["registrar", "c", "regc"], ["revoked", "d", "revd"], ["expired", "e", "expe"], ["disabled", "f", "disf"], ["wrong club", "c", "dira"],
   ];
   for (const [label, clubKey, emailKey] of cases) {
     waiting[label] = await submit(youth(label.slice(0, 3)), `Waiting ${label}`, { club_name: clubName(clubKey), email: emailOf(emailKey) });
-    assert(waiting[label]!.outcome === "PENDING" && waiting[label]!.clubName === null, `${label}: the team waits for staff`);
+    assert(await kind(waiting[label]!) === "PENDING", `${label}: the team waits for staff`);
   }
   const both = await submit(youth("Both"), "Both Clubs", { club_name: clubName("g"), email: emailOf("both") });
-  assert(both.outcome === "ATTACHED" && both.clubName === clubName("g"), "a person who directs one club and is deputy of another is matched to the club they pick");
+  assert(await kind(both) === "ATTACHED" && (await submissionOf("Both Clubs")).organizationId === clubOf("g"), "a person who directs one club and is deputy of another is matched to the club they pick");
   assert(await registrationCount() === 3, `only the three matched teams are registered, got ${await registrationCount()}`);
   assert(await pendingCount() === 5, "the five unmatched teams wait");
   console.log("ok  a deputy matches; a registrar, a revoked or expired role, a disabled account and another club's director do not");
@@ -282,13 +290,17 @@ async function main() {
   assert((await club.listClubCheckInInfo(eventId)).length === 3, "and so does check-in");
   assert((await prisma.registrationAttendee.count({ where: { eventId, profileSnapshot: { path: ["firstName"], string_contains: "Reg" } } })) === 0, "no person record exists for a waiting team's members");
   const pendingMessages = await prisma.messageOutbox.findMany({ where: { eventId, templateKey: "CUSTOM_MESSAGE" } });
-  assert(pendingMessages.some((message) => message.recipientEmail === staffNoticeEmail && /waiting for club confirmation/.test(message.subjectSnapshot)), "staff are told by email that a team waits for confirmation");
-  assert(pendingMessages.some((message) => message.recipientEmail === emailOf("regc") && /We have your team registration/.test(message.subjectSnapshot) && /could not match this email/.test(message.bodyTextSnapshot)), "the director is told it is waiting for staff confirmation");
+  const staffDigests = pendingMessages.filter((message) => message.recipientEmail === staffNoticeEmail && /waiting for club confirmation/.test(message.subjectSnapshot));
+  assert(staffDigests.length === 1, `staff get ONE digest for the five teams that waited in the same 15 minutes, got ${staffDigests.length}`);
+  assert(/1 team is waiting|teams are waiting/.test(staffDigests[0]!.bodyTextSnapshot) && !/Waiting|Gl Club|Kid/.test(staffDigests[0]!.bodyTextSnapshot), "the digest holds the count and the review link, nothing the submitters typed");
+  const regcPending = pendingMessages.filter((message) => message.recipientEmail === emailOf("regc"));
+  assert(regcPending.length === 1 && /We have your team registration/.test(regcPending[0]!.subjectSnapshot) && /will confirm which club/.test(regcPending[0]!.bodyTextSnapshot), "the submitter gets one email saying the team waits for staff confirmation");
   const pendingAudit = await prisma.auditLog.findMany({ where: { eventId, action: "GENERAL_LINK_TEAM_PENDING" } });
-  assert(pendingAudit.length === 5 && !pendingAudit.some((entry) => /Gl(Reg|Rev|Exp|Dis|Wro)|Kid/.test(JSON.stringify(entry.metadata))), "each waiting team is audited with ids and counts only");
+  assert(pendingAudit.length === 5 && !pendingAudit.some((entry) => /Gl(reg|rev|exp|dis|wro)|Kid/i.test(JSON.stringify(entry.metadata))), "each waiting team is audited with ids and counts only");
   const list = await link.listPendingTeams(eventId, now);
-  assert(list.length === 5 && !/Kid|GlReg/.test(JSON.stringify(list)), "the staff list shows counts and the director's contact, never the members' names");
   const registrarRow = list.find((row) => row.teamName === "Waiting registrar")!;
+  assert(list.length === 5 && registrarRow.members.map((member) => `${member.firstName} ${member.lastName}`).sort().join() === "Glreg Kid1,Glreg Kid2" && registrarRow.members.every((member) => member.role === "MEMBER" && !member.alternate) && registrarRow.coaches.length === 0, "the staff list shows the members' names and roles with the director's contact");
+  assert(!/"age"|birth/i.test(JSON.stringify(list)), "but no ages");
   assert(registrarRow.suggestedClub?.id === clubOf("c") && registrarRow.attendeeCount === 2 && registrarRow.locationName === "Missouri", "the list names the club picked, the people counted and the site");
   const wrongClubRow = list.find((row) => row.teamName === "Waiting wrong club")!;
   assert(wrongClubRow.emailClubs.map((entry) => entry.id).join() === clubOf("a"), "and the clubs the director's email is a director of, to choose from");
@@ -296,13 +308,22 @@ async function main() {
 
   // 6. Staff confirm: one click makes it an ordinary club registration for the club picked.
   const registrarSubmission = await submissionOf("Waiting registrar");
+  // The team was received on a day before the closing date: confirmation runs as of that day, whenever staff get to it.
+  const receivedOn = new Date("2026-12-10T15:00:00Z");
+  await prisma.generalLinkSubmission.update({ where: { id: registrarSubmission.id }, data: { createdAt: receivedOn } });
+  // A team "received" after the December 18 deadline is refused at confirmation although the clock now is before it, which
+  // proves the confirmation is judged on the submit date and not on the day staff click.
+  const lateSubmission = await submissionOf("Waiting expired");
+  await prisma.generalLinkSubmission.update({ where: { id: lateSubmission.id }, data: { createdAt: new Date("2026-12-19T15:00:00Z") } });
+  await expectCode(link.resolvePendingTeam(eventId, lateSubmission.id, staffUserId, { action: "CONFIRM", organizationId: clubOf("e") }), "REGISTRATION_CLOSED", "a team received after the deadline is not attached");
+  assert((await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { id: lateSubmission.id } })).status === "PENDING", "and stays waiting, nothing registered");
   const confirmed = await link.resolvePendingTeam(eventId, registrarSubmission.id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") });
   assert(confirmed.status === "CONFIRMED" && !confirmed.alreadyDone && confirmed.registrationId, "staff confirm the club picked");
   const confirmedRow = await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { id: registrarSubmission.id } });
   assert(confirmedRow.status === "CONFIRMED" && confirmedRow.resolution === "STAFF_CONFIRMED" && confirmedRow.payload === null && confirmedRow.resolvedByUserId === staffUserId && confirmedRow.organizationId === clubOf("c"), "the submission records who confirmed what, and keeps no typed answers");
   const waitingTeam = await teamRow("c", "Waiting registrar");
   assert(waitingTeam.registrationId === confirmed.registrationId && waitingTeam.registration.attendees.length === 2 && Number(waitingTeam.registration.totalAmount) === 0, "now an ordinary club registration for that club");
-  assert(waitingTeam.registration.submittedAt?.toISOString() === registrarSubmission.createdAt.toISOString() || waitingTeam.registration.submittedAt !== null, "with the time of the registration");
+  assert(waitingTeam.registration.submittedAt?.getTime() === receivedOn.getTime(), `the registration keeps the day the director submitted (${receivedOn.toISOString()}), got ${waitingTeam.registration.submittedAt?.toISOString()}`);
   assert((await club.listChurchAmountsOwed(eventId)).some((row) => row.organizationId === clubOf("c") && row.teamName === "Waiting registrar"), "on the church invoice list from now on");
   const staffAudit = await prisma.auditLog.findFirstOrThrow({ where: { eventId, action: "GENERAL_LINK_TEAM_CONFIRMED", entityId: registrarSubmission.id } });
   const clubAudit = await prisma.auditLog.findFirstOrThrow({ where: { eventId, action: "CLUB_REGISTRATION_SUBMITTED", entityId: confirmed.registrationId! } });
@@ -332,7 +353,7 @@ async function main() {
 
   // 8. "Not listed": the typed name is kept for staff; confirmation has no club to confirm, so staff choose one.
   const notListed = await submit(youth("Nol"), "Typed Club Team", { club_name: "Not listed", club_name_other: "The Typed Name Pathfinders", email: emailOf("dira") });
-  assert(notListed.outcome === "PENDING", "\"Not listed\" waits for staff, whatever the email");
+  assert(await kind(notListed) === "PENDING", "\"Not listed\" waits for staff, whatever the email");
   const notListedRow = await submissionOf("Typed Club Team");
   assert(notListedRow.suggestedOrganizationId === null && notListedRow.clubNameAsEntered === "The Typed Name Pathfinders", "the club as typed is kept for staff");
   const reviewRow = (await link.listPendingTeams(eventId, now)).find((row) => row.id === notListedRow.id)!;
@@ -354,12 +375,12 @@ async function main() {
   assert((await link.resolvePendingTeam(eventId, wrongSubmission.id, otherStaffId, { action: "REJECT", reason: "Again" })).alreadyDone, "rejecting again changes nothing");
   await expectCode(link.resolvePendingTeam(eventId, wrongSubmission.id, otherStaffId, { action: "CONFIRM", organizationId: clubOf("c") }), "ALREADY_RESOLVED", "a rejected team cannot be attached");
   const reused = await submit(youth("Rej"), "Waiting wrong club", { club_name: clubName("c"), email: emailOf("regc") });
-  assert(reused.outcome === "PENDING", "a rejected team's name can be used again");
+  assert(await kind(reused) === "PENDING", "a rejected team's name can be used again");
   console.log("ok  staff reject a team with a reason: audited with ids only, the typed answers removed, the name freed");
 
   // 10. Two teams from one club through the same link.
   const second = await submit(youth("Two"), "Sword Drill", { email: emailOf("dira") }, iowa!.id);
-  assert(second.outcome === "ATTACHED" && (await prisma.clubEventRegistration.count({ where: { eventId, organizationId: clubOf("a"), teamName: { in: ["Bible Bees", "Sword Drill"] } } })) === 2, "a club registers a second team through the same link");
+  assert(await kind(second) === "ATTACHED" && (await prisma.clubEventRegistration.count({ where: { eventId, organizationId: clubOf("a"), teamName: { in: ["Bible Bees", "Sword Drill"] } } })) === 2, "a club registers a second team through the same link");
   const teamsOfA = await club.getClubEventWorkspace(clubOf("a"), eventId, now, {});
   assert(teamsOfA.teams.registered.length >= 3, "the director's portal lists the club's teams");
   console.log("ok  two teams from one club go through one link");
@@ -380,9 +401,9 @@ async function main() {
   await refuseCount("too old", [typedMember("GlOld", "Twenty", 20), typedMember("GlOld", "Fifteen", 15)], ["this one has 1"], { club_name: clubName("c"), email: emailOf("regc") });
   const seven = Array.from({ length: 7 }, (_, index) => typedMember("GlSeven", `M${index}`, 14, "Pathfinder", index === 6));
   const sevenTeam = await submit([...seven, typedMember("GlCoach", "D", 41, "Coach"), typedMember("GlCoach", "E", 42, "Coach")], "Seven Plus Coaches");
-  assert(sevenTeam.outcome === "ATTACHED" && (await teamRow("a", "Seven Plus Coaches")).registration.attendees.length === 9, "seven members with an alternate and two coaches are accepted");
+  assert(await kind(sevenTeam) === "ATTACHED" && (await teamRow("a", "Seven Plus Coaches")).registration.attendees.length === 9, "seven members with an alternate and two coaches are accepted");
   const edge = await submit([typedMember("GlEdge", "Nineteen", 19), typedMember("GlEdge", "Fourteen", 14)], "Edge Team", { club_name: clubName("c"), email: emailOf("regc") });
-  assert(edge.outcome === "PENDING", "a member of 19 on 2026-01-01 is allowed (the pending team passed the same rules)");
+  assert(await kind(edge) === "PENDING", "a member of 19 on 2026-01-01 is allowed (the pending team passed the same rules)");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, { ...request([typedMember("GlNoAge", "X", 14), { clientId: "cnoage000001", responses: { first_name: "GlNoAge", last_name: "Y", attendee_type: "Pathfinder" } }]) }, { locationId: missouri!.id, teamName: "No Age" }, now), "INVALID_SUBMISSION", "a missing age is the form's own required-field error");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Nod"), { director_confirmation: false }), { locationId: missouri!.id, teamName: "No Confirm" }, now), "INVALID_SUBMISSION", "the director's confirmation is required");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Nor"), { photo_video_release: undefined }), { locationId: missouri!.id, teamName: "No Release" }, now), "INVALID_SUBMISSION", "the release is required");
@@ -483,7 +504,8 @@ async function main() {
   const routeBody = { ...keyed, locationId: missouri!.id, teamName: "Idempotent Team" };
   const first = await post(general.POST as never, `/api/public/events/${eventSlug}/general-registrations`, { eventSlug }, routeBody);
   const firstBody = await first.json() as { confirmation?: { confirmationCode: string; outcome: string } };
-  assert(first.status === 201 && firstBody.confirmation?.outcome === "ATTACHED", `the route registers a matched team, got ${first.status}`);
+  assert(first.status === 201 && firstBody.confirmation?.outcome === "RECEIVED" && await kind(firstBody.confirmation) === "ATTACHED", `the route registers a matched team, got ${first.status}`);
+  assert(JSON.stringify(firstBody.confirmation).includes('"managePath":null') && JSON.stringify(firstBody.confirmation).includes('"manageLinkExpiresAt":null'), "and its body carries no manage link");
   const retry = await post(general.POST as never, `/api/public/events/${eventSlug}/general-registrations`, { eventSlug }, routeBody);
   const retryBody = await retry.json() as { confirmation?: { confirmationCode: string; outcome: string } };
   assert(retry.status === 201 && retryBody.confirmation?.confirmationCode === firstBody.confirmation?.confirmationCode, "a retried POST returns the same confirmation");
@@ -491,7 +513,7 @@ async function main() {
   const keyedWaiting = { ...request(youth("Idw"), { club_name: clubName("c"), email: emailOf("regc") }), locationId: missouri!.id, teamName: "Idempotent Waiting" };
   const waitFirst = await (await post(general.POST as never, `/api/public/events/${eventSlug}/general-registrations`, { eventSlug }, keyedWaiting)).json() as { confirmation?: { confirmationCode: string; outcome: string } };
   const waitRetry = await (await post(general.POST as never, `/api/public/events/${eventSlug}/general-registrations`, { eventSlug }, keyedWaiting)).json() as { confirmation?: { confirmationCode: string; outcome: string } };
-  assert(waitFirst.confirmation?.outcome === "PENDING" && waitRetry.confirmation?.confirmationCode === waitFirst.confirmation.confirmationCode, `a retried POST of a waiting team returns the same confirmation, got ${JSON.stringify(waitFirst)} then ${JSON.stringify(waitRetry)}`);
+  assert(waitFirst.confirmation && await kind(waitFirst.confirmation) === "PENDING" && waitRetry.confirmation?.confirmationCode === waitFirst.confirmation.confirmationCode, `a retried POST of a waiting team returns the same confirmation, got ${JSON.stringify(waitFirst)} then ${JSON.stringify(waitRetry)}`);
   assert(await prisma.generalLinkSubmission.count({ where: { eventId, teamName: "Idempotent Waiting" } }) === 1, "with one submission");
   const reused2 = await post(general.POST as never, `/api/public/events/${eventSlug}/general-registrations`, { eventSlug }, { ...keyedWaiting, responses: { ...keyedWaiting.responses, director_name: "Someone Else" } });
   assert(reused2.status === 409 && (await reused2.json() as { error?: string }).error === "IDEMPOTENCY_CONFLICT", "the same key with different answers is refused");
@@ -530,7 +552,147 @@ async function main() {
   assert(unlinked.linkedRosterMemberId === null && (await teamRow("a", "Bible Bees")).registration.attendees.every((attendee) => !("linkedRosterMemberId" in (attendee.profileSnapshot as object))), "and the link can be removed");
   console.log("ok  a typed-in person can be linked to the roster, optionally, without changing the registration");
 
-  // 16. The table constraints.
+  // 15b. A waiting team's name is reserved against the club portal too, case-insensitively; staff confirming it are exempt.
+  const { clubAttendeeClientId } = await import("../modules/club-registrations/domain");
+  const portalMembers: string[] = [];
+  for (const index of [1, 2, 3]) {
+    const portalPerson = await prisma.person.create({ data: { id: `${P}_portal_${index}`, firstName: `GlPortal${index}`, lastName: "Member" } });
+    portalMembers.push((await prisma.clubRosterMember.create({ data: { organizationId: clubOf("b"), clubYear: "2026-27", personId: portalPerson.id, attendeeType: "YOUTH", role: "Pathfinder", sealedBirthDate: born, source: "DIRECTOR" } })).id);
+  }
+  const portalActor = { accountId: accountOf("depb") };
+  const portalInput = (ids: string[]) => ({
+    versionId,
+    idempotencyKey: randomUUID(),
+    responses: {
+      director_name: "Gl Portal Director", email: emailOf("depb"), phone: "515-555-0100",
+      coordinator_name: "Gl Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
+      coordinator_phone: "515-555-0101", coordinator_email: "gl-coordinator@example.test",
+      director_confirmation: true, photo_video_release: "Yes",
+    },
+    attendees: ids.map((id) => ({ clientId: clubAttendeeClientId(id), responses: { attendee_type: "Pathfinder" } })),
+    website: "" as const,
+  });
+  const portalSubmit = (ids: string[], teamName: string) => club.submitClubRegistration(clubOf("b"), eventId, portalActor, portalInput(ids), now, { locationId: missouri!.id, teamName, draftKey: randomUUID().replaceAll("-", "") });
+  const reservedPending = await submit(youth("Prs"), "Portal Reserved", { club_name: clubName("c"), email: emailOf("regc") });
+  assert(await kind(reservedPending) === "PENDING", "a team waits under the name Portal Reserved");
+  await expectCode(portalSubmit(portalMembers.slice(0, 2), "  portal   RESERVED "), "CLUB_TEAM_NAME_TAKEN", "the club portal cannot take a waiting team's name, in any case or spacing", ["already registered for this event"]);
+  assert(await prisma.clubEventRegistration.count({ where: { eventId, teamKey: "portal reserved" } }) === 0, "and nothing was registered");
+  await link.resolvePendingTeam(eventId, (await submissionOf("Portal Reserved")).id, staffUserId, { action: "REJECT", reason: "Synthetic reason." });
+  await portalSubmit(portalMembers.slice(0, 2), "PORTAL reserved");
+  assert(await prisma.clubEventRegistration.count({ where: { eventId, organizationId: clubOf("b"), teamKey: "portal reserved" } }) === 1, "once the waiting team is rejected the name is free to the portal");
+  const exemptPending = await submit(youth("Pex"), "Portal Exempt", { club_name: clubName("c"), email: emailOf("regc") });
+  assert(await kind(exemptPending) === "PENDING", "another waiting team");
+  const exemptDone = await link.resolvePendingTeam(eventId, (await submissionOf("Portal Exempt")).id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") });
+  assert(exemptDone.status === "CONFIRMED" && await prisma.clubEventRegistration.count({ where: { eventId, teamKey: "portal exempt" } }) === 1, "staff confirming a waiting team are not blocked by its own reserved name");
+  console.log("ok  a waiting team's name is reserved against the club portal, and released by its own confirmation or rejection");
+
+  // 15c. The answer never tells a director from anyone else: the same refusals and the same success, whatever the email.
+  const bodyFor = (matching: boolean, members: Array<ReturnType<typeof typedMember>>, teamName: string, site: string | null, label: string) => ({
+    ...request(members, { club_name: clubName("a"), email: matching ? emailOf("dira") : emailOf("regc") }),
+    locationId: site,
+    teamName,
+    label,
+  });
+  let probe = 0;
+  const route = async (body: ReturnType<typeof bodyFor>) => {
+    const { label, ...payload } = body;
+    void label;
+    const response = await post(general.POST as never, `/api/public/events/${eventSlug}/general-registrations`, { eventSlug }, payload, `gl-oracle-${P}-${probe += 1}`);
+    return { status: response.status, body: await response.json() as Record<string, unknown> };
+  };
+  const sameForBoth = async (label: string, make: (matching: boolean) => ReturnType<typeof bodyFor>) => {
+    const [matched, other] = [await route(make(true)), await route(make(false))];
+    assert(matched.status !== 201 && matched.status === other.status && JSON.stringify(matched.body) === JSON.stringify(other.body), `${label}: a matching and a non-matching email get the same refusal, got ${matched.status} ${JSON.stringify(matched.body)} and ${other.status} ${JSON.stringify(other.body)}`);
+    assert(!/deputy|club a|match(es|ed)? (a|the) (director|club)|not a director/i.test(JSON.stringify(matched.body)), `${label}: and the refusal says nothing about directors or clubs`);
+    return matched;
+  };
+  const holdersBefore = [await registrationCount(), await prisma.generalLinkSubmission.count({ where: { eventId } })];
+  await sameForBoth("a site that does not exist", (matching) => bodyFor(matching, youth("Or1"), "Oracle One", "no-such-location", "bad location"));
+  await sameForBoth("no site", (matching) => bodyFor(matching, youth("Or2"), "Oracle Two", null, "no location"));
+  await sameForBoth("a registered team's name", (matching) => bodyFor(matching, youth("Or3"), "bible BEES", missouri!.id, "registered name"));
+  await sameForBoth("a waiting team's name", (matching) => bodyFor(matching, youth("Or4"), "WAITING wrong CLUB", missouri!.id, "waiting name"));
+  await sameForBoth("a team that breaks the rules", (matching) => bodyFor(matching, Array.from({ length: 8 }, (_, index) => typedMember("GlOr", `N${index}`, 14)), "Oracle Rules", missouri!.id, "rules"));
+  await sameForBoth("a person already on another team of the club", (matching) => bodyFor(matching, [typedMember("GlAlex", "Alpha", 14), typedMember("GlOr5", "Two", 14)], "Oracle Other Team", missouri!.id, "other team"));
+  await sameForBoth("a form missing its confirmation", (matching) => ({ ...bodyFor(matching, youth("Or6"), "Oracle Six", missouri!.id, "form"), responses: { ...bodyFor(matching, youth("Or6"), "x", missouri!.id, "x").responses, director_confirmation: false } }));
+  // A closed site and a full site, changed for these checks and put back.
+  const closedBefore = missouri!.registrationClosesOn;
+  await prisma.eventLocation.update({ where: { id: missouri!.id }, data: { registrationClosesOn: "2020-01-01" } });
+  const closedRefusal = await sameForBoth("a closed site", (matching) => bodyFor(matching, youth("Or7"), "Oracle Closed", missouri!.id, "closed"));
+  assert(closedRefusal.status === 410 && closedRefusal.body.error === "REGISTRATION_CLOSED", `the closed site is refused as closed, got ${JSON.stringify(closedRefusal.body)}`);
+  await prisma.eventLocation.update({ where: { id: missouri!.id }, data: { registrationClosesOn: closedBefore } });
+  const capacityBefore = { capacity: missouri!.capacity, waitlist: event.waitlistEnabled };
+  await prisma.event.update({ where: { id: eventId }, data: { waitlistEnabled: false } });
+  await prisma.eventLocation.update({ where: { id: missouri!.id }, data: { capacity: 1 } });
+  const fullRefusal = await sameForBoth("a full site with no waitlist", (matching) => bodyFor(matching, youth("Or8"), "Oracle Full", missouri!.id, "full"));
+  assert(fullRefusal.body.error === "LOCATION_FULL", `the full site is refused as full, got ${JSON.stringify(fullRefusal.body)}`);
+  await prisma.eventLocation.update({ where: { id: missouri!.id }, data: { capacity: capacityBefore.capacity } });
+  await prisma.event.update({ where: { id: eventId }, data: { waitlistEnabled: capacityBefore.waitlist } });
+  assert([await registrationCount(), await prisma.generalLinkSubmission.count({ where: { eventId } })].join() === holdersBefore.join(), "none of the refusals stored anything");
+  // The success is the same too: status, fields and words.
+  const okMatched = await route(bodyFor(true, youth("Ok1"), "Oracle Ok One", missouri!.id, "ok"));
+  const okOther = await route(bodyFor(false, youth("Ok2"), "Oracle Ok Two", missouri!.id, "ok"));
+  const shape = (value: Record<string, unknown>) => {
+    const confirmation = { ...(value.confirmation as Record<string, unknown>) };
+    return { keys: Object.keys(confirmation).join(), message: confirmation.message, outcome: confirmation.outcome, clubName: confirmation.clubName, managePath: confirmation.managePath, expires: confirmation.manageLinkExpiresAt, code: /^PBE-[0-9A-F]{10}$/.test(String(confirmation.confirmationCode)), lines: confirmation.lineItems, status: confirmation.registrationStatus, place: confirmation.waitlistPosition, capacity: confirmation.capacityDecision };
+  };
+  assert(okMatched.status === 201 && okOther.status === 201 && JSON.stringify(shape(okMatched.body)) === JSON.stringify(shape(okOther.body)), `a matched and a waiting team get the same answer, got ${JSON.stringify(shape(okMatched.body))} and ${JSON.stringify(shape(okOther.body))}`);
+  assert(await kind(okMatched.body.confirmation as { confirmationCode: string }) === "ATTACHED" && await kind(okOther.body.confirmation as { confirmationCode: string }) === "PENDING", "although one was attached and the other waits");
+  console.log("ok  a matching and a non-matching email get identical refusals (site, closed, full, name, rules, form) and identical answers");
+
+  // 15d. A team that lands on the event's waitlist is told it is waitlisted, never attached; the staff digest comes once a window.
+  await prisma.eventLocation.update({ where: { id: iowa!.id }, data: { capacity: 1 } });
+  await prisma.event.update({ where: { id: eventId }, data: { waitlistEnabled: true } });
+  const fullPending = await submit(youth("Wl1"), "Waitlist Candidate", { club_name: clubName("c"), email: emailOf("regc") }, iowa!.id);
+  assert(await kind(fullPending) === "PENDING", "a waiting team for a site with no room");
+  const waitlisted = await link.resolvePendingTeam(eventId, (await submissionOf("Waitlist Candidate")).id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") });
+  const waitlistedRegistration = await prisma.registration.findUniqueOrThrow({ where: { id: waitlisted.registrationId! } });
+  assert(waitlistedRegistration.status === "WAITLISTED", `the confirmed team landed on the waitlist, got ${waitlistedRegistration.status}`);
+  const waitlistMail = await prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: emailOf("regc"), AND: [{ metadata: { path: ["generalLinkSubmissionId"], equals: (await submissionOf("Waitlist Candidate")).id } }, { metadata: { path: ["trigger"], equals: "GENERAL_LINK_ATTACHED" } }] } });
+  assert(waitlistMail.length === 1 && /waitlist/i.test(waitlistMail[0]!.subjectSnapshot) && !/attached to/i.test(`${waitlistMail[0]!.subjectSnapshot} ${waitlistMail[0]!.bodyTextSnapshot}`) && /not a confirmed registration/.test(waitlistMail[0]!.bodyTextSnapshot), `the director is told it is waitlisted, not attached, got ${JSON.stringify(waitlistMail.map((mail) => [mail.subjectSnapshot, mail.bodyTextSnapshot.slice(0, 200)]))}`);
+  await prisma.eventLocation.update({ where: { id: iowa!.id }, data: { capacity: iowa!.capacity } });
+  await prisma.event.update({ where: { id: eventId }, data: { waitlistEnabled: false } });
+  const digestCount = () => prisma.messageOutbox.count({ where: { eventId, recipientEmail: staffNoticeEmail, subjectSnapshot: { contains: "waiting for club confirmation" } } });
+  const digestsNow = await digestCount();
+  await link.submitGeneralLinkRegistration(eventSlug, request(youth("Dg1"), { club_name: clubName("c"), email: emailOf("regc") }), { locationId: missouri!.id, teamName: "Digest Same Window" }, new Date(now.getTime() + 5 * 60 * 1000));
+  assert(await digestCount() === digestsNow, "a team waiting in the same 15 minutes sends staff no new email");
+  await link.submitGeneralLinkRegistration(eventSlug, request(youth("Dg2"), { club_name: clubName("c"), email: emailOf("regc") }), { locationId: missouri!.id, teamName: "Digest Next Window" }, new Date(now.getTime() + 20 * 60 * 1000));
+  assert(await digestCount() === digestsNow + 1, "the next window sends one more");
+  console.log("ok  a waitlisted team is told it is waitlisted; staff get one digest per 15 minutes");
+
+  // 15e. The cap on waiting teams per rolling hour: over it, a matching and a non-matching email are refused alike.
+  const capRows = Array.from({ length: 60 }, (_, index) => ({
+    eventId, confirmationCode: `PBE-CAP${P.slice(3)}${index}`.slice(0, 40), idempotencyKey: `${P}-cap-${index}`, requestHash: "x", clubNameAsEntered: "x", directorEmail: "cap@example.test",
+    directorName: "x", teamName: "", teamKey: "", attendeeCount: 1, payload: {}, createdAt: new Date(now.getTime() - 5 * 60 * 1000),
+  }));
+  await prisma.generalLinkSubmission.createMany({ data: capRows });
+  const capped = await Promise.all([true, false].map((matching) => caught(link.submitGeneralLinkRegistration(eventSlug, request(youth("Cap"), { club_name: clubName("a"), email: matching ? emailOf("dira") : emailOf("regc") }), { locationId: missouri!.id, teamName: "Cap Team" }, now))));
+  assert(capped.every((error) => (error as { code?: string } | null)?.code === "TOO_MANY_PENDING" && (error as Error).message === "Too many registrations right now; please try again later."), `over the hourly cap both are refused with the same generic message, got ${capped.map(String).join(" | ")}`);
+  const cappedRoute = await Promise.all([true, false].map((matching) => route(bodyFor(matching, youth("Cap"), "Cap Team", missouri!.id, "cap"))));
+  assert(cappedRoute[0]!.status === 429 && cappedRoute[1]!.status === 429 && JSON.stringify(cappedRoute[0]!.body) === JSON.stringify(cappedRoute[1]!.body), "through the route: the same 429 and body");
+  await prisma.generalLinkSubmission.deleteMany({ where: { eventId, idempotencyKey: { startsWith: `${P}-cap-` } } });
+  console.log("ok  the hourly cap on waiting teams refuses every request alike");
+
+  // 15f. Retention: a waiting team is expired 30 days after the event ends, its answers removed, the table's check holding.
+  const stale = await prisma.generalLinkSubmission.findFirstOrThrow({ where: { eventId, status: "PENDING", teamName: "Digest Next Window" } });
+  const eventEnds = (await prisma.event.findUniqueOrThrow({ where: { id: eventId } })).endsAt;
+  const tooEarly = await link.expireStalePendingTeams(new Date(eventEnds.getTime() + 29 * 24 * 60 * 60 * 1000), { eventId });
+  assert((await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { id: stale.id } })).status === "PENDING" && tooEarly.expired === 0, "29 days after the event nothing expires");
+  const sweptAt = new Date(eventEnds.getTime() + 31 * 24 * 60 * 60 * 1000);
+  const waitingBefore = await prisma.generalLinkSubmission.count({ where: { eventId, status: "PENDING" } });
+  const swept = await link.expireStalePendingTeams(sweptAt, { eventId });
+  assert(swept.expired === waitingBefore && swept.events === 1, `31 days after, every waiting team of the event expires, got ${JSON.stringify(swept)} for ${waitingBefore}`);
+  const expiredRow = await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { id: stale.id } });
+  assert(expiredRow.status === "EXPIRED" && expiredRow.resolution === "RETENTION_EXPIRED" && expiredRow.payload === null && expiredRow.resolvedAt !== null && expiredRow.resolvedByUserId === null, "marked EXPIRED with the answers removed");
+  assert(await prisma.generalLinkSubmission.count({ where: { eventId, status: "PENDING" } }) === 0 && (await link.listPendingTeams(eventId, now)).length === 0, "nothing is left waiting");
+  const expiryAudit = await prisma.auditLog.findFirstOrThrow({ where: { eventId, action: "GENERAL_LINK_TEAMS_EXPIRED" } });
+  const expiryMeta = expiryAudit.metadata as { generalLinkSubmissionIds?: string[]; count?: number };
+  assert(expiryMeta.count === waitingBefore && expiryMeta.generalLinkSubmissionIds?.length === waitingBefore && !/Gl[A-Za-z]+|Kid|@/.test(JSON.stringify(expiryMeta).replace(new RegExp(P, "g"), "")), "audited with the ids and a count, never an answer");
+  assert((await link.expireStalePendingTeams(sweptAt, { eventId })).expired === 0, "a second sweep changes nothing");
+  assert(await prisma.clubEventRegistration.count({ where: { eventId, teamKey: "digest next window" } }) === 0, "and an expired team holds no registration");
+  console.log("ok  retention: waiting teams expire 30 days after the event, answers removed, audited with ids and a count");
+
+  // 16. The table constraints (the sweep above left nothing waiting, so one more team waits first).
+  await submit(youth("Con"), "Constraint Row", { club_name: clubName("c"), email: emailOf("regc") });
   const constraintRow = await prisma.generalLinkSubmission.findFirstOrThrow({ where: { eventId, status: "PENDING" } });
   const noPayload = await caught(prisma.$executeRawUnsafe(`UPDATE "GeneralLinkSubmission" SET "payload" = NULL WHERE "id" = '${constraintRow.id}'`));
   assert(noPayload && /GeneralLinkSubmission_payload_check/.test(dbError(noPayload)), `a waiting submission must keep its answers, got ${dbError(noPayload)}`);

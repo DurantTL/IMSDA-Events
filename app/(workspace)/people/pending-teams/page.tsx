@@ -30,8 +30,10 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
           <p>
             Teams registered through the general registration link for {event.name} whose director&rsquo;s email did not match a
             current director or deputy of the club they picked, or whose club was not listed. Confirm the club, choose another,
-            or reject the team. Until then a team is in no club&rsquo;s registrations, invoice or check-in list. This page shows
-            counts only; open the registration after you attach a team to see its people.
+            or reject the team. Until then a team is in no club&rsquo;s registrations, invoice or check-in list. Each team shows its
+            members&rsquo; names and roles, its coaches, the club picked and the director&rsquo;s contact, so you can tell which
+            club it really is. Handle these names as you would a club roster. A team nobody resolves has its names removed 30
+            days after the event ends.
           </p>
           <p className="field-help">{counts.attached} attached through the link · {counts.rejected} rejected</p>
         </div>

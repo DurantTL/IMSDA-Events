@@ -8710,6 +8710,8 @@ enum GeneralLinkSubmissionStatus {
   CONFIRMED
   /// Refused by staff, with a reason. The submitted answers are removed.
   REJECTED
+  /// Nobody resolved it by 30 days after the event ended: the retention sweep removed the submitted answers.
+  EXPIRED
 }
 
 enum GeneralLinkResolution {
@@ -8720,6 +8722,8 @@ enum GeneralLinkResolution {
   /// Staff attached it to a different club than the one picked ("Not listed" included).
   STAFF_REASSIGNED
   STAFF_REJECTED
+  /// The retention sweep removed a still-waiting submission's answers after the event.
+  RETENTION_EXPIRED
 }
 
 /// A team registered through an event's general registration link (#931), with no account. A submission whose director

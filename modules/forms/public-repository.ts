@@ -130,7 +130,17 @@ export type ClubSubmissionContext = {
    * Runs inside this transaction right after the club registration row exists (#931), so a record that must exist exactly when
    * the registration does (the general link's submission row) commits or rolls back with it. Not run for a replay.
    */
-  inTransaction?: (tx: Prisma.TransactionClient, created: { registrationId: string; confirmationCode: string }) => Promise<void>;
+  inTransaction?: (tx: Prisma.TransactionClient, created: { registrationId: string; confirmationCode: string; waitlisted: boolean }) => Promise<void>;
+  /**
+   * The general link's waiting submission this very submission confirms (#931). Every other waiting submission's team name is
+   * reserved against this club submission, case-insensitively; this one's own is not (staff confirming it is how it is released).
+   */
+  confirmsPendingSubmissionId?: string;
+  /**
+   * A line added to the top of the registrant's confirmation email (#931), decided inside the transaction once it is known
+   * whether the registration was waitlisted. Not used for a waitlisted registration, whose email is the waitlist notice.
+   */
+  confirmationNote?: () => string | null;
   /** Extra ids for the club registration's audit entry (#931): ids and flags only, never names. */
   auditMetadata?: Record<string, string | number | boolean | null>;
   /** The staff user behind this submission for the audit entry when staff confirmed a waiting team (#931); never an act-as. */
@@ -798,6 +808,20 @@ async function createPublicRegistrationTransaction(
       if (nameTaken) {
         throw new PublicRegistrationError("CLUB_TEAM_NAME_TAKEN", teamNameTakenMessage(club.team.name));
       }
+      // A team waiting for staff on the general link (#931) holds its name too, whichever door the new submission comes through
+      // (the club portal included). Read in this Serializable transaction. The name key is already lowercase and trimmed.
+      const nameWaiting = await tx.generalLinkSubmission.findFirst({
+        where: {
+          eventId: form.eventId,
+          teamKey: club.team.key,
+          status: "PENDING",
+          ...(club.confirmsPendingSubmissionId ? { id: { not: club.confirmsPendingSubmissionId } } : {}),
+        },
+        select: { id: true },
+      });
+      if (nameWaiting) {
+        throw new PublicRegistrationError("CLUB_TEAM_NAME_TAKEN", teamNameTakenMessage(club.team.name));
+      }
     }
   }
 
@@ -1385,7 +1409,7 @@ async function createPublicRegistrationTransaction(
       }
       throw error;
     }
-    if (club.inTransaction) await club.inTransaction(tx, { registrationId: registration.id, confirmationCode });
+    if (club.inTransaction) await club.inTransaction(tx, { registrationId: registration.id, confirmationCode, waitlisted: isWaitlisted });
     await tx.clubRegistrationDraft.deleteMany({
       // The team's own draft (#809); an event without teams has only the one.
       where: { eventId: form.eventId, organizationId: club.organizationId, ...(club.team ? { draftKey: club.team.draftKey } : {}) },
@@ -1442,6 +1466,7 @@ async function createPublicRegistrationTransaction(
         calculation: admittedCalculation,
         location: registrationLocation,
         billedToGroup: Boolean(group),
+        ...(club?.confirmationNote ? { registrantNote: club.confirmationNote() } : {}),
       });
   await tx.auditLog.create({
     data: {

@@ -187,6 +187,11 @@ export type RegistrationMessageInput = {
    * its price and estimated total shown, never the church-billed wording.
    */
   billedToGroup?: boolean;
+  /**
+   * One plain line placed at the top of the registrant's confirmation (never the internal notice), such as the club a team
+   * was attached to (#931). Braces are removed so it can never read as a template token.
+   */
+  registrantNote?: string | null;
 };
 
 export type QueuedRegistrationMessages = {
@@ -3415,6 +3420,7 @@ export async function enqueuePublicRegistrationMessages(
 ): Promise<QueuedRegistrationMessages> {
   const isDeferredOrganizationBilling = input.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
   const billedToGroup = isDeferredOrganizationBilling && Boolean(input.billedToGroup);
+  const registrantNote = input.registrantNote?.replace(/[{}]/g, "").trim() || null;
   const registrantTemplateKey = selectRegistrationMessageTemplate({
     isWorker: input.registration.attendeeType === "WORKER",
     balanceCents: input.calculation.totalCents,
@@ -3587,13 +3593,13 @@ export async function enqueuePublicRegistrationMessages(
     const rendered = renderMessageTemplate(
       {
         subject: source.subject,
-        body: withGroupBilledWording(
+        body: `${recipient.kind === "REGISTRANT" && registrantNote ? `${registrantNote}\n\n` : ""}${withGroupBilledWording(
           withChurchBilledPriceWording(
             withChurchBilledLinkWording(source.body, isDeferredOrganizationBilling),
             hidesTotals,
           ),
           billedToGroup && recipient.kind === "REGISTRANT",
-        ),
+        )}`,
       },
       {
         ...commonContext,

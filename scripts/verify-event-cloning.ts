@@ -105,7 +105,7 @@ async function buildPopulatedSource(): Promise<Fixture> {
       calendarCategory: "Camp meeting", hotelName: "Synthetic Inn", hotelRate: "$99", isPublished: true, capacity: 400,
       registrationOpensOn: "2027-01-10", registrationClosesOn: "2027-04-20", seminarPreferenceClosesOn: "2027-04-01", seminarPreferenceSelfServiceLocked: true,
       waitlistEnabled: true, autoPromoteWaitlist: true, collectsShirtSizes: true, checksAdultBackgrounds: true,
-      audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", showOnCalendar: false,
+      audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", showOnCalendar: false, generalRegistrationLinkEnabled: true,
       operationalPacketConfig: { groupingFieldKey: "club", sections: { coverNotes: false } },
     },
   });
@@ -348,6 +348,7 @@ async function run() {
   assert(cloneRow.location === "Synthetic Lodge" && cloneRow.timezone === "America/Denver" && cloneRow.hotelName === "Synthetic Inn" && cloneRow.calendarCategory === "Camp meeting", "branding and details are copied");
   assert(cloneRow.showOnCalendar === false, "showOnCalendar is copied with the event details (the source hides it; the default is shown)");
   assert(cloneRow.audience === "CLUB" && cloneRow.billingMode === "DEFERRED_ORGANIZATION_INVOICE", "audience and billing mode are copied");
+  assert(cloneRow.generalRegistrationLinkEnabled === false, "the general registration link (#931) stays OFF in a clone, though the source has it on: staff turn it on deliberately");
   assert(cloneRow.waitlistEnabled && cloneRow.autoPromoteWaitlist && cloneRow.collectsShirtSizes && cloneRow.checksAdultBackgrounds, "module toggles are copied");
   const clonedPacketConfig = cloneRow.operationalPacketConfig as { groupingFieldKey?: string; sections?: Record<string, boolean> } | null;
   assert(

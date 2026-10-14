@@ -14,7 +14,7 @@ type Ready = GeneralLinkExperience & { experience: NonNullable<GeneralLinkExperi
 /**
  * The event's general registration link (#931): a club director with no account registers a team. Pick the site and name the
  * team, then fill in the form (the club from the directory list, the people typed in). The server matches the team to the
- * club, enforces the team rules and answers whether it is attached or waiting for staff; this only guides.
+ * club, enforces the team rules and answers with the same words whether the team is attached at once or waits for staff; this only guides.
  */
 export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { eventSlug: string; ready: Ready; topContent?: ReactNode }) {
   const { experience, locations, team } = ready;
@@ -47,8 +47,8 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
           <h1><UsersRound aria-hidden="true" size={22} /> Register a team without an account</h1>
           <p>
             Club directors can register a team here without signing in. Choose your club from the list on the form and use the email
-            address your club has on file for its director or deputy: the team is then attached to your club right away. Otherwise
-            the event team confirms the club for you. There is no fee.
+            address your club has on file for its director or deputy, so the team can be attached to your club. If it cannot be matched,
+            the event team confirms the club for you. Either way you get an email with the details. There is no fee.
           </p>
           <ClubLocationPicker allowWaitlist locations={locations} noun="club" onChange={setLocationId} value={locationId} />
           {team.named && (

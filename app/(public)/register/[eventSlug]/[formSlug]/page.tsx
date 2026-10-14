@@ -16,6 +16,7 @@ import {
 import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
+import { clubEventEntryRedirect } from "@/modules/general-link-registrations/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,9 @@ export default async function PublicRegistrationPage({
   const { eventSlug, formSlug } = await params;
   const experience = await getPublicRegistrationExperience(eventSlug, formSlug);
   if (!experience) notFound();
+  // A club event takes teams through the portal or the general link, never this individual form (#931).
+  const clubEntry = await clubEventEntryRedirect(eventSlug);
+  if (clubEntry) redirect(clubEntry);
   if (
     experience.lifecycle.phase !== "OPEN"
     || experience.lifecycle.capacityDecision === "FULL"

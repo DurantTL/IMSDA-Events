@@ -3,9 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle2, Users, XCircle } from "lucide-react";
-import type { PendingTeamView } from "@/modules/general-link-registrations/repository";
+import type { PendingTeamMemberView, PendingTeamView } from "@/modules/general-link-registrations/repository";
 
 type Club = { id: string; name: string };
+
+function personLabel(person: PendingTeamMemberView) {
+  const name = `${person.firstName} ${person.lastName}`.trim() || "(no name)";
+  return person.alternate ? `${name} (alternate)` : name;
+}
 
 type Action =
   | { action: "CONFIRM" | "REASSIGN"; organizationId: string }
@@ -60,6 +65,13 @@ function TeamRow({ eventId, team, clubs }: { eventId: string; team: PendingTeamV
             Submitted {team.createdAt.slice(0, 16).replace("T", " ")} UTC by {team.directorName || "the director"}
             {" "}({team.directorEmail})
           </p>
+          <p className="field-help">
+            <strong>Members{team.members.length > 0 ? ` (${team.members.length})` : ""}:</strong>{" "}
+            {team.members.length > 0 ? team.members.map(personLabel).join(", ") : "none listed"}
+          </p>
+          {team.coaches.length > 0 && (
+            <p className="field-help"><strong>Coaches ({team.coaches.length}):</strong> {team.coaches.map(personLabel).join(", ")}</p>
+          )}
           {team.emailClubs.length > 0 && (
             <p className="field-help">This email is a director or deputy of: {team.emailClubs.map((club) => club.name).join(", ")}.</p>
           )}
