@@ -69,9 +69,12 @@ a sent or dismissed one stays as history. Only a 28-day window around
 today is expanded (a point is reached at most 14 days before its due date), so a
 long-running daily rule is cheap. A repeating deadline's point is prepared only if
 the point's date falls after the previous occurrence's due date, so closely spaced
-occurrences do not produce a batch that is withdrawn days later: a weekly (or
-every-other-week) deadline gets only the 2-day reminder, a daily one none, and a
-monthly one both. The reminders tab says so. Occurrences are never moved onto one
+occurrences do not produce a batch that is withdrawn days later: after the
+series' first occurrence (which has no previous one and gets both points), a
+weekly (or every-other-week) deadline gets only the 2-day reminder, a daily one
+none, and a monthly one both. When no occurrence is within reach, a waiting batch
+is withdrawn as "moved later" only if a later occurrence exists; if the series has
+ended (UNTIL or COUNT used up) the reason says no occurrence is left. The reminders tab says so. Occurrences are never moved onto one
 another the way a one-off deadline's waiting batch follows a new date. Existing
 calendar items are not re-typed: staff mark an existing "due" item as a Deadline
 themselves.

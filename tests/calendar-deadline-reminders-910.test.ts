@@ -581,12 +581,31 @@ describe("repeating deadlines: a reminder for each occurrence (#915)", () => {
     expect(keys()).toEqual([]);
   });
 
-  it("withdraws a waiting batch with the 'moved later' reason when nothing is left in range", async () => {
+  it("withdraws a waiting batch with the 'no occurrence left' reason when the series has ended", async () => {
     state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=MONTHLY" })];
     await reconcileDeadlineReminders(at("2026-11-02T18:00:00Z"));
     state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=MONTHLY;UNTIL=20261101" })];
     await reconcileDeadlineReminders(at("2026-11-02T18:00:00Z"));
+    expect(state.batches[0]).toMatchObject({ status: "WITHDRAWN", statusReason: "No occurrence of the repeating deadline is left." });
+  });
+
+  it("withdraws with the 'moved later' reason when the series still has later occurrences", async () => {
+    state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=MONTHLY" })];
+    await reconcileDeadlineReminders(at("2026-11-02T18:00:00Z"));
+    // Now a yearly series whose next occurrence (Oct 15 2027) is far off.
+    state.entries = [entry({ startsOn: "2026-10-15", endsOn: "2026-10-15", repeatRule: "FREQ=YEARLY" })];
+    await reconcileDeadlineReminders(at("2026-11-02T18:00:00Z"));
     expect(state.batches[0]).toMatchObject({ status: "WITHDRAWN", statusReason: "The due date moved later; a reminder is prepared when its time comes." });
+  });
+
+  it("gives a weekly series' first occurrence a 14-day batch and the second only a 2-day batch", async () => {
+    state.entries = [entry({ startsOn: "2026-11-27", endsOn: "2026-11-27", repeatRule: "FREQ=WEEKLY;BYDAY=FR;WKST=SU" })];
+    await reconcileDeadlineReminders(at("2026-11-13T18:00:00Z")); // 14 days before the first occurrence
+    expect(keys()).toEqual(["2026-11-27:14:PENDING"]);
+    await reconcileDeadlineReminders(at("2026-11-28T18:00:00Z")); // the first has passed; the second (Dec 4) has no 14-day point
+    expect(keys()).toEqual(["2026-11-27:14:WITHDRAWN"]);
+    await reconcileDeadlineReminders(at("2026-12-02T18:00:00Z")); // 2 days before the second
+    expect(keys()).toEqual(["2026-11-27:14:WITHDRAWN", "2026-12-04:2:PENDING"]);
   });
 
   it("follows a one-off deadline that becomes repeating while its batch waits", async () => {

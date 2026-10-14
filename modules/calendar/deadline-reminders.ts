@@ -174,6 +174,9 @@ type Assessment = {
 /** A point can only be reached within this many days of its due date, so repeats are only expanded this far from today. */
 const maxPointDays = Math.max(...deadlineReminderPoints);
 
+/** How far ahead to look (about five years) to tell a sparse series from one that has ended. */
+const laterLookaheadDays = 5 * 366;
+
 /**
  * The due date a deadline is reminded for right now, and why it gets no
  * reminder (null when it does, apart from whether a point is reached yet).
@@ -185,7 +188,8 @@ const maxPointDays = Math.max(...deadlineReminderPoints);
  * date), so a long-running daily rule costs a handful of steps, not thousands.
  *
  * A repeating deadline's point is prepared only if the point's date falls after
- * the previous occurrence's due date: a weekly deadline gets just the 2-day
+ * the previous occurrence's due date: after its first occurrence (which has no
+ * previous one and so gets both points), a weekly deadline gets just the 2-day
  * reminder, and a daily one none, instead of a batch per occurrence that is
  * withdrawn a few days later.
  */
@@ -204,7 +208,16 @@ function assess(entry: EntryRow | undefined, today: string): Assessment {
   }
   const occurrences = expandOccurrences(entry, rule, entry.repeatExceptions, addDays(today, -maxPointDays), addDays(today, maxPointDays));
   const next = occurrences.find((occurrence) => occurrence.endsOn >= today);
-  if (!next) return none("The due date moved later; a reminder is prepared when its time comes.", true);
+  if (!next) {
+    // Nothing within reach: either a later occurrence exists (a sparse rule) or the series has ended.
+    const later = expandOccurrences(entry, rule, entry.repeatExceptions, addDays(today, maxPointDays + 1), addDays(today, laterLookaheadDays));
+    return none(
+      later.length > 0
+        ? "The due date moved later; a reminder is prepared when its time comes."
+        : "No occurrence of the repeating deadline is left.",
+      true,
+    );
+  }
   const allowedPoints = deadlineReminderPoints.filter((point) => {
     const pointDate = reminderDate(next.endsOn, point);
     return !occurrences.some((occurrence) => occurrence.endsOn >= pointDate && occurrence.endsOn < next.endsOn);
@@ -223,6 +236,13 @@ export type ReconcileResult = { prepared: number; updated: number; withdrawn: nu
 export async function reconcileDeadlineReminders(now = new Date()): Promise<ReconcileResult> {
   const today = calendarDateIn(now);
   return getPrisma().$transaction(async (tx) => {
+    const assessed = new Map<string, Assessment>();
+    const assessOnce = (entry: EntryRow | undefined) => {
+      if (!entry) return assess(entry, today);
+      let found = assessed.get(entry.id);
+      if (!found) assessed.set(entry.id, (found = assess(entry, today)));
+      return found;
+    };
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${reminderLockKey}))`;
     const result: ReconcileResult = { prepared: 0, updated: 0, withdrawn: 0 };
 
@@ -241,7 +261,7 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
     // Per deadline: the occurrence being reminded (its due date) and the latest reminder point reached for it.
     const points = new Map<string, { point: DeadlineReminderPoint; dueOn: string }>();
     for (const entry of candidates) {
-      const { reason, dueOn, allowedPoints } = assess(entry, today);
+      const { reason, dueOn, allowedPoints } = assessOnce(entry);
       if (reason || !dueOn) continue;
       const point = reminderPointFor(dueOn, today);
       if (point && allowedPoints.includes(point)) points.set(entry.id, { point, dueOn });
@@ -268,7 +288,7 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
     for (const batch of pending) {
       const entry = batch.calendarEntryId ? known.get(batch.calendarEntryId) : undefined;
       const current = batch.calendarEntryId ? points.get(batch.calendarEntryId) : undefined;
-      const assessment = assess(entry, today);
+      const assessment = assessOnce(entry);
       const repeating = assessment.repeating;
       // A one-off deadline's waiting batch follows its date; a repeating one's belongs to its occurrence.
       if (entry && current?.point === batch.daysBefore && (!repeating || current.dueOn === batch.dueOn)) {
@@ -291,7 +311,7 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
       : await tx.deadlineReminderBatch.findMany({ where: { calendarEntryId: { in: entryIds } } });
     for (const [entryId, { point, dueOn }] of points) {
       const entry = known.get(entryId)!;
-      const repeating = assess(entry, today).repeating;
+      const repeating = assessOnce(entry).repeating;
       const snapshot = { title: entry.title, dueOn, linkUrl: entry.linkUrl };
       const forPoint = existing.filter((candidate) => candidate.calendarEntryId === entryId && candidate.daysBefore === point);
       // A batch is per due date: if the date moved, an earlier due date's SENT or DISMISSED batch is history and this
