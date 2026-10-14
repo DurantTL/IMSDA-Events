@@ -88,6 +88,8 @@ export type PublicRegistrationErrorCode =
   | "CLUB_ALREADY_REGISTERED"
   | "CLUB_TEAM_NAME_TAKEN"
   | "CLUB_ATTENDEES_INVALID"
+  /** A club-audience event's form was posted to the generic public route (#931): clubs register through the portal or the event's general link. */
+  | "CLUB_ENTRY_REQUIRED"
   | "GROUP_REGISTRATION_UNAVAILABLE"
   | "GROUP_ATTENDEES_INVALID";
 
@@ -124,6 +126,25 @@ export type ClubSubmissionContext = {
   report?: (outcome: { replayed: boolean; waitlisted: boolean }) => void;
   /** Told the new (or replayed) registration's id once it has committed, so the director can be told about any flags (#809). */
   registered?: (registrationId: string) => void;
+  /**
+   * Runs inside this transaction right after the club registration row exists (#931), so a record that must exist exactly when
+   * the registration does (the general link's submission row) commits or rolls back with it. Not run for a replay.
+   */
+  inTransaction?: (tx: Prisma.TransactionClient, created: { registrationId: string; confirmationCode: string; waitlisted: boolean }) => Promise<void>;
+  /**
+   * The general link's waiting submission this very submission confirms (#931). Every other waiting submission's team name is
+   * reserved against this club submission, case-insensitively; this one's own is not (staff confirming it is how it is released).
+   */
+  confirmsPendingSubmissionId?: string;
+  /**
+   * A line added to the top of the registrant's one email (#931), decided inside the transaction once it is known whether the
+   * registration was waitlisted: the ordinary confirmation, or the waitlist notice.
+   */
+  confirmationNote?: (outcome: { waitlisted: boolean }) => string | null;
+  /** Extra ids for the club registration's audit entry (#931): ids and flags only, never names. */
+  auditMetadata?: Record<string, string | number | boolean | null>;
+  /** The staff user behind this submission for the audit entry when staff confirmed a waiting team (#931); never an act-as. */
+  auditActorUserId?: string;
   prepareAttendees: (
     tx: Prisma.TransactionClient,
     args: {
@@ -370,7 +391,7 @@ function attendeeResponsesFromJson(value: Prisma.JsonValue): PublicRegistrationI
   });
 }
 
-function usageFromReservations(
+export function usageFromReservations(
   definition: RegistrationFormDefinition,
   reservations: Array<{ fieldId: string; optionValue: string; rank: number | null }>,
 ) {
@@ -699,6 +720,14 @@ async function createPublicRegistrationTransaction(
   const form = await tx.registrationForm.findFirst(publishedFormQuery(eventSlug, formSlug));
   const version = form?.versions[0];
   if (!form || !version) throw new PublicRegistrationError("FORM_NOT_FOUND", "That public registration form is not available.");
+  // A club event's form takes registrations only through the club portal or the event's general link (#931): both carry a
+  // bulk context. Without one, anyone could post a club form here and skip the roster, the club match and the team rules.
+  if (!bulk && form.event.audience === "CLUB") {
+    throw new PublicRegistrationError(
+      "CLUB_ENTRY_REQUIRED",
+      "This is a club event. Club directors register through the club portal, or through the event's general registration link when it has one.",
+    );
+  }
   if (version.id !== input.versionId) {
     throw new PublicRegistrationError("FORM_VERSION_CHANGED", "This form was updated while it was open. Refresh the page before submitting.");
   }
@@ -777,6 +806,20 @@ async function createPublicRegistrationTransaction(
         select: { id: true },
       });
       if (nameTaken) {
+        throw new PublicRegistrationError("CLUB_TEAM_NAME_TAKEN", teamNameTakenMessage(club.team.name));
+      }
+      // A team waiting for staff on the general link (#931) holds its name too, whichever door the new submission comes through
+      // (the club portal included). Read in this Serializable transaction. The name key is already lowercase and trimmed.
+      const nameWaiting = await tx.generalLinkSubmission.findFirst({
+        where: {
+          eventId: form.eventId,
+          teamKey: club.team.key,
+          status: "PENDING",
+          ...(club.confirmsPendingSubmissionId ? { id: { not: club.confirmsPendingSubmissionId } } : {}),
+        },
+        select: { id: true },
+      });
+      if (nameWaiting) {
         throw new PublicRegistrationError("CLUB_TEAM_NAME_TAKEN", teamNameTakenMessage(club.team.name));
       }
     }
@@ -1366,6 +1409,7 @@ async function createPublicRegistrationTransaction(
       }
       throw error;
     }
+    if (club.inTransaction) await club.inTransaction(tx, { registrationId: registration.id, confirmationCode, waitlisted: isWaitlisted });
     await tx.clubRegistrationDraft.deleteMany({
       // The team's own draft (#809); an event without teams has only the one.
       where: { eventId: form.eventId, organizationId: club.organizationId, ...(club.team ? { draftKey: club.team.draftKey } : {}) },
@@ -1397,6 +1441,7 @@ async function createPublicRegistrationTransaction(
         recipientEmail: identity.email,
         recipientName: `${identity.firstName} ${identity.lastName}`.trim(),
         waitlistPosition,
+        ...(club?.confirmationNote ? { leadNote: club.confirmationNote({ waitlisted: true }) } : {}),
         metadata: {
           source: "PUBLIC_REGISTRATION",
           formVersionId: version.id,
@@ -1422,11 +1467,12 @@ async function createPublicRegistrationTransaction(
         calculation: admittedCalculation,
         location: registrationLocation,
         billedToGroup: Boolean(group),
+        ...(club?.confirmationNote ? { registrantNote: club.confirmationNote({ waitlisted: false }) } : {}),
       });
   await tx.auditLog.create({
     data: {
       eventId: form.eventId,
-      actorUserId: club?.submittedByUserId ?? null,
+      actorUserId: club?.submittedByUserId ?? club?.auditActorUserId ?? null,
       action: club
         ? "CLUB_REGISTRATION_SUBMITTED"
         : group ? "GROUP_REGISTRATION_SUBMITTED"
@@ -1462,6 +1508,7 @@ async function createPublicRegistrationTransaction(
               ...(club.submittedByAccountId ? { submittedByAttendeeAccountId: club.submittedByAccountId } : {}),
               ...(club.submittedByUserId ? { submittedByStaffUserId: club.submittedByUserId } : {}),
               ...(club.actAsId ? { actAsId: club.actAsId } : {}),
+              ...(club.auditMetadata ?? {}),
             }
           : {}),
         // A group names no club or church: only its place and its billing contact (#650).

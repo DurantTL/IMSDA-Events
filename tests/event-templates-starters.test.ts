@@ -49,13 +49,15 @@ describe("starter event templates (#546)", () => {
     expect(payload.moduleEnablement.autoPromoteWaitlist).toBe(false);
     expect(payload.messageTemplateDefaults).toEqual([]);
     expect(payload.attendeeTypes).toEqual([]);
-    // The Pathfinder Bible Experience (#809) also carries its team rules and registration deadline.
-    expect(Object.keys(payload).filter((key) => !["locations", "teamSettings", "registrationClosesOn"].includes(key)).sort()).toEqual([
+    // The Pathfinder Bible Experience (#809) also carries its team rules and registration deadline, and (#931) turns on the
+    // general registration link.
+    expect(Object.keys(payload).filter((key) => !["locations", "teamSettings", "registrationClosesOn", "generalRegistrationLink"].includes(key)).sort()).toEqual([
       "attendeeClassifications", "attendeeTypes", "audience", "billingMode", "brandingDefaults", "formTemplateKeys",
       "messageTemplateDefaults", "moduleEnablement", "reportSelections", "starterKey",
     ]);
     expect("locations" in payload).toBe(["fall_camporee", "pathfinder_bible_experience"].includes(starter.starterKey));
     expect("teamSettings" in payload).toBe(starter.starterKey === "pathfinder_bible_experience");
+    expect(payload.generalRegistrationLink === true).toBe(starter.starterKey === "pathfinder_bible_experience");
   });
 
   it("bills every CLUB starter to the church so directors can see the event (#565)", () => {

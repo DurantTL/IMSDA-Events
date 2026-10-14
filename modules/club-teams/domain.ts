@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { REGISTRATION_MANAGE_API_SENTINEL, REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
 
 /**
  * Club teams (#809): an event may let a club register more than one team, each
@@ -31,13 +32,17 @@ export function cleanTeamName(name: string) {
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
+const DELIVERY_SENTINELS = [REGISTRATION_MANAGE_LINK_SENTINEL, REGISTRATION_MANAGE_API_SENTINEL];
+
 export const teamNameSchema = z.string()
   .transform(cleanTeamName)
   .pipe(
     z.string()
       .min(1, "Enter a name for the team.")
       .max(TEAM_NAME_MAX, `Keep the team name to ${TEAM_NAME_MAX} characters or fewer.`)
-      .refine((value) => !CONTROL_CHARACTERS.test(value), "The team name can only use letters, numbers and punctuation."),
+      .refine((value) => !CONTROL_CHARACTERS.test(value), "The team name can only use letters, numbers and punctuation.")
+      // Delivery swaps these placeholders for a private link: a name carrying one could mint a link into an email.
+      .refine((value) => !DELIVERY_SENTINELS.some((sentinel) => value.includes(sentinel)), "The team name can only use letters, numbers and punctuation."),
   );
 
 /** What an event-wide name clash says. Never names the other club. */

@@ -395,6 +395,8 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   // 10. Registrations: cascades attendees, check-ins, waitlist, club
   //     registrations and assignments, access tokens, transfer moves.
   await tx.clubEventAssignment.deleteMany({ where: inEvent });
+  // Teams registered through the general registration link (#931): waiting ones hold typed-in answers, so they go with the event.
+  await tx.generalLinkSubmission.deleteMany({ where: inEvent });
   await tx.clubEventRegistration.deleteMany({ where: inEvent });
   await tx.clubRegistrationDraft.deleteMany({ where: inEvent });
   await tx.memberTransferRegistrationMove.deleteMany({ where: inEvent });

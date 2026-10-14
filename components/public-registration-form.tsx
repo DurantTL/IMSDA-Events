@@ -336,6 +336,14 @@ export type PublicRegistrationFormProps = {
     renderAttendeeExtras?: (attendee: RosterAttendee, index: number) => ReactNode;
     /** A reason the form can't be sent yet (no location chosen), shown instead of submitting. */
     blockedReason?: string | null;
+    /**
+     * The event's general registration link (#931): a club team typed in with no account. The team's name travels beside the
+     * answers, an event with nothing to pay says so (`billingNotice`) instead of promising a later bill, and the submit button
+     * and the confirmation use the server's own words.
+     */
+    teamName?: string | null;
+    noCost?: boolean;
+    submitLabel?: string;
     /** The location the group registers at, shown beside the price, with a way back to change it. */
     locationName?: string | null;
     onChangeLocation?: () => void;
@@ -2767,7 +2775,7 @@ export function PublicRegistrationForm({
           )}
           {!joiningWaitlist && group && (
             <p className="public-registration-review-waitlist">
-              {group.billingNotice} No payment is due online.
+              {group.billingNotice}{group.noCost ? "" : " No payment is due online."}
             </p>
           )}
         </section>
@@ -2969,6 +2977,7 @@ export function PublicRegistrationForm({
           ...(club?.honorSelections && Object.keys(club.honorSelections).length > 0 ? { honorSelections: club.honorSelections } : {}),
           ...(club?.honorConfirmations && Object.keys(club.honorConfirmations).length > 0 ? { honorConfirmations: club.honorConfirmations } : {}),
           ...(group?.locationId ? { locationId: group.locationId } : {}),
+          ...(group?.teamName ? { teamName: group.teamName } : {}),
           ...(Object.keys(groupPicks).length > 0 ? { honorSelections: groupPicks } : {}),
           website,
         }),
@@ -3106,7 +3115,7 @@ export function PublicRegistrationForm({
                 {!waitlisted && <p className="public-registration-review-waitlist">No payment is due online.</p>}
               </>
             )}
-            {group && !waitlisted && <p className="public-registration-review-waitlist"><strong>{group.billingNotice}</strong> No payment is due online. The total below is an estimate.</p>}
+            {group && !waitlisted && <p className="public-registration-review-waitlist"><strong>{group.billingNotice}</strong>{group.noCost ? "" : " No payment is due online. The total below is an estimate."}</p>}
             {group && groupHonorsNote && <p className="public-registration-review-waitlist" role="status">{groupHonorsNote}</p>}
             {rosterEnabled && confirmation.attendeeNames.length > 0 && (
               <section className="public-registration-confirmation-attendees" aria-label="Registered attendees">
@@ -3358,7 +3367,7 @@ export function PublicRegistrationForm({
                 className="public-registration-submit-button is-sticky-submit"
                 icon={<ClipboardCheck size={19} aria-hidden="true" />}
                 iconSize={19}
-                label={club?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration")}
+                label={club?.submitLabel ?? group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration")}
                 submitting={submitting}
               />
             )}
@@ -3376,7 +3385,7 @@ export function PublicRegistrationForm({
                 className="public-registration-submit-button"
                 icon={<ClipboardCheck size={19} aria-hidden="true" />}
                 iconSize={19}
-                label={club?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration")}
+                label={club?.submitLabel ?? group?.submitLabel ?? (joiningWaitlist ? "Join waitlist" : "Submit registration")}
                 submitting={submitting}
               />
             </section>
@@ -3411,7 +3420,7 @@ export function PublicRegistrationForm({
             </div>
           )}
           <small className="public-registration-pricing-date">Pricing verified for {formatPricingDate(pricingDate)}</small>
-          <div className="public-registration-summary-note">{joiningWaitlist ? <Clock3 size={15} aria-hidden="true" /> : <LockKeyhole size={15} aria-hidden="true" />}<span>{joiningWaitlist ? "This estimate is not charged while you are on the waitlist." : group ? `${group.billingNotice} No payment is due online.` : deferredOrganizationBilling ? "No payment is due online." : "Final pricing and availability are confirmed securely on submission."}</span></div>
+          <div className="public-registration-summary-note">{joiningWaitlist ? <Clock3 size={15} aria-hidden="true" /> : <LockKeyhole size={15} aria-hidden="true" />}<span>{joiningWaitlist ? "This estimate is not charged while you are on the waitlist." : group ? `${group.billingNotice}${group.noCost ? "" : " No payment is due online."}` : deferredOrganizationBilling ? "No payment is due online." : "Final pricing and availability are confirmed securely on submission."}</span></div>
         </aside>
       </form>
       {(() => {

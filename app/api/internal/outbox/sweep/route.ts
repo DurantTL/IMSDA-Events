@@ -9,6 +9,7 @@ import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitli
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { runHealthSnapshotSweep } from "@/modules/health-records/snapshot-hooks";
+import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
@@ -91,6 +92,12 @@ async function postHandler(request: Request) {
       logError("The sealed health copy sweep failed after a successful outbox sweep", error);
       return null;
     });
+    // General registration link (#931): teams still waiting 30 days after their event ended lose their typed answers and are
+    // marked EXPIRED. Safe on every sweep; it reports counts only. Its failure must not make a successful sweep look failed.
+    const generalLinkRetention = await expireStalePendingTeams().catch((error) => {
+      logError("The general link retention sweep failed after a successful outbox sweep", error);
+      return null;
+    });
     return Response.json({
       sweptEventCount: result.sweptEventIds.length,
       sweptAccountMessages: result.sweptAccountMessages,
@@ -108,6 +115,7 @@ async function postHandler(request: Request) {
       hostedLinks,
       classWaitlists,
       healthSnapshots,
+      generalLinkRetention,
       locationWaitlistDigest: locationWaitlistDigest && {
         status: locationWaitlistDigest.status,
         changesCovered: locationWaitlistDigest.changesCovered,

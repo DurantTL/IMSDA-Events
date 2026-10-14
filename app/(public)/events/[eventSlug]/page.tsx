@@ -309,6 +309,26 @@ export default async function PublicEventPage({
             </div>
           )}
 
+          {landing.generalLink && (
+            <div className="public-event-form-list">
+              <article className="public-event-form-card">
+                <div className="public-event-form-number" aria-hidden="true"><UsersRound size={20} /></div>
+                <div className="public-event-form-copy">
+                  <p className="public-registration-eyebrow">Club directors</p>
+                  <h3>{landing.generalLink.title}</h3>
+                  <p>No club account yet? Register a team here without signing in. Choose your club from the list and use the email your club has on file for its director or deputy to have the team attached to your club right away. There is no fee.</p>
+                </div>
+                {landing.lifecycle.ctaEnabled ? (
+                  <Link className="public-event-form-cta" href={landing.generalLink.href}>
+                    {landing.lifecycle.ctaLabel} <ArrowRight size={17} aria-hidden="true" />
+                  </Link>
+                ) : (
+                  <span className="public-event-form-cta is-disabled" aria-disabled="true">{landing.lifecycle.ctaLabel}</span>
+                )}
+              </article>
+            </div>
+          )}
+
           {landing.groupRegistration && (
             <div className="public-event-form-list">
               <article className="public-event-form-card">

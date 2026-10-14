@@ -800,6 +800,7 @@ model User {
   createdClubMeetingNotes            ClubMeetingNote[]             @relation("ClubMeetingNoteCreatedByUser")
   updatedClubMeetingNotes            ClubMeetingNote[]             @relation("ClubMeetingNoteUpdatedByUser")
   submittedClubEventRegistrations    ClubEventRegistration[]      @relation("ClubEventRegistrationSubmittedByUser")
+  resolvedGeneralLinkSubmissions     GeneralLinkSubmission[]      @relation("GeneralLinkSubmissionResolvedBy")
   updatedClubRegistrationDrafts      ClubRegistrationDraft[]      @relation("ClubRegistrationDraftUpdatedByUser")
   updatedClubSupplyStock             ClubSupplyStock[]            @relation("ClubSupplyStockUpdatedByUser")
   createdClubOrderBatches            ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchCreatedByUser")
@@ -1508,6 +1509,9 @@ model Event {
   /// Offers "Pay on Square" (Square's hosted checkout page) next to the embedded card form (#327).
   /// Off by default; staff turn it on for attendee-paid events.
   hostedPaymentLinkEnabled Boolean        @default(false)
+  /// One public "general registration link" for a club event (#931): directors with no account register a team through
+  /// it, and it is matched to the club they pick. Off by default; on for the Pathfinder Bible Experience starter.
+  generalRegistrationLinkEnabled Boolean  @default(false)
   /// A person is a minor at this event when their age on the event's start date is below this (#131).
   ageOfMajority        Int                @default(18)
   attendeeEditPolicy   AttendeeEditPolicy @default(VERIFY_EVERY_EDIT)
@@ -1591,6 +1595,7 @@ model Event {
   honorInstructors                    HonorInstructor[]
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
+  generalLinkSubmissions              GeneralLinkSubmission[]
   groupRegistrations                  GroupEventRegistration[]
   billingResponsibilities             RegistrationBillingResponsibility[]
   billingResponsibilityChanges        RegistrationBillingResponsibilityChange[]
@@ -1762,6 +1767,7 @@ model EventLocation {
   @@unique([eventId, normalizedName])
   @@index([eventId, isActive, sortOrder])
   @@index([coordinatorAccountId])
+  generalLinkSubmissions GeneralLinkSubmission[]
 }
 
 enum LocationWaitlistChangeKind {
@@ -2245,6 +2251,8 @@ model Organization {
   rosterMembers      ClubRosterMember[]
   rosterExportFormats ClubRosterExportFormat[]
   eventRegistrations ClubEventRegistration[]
+  generalLinkSubmissionsAsClub GeneralLinkSubmission[] @relation("GeneralLinkSubmissionClub")
+  generalLinkSubmissionsSuggested GeneralLinkSubmission[] @relation("GeneralLinkSubmissionSuggestedClub")
   registrationDrafts ClubRegistrationDraft[]
   eventAssignments   ClubEventAssignment[]
   honorEnrollments   HonorEnrollment[]
@@ -2715,6 +2723,7 @@ model Registration {
   notes                   StaffNote[]
   tagAssignments          RegistrationTagAssignment[]
   clubRegistration        ClubEventRegistration?
+  generalLinkSubmission   GeneralLinkSubmission?
   groupRegistration       GroupEventRegistration?
   billingResponsibility        RegistrationBillingResponsibility?
   billingResponsibilityChanges RegistrationBillingResponsibilityChange[]
@@ -8721,4 +8730,76 @@ model SeededFormTemplateVersion {
   template SeededFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
 
   @@unique([templateId, version])
+}
+
+enum GeneralLinkSubmissionStatus {
+  /// Waiting for staff to confirm or reassign the club. Holds no registration, seat, invoice line or check-in record.
+  PENDING
+  /// Attached to a club as an ordinary club registration (`registrationId`).
+  CONFIRMED
+  /// Refused by staff, with a reason. The submitted answers are removed.
+  REJECTED
+  /// Nobody resolved it by 30 days after the event ended: the retention sweep removed the submitted answers.
+  EXPIRED
+}
+
+enum GeneralLinkResolution {
+  /// The submitted director email matched a current director or deputy of the club the director picked.
+  AUTO_EMAIL_MATCH
+  /// Staff confirmed the club the director picked.
+  STAFF_CONFIRMED
+  /// Staff attached it to a different club than the one picked ("Not listed" included).
+  STAFF_REASSIGNED
+  STAFF_REJECTED
+  /// The retention sweep removed a still-waiting submission's answers after the event.
+  RETENTION_EXPIRED
+}
+
+/// A team registered through an event's general registration link (#931), with no account. A submission whose director
+/// email matches a current director or deputy of the picked club is created already CONFIRMED, in the same transaction as
+/// its club registration. Any other waits here as PENDING: it is NOT a Registration, so it is in no club count, invoice,
+/// report or check-in list until staff confirm or reassign the club, which runs the ordinary club submission once and
+/// links it (`registrationId`). While PENDING it keeps the validated answers (`payload`, including the team members'
+/// names and ages) for staff only; the payload is cleared the moment the row is resolved.
+model GeneralLinkSubmission {
+  id                      String                      @id @default(cuid())
+  eventId                 String
+  status                  GeneralLinkSubmissionStatus @default(PENDING)
+  resolution              GeneralLinkResolution?
+  confirmationCode        String                      @unique
+  /// The director's own submission key: a retried POST replays this row.
+  idempotencyKey          String
+  requestHash             String
+  /// The club as the director named it: a directory club's name, or the typed name for "Not listed".
+  clubNameAsEntered       String
+  /// The directory club the director picked, if it was one; null for "Not listed". Only a suggestion until resolved.
+  suggestedOrganizationId String?
+  /// The club the team belongs to once resolved.
+  organizationId          String?
+  /// The submitted director email, normalized (trimmed, lowercase).
+  directorEmail           String
+  directorName            String
+  teamName                String
+  /// The normalized team name; unique among PENDING submissions of an event, like a registered team's key.
+  teamKey                 String
+  locationId              String?
+  attendeeCount           Int
+  /// The validated request (answers and typed-in people), while PENDING only; cleared when resolved.
+  payload                 Json?
+  registrationId          String?                     @unique
+  rejectReason            String?
+  resolvedByUserId        String?
+  resolvedAt              DateTime?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  event                 Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  suggestedOrganization Organization?  @relation("GeneralLinkSubmissionSuggestedClub", fields: [suggestedOrganizationId], references: [id], onDelete: SetNull)
+  organization          Organization?  @relation("GeneralLinkSubmissionClub", fields: [organizationId], references: [id], onDelete: SetNull)
+  location              EventLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  registration          Registration?  @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  resolvedBy            User?          @relation("GeneralLinkSubmissionResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, idempotencyKey])
+  @@index([eventId, status, createdAt])
 }

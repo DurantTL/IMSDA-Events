@@ -414,6 +414,7 @@ export async function applyEventTemplate(
           supportContact: payload.brandingDefaults.supportContact,
           calendarCategory: payload.brandingDefaults.calendarCategory,
           ...(payload.registrationClosesOn ? { registrationClosesOn: payload.registrationClosesOn } : {}),
+          ...(payload.generalRegistrationLink ? { generalRegistrationLinkEnabled: true } : {}),
         },
       });
       // Team rules (#809): their own row, set before any club can register.

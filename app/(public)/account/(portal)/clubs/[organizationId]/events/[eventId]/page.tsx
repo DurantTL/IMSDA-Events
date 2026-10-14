@@ -13,6 +13,7 @@ import { ClubPassQr } from "@/components/club-pass-qr";
 import { clubPassIsAvailable } from "@/modules/checkin/club-pass-token";
 import { ClubRegistrationEditor } from "@/components/club-registration-editor";
 import { ClubRegistrationWorkspace } from "@/components/club-registration-workspace";
+import { TypedInRosterLink } from "@/components/typed-in-roster-link";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { getAttendeeProfile } from "@/modules/attendee-accounts/profile-service";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
@@ -267,6 +268,15 @@ export default async function ClubEventRegistrationPage({
                   {attendee.teamRole === "COACH" && <small>Coach</small>}
                   {attendee.alternate && <small>Alternate</small>}
                 </span>
+                {attendee.temporary && workspace.roster.length > 0 && (
+                  <TypedInRosterLink
+                    attendeeId={attendee.attendeeId}
+                    eventId={eventId}
+                    initialRosterMemberId={attendee.linkedRosterMemberId}
+                    options={workspace.roster.map((member) => ({ id: member.memberId, name: `${member.lastName}, ${member.firstName}` }))}
+                    organizationId={organizationId}
+                  />
+                )}
               </li>
             ))}
           </ul>
