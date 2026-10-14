@@ -7,6 +7,8 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { passkeysConfigured } from "@/modules/attendee-accounts/passkeys";
 import { ROSTER_UNLOCK_HOURS, requireRosterAccess } from "@/modules/club-rosters/access";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { listDirectedClubs } from "@/modules/organizations/director-access";
+import type { AcknowledgmentViewer } from "@/modules/health-records/acknowledgment-domain";
 import { isClubFormsRole } from "@/modules/club-forms/domain";
 import { HEALTH_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
 import { requireHealthRecordsEnabled } from "@/modules/health-records/flag";
@@ -18,8 +20,11 @@ import type { HealthViewer } from "@/modules/health-records/domain";
  * first so a switched-off site never reaches a database read.
  *
  * - A club's director or deputy, past the roster's second step: their own
- *   club only, all year. A registrar, reporter or another club's director is
- *   refused by the roster gate or by the role check below.
+ *   club only, all year.
+ * - A club Registrar, past the same second step (owner decision, 2026-10-14,
+ *   #923): write-only. The viewer can enter a record, only when none exists, for their own
+ *   club; `viewerCan` and the repository refuse every read. A reporter or
+ *   another club's director is refused by the roster gate or by the role check.
  * - An Area Coordinator with a verified second sign-in step: view only, and
  *   only for members registered for an event inside its window (checked where
  *   the member is loaded, with the event id).
@@ -30,15 +35,19 @@ import type { HealthViewer } from "@/modules/health-records/domain";
  */
 
 /**
- * For the club portal and its API routes: the club's own director or deputy.
- * A system administrator "acting as" the director is a system administrator:
- * view-only staff, never an editor of health records.
+ * For the club portal and its API routes: the club's own director or deputy,
+ * or its Registrar (write-only, #923). A system administrator "acting as" the
+ * director is a system administrator: view-only staff, never an editor of
+ * health records.
  */
 export async function requireHealthViewerForClub(organizationId: string, now = new Date()): Promise<HealthViewer> {
   requireHealthRecordsEnabled();
   const access = await requireRosterAccess(organizationId, now);
   if (access.actor.kind === "STAFF_ACTING") {
     return { kind: "SYSTEM_ADMIN", userId: access.actor.userId, actAsId: access.actor.actAsId };
+  }
+  if (access.club.role === "REGISTRAR") {
+    return { kind: "CLUB_REGISTRAR", organizationId: access.club.organizationId, accountId: access.actor.accountId };
   }
   if (!isClubFormsRole(access.club.role)) {
     throw new HealthRecordError("FORBIDDEN", "Health records are for the club's director and deputy.");
@@ -104,4 +113,26 @@ export async function attendeeUnlockMethods() {
     passkeysConfigured(),
   ]);
   return { code: enrollment?.status === "ACTIVE", passkey: passkeysOn && passkeyCount > 0 };
+}
+
+/**
+ * Who is acknowledging the privacy notice (#923): the signed-in person, as a
+ * staff user (`STAFF`) or an attendee account (`ATTENDEE`), and only if that
+ * person could use health access at all. The acknowledgment grants nothing by
+ * itself; this keeps the table to people the notice is for.
+ */
+export async function resolveAcknowledgmentViewer(as: "STAFF" | "ATTENDEE", now = new Date()): Promise<AcknowledgmentViewer> {
+  requireHealthRecordsEnabled();
+  if (as === "STAFF") {
+    const viewer = await requireStaffHealthViewer();
+    if (viewer.kind !== "SYSTEM_ADMIN" && viewer.kind !== "HEALTH_ROLE") throw new HealthRecordError("FORBIDDEN", "Health records need the health information permission.");
+    return { kind: viewer.kind, userId: viewer.userId };
+  }
+  const { account } = await getCurrentAttendee();
+  if (!account) throw new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED");
+  if (await currentAreaCoordinator()) return { kind: "AREA_COORDINATOR", accountId: account.id };
+  const clubs = await listDirectedClubs(account.id, now);
+  const broadest = clubs.some((club) => isClubFormsRole(club.role)) ? "CLUB_LEADER" : clubs.some((club) => club.role === "REGISTRAR") ? "CLUB_REGISTRAR" : null;
+  if (!broadest) throw new HealthRecordError("FORBIDDEN", "Health records are for a club's director, deputy or Registrar, an Area Coordinator, or event health staff.");
+  return { kind: broadest, accountId: account.id };
 }

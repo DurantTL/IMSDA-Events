@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { EventHealthSheet } from "@/components/event-health-sheet";
+import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
-import { HealthViewError, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
+import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   const viewer = await resolveAreaHealthViewer();
   if (!viewer) notFound();
   const query = await searchParams;
+  // The one-time privacy notice (#923) comes before anything is listed or opened.
+  if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
 
   if (!query.event) {
     const events = await listHealthEvents(viewer);
@@ -32,7 +35,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
         </section>
         <div className="account-page-body club-roster-stack">
           <BackLink href="/account/clubs">Back to clubs</BackLink>
-          <p className="inline-notice" role="status">Dietary notes as entered, the medical-need flag, and emergency contacts for club events. Each event is available until 30 days after it ends. Every time you open or print one it is recorded.</p>
+          <p className="inline-notice" role="status">Dietary notes as entered, the medical-need flag, and emergency contacts for club events. Each event is available through its last day. Every time you open or print one it is recorded.</p>
           {events.length === 0 ? <p className="quiet-copy">No club event is open for health information right now.</p> : (
             <ul className="account-overview-list">
               {events.map((event) => (
@@ -53,6 +56,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   try {
     data = await loadEventHealth(viewer, query.event, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
     if (error instanceof HealthViewError) notFound();
     throw error;
   }
@@ -66,7 +70,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
       </section>
       <div className="account-page-body club-roster-stack">
         <BackLink href="/account/area/health">Back to events</BackLink>
-        <p className="inline-notice" role="status">Available through {data.event.availableThrough}, 30 days after the event ends. This view is recorded.</p>
+        <p className="inline-notice" role="status">Available through {data.event.availableThrough}, the last day of the event. This view is recorded.</p>
         {sheet
           ? <PrintReportButton label="Print confidential sheet" />
           : <a className="secondary-button" href={`/account/area/health?event=${encodeURIComponent(data.event.id)}${query.club ? `&club=${encodeURIComponent(query.club)}` : ""}&sheet=1`}>Open printable sheet</a>}

@@ -71,6 +71,7 @@ export function ClubRosterWorkspace({
   complianceFilter: initialComplianceFilter = null,
   headingActions,
   healthTab,
+  healthEntryOnly,
   healthRecordFlags,
   guardians: initialGuardians,
 }: {
@@ -115,7 +116,9 @@ export function ClubRosterWorkspace({
    * the feature is switched on and the viewer is the club's director or
    * deputy; omitted everywhere else, so nothing about health is rendered.
    */
-  healthTab?: Record<string, { status: "NONE" | "CURRENT" | "NEEDS_UPDATE"; hasHealthNote: boolean }>;
+  healthTab?: Record<string, { status: "NONE" | "CURRENT" | "NEEDS_UPDATE" | "LOCKED"; hasHealthNote: boolean }>;
+  /** A Registrar (#923) can enter a health record only when none exists yet: with one on file, the row shows its status and no link. */
+  healthEntryOnly?: boolean;
   /** A neutral "Has a health record" marker (#611): a record exists, nothing more. Ids only, never text. */
   healthRecordFlags?: Record<string, boolean>;
   /**
@@ -542,13 +545,16 @@ export function ClubRosterWorkspace({
                               {healthRecordFlags?.[member.id] && (
                                 <span className="status-chip">Has a health record</span>
                               )}
-                              {healthTab && (
+                              {healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE") && (
+                                <span className="status-chip">A health record is on file; the director or a deputy can update it.</span>
+                              )}
+                              {healthTab && !(healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE")) && (
                                 <a
                                   aria-label={`Health record for ${member.firstName} ${member.lastName}`}
                                   className="secondary-button"
                                   href={`/account/clubs/${encodeURIComponent(organizationId)}/roster/${encodeURIComponent(member.id)}/health`}
                                 >
-                                  Health{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
+                                  {healthEntryOnly ? "Enter health record" : "Health"}{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
                                 </a>
                               )}
                               <button aria-label={`Edit ${member.firstName} ${member.lastName}`} className="secondary-button" disabled={saving} onClick={() => openDialog(member)} type="button">

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { isUnchangedFromStored, storedContactPhone, normalizePhoneAnswer, validateEmail, validatePhone, validateZip, type FieldCheck } from "@/lib/field-validation";
 import { clubYearFor, parseCalendarDate } from "@/modules/club-rosters/domain";
-import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 
 /**
  * Pure rules for the Pathfinder Health Record (#611): the field list, input
@@ -289,23 +288,44 @@ export function clampHealthLinkDays(days: number | undefined) {
  *   and only for a member registered for one of those events, inside its window.
  * - SYSTEM_ADMIN: view only, any member, all year.
  *
- * There is deliberately no registrar, reporter, or event-staff viewer: none of
- * them can be constructed, whatever other permissions they hold (Event Admins
- * and VIEW_SENSITIVE_DATA holders included).
+ * - CLUB_REGISTRAR (owner decision, 2026-10-14, #923): write-only. Types in a
+ *   record for a member of their own club only when none exists (directors and
+ *   deputies change an existing one), and is afterwards shown only that a
+ *   record is on file and its status.
+ *
+ * There is deliberately no reporter or event-staff viewer: none of them can be
+ * constructed, whatever other permissions they hold (Event Admins and
+ * VIEW_SENSITIVE_DATA holders included).
  */
 export type HealthViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; accountId: string }
+  /** Write-only (#923): enters a record only when none exists, never reads one back. Own club only. */
+  | { kind: "CLUB_REGISTRAR"; organizationId: string; accountId: string }
   | { kind: "AREA_COORDINATOR"; accountId: string }
   | { kind: "HEALTH_ROLE"; userId: string; eventIds: readonly string[] }
   /** `actAsId` is set when the administrator is acting as a club director (#442), so the audit shows it. */
   | { kind: "SYSTEM_ADMIN"; userId: string; actAsId?: string };
 
-export type HealthAction = "VIEW" | "EDIT" | "SEND_LINK";
+/** EDIT is entering or changing a record from the paper form (a Registrar only when none exists); CONFIRM re-affirms one that was read. */
+export type HealthAction = "VIEW" | "EDIT" | "CONFIRM" | "SEND_LINK";
 
 export function viewerCan(viewer: HealthViewer, organizationId: string, action: HealthAction) {
-  // Everyone but the club's own leaders only looks.
-  if (viewer.kind !== "CLUB_LEADER") return action === "VIEW";
-  return viewer.organizationId === organizationId;
+  switch (viewer.kind) {
+    case "CLUB_LEADER":
+      return viewer.organizationId === organizationId;
+    // A Registrar may enter a record for their own club (the repository refuses when one exists) and do nothing else: no view, no
+    // confirmation (it would affirm what they cannot read), no parent links.
+    case "CLUB_REGISTRAR":
+      return viewer.organizationId === organizationId && action === "EDIT";
+    // Everyone else only looks.
+    default:
+      return action === "VIEW";
+  }
+}
+
+/** True for a viewer who may be shown a record's values. A Registrar never is. */
+export function viewerCanReadValues(viewer: HealthViewer) {
+  return viewer.kind !== "CLUB_REGISTRAR";
 }
 
 /** Coordinators and the health role see a member only through an event they can access. */
@@ -329,6 +349,7 @@ export function healthAuditActor(viewer: HealthViewer): {
       return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind } };
     case "AREA_COORDINATOR":
     case "CLUB_LEADER":
+    case "CLUB_REGISTRAR":
       return { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: viewer.accountId } };
   }
 }
@@ -338,31 +359,6 @@ export function viewerActorId(viewer: HealthViewer) {
 }
 
 // ---------------------------------------------------------------------------
-// The event window.
+// The event window: one definition shared with the coordinator health view.
 
-/**
- * How long after an event ends its attendees' records stay open to an Area
- * Coordinator or the health role. This is the coordinator health view's rule
- * (#658, `HEALTH_WINDOW_DAYS`): open from registration until 30 days after the
- * event's last day, inclusive, in the event's time zone. It is restated here as
- * one named constant until #658 merges and the two can share a definition.
- */
-export const HEALTH_WINDOW_DAYS = 30;
-
-function addCalendarDays(date: string, days: number) {
-  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-}
-
-/** The last calendar day (event time zone, inclusive) an event's attendee records may be opened. */
-export function healthWindowEndsOn(event: { timezone: string; endsAt: Date }) {
-  return addCalendarDays(calendarDateInEventTimeZone(event.endsAt, event.timezone), HEALTH_WINDOW_DAYS);
-}
-
-/**
- * There is no start bound of its own: a member can only be an attendee after
- * registering, so "from registration" is the attendee check itself.
- */
-export function healthWindowOpen(event: { timezone: string; endsAt: Date }, now: Date) {
-  return calendarDateInEventTimeZone(now, event.timezone) <= healthWindowEndsOn(event);
-}
+export { HEALTH_WINDOW_DAYS, healthWindowEndsOn, healthWindowOpen } from "@/modules/events/health-window";

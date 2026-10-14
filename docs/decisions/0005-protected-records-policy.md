@@ -10,8 +10,9 @@ Date: 2026-08-09
 
 **Addendum A (club roster birth dates) is Accepted** as of 2026-09-22; see the end
 of this document. It covers only roster birth dates. The rest of this ADR is
-still Proposed. **Addendum B (Pathfinder Health Record) is Proposed**, drafted with
-#611 for human sign-off; the feature stays switched off until it is Accepted.
+still Proposed. **Addendum B (Pathfinder Health Record) is Accepted (interim)** as
+of 2026-10-14 (see its status line); the feature stays switched off in production
+until the prerequisites listed there are met.
 
 ## Context
 
@@ -384,11 +385,18 @@ birth dates need their own protection.
 
 ## Addendum B: Pathfinder Health Record
 
-Status: **Proposed.** Drafted for human review with issue #611. Nothing here is
-approved until the people named under "Sign-off" accept it. Until then the
-feature stays **switched off in production** (`HEALTH_RECORDS_ENABLED`
-unset or `false`). Addendum A is unaffected: it still covers only roster birth
-dates.
+Status: **Accepted (interim), 2026-10-14, Communication Director and IT
+Director.** Approved as written by the two of them as an interim measure
+(issue #923). The reason given: health information currently has no security at
+all (paper forms and Cognito), so this design is better than the status quo
+now. The full sign-off list under "Sign-off" still applies for final
+acceptance. Production use stays **switched off** (`HEALTH_RECORDS_ENABLED`
+unset or `false`) until the prerequisites below are met, in particular the key
+backup restore test. Addendum A is unaffected: it still covers only roster
+birth dates.
+
+Where the owner decisions of 2026-10-14 (below) differ from the design text in
+this addendum, the 2026-10-14 decisions are the current rule.
 
 ### Why
 
@@ -430,24 +438,27 @@ human can accept, change or reject them before any real record is stored.
    | Role | Health tab and record |
    | --- | --- |
    | That club's Director and Deputy (second step passed) | View and edit, own club only, all year; send and withdraw parent links |
-   | Club Registrar | No health access. Sees only a neutral "Has a health record" marker on the club roster page: the single fact that a record exists, not whether it holds a clinical note, not its status, never its text |
+   | Club Registrar (changed 2026-10-14, #923) | **Write-only, and only when none exists yet.** Can create a member's record for their own club (typing in a paper form) when the member has none, after the one-time privacy acknowledgment. If a record already exists, the save is refused and only the director or a deputy can update it. They cannot read a record back: they are shown only that a record is on file, its status and no form. No view, no confirmation, no parent links, no export, print or CSV. Every save and every refused save is audited. Also sees the neutral "Has a health record" marker on the roster page |
    | Club Reporter | No |
-   | Area Coordinator (verified second step) | **View only** the full record of a member registered for an event (submitted or confirmed registration by that club), from registration until 30 days after the event's last day; no roster browsing, no Health tab, no edit |
+   | Area Coordinator (verified second step) | **View only** the full record of a member registered for an event (submitted or confirmed registration by that club), from registration through the event's last day (changed 2026-10-14, #923: it was 30 days after); no roster browsing, no Health tab, no edit |
    | Staff holding `VIEW_HEALTH_INFORMATION` on an event membership | **View only**, and only for members registered for that event, inside the same window |
    | System administrators | View only, any member, all year (no event needed) |
    | Everyone else by role alone (Event Admins, registration, finance, check-in, read-only staff, and anyone with `VIEW_SENSITIVE_DATA`) | No |
    | The parent, holding a valid private link | Fills in one member's record once; sees no stored value |
 
-   The window is the coordinator health view's rule (#658): inclusive, in the
-   event's time zone. Outside it, a coordinator or health-role viewer gets "not
-   found", system administrators excepted.
+   The window is one definition shared with the coordinator health view
+   (#658, `modules/events/health-window.ts`): it closes at the end of the
+   event's last day, inclusive, in the event's time zone (changed 2026-10-14,
+   #923; it used to stay open 30 days longer). Outside it, a coordinator or
+   health-role viewer gets "not found", system administrators excepted.
 4. **The explicit permission** is `VIEW_HEALTH_INFORMATION`, the same
    permission the coordinator health view (#658) adds to event memberships. No
    role carries it, Event Admin included; only a system administrator grants
    it, one membership at a time, and each grant is audited. #611 adds no second
    grant route.
 5. **Audit.** Every view, create, update, confirmation, link send, link
-   withdrawal and link submission writes an audit row (permission grants are
+   withdrawal and link submission writes an audit row, as does each privacy
+   acknowledgment and each refused read by a Registrar (permission grants are
    audited by #658). A row names who, which club and member by id, the event
    id when the view was through an event, a field count, and the club year.
    It never holds a health value, an address, a phone number or an email.
@@ -509,29 +520,94 @@ human can accept, change or reject them before any real record is stored.
 - **Event health staff:** the health permission stays event-scoped (given on
   an event membership), not conference-wide.
 - **Registrar entry:** Registrars get no health access, to enter or to read.
+  *Replaced on 2026-10-14: Registrars may now enter but not read (below).*
 - **Refused attempts:** refused attempts by signed-in staff are audited too.
 - **Training:** everyone who holds health access completes short training
-  before it is granted.
+  before it is granted. *Replaced on 2026-10-14 by the one-time privacy
+  acknowledgment (below).*
 - **Consent wording:** the three statements are the verbatim text from the 2026
   Pathfinder Health Record (`HEALTH_CONSENT_TEXT`, version
   `pathfinder-health-record-2026`).
+
+### Decided 2026-10-14 (Communication Director and IT Director, #923)
+
+Owner decisions from Caleb, Communication Director, on 2026-10-14.
+
+1. **Addendum B is Accepted, as an interim measure.** Approved as written by
+   the Communication Director and the IT Director, because health information
+   currently has no security at all (paper forms and Cognito). The full
+   sign-off list still applies for final acceptance.
+2. **Key backup restore test:** still to be done by a human, following
+   `docs/DEPLOY-DOCKER.md`, "Keeping and testing the key backup"
+   (`npm run key:restore-check`). Production use stays off until it has passed.
+3. **Event health access ends when the event ends.** For Area Coordinators and
+   the event health role the window closes at the end of the event's last day
+   in the event's time zone (it was 30 days after, `HEALTH_WINDOW_DAYS = 30`).
+   One shared definition (`modules/events/health-window.ts`,
+   `HEALTH_WINDOW_DAYS = 0`) serves this addendum and Addendum C, so the
+   coordinator health view closes at the same moment for everyone, club
+   directors and system administrators included.
+4. **Registrars may enter health records but not read them.** This replaces
+   the 2026-10-09 rule of no access.
+   - A club Registrar can create a member's health record when none exists
+     yet, for example typing in a paper form. After saving they cannot read it
+     back: they see only that a record is on file and its status. The server enforces this on every read path (API routes,
+     pages, summaries, links); the code that serves a Registrar never selects
+     or decrypts a stored value, and no validation message compares against one.
+   - A Registrar cannot confirm a record (that would affirm what they cannot
+     read) or send, list or withdraw parent links.
+   - **Only when none exists (owner decision of 2026-10-14, follow-up).** If a
+     health record already exists for the member, a Registrar's save is
+     refused on the server with a plain message that says only that a record
+     is already on file and the director or a deputy can update it. It carries
+     no value. The check runs inside the save transaction, with the member's
+     row locked and the unique key as the backstop, so two saves at once
+     cannot get past it. The Registrar's page and roster link then show the
+     status only, with no form: "A health record is on file; the director or a
+     deputy can update it." The refusal is audited
+     (`HEALTH_RECORD_SAVE_REFUSED`) with ids and the reason `RECORD_EXISTS`,
+     never a value. A record kept from an earlier club year counts as
+     existing.
+   - Only directors and deputies change an existing record (and keep full
+     read and write).
+5. **Refused attempts are audited:** confirmed (already decided 2026-10-09).
+   A Registrar's refused read writes `HEALTH_RECORD_ACCESS_REFUSED` with ids
+   and a reason, never a health value.
+6. **Training is a one-time privacy acknowledgment screen.** It appears before
+   health access works for a person and is recorded, per person, with its
+   wording version (`HealthPrivacyAcknowledgment`). A new wording version
+   means acknowledging again. It covers directors, deputies, Area
+   Coordinators, the event health role and system administrators (before
+   break-glass), and Registrars before entry. The coordinator health view
+   (Addendum C) asks for it too, while `HEALTH_RECORDS_ENABLED` is on; with the
+   switch off (production today) that view behaves as before.
+7. **Backup retention and legal hold:** still open. Research is going to the
+   owner; #923 does not cover it.
 
 ### Still open (blocking production use)
 
 These are the remaining decisions from section 6 of the options report plus
 questions this build raised.
 
-- **Coordinator window start.** The window has no start bound of its own (a
-  member can only be an attendee after registering). Confirm.
+- **Key backup restore test** (decision 2 above): a human has to run it.
+- **Final acceptance:** the full sign-off list below, beyond the interim
+  acceptance.
 - **Backup retention and legal hold.** How long off-site backup copies are
   kept (#875 suggests 90 days), and who can pause deletion under a legal hold.
+  Research is going to the owner.
+- **Acknowledgment wording.** The notice text in
+  `modules/health-records/acknowledgment-domain.ts` is a draft for the
+  Communication Director to confirm. A change to it needs a new version.
+- **Coordinator window start.** The window has no start bound of its own (a
+  member can only be an attendee after registering). Confirm.
 - **Typed signature versus signature evidence** (#150) when it ships.
 - **Coordinator entry point.** #611 adds the coordinator and staff pages but
   no links to them; #658's event sheet is the natural place to link from.
 
 ### Prerequisites before real records
 
-1. This addendum Accepted.
+1. This addendum Accepted (done, interim, 2026-10-14; final acceptance needs
+   the full sign-off list).
 2. The `SECRET_ENCRYPTION_KEY` backup exists **and has been test-restored**
    (reported created on 2026-10-01; the restore is not yet confirmed).
 3. The open decisions above answered.
@@ -541,7 +617,9 @@ questions this build raised.
 
 Privacy, security, legal, ministry-operations and key-operations owners, as
 for the rest of this ADR, plus the club-health owner named by the director.
-Key custodian remains Jonathan Swena (Addendum A, item 7).
+Key custodian remains Jonathan Swena (Addendum A, item 7). The interim
+acceptance of 2026-10-14 was given by the Communication Director and the IT
+Director only.
 
 ### Consequences
 
@@ -622,10 +700,14 @@ only.
 
 ### Rules
 
-- **Window.** Open from registration until 30 days after the event's last day
-  (event time zone, inclusive), then closed for everyone, system
-  administrators included, for the view and for the printable sheet. This is
-  this view's own rule; the club forms "has not ended" rule is unchanged.
+- **Window.** Open from registration through the event's last day (event time
+  zone, inclusive), then closed for everyone, directors and system
+  administrators included, for the view and for the printable sheet. The owner
+  confirmed on 2026-10-14 that it closes for everyone at the end of the event's
+  last day; no exception. It was 30 days after the last day
+  until the owner decision of 2026-10-14 (#923, Addendum B); the definition is
+  now shared with the Health Record (`modules/events/health-window.ts`). The
+  club forms "has not ended" rule is unchanged.
 - **MFA.** Staff accounts with any active event membership, and system
   administrators, already require two-step sign-in (decision of 2026-09-25).
   Granting or removing `VIEW_HEALTH_INFORMATION` ends all of that user's
@@ -669,8 +751,8 @@ only.
 - Medications and structured allergies are not collected for club events.
   Collecting them is #611.
 - Emergency contact name and relationship are missing from the permission slip.
-- The 30-day window and the exception need the same owner sign-off as the rest
-  of this ADR before it moves from Proposed to Accepted.
+- The window (now the event's last day) and the exception need the same owner
+  sign-off as the rest of this ADR before it moves from Proposed to Accepted.
 
 ## Addendum D: Anonymous kitchen report
 

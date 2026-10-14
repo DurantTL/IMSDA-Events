@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { HealthStepUp } from "@/components/health-step-up";
 import { attendeeUnlockMethods, requireAreaCoordinatorHealthViewer } from "@/modules/health-records/access";
@@ -33,9 +34,12 @@ export default async function AreaCoordinatorHealthPage({
     return <HealthStepUp methods={await attendeeUnlockMethods()} />;
   }
   const health = await viewHealthRecord(viewer, organizationId, memberId, new Date(), { eventId }).catch((error: unknown) => {
+    // The one-time privacy notice (#923) comes before any record opens.
+    if (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED") return null;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (!health) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
   return (
     <section className="page-stack club-form-page">
       <header>

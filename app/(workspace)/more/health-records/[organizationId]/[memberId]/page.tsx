@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
+import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
 import { HealthRecordError } from "@/modules/health-records/errors";
@@ -36,9 +37,12 @@ export default async function StaffHealthRecordPage({
     return <AccessRestricted detail="Health records need the health information permission, granted by a system administrator." title="Health records are restricted" />;
   }
   const health = await viewHealthRecord(viewer, organizationId, memberId, new Date(), { eventId: event }).catch((error: unknown) => {
+    // The one-time privacy notice (#923) comes before any record opens.
+    if (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED") return null;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (!health) return <HealthPrivacyAcknowledgment as="STAFF" />;
   return (
     <section className="page-stack club-form-page">
       <header>

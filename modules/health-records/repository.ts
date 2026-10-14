@@ -6,7 +6,9 @@ import { ZodError } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { isSecretEncryptionConfigured } from "@/lib/secret-box";
 import { hashOpaqueToken } from "@/modules/access/tokens";
+import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { requireHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { openHealthField, sealHealthField } from "@/modules/health-records/crypto";
@@ -28,6 +30,7 @@ import {
   isHealthFieldKey,
   viewerActorId,
   viewerCan,
+  viewerCanReadValues,
   type HealthAction,
   type HealthRecordInput,
   type HealthRecordStatus,
@@ -52,11 +55,57 @@ function unavailable() {
   return new HealthRecordError("LINK_UNAVAILABLE", HEALTH_LINK_UNAVAILABLE_MESSAGE);
 }
 
+/** Says only that a record exists and who can change it. Never a value. */
+export const REGISTRAR_RECORD_EXISTS_MESSAGE = "A health record is already on file. The director or a deputy can update it.";
+
+const REGISTRAR_WRITE_ONLY_MESSAGE = "Registrars can enter a health record but cannot read, confirm or send links for one.";
+
+function isClubViewer(viewer: HealthViewer): viewer is Extract<HealthViewer, { kind: "CLUB_LEADER" | "CLUB_REGISTRAR" }> {
+  return viewer.kind === "CLUB_LEADER" || viewer.kind === "CLUB_REGISTRAR";
+}
+
 function allow(viewer: HealthViewer, organizationId: string, action: HealthAction) {
   if (!viewerCan(viewer, organizationId, action)) {
     // Another club's record is not found; a permitted viewer without this action is forbidden.
+    if (isClubViewer(viewer) && viewer.organizationId !== organizationId) throw new HealthRecordError("MEMBER_NOT_FOUND", HEALTH_MEMBER_NOT_FOUND_MESSAGE);
+    if (viewer.kind === "CLUB_REGISTRAR") throw new HealthRecordError("FORBIDDEN", REGISTRAR_WRITE_ONLY_MESSAGE);
     if (viewer.kind === "CLUB_LEADER") throw new HealthRecordError("MEMBER_NOT_FOUND", HEALTH_MEMBER_NOT_FOUND_MESSAGE);
     throw new HealthRecordError("FORBIDDEN", "Your access to health records is view-only.");
+  }
+}
+
+/** Ids are short opaque strings. Anything else is caller-supplied text and is never stored. */
+function idShaped(value: string | null | undefined) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : "invalid";
+}
+
+/**
+ * `allow` for a read, where a refusal is itself audited (ADR 0005, decided
+ * 2026-10-09: refused attempts are audited): who, which club and member by id,
+ * and what was attempted. Never a health value. The refusal stands even if the
+ * audit write fails.
+ */
+async function allowRead(viewer: HealthViewer, organizationId: string, memberId: string | null, attempted: string) {
+  try {
+    allow(viewer, organizationId, "VIEW");
+  } catch (refusal) {
+    if (viewer.kind === "CLUB_REGISTRAR" && refusal instanceof HealthRecordError && refusal.code === "FORBIDDEN") {
+      const who = healthAuditActor(viewer);
+      try {
+        await writeAuditLog({
+          actorUserId: who.actorUserId,
+          action: "HEALTH_RECORD_ACCESS_REFUSED",
+          entityType: "HealthRecord",
+          entityId: memberId ? idShaped(memberId) : idShaped(organizationId),
+          summary: "A read of a member's health record was refused.",
+          metadata: { ...who.metadata, organizationId: idShaped(organizationId), rosterMemberId: memberId ? idShaped(memberId) : null, attempted, reason: "WRITE_ONLY_ROLE" },
+        });
+      } catch (error) {
+        const action = "Auditing a refused health record read failed";
+        logError(action, error);
+      }
+    }
+    throw refusal;
   }
 }
 
@@ -79,7 +128,7 @@ async function loadMember(
   memberId: string,
   now: Date,
   // An Area Coordinator's event-scoped view may reach a member whose roster row
-  // is from the club year just ended (the window runs 30 days past the event).
+  // is from the club year just ended (the window runs through the event's last day).
   options: { anyYear?: boolean } = {},
 ) {
   const member = await client.clubRosterMember.findFirst({
@@ -175,7 +224,8 @@ export async function viewHealthRecord(
   options: { eventId?: string } = {},
 ): Promise<HealthTabView> {
   requireHealthRecordsEnabled();
-  allow(viewer, organizationId, "VIEW");
+  await allowRead(viewer, organizationId, memberId, "VIEW_RECORD");
+  await requireHealthPrivacyAcknowledgment(viewer);
   const prisma = getPrisma();
   const scoped = viewerNeedsEvent(viewer);
   const member = await loadMember(prisma, organizationId, memberId, now, { anyYear: scoped });
@@ -259,6 +309,7 @@ async function writeRecord(
   const rows = Object.entries(values).map(([fieldKey, value]) => ({ fieldKey, sealedValue: sealHealthField(recordId, fieldKey, value) }));
   const common = {
     confirmedClubYear: clubYearFor(input.now),
+    lastConfirmedAt: input.now,
     hasHealthNote: hasHealthNoteFor(values),
     lastEnteredVia: input.via,
     lastSavedByActor: input.savedBy,
@@ -295,15 +346,22 @@ async function storedTypedValuesForMember(organizationId: string, memberId: stri
   }
 }
 
-/** A director or deputy types the record in from the paper form (or corrects it). */
+/**
+ * A director, deputy or Registrar types the record in from the paper form. Only a director or deputy changes
+ * a record that already exists; a Registrar's save over one is refused (owner decision of 2026-10-14).
+ */
 export async function saveHealthRecord(viewer: HealthViewer, organizationId: string, memberId: string, rawInput: unknown, now = new Date()) {
   requireHealthRecordsEnabled();
   allow(viewer, organizationId, "EDIT");
+  await requireHealthPrivacyAcknowledgment(viewer);
   let input: HealthRecordInput;
   try {
     input = parseHealthRecordInput(rawInput);
   } catch (error) {
     if (!(error instanceof HealthRecordError) || error.code !== "VALIDATION_FAILED") throw error;
+    // A write-only Registrar never has stored values opened for them, not even to compare: that would let
+    // them probe what is stored by whether a guess is accepted.
+    if (!viewerCanReadValues(viewer)) throw error;
     // Only when every failure is a typed phone, email or ZIP check: a plain failure opens nothing.
     const check = healthRecordInputSchemaFor().safeParse(rawInput);
     if (check.success || !failsOnlyTypedChecks(check.error.issues)) throw error;
@@ -315,25 +373,53 @@ export async function saveHealthRecord(viewer: HealthViewer, organizationId: str
   }
   requireEncryption();
   const who = healthAuditActor(viewer);
-  return withFirstSaveRetry(() => getPrisma().$transaction(async (tx) => {
-    const member = await loadMember(tx, organizationId, memberId, now);
-    const written = await writeRecord(tx, { organizationId, member, input, via: "DIRECTOR", savedBy: viewerActorId(viewer), now });
-    await writeAuditLog({
-      actorUserId: who.actorUserId,
-      action: written.created ? "HEALTH_RECORD_CREATED" : "HEALTH_RECORD_UPDATED",
-      entityType: "HealthRecord",
-      entityId: written.recordId,
-      summary: written.created ? "Created a member's health record." : "Updated a member's health record.",
-      metadata: { ...who.metadata, organizationId, rosterMemberId: memberId, fieldCount: written.fieldCount, clubYear: clubYearFor(now) },
-    }, tx);
-    return { recordId: written.recordId, status: "CURRENT" as const };
-  }));
+  try {
+    return await withFirstSaveRetry(() => getPrisma().$transaction(async (tx) => {
+      const member = await loadMember(tx, organizationId, memberId, now);
+      if (viewer.kind === "CLUB_REGISTRAR") {
+        // A Registrar may only create (owner decision of 2026-10-14). The member's row is locked so two saves
+        // for the same member run one after the other; the check below then sees the first one's record. If a
+        // create still races past the check, the unique key stops it and the retry lands here again, refused.
+        await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ${member.id} FOR UPDATE`;
+        if (await findRecordMeta(tx, organizationId, member)) throw new HealthRecordError("RECORD_EXISTS", REGISTRAR_RECORD_EXISTS_MESSAGE);
+      }
+      const written = await writeRecord(tx, { organizationId, member, input, via: "DIRECTOR", savedBy: viewerActorId(viewer), now });
+      await writeAuditLog({
+        actorUserId: who.actorUserId,
+        action: written.created ? "HEALTH_RECORD_CREATED" : "HEALTH_RECORD_UPDATED",
+        entityType: "HealthRecord",
+        entityId: written.recordId,
+        summary: written.created ? "Created a member's health record." : "Updated a member's health record.",
+        metadata: { ...who.metadata, organizationId, rosterMemberId: memberId, fieldCount: written.fieldCount, clubYear: clubYearFor(now) },
+      }, tx);
+      return { recordId: written.recordId, status: "CURRENT" as const };
+    }));
+  } catch (refusal) {
+    if (viewer.kind === "CLUB_REGISTRAR" && refusal instanceof HealthRecordError && refusal.code === "RECORD_EXISTS") {
+      // Audited outside the rolled-back transaction: ids and a reason only. The refusal stands if the audit fails.
+      try {
+        await writeAuditLog({
+          actorUserId: who.actorUserId,
+          action: "HEALTH_RECORD_SAVE_REFUSED",
+          entityType: "HealthRecord",
+          entityId: idShaped(memberId),
+          summary: "A Registrar's save over an existing health record was refused.",
+          metadata: { ...who.metadata, organizationId: idShaped(organizationId), rosterMemberId: idShaped(memberId), reason: "RECORD_EXISTS" },
+        });
+      } catch (error) {
+        const action = "Auditing a refused health record save failed";
+        logError(action, error);
+      }
+    }
+    throw refusal;
+  }
 }
 
 /** The director confirms last year's record is still right for this club year. */
 export async function confirmHealthRecord(viewer: HealthViewer, organizationId: string, memberId: string, now = new Date()) {
   requireHealthRecordsEnabled();
-  allow(viewer, organizationId, "EDIT");
+  allow(viewer, organizationId, "CONFIRM");
+  await requireHealthPrivacyAcknowledgment(viewer);
   const who = healthAuditActor(viewer);
   return getPrisma().$transaction(async (tx) => {
     const member = await loadMember(tx, organizationId, memberId, now);
@@ -341,7 +427,7 @@ export async function confirmHealthRecord(viewer: HealthViewer, organizationId: 
     if (!record) throw new HealthRecordError("MEMBER_NOT_FOUND", "There is no health record to confirm yet.");
     await tx.healthRecord.update({
       where: { id: record.id },
-      data: { confirmedClubYear: clubYearFor(now), rosterMemberId: member.id, lastSavedByActor: viewerActorId(viewer) },
+      data: { confirmedClubYear: clubYearFor(now), lastConfirmedAt: now, rosterMemberId: member.id, lastSavedByActor: viewerActorId(viewer) },
     });
     await writeAuditLog({
       actorUserId: who.actorUserId,
@@ -369,7 +455,8 @@ export async function healthSummariesForMembers(
   now = new Date(),
 ): Promise<Record<string, HealthSummary>> {
   requireHealthRecordsEnabled();
-  allow(viewer, organizationId, "VIEW");
+  await allowRead(viewer, organizationId, null, "VIEW_SUMMARIES");
+  await requireHealthPrivacyAcknowledgment(viewer);
   // Event-scoped viewers have no roster-wide view; only the event-scoped record.
   if (viewerNeedsEvent(viewer)) throw new HealthRecordError("FORBIDDEN", "Health summaries are for the club's own leaders and system administrators.");
   if (memberIds.length === 0) return {};
@@ -382,6 +469,89 @@ export async function healthSummariesForMembers(
     const record = byMember.get(id) ?? null;
     return [id, { status: healthRecordStatus(record, now), hasHealthNote: record?.hasHealthNote ?? false }];
   }));
+}
+
+// ---------------------------------------------------------------------------
+// The write-only Registrar (#923). Nothing below opens, selects or returns a
+// stored health value: the queries ask for ids, the club year and a date.
+
+export type HealthEntryView = {
+  member: { id: string; firstName: string; lastName: string };
+  club: { name: string; sponsoringChurch: string | null };
+  /** The one fact a Registrar learns about a stored record, beside its status. */
+  exists: boolean;
+  status: HealthRecordStatus;
+  consentText: typeof HEALTH_CONSENT_TEXT;
+  consentVersion: string;
+};
+
+/** Record metadata for a member (same person-follows-year rule as `findRecord`), with no field rows. */
+async function findRecordMeta(client: Pick<Client, "healthRecord">, organizationId: string, member: Pick<LoadedMember, "id" | "personId">) {
+  const select = { confirmedClubYear: true } as const;
+  const own = await client.healthRecord.findUnique({ where: { rosterMemberId: member.id }, select });
+  if (own) return own;
+  if (!member.personId) return null;
+  return client.healthRecord.findFirst({ where: { organizationId, rosterMember: { personId: member.personId } }, orderBy: { updatedAt: "desc" }, select });
+}
+
+/**
+ * What a Registrar sees for one member: that a record exists and its status.
+ * For the entry page; never a value or a date.
+ */
+export async function viewHealthEntryStatus(viewer: HealthViewer, organizationId: string, memberId: string, now = new Date()): Promise<HealthEntryView> {
+  requireHealthRecordsEnabled();
+  if (viewer.kind !== "CLUB_REGISTRAR") throw new HealthRecordError("FORBIDDEN", "This page is for a club Registrar. Directors and deputies open the record itself.");
+  allow(viewer, organizationId, "EDIT");
+  await requireHealthPrivacyAcknowledgment(viewer);
+  const prisma = getPrisma();
+  const member = await loadMember(prisma, organizationId, memberId, now);
+  const record = await findRecordMeta(prisma, organizationId, member);
+  return {
+    member: { id: member.id, firstName: member.person?.firstName ?? "", lastName: member.person?.lastName ?? "" },
+    club: { name: member.organization.name, sponsoringChurch: member.organization.parentOrganization?.name ?? null },
+    exists: record !== null,
+    status: healthRecordStatus(record, now),
+    consentText: HEALTH_CONSENT_TEXT,
+    consentVersion: HEALTH_CONSENT_VERSION,
+  };
+}
+
+/** Status only, for a Registrar's roster rows: no clinical-note flag, no text. */
+export async function healthEntryStatusesForMembers(
+  viewer: HealthViewer,
+  organizationId: string,
+  memberIds: string[],
+  now = new Date(),
+): Promise<Record<string, { status: HealthRecordStatus }>> {
+  requireHealthRecordsEnabled();
+  if (viewer.kind !== "CLUB_REGISTRAR") throw new HealthRecordError("FORBIDDEN", "This list is for a club Registrar.");
+  allow(viewer, organizationId, "EDIT");
+  await requireHealthPrivacyAcknowledgment(viewer);
+  if (memberIds.length === 0) return {};
+  const prisma = getPrisma();
+  // Same rule as `findRecordMeta`: the person's record from an earlier club year counts as on file, because a
+  // Registrar's save over it would be refused.
+  const members = await prisma.clubRosterMember.findMany({ where: { id: { in: memberIds }, organizationId }, select: { id: true, personId: true } });
+  const personIds = members.flatMap((member) => (member.personId ? [member.personId] : []));
+  const records = await prisma.healthRecord.findMany({
+    where: {
+      organizationId,
+      OR: [{ rosterMemberId: { in: memberIds } }, ...(personIds.length > 0 ? [{ rosterMember: { personId: { in: personIds } } }] : [])],
+    },
+    select: { rosterMemberId: true, confirmedClubYear: true, updatedAt: true, rosterMember: { select: { personId: true } } },
+  });
+  const byMember = new Map(records.map((record) => [record.rosterMemberId, record]));
+  const personOf = new Map(members.map((member) => [member.id, member.personId]));
+  const forMember = (id: string) => {
+    const own = byMember.get(id);
+    if (own) return own;
+    const personId = personOf.get(id);
+    if (!personId) return null;
+    return records
+      .filter((record) => record.rosterMember.personId === personId)
+      .sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0))[0] ?? null;
+  };
+  return Object.fromEntries(memberIds.map((id) => [id, { status: healthRecordStatus(forMember(id), now) }]));
 }
 
 /**
@@ -433,6 +603,7 @@ export async function createHealthRecordLink(viewer: HealthViewer, input: Create
   requireHealthRecordsEnabled();
   allow(viewer, input.organizationId, "SEND_LINK");
   if (viewer.kind !== "CLUB_LEADER") throw new HealthRecordError("FORBIDDEN", "Only the club's director or deputy can send a link.");
+  await requireHealthPrivacyAcknowledgment(viewer);
   if (!isAccountEmailConfigured()) {
     throw new HealthRecordError("EMAIL_NOT_CONFIGURED", "Email isn't set up on this server, so a link can't be sent yet.");
   }
@@ -512,6 +683,7 @@ export async function listHealthRecordLinks(viewer: HealthViewer, organizationId
   requireHealthRecordsEnabled();
   allow(viewer, organizationId, "SEND_LINK");
   if (viewer.kind !== "CLUB_LEADER") throw new HealthRecordError("FORBIDDEN", "Only the club's director or deputy can see links.");
+  await requireHealthPrivacyAcknowledgment(viewer);
   const links = await getPrisma().healthRecordLink.findMany({
     where: { organizationId, rosterMemberId: memberId },
     orderBy: { createdAt: "desc" },
@@ -532,6 +704,7 @@ export async function revokeHealthRecordLink(viewer: HealthViewer, organizationI
   requireHealthRecordsEnabled();
   allow(viewer, organizationId, "SEND_LINK");
   if (viewer.kind !== "CLUB_LEADER") throw new HealthRecordError("FORBIDDEN", "Only the club's director or deputy can withdraw a link.");
+  await requireHealthPrivacyAcknowledgment(viewer);
   const who = healthAuditActor(viewer);
   return getPrisma().$transaction(async (tx) => {
     const link = await tx.healthRecordLink.findFirst({ where: { id: linkId, organizationId }, select: { id: true } });

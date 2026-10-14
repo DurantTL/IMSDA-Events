@@ -8,7 +8,9 @@ export type HealthRecordErrorCode =
   | "EMAIL_NOT_CONFIGURED"
   | "ENCRYPTION_NOT_CONFIGURED"
   | "STEP_UP_REQUIRED"
+  | "ACKNOWLEDGMENT_REQUIRED"
   | "CONFLICT"
+  | "RECORD_EXISTS"
   | "UNREADABLE";
 
 /** A health record rule that stopped a request. Messages never carry a health value. */

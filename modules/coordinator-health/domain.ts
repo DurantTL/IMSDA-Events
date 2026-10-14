@@ -2,7 +2,7 @@ import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 
 /**
  * Coordinator health view (#658, ADR 0005 Addendum C). Pure rules: who may see
- * what, the 30-day window, and how existing answers become one sheet. Nothing
+ * what, the event window, and how existing answers become one sheet. Nothing
  * here reads or writes the database.
  *
  * Only these things are ever shown, per attendee of a club event:
@@ -12,8 +12,6 @@ import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
  *   `emergency_contact_phone`, the passenger list's `passenger_N_emergency_contact`).
  * Every other field on those forms is ignored. Medications are not collected.
  */
-
-export const HEALTH_WINDOW_DAYS = 30;
 
 export const HEALTH_TEXT = {
   dietaryLabel: "Dietary restrictions / allergies (as entered)",
@@ -42,26 +40,9 @@ export const ATTENDEE_DIETARY_KEY = "dietary_needs";
 export const ATTENDEE_MEDICAL_FLAG_KEY = "medical_or_accessibility_need";
 
 // ---------------------------------------------------------------------------
-// The 30-day window
+// The event window: one definition shared with the Health Record (#923)
 
-function addDays(isoDate: string, days: number) {
-  const [year, month, day] = isoDate.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-}
-
-/**
- * The last calendar day (event time zone, inclusive) the health view is open:
- * 30 days after the event's last day. This is this view's own rule; the club
- * forms "has not ended" rule is separate and unchanged.
- */
-export function healthWindowEndsOn(event: { timezone: string; endsAt: Date }) {
-  return addDays(calendarDateInEventTimeZone(event.endsAt, event.timezone), HEALTH_WINDOW_DAYS);
-}
-
-/** Open from registration until 30 days after the event ends, then closed for everyone, system administrators included. */
-export function healthWindowOpen(event: { timezone: string; endsAt: Date }, now = new Date()) {
-  return calendarDateInEventTimeZone(now, event.timezone) <= healthWindowEndsOn(event);
-}
+export { HEALTH_WINDOW_DAYS, healthWindowEndsOn, healthWindowOpen } from "@/modules/events/health-window";
 
 // ---------------------------------------------------------------------------
 // Who may see it

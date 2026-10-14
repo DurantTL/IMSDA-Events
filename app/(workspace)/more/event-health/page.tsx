@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
 import { BackLink } from "@/components/back-link";
 import { EventHealthSheet } from "@/components/event-health-sheet";
+import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveStaffHealthViewer } from "@/modules/coordinator-health/access";
-import { HealthViewError, loadEventHealth } from "@/modules/coordinator-health/repository";
+import { HealthViewError, healthAcknowledgmentOwed, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 
 export const metadata: Metadata = {
@@ -31,11 +32,14 @@ export default async function EventHealthPage({
   if (!viewer) {
     return <AccessRestricted title="Health information is restricted" detail="Ask a system administrator if you need health information access for this event." />;
   }
+  // The one-time privacy notice (#923) comes before anything is opened.
+  if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as="STAFF" />;
   const sheet = query.sheet === "1";
   let data;
   try {
     data = await loadEventHealth(viewer, event.id, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="STAFF" />;
     if (error instanceof HealthViewError) return <AccessRestricted title="Health information is unavailable" detail={error.message} />;
     throw error;
   }
@@ -47,7 +51,7 @@ export default async function EventHealthPage({
         <div>
           <p className="eyebrow">Confidential · read only</p>
           <h2>{data.event.name}: health information</h2>
-          <p>Available through {data.event.availableThrough}, 30 days after the event ends. Every time this is opened or printed it is recorded.</p>
+          <p>Available through {data.event.availableThrough}, the last day of the event. Every time this is opened or printed it is recorded.</p>
         </div>
         <div className="intro-actions">
           {sheet

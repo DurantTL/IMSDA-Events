@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { EventHealthSheet } from "@/components/event-health-sheet";
+import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
 import { clubLeaderHealthViewerFromAccess } from "@/modules/coordinator-health/access";
-import { HealthViewError, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
+import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
@@ -28,12 +29,14 @@ export default async function ClubHealthPage({
   const viewer = clubLeaderHealthViewerFromAccess(access);
   if (!viewer) return <p className="public-manage-empty">Health information is kept by the club&apos;s director and deputy.</p>;
   const base = `/account/clubs/${organizationId}/health`;
+  // The one-time privacy notice (#923) comes before anything is listed or opened.
+  if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as={viewer.actor.kind === "ATTENDEE" ? "ATTENDEE" : "STAFF"} />;
 
   if (!query.event) {
     const events = await listHealthEvents(viewer);
     return (
       <>
-        <p className="inline-notice" role="status">Confidential. Each event is available until 30 days after it ends, and every time you open or print one it is recorded.</p>
+        <p className="inline-notice" role="status">Confidential. Each event is available through its last day, and every time you open or print one it is recorded.</p>
         {events.length === 0 ? <p className="quiet-copy">No event your club registered for is open for health information.</p> : (
           <ul className="account-overview-list">
             {events.map((event) => (
@@ -53,6 +56,7 @@ export default async function ClubHealthPage({
   try {
     data = await loadEventHealth(viewer, query.event, { purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as={viewer.actor.kind === "ATTENDEE" ? "ATTENDEE" : "STAFF"} />;
     if (error instanceof HealthViewError) notFound();
     throw error;
   }

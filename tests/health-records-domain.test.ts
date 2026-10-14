@@ -14,8 +14,10 @@ import {
   healthRecordInputSchemaFor,
   healthRecordStatus,
   viewerCan,
+  viewerCanReadValues,
   type HealthViewer,
 } from "@/modules/health-records/domain";
+import { HEALTH_PRIVACY_ACK_VERSION, acknowledgmentSubjectFor } from "@/modules/health-records/acknowledgment-domain";
 
 import { eventPermissions, rolePermissions } from "@/modules/access/permissions";
 import { syntheticRecord } from "./health-records-fixtures";
@@ -121,9 +123,39 @@ describe("who may do what", () => {
     }
   });
 
-  it("has no viewer kind for a registrar, reporter or event staff", () => {
-    const kinds: HealthViewer["kind"][] = ["CLUB_LEADER", "AREA_COORDINATOR", "HEALTH_ROLE", "SYSTEM_ADMIN"];
-    expect(kinds).toHaveLength(4);
+  it("lets a Registrar enter or replace a record for their own club and do nothing else (#923)", () => {
+    const registrar: HealthViewer = { kind: "CLUB_REGISTRAR", organizationId: "club-a", accountId: "acct-3" };
+    expect(viewerCan(registrar, "club-a", "EDIT")).toBe(true);
+    expect(viewerCan(registrar, "club-b", "EDIT")).toBe(false);
+    for (const action of ["VIEW", "CONFIRM", "SEND_LINK"] as const) {
+      expect(viewerCan(registrar, "club-a", action), action).toBe(false);
+    }
+    expect(viewerCanReadValues(registrar)).toBe(false);
+    for (const viewer of [leader, staff, admin, coordinator]) expect(viewerCanReadValues(viewer)).toBe(true);
+    expect(healthAuditActor(registrar)).toEqual({ metadata: { viewerKind: "CLUB_REGISTRAR", actorAttendeeAccountId: "acct-3" } });
+  });
+
+  it("keeps directors and deputies as they were: view, edit, confirm and send links for their own club (#923)", () => {
+    for (const action of ["VIEW", "EDIT", "CONFIRM", "SEND_LINK"] as const) {
+      expect(viewerCan(leader, "club-a", action)).toBe(true);
+      expect(viewerCan(leader, "club-b", action)).toBe(false);
+    }
+    for (const viewer of [staff, coordinator, admin]) expect(viewerCan(viewer, "club-a", "CONFIRM")).toBe(false);
+  });
+
+  it("has no viewer kind for a reporter or event staff", () => {
+    const kinds: HealthViewer["kind"][] = ["CLUB_LEADER", "CLUB_REGISTRAR", "AREA_COORDINATOR", "HEALTH_ROLE", "SYSTEM_ADMIN"];
+    expect(kinds).toHaveLength(5);
+  });
+
+  it("identifies who acknowledges the privacy notice: staff by user, everyone else by attendee account (#923)", () => {
+    expect(acknowledgmentSubjectFor(admin as never)).toEqual({ userId: "user-0" });
+    expect(acknowledgmentSubjectFor(staff as never)).toEqual({ userId: "user-1" });
+    expect(acknowledgmentSubjectFor(coordinator as never)).toEqual({ attendeeAccountId: "acct-2" });
+    expect(acknowledgmentSubjectFor(leader as never)).toEqual({ attendeeAccountId: "acct-1" });
+    expect(acknowledgmentSubjectFor({ kind: "CLUB_REGISTRAR", accountId: "acct-3" })).toEqual({ attendeeAccountId: "acct-3" });
+    expect(acknowledgmentSubjectFor({ kind: "CLUB_LEADER", actor: { kind: "STAFF_ACTING", userId: "user-9" } })).toEqual({ userId: "user-9" });
+    expect(HEALTH_PRIVACY_ACK_VERSION).toMatch(/^health-privacy-ack-/);
   });
 
   it("scopes coordinators and the health role to events, and the health role to its own events", () => {
@@ -150,15 +182,16 @@ describe("who may do what", () => {
   });
 });
 
-describe("the event window (the coordinator health view's rule)", () => {
+describe("the event window (shared with the coordinator health view, #923)", () => {
   const event = { timezone: "America/Chicago", endsAt: new Date("2026-11-08T18:00:00Z") };
 
-  it("ends 30 calendar days after the event's last day, inclusive, in the event's time zone", () => {
-    expect(healthWindowEndsOn(event)).toBe("2026-12-08");
+  it("ends on the event's last day, inclusive, in the event's time zone", () => {
+    expect(healthWindowEndsOn(event)).toBe("2026-11-08");
     expect(healthWindowOpen(event, new Date("2026-09-01T12:00:00Z"))).toBe(true);
     expect(healthWindowOpen(event, new Date("2026-11-07T12:00:00Z"))).toBe(true);
-    expect(healthWindowOpen(event, new Date("2026-12-08T23:30:00-06:00"))).toBe(true);
-    expect(healthWindowOpen(event, new Date("2026-12-09T00:30:00-06:00"))).toBe(false);
+    expect(healthWindowOpen(event, new Date("2026-11-08T23:30:00-06:00"))).toBe(true);
+    expect(healthWindowOpen(event, new Date("2026-11-09T00:30:00-06:00"))).toBe(false);
+    expect(healthWindowOpen(event, new Date("2026-12-08T12:00:00-06:00"))).toBe(false);
   });
 });
 

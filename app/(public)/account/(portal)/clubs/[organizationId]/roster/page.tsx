@@ -13,7 +13,8 @@ import { listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
-import { healthRecordFlagsForRoster, healthSummariesForMembers } from "@/modules/health-records/repository";
+import { HealthRecordError } from "@/modules/health-records/errors";
+import { healthEntryStatusesForMembers, healthRecordFlagsForRoster, healthSummariesForMembers } from "@/modules/health-records/repository";
 
 export const metadata: Metadata = { title: "Club roster" };
 export const dynamic = "force-dynamic";
@@ -51,10 +52,20 @@ export default async function ClubRosterPage({
   const linkableMembers = members.map((member) => (member.personId && movedAway.has(member.personId) ? { ...member, personId: undefined } : member));
   // The Health tab (#611): only with the feature on, for the current year, and
   // for the club's own director or deputy. Status and a plain flag, never text.
-  const healthTab = healthRecordsEnabled() && !readOnly
-    ? await requireHealthViewerForClub(organizationId)
-      .then((viewer) => (viewer.kind === "CLUB_LEADER" ? healthSummariesForMembers(viewer, organizationId, members.map((member) => member.id)) : undefined))
-      .catch(() => undefined)
+  // A club Registrar (#923) gets an entry link with the status only: no clinical-note flag, nothing to read.
+  // Until the one-time privacy acknowledgment is made, the link is shown without a status, so the person can reach the prompt.
+  const memberIds = members.map((member) => member.id);
+  const healthViewer = healthRecordsEnabled() && !readOnly ? await requireHealthViewerForClub(organizationId).catch(() => null) : null;
+  const healthEntryOnly = healthViewer?.kind === "CLUB_REGISTRAR";
+  const healthTab = healthViewer
+    ? await (async () => {
+      if (healthViewer.kind === "CLUB_LEADER") return healthSummariesForMembers(healthViewer, organizationId, memberIds);
+      if (healthViewer.kind !== "CLUB_REGISTRAR") return undefined;
+      const statuses = await healthEntryStatusesForMembers(healthViewer, organizationId, memberIds);
+      return Object.fromEntries(Object.entries(statuses).map(([id, { status }]) => [id, { status, hasHealthNote: false }]));
+    })().catch((error: unknown) => (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED"
+      ? Object.fromEntries(memberIds.map((id) => [id, { status: "LOCKED" as const, hasHealthNote: false }]))
+      : undefined))
     : undefined;
   // Anyone who can see these rows, with no health access, still sees a neutral
   // "Has a health record" marker: one boolean saying a record exists, no text (#611).
@@ -84,6 +95,7 @@ export default async function ClubRosterPage({
         guardians={guardians}
         healthRecordFlags={healthRecordFlags}
         healthTab={healthTab}
+        healthEntryOnly={healthEntryOnly}
         honorsPopup={{ canRecord: !readOnly }}
         initialMembers={linkableMembers}
         organizationId={organizationId}

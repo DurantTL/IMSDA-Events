@@ -18,13 +18,15 @@ import {
 // Synthetic event: ends Sunday 2026-10-11 (Central time).
 const event = { timezone: "America/Chicago", endsAt: new Date("2026-10-11T22:00:00Z") };
 
-describe("the 30-day window (#658)", () => {
-  it("is open before, during and up to 30 days after the event, then closed", () => {
-    expect(healthWindowEndsOn(event)).toBe("2026-11-10");
+describe("the event window (#658, #923)", () => {
+  it("is open before and during the event, through its last day, then closed", () => {
+    expect(healthWindowEndsOn(event)).toBe("2026-10-11");
     expect(healthWindowOpen(event, new Date("2026-09-01T12:00:00Z"))).toBe(true);
     expect(healthWindowOpen(event, new Date("2026-10-11T12:00:00Z"))).toBe(true);
-    expect(healthWindowOpen(event, new Date("2026-11-10T20:00:00Z"))).toBe(true);
-    expect(healthWindowOpen(event, new Date("2026-11-11T07:00:00Z"))).toBe(false);
+    // 11:30 pm Central on the last day is still open; 12:30 am the next day is closed.
+    expect(healthWindowOpen(event, new Date("2026-10-12T04:30:00Z"))).toBe(true);
+    expect(healthWindowOpen(event, new Date("2026-10-12T05:30:00Z"))).toBe(false);
+    expect(healthWindowOpen(event, new Date("2026-11-10T20:00:00Z"))).toBe(false);
     expect(healthWindowOpen(event, new Date("2027-03-01T12:00:00Z"))).toBe(false);
   });
 });

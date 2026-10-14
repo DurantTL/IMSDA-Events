@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   coordinator: vi.fn(),
   attendee: vi.fn(),
   sessionFind: vi.fn(),
+  directed: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -19,11 +20,13 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAtten
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: state.session }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: state.acting }));
 vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: state.coordinator }));
+vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: state.directed }));
 
 import {
   requireAreaCoordinatorHealthViewer,
   requireHealthViewerForClub,
   requireStaffHealthViewer,
+  resolveAcknowledgmentViewer,
 } from "@/modules/health-records/access";
 
 function rosterAs(role: string, actor: Record<string, unknown> = { kind: "ATTENDEE", accountId: "acct-1" }) {
@@ -48,11 +51,11 @@ describe("health access: club portal", () => {
     }
   });
 
-  it("refuses a registrar and a reporter", async () => {
-    for (const role of ["REGISTRAR", "REPORTER"]) {
-      state.roster.mockResolvedValue(rosterAs(role));
-      await expect(requireHealthViewerForClub("club-a")).rejects.toMatchObject({ code: "FORBIDDEN" });
-    }
+  it("lets a registrar in as a write-only registrar for their own club, and refuses a reporter (#923)", async () => {
+    state.roster.mockResolvedValue(rosterAs("REGISTRAR"));
+    await expect(requireHealthViewerForClub("club-a")).resolves.toEqual({ kind: "CLUB_REGISTRAR", organizationId: "club-a", accountId: "acct-1" });
+    state.roster.mockResolvedValue(rosterAs("REPORTER"));
+    await expect(requireHealthViewerForClub("club-a")).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("passes the roster gate's refusals through (another club, no second step, signed out)", async () => {
@@ -168,5 +171,47 @@ describe("health access: Area Coordinator", () => {
     state.enabled = false;
     await expect(requireAreaCoordinatorHealthViewer(now)).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(state.coordinator).not.toHaveBeenCalled();
+  });
+});
+
+describe("who may acknowledge the privacy notice (#923)", () => {
+  beforeEach(() => {
+    state.enabled = true;
+    for (const mock of [state.session, state.acting, state.memberships, state.coordinator, state.attendee, state.directed]) mock.mockReset();
+    state.memberships.mockResolvedValue([]);
+    state.coordinator.mockResolvedValue(null);
+    state.directed.mockResolvedValue([]);
+  });
+
+  it("identifies a system administrator or the health role by user, and refuses other staff", async () => {
+    state.session.mockResolvedValue({ user: { id: "u-sysadmin", globalRole: "SYSTEM_ADMIN" } });
+    await expect(resolveAcknowledgmentViewer("STAFF")).resolves.toEqual({ kind: "SYSTEM_ADMIN", userId: "u-sysadmin" });
+    state.session.mockResolvedValue({ user: { id: "u-health", globalRole: null } });
+    state.memberships.mockResolvedValue([{ eventId: "event-1", permissions: ["VIEW_HEALTH_INFORMATION"] }]);
+    await expect(resolveAcknowledgmentViewer("STAFF")).resolves.toEqual({ kind: "HEALTH_ROLE", userId: "u-health" });
+    state.memberships.mockResolvedValue([]);
+    await expect(resolveAcknowledgmentViewer("STAFF")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("identifies an Area Coordinator, a director or deputy, and a Registrar by attendee account", async () => {
+    state.attendee.mockResolvedValue({ account: { id: "acct-1" } });
+    state.coordinator.mockResolvedValue({ id: "acct-1" });
+    await expect(resolveAcknowledgmentViewer("ATTENDEE")).resolves.toEqual({ kind: "AREA_COORDINATOR", accountId: "acct-1" });
+    state.coordinator.mockResolvedValue(null);
+    state.directed.mockResolvedValue([{ organizationId: "club-a", role: "DEPUTY" }, { organizationId: "club-b", role: "REGISTRAR" }]);
+    await expect(resolveAcknowledgmentViewer("ATTENDEE")).resolves.toEqual({ kind: "CLUB_LEADER", accountId: "acct-1" });
+    state.directed.mockResolvedValue([{ organizationId: "club-b", role: "REGISTRAR" }]);
+    await expect(resolveAcknowledgmentViewer("ATTENDEE")).resolves.toEqual({ kind: "CLUB_REGISTRAR", accountId: "acct-1" });
+  });
+
+  it("refuses a reporter, a signed-out visitor, and everything with the feature off", async () => {
+    state.attendee.mockResolvedValue({ account: { id: "acct-1" } });
+    state.directed.mockResolvedValue([{ organizationId: "club-a", role: "REPORTER" }]);
+    await expect(resolveAcknowledgmentViewer("ATTENDEE")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    state.attendee.mockResolvedValue({ account: null });
+    await expect(resolveAcknowledgmentViewer("ATTENDEE")).rejects.toMatchObject({ status: 401 });
+    state.enabled = false;
+    await expect(resolveAcknowledgmentViewer("ATTENDEE")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(resolveAcknowledgmentViewer("STAFF")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

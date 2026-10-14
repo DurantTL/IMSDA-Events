@@ -16,6 +16,9 @@ const state = vi.hoisted(() => ({
   emailConfigured: true,
   members: [] as Array<Record<string, any>>,
   eventRegistrations: [] as Array<Record<string, any>>,
+  /** Stored privacy acknowledgments (#923); `ackAll` acknowledges everyone, for the tests that are not about it. */
+  acks: [] as Array<Record<string, any>>,
+  ackAll: true,
 }));
 
 function matches(row: Row, where: Row): boolean {
@@ -116,6 +119,14 @@ const client: any = {
     findFirst: async ({ where }: { where: Row }) => state.links.find((row) => matches(row, where)) ?? null,
     findMany: async ({ where }: { where: Row }) => state.links.filter((row) => matches(row, where)),
   },
+  healthPrivacyAcknowledgment: {
+    findFirst: async ({ where }: { where: Row }) => {
+      return state.acks.find((row) => matches(row, where)) ?? (state.ackAll ? { id: "ack-all" } : null);
+    },
+    create: async ({ data }: { data: Row }) => {
+      state.acks.push({ id: `ack-${state.acks.length + 1}`, ...data });
+    },
+  },
   messageOutbox: {
     create: async ({ data }: { data: Row }) => {
       const message = { id: `message-${state.outbox.length + 1}`, ...data };
@@ -123,6 +134,7 @@ const client: any = {
       return message;
     },
   },
+  $queryRaw: async () => [],
   $transaction: async (work: (tx: unknown) => unknown) => work(client),
 };
 
@@ -139,12 +151,15 @@ vi.mock("@/modules/communications/account-email", () => ({
   getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
 }));
 
+import { recordHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";
+import { HEALTH_PRIVACY_ACK_VERSION } from "@/modules/health-records/acknowledgment-domain";
 import { openHealthField } from "@/modules/health-records/crypto";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { prepareHealthRecordLinkBodyForDelivery } from "@/modules/health-records/link-email";
 import {
   confirmHealthRecord,
   createHealthRecordLink,
+  healthEntryStatusesForMembers,
   healthRecordFlagsForRoster,
   healthSummariesForMembers,
   listHealthRecordLinks,
@@ -152,6 +167,7 @@ import {
   revokeHealthRecordLink,
   saveHealthRecord,
   submitHealthRecordViaLink,
+  viewHealthEntryStatus,
   viewHealthRecord,
 } from "@/modules/health-records/repository";
 import type { HealthViewer } from "@/modules/health-records/domain";
@@ -171,6 +187,8 @@ function resetState() {
   state.fields = [];
   state.links = [];
   state.outbox = [];
+  state.acks = [];
+  state.ackAll = true;
   state.eventRegistrations = [{
     eventId: "event-1",
     organizationId: "club-a",
@@ -455,9 +473,11 @@ describe("the Area Coordinator's event-scoped view", () => {
     expect((error as Error).message).toBe((roster as Error).message);
   });
 
-  it("still opens a record through the 30 days after the event, and not after", async () => {
-    await expect(viewHealthRecord(coordinator, "club-a", "member-1", new Date("2026-11-10T12:00:00Z"), { eventId: "event-1" })).resolves.toBeTruthy();
-    await expect(viewHealthRecord(coordinator, "club-a", "member-1", new Date("2026-11-11T12:00:00Z"), { eventId: "event-1" })).rejects.toMatchObject({ code: "MEMBER_NOT_FOUND" });
+  it("opens a record through the event's last day, and not the day after (#923)", async () => {
+    // The event ends Sunday 2026-10-11 at 1:00 pm Central.
+    await expect(viewHealthRecord(coordinator, "club-a", "member-1", new Date("2026-10-11T23:30:00-05:00"), { eventId: "event-1" })).resolves.toBeTruthy();
+    await expect(viewHealthRecord(coordinator, "club-a", "member-1", new Date("2026-10-12T00:30:00-05:00"), { eventId: "event-1" })).rejects.toMatchObject({ code: "MEMBER_NOT_FOUND" });
+    await expect(viewHealthRecord(coordinator, "club-a", "member-1", new Date("2026-11-10T12:00:00Z"), { eventId: "event-1" })).rejects.toMatchObject({ code: "MEMBER_NOT_FOUND" });
   });
 
   it("refuses a member who is not an attendee of that event, another event, or a cancelled registration", async () => {
@@ -579,5 +599,256 @@ describe("the neutral record-exists marker", () => {
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
     state.env.HEALTH_RECORDS_ENABLED = false;
     expect(await healthRecordFlagsForRoster("club-a", ["member-1"])).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Owner decisions of 2026-10-14 (#923).
+
+
+const registrar: HealthViewer = { kind: "CLUB_REGISTRAR", organizationId: "club-a", accountId: "acct-reg" };
+const otherRegistrar: HealthViewer = { kind: "CLUB_REGISTRAR", organizationId: "club-b", accountId: "acct-reg-b" };
+
+describe("a Registrar can enter a health record but never read one (#923)", () => {
+  beforeEach(resetState);
+
+  it("creates a record from the paper form, sealed, with an audited save that holds no health value", async () => {
+    await expect(saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now)).resolves.toMatchObject({ status: "CURRENT" });
+    expect(state.records).toHaveLength(1);
+    expect(state.records[0]!.lastConfirmedAt).toEqual(now);
+    for (const marker of healthMarkers) expect(JSON.stringify([state.records, state.fields])).not.toContain(marker);
+    expect(state.audit).toHaveLength(1);
+    expect(state.audit[0]).toMatchObject({
+      action: "HEALTH_RECORD_CREATED",
+      entityType: "HealthRecord",
+      metadata: { viewerKind: "CLUB_REGISTRAR", actorAttendeeAccountId: "acct-reg", organizationId: "club-a", rosterMemberId: "member-1" },
+    });
+    for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("refuses a Registrar's save when a record already exists: a plain message, no value, nothing changed, audited with ids only", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    const before = JSON.stringify([state.records, state.fields]);
+    state.audit = [];
+    const error = await saveHealthRecord(registrar, "club-a", "member-1", { ...syntheticRecord, medications: "Synthetic registrar note" }, now).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(HealthRecordError);
+    expect(error).toMatchObject({ code: "RECORD_EXISTS", message: "A health record is already on file. The director or a deputy can update it." });
+    for (const marker of [...healthMarkers, "Synthetic registrar note"]) expect(JSON.stringify(error) + (error as Error).message).not.toContain(marker);
+    expect(JSON.stringify([state.records, state.fields])).toBe(before);
+    expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_SAVE_REFUSED"]);
+    expect(state.audit[0]).toMatchObject({
+      entityId: "member-1",
+      metadata: { viewerKind: "CLUB_REGISTRAR", actorAttendeeAccountId: "acct-reg", organizationId: "club-a", rosterMemberId: "member-1", reason: "RECORD_EXISTS" },
+    });
+    for (const marker of [...healthMarkers, "Synthetic registrar note"]) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("refuses a Registrar even for an earlier club year's record of the same person", async () => {
+    state.members.push({ ...state.members[0], id: "member-old", clubYear: "2025-26" });
+    state.records.push({ id: "rec-old", organizationId: "club-a", rosterMemberId: "member-old", confirmedClubYear: "2025-26" });
+    await expect(saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now)).rejects.toMatchObject({ code: "RECORD_EXISTS" });
+    expect(state.records).toHaveLength(1);
+  });
+
+  it("lets the director or a deputy keep updating an existing record", async () => {
+    await saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now);
+    state.audit = [];
+    await expect(saveHealthRecord(leader, "club-a", "member-1", { ...syntheticRecord, medications: "Synthetic director note" }, now)).resolves.toMatchObject({ status: "CURRENT" });
+    expect(state.records).toHaveLength(1);
+    expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_UPDATED"]);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values.medications).toBe("Synthetic director note");
+  });
+
+  it("retries a lost create race and then refuses the Registrar, since the winner's record now exists", async () => {
+    const realCreate = client.healthRecord.create;
+    let raced = false;
+    client.healthRecord.create = async (args: { data: Row }) => {
+      if (!raced) {
+        raced = true;
+        // The other save's record lands first; ours then hits the unique key.
+        await realCreate({ data: { id: "winner", organizationId: "club-a", rosterMemberId: "member-1", confirmedClubYear: "2026-27" } });
+        throw Object.assign(new Error("unique"), { code: "P2002" });
+      }
+      return realCreate(args);
+    };
+    try {
+      await expect(saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now)).rejects.toMatchObject({ code: "RECORD_EXISTS" });
+    } finally {
+      client.healthRecord.create = realCreate;
+    }
+    expect(state.records.map((record) => record.id)).toEqual(["winner"]);
+  });
+
+  it("refuses every read, audits the refusal with ids only, and opens nothing", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    state.audit = [];
+    state.prismaTouched.mockClear();
+    await expect(viewHealthRecord(registrar, "club-a", "member-1", now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(healthSummariesForMembers(registrar, "club-a", ["member-1"], now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(state.prismaTouched).not.toHaveBeenCalled();
+    expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_ACCESS_REFUSED", "HEALTH_RECORD_ACCESS_REFUSED"]);
+    expect(state.audit[0]).toMatchObject({ metadata: { viewerKind: "CLUB_REGISTRAR", organizationId: "club-a", rosterMemberId: "member-1", reason: "WRITE_ONLY_ROLE" } });
+    for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("never confirms a record or sends, lists or withdraws parent links", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    await expect(confirmHealthRecord(registrar, "club-a", "member-1", now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(createHealthRecordLink(registrar, { organizationId: "club-a", rosterMemberId: "member-1", recipientEmail: "p@example.test" }, now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(listHealthRecordLinks(registrar, "club-a", "member-1", now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(revokeHealthRecordLink(registrar, "club-a", "link-1", now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(state.links).toHaveLength(0);
+  });
+
+  it("is not found for another club, for reads and writes alike", async () => {
+    await expect(saveHealthRecord(otherRegistrar, "club-a", "member-1", syntheticRecord, now)).rejects.toMatchObject({ code: "MEMBER_NOT_FOUND" });
+    await expect(viewHealthEntryStatus(otherRegistrar, "club-a", "member-1", now)).rejects.toMatchObject({ code: "MEMBER_NOT_FOUND" });
+    expect(state.records).toHaveLength(0);
+    expect(state.audit).toHaveLength(0);
+  });
+
+  it("never opens a stored value, even to compare, when a typed answer fails validation", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    state.prismaTouched.mockClear();
+    const error = await saveHealthRecord(registrar, "club-a", "member-1", { ...syntheticRecord, phone: "not a phone" }, now).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(state.prismaTouched).not.toHaveBeenCalled();
+    expect(JSON.stringify(error)).not.toContain("not a phone");
+  });
+
+  it("shows only that a record exists, and its status, never a value or a date", async () => {
+    const before = await viewHealthEntryStatus(registrar, "club-a", "member-1", now);
+    expect(before).toMatchObject({ exists: false, status: "NONE", member: { firstName: "Casey" } });
+    await saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now);
+    const after = await viewHealthEntryStatus(registrar, "club-a", "member-1", now);
+    expect(after).toMatchObject({ exists: true, status: "CURRENT" });
+    expect(Object.keys(after).sort()).toEqual(["club", "consentText", "consentVersion", "exists", "member", "status"]);
+    for (const marker of healthMarkers) expect(JSON.stringify(after)).not.toContain(marker);
+    state.records[0]!.confirmedClubYear = "2025-26";
+    expect((await viewHealthEntryStatus(registrar, "club-a", "member-1", now)).status).toBe("NEEDS_UPDATE");
+    expect(await healthEntryStatusesForMembers(registrar, "club-a", ["member-1", "member-2"], now)).toEqual({
+      "member-1": { status: "NEEDS_UPDATE" },
+      "member-2": { status: "NONE" },
+    });
+    // An earlier club year's record of the same person counts as on file.
+    state.members.push({ ...state.members[0], id: "member-next", clubYear: "2027-28" });
+    expect((await healthEntryStatusesForMembers(registrar, "club-a", ["member-next"], now))["member-next"]).toEqual({ status: "NEEDS_UPDATE" });
+  });
+
+  it("leaves the entry status and list to the Registrar: a director or system administrator uses the record itself", async () => {
+    await expect(viewHealthEntryStatus(leader, "club-a", "member-1", now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(healthEntryStatusesForMembers(admin, "club-a", ["member-1"], now)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("keeps directors and deputies exactly as before: read, write, confirm, summaries, links", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).canEdit).toBe(true);
+    expect((await healthSummariesForMembers(leader, "club-a", ["member-1"], now))["member-1"]).toEqual({ status: "CURRENT", hasHealthNote: true });
+    await expect(confirmHealthRecord(leader, "club-a", "member-1", now)).resolves.toMatchObject({ status: "CURRENT" });
+    await expect(createHealthRecordLink(leader, { organizationId: "club-a", rosterMemberId: "member-1", recipientEmail: "p@example.test" }, now)).resolves.toBeTruthy();
+  });
+
+  it("stays off with the feature off: nothing is read, stored or audited", async () => {
+    state.env.HEALTH_RECORDS_ENABLED = false;
+    state.prismaTouched.mockClear();
+    await expect(saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(viewHealthEntryStatus(registrar, "club-a", "member-1", now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(healthEntryStatusesForMembers(registrar, "club-a", ["member-1"], now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(state.prismaTouched).not.toHaveBeenCalled();
+    expect(state.records).toHaveLength(0);
+    expect(state.audit).toHaveLength(0);
+  });
+});
+
+describe("the one-time privacy acknowledgment (#923)", () => {
+  beforeEach(() => {
+    resetState();
+    state.ackAll = false;
+  });
+
+  const everyone: Array<[string, HealthViewer]> = [
+    ["a director or deputy", leader],
+    ["a Registrar", registrar],
+    ["an Area Coordinator", coordinator],
+    ["the event health role", staff],
+    ["a system administrator", admin],
+  ];
+
+  it.each(everyone)("refuses %s everything until they acknowledge, then lets them in", async (_name, viewer) => {
+    // A record exists, so a refused read would have something to open. (Not for a Registrar, who may only create.)
+    state.ackAll = true;
+    if (viewer.kind !== "CLUB_REGISTRAR") await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    state.ackAll = false;
+    state.audit = [];
+    state.prismaTouched.mockClear();
+    const attempt = () => (viewer.kind === "CLUB_REGISTRAR"
+      ? saveHealthRecord(viewer, "club-a", "member-1", syntheticRecord, now)
+      : viewHealthRecord(viewer, "club-a", "member-1", now, { eventId: "event-1" }));
+    await expect(attempt()).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+    // Nothing was opened, written or audited as a view.
+    expect(state.audit).toHaveLength(0);
+    expect(state.prismaTouched).not.toHaveBeenCalled();
+
+    await recordHealthPrivacyAcknowledgment(viewer, now);
+    await expect(attempt()).resolves.toBeTruthy();
+  });
+
+  it("asks leaders again for every other entry point too: confirm, summaries and links", async () => {
+    for (const attempt of [
+      () => confirmHealthRecord(leader, "club-a", "member-1", now),
+      () => healthSummariesForMembers(leader, "club-a", ["member-1"], now),
+      () => createHealthRecordLink(leader, { organizationId: "club-a", rosterMemberId: "member-1", recipientEmail: "p@example.test" }, now),
+      () => listHealthRecordLinks(leader, "club-a", "member-1", now),
+      () => revokeHealthRecordLink(leader, "club-a", "link-1", now),
+    ]) {
+      await expect(attempt()).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+    }
+    await expect(viewHealthEntryStatus(registrar, "club-a", "member-1", now)).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+    await expect(healthEntryStatusesForMembers(registrar, "club-a", ["member-1"], now)).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+  });
+
+  it("stores one row per person and wording version: staff by user, everyone else by attendee account", async () => {
+    await recordHealthPrivacyAcknowledgment(admin, now);
+    await recordHealthPrivacyAcknowledgment(leader, now);
+    expect(state.acks).toEqual([
+      expect.objectContaining({ userId: "admin-1", version: HEALTH_PRIVACY_ACK_VERSION, acknowledgedAt: now }),
+      expect.objectContaining({ attendeeAccountId: "acct-1", version: HEALTH_PRIVACY_ACK_VERSION, acknowledgedAt: now }),
+    ]);
+    // One person's acknowledgment is not another's.
+    await expect(viewHealthRecord(coordinator, "club-a", "member-1", now, { eventId: "event-1" })).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+  });
+
+  it("is idempotent: a second acknowledgment changes nothing and is not audited twice", async () => {
+    await expect(recordHealthPrivacyAcknowledgment(leader, now)).resolves.toMatchObject({ alreadyAcknowledged: false });
+    await expect(recordHealthPrivacyAcknowledgment(leader, now)).resolves.toMatchObject({ alreadyAcknowledged: true });
+    expect(state.acks).toHaveLength(1);
+    expect(state.audit.filter((entry) => entry.action === "HEALTH_PRIVACY_ACKNOWLEDGED")).toHaveLength(1);
+  });
+
+  it("requires acknowledging again when the wording version changes", async () => {
+    state.acks.push({ id: "old", attendeeAccountId: "acct-1", version: "health-privacy-ack-2020-01" });
+    state.acks.push({ id: "old-2", userId: "admin-1", version: "health-privacy-ack-2020-01" });
+    await expect(viewHealthRecord(leader, "club-a", "member-1", now)).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+    await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+    await recordHealthPrivacyAcknowledgment(leader, now);
+    await expect(viewHealthRecord(leader, "club-a", "member-1", now)).resolves.toBeTruthy();
+    expect(state.acks).toHaveLength(3);
+  });
+
+  it("audits the acknowledgment with the viewer kind and version only", async () => {
+    await recordHealthPrivacyAcknowledgment(registrar, now);
+    expect(state.audit).toHaveLength(1);
+    expect(state.audit[0]).toMatchObject({
+      action: "HEALTH_PRIVACY_ACKNOWLEDGED",
+      metadata: { viewerKind: "CLUB_REGISTRAR", version: HEALTH_PRIVACY_ACK_VERSION, actorAttendeeAccountId: "acct-reg" },
+    });
+    for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("is switched off with the feature: recording stores nothing", async () => {
+    state.env.HEALTH_RECORDS_ENABLED = false;
+    await expect(recordHealthPrivacyAcknowledgment(leader, now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(state.acks).toHaveLength(0);
+    expect(state.audit).toHaveLength(0);
   });
 });
