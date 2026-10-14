@@ -31,6 +31,7 @@ export default async function ClubRosterNextYearPage({ params }: { params: Promi
       <BackLink href={rosterHref}>Back to roster</BackLink>
       <section className="public-manage-card page-stack">
         <h2>Start the {offer.toClubYear} roster</h2>
+        <p className="field-help">Carries people from the {offer.fromClubYear} roster to the {offer.toClubYear} roster.</p>
         {offer.state === "DONE" && (
           <p className="inline-notice success" role="status">
             This club already started its {offer.toClubYear} roster. <a href={`${rosterHref}?year=${encodeURIComponent(offer.toClubYear)}`}>Open it</a>.

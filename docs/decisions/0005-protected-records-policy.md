@@ -354,15 +354,6 @@ birth dates need their own protection.
    - **Remove** erases the birth date and personal fields. The audit keeps only
      the fact that the person was removed, and by whom.
 
-   **Carrying forward** (#414, owner-approved 2026-10-14): from August a
-   director may start next year's roster from last year's active people. A
-   carried person keeps the same person record and the same sealed birth date
-   (the ciphertext is copied, never opened); last year's roster stays as it
-   was, read-only for history; nothing rolls over without the director's
-   confirmation. Removing a person erases their birth date and personal fields
-   on **every** club-year row of theirs in that club, not only the year they
-   were removed from.
-
    Not decided yet: what happens to a closed club's roster, or one with no
    director. Raise it when it first comes up.
 7. **Key custody** (decided 2026-09-22):

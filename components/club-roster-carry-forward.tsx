@@ -22,6 +22,7 @@ export type CarryForwardRow = {
   role: string;
   classLevel: string | null;
   age: number | null;
+  transferring?: boolean;
 };
 
 type Choice = { ticked: boolean; attendeeType: AttendeeType; role: string; classLevel: string };
@@ -39,7 +40,7 @@ export function ClubRosterCarryForward({
 }) {
   const router = useRouter();
   const [choices, setChoices] = useState<Record<string, Choice>>(() => Object.fromEntries(
-    rows.map((row) => [row.memberId, { ticked: true, attendeeType: row.attendeeType, role: row.role, classLevel: row.classLevel ?? "" }]),
+    rows.map((row) => [row.memberId, { ticked: !row.transferring, attendeeType: row.attendeeType, role: row.role, classLevel: row.classLevel ?? "" }]),
   ));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -98,7 +99,7 @@ export function ClubRosterCarryForward({
       }}
     >
       <p className="field-help">
-        Everyone on the {fromClubYear} roster is ticked. Untick anyone who is leaving, and change a type, role or class
+        Everyone on the {fromClubYear} roster is ticked, except anyone with an open transfer to another club. Untick anyone who is leaving, and change a type, role or class
         for anyone moving up. People you carry keep their record and birth date; the {fromClubYear} roster stays as it was.
       </p>
       <div className="intro-actions">
@@ -132,7 +133,10 @@ export function ClubRosterCarryForward({
                       type="checkbox"
                     />
                   </td>
-                  <th scope="row" translate="no">{fullName}</th>
+                  <th scope="row" translate="no">
+                    {fullName}
+                    {row.transferring && <small> Transferring to another club</small>}
+                  </th>
                   <td data-label="Age">{row.age ?? "—"}</td>
                   <td data-label={`${toClubYear} type`}>
                     <select

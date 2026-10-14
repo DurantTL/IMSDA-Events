@@ -51,6 +51,8 @@ export type CarryForwardCandidate = {
   attendeeType: "YOUTH" | "STAFF" | "ADULT" | "UNDERAGE";
   role: string;
   classLevel: string | null;
+  /** An open transfer request moves this person to another club: shown flagged and unticked. */
+  transferring: boolean;
   /** Whole years today, computed here. The birth date itself never leaves the server. */
   age: number | null;
 };
@@ -92,6 +94,13 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
   });
   const present = await personsAlreadyOnTarget(prisma, organizationId, toClubYear, members.flatMap((member) => (member.personId ? [member.personId] : [])));
   const today = calendarDateOf(now);
+  // Open outbound transfer requests (#489): pending or declined, still holding the person.
+  const personIds = members.flatMap((member) => (member.personId ? [member.personId] : []));
+  const transfers = personIds.length === 0 ? [] : await prisma.memberTransfer.findMany({
+    where: { fromOrganizationId: organizationId, status: { in: ["PENDING", "DECLINED"] }, pendingPersonId: { in: personIds } },
+    select: { pendingPersonId: true },
+  });
+  const transferring = new Set(transfers.flatMap((transfer) => (transfer.pendingPersonId ? [transfer.pendingPersonId] : [])));
   const candidates = members
     .filter((member) => member.personId && !present.has(member.personId))
     .map((member) => ({
@@ -101,6 +110,7 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
       attendeeType: member.attendeeType,
       role: member.role,
       classLevel: member.classLevel,
+      transferring: member.personId ? transferring.has(member.personId) : false,
       age: member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), today) : null,
     }))
     .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.memberId.localeCompare(b.memberId));
@@ -137,6 +147,9 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
       throw new RosterOperationError("CARRY_FORWARD_DONE", "This club has already started its new year's roster.");
     }
     const ids = input.people.map((person) => person.memberId);
+    // Lock the chosen rows. A removal that commits first, or one still running, makes this fail to serialize (or
+    // shows the row as removed on the retry), so a person removed meanwhile is never carried.
+    await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ANY(${ids}::text[]) AND "organizationId" = ${organizationId} FOR UPDATE`;
     const sources = await tx.clubRosterMember.findMany({
       where: { id: { in: ids }, organizationId, clubYear: fromClubYear, status: "ACTIVE", personId: { not: null } },
       select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, gender: true, reportedAge: true, sealedBirthDate: true },

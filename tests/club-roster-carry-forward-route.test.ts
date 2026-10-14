@@ -95,6 +95,13 @@ describe("POST /roster/next-year (#414)", () => {
     expect(mocks.refreshBackgroundCheckMatchesSafely).not.toHaveBeenCalled();
   });
 
+  it("a conflict that outlasts the retries is a 503 to try again, like a busy roster", async () => {
+    mocks.carryRosterForward.mockRejectedValue(new RosterOperationError("CARRY_FORWARD_BUSY", "Try again in a moment."));
+    const response = await POST(request(valid), ctx);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: "CARRY_FORWARD_BUSY" });
+  });
+
   it("answers 404 for a person who is not on this club's last year roster", async () => {
     mocks.carryRosterForward.mockRejectedValue(new RosterOperationError("MEMBER_NOT_FOUND", "One of those people isn't on last year's roster."));
     expect((await POST(request(valid), ctx)).status).toBe(404);

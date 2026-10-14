@@ -11,7 +11,8 @@
  * - a repeat is refused cleanly and changes nothing, and eight racing
  *   confirmations leave exactly one winner and no duplicate rows;
  * - another club's person is `MEMBER_NOT_FOUND` and nothing is written;
- * - removing a carried person erases the birth date on every year's row;
+ * - removal is unchanged: removing a carried person leaves last year's row as it was;
+ * - a person with an open outbound transfer is flagged, and a removal that commits during a carry is never carried;
  * - the oversight list shows clubs that haven't started, counts only;
  * - no audit row, and no carry-forward record, holds a birth date or a name.
  *
@@ -24,7 +25,7 @@ import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { carryRosterForward, getCarryForwardOffer, listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
-import { addRosterMember, listRoster, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
+import { addRosterMember, eraseRosterRow, listRoster, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
 
 loadEnvConfig(process.cwd());
 // Local-only, before any Prisma client or connection exists.
@@ -33,7 +34,7 @@ fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-carry-forward-synthetic-k
 
 const prisma = new PrismaClient();
 const P = "cf414";
-const clubs = { a: `${P}_club_a`, b: `${P}_club_b`, c: `${P}_club_c`, d: `${P}_club_d` };
+const clubs = { a: `${P}_club_a`, b: `${P}_club_b`, c: `${P}_club_c`, d: `${P}_club_d`, e: `${P}_club_e`, f: `${P}_club_f` };
 const from = "2026-27";
 const to = "2027-28";
 // August: the next year is prepared. September 20 is a late club: the same pair of years.
@@ -53,6 +54,7 @@ async function codeOf(promise: Promise<unknown>) {
 
 async function cleanup() {
   await prisma.auditLog.deleteMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
+  await prisma.memberTransfer.deleteMany({ where: { fromOrganizationId: { in: Object.values(clubs) } } });
   await prisma.clubRosterCarryForward.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.person.deleteMany({ where: { lastName: "Carryfwd" } });
@@ -162,11 +164,47 @@ async function main() {
   assert(skip.carried === 0 && skip.alreadyThere === 1, "someone already on the new roster is skipped");
   assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.b, clubYear: to } })) === 1 && bHand.id, "no duplicate row for them");
 
-  // Removing a carried person erases every year's row (ADR 0005 Addendum A section 6).
+  // Removal is unchanged (ADR 0005 Addendum A section 6): it erases the row it is run on, and last year's row stays as it was.
   const carriedStayed = stayed.id;
+  const lastYearBefore = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: a[1]!.memberId } });
   await removeRosterMember(clubs.a, carriedStayed, actor, august);
-  const afterRemoval = await prisma.clubRosterMember.findMany({ where: { id: { in: [carriedStayed, a[1]!.memberId] } } });
-  assert(afterRemoval.every((row) => row.status === "REMOVED" && row.sealedBirthDate === null && row.personId === null), "removal erases the birth date on last year's row and the new year's");
+  const removedRow = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: carriedStayed } });
+  assert(removedRow.status === "REMOVED" && removedRow.sealedBirthDate === null && removedRow.personId === null, "removal erases the new year's row");
+  const lastYearAfter = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: a[1]!.memberId } });
+  assert(lastYearAfter.updatedAt.getTime() === lastYearBefore.updatedAt.getTime() && lastYearAfter.status === "ACTIVE" && lastYearAfter.sealedBirthDate === lastYearBefore.sealedBirthDate, "last year's row is untouched by a new-year removal");
+
+  // A person with an open outbound transfer is flagged in the offer (club E).
+  const e = [await addPerson(clubs.e, 0), await addPerson(clubs.e, 1)];
+  await prisma.memberTransfer.create({
+    data: {
+      personId: e[1]!.personId, pendingPersonId: e[1]!.personId, clubYear: from, fromOrganizationId: clubs.e, toOrganizationId: clubs.b,
+      fromRosterMemberId: e[1]!.memberId, requestedFirstName: "", requestedLastName: "", reason: "", status: "PENDING",
+      acknowledgeDueAt: new Date("2027-09-01T00:00:00Z"),
+    },
+  });
+  const eOffer = await getCarryForwardOffer(clubs.e, august);
+  const eCandidates = eOffer.state === "AVAILABLE" ? eOffer.candidates : [];
+  assert(eCandidates.find((c) => c.memberId === e[1]!.memberId)?.transferring === true, "a person with an open transfer is flagged");
+  assert(eCandidates.find((c) => c.memberId === e[0]!.memberId)?.transferring === false, "everyone else is not");
+
+  // A carry racing a removal: the removal commits first, and the removed person is never carried (club F).
+  const f = [await addPerson(clubs.f, 0), await addPerson(clubs.f, 1)];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const removal = prisma.$transaction(async (tx) => {
+    await eraseRosterRow(tx, f[0]!.memberId, new Date());
+    await gate;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const racing = codeOf(carryRosterForward(clubs.f, {
+    confirm: true, people: f.map((member) => ({ memberId: member.memberId, attendeeType: "YOUTH" as const })),
+  }, actor, august));
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  release();
+  await removal;
+  assert((await racing) === "MEMBER_NOT_FOUND", "a person removed while the carry waited is refused, not carried");
+  assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.f, clubYear: to } })) === 0, "the racing carry wrote nothing");
+  assert((await prisma.clubRosterCarryForward.count({ where: { organizationId: clubs.f } })) === 0, "and left no confirmation");
 
   // No plaintext birth date or name in any audit row or confirmation record.
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
