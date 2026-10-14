@@ -81,8 +81,12 @@ export async function requireClubSupplyAccess(
       return { mode: "READ", viewer: actorAttribution(access.actor) };
     }
     if (!FALLBACK_CODES.has(error.code)) throw error;
-    if (options.areaCoordinator === false) throw error;
     const viewer = await areaCoordinatorViewer();
+    if (options.areaCoordinator === false) {
+      // A coordinator (signed in, or a staff "act as") is refused like any non-member: 404, not 401.
+      if (viewer) throw new RosterAccessError("NOT_FOUND", 404, "That club could not be found.");
+      throw error;
+    }
     if (!viewer) throw error;
     if (!(await isActiveClub(organizationId))) {
       throw new RosterAccessError("NOT_FOUND", 404, "That club could not be found.");

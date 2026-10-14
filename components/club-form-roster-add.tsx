@@ -12,10 +12,12 @@ import {
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   defaultRosterRole,
+  isAdultRosterPerson,
 } from "@/modules/club-rosters/domain";
 import {
   GUARDIAN_SLOTS,
   guardianFieldLabels,
+  guardianTerm,
   validateGuardianForm,
   type GuardianFormErrors,
 } from "@/modules/club-rosters/guardians-domain";
@@ -42,6 +44,9 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, calendarDateInEventTimeZone(new Date(), "America/Chicago"))
     : null;
+
+  const adult = isAdultRosterPerson(formType, formBirthDate, calendarDateInEventTimeZone(new Date(), "America/Chicago"));
+  const term = guardianTerm(adult);
 
   async function send(body: unknown) {
     setSaving(true);
@@ -201,13 +206,13 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         </div>
 
         <fieldset className="roster-guardians">
-            <legend>Guardian contacts (optional)</legend>
-            <p className="field-help">Up to two guardians, from the parent or guardian details on the form. Only your club&apos;s director and deputy, Area Coordinators and conference staff with sensitive-data access can see them.</p>
+            <legend>{term.plural} (optional)</legend>
+            <p className="field-help">{adult ? "Up to two emergency contacts for this adult, from the contact details on the form." : "Up to two guardians, from the parent or guardian details on the form."} Only your club&apos;s director and deputy, Area Coordinators and conference staff with sensitive-data access can see them.</p>
             {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
               const slot = (index + 1) as 1 | 2;
               const value = prefill.guardians[index];
               return (
-                <div className="roster-guardian-slot" key={slot} role="group" aria-label={`Guardian ${slot}`}>
+                <div className="roster-guardian-slot" key={slot} role="group" aria-label={`${term.singular} ${slot}`}>
                   <div className="form-grid two-column">
                     <label>{guardianFieldLabels.name}
                       <input autoComplete="off" defaultValue={value.name} maxLength={120} name={`g${slot}Name`} />

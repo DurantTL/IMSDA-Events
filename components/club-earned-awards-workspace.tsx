@@ -11,7 +11,7 @@ import type { EarnedAwardsWorkspaceData } from "@/modules/earned-awards/order-so
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
-import { effectiveChoice, makeSearchMatcher, matchesSearch, narrowedListSize, searchResultSummary } from "@/lib/search-match";
+import { effectiveChoice, makeSearchMatcher, matchesSearch, searchResultSummary } from "@/lib/search-match";
 
 export type ClubEarnedAwardsData = EarnedAwardsWorkspaceData;
 
@@ -494,12 +494,12 @@ export function ClubEarnedAwardsWorkspace({
                 {data.catalog.length > 8 && (
                   <span className={styles.pickerField}>
                     <label htmlFor="earned-item-search">Find an item</label>
-                    <input autoComplete="off" className={styles.select} id="earned-item-search" onChange={(event) => { setItemQuery(event.target.value); setItemId(""); }} placeholder="Item name" type="search" value={itemQuery} />
+                    <input autoComplete="off" className={styles.select} aria-describedby="earned-item-results" id="earned-item-search" onChange={(event) => { setItemQuery(event.target.value); setItemId(""); }} placeholder="Item name" type="search" value={itemQuery} />
                   </span>
                 )}
                 <span className={styles.pickerField}>
                   <label htmlFor="earned-item">Item</label>
-                  <select className={styles.select} id="earned-item" size={narrowedListSize(matchingCatalog.length, itemQuery)} onChange={(event) => setItemId(event.target.value)} value={chosenItemId}>
+                  <select className={styles.select} id="earned-item" onChange={(event) => setItemId(event.target.value)} value={chosenItemId}>
                     <option value="">Choose an item</option>
                     {sections.map(([section, { label, items }]) => (
                       <optgroup key={section} label={label}>

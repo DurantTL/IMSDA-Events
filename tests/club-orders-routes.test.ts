@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   markNeedsAlreadyAwarded: vi.fn(),
   listPickList: vi.fn(),
   syncHonorOrderNeeds: vi.fn(),
+  staffActing: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -39,7 +40,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
-vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: async () => null }));
+vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: () => mocks.staffActing() }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/honors/order-source", () => ({ syncHonorOrderNeeds: mocks.syncHonorOrderNeeds }));
 vi.mock("@/modules/club-orders/repository", async () => {
@@ -90,6 +91,7 @@ beforeEach(() => {
   mocks.findSettings.mockResolvedValue({ passkeyRpId: null });
   mocks.findAreaGrant.mockResolvedValue(null);
   mocks.findOrganization.mockResolvedValue({ type: "CLUB", isActive: true });
+  mocks.staffActing.mockResolvedValue(null);
   mocks.syncHonorOrderNeeds.mockResolvedValue({ count: 0 });
   mocks.loadOrderWorkspace.mockResolvedValue({ helper: [], unmatched: [], awardable: [], waiting: [], firstOrderAt: null });
   mocks.setOrderListQuantity.mockResolvedValue({ itemId: "item-1", quantity: 2 });
@@ -160,6 +162,29 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
     expect((await POST_AWARD(postRequest({ needIds: ["need-1"] }), ctx())).status).toBe(404);
     expect(mocks.setOrderListQuantity).not.toHaveBeenCalled();
     expect(mocks.markNeedsAwarded).not.toHaveBeenCalled();
+  });
+
+  it("a system administrator acting as an Area Coordinator gets 404, not 401 (#918)", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    mocks.listDirectedClubs.mockResolvedValue([]);
+    mocks.staffActing.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-1", actAsId: "act-1" });
+    expect((await GET(getRequest(), ctx())).status).toBe(404);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=list"), ctx())).status).toBe(404);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=picklist"), ctx())).status).toBe(404);
+    expect(mocks.loadOrderWorkspace).not.toHaveBeenCalled();
+    expect(mocks.listHelperLines).not.toHaveBeenCalled();
+    expect(mocks.listPickList).not.toHaveBeenCalled();
+    expect(mocks.syncHonorOrderNeeds).not.toHaveBeenCalled();
+  });
+
+  it("a signed-out request to the Orders routes is still 401", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    mocks.listDirectedClubs.mockResolvedValue([]);
+    expect((await GET(getRequest(), ctx())).status).toBe(401);
+    expect((await GET_CSV(new Request("https://events.imsda.test/x?view=list"), ctx())).status).toBe(401);
+    expect((await PUT_LINE(putRequest({ quantity: 1 }), lineCtx())).status).toBe(401);
+    expect((await POST_AWARD(postRequest({ needIds: ["need-1"] }), ctx())).status).toBe(401);
+    expect(mocks.loadOrderWorkspace).not.toHaveBeenCalled();
   });
 
   it("has no route that places an order", async () => {

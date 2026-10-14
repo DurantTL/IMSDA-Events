@@ -1838,20 +1838,26 @@ select:focus-visible {
 /* #918: date, time and datetime-local inputs. WebKit (iPad Safari) draws these with its own box: an intrinsic
    minimum width that spills out of a narrow grid column, an inner value row with its own line height and padding
    (and none at all while empty, which is what made the box collapse or balloon), and the platform look that
-   ignores the field border and padding set above. Size them like every other text-like field: a block that never
-   outgrows its box (a field that sets its own width keeps it), a set minimum height and line height, the native look off (so the shared border and padding apply),
-   and the inner value and edit fields reset so an empty one is as tall as a filled one. */
-input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]) {
-  display: block;
+   ignores the field border and padding set above. Size them like every other text-like field: a box that never
+   outgrows its container, a 44px minimum height, a set line height, the native look off (so the shared border and
+   padding apply), and the inner value and edit fields reset so an empty one is as tall as a filled one.
+   Both rules sit inside :where() (zero specificity, like the field base rule above), so a component's own
+   single-class rule (.date in club-orders.module.css) still sets its size, display and margin. The block layout
+   is only for fields in a block-label form (.form-stack, .form-grid); the inline-label staff forms (meals,
+   lodging, asset return) keep their own flow. */
+:where(input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])) {
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  min-height: 2.6rem;
-  margin: 0;
+  min-height: 2.75rem;
   line-height: 1.4;
-  text-align: left;
   -webkit-appearance: none;
   appearance: none;
+}
+:where(:is(.form-stack, .form-grid) input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])) {
+  display: block;
+  margin: 0;
+  text-align: left;
 }
 input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])::-webkit-date-and-time-value { min-width: 0; min-height: 1.4em; margin: 0; text-align: left; }
 input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])::-webkit-datetime-edit { padding: 0; line-height: inherit; }

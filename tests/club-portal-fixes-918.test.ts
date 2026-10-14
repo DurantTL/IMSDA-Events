@@ -31,9 +31,10 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), not
 
 import { ClubEarnedAwardsWorkspace, emptyEarnedAwardsData } from "@/components/club-earned-awards-workspace";
 import { ClubOrderWorkspace, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
+import { ClubFormRosterAdd } from "@/components/club-form-roster-add";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
-import { narrowedListSize, searchResultSummary } from "@/lib/search-match";
+import { searchResultSummary } from "@/lib/search-match";
 import { isAdultRosterPerson } from "@/modules/club-rosters/domain";
 import { guardianTerm } from "@/modules/club-rosters/guardians-domain";
 import { areaClubPortalNavItems } from "@/modules/club-rosters/portal-nav";
@@ -118,6 +119,24 @@ describe("2. adults have an Emergency contact, a minor has a Guardian", () => {
     expect(html).toContain("<h3>Guardian 1</h3>");
     expect(html).not.toContain("Emergency contact");
   });
+  it("words the form's Add to roster contact section by who the person is, not always Guardian", () => {
+    const blank = { name: "", relationship: "", email: "", phone: "" };
+    const review = (attendeeType: string, birthDate: string) => ({
+      submissionId: "sub-1", organizationId: "club-1", formName: "Synthetic form", clubYear: "2026-27", duplicates: [], canAdd: true,
+      prefill: { firstName: "Sam", lastName: "Sample", birthDate, attendeeType, classLevel: "", role: "", gender: "", guardians: [blank, blank] },
+    }) as never;
+    const render = (attendeeType: string, birthDate: string) => renderToStaticMarkup(createElement(ClubFormRosterAdd, { review: review(attendeeType, birthDate), formHref: "/forms/1" }));
+    for (const html of [render("STAFF", ""), render("ADULT", ""), render("YOUTH", "1980-01-01")]) {
+      expect(html).toContain("<legend>Emergency contacts (optional)</legend>");
+      expect(html).toContain('aria-label="Emergency contact 1"');
+      expect(html).not.toContain("Guardian contacts");
+      expect(html).not.toContain('aria-label="Guardian');
+    }
+    const minor = render("YOUTH", "2013-04-09");
+    expect(minor).toContain("<legend>Guardians (optional)</legend>");
+    expect(minor).toContain('aria-label="Guardian 2"');
+    expect(minor).not.toContain("Emergency contact");
+  });
   it("labels each row of the read-only contacts panel by who it is for", async () => {
     vi.resetModules();
     vi.doMock("server-only", () => ({}));
@@ -144,12 +163,29 @@ describe("2. adults have an Emergency contact, a minor has a Guardian", () => {
 });
 
 describe("3. date, time and datetime-local fields are sized like every other field", () => {
-  const dateRule = /input:is\(\[type="date"\], \[type="time"\], \[type="datetime-local"\][^)]*\) \{([^}]*)\}/.exec(css)?.[1] ?? "";
-  it("has one general rule for date, time and datetime-local inputs", () => {
+  const dateRule = /^:where\(input:is\(\[type="date"\], \[type="time"\], \[type="datetime-local"\][^)]*\)\) \{([^}]*)\}/m.exec(css)?.[1] ?? "";
+  const blockRule = /^:where\(:is\(\.form-stack, \.form-grid\) input:is\(\[type="date"\][^)]*\)\) \{([^}]*)\}/m.exec(css)?.[1] ?? "";
+  it("has one zero-specificity rule for date, time and datetime-local inputs, at a 44px target", () => {
     expect(dateRule).not.toBe("");
-    for (const declaration of ["display: block", "box-sizing: border-box", "min-width: 0", "max-width: 100%", "min-height: 2.6rem", "line-height: 1.4", "-webkit-appearance: none", "appearance: none"]) {
+    for (const declaration of ["box-sizing: border-box", "min-width: 0", "max-width: 100%", "min-height: 2.75rem", "line-height: 1.4", "-webkit-appearance: none", "appearance: none"]) {
       expect(dateRule).toContain(declaration);
     }
+    // 2.75rem is 44px at the 16px root; it must not be smaller than a module's own 44px minimum.
+    expect(Number(/min-height:\s*([\d.]+)rem/.exec(dateRule)![1]) * 16).toBeGreaterThanOrEqual(44);
+    // No global display, margin or alignment: inline-label staff forms keep their own flow.
+    expect(dateRule).not.toMatch(/display:|margin:|text-align:/);
+  });
+  it("keeps every top-level date rule at zero specificity so a single-class rule wins", () => {
+    const topLevel = css.split("\n").filter((line) => /^(?!\s)[^/@].*input:is\(\[type="date"\]/.test(line) && !line.includes("::"));
+    expect(topLevel.length).toBeGreaterThan(0);
+    for (const line of topLevel) expect(line.startsWith(":where(")).toBe(true);
+    const ordersCss = readFileSync(path.join(process.cwd(), "components/club-orders.module.css"), "utf8");
+    expect(/\.date \{ min-height: 44px;/.test(ordersCss)).toBe(true);
+  });
+  it("lays out as a block only inside block-label forms", () => {
+    expect(blockRule).toContain("display: block");
+    expect(blockRule).toContain("margin: 0");
+    expect(blockRule).toContain("text-align: left");
   });
   it("resets WebKit's inner value row so an empty field is as tall as a filled one", () => {
     expect(css).toMatch(/::-webkit-date-and-time-value \{ min-width: 0; min-height: 1\.4em;/);
@@ -181,14 +217,6 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     expect(searchResultSummary(1, "shirt", "item")).toBe("1 item matches “shirt”.");
     expect(searchResultSummary(0, "zzz", "item")).toContain("No items match “zzz”.");
   });
-  it("opens the select as a short list while a search has several matches", () => {
-    expect(narrowedListSize(5, "")).toBeUndefined();
-    expect(narrowedListSize(1, "x")).toBeUndefined();
-    expect(narrowedListSize(0, "x")).toBeUndefined();
-    expect(narrowedListSize(3, "x")).toBe(4);
-    expect(narrowedListSize(40, "x")).toBe(6);
-  });
-
   const names = ["Good Conduct Bar", "Good Conduct Star", "TLT Pin", "TLT Ribbon", "Master Guide Bar", "Camp Patch", "Fall Patch", "Spring Patch", "Winter Patch", "Summer Patch"];
   const catalog = names.map((name, index) => ({ itemId: `item-${index}`, section: "MISC", sectionLabel: "Miscellaneous", name, catalogNumber: `00${index}` }));
   const earned = () => {
@@ -204,7 +232,8 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     tree = earned();
     expect(optionLabels(byId(tree, "earned-item"))).toEqual(["Choose an item", "Camp Patch", "Fall Patch", "Spring Patch", "Winter Patch", "Summer Patch"]);
     expect(text(byId(tree, "earned-item-results"))).toBe("5 items match “patch”.");
-    expect(byId(tree, "earned-item").props.size).toBe(6);
+    expect(byId(tree, "earned-item").props.size).toBeUndefined();
+    expect(byId(tree, "earned-item-search").props["aria-describedby"]).toBe("earned-item-results");
     type(byId(tree, "earned-item-search"), "tlt rib");
     tree = earned();
     expect(optionLabels(byId(tree, "earned-item"))).toEqual(["Choose an item", "TLT Ribbon"]);
@@ -234,7 +263,8 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     tree = orders();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(3);
     expect(text(byId(tree, "club-order-picker-results"))).toBe("2 items match “polo”.");
-    expect(byId(tree, "club-order-picker-item").props.size).toBe(3);
+    expect(byId(tree, "club-order-picker-item").props.size).toBeUndefined();
+    expect(byId(tree, "club-order-picker-search").props["aria-describedby"]).toBe("club-order-picker-results");
     type(byId(tree, "club-order-picker-search"), "nk 1");
     tree = orders();
     expect(optionLabels(byId(tree, "club-order-picker-item"))).toEqual(["Choose an item", "Neckerchief · NK-1"]);
@@ -242,6 +272,14 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     type(byId(tree, "club-order-picker-search"), "zzz");
     tree = orders();
     expect(text(byId(tree, "club-order-picker-results"))).toContain("No items match");
+  });
+  it("Orders: when the match list is capped, says how many are shown of how many match", () => {
+    const many: ClubStockRow[] = Array.from({ length: 250 }, (_, index) => ({ itemId: `i${index}`, section: "MISCELLANEOUS", name: `Patch ${index}`, catalogNumber: `P-${index}`, sizeLabel: null, isActive: true, quantityOnHand: 0 }));
+    const capped = () => { runtime.index = 0; return ClubOrderWorkspace({ organizationId: "club-1", initial, stock: many }) as ReactElement<Props>; };
+    type(byId(capped(), "club-order-picker-search"), "patch");
+    const tree = capped();
+    expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(101);
+    expect(text(byId(tree, "club-order-picker-results"))).toContain("Showing the first 100 of 250 matches");
   });
 });
 
