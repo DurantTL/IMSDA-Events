@@ -2,7 +2,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { orderListCsv, pickListCsv } from "@/modules/club-orders/domain";
 import { clubOrderApiError } from "@/modules/club-orders/api-errors";
 import { listHelperLines, listPickList, loadOrderExportHeader } from "@/modules/club-orders/repository";
-import { requireClubSupplyAccess } from "@/modules/club-supplies/access";
+import { requireClubOrdersAccess } from "@/modules/club-supplies/access";
 import { syncHonorOrderNeeds } from "@/modules/honors/order-source";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
@@ -29,7 +29,7 @@ function csvResponse(body: string, filename: string) {
 async function getHandler(request: Request, context: RouteContext) {
   try {
     const { organizationId } = await context.params;
-    const access = await requireClubSupplyAccess(organizationId);
+    const access = await requireClubOrdersAccess(organizationId);
     const view = new URL(request.url).searchParams.get("view");
     if (view !== "list" && view !== "picklist") {
       return Response.json({ error: "INVALID_VIEW", message: "Choose list or picklist." }, { status: 400 });

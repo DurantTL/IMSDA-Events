@@ -1,7 +1,7 @@
 import { Phone, UsersRound } from "lucide-react";
-import { clubRosterAttendeeTypeLabels, clubYearFor } from "@/modules/club-rosters/domain";
+import { clubRosterAttendeeTypeLabels, clubYearFor, isAdultRosterPerson } from "@/modules/club-rosters/domain";
 import { GuardianAccessError, listGuardianContactsForClub, type ClubGuardianContact } from "@/modules/club-rosters/guardians-repository";
-import { GUARDIAN_SLOTS, type GuardianRecord, type GuardianViewer } from "@/modules/club-rosters/guardians-domain";
+import { GUARDIAN_SLOTS, guardianTerm, type GuardianRecord, type GuardianViewer } from "@/modules/club-rosters/guardians-domain";
 
 /**
  * A club's guardian contacts, read only (#510), for the pages Area
@@ -31,17 +31,17 @@ export async function ClubGuardiansPanel({
     <section className="public-manage-card" aria-labelledby="open-club-guardians" id="open-club-guardians">
       <div className="public-manage-card-heading">
         <p className="public-registration-eyebrow">Confidential · for event care</p>
-        <Heading id="open-club-guardians">Guardian contacts</Heading>
+        <Heading id="open-club-guardians">Guardian and emergency contacts</Heading>
       </div>
       {contacts.length === 0 ? (
-        <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> No guardian contacts are on file for this club yet.</p>
+        <p className="public-manage-empty"><UsersRound size={17} aria-hidden="true" /> No guardian or emergency contacts are on file for this club yet.</p>
       ) : (
         <div className="club-guardians-table-wrap report-table-wrap">
           <table className="report-table">
             <thead>
               <tr>
                 <th scope="col">Member</th>
-                {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => <th key={index} scope="col">Guardian {index + 1}</th>)}
+                {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => <th key={index} scope="col">Contact {index + 1}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -52,7 +52,7 @@ export async function ClubGuardiansPanel({
                     <small> · {clubRosterAttendeeTypeLabels[contact.attendeeType as keyof typeof clubRosterAttendeeTypeLabels] ?? contact.attendeeType}</small>
                   </th>
                   {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => (
-                    <td key={index}><GuardianCell guardian={contact.guardians.find((guardian) => guardian.position === index + 1)} /></td>
+                    <td key={index}><GuardianCell adult={isAdultRosterPerson(contact.attendeeType)} guardian={contact.guardians.find((guardian) => guardian.position === index + 1)} /></td>
                   ))}
                 </tr>
               ))}
@@ -64,10 +64,11 @@ export async function ClubGuardiansPanel({
   );
 }
 
-function GuardianCell({ guardian }: { guardian: GuardianRecord | undefined }) {
+function GuardianCell({ guardian, adult }: { guardian: GuardianRecord | undefined; adult: boolean }) {
   if (!guardian) return <span className="quiet-copy">None on file</span>;
   return (
     <span className="club-guardian-cell">
+      <small className="club-guardian-term">{guardianTerm(adult).singular}</small>
       <strong translate="no">{guardian.name || "Name not given"}</strong>
       {guardian.relationship && <small>{guardian.relationship}</small>}
       {guardian.phone && <a href={`tel:${guardian.phone.replace(/[^0-9+]/g, "")}`} translate="no"><Phone aria-hidden="true" size={12} /> {guardian.phone}</a>}

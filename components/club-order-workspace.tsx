@@ -8,7 +8,7 @@ import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/co
 import { ORDER_LIST_SECTIONS, activeHelperLines, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
 import type { AwardableNeed, OrderBatchSummary, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
-import { effectiveChoice, makeSearchMatcher } from "@/lib/search-match";
+import { effectiveChoice, hasSearchText, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
 
 export type ClubOrderWorkspaceData = {
   helper: HelperLine[];
@@ -190,6 +190,11 @@ export function ClubOrderWorkspace({
     return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel]));
   }, [stock, pickerQuery, onList]);
   const shownPickerItems = useMemo(() => pickerItems.slice(0, PICKER_LIMIT), [pickerItems]);
+  const pickerSummary = pickerItems.length > PICKER_LIMIT
+    ? hasSearchText(pickerQuery)
+      ? `Showing the first ${PICKER_LIMIT} of ${pickerItems.length} matches for \u201c${pickerQuery.trim()}\u201d. Type more to narrow them.`
+      : `Showing the first ${PICKER_LIMIT} of ${pickerItems.length} items. Search to narrow the list.`
+    : searchResultSummary(pickerItems.length, pickerQuery, "item");
   // One match needs no second click, and a search can never leave a hidden item chosen (#799).
   const chosenItem = effectiveChoice(pickerItem, shownPickerItems.map((row) => ({ id: row.itemId })), pickerQuery);
   // Honors that may have been handed out long ago: the club marks them so they aren't counted as needed.
@@ -555,7 +560,7 @@ export function ClubOrderWorkspace({
             <div className={styles.pickerRow}>
               <label className={styles.pickerField} htmlFor="club-order-picker-search">
                 Search the catalog
-                <input className={styles.select} id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerItem(""); }} placeholder="Name or item number" type="search" value={pickerQuery} />
+                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerItem(""); }} placeholder="Name or item number" type="search" value={pickerQuery} />
               </label>
               <label className={styles.pickerField} htmlFor="club-order-picker-item">
                 Item
@@ -576,6 +581,7 @@ export function ClubOrderWorkspace({
                 <Plus aria-hidden="true" size={14} /> Add to list
               </button>
             </div>
+            <p aria-live="polite" className="field-help" id="club-order-picker-results" role="status">{pickerSummary}</p>
           </div>
         )}
 

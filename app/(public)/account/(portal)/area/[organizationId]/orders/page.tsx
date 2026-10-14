@@ -1,33 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ClubOrderWorkspace } from "@/components/club-order-workspace";
-import { getPrisma } from "@/lib/prisma";
-import { listClubStock } from "@/modules/club-supplies/repository";
-import { loadOrderWorkspace } from "@/modules/club-orders/repository";
-import { loadUniformWorkspace } from "@/modules/uniforms/order-source";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Orders", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
-/** Any club's orders helper list and supplies on hand, view only, for an Area Coordinator (#387, #487, #497). Reads what's on file; never writes. */
-export default async function AreaClubOrdersPage({ params }: { params: Promise<{ organizationId: string }> }) {
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
-  const { organizationId } = await params;
-  const club = await getPrisma().organization.findUnique({
-    where: { id: organizationId },
-    select: { type: true, name: true, isActive: true },
-  });
-  if (!club || club.type !== "CLUB" || !club.isActive) notFound();
-  return (
-    <>
-      <ClubOrderWorkspace
-        initial={await loadOrderWorkspace(organizationId)}
-        initialUniforms={await loadUniformWorkspace(organizationId, { forEditing: false })}
-        stock={await listClubStock(organizationId)}
-        organizationId={organizationId}
-        readOnly
-      />
-    </>
-  );
+/**
+ * Club Orders are not an Area Coordinator's to see (owner decision, Oct 14, 2026; #918). This
+ * route used to show a club's order helper list and supplies view-only. It now answers 404 to
+ * everyone, and the loaders behind it (`/api/attendee/clubs/<id>/orders`, `.../supplies`,
+ * `.../uniforms`) refuse an Area Coordinator too (`requireClubOrdersAccess`). A club's own
+ * Orders screen is under `/account/clubs/<id>/orders`.
+ */
+export default function AreaClubOrdersPage() {
+  notFound();
 }

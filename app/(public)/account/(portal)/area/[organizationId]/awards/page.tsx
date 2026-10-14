@@ -21,7 +21,6 @@ export default async function AreaClubAwardsPage({ params }: { params: Promise<{
     <>
       <ClubEarnedAwardsWorkspace
         initial={await loadEarnedAwardsWorkspace(organizationId, { forEditing: false })}
-        ordersHref={`/account/area/${organizationId}/orders`}
         organizationId={organizationId}
         readOnly
       />

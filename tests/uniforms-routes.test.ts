@@ -105,13 +105,11 @@ describe("uniform routes (#497)", () => {
     expect(mocks.removeUniformNeeds).not.toHaveBeenCalled();
   });
 
-  it("an Area Coordinator views read-only and can't record or remove", async () => {
+  it("an Area Coordinator is refused the uniform needs (part of club Orders, #918) and can't record or remove", async () => {
     mocks.listDirectedClubs.mockResolvedValue([]);
     mocks.findAreaGrant.mockResolvedValue({ revokedAt: null, expiresAt: null });
-    const read = await GET(getRequest(), ctx());
-    expect(read.status).toBe(200);
-    expect(await read.json()).toMatchObject({ canEdit: false });
-    expect(mocks.loadUniformWorkspace).toHaveBeenCalledWith("club-1", { forEditing: false });
+    expect((await GET(getRequest(), ctx())).status).toBe(404);
+    expect(mocks.loadUniformWorkspace).not.toHaveBeenCalled();
     expect((await POST(postRequest(entry), ctx())).status).toBe(404);
     expect((await POST_REMOVE(postRequest({ needIds: ["n1"] }), ctx())).status).toBe(404);
     expect(mocks.recordUniformNeeds).not.toHaveBeenCalled();

@@ -31,4 +31,19 @@ export function permissionNotice(status: PermissionStatus, name: string, tlt = f
 export const permissionShortLabel = (status: PermissionStatus) =>
   status === "GRANTED" ? "AC permission: granted" : status === "DECLINED" ? "AC permission: declined" : "AC permission: pending";
 
+/**
+ * The plain-language explanation at the top of the Area Coordinator's Team permissions tab (#918): what the tab is
+ * for and what each permission level does, in the words of the notices above. Shared so the page and its test agree.
+ */
+export const teamPermissionsIntro = {
+  summary:
+    "When a club registers a team, any team member who is 18 or older needs your permission to be on it. Each person who needs a decision from you is listed here, for teams at your own locations.",
+  levels: [
+    { label: "Waiting for a decision", detail: "The club has asked. The team is registered while you decide, so nothing is held up." },
+    { label: "Permission granted", detail: "The person stays on the team as a team member. You can change your mind later and decline." },
+    { label: "Declined", detail: "The person cannot be a team member. The club's director is told to change them to a coach or take them off the team. Nobody is removed for them." },
+  ],
+  footer: "Choose Grant or Decline beside a name. The club's director sees your answer on their team page.",
+} as const;
+
 export const permissionDecisionSchema = z.strictObject({ decision: z.enum(["GRANTED", "DECLINED"]) });

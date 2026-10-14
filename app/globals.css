@@ -1828,6 +1828,40 @@ select:focus-visible {
 .form-stack input:focus,
 .form-stack select:focus,
 .form-stack textarea:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+/* #918: a field label is a small grid (caption, control, help). In a grid row that is taller than the label (its
+   neighbour has helper text) the label's own rows used to stretch, so the control grew into an empty tall box;
+   keep the rows at their natural size and let the free space fall below. */
+.form-stack label, .form-grid > label { align-content: start; }
+/* The helper text under a field's control sits one label gap (6px) below it. Its -9px pull is for a standalone
+   .field-help in a .form-stack (15px gap); inside a label it dragged the text up over the control. */
+.form-stack label > .field-help, .form-grid > label > .field-help { margin: 0; }
+/* #918: date, time and datetime-local inputs. WebKit (iPad Safari) draws these with its own box: an intrinsic
+   minimum width that spills out of a narrow grid column, an inner value row with its own line height and padding
+   (and none at all while empty, which is what made the box collapse or balloon), and the platform look that
+   ignores the field border and padding set above. Size them like every other text-like field: a box that never
+   outgrows its container, a 44px minimum height, a set line height, the native look off (so the shared border and
+   padding apply), and the inner value and edit fields reset so an empty one is as tall as a filled one.
+   Both rules sit inside :where() (zero specificity, like the field base rule above), so a component's own
+   single-class rule (.date in club-orders.module.css) still sets its size, display and margin. The block layout
+   is only for fields in a block-label form (.form-stack, .form-grid); the inline-label staff forms (meals,
+   lodging, asset return) keep their own flow. */
+:where(input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  line-height: 1.4;
+  -webkit-appearance: none;
+  appearance: none;
+}
+:where(:is(.form-stack, .form-grid) input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])) {
+  display: block;
+  margin: 0;
+  text-align: left;
+}
+input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])::-webkit-date-and-time-value { min-width: 0; min-height: 1.4em; margin: 0; text-align: left; }
+input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])::-webkit-datetime-edit { padding: 0; line-height: inherit; }
+input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])::-webkit-datetime-edit-fields-wrapper { padding: 0; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding-top: 15px; }
 .form-error { margin: 0; border-radius: 9px; background: #fff1ef; color: var(--coral); padding: 9px 11px; font-size: max(var(--type-floor, 0px), 0.68rem); }
 .detail-stack { display: grid; gap: 17px; }
@@ -7576,6 +7610,7 @@ select:focus-visible {
 .roster-guardian-slot h3 { margin: 0; font-size: 0.95rem; }
 .club-guardians-table-wrap { overflow-x: auto; }
 .club-guardian-cell { display: grid; gap: 2px; min-width: 11rem; }
+.club-guardian-term { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 @media (max-width: 520px) {
   .roster-guardian-slot .form-grid.two-column { grid-template-columns: minmax(0, 1fr); }
 }
@@ -10143,6 +10178,13 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 
 /* Class history link under a roster name (#791). */
 .roster-class-history-link { display: block; margin-top: 2px; padding: 0; font-size: 0.8rem; }
+/* #918: the member's name is the most prominent thing in its row; "Class history" is a quiet secondary link under it. */
+.roster-card-name .roster-member-name { display: block; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 1.0625rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.roster-card-name .roster-class-history-link { margin-top: 4px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8125rem); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.roster-card-name .roster-class-history-link:hover, .roster-card-name .roster-class-history-link:focus-visible { color: var(--imsda-purple); }
+@media (max-width: 720px) {
+  .roster-card-table td.roster-card-name[data-label] { font-size: max(var(--type-body-floor, 0px), 1.0625rem); }
+}
 .area-club-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .area-club-search .search-field { max-width: 360px; padding: 0 12px; }
 
@@ -10823,3 +10865,9 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 @media (max-width: 600px) {
   .cancel-policy .form-grid.two-column { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Team permissions explanation (#918): a short definition list under the tab's heading. */
+.team-permission-levels { display: grid; gap: 8px; margin: 10px 0; }
+.team-permission-levels > div { display: grid; gap: 2px; border-left: 3px solid var(--line); padding-left: 10px; }
+.team-permission-levels dt { color: var(--ink); font-weight: 800; }
+.team-permission-levels dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }

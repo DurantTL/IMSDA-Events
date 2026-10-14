@@ -51,3 +51,16 @@ export function effectiveChoice(chosenId: string, listed: ReadonlyArray<{ id: st
   if (chosenId && listed.some((entry) => entry.id === chosenId)) return chosenId;
   return hasSearchText(query) && listed.length === 1 ? listed[0]!.id : "";
 }
+
+/**
+ * What a picker's search says it found (#918), shown next to the search box. A closed native
+ * <select> (iPad Safari) gives no sign it was narrowed, so typing looked like it did nothing.
+ * Empty while nothing is typed.
+ */
+export function searchResultSummary(count: number, query: string, noun: string, nounPlural = `${noun}s`) {
+  if (!hasSearchText(query)) return "";
+  const typed = query.trim();
+  if (count === 0) return `No ${nounPlural} match \u201c${typed}\u201d. Clear the search to see every ${noun}.`;
+  return count === 1 ? `1 ${noun} matches \u201c${typed}\u201d.` : `${count} ${nounPlural} match \u201c${typed}\u201d.`;
+}
+

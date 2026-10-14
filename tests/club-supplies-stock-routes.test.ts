@@ -125,16 +125,13 @@ describe("club stock routes (#531): permissioned like the roster", () => {
     expect(mocks.setClubStockQuantity).not.toHaveBeenCalled();
   });
 
-  it("an Area Coordinator views read-only, can't edit, and gets 404 for a non-club organization", async () => {
+  it("an Area Coordinator is refused the stock list (supplies are part of club Orders, #918) and can't edit", async () => {
     mocks.listDirectedClubs.mockResolvedValue([]);
     mocks.findAreaGrant.mockResolvedValue({ revokedAt: null, expiresAt: null });
-    const read = await GET(getRequest(), ctx());
-    expect(read.status).toBe(200);
-    expect(await read.json()).toMatchObject({ canEdit: false });
+    expect((await GET(getRequest(), ctx())).status).toBe(404);
+    expect(mocks.listClubStock).not.toHaveBeenCalled();
     expect((await PUT(putRequest({ quantityOnHand: 4 }), itemCtx())).status).toBe(404);
     expect(mocks.setClubStockQuantity).not.toHaveBeenCalled();
-    mocks.findOrganization.mockResolvedValue({ type: "CHURCH", isActive: true });
-    expect((await GET(getRequest(), ctx())).status).toBe(404);
   });
 
   it("rejects a negative or fractional quantity, and 404s an unknown item", async () => {

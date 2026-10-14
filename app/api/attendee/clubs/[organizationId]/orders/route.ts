@@ -1,7 +1,7 @@
 import { withRequestContext } from "@/lib/request-context";
 import { clubOrderApiError } from "@/modules/club-orders/api-errors";
 import { loadOrderWorkspace } from "@/modules/club-orders/repository";
-import { requireClubSupplyAccess } from "@/modules/club-supplies/access";
+import { requireClubOrdersAccess } from "@/modules/club-supplies/access";
 import { syncHonorOrderNeeds } from "@/modules/honors/order-source";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
@@ -11,14 +11,15 @@ type RouteContext = { params: Promise<{ organizationId: string }> };
  * honor, uniform and award, grouped by catalog item, with the club's stock
  * applied. Syncing first means a completion recorded since the last visit
  * shows up with no manual comparison against a prior file. Directors and
- * deputies edit (and their visit syncs); registrars and Area Coordinators
- * view what's on file and never write, the same gate as club supplies (#531).
+ * deputies edit (and their visit syncs); registrars
+ * view what's on file and never write, the same gate as club supplies (#531). Area
+ * Coordinators are refused (#918).
  * The list is a planning aid: nothing is ordered from here.
  */
 async function getHandler(_request: Request, context: RouteContext) {
   try {
     const { organizationId } = await context.params;
-    const access = await requireClubSupplyAccess(organizationId);
+    const access = await requireClubOrdersAccess(organizationId);
     // Only an editor's visit records new needs; a view-only role reads what's on file.
     if (access.mode === "EDIT") await syncHonorOrderNeeds(organizationId);
     return Response.json({ ...(await loadOrderWorkspace(organizationId)), canEdit: access.mode === "EDIT" });

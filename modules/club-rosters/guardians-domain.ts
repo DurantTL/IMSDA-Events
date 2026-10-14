@@ -27,6 +27,11 @@ export const guardianFieldLabels: Record<GuardianField, string> = {
   phone: "Cell phone",
 };
 
+/** What a contact is called (#918): an adult names an emergency contact, a minor a guardian. */
+export function guardianTerm(adult: boolean) {
+  return adult ? { singular: "Emergency contact", plural: "Emergency contacts" } : { singular: "Guardian", plural: "Guardians" };
+}
+
 export type GuardianValues = Record<GuardianField, string>;
 
 /** One stored guardian: the slot (1 or 2) and its values. */

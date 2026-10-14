@@ -52,7 +52,7 @@ export function clubReporterNavItems({ base, capabilities }: { base: string; cap
  * its view-only form. It lists only destinations a coordinator can already
  * open (each page still checks access on the server); the director's
  * editing-only screens (Class tracking, Club settings, Health, Monthly Records
- * entry) are never listed. Every item stays inside this club: Roster, Events
+ * entry) and Orders (#918) are never listed. Every item stays inside this club: Roster, Events
  * and Monthly Records are sections of the club's Home page (ages only), and
  * the Sterling Volunteers status, counts and note are on its roster.
  *
@@ -69,7 +69,7 @@ export function areaClubPortalNavItems({ organizationId }: { organizationId: str
     { href: `${base}#open-club-events`, label: "Events", group: "Events", hideGroupLabel: true },
     { href: `${base}/forms`, label: "Club forms", matchChildren: true, group: "Events", hideGroupLabel: true },
     { href: `${base}#open-club-reports`, label: "Monthly Records", alsoMatchPrefix: `${base}/reports`, group: "Records", hideGroupLabel: true },
-    { href: `${base}/orders`, label: "Orders", group: "Orders", hideGroupLabel: true },
+    // No Orders entry (#918): club Orders are not an Area Coordinator's to see, and the server refuses them.
     { href: `${base}/awards`, label: "Earned awards", group: "Orders", hideGroupLabel: true },
   ];
 }

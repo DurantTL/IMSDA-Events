@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TeamPermissionPanel } from "@/components/team-permission-panel";
+import { teamPermissionsIntro } from "@/modules/club-teams/permission-domain";
 import { listCoordinatorTeamPermissions } from "@/modules/club-teams/permission-repository";
 import { currentAreaCoordinator, currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 
@@ -19,7 +20,16 @@ export default async function TeamPermissionsPage() {
     <section className="page-stack">
       <div className="public-manage-card">
         <h2>Team permissions</h2>
-        <p className="field-help">Team members 18 and over need your permission. The team is registered while you decide. Only teams at your own locations are listed.</p>
+        <p>{teamPermissionsIntro.summary}</p>
+        <dl className="team-permission-levels" aria-label="What each permission level means">
+          {teamPermissionsIntro.levels.map((level) => (
+            <div key={level.label}>
+              <dt>{level.label}</dt>
+              <dd>{level.detail}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="field-help">{teamPermissionsIntro.footer}</p>
       </div>
       <TeamPermissionPanel canDecide={account !== null} endpointBase="/api/attendee/area-clubs/team-permissions" rows={rows} showEvent />
     </section>

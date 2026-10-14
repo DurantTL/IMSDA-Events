@@ -20,17 +20,17 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
+  isAdultRosterPerson,
   missingRosterFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
 import {
   GUARDIAN_SLOTS,
-  guardianFieldLabels,
-  guardianSlotValues,
   validateGuardianForm,
   type GuardianFormErrors,
   type GuardianRecord,
 } from "@/modules/club-rosters/guardians-domain";
+import { RosterGuardianFields } from "@/components/roster-guardian-fields";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 
 type RosterResponse = {
@@ -192,8 +192,11 @@ export function ClubRosterWorkspace({
     }
   }
 
+  const today = calendarDateInEventTimeZone(new Date(), "America/Chicago");
+  /** Adults (staff, adult members, and anyone 18 or over) name an emergency contact; only a minor has a guardian (#918). */
+  const adultContact = isAdultRosterPerson(formType, formBirthDate, today);
   const typeHint = formBirthDate
-    ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, calendarDateInEventTimeZone(new Date(), "America/Chicago"))
+    ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, today)
     : null;
   const [nameDirection, setNameDirection] = useState<SortDirection>("asc");
   const active = members.filter((member) => member.status === "ACTIVE");
@@ -462,7 +465,7 @@ export function ClubRosterWorkspace({
                         return (
                           <tr id={`member-${member.id}`} key={member.id}>
                             <td className="roster-card-name" data-label="Name">
-                              <strong translate="no">{member.lastName}, {member.firstName}</strong>
+                              <strong className="roster-member-name" translate="no">{member.lastName}, {member.firstName}</strong>
                               {classHistoryBase && member.personId && (
                                 <Link className="text-button roster-class-history-link" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
                                   Class history<span className="sr-only"> for {member.firstName} {member.lastName}</span>
@@ -648,47 +651,13 @@ export function ClubRosterWorkspace({
           </label>
         </div>
         {canEditGuardians && (
-          <fieldset className="roster-guardians" key={`${editing?.id ?? "new"}-${guardianRev}`}>
-            <legend>Guardians (optional)</legend>
-            <p className="field-help">
-              Up to two guardians. Your club&apos;s director and deputy, Area Coordinators and conference staff with
-              sensitive-data access can see them. They are erased when this person is removed from the roster.
-            </p>
-            {guardianState === "failed" && (
-              <p className="field-help" role="status">Guardian contacts couldn&apos;t be loaded, so saving won&apos;t change them. Close and reopen this person to try again.</p>
-            )}
-            {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
-              const slot = index + 1;
-              const stored = guardianSlotValues(editing ? guardianMap?.[editing.id] : undefined)[index]!;
-              const emailError = guardianErrors[`g${slot as 1 | 2}Email`];
-              const phoneError = guardianErrors[`g${slot as 1 | 2}Phone`];
-              return (
-                <div className="roster-guardian-slot" key={slot} role="group" aria-label={`Guardian ${slot}`}>
-                  <h3>Guardian {slot}</h3>
-                  <div className="form-grid two-column">
-                    <label>
-                      {guardianFieldLabels.name}
-                      <input autoComplete="off" defaultValue={stored.name} readOnly={guardianState !== "ready"} maxLength={120} name={`g${slot}Name`} />
-                    </label>
-                    <label>
-                      {guardianFieldLabels.relationship}
-                      <input autoComplete="off" defaultValue={stored.relationship} readOnly={guardianState !== "ready"} maxLength={60} name={`g${slot}Relationship`} placeholder="e.g. Mother" />
-                    </label>
-                    <label>
-                      {guardianFieldLabels.email}
-                      <input aria-describedby={emailError ? `roster-g${slot}Email-error` : undefined} aria-invalid={emailError ? true : undefined} autoComplete="off" defaultValue={stored.email} readOnly={guardianState !== "ready"} inputMode="email" maxLength={254} name={`g${slot}Email`} type="text" />
-                      {emailError && <span className="roster-field-error" id={`roster-g${slot}Email-error`} role="alert">{emailError}</span>}
-                    </label>
-                    <label>
-                      {guardianFieldLabels.phone}
-                      <input aria-describedby={phoneError ? `roster-g${slot}Phone-error` : undefined} aria-invalid={phoneError ? true : undefined} autoComplete="off" defaultValue={stored.phone} readOnly={guardianState !== "ready"} inputMode="tel" maxLength={40} name={`g${slot}Phone`} type="text" />
-                      {phoneError && <span className="roster-field-error" id={`roster-g${slot}Phone-error`} role="alert">{phoneError}</span>}
-                    </label>
-                  </div>
-                </div>
-              );
-            })}
-          </fieldset>
+          <RosterGuardianFields
+            adult={adultContact}
+            errors={guardianErrors}
+            guardianState={guardianState}
+            key={`${editing?.id ?? "new"}-${guardianRev}`}
+            records={editing ? guardianMap?.[editing.id] : undefined}
+          />
         )}
         <p className="field-help">
           Birth dates are encrypted and shown only to your club&apos;s director and deputy. Registrars and event
