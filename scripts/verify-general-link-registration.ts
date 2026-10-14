@@ -127,6 +127,7 @@ async function main() {
   const day = 24 * 60 * 60 * 1000;
   const account = (key: string, extra: { disabledAt?: Date } = {}) => prisma.attendeeAccount.create({
     data: { id: accountOf(key), email: emailOf(key), displayName: `Gl ${key}`, status: "ACTIVE", emailVerifiedAt: new Date(), ...extra },
+    select: { id: true },
   });
   const grant = (key: string, organization: string, role: "DIRECTOR" | "DEPUTY" | "REGISTRAR" | "REPORTER", extra: { revokedAt?: Date; effectiveTo?: Date; effectiveFrom?: Date } = {}) => prisma.clubDirectorGrant.create({
     data: { organizationId: clubOf(organization), attendeeAccountId: accountOf(key), role, reason: "Synthetic grant for the general link check.", effectiveFrom: new Date(now.getTime() - 30 * day), ...extra },
@@ -192,7 +193,7 @@ async function main() {
   // Request builders. The people are typed in; the club is picked from the directory by name.
   const typedMember = (first: string, last: string, age: number, role = "Pathfinder", alternate = false) => ({
     clientId: `c${randomUUID().replaceAll("-", "").slice(0, 12)}`,
-    responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) },
+    responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
   });
   const request = (members: Array<ReturnType<typeof typedMember>>, answers: Record<string, unknown> = {}, key = randomUUID()) => ({
     versionId,

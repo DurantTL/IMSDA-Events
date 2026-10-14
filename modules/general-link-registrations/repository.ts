@@ -5,7 +5,6 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { getServerEnv } from "@/lib/env";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
-import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   clubDirectoryIdentity,
   clubLocationSelect,

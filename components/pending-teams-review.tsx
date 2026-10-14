@@ -90,7 +90,7 @@ function TeamRow({ eventId, team, clubs }: { eventId: string; team: PendingTeamV
               onClick={() => void send({ action: choice === suggested?.id ? "CONFIRM" : "REASSIGN", organizationId: choice })}
               type="button"
             >
-              {suggested && choice !== suggested.id ? "Attach to the chosen club" : suggested ? "Attach to the chosen club" : "Attach to this club"}
+              {suggested ? "Attach to the chosen club" : "Attach to this club"}
             </button>
             <button className="text-button" disabled={busy} onClick={() => setRejecting((open) => !open)} type="button"><XCircle aria-hidden="true" size={14} /> Reject</button>
           </div>
