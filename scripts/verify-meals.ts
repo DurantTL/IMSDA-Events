@@ -428,7 +428,7 @@ async function main() {
   const csv = await mealTicketsCsv(eventId);
   assert(ticketRows.some((row) => row.confirmationCode === entitled.code && row.payer === "CONFERENCE" && row.serviceDate === "2027-06-16"), "the ticket rows name the registration, service date and payer");
   assert(ticketRows.some((row) => row.confirmationCode === formRegistration.confirmationCode && row.serviceDate === "" && row.attendeeName.length > 0), "a form ticket good for any service has no service date");
-  assert(csv.startsWith('"ticket_id","reg_id","guest_name"') && !ticketRows.some((row) => row.source === "WALK_UP"), "the CSV has the café scanner's columns and no walk-up orders");
+  assert(csv.startsWith("ticket_id,reg_id,guest_name,") && !ticketRows.some((row) => row.source === "WALK_UP"), "the CSV has the café scanner's columns and no walk-up orders");
 
   // ---- Walk-up orders -----------------------------------------------------------------------------------------------------
   const thursdayLunch = service("Thursday lunch");

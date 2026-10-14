@@ -86,6 +86,9 @@ Invitations (#804) and scanning (#211) are not built.
 scanner's format exactly, one row per ticket (a selection of quantity 3 is three rows):
 `ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes`.
 
+- The file is written like the scanner's own: unquoted header and rows (a cell is quoted only when it holds a comma, a
+  double quote or a line break; a cell starting with `=`, `+`, `-`, `@`, tab or CR still gets the formula-safe `'`
+  prefix), CRLF line endings, no byte-order mark. Other exports keep quoting every cell.
 - `ticket_id` is `MT-` and the stored number (at least five digits), unique within the event; `reg_id` is the confirmation
   code; `meal_type` is `breakfast`, `lunch` or `supper`; `meal_day` is `tue` to `sat` (three-letter lowercase) and
   `meal_date` is `YYYY-MM-DD`, both from the service date, which is already in the event's time zone; `ticket_type` is

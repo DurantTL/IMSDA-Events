@@ -80,10 +80,11 @@ const everIssued = new Set<string>();
 async function exportRows() {
   const csv = await mealTicketsCsv(eventId);
   const lines = csv.trimEnd().split("\r\n");
-  const cells = (line: string) => line.slice(1, -1).split('","');
-  assert(lines[0] === scannerTicketCsvHeader.map((name) => `"${name}"`).join(","), "the header is exactly the scanner's columns");
+  // The synthetic names here never need quoting, so a plain split is a faithful parse.
+  assert(lines[0] === scannerTicketCsvHeader.join(",") && csv.startsWith(`${scannerTicketCsvHeader.join(",")}\r\n`), "the header is exactly the scanner's columns, unquoted, CRLF");
+  assert(!csv.includes('"') && !csv.replaceAll("\r\n", "").includes("\n") && csv.charCodeAt(0) !== 0xfeff, "unquoted rows, CRLF only, no byte-order mark");
   const rows = lines.slice(1).map((line) => {
-    const values = cells(line);
+    const values = line.split(",");
     assert(values.length === scannerTicketCsvHeader.length, `a row has the scanner's ${scannerTicketCsvHeader.length} columns`);
     return Object.fromEntries(scannerTicketCsvHeader.map((name, index) => [name, values[index]!])) as Record<(typeof scannerTicketCsvHeader)[number], string>;
   });

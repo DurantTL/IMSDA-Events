@@ -332,10 +332,29 @@ describe("café scanner CSV (#916)", () => {
     expect(rows.map((row) => row[0])).toEqual(["MT-00005", "MT-00004", "MT-00003", "MT-00002", "MT-00001"]);
   });
 
+  const scannerCsv = (tickets: ScannerTicket[]) => toCsv([[...scannerTicketCsvHeader], ...scannerTicketCsvRows(tickets)], { minimalQuoting: true });
+
+  it("writes an unquoted header and rows, CRLF lines, no byte-order mark", () => {
+    const csv = scannerCsv([ticket()]);
+    expect(csv.startsWith("ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes\r\n")).toBe(true);
+    expect(csv).toBe("ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes\r\nMT-01234,CM99-0001,Test Guest,lunch,wed,2099-06-17,adult,8,no,,,\r\n");
+    expect(csv.charCodeAt(0)).not.toBe(0xfeff);
+  });
+
+  it("quotes a name with a comma, and is byte-identical when written twice", () => {
+    const tickets = [ticket({ guestName: "Guest, Test" })];
+    expect(scannerCsv(tickets)).toContain(',"Guest, Test",');
+    expect(scannerCsv(tickets)).toBe(scannerCsv(tickets));
+  });
+
   it("defuses spreadsheet formulas in the guest name", () => {
-    const csv = toCsv([[...scannerTicketCsvHeader], ...scannerTicketCsvRows([ticket({ guestName: "=HYPERLINK(\"x\")" })])]);
+    const csv = scannerCsv([ticket({ guestName: "=HYPERLINK(\"x\")" })]);
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
-    expect(csv.split("\r\n")[0]).toBe(scannerTicketCsvHeader.map((name) => `"${name}"`).join(","));
+    expect(scannerCsv([ticket({ guestName: "+1" })])).toContain(",'+1,");
+  });
+
+  it("leaves the default writer quoting every cell", () => {
+    expect(toCsv([["a", "b"]])).toBe('"a","b"\r\n');
   });
 });
 

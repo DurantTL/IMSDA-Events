@@ -193,5 +193,5 @@ export async function loadScannerTickets(eventId: string): Promise<ScannerTicket
 
 /** The café scanner's import file: exactly its columns, one row per ticket, with stable `MT-` ids. */
 export async function mealTicketsCsv(eventId: string) {
-  return toCsv([[...scannerTicketCsvHeader], ...scannerTicketCsvRows(await loadScannerTickets(eventId))]);
+  return toCsv([[...scannerTicketCsvHeader], ...scannerTicketCsvRows(await loadScannerTickets(eventId))], { minimalQuoting: true });
 }
