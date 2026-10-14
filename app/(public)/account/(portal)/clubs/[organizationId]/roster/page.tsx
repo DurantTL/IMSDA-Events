@@ -55,19 +55,17 @@ export default async function ClubRosterPage({
   // A club Registrar (#923) gets an entry link with the status only: no clinical-note flag, nothing to read.
   // Until the one-time privacy acknowledgment is made, the link is shown without a status, so the person can reach the prompt.
   const memberIds = members.map((member) => member.id);
-  let healthEntryOnly = false;
-  const healthTab = healthRecordsEnabled() && !readOnly
-    ? await requireHealthViewerForClub(organizationId)
-      .then(async (viewer) => {
-        if (viewer.kind === "CLUB_LEADER") return await healthSummariesForMembers(viewer, organizationId, memberIds);
-        if (viewer.kind !== "CLUB_REGISTRAR") return undefined;
-        healthEntryOnly = true;
-        const statuses = await healthEntryStatusesForMembers(viewer, organizationId, memberIds);
-        return Object.fromEntries(Object.entries(statuses).map(([id, { status }]) => [id, { status, hasHealthNote: false }]));
-      })
-      .catch((error: unknown) => (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED"
-        ? Object.fromEntries(memberIds.map((id) => [id, { status: "LOCKED" as const, hasHealthNote: false }]))
-        : undefined))
+  const healthViewer = healthRecordsEnabled() && !readOnly ? await requireHealthViewerForClub(organizationId).catch(() => null) : null;
+  const healthEntryOnly = healthViewer?.kind === "CLUB_REGISTRAR";
+  const healthTab = healthViewer
+    ? await (async () => {
+      if (healthViewer.kind === "CLUB_LEADER") return healthSummariesForMembers(healthViewer, organizationId, memberIds);
+      if (healthViewer.kind !== "CLUB_REGISTRAR") return undefined;
+      const statuses = await healthEntryStatusesForMembers(healthViewer, organizationId, memberIds);
+      return Object.fromEntries(Object.entries(statuses).map(([id, { status }]) => [id, { status, hasHealthNote: false }]));
+    })().catch((error: unknown) => (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED"
+      ? Object.fromEntries(memberIds.map((id) => [id, { status: "LOCKED" as const, hasHealthNote: false }]))
+      : undefined))
     : undefined;
   // Anyone who can see these rows, with no health access, still sees a neutral
   // "Has a health record" marker: one boolean saying a record exists, no text (#611).

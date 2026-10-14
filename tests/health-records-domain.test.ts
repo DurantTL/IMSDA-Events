@@ -153,7 +153,7 @@ describe("who may do what", () => {
     expect(acknowledgmentSubjectFor(staff as never)).toEqual({ userId: "user-1" });
     expect(acknowledgmentSubjectFor(coordinator as never)).toEqual({ attendeeAccountId: "acct-2" });
     expect(acknowledgmentSubjectFor(leader as never)).toEqual({ attendeeAccountId: "acct-1" });
-    expect(acknowledgmentSubjectFor({ kind: "CLUB_REGISTRAR", organizationId: "club-a", accountId: "acct-3" })).toEqual({ attendeeAccountId: "acct-3" });
+    expect(acknowledgmentSubjectFor({ kind: "CLUB_REGISTRAR", accountId: "acct-3" })).toEqual({ attendeeAccountId: "acct-3" });
     expect(acknowledgmentSubjectFor({ kind: "CLUB_LEADER", actor: { kind: "STAFF_ACTING", userId: "user-9" } })).toEqual({ userId: "user-9" });
     expect(HEALTH_PRIVACY_ACK_VERSION).toMatch(/^health-privacy-ack-/);
   });

@@ -44,6 +44,8 @@ const client: any = {
   clubRosterMember: { findFirst: mocks.rosterFindFirst, findMany: vi.fn(async () => []) },
   healthRecord: { findUnique: mocks.healthRecordFindUnique, findFirst: vi.fn(async () => null), create: mocks.healthRecordCreate, update: mocks.healthRecordUpdate },
   healthRecordField: { deleteMany: mocks.healthFieldDeleteMany, createMany: mocks.healthFieldCreateMany },
+  // The privacy acknowledgment (#923) is not what these tests are about: everyone here has acknowledged it.
+  healthPrivacyAcknowledgment: { findFirst: vi.fn(async () => ({ id: "ack-1" })) },
   $transaction: (work: (tx: unknown) => unknown) => work(client),
 };
 

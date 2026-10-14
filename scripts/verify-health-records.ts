@@ -10,7 +10,13 @@
  * - a parent's private link: minted at delivery, stored only as a hash, works
  *   exactly once even when many submits race, and the record it writes is
  *   Current for this club year; an older club year reads Needs update;
- * - removing a roster member erases the record and withdraws its open links.
+ * - removing a roster member erases the record and withdraws its open links;
+ * - the owner decisions of 2026-10-14 (#923): a Registrar enters and replaces a
+ *   record but never reads one back (refusals audited, no value in any row),
+ *   and nobody reads or enters health data until they have acknowledged the
+ *   current privacy wording once (per person and version, staff by user and
+ *   everyone else by attendee account, with the table holding no event, club,
+ *   roster or person reference so event and roster deletion never touch it).
  *
  * Uses fictitious rows it creates and removes itself, and a synthetic key.
  *
@@ -46,7 +52,8 @@ function linkFrom(bodyText: string) {
 const prisma = new PrismaClient();
 const P = "hr611";
 const clubs = { a: `${P}_club_a`, b: `${P}_club_b` };
-const accounts = { a: `${P}_acct_a`, b: `${P}_acct_b` };
+const accounts = { a: `${P}_acct_a`, b: `${P}_acct_b`, reg: `${P}_acct_reg`, reg2: `${P}_acct_reg2`, temp: `${P}_acct_temp` };
+const adminUserId = `${P}_admin_user`;
 const emailDomain = "health.example.test";
 const SECRETS = ["Verify allergy text only", "Verify medication text only", "Verify Mutual Insurer", "4 Verify Road", "515-555-0188"];
 
@@ -93,8 +100,9 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 async function cleanup() {
   const records = await prisma.healthRecord.findMany({ where: { organizationId: { in: Object.values(clubs) } }, select: { id: true } });
   const links = await prisma.healthRecordLink.findMany({ where: { organizationId: { in: Object.values(clubs) } }, select: { id: true, messageId: true } });
+  const members = await prisma.clubRosterMember.findMany({ where: { organizationId: { in: Object.values(clubs) } }, select: { id: true } });
   await prisma.auditLog.deleteMany({
-    where: { OR: [{ entityId: { in: [...records, ...links].map((row) => row.id) } }, { entityId: { startsWith: P } }] },
+    where: { OR: [{ entityId: { in: [...records, ...links, ...members].map((row) => row.id) } }, { entityId: { startsWith: P } }, { actorUserId: adminUserId }] },
   });
   await prisma.healthRecord.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.healthRecordLink.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
@@ -103,17 +111,23 @@ async function cleanup() {
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: Object.values(accounts) } } });
+  await prisma.user.deleteMany({ where: { id: adminUserId } });
   await prisma.organization.deleteMany({ where: { id: { in: Object.values(clubs) } } });
 }
 
 async function main() {
   const repo = await import("../modules/health-records/repository");
+  const acknowledgment = await import("../modules/health-records/acknowledgment");
+  const acknowledgmentDomain = await import("../modules/health-records/acknowledgment-domain");
   const linkEmail = await import("../modules/health-records/link-email");
   const rosterDomain = await import("../modules/club-rosters/domain");
   const rosterRepo = await import("../modules/club-rosters/repository");
   type Viewer = import("../modules/health-records/domain").HealthViewer;
   const directorA: Viewer = { kind: "CLUB_LEADER", organizationId: clubs.a, accountId: accounts.a };
   const directorB: Viewer = { kind: "CLUB_LEADER", organizationId: clubs.b, accountId: accounts.b };
+  const registrarA: Viewer = { kind: "CLUB_REGISTRAR", organizationId: clubs.a, accountId: accounts.reg };
+  const registrarB: Viewer = { kind: "CLUB_REGISTRAR", organizationId: clubs.b, accountId: accounts.reg2 };
+  const adminViewer: Viewer = { kind: "SYSTEM_ADMIN", userId: adminUserId };
   const now = new Date();
   const clubYear = rosterDomain.clubYearFor(now);
 
@@ -127,6 +141,7 @@ async function main() {
   for (const [key, id] of Object.entries(accounts)) {
     await prisma.attendeeAccount.create({ data: { id, email: `account-${key}@${emailDomain}`, displayName: `Verify ${key}`, status: "ACTIVE" } });
   }
+  await prisma.user.create({ data: { id: adminUserId, email: `admin@${emailDomain}`, displayName: "Verify Admin" } });
   await prisma.person.create({ data: { id: `${P}_riley`, firstName: "Riley", lastName: "Verify" } });
   const member = await prisma.clubRosterMember.create({
     data: { organizationId: clubs.a, clubYear, personId: `${P}_riley`, attendeeType: "YOUTH", role: "Pathfinder", source: "DIRECTOR" },
@@ -143,6 +158,14 @@ async function main() {
   const envModule = await import("../lib/env");
   envModule.resetServerEnvCache();
   assert((await import("../modules/health-records/flag")).healthRecordsEnabled(), "the flag is on for the rest of this script");
+
+  // Nobody enters or reads anything until they have acknowledged the privacy notice (#923).
+  await expectCode(repo.saveHealthRecord(directorA, clubs.a, member.id, record, now), "ACKNOWLEDGMENT_REQUIRED", "saving before acknowledging");
+  await expectCode(repo.viewHealthRecord(directorA, clubs.a, member.id, now), "ACKNOWLEDGMENT_REQUIRED", "viewing before acknowledging");
+  assert((await prisma.healthRecord.count({ where: { organizationId: clubs.a } })) === 0, "nothing is stored before the acknowledgment");
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_VIEWED", entityId: member.id } })) === 0, "a refused view is not audited as a view");
+  await acknowledgment.recordHealthPrivacyAcknowledgment(directorA, now);
+  await acknowledgment.recordHealthPrivacyAcknowledgment(directorB, now);
 
   await repo.saveHealthRecord(directorA, clubs.a, member.id, record, now);
   const stored = await prisma.healthRecord.findUniqueOrThrow({ where: { rosterMemberId: member.id }, include: { fields: true } });
@@ -218,6 +241,80 @@ async function main() {
   await prisma.$transaction((tx) => rosterRepo.eraseRosterRow(tx, currentRow.id, now));
   assert((await prisma.healthRecord.count({ where: { organizationId: clubs.a, rosterMemberId: { in: [priorRow.id, currentRow.id] } } })) === 0, "removing the current-year row erases the earlier year's record too");
   assert((await prisma.healthRecordLink.count({ where: { rosterMemberId: priorRow.id, status: "OPEN" } })) === 0, "and withdraws the earlier row's open link");
+
+  // 6. A Registrar enters and replaces a record but never reads one (#923) -
+  await prisma.person.create({ data: { id: `${P}_morgan`, firstName: "Morgan", lastName: "Verify" } });
+  const morgan = await prisma.clubRosterMember.create({
+    data: { organizationId: clubs.a, clubYear, personId: `${P}_morgan`, attendeeType: "YOUTH", role: "Pathfinder", source: "DIRECTOR" },
+  });
+  await expectCode(repo.saveHealthRecord(registrarA, clubs.a, morgan.id, record, now), "ACKNOWLEDGMENT_REQUIRED", "a Registrar entering before acknowledging");
+  await acknowledgment.recordHealthPrivacyAcknowledgment(registrarA, now);
+  await acknowledgment.recordHealthPrivacyAcknowledgment(registrarB, now);
+  await repo.saveHealthRecord(registrarA, clubs.a, morgan.id, record, now);
+  const entered = await prisma.healthRecord.findUniqueOrThrow({ where: { rosterMemberId: morgan.id }, include: { fields: true } });
+  assert(entered.fields.length >= 15 && entered.lastConfirmedAt !== null && entered.confirmedClubYear === clubYear, "the Registrar's entry is sealed field by field and dated");
+  assert(!JSON.stringify(entered).includes("Verify allergy text only"), "no plaintext is stored for a Registrar's entry");
+  const createdRows = await prisma.auditLog.findMany({ where: { action: "HEALTH_RECORD_CREATED", entityId: entered.id } });
+  assert(createdRows.length === 1 && (createdRows[0]!.metadata as { viewerKind?: string }).viewerKind === "CLUB_REGISTRAR", "the Registrar's save is audited as theirs");
+  for (const secret of SECRETS) assert(!JSON.stringify(createdRows).includes(secret), "the save audit row holds no health text");
+
+  await expectCode(repo.viewHealthRecord(registrarA, clubs.a, morgan.id, now), "FORBIDDEN", "a Registrar reading a record");
+  await expectCode(repo.healthSummariesForMembers(registrarA, clubs.a, [morgan.id], now), "FORBIDDEN", "a Registrar reading summaries");
+  await expectCode(repo.confirmHealthRecord(registrarA, clubs.a, morgan.id, now), "FORBIDDEN", "a Registrar confirming");
+  await expectCode(repo.listHealthRecordLinks(registrarA, clubs.a, morgan.id, now), "FORBIDDEN", "a Registrar listing links");
+  await expectCode(repo.viewHealthRecord(registrarB, clubs.a, morgan.id, now), "MEMBER_NOT_FOUND", "another club's Registrar reading");
+  await expectCode(repo.saveHealthRecord(registrarB, clubs.a, morgan.id, record, now), "MEMBER_NOT_FOUND", "another club's Registrar writing");
+  const refusals = await prisma.auditLog.findMany({ where: { action: "HEALTH_RECORD_ACCESS_REFUSED", entityId: { in: [morgan.id, clubs.a] } } });
+  assert(refusals.length === 2, "a Registrar's refused reads (one record, one list) are audited");
+  for (const secret of SECRETS) assert(!JSON.stringify(refusals).includes(secret), "the refusal audit rows hold no health text");
+  assert(!(await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_VIEWED", entityId: entered.id } })), "a refused read is never a view");
+
+  const entry = await repo.viewHealthEntryStatus(registrarA, clubs.a, morgan.id, now);
+  assert(entry.exists && entry.status === "CURRENT" && entry.lastConfirmedAt !== null, "the Registrar sees that a record exists, its status and when it was confirmed");
+  for (const secret of SECRETS) assert(!JSON.stringify(entry).includes(secret), "the entry status holds no health text");
+  const statuses = await repo.healthEntryStatusesForMembers(registrarA, clubs.a, [morgan.id], now);
+  assert(JSON.stringify(statuses) === JSON.stringify({ [morgan.id]: { status: "CURRENT" } }), "the roster status for a Registrar is the status alone");
+
+  await repo.saveHealthRecord(registrarA, clubs.a, morgan.id, { ...record, medications: "Verify replaced medication" }, now);
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_UPDATED", entityId: entered.id } })) === 1, "a Registrar's replacement is audited as an update");
+  assert((await repo.viewHealthRecord(directorA, clubs.a, morgan.id, now)).values.medications === "Verify replaced medication", "the director reads what the Registrar entered");
+
+  // 7. The acknowledgment: per person and wording version (#923) ----------
+  const version = acknowledgmentDomain.HEALTH_PRIVACY_ACK_VERSION;
+  await expectCode(repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, now), "ACKNOWLEDGMENT_REQUIRED", "a system administrator before acknowledging");
+  await acknowledgment.recordHealthPrivacyAcknowledgment(adminViewer, now);
+  await acknowledgment.recordHealthPrivacyAcknowledgment(adminViewer, now);
+  assert((await prisma.healthPrivacyAcknowledgment.count({ where: { userId: adminUserId, version } })) === 1, "acknowledging twice stores one row, by user for staff");
+  assert((await repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, now)).values.medications === "Verify replaced medication", "staff read after acknowledging");
+  assert((await prisma.healthPrivacyAcknowledgment.count({ where: { attendeeAccountId: accounts.a, version } })) === 1, "a director is acknowledged by attendee account");
+  assert((await prisma.healthPrivacyAcknowledgment.count({ where: { attendeeAccountId: accounts.reg, version } })) === 1, "a Registrar is acknowledged by attendee account");
+
+  // A new wording version asks everyone again; the old row does not count.
+  await prisma.healthPrivacyAcknowledgment.updateMany({ where: { userId: adminUserId }, data: { version: "health-privacy-ack-old" } });
+  await prisma.healthPrivacyAcknowledgment.updateMany({ where: { attendeeAccountId: accounts.a }, data: { version: "health-privacy-ack-old" } });
+  await expectCode(repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, now), "ACKNOWLEDGMENT_REQUIRED", "staff after a wording change");
+  await expectCode(repo.viewHealthRecord(directorA, clubs.a, morgan.id, now), "ACKNOWLEDGMENT_REQUIRED", "a director after a wording change");
+  await acknowledgment.recordHealthPrivacyAcknowledgment(directorA, now);
+  assert((await repo.viewHealthRecord(directorA, clubs.a, morgan.id, now)).status === "CURRENT", "acknowledging the new wording reopens access");
+  assert((await prisma.healthPrivacyAcknowledgment.count({ where: { attendeeAccountId: accounts.a } })) === 2, "the old acknowledgment is kept beside the new one");
+
+  const ackAudit = await prisma.auditLog.findMany({ where: { action: "HEALTH_PRIVACY_ACKNOWLEDGED" } , select: { metadata: true, actorUserId: true } });
+  assert(ackAudit.length >= 4, "each acknowledgment is audited");
+  for (const row of ackAudit) {
+    const keys = Object.keys(row.metadata as object).sort().join(",");
+    assert(keys === "actorAttendeeAccountId,version,viewerKind" || keys === "version,viewerKind", `an acknowledgment audit row holds only who and which wording (${keys})`);
+  }
+
+  // The database itself: exactly one person, one row per person and version, and nothing else referenced.
+  await expectCode(prisma.healthPrivacyAcknowledgment.create({ data: { version } }).catch((error: unknown) => { throw Object.assign(new Error("refused"), { code: "REFUSED", cause: error }); }), "REFUSED", "an acknowledgment of no one");
+  await expectCode(prisma.healthPrivacyAcknowledgment.create({ data: { version, userId: adminUserId, attendeeAccountId: accounts.a } }).catch((error: unknown) => { throw Object.assign(new Error("refused"), { code: "REFUSED", cause: error }); }), "REFUSED", "an acknowledgment of two people");
+  await expectCode(prisma.healthPrivacyAcknowledgment.create({ data: { version: "health-privacy-ack-old", attendeeAccountId: accounts.a } }), "P2002", "a duplicate for the same person and version");
+  const columns = await prisma.$queryRaw<Array<{ column_name: string }>>`
+    SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'HealthPrivacyAcknowledgment'`;
+  assert(columns.map((column) => column.column_name).sort().join(",") === "acknowledgedAt,attendeeAccountId,id,userId,version", "the table refers to no event, club, roster row or person, so event and roster deletion never touch it");
+  await prisma.healthPrivacyAcknowledgment.create({ data: { version, attendeeAccountId: accounts.temp } });
+  await prisma.attendeeAccount.delete({ where: { id: accounts.temp } });
+  assert((await prisma.healthPrivacyAcknowledgment.count({ where: { attendeeAccountId: accounts.temp } })) === 0, "an acknowledgment goes with the account that made it");
 
   await cleanup();
   console.log("Health record checks passed.");
