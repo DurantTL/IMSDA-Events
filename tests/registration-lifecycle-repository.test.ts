@@ -77,6 +77,7 @@ function transactionFixture() {
       update: vi.fn().mockResolvedValue({}),
     },
     locationWaitlistChange: { create: vi.fn().mockResolvedValue({ id: "change-1" }) },
+    staffInvitation: { findUnique: vi.fn().mockResolvedValue(null), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     registrationAttendee: {
       count: vi.fn().mockResolvedValue(0),
     },

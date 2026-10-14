@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => {
     approveRegistrations: vi.fn(),
     declineRegistrations: vi.fn(),
     submitInvitationRegistration: vi.fn(),
+    retryMealCoverage: vi.fn(),
   };
 });
 
@@ -42,7 +43,7 @@ vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.find
 vi.mock("@/modules/rate-limit/service", () => ({ checkPublicRegistrationRateLimit: mocks.checkRateLimit }));
 vi.mock("@/modules/staff-invitations/repository", () => ({
   StaffInvitationError: mocks.StaffInvitationError,
-  staffInvitationErrorStatus: (code: string) => (code === "INVITATION_USED" ? 409 : code === "INVITATION_UNAVAILABLE" ? 410 : 400),
+  staffInvitationErrorStatus: (code: string) => (code === "INVITATION_USED" ? 409 : code === "INVITATION_UNAVAILABLE" ? 410 : code === "REQUEST_TOO_LARGE" ? 413 : 400),
   listInvitations: mocks.listInvitations,
   previewInvitationImport: mocks.previewInvitationImport,
   confirmInvitationImport: mocks.confirmInvitationImport,
@@ -55,11 +56,14 @@ vi.mock("@/modules/staff-invitations/repository", () => ({
   approveRegistrations: mocks.approveRegistrations,
   declineRegistrations: mocks.declineRegistrations,
   submitInvitationRegistration: mocks.submitInvitationRegistration,
+  retryMealCoverage: mocks.retryMealCoverage,
+  APPROVAL_BATCH_MAX: 200,
 }));
 
 import { GET as LIST } from "@/app/api/events/[eventId]/staff-invitations/route";
 import { POST as IMPORT } from "@/app/api/events/[eventId]/staff-invitations/import/route";
 import { POST as ACTIONS } from "@/app/api/events/[eventId]/staff-invitations/actions/route";
+import { POST as SEND } from "@/app/api/events/[eventId]/staff-invitations/send/route";
 import { POST as ONE } from "@/app/api/events/[eventId]/staff-invitations/[invitationId]/route";
 import { GET as APPROVALS, POST as DECIDE } from "@/app/api/events/[eventId]/staff-invitations/approvals/route";
 import { POST as PUBLIC_SUBMIT } from "@/app/api/public/staff-invitations/[token]/route";
@@ -115,27 +119,41 @@ describe("the staff routes (#804)", () => {
     expect(mocks.confirmInvitationImport).toHaveBeenCalledWith("event-1", "user-1", expect.objectContaining({ digest: "a".repeat(32) }));
   });
 
-  it("make sending a bulk communication: it needs MANAGE_COMMUNICATIONS and the previewed count", async () => {
-    mocks.previewInvitationSend.mockResolvedValue({ willSend: 2 });
+  const digest = "b".repeat(32);
+
+  it("make sending a bulk communication: it needs MANAGE_COMMUNICATIONS and the preview's digest", async () => {
+    mocks.previewInvitationSend.mockResolvedValue({ willSend: 2, digest });
     mocks.sendInvitations.mockResolvedValue({ queued: 2, skipped: 0, deliveryMode: "LOCAL_CAPTURE" });
-    expect((await ACTIONS(post("/a", { action: "preview_send", ids: ["a", "b"] }), event)).status).toBe(200);
-    expect((await ACTIONS(post("/a", { action: "send", ids: ["a", "b"], expectedCount: 2 }), event)).status).toBe(200);
+    expect((await SEND(post("/s", { action: "preview", ids: ["a", "b"] }), event)).status).toBe(200);
+    expect((await SEND(post("/s", { action: "send", ids: ["a", "b"], digest }), event)).status).toBe(200);
     expect(mocks.requirePermission.mock.calls.map((call) => call[2])).toEqual(["MANAGE_COMMUNICATIONS", "MANAGE_COMMUNICATIONS"]);
-    expect(mocks.sendInvitations).toHaveBeenCalledWith("event-1", "user-1", { ids: ["a", "b"], expectedCount: 2 });
-    // No count, no send.
-    expect((await ACTIONS(post("/a", { action: "send", ids: ["a"] }), event)).status).toBe(400);
-    expect(mocks.sendInvitations).toHaveBeenCalledTimes(1);
-    // A registration manager without communications permission cannot send or preview.
-    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("No."));
-    expect((await ACTIONS(post("/a", { action: "send", ids: ["a"], expectedCount: 1 }), event)).status).toBe(403);
+    expect(mocks.sendInvitations).toHaveBeenCalledWith("event-1", "user-1", { ids: ["a", "b"], digest });
+    // No digest, no send; a count in place of the digest is not accepted.
+    expect((await SEND(post("/s", { action: "send", ids: ["a"] }), event)).status).toBe(400);
+    expect((await SEND(post("/s", { action: "send", ids: ["a"], expectedCount: 1 }), event)).status).toBe(400);
     expect(mocks.sendInvitations).toHaveBeenCalledTimes(1);
   });
 
-  it("revoke with MANAGE_REGISTRATION, and refuse an unknown action or an empty selection", async () => {
+  it("check the permission before the body is read, and refuse a big body", async () => {
+    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("No."));
+    const unreadable = post("/s", { action: "send", ids: ["a"], digest });
+    const text = vi.spyOn(unreadable, "text");
+    const json = vi.spyOn(unreadable, "json");
+    expect((await SEND(unreadable, event)).status).toBe(403);
+    expect(text).not.toHaveBeenCalled();
+    expect(json).not.toHaveBeenCalled();
+    expect(mocks.sendInvitations).not.toHaveBeenCalled();
+    mocks.requirePermission.mockResolvedValue({ user: { id: "user-1" } });
+    const big = await ACTIONS(post("/a", { action: "revoke", ids: ["a"], pad: "x".repeat(200_000) }), event);
+    expect(big.status).toBe(413);
+    expect(mocks.revokeInvitations).not.toHaveBeenCalled();
+  });
+
+  it("revoke with MANAGE_REGISTRATION only, and refuse send actions on that route", async () => {
     mocks.revokeInvitations.mockResolvedValue({ revoked: 1, skipped: 0 });
     expect((await ACTIONS(post("/a", { action: "revoke", ids: ["a"] }), event)).status).toBe(200);
     expect(mocks.requirePermission.mock.calls[0][2]).toBe("MANAGE_REGISTRATION");
-    expect((await ACTIONS(post("/a", { action: "delete", ids: ["a"] }), event)).status).toBe(400);
+    expect((await ACTIONS(post("/a", { action: "send", ids: ["a"], digest }), event)).status).toBe(400);
     expect((await ACTIONS(post("/a", { action: "revoke", ids: [] }), event)).status).toBe(400);
     expect(mocks.revokeInvitations).toHaveBeenCalledTimes(1);
   });
@@ -145,6 +163,7 @@ describe("the staff routes (#804)", () => {
     for (const response of [
       await IMPORT(post("/i", { mode: "preview", csv: "x" }), event),
       await ACTIONS(post("/a", { action: "revoke", ids: ["a"] }), event),
+      await SEND(post("/s", { action: "preview", ids: ["a"] }), event),
       await ONE(post("/o", { action: "copy" }), one),
       await DECIDE(post("/d", { decision: "APPROVE", ids: ["a"] }), event),
       await PUBLIC_SUBMIT(post("/p", {}), publicContext),
@@ -167,10 +186,25 @@ describe("the staff routes (#804)", () => {
     mocks.declineRegistrations.mockResolvedValue({ decided: 1, skipped: 0, failed: 0 });
     expect((await DECIDE(post("/d", { decision: "APPROVE", ids: ["a", "b"] }), event)).status).toBe(200);
     expect((await DECIDE(post("/d", { decision: "DECLINE", ids: ["c"] }), event)).status).toBe(200);
-    expect(mocks.approveRegistrations).toHaveBeenCalledWith("event-1", "user-1", ["a", "b"]);
+    expect(mocks.approveRegistrations).toHaveBeenCalledWith("event-1", "user-1", ["a", "b"], { withoutMealCoverage: false });
     expect(mocks.declineRegistrations).toHaveBeenCalledWith("event-1", "user-1", ["c"]);
     expect((await DECIDE(post("/d", { decision: "DELETE", ids: ["c"] }), event)).status).toBe(400);
     expect((await DECIDE(post("/d", { decision: "APPROVE", ids: ["c"], extra: 1 }), event)).status).toBe(400);
+  });
+
+  it("pass the office's explicit choice to approve without meal coverage, retry meals, and cap the batch at 200", async () => {
+    mocks.approveRegistrations.mockResolvedValue({ decided: 1, skipped: 0, failed: 0 });
+    mocks.retryMealCoverage.mockResolvedValue({ decided: 1, skipped: 0, failed: 0 });
+    await DECIDE(post("/d", { decision: "APPROVE", ids: ["a"] }), event);
+    expect(mocks.approveRegistrations).toHaveBeenLastCalledWith("event-1", "user-1", ["a"], { withoutMealCoverage: false });
+    await DECIDE(post("/d", { decision: "APPROVE", ids: ["a"], withoutMealCoverage: true }), event);
+    expect(mocks.approveRegistrations).toHaveBeenLastCalledWith("event-1", "user-1", ["a"], { withoutMealCoverage: true });
+    expect((await DECIDE(post("/d", { decision: "RETRY_MEALS", ids: ["a"] }), event)).status).toBe(200);
+    expect(mocks.retryMealCoverage).toHaveBeenCalledWith("event-1", "user-1", ["a"]);
+    expect((await DECIDE(post("/d", { decision: "DECLINE", ids: ["a"], withoutMealCoverage: true }), event)).status).toBe(400);
+    const many = Array.from({ length: 201 }, (_, index) => `id-${index}`);
+    expect((await DECIDE(post("/d", { decision: "APPROVE", ids: many }), event)).status).toBe(400);
+    expect((await DECIDE(post("/d", { decision: "APPROVE", ids: many.slice(0, 200) }), event)).status).toBe(200);
   });
 });
 

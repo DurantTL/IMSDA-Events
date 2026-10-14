@@ -12,6 +12,8 @@ type Props = {
   counts: { WAITING: number; APPROVED: number; DECLINED: number };
 };
 
+const BATCH_MAX = 200;
+
 type Filter = "WAITING" | "APPROVED" | "DECLINED" | "ALL";
 
 const roleLabel: Record<string, string> = { PRIMARY: "Invited person", SPOUSE: "Spouse", DEPENDANT: "Child or dependant" };
@@ -26,14 +28,20 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
   const [filter, setFilter] = useState<Filter>("WAITING");
   const [group, setGroup] = useState<StaffInvitationGroupValue | "ALL">("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [pending, setPending] = useState<"APPROVE" | "DECLINE" | null>(null);
+  const [pending, setPending] = useState<"APPROVE" | "DECLINE" | "RETRY_MEALS" | null>(null);
+  const [withoutMeals, setWithoutMeals] = useState(false);
+  const [needsMealChoice, setNeedsMealChoice] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   const visible = useMemo(() => rows.filter((row) => (filter === "ALL" || row.approval === filter) && (group === "ALL" || row.group === group)), [rows, filter, group]);
   const waitingVisible = visible.filter((row) => row.approval === "WAITING");
-  const selectedIds = [...selected].filter((id) => rows.some((row) => row.id === id && row.approval === "WAITING"));
+  const selectedRows = [...selected].flatMap((id) => rows.find((row) => row.id === id) ?? []);
+  const selectedIds = selectedRows.filter((row) => row.approval === "WAITING").map((row) => row.id);
+  const approvedWithoutMeals = rows.filter((row) => row.approval === "APPROVED" && row.peopleWithoutMeals > 0);
+  const retryIds = selectedRows.filter((row) => row.approval === "APPROVED" && row.peopleWithoutMeals > 0).map((row) => row.id);
+  const overCap = (pending === "RETRY_MEALS" ? retryIds : selectedIds).length > BATCH_MAX;
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -44,7 +52,7 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
     });
   }
 
-  async function decide(decision: "APPROVE" | "DECLINE") {
+  async function decide(decision: "APPROVE" | "DECLINE" | "RETRY_MEALS") {
     setBusy(true);
     setError("");
     setNotice("");
@@ -52,28 +60,42 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/staff-invitations/approvals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, ids: selectedIds }),
+        body: JSON.stringify({
+          decision,
+          ids: decision === "RETRY_MEALS" ? retryIds : selectedIds,
+          ...(decision === "APPROVE" ? { withoutMealCoverage: withoutMeals } : {}),
+        }),
       });
       const body = await response.json().catch(() => ({})) as {
         message?: string;
-        result?: { decided: number; skipped: number; failed: number; meals?: { planFound: boolean; entitledPeople: number; failedPeople: number } };
+        error?: string;
+        result?: { decided: number; skipped: number; failed: number; meals?: { planFound: boolean; entitledPeople: number; failedPeople: number; failed: Array<{ name: string }> } };
       };
-      if (!response.ok || !body.result) throw new Error(body.message ?? "That couldn't be done. Nothing was changed.");
+      if (!response.ok || !body.result) {
+        if (body.error === "MEAL_PLAN_REQUIRED") setNeedsMealChoice(true);
+        throw new Error(body.message ?? "That couldn't be done. Refresh to see what changed.");
+      }
       const { decided, skipped, failed, meals } = body.result;
-      const parts = [`${decided} ${decision === "APPROVE" ? "approved" : "declined"}`];
+      const parts = [`${decided} ${decision === "APPROVE" ? "approved" : decision === "DECLINE" ? "declined" : "checked for meal coverage"}`];
       if (skipped > 0) parts.push(`${skipped} skipped (no longer waiting)`);
       if (failed > 0) parts.push(`${failed} could not be changed, try them again`);
-      if (decision === "APPROVE" && meals) {
+      if (decision !== "DECLINE" && meals) {
         parts.push(meals.planFound
-          ? `${meals.entitledPeople} ${meals.entitledPeople === 1 ? "person" : "people"} given the conference-paid meal plan${meals.failedPeople > 0 ? `, ${meals.failedPeople} could not be (check the Meals screen)` : ""}`
-          : "this event has no single conference-paid meal plan, so meals were not covered");
+          ? `${meals.entitledPeople} ${meals.entitledPeople === 1 ? "person" : "people"} given the conference-paid meal plan`
+          : "this event has no single conference-paid meal plan, so no meals were covered");
+        if (meals.failedPeople > 0) {
+          const names = meals.failed.map((person) => person.name || "someone").slice(0, 12).join(", ");
+          parts.push(`${meals.failedPeople} without meal coverage (${names}${meals.failed.length > 12 ? ", and more" : ""}); use Retry meal coverage once the plan is fixed`);
+        }
       }
       setNotice(`${parts.join("; ")}.`);
+      setNeedsMealChoice(false);
+      setWithoutMeals(false);
       setSelected(new Set());
       setPending(null);
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That couldn't be done. Nothing was changed.");
+      setError(caught instanceof Error ? caught.message : "The request failed. Some registrations may have been changed; refresh to see the current state.");
     } finally {
       setBusy(false);
     }
@@ -100,17 +122,23 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
         </label>
       </div>
 
+      {approvedWithoutMeals.length > 0 && (
+        <p className="inline-notice error" role="note">
+          {approvedWithoutMeals.reduce((total, row) => total + row.peopleWithoutMeals, 0)} approved {approvedWithoutMeals.length === 1 ? "person has" : "people have"} no conference-paid meals yet. Tick those registrations and use Retry meal coverage.
+        </p>
+      )}
       <div className="panel selection-bar">
-        <span role="status">{selectedIds.length > 0 ? <><strong>{selectedIds.length}</strong> selected</> : "Tick registrations, or use Select all."}</span>
+        <span role="status">{selectedRows.length > 0 ? <><strong>{selectedRows.length}</strong> selected</> : "Tick registrations, or use Select all."}</span>
         <div className="selection-bar-actions">
           {waitingVisible.length > 0 && selectedIds.length < waitingVisible.length && (
             <button className="text-button" onClick={() => setSelected(new Set(waitingVisible.map((row) => row.id)))} type="button">Select all {waitingVisible.length} waiting</button>
           )}
-          {selectedIds.length > 0 && (
+          {selectedRows.length > 0 && (
             <>
               <button className="text-button" onClick={() => { setSelected(new Set()); setPending(null); }} type="button">Clear selection</button>
-              <button className="primary-button" disabled={busy} onClick={() => setPending("APPROVE")} type="button"><CheckCircle2 aria-hidden="true" size={16} /> Approve…</button>
-              <button className="secondary-button outline-action" disabled={busy} onClick={() => setPending("DECLINE")} type="button"><XCircle aria-hidden="true" size={16} /> Decline…</button>
+              <button className="primary-button" disabled={busy || selectedIds.length === 0} onClick={() => setPending("APPROVE")} type="button"><CheckCircle2 aria-hidden="true" size={16} /> Approve…</button>
+              <button className="secondary-button outline-action" disabled={busy || selectedIds.length === 0} onClick={() => setPending("DECLINE")} type="button"><XCircle aria-hidden="true" size={16} /> Decline…</button>
+              {retryIds.length > 0 && <button className="secondary-button outline-action" disabled={busy} onClick={() => setPending("RETRY_MEALS")} type="button">Retry meal coverage…</button>}
             </>
           )}
         </div>
@@ -118,13 +146,20 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
 
       {pending && (
         <div className="staff-invite-preview" role="alertdialog" aria-label={pending === "APPROVE" ? "Confirm approval" : "Confirm decline"}>
+          {overCap && <p className="inline-notice error" role="alert">At most {BATCH_MAX} registrations can be decided at a time. Clear some from the selection and do the rest in another batch.</p>}
+          {pending === "APPROVE" && needsMealChoice && (
+            <label className="checkbox-label">
+              <input checked={withoutMeals} onChange={(changeEvent) => setWithoutMeals(changeEvent.target.checked)} type="checkbox" />
+              Approve without meal coverage. This event has no single conference-paid meal plan, so these people will have no meals until it is fixed.
+            </label>
+          )}
           <p>
-            {pending === "APPROVE"
+            {pending === "RETRY_MEALS" ? `Give the ${retryIds.length} selected approved registration${retryIds.length === 1 ? "" : "s"} the conference-paid meal plan again? Nobody is charged.` : pending === "APPROVE"
               ? `Approve ${selectedIds.length} registration${selectedIds.length === 1 ? "" : "s"}? Each becomes a confirmed registration at no charge, its confirmation email is queued in the outbox, and every person in it is given the conference-paid meal plan.`
               : `Decline ${selectedIds.length} registration${selectedIds.length === 1 ? "" : "s"}? Each is cancelled and its link cannot be used again. Its registrant is sent the usual cancellation notice.`}
           </p>
           <div className="intro-actions">
-            <button className="primary-button" disabled={busy} onClick={() => void decide(pending)} type="button">{busy ? "Working…" : pending === "APPROVE" ? `Approve ${selectedIds.length}` : `Decline ${selectedIds.length}`}</button>
+            <button className="primary-button" disabled={busy || overCap || (pending === "APPROVE" && needsMealChoice && !withoutMeals)} onClick={() => void decide(pending)} type="button">{busy ? "Working…" : pending === "APPROVE" ? `Approve ${selectedIds.length}` : pending === "DECLINE" ? `Decline ${selectedIds.length}` : `Retry for ${retryIds.length}`}</button>
             <button className="text-button" onClick={() => setPending(null)} type="button">Cancel</button>
           </div>
         </div>
@@ -151,7 +186,7 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
               {visible.map((row) => (
                 <tr key={row.id}>
                   <td>
-                    {row.approval === "WAITING" && <input aria-label={`Select ${row.confirmationCode}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" />}
+                    {(row.approval === "WAITING" || (row.approval === "APPROVED" && row.peopleWithoutMeals > 0)) && <input aria-label={`Select ${row.confirmationCode}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" />}
                   </td>
                   <td>
                     <strong>{row.name || row.email}</strong>
@@ -170,7 +205,10 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
                     {row.needsHousing === null ? "—" : row.needsHousing ? "Needs on-site housing" : "No housing needed"}
                     {row.housingNote && <><br /><span className="field-help">{row.housingNote}</span></>}
                   </td>
-                  <td><span className={`status-chip ${row.approval === "APPROVED" ? "green" : row.approval === "DECLINED" ? "coral" : "gold"}`}>{row.approval === "WAITING" ? "Waiting for approval" : row.approval === "APPROVED" ? "Approved" : "Declined"}</span></td>
+                  <td>
+                    <span className={`status-chip ${row.approval === "APPROVED" ? "green" : row.approval === "DECLINED" ? "coral" : "gold"}`}>{row.approval === "WAITING" ? "Waiting for approval" : row.approval === "APPROVED" ? "Approved" : "Declined"}</span>
+                    {row.peopleWithoutMeals > 0 && <><br /><span className="field-help">{row.peopleWithoutMeals} without meal coverage</span></>}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -3,7 +3,7 @@ import { requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findActiveMembership } from "@/modules/events/repository";
-import { staffInvitationApiError } from "@/modules/staff-invitations/api-errors";
+import { readBoundedJson, staffInvitationApiError } from "@/modules/staff-invitations/api-errors";
 import { copyInvitationLink, reissueInvitation } from "@/modules/staff-invitations/repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -23,7 +23,7 @@ async function postHandler(request: Request, context: Context) {
   try {
     const { eventId, invitationId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_REGISTRATION", findActiveMembership);
-    const { action } = bodySchema.parse(await request.json());
+    const { action } = bodySchema.parse(await readBoundedJson(request));
     const result = action === "copy"
       ? await copyInvitationLink(eventId, access.user.id, invitationId)
       : await reissueInvitation(eventId, access.user.id, invitationId);

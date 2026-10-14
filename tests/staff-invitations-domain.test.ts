@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { buildImportPreview, InvitationCsvError } from "@/modules/staff-invitations/csv";
+import { buildImportPreview, InvitationCsvError, parseInvitationCsv, usableEmails } from "@/modules/staff-invitations/csv";
 import {
   approvedEmail,
   COVERAGE_SENTENCE,
@@ -102,6 +102,13 @@ describe("the CSV preview", () => {
   it("strips control characters from names", () => {
     const result = buildImportPreview({ csv: "email,first name\nada.synthetic@example.test,\"Ada\u0007\u0000  Q\"", defaultGroup: "STAFF", existing: none });
     expect(result.rows[0].firstName).toBe("Ada Q");
+  });
+});
+
+describe("the addresses looked up before a preview", () => {
+  it("come from the parsed email column, whatever else the rows hold", () => {
+    const parsed = parseInvitationCsv('name,notes,Email\n"Synthetic, Ada","see bob@elsewhere.test",ADA.Synthetic@example.test\nx,y,not-an-email\nz,z,ada.synthetic@example.test', "STAFF");
+    expect(usableEmails(parsed)).toEqual(["ada.synthetic@example.test"]);
   });
 });
 

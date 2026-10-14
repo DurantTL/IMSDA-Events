@@ -4,7 +4,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findActiveMembership } from "@/modules/events/repository";
 import { MAX_IMPORT_CHARACTERS, STAFF_INVITATION_GROUPS } from "@/modules/staff-invitations/domain";
-import { staffInvitationApiError } from "@/modules/staff-invitations/api-errors";
+import { IMPORT_BODY_MAX_BYTES, readBoundedJson, staffInvitationApiError } from "@/modules/staff-invitations/api-errors";
 import { confirmInvitationImport, previewInvitationImport } from "@/modules/staff-invitations/repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -37,7 +37,7 @@ async function postHandler(request: Request, context: Context) {
   try {
     const { eventId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_REGISTRATION", findActiveMembership);
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await readBoundedJson(request, IMPORT_BODY_MAX_BYTES));
     if (body.mode === "preview") {
       return Response.json({ preview: await previewInvitationImport(eventId, { csv: body.csv, defaultGroup: body.defaultGroup }) }, { headers: noStore });
     }

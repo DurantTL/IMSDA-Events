@@ -154,9 +154,15 @@ async function main() {
   const everyone = (await repo.listInvitations(eventId)).rows.map((entry) => entry.id);
   const sendPreview = await repo.previewInvitationSend(eventId, everyone);
   assert(sendPreview.willSend === 6 && sendPreview.sample?.bodyText.includes("/staff-invite/") && sendPreview.sample.bodyText.includes("up to age 18"), "the preview shows the exact email");
+  const everyToken = await prisma.staffInvitation.findMany({ where: { eventId } });
+  assert(everyToken.every((invitation) => !JSON.stringify(sendPreview).includes(invitationToken(invitation))), "the preview shows a placeholder, never a working link");
+  assert(/^[0-9a-f]{32}$/.test(sendPreview.digest), "the preview carries a digest of exactly who would be sent"
+  );
   assert((await prisma.messageOutbox.count({ where: { eventId } })) === 0, "a send preview queues nothing");
-  await expectCode(repo.sendInvitations(eventId, userId, { ids: everyone, expectedCount: 5 }), "SEND_COUNT_CHANGED", "a send that is not what was previewed");
-  const sent = await repo.sendInvitations(eventId, userId, { ids: everyone, expectedCount: 6 });
+  await expectCode(repo.sendInvitations(eventId, userId, { ids: everyone, digest: "0".repeat(32) }), "SEND_COUNT_CHANGED", "a send that is not what was previewed");
+  await expectCode(repo.sendInvitations(eventId, userId, { ids: everyone.slice(1), digest: sendPreview.digest }), "SEND_COUNT_CHANGED", "a send of a different selection than the one previewed");
+  assert((await prisma.messageOutbox.count({ where: { eventId } })) === 0, "a refused send queues nothing");
+  const sent = await repo.sendInvitations(eventId, userId, { ids: everyone, digest: sendPreview.digest });
   assert(sent.queued === 6, "six invitations are queued");
   const queued = await prisma.messageOutbox.findMany({ where: { eventId, templateKey: "CUSTOM_MESSAGE" } });
   assert(queued.length === 6 && queued.every((message) => message.status === "PENDING" && message.recipientKind === "REGISTRANT"), "they wait in the outbox, pending, for the worker");
@@ -165,14 +171,15 @@ async function main() {
   assert(adaMessage.bodyTextSnapshot.includes(newAdaToken) && !adaMessage.bodyTextSnapshot.includes(adaToken), "the email carries the current link");
   let afterSend = await repo.listInvitations(eventId);
   assert(afterSend.counts.SENT === 6 && afterSend.counts.NOT_SENT === 0, "the list shows them sent");
-  await expectCode(repo.sendInvitations(eventId, userId, { ids: everyone, expectedCount: 6 }), "NOTHING_TO_SEND", "a second click a moment later");
+  await expectCode(repo.sendInvitations(eventId, userId, { ids: everyone, digest: sendPreview.digest }), "NOTHING_TO_SEND", "a second click a moment later");
   assert((await prisma.messageOutbox.count({ where: { eventId } })) === 6, "a second click queues nothing more");
   await prisma.messageOutbox.update({ where: { id: adaMessage.id }, data: { status: "FAILED", lastError: "Synthetic bounce." } });
   afterSend = await repo.listInvitations(eventId);
   assert(afterSend.counts.DELIVERY_FAILED === 1 && afterSend.rows.find((entry) => entry.email === email("ada"))?.status === "DELIVERY_FAILED", "a failed delivery shows in the list");
   // A resend after the cooldown goes out again, and a reissue clears the sent state (nothing is emailed by it).
   const later = new Date(Date.now() + 10 * 60 * 1000);
-  const resent = await repo.sendInvitations(eventId, userId, { ids: [row("ada").id], expectedCount: 1 }, later);
+  const resendPreview = await repo.previewInvitationSend(eventId, [row("ada").id], later);
+  const resent = await repo.sendInvitations(eventId, userId, { ids: [row("ada").id], digest: resendPreview.digest }, later);
   assert(resent.queued === 1 && (await prisma.messageOutbox.count({ where: { eventId } })) === 7, "a resend after the cooldown queues one more");
   assert((await repo.listInvitations(eventId)).rows.find((entry) => entry.email === email("ada"))?.status === "SENT", "the resend shows as sent");
 
@@ -197,7 +204,9 @@ async function main() {
   await expectCode(repo.submitInvitationRegistration(newAdaToken, family), "INVITATION_USED", "using a link twice");
   const notices = await prisma.messageOutbox.findMany({ where: { eventId, registrationId: registration.id } });
   assert(notices.some((message) => message.recipientEmail === email("ada") && message.subjectSnapshot.includes("We received")), "the registrant gets a receipt");
-  assert(notices.some((message) => message.recipientEmail === officeEmail && message.recipientKind === "INTERNAL"), "the office is told");
+  const digests = await prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" }, orderBy: { createdAt: "asc" } });
+  assert(digests.length >= 1 && digests.every((message) => message.registrationId === null && message.status === "PENDING" && message.availableAt.getTime() > Date.now() - 15 * 60 * 1000), "the office is told in a digest that belongs to no registration and waits for its window to close");
+  assert(digests[0].bodyTextSnapshot.includes("/people/staff-invitations/approvals?event="), "the digest links to the approval list");
   const shown = (await listRegistrations(eventId)).find((entry) => entry.id === registration.id);
   assert(shown?.staffInvitation?.group === "STAFF" && shown.staffInvitation.approval === "WAITING" && shown.totalAmountCents === 0 && shown.balanceCents === 0, "staff see the group, and nothing due");
   assert((await repo.listInvitations(eventId)).rows.find((entry) => entry.email === email("ada"))?.status === "REGISTERED", "the invite list shows registered");
@@ -265,18 +274,57 @@ async function main() {
   assert(cyAfter.status === "CANCELLED", "a declined registration is cancelled");
   assert((await prisma.staffInvitation.findFirstOrThrow({ where: { id: cyRow.id } })).approval === "DECLINED", "its invitation says declined");
   assert((await repo.getInvitationExperience(cyToken)).state === "REGISTERED", "a declined person's link cannot register again");
-  // A registration cancelled by hand while waiting is not approved.
-  await prisma.registration.updateMany({ where: { eventId, accountHolderPerson: { normalizedEmail: email("eve") } }, data: { status: "CANCELLED" } });
+  // A declined registration can't be reactivated from People: that would skip the approval it never had.
+  const { reactivateRegistration, cancelRegistration } = await import("../modules/registrations/lifecycle-repository");
+  const reactivation = await caught(reactivateRegistration(eventId, cyAfter.id, userId, "Try to bring back"));
+  assert(reactivation && (reactivation as { code?: string }).code === "INVALID_REGISTRATION_TRANSITION", "a declined staff registration cannot be reactivated");
+  assert((await prisma.registration.findUniqueOrThrow({ where: { id: cyAfter.id } })).status === "CANCELLED", "and stays cancelled");
+  // Cancelling a waiting registration by hand from People settles its invitation as declined, so it never waits for ever.
+  const eveReg = await prisma.registration.findFirstOrThrow({ where: { eventId, accountHolderPerson: { normalizedEmail: email("eve") } } });
+  await cancelRegistration(eventId, eveReg.id, userId, "Cancelled from People");
+  assert((await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email("eve") } })).approval === "DECLINED", "a hand-cancelled waiting registration is declined, not waiting for ever");
   const stale = await repo.approveRegistrations(eventId, userId, [ids("eve")]);
   assert(stale.decided === 0 && stale.skipped === 1, "a registration no longer waiting is skipped");
-  const cleared = await repo.declineRegistrations(eventId, userId, [ids("eve")]);
-  assert(cleared.decided === 1 && cleared.failed === 0 && (await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email("eve") } })).approval === "DECLINED", "declining a registration already cancelled by hand just records the decision");
-  assert((await repo.listApprovals(eventId)).counts.APPROVED === 2, "the queue shows two approved");
+  assert((await repo.listApprovals(eventId)).counts.WAITING === 0 && (await repo.listApprovals(eventId)).counts.APPROVED === 2, "nothing waits, and two are approved");
+
+  // The registrant's own lodging paths are closed for a staff registration, the $0 direct save and the priced change request alike.
+  const { saveLodgingRequest, changeRegistrantRoommates } = await import("../modules/lodging/preferences-service");
+  const { applyRegistrantWaitlistAction } = await import("../modules/lodging/waitlist-service");
+  const registrant = { kind: "REGISTRANT" as const, accessTokenId: "synthetic-token" };
+  for (const [name, attempt] of [
+    ["a save", saveLodgingRequest({ eventId, registrationId: registration.id, actor: registrant, raw: { category: "DORM_ROOM", roomCount: 2 } })],
+    ["a roommate request", changeRegistrantRoommates({ eventId, registrationId: registration.id, accessTokenId: "synthetic-token", raw: { action: "add_by_code", name: "Someone", confirmationCode: "REG-NOTREAL1" } })],
+    ["a waitlist join", applyRegistrantWaitlistAction({ eventId, registrationId: registration.id, accessTokenId: "synthetic-token", raw: { action: "join", category: "DORM_ROOM", partySize: 2 } })],
+  ] as const) {
+    await expectCode(attempt, "STAFF_REGISTRATION", `${name} by the registrant of a staff registration`);
+  }
+  assert((await prisma.eventLodgingRequest.count({ where: { registrationId: registration.id } })) === 0 && (await prisma.eventLodgingChangeRequest.count({ where: { registrationId: registration.id } })) === 0, "no lodging request or change request was made");
+
+  // ---- No single conference-paid plan: approval is refused unless the office says to go ahead, and meals can be retried -------
+  const gusToken2 = regained.url.split("/staff-invite/")[1];
+  await repo.submitInvitationRegistration(gusToken2, { firstName: "Gus", lastName: surname, dependants: [{ firstName: "Pip", lastName: surname, age: 3 }] });
+  const gusRow = (await repo.listApprovals(eventId)).rows.find((entry) => entry.email === email("gus"))!;
+  await prisma.eventMealPlan.updateMany({ where: { eventId, payer: "CONFERENCE" }, data: { isActive: false } });
+  await expectCode(repo.approveRegistrations(eventId, userId, [gusRow.id]), "MEAL_PLAN_REQUIRED", "approving without a conference-paid plan");
+  assert((await repo.listApprovals(eventId)).rows.find((entry) => entry.email === email("gus"))?.approval === "WAITING", "the refused approval changed nothing");
+  const noMeals = await repo.approveRegistrations(eventId, userId, [gusRow.id], { withoutMealCoverage: true });
+  assert(noMeals.decided === 1 && noMeals.meals?.planFound === false && noMeals.meals.failedPeople === 2 && noMeals.meals.failed.length === 2 && noMeals.meals.failed.every((person) => person.attendeeId && person.registrationId === gusRow.registrationId && person.name.length > 0), `approving without meal coverage says who has none (${JSON.stringify(noMeals.meals)})`);
+  assert((await repo.listApprovals(eventId)).rows.find((entry) => entry.email === email("gus"))?.peopleWithoutMeals === 2, "the approval list shows two people without meals");
+  await expectCode(repo.retryMealCoverage(eventId, userId, [gusRow.id]), "MEAL_PLAN_REQUIRED", "retrying meals with no plan");
+  await prisma.eventMealPlan.updateMany({ where: { eventId, payer: "CONFERENCE" }, data: { isActive: true } });
+  const retried = await repo.retryMealCoverage(eventId, userId, [gusRow.id]);
+  assert(retried.decided === 1 && retried.meals?.entitledPeople === 2 && retried.meals.failedPeople === 0, `the retry covers both people (${JSON.stringify(retried.meals)})`);
+  assert((await repo.listApprovals(eventId)).rows.find((entry) => entry.email === email("gus"))?.peopleWithoutMeals === 0, "nobody lacks meals now");
+  assert((await prisma.eventMealSelection.count({ where: { registrationId: gusRow.registrationId, payer: "CONFERENCE", status: "ACTIVE" } })) > 0, "the meals are conference-paid tickets");
+  const again3 = await repo.retryMealCoverage(eventId, userId, [gusRow.id]);
+  assert(again3.meals?.failedPeople === 0, "a second retry is harmless");
+  // A batch is capped.
+  await expectCode(repo.approveRegistrations(eventId, userId, Array.from({ length: 201 }, (_, index) => `x${index}`)), "BATCH_TOO_LARGE", "an approval batch over 200");
 
   // ---- Delivery settings are respected, and the table's own constraints --------------------------------------------------
   await prisma.eventMessageSettings.update({ where: { eventId }, data: { deliveryMode: "DISABLED" } });
   const fresh = await prisma.staffInvitation.create({ data: { eventId, email: email("fresh"), group: "VOLUNTEER" } });
-  const disabled = await repo.sendInvitations(eventId, userId, { ids: [fresh.id], expectedCount: 1 });
+  const disabled = await repo.sendInvitations(eventId, userId, { ids: [fresh.id], digest: (await repo.previewInvitationSend(eventId, [fresh.id])).digest });
   assert(disabled.deliveryMode === "DISABLED" && (await prisma.messageOutbox.findFirstOrThrow({ where: { eventId, recipientEmail: email("fresh") } })).status === "SUPPRESSED", "a disabled event suppresses the email");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("fresh").toUpperCase(), group: "STAFF" } })), "an address that is not normalized is refused by the table");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("fresh"), group: "STAFF" } })), "a second invitation for one address is refused");

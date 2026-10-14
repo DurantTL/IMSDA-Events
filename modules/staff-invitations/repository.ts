@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
@@ -9,9 +9,8 @@ import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/backgro
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { calendarDateInEventTimeZone, hasEventEnded } from "@/modules/events/lifecycle";
 import { entitleAttendeeToPlan } from "@/modules/meals/selection-repository";
-import { MealError } from "@/modules/meals/errors";
 import { cancelRegistration } from "@/modules/registrations/lifecycle-repository";
-import { buildImportPreview, InvitationCsvError } from "@/modules/staff-invitations/csv";
+import { classifyInvitationRows, InvitationCsvError, parseInvitationCsv, usableEmails } from "@/modules/staff-invitations/csv";
 import {
   approvedEmail,
   COVERED_MEAL_ANSWER,
@@ -23,7 +22,7 @@ import {
   invitationStatus,
   invitationUrl,
   invitationUsable,
-  normalizeInvitationEmail,
+  OFFICE_DIGEST_WINDOW_MS,
   officeDigestEmail,
   officeDigestWindow,
   partyOf,
@@ -51,7 +50,10 @@ export type StaffInvitationErrorCode =
   | "NOTHING_TO_SEND"
   | "SEND_COUNT_CHANGED"
   | "INVALID_PARTY"
-  | "NOTHING_SELECTED";
+  | "NOTHING_SELECTED"
+  | "MEAL_PLAN_REQUIRED"
+  | "BATCH_TOO_LARGE"
+  | "REQUEST_TOO_LARGE";
 
 export class StaffInvitationError extends Error {
   constructor(public readonly code: StaffInvitationErrorCode, message: string) {
@@ -71,7 +73,10 @@ export function staffInvitationErrorStatus(code: StaffInvitationErrorCode) {
     case "PREVIEW_CHANGED":
     case "SEND_COUNT_CHANGED":
     case "NOT_REISSUABLE":
+    case "MEAL_PLAN_REQUIRED":
       return 409;
+    case "REQUEST_TOO_LARGE":
+      return 413;
     default:
       return 400;
   }
@@ -145,15 +150,11 @@ async function existingEmails(client: Tx | ReturnType<typeof getPrisma>, eventId
   };
 }
 
-function candidateEmails(csv: string) {
-  // Only used to look up who already holds an address: the preview itself decides what each row is.
-  return [...new Set(csv.split(/\r?\n/).flatMap((line) => line.split(",").map((cell) => normalizeInvitationEmail(cell.replace(/^"|"$/g, "")))).filter((cell) => cell.includes("@")))];
-}
-
 async function previewWith(client: Tx | ReturnType<typeof getPrisma>, eventId: string, input: { csv: string; defaultGroup: StaffInvitationGroupValue | null }): Promise<ImportPreview> {
   try {
-    const existing = await existingEmails(client, eventId, candidateEmails(input.csv));
-    return buildImportPreview({ csv: input.csv, defaultGroup: input.defaultGroup, existing });
+    // The file is parsed once; the lookup uses the addresses that parse found, never a guess at where they are.
+    const parsed = parseInvitationCsv(input.csv, input.defaultGroup);
+    return classifyInvitationRows(parsed, await existingEmails(client, eventId, usableEmails(parsed)));
   } catch (error) {
     if (error instanceof InvitationCsvError) throw new StaffInvitationError("INVALID_IMPORT", error.message);
     throw error;
@@ -394,7 +395,20 @@ function sendable(row: SendCandidate, now: Date) {
   return !row.sentAt || now.getTime() - row.sentAt.getTime() >= SEND_COOLDOWN_MS;
 }
 
-/** The exact email people would get, for the first selected person, and how many would be sent. Reads only. */
+/** What the preview promised: exactly these invitations, each at its current send count. A send must present it. */
+function sendDigest(toSend: readonly Pick<SendCandidate, "id" | "sendCount">[]) {
+  const key = [...toSend].map((row) => `${row.id}:${row.sendCount}`).sort();
+  return createHash("sha256").update(JSON.stringify(key)).digest("hex").slice(0, 32);
+}
+
+/** The token the preview's sample shows in place of a link: it opens nothing. */
+const SAMPLE_LINK_TOKEN = "PERSONAL-LINK-GOES-HERE";
+
+/**
+ * The exact email people would get, rendered for the first selected person but with a placeholder where their personal link
+ * goes (the preview never shows a link that works), how many would be sent, and a digest of exactly which invitations those are.
+ * Reads only.
+ */
 export async function previewInvitationSend(eventId: string, ids: readonly string[], now = new Date()) {
   const event = await requireEvent(getPrisma(), eventId);
   const found = await invitationsById(getPrisma(), eventId, ids);
@@ -408,6 +422,7 @@ export async function previewInvitationSend(eventId: string, ids: readonly strin
     senderName: settings?.senderName ?? "IMSDA Events",
     /** False when the event is not published or is over: the links would not open yet (or any more). */
     linksOpen: eventAcceptsInvitationRegistration(event, now),
+    digest: sendDigest(toSend),
     sample: first
       ? {
           to: first.email,
@@ -415,7 +430,7 @@ export async function previewInvitationSend(eventId: string, ids: readonly strin
             eventName: event.name,
             firstName: first.firstName,
             group: first.group,
-            url: invitationUrl(baseUrl(), invitationToken(first)),
+            url: invitationUrl(baseUrl(), SAMPLE_LINK_TOKEN),
             supportContact: event.supportContact,
           }),
         }
@@ -425,18 +440,18 @@ export async function previewInvitationSend(eventId: string, ids: readonly strin
 
 /**
  * Queues one invitation email per selected person in the event's outbox. This is the human Send: it is never called from an
- * import, a schedule or any other automatic path. `expectedCount` is the number the person saw in the preview; if what would
- * be sent now differs, nothing is queued. The outbox delivers (or captures, or suppresses) according to the event's message
+ * import, a schedule or any other automatic path. `digest` is the one the preview gave for exactly which invitations would go;
+ * if what would be sent now differs in any way, nothing is queued. The outbox delivers (or captures, or suppresses) according to the event's message
  * settings, like every other message.
  */
-export async function sendInvitations(eventId: string, actorUserId: string, input: { ids: readonly string[]; expectedCount: number }, now = new Date()) {
+export async function sendInvitations(eventId: string, actorUserId: string, input: { ids: readonly string[]; digest: string }, now = new Date()) {
   const event = await requireEvent(getPrisma(), eventId);
   return serializable(async (tx) => {
     const found = await invitationsById(tx, eventId, input.ids);
     const toSend = found.filter((row) => sendable(row, now));
     if (toSend.length === 0) throw new StaffInvitationError("NOTHING_TO_SEND", "Nobody selected can be sent a link right now.");
-    if (toSend.length !== input.expectedCount) {
-      throw new StaffInvitationError("SEND_COUNT_CHANGED", `${toSend.length} would be sent now, not ${input.expectedCount}. Preview again before sending.`);
+    if (sendDigest(toSend) !== input.digest) {
+      throw new StaffInvitationError("SEND_COUNT_CHANGED", "Who would be sent a link changed since the preview. Nothing was sent. Preview again.");
     }
     const settings = await tx.eventMessageSettings.findUnique({ where: { eventId } });
     const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
@@ -504,7 +519,13 @@ type Notice = {
   subject: string;
   bodyText: string;
   idempotencyKey: string;
-  skipIfQueued?: boolean;
+  /** Overrides the batch's registration (the office digest belongs to no registration). */
+  registrationId?: string | null;
+  /**
+   * A digest the worker sends when this time arrives, not now. While it still waits, every later registration refreshes its
+   * count in place, so the one email that goes names everyone waiting at that moment.
+   */
+  digestUntil?: Date;
 };
 
 /** Queues plain-text notices in the event's outbox inside the caller's transaction. Returns the ids still waiting to be sent. */
@@ -516,13 +537,21 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
   const correlationId = randomUUID();
   const ids: string[] = [];
   for (const notice of input.notices) {
-    if (notice.skipIfQueued && (await tx.messageOutbox.findUnique({ where: { idempotencyKey: notice.idempotencyKey }, select: { id: true } }))) continue;
+    if (notice.digestUntil) {
+      const waiting = await tx.messageOutbox.findUnique({ where: { idempotencyKey: notice.idempotencyKey }, select: { id: true, status: true } });
+      if (waiting) {
+        if (waiting.status === "PENDING") {
+          await tx.messageOutbox.update({ where: { id: waiting.id }, data: { subjectSnapshot: notice.subject, bodyTextSnapshot: notice.bodyText } });
+        }
+        continue;
+      }
+    }
     const message = await tx.messageOutbox.upsert({
       where: { idempotencyKey: notice.idempotencyKey },
       update: {},
       create: {
         eventId: input.eventId,
-        registrationId: input.registrationId,
+        registrationId: notice.registrationId === undefined ? input.registrationId : notice.registrationId,
         templateKey: "CUSTOM_MESSAGE",
         recipientKind: notice.recipientKind,
         recipientEmail: notice.email,
@@ -535,12 +564,14 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
         metadata: { trigger: `STAFF_INVITATION_${notice.kind}`, deliveryMode, realDelivery: deliveryMode === "EXTERNAL_EMAIL" },
         idempotencyKey: notice.idempotencyKey,
         correlationId,
+        ...(notice.digestUntil ? { availableAt: notice.digestUntil } : {}),
         status: suppressed ? "SUPPRESSED" : "PENDING",
         lastError: suppressed ? "Delivery is disabled for this event." : null,
       },
       select: { id: true, status: true },
     });
-    if (message.status === "PENDING") ids.push(message.id);
+    // A digest waits for its time and is delivered by the outbox worker, never from this request.
+    if (message.status === "PENDING" && !notice.digestUntil) ids.push(message.id);
   }
   return ids;
 }
@@ -700,8 +731,9 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
     });
     const staff = await officeEmails(tx, event.id);
     const waitingCount = await tx.staffInvitation.count({ where: { eventId: event.id, approval: "WAITING" } });
-    const reviewUrl = `${baseUrl().replace(/\/+$/, "")}/people/staff-invitations?event=${encodeURIComponent(event.id)}`;
+    const reviewUrl = `${baseUrl().replace(/\/+$/, "")}/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`;
     const window = officeDigestWindow(now);
+    const windowEnd = new Date((window + 1) * OFFICE_DIGEST_WINDOW_MS);
     notices = await queueNotices(tx, {
       eventId: event.id,
       registrationId: registration.id,
@@ -720,7 +752,8 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
           email,
           name: "IMSDA event team",
           idempotencyKey: `staff-invitation:office-digest:${event.id}:${window}:${email}`,
-          skipIfQueued: true,
+          registrationId: null,
+          digestUntil: windowEnd,
           ...officeDigestEmail({ eventName: event.name, waitingCount, reviewUrl }),
         })),
       ],
@@ -747,6 +780,8 @@ export type ApprovalRow = {
   needsHousing: boolean | null;
   housingNote: string;
   party: Array<{ name: string; role: string; age: number | null }>;
+  /** Approved registrations only: people on it with no conference-paid meal ticket, for the office to retry. */
+  peopleWithoutMeals: number;
 };
 
 function snapshotRecord(value: Prisma.JsonValue): Record<string, unknown> {
@@ -773,11 +808,18 @@ export async function listApprovals(eventId: string) {
         select: {
           confirmationCode: true,
           contactSnapshot: true,
-          attendees: { orderBy: { position: "asc" }, select: { profileSnapshot: true } },
+          attendees: { orderBy: { position: "asc" }, select: { id: true, profileSnapshot: true } },
         },
       },
     },
   });
+  const covered = new Set(
+    (await getPrisma().eventMealSelection.findMany({
+      where: { eventId, payer: "CONFERENCE", status: "ACTIVE", registrationId: { in: rows.flatMap((row) => (row.approval === "APPROVED" && row.registrationId ? [row.registrationId] : [])) } },
+      distinct: ["registrationAttendeeId"],
+      select: { registrationAttendeeId: true },
+    })).flatMap((row) => (row.registrationAttendeeId ? [row.registrationAttendeeId] : [])),
+  );
   const list: ApprovalRow[] = rows.flatMap((row) => {
     if (!row.registration || !row.registrationId || !row.registeredAt || !row.approval) return [];
     const contact = snapshotRecord(row.registration.contactSnapshot);
@@ -792,6 +834,7 @@ export async function listApprovals(eventId: string) {
       registeredAt: row.registeredAt.toISOString(),
       needsHousing: row.needsHousing,
       housingNote: row.housingNote,
+      peopleWithoutMeals: row.approval === "APPROVED" ? row.registration.attendees.filter((attendee) => !covered.has(attendee.id)).length : 0,
       party: row.registration.attendees.map((attendee) => {
         const snapshot = snapshotRecord(attendee.profileSnapshot);
         return {
@@ -812,13 +855,36 @@ export async function listApprovals(eventId: string) {
   };
 }
 
+/** The most registrations one approve, decline or retry request takes. */
+export const APPROVAL_BATCH_MAX = 200;
+
+export type MealCoverageResult = {
+  /** The event has exactly one active conference-paid plan. */
+  planFound: boolean;
+  entitledPeople: number;
+  failedPeople: number;
+  /** Everyone left without the meal plan, so the office can see who and retry. */
+  failed: Array<{ registrationId: string; attendeeId: string; name: string }>;
+};
+
 export type DecisionResult = {
   decided: number;
   skipped: number;
   failed: number;
-  /** Approvals only: how many people were given the conference-paid meal plan, and whether the event has one. */
-  meals?: { planFound: boolean; entitledPeople: number; failedPeople: number };
+  /** Approvals and meal retries only. */
+  meals?: MealCoverageResult;
 };
+
+function assertBatch(ids: readonly string[]) {
+  if (new Set(ids).size > APPROVAL_BATCH_MAX) {
+    throw new StaffInvitationError("BATCH_TOO_LARGE", `Choose at most ${APPROVAL_BATCH_MAX} registrations at a time. Do the rest in another batch.`);
+  }
+}
+
+async function singleConferencePlan(client: Tx | ReturnType<typeof getPrisma>, eventId: string) {
+  const plans = await client.eventMealPlan.findMany({ where: { eventId, payer: "CONFERENCE", isActive: true }, select: { id: true } });
+  return plans.length === 1 ? plans[0].id : null;
+}
 
 /**
  * Approves the waiting registrations the office chose, in one batch. Each becomes a confirmed registration
@@ -826,8 +892,21 @@ export type DecisionResult = {
  * the event has a conference-paid meal plan, every person in the party is entitled to it through the meals module. A
  * registration that is no longer waiting is skipped, never changed.
  */
-export async function approveRegistrations(eventId: string, actorUserId: string, ids: readonly string[], now = new Date()): Promise<DecisionResult> {
+export async function approveRegistrations(
+  eventId: string,
+  actorUserId: string,
+  ids: readonly string[],
+  options: { withoutMealCoverage?: boolean } = {},
+  now = new Date(),
+): Promise<DecisionResult> {
   const event = await requireEvent(getPrisma(), eventId);
+  assertBatch(ids);
+  // Every approved person is meant to be fed by the conference. Without exactly one conference-paid plan that can't happen, so
+  // the office either sets one up or says out loud that this batch goes ahead without meal coverage.
+  const planId = await singleConferencePlan(getPrisma(), eventId);
+  if (!planId && !options.withoutMealCoverage) {
+    throw new StaffInvitationError("MEAL_PLAN_REQUIRED", "This event does not have exactly one active conference-paid meal plan, so approved people can't be given their meals. Set the plan up in Meals, or approve without meal coverage.");
+  }
   const found = await invitationsById(getPrisma(), eventId, ids);
   const approvedRegistrationIds: string[] = [];
   let skipped = 0;
@@ -890,40 +969,69 @@ export async function approveRegistrations(eventId: string, actorUserId: string,
   }
   // The confirmations stay queued for the outbox worker: a batch is never sent from inside the request.
   await refreshBackgroundCheckMatchesForRegistrations(approvedRegistrationIds).catch(() => undefined);
-  const meals = await entitleMeals(eventId, actorUserId, approvedRegistrationIds);
+  const meals = await entitleMeals(eventId, actorUserId, approvedRegistrationIds, planId);
   return { decided: approvedRegistrationIds.length, skipped, failed, meals };
 }
 
 /**
- * Gives every person on the approved registrations the event's conference-paid meal plan (#905/#916): every meal, each used
- * once. Uses the meals module's own entitlement, which never charges the attendee. An event with no single active conference
- * plan skips this and says so; the office can entitle people from the meals screen.
+ * Gives the people on approved registrations the meal plan again, for those who lack it (an approval that went ahead without
+ * the plan, or one whose entitlement failed). Safe to repeat: the meals module adds only what is missing.
  */
-async function entitleMeals(eventId: string, actorUserId: string, registrationIds: readonly string[]) {
-  if (registrationIds.length === 0) return { planFound: true, entitledPeople: 0, failedPeople: 0 };
-  const plans = await getPrisma().eventMealPlan.findMany({ where: { eventId, payer: "CONFERENCE", isActive: true }, select: { id: true } });
-  if (plans.length !== 1) return { planFound: false, entitledPeople: 0, failedPeople: 0 };
-  const attendees = await getPrisma().registrationAttendee.findMany({
-    where: { eventId, registrationId: { in: [...registrationIds] } },
-    select: { id: true, attendeeType: true },
+export async function retryMealCoverage(eventId: string, actorUserId: string, ids: readonly string[]): Promise<DecisionResult> {
+  await requireEvent(getPrisma(), eventId);
+  assertBatch(ids);
+  const planId = await singleConferencePlan(getPrisma(), eventId);
+  if (!planId) {
+    throw new StaffInvitationError("MEAL_PLAN_REQUIRED", "This event does not have exactly one active conference-paid meal plan. Set the plan up in Meals first.");
+  }
+  const found = await invitationsById(getPrisma(), eventId, ids);
+  const approved = found.filter((row) => row.approval === "APPROVED" && row.registrationId);
+  const live = await getPrisma().registration.findMany({
+    where: { eventId, id: { in: approved.map((row) => row.registrationId as string) }, status: { in: ["SUBMITTED", "CONFIRMED"] } },
+    select: { id: true },
   });
+  const meals = await entitleMeals(eventId, actorUserId, live.map((row) => row.id), planId);
+  return { decided: live.length, skipped: found.length - live.length, failed: 0, meals };
+}
+
+/**
+ * Gives every person on the approved registrations the event's conference-paid meal plan (#905/#916): every meal, each used
+ * once. Uses the meals module's own entitlement, which never charges the attendee. It never throws: the approvals have already
+ * committed, so any trouble is counted per person and returned with who they are, for the office to retry.
+ */
+async function entitleMeals(eventId: string, actorUserId: string, registrationIds: readonly string[], planId: string | null): Promise<MealCoverageResult> {
+  if (registrationIds.length === 0) return { planFound: planId !== null, entitledPeople: 0, failedPeople: 0, failed: [] };
+  let attendees: Array<{ id: string; registrationId: string; attendeeType: string; profileSnapshot: Prisma.JsonValue }>;
+  try {
+    attendees = await getPrisma().registrationAttendee.findMany({
+      where: { eventId, registrationId: { in: [...registrationIds] } },
+      orderBy: [{ registrationId: "asc" }, { position: "asc" }],
+      select: { id: true, registrationId: true, attendeeType: true, profileSnapshot: true },
+    });
+  } catch {
+    return { planFound: planId !== null, entitledPeople: 0, failedPeople: registrationIds.length, failed: registrationIds.map((registrationId) => ({ registrationId, attendeeId: "", name: "" })) };
+  }
+  const named = (attendee: (typeof attendees)[number]) => {
+    const snapshot = snapshotRecord(attendee.profileSnapshot);
+    return { registrationId: attendee.registrationId, attendeeId: attendee.id, name: `${String(snapshot.firstName ?? "")} ${String(snapshot.lastName ?? "")}`.trim() };
+  };
+  if (!planId) return { planFound: false, entitledPeople: 0, failedPeople: attendees.length, failed: attendees.map(named) };
+  const failed: MealCoverageResult["failed"] = [];
   let entitledPeople = 0;
-  let failedPeople = 0;
   for (const attendee of attendees) {
     try {
       await entitleAttendeeToPlan(eventId, actorUserId, {
         registrationAttendeeId: attendee.id,
-        planId: plans[0].id,
+        planId,
         ageGroup: attendee.attendeeType === "CHILD" ? "CHILD" : "ADULT",
         reason: "Approved staff, pastor or volunteer registration: the conference pays for every meal.",
       });
       entitledPeople += 1;
-    } catch (error) {
-      if (!(error instanceof MealError)) throw error;
-      failedPeople += 1;
+    } catch {
+      failed.push(named(attendee));
     }
   }
-  return { planFound: true, entitledPeople, failedPeople };
+  return { planFound: true, entitledPeople, failedPeople: failed.length, failed };
 }
 
 /**
@@ -932,6 +1040,7 @@ async function entitleMeals(eventId: string, actorUserId: string, registrationId
  */
 export async function declineRegistrations(eventId: string, actorUserId: string, ids: readonly string[], now = new Date()): Promise<DecisionResult> {
   await requireEvent(getPrisma(), eventId);
+  assertBatch(ids);
   const found = await invitationsById(getPrisma(), eventId, ids);
   let decided = 0;
   let skipped = 0;

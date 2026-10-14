@@ -6,6 +6,23 @@ import { StaffInvitationError, staffInvitationErrorStatus } from "@/modules/staf
 
 const noStore = { "Cache-Control": "no-store" };
 
+/** The most a staff route reads from a request body (the import takes a whole CSV). */
+export const STAFF_BODY_MAX_BYTES = 128 * 1024;
+export const IMPORT_BODY_MAX_BYTES = 1024 * 1024;
+
+/**
+ * The request's JSON, read only up to `maxBytes`: a declared length over the cap is refused without reading, and so is a body
+ * that turns out larger. Call it after the permission check, never before.
+ */
+export async function readBoundedJson(request: Request, maxBytes = STAFF_BODY_MAX_BYTES): Promise<unknown> {
+  const tooLarge = () => new StaffInvitationError("REQUEST_TOO_LARGE", "That request is too large.");
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > maxBytes) throw tooLarge();
+  const text = await request.text();
+  if (Buffer.byteLength(text) > maxBytes) throw tooLarge();
+  return JSON.parse(text);
+}
+
 /**
  * The JSON every staff-invitation route answers with for a failure, staff or public. Never the request body: it holds names,
  * ages and email addresses.

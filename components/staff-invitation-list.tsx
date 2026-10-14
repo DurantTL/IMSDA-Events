@@ -19,6 +19,7 @@ type SendPreview = {
   deliveryMode: string;
   senderName: string;
   linksOpen: boolean;
+  digest: string;
   sample: { to: string; subject: string; bodyText: string } | null;
 };
 
@@ -76,8 +77,15 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
   const visibleSelected = visible.filter((row) => selected.has(row.id));
   const selectedIds = [...selected];
 
+  // A preview describes exactly one selection: any change to the selection discards it (and a pending revoke confirmation).
+  function changeSelection(update: (current: Set<string>) => Set<string>) {
+    setSelected(update);
+    setSendPreview(null);
+    setConfirmingRevoke(false);
+  }
+
   function toggle(id: string) {
-    setSelected((current) => {
+    changeSelection((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -110,13 +118,13 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
   }
 
   const openSendPreview = () => run(async () => {
-    const result = await call("/actions", { action: "preview_send", ids: selectedIds });
+    const result = await call("/send", { action: "preview", ids: selectedIds });
     setSendPreview(result.preview as SendPreview);
   });
 
   const confirmSend = () => run(async () => {
     if (!sendPreview) return;
-    const result = await call("/actions", { action: "send", ids: selectedIds, expectedCount: sendPreview.willSend }) as { result?: { queued: number } };
+    const result = await call("/send", { action: "send", ids: selectedIds, digest: sendPreview.digest }) as { result?: { queued: number } };
     setNotice(`${result.result?.queued ?? 0} invitation email${result.result?.queued === 1 ? "" : "s"} queued in the message outbox for delivery.`);
     setSendPreview(null);
     setSelected(new Set());
@@ -181,11 +189,11 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
         </span>
         <div className="selection-bar-actions">
           {visibleSelected.length < visible.length && (
-            <button className="text-button" onClick={() => setSelected((current) => new Set([...current, ...visible.map((row) => row.id)]))} type="button">Select all {visible.length} shown</button>
+            <button className="text-button" onClick={() => changeSelection((current) => new Set([...current, ...visible.map((row) => row.id)]))} type="button">Select all {visible.length} shown</button>
           )}
           {selected.size > 0 && (
             <>
-              <button className="text-button" onClick={() => { setSelected(new Set()); setSendPreview(null); setConfirmingRevoke(false); }} type="button">Clear selection</button>
+              <button className="text-button" onClick={() => changeSelection(() => new Set())} type="button">Clear selection</button>
               {canSend && (
                 <button className="secondary-button outline-action" disabled={busy} onClick={() => void openSendPreview()} type="button">
                   <MailPlus aria-hidden="true" size={16} /> Send or resend…
@@ -237,7 +245,7 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
               )}
               {sendPreview.sample && (
                 <>
-                  <p className="field-help">The first email, to {sendPreview.sample.to}. Everyone gets the same words with their own name and link.</p>
+                  <p className="field-help">The first email, to {sendPreview.sample.to}. Everyone gets the same words with their own name and their own personal link (shown here as a placeholder).</p>
                   <p><strong>{sendPreview.sample.subject}</strong></p>
                   <pre>{sendPreview.sample.bodyText}</pre>
                 </>

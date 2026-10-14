@@ -789,6 +789,12 @@ export async function cancelRegistration(
       where: { id: registration.id },
       data: { status: "CANCELLED", cancelledAt: now },
     });
+    // Cancelling a staff, pastor or volunteer registration that is still waiting for approval settles its invitation as
+    // declined, so it does not wait in the approval list for ever (#804).
+    await tx.staffInvitation.updateMany({
+      where: { registrationId: registration.id, approval: "WAITING" },
+      data: { approval: "DECLINED", decidedAt: now, decidedByUserId: actorUserId },
+    });
     if (wasWaitlisted && registration.waitlistEntry) {
       await recordLocationWaitlistChange(tx, {
         registrationId: registration.id,
@@ -999,6 +1005,15 @@ export async function reactivateRegistration(
     const event = await loadEvent(tx, eventId);
     const registration = await loadRegistration(tx, eventId, registrationId);
     requireStatus(registration, ["CANCELLED"], "Reactivation");
+    // A staff, pastor or volunteer registration the office declined (or that never got approved) is not brought back here: that
+    // would skip the approval it never had (#804). One that was approved and later cancelled can be reactivated as usual.
+    const invitation = await tx.staffInvitation.findUnique({ where: { registrationId: registration.id }, select: { approval: true } });
+    if (invitation && invitation.approval !== "APPROVED") {
+      throw new RegistrationLifecycleError(
+        "INVALID_REGISTRATION_TRANSITION",
+        "This staff, pastor or volunteer registration was never approved, so it can't be reactivated. Ask them to register again through a new personal link.",
+      );
+    }
     const eventCapacity = await checkEventCapacity(tx, event, registration);
     if (!eventCapacity.fits) {
       throw new RegistrationLifecycleError(

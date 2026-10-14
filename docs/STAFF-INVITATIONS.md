@@ -30,7 +30,12 @@ registrations that come back wait for the office to approve them in one batch. T
   one message per person in the event's outbox (`CUSTOM_MESSAGE`, `metadata.trigger = STAFF_INVITATION_SENT`); the outbox worker
   delivers, captures or suppresses it according to the event's message settings. Nothing in the app calls this on its own: not the
   import, not a schedule.
-- The send must match the count the preview showed, and a second click within two minutes does not queue again.
+- The preview shows the email with a placeholder where the personal link goes (never a working link) and returns a digest of
+  exactly which invitations would be sent. The send must present that digest, so a changed selection or a changed list sends
+  nothing; a second click within two minutes does not queue again.
+- Each invitation email carries that person's personal link in its body in the outbox (the same as club invites do with their
+  sign-up link). The link is a bearer link, and the exposure is limited: it allows one registration, which waits for the office,
+  and the office can reissue it (every earlier copy stops working) or revoke it.
 - The invite list shows Not sent, Sent, Delivery failed (from the message's own status), Registered (waiting), Approved, Declined
   and Revoked.
 
@@ -40,6 +45,13 @@ registrations that come back wait for the office to approve them in one batch. T
   the event (the server enforces it; no other relative). The person can say they need on-site housing and add a note.
 - The price is $0 for the whole registration: total 0, no adjustments, no payment, so invoice and balance screens show nothing due.
   There are no meal questions: every person is recorded as `Covered (staff)`.
+- Everything the registrant could later change on the private manage page that would add rooms or priced items is closed for these
+  registrations. The lodging card is hidden, and saving a lodging request (the $0 direct save and the priced change request),
+  roommate requests and joining the lodging waitlist are refused for the registrant (`STAFF_REGISTRATION`), so housing is only
+  ever assigned by the office. Answer edits and amendments need a public form submission, which these registrations don't have,
+  there is no balance to pay, and the manage link has no merchandise, meal-ticket or add-attendee path. Staff can still do all of
+  these from the workspace. The private link is also redacted from request logs (`/staff-invite/` and
+  `/api/public/staff-invitations/`).
 - It is written in one transaction that also uses the link up, so two clicks make one registration. The registrant gets a receipt,
   and the event's internal notification addresses get one digest per 15 minutes.
 - The registration carries the invitation's group on every attendee's profile (`staffGroup`).
@@ -49,6 +61,12 @@ registrations that come back wait for the office to approve them in one batch. T
 - A registration made through a link is a `DRAFT` registration until the office approves it, so a waiting one is in no count,
   capacity check, report, check-in list or room list. Approve or decline in one batch, with select-all, normally when housing is
   assigned.
+- A batch is at most 200 registrations. Approve is refused unless the event has exactly one active conference-paid meal plan,
+  or the office ticks "approve without meal coverage"; then the screen names who has no meals, and "Retry meal coverage" gives
+  them the plan once it is fixed. A failure of any one person's entitlement never undoes an approval; it is reported by name.
+- The office digest is one email per event per 15 minutes naming how many registrations wait (refreshed while it waits, so it
+  counts everyone), with a link to the approval list. Cancelling a waiting registration from People marks its invitation
+  declined, and a declined or never-approved registration can't be reactivated from People.
 - Approve makes it `CONFIRMED`, queues the registrant's confirmation in the outbox (not sent from the request), and gives every
   person in the party the event's conference-paid meal plan through `entitleAttendeeToPlan` (#905/#916: every meal, one ticket per
   service, charged to no one; the café scan and its CSV are unchanged). If the event does not have exactly one active

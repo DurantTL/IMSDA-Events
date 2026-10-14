@@ -29,8 +29,9 @@ async function postHandler(request: Request, context: Context) {
         rateLimit,
       );
     }
-    const body = await request.text();
-    if (Buffer.byteLength(body) > maximumBodyBytes) {
+    const declared = Number(request.headers.get("content-length") ?? "0");
+    const body = Number.isFinite(declared) && declared > maximumBodyBytes ? null : await request.text();
+    if (body === null || Buffer.byteLength(body) > maximumBodyBytes) {
       return applyRateLimitHeaders(
         Response.json({ error: "REQUEST_TOO_LARGE", message: "This request is too large." }, { status: 413, headers: noStore }),
         rateLimit,
