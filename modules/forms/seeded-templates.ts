@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { logWarn } from "@/lib/logger";
 import { registrationFormDefinitionSchema, type FormTemplate } from "@/modules/forms/definition";
 import { bundledSeededFormTemplates, type SeededFormTemplateSeed } from "@/modules/forms/seeded-template-data";
 
@@ -77,14 +78,16 @@ export async function syncSeededFormTemplates(
 export async function loadSeededFormTemplate(client: Client, key: string): Promise<(FormTemplate & { version: number }) | null> {
   const bundled = bundledSeededFormTemplates.find((seed) => seed.key === key);
   if (!bundled) return null;
+  const bundledTemplate = { key: bundled.key, name: bundled.name, description: bundled.description, audience: bundled.audience, definition: bundled.definition, version: bundled.version };
   const row = await client.seededFormTemplate.findUnique({ where: { key } });
-  if (!row) return { key: bundled.key, name: bundled.name, description: bundled.description, audience: bundled.audience, definition: bundled.definition, version: bundled.version };
-  return {
-    key: row.key,
-    name: row.name,
-    description: row.description,
-    audience: row.audience,
-    definition: registrationFormDefinitionSchema.parse(row.definition),
-    version: row.version,
-  };
+  if (!row) return bundledTemplate;
+  // One unreadable stored row (for example after a rollback) must not take down
+  // every caller: listFormTemplates() loads all three. Fall back to the bundled
+  // seed for this key and log the key only, never the stored definition.
+  const definition = registrationFormDefinitionSchema.safeParse(row.definition);
+  if (!definition.success) {
+    logWarn("Seeded form template row failed validation; using the bundled seed", { templateKey: key, storedVersion: row.version });
+    return bundledTemplate;
+  }
+  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version };
 }

@@ -659,6 +659,9 @@ const manCampRegistrationPackages = [
  * and the unit tests read; the app creates new forms from the synced row.
  */
 function seededFormTemplate(key: string): FormTemplate {
+  // Reads the bundled seed directly. Form creation and the picker follow the
+  // synced row (loadSeededFormTemplate); this follows the code. They differ only
+  // when a stored version is ahead of the code (for example after a rollback).
   const seed = bundledSeededFormTemplates.find((entry) => entry.key === key);
   if (!seed) throw new Error(`The seeded form template ${key} is missing from prisma/seed-data/form-templates.`);
   return { key: seed.key, name: seed.name, description: seed.description, audience: seed.audience, definition: seed.definition };
@@ -995,6 +998,9 @@ function buildFallCamporeeTemplate(spring: FormTemplate): FormTemplate {
 }
 
 {
+  // Fall Camporee derives from the bundled Spring Camporee seed, not the synced
+  // row, so it follows the code. It differs from the row only when a stored
+  // version is ahead of the code.
   const springIndex = formTemplates.findIndex((template) => template.key === "spring_camporee_export");
   if (springIndex >= 0) formTemplates.splice(springIndex + 1, 0, buildFallCamporeeTemplate(formTemplates[springIndex]!));
 }
@@ -1403,6 +1409,11 @@ export function pruneRequireAtLeastOne<T extends { requireAtLeastOne?: { fieldKe
   return rest;
 }
 
+/**
+ * Reads the in-process list, so a seeded template here is the bundled seed.
+ * Form creation and the picker use the synced row; the two differ only when a
+ * stored version is ahead of the code.
+ */
 export function getFormTemplate(key: string) {
   return formTemplates.find((template) => template.key === key) ?? null;
 }

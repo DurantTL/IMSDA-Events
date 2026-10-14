@@ -14,6 +14,11 @@
  * (and records it), and that an older form keeps its own definition.
  * Uses fictitious users and data it creates and removes itself.
  *
+ * Destructive: it deletes every row in both seeded template tables. It refuses
+ * to run unless NODE_ENV is not production and DATABASE_URL points at this
+ * machine (a local database or the CI service container), using the same
+ * guard as prisma/seed.ts.
+ *
  *   npm run test:seeded-form-templates
  */
 import { loadEnvConfig } from "@next/env";
@@ -22,8 +27,10 @@ import { createRegistrationFormFromTemplateInTransaction, listFormTemplates } fr
 import { canonicalJson } from "../modules/event-clones/domain";
 import { bundledSeededFormTemplates, type SeededFormTemplateSeed } from "../modules/forms/seeded-template-data";
 import { syncSeededFormTemplates } from "../modules/forms/seeded-templates";
+import { assertLocalDatabase } from "./support/local-only-guard";
 
 loadEnvConfig(process.cwd());
+assertLocalDatabase(process.env, "run the seeded form template check (it deletes all seeded template rows)");
 
 const prisma = new PrismaClient();
 const P = "seedfm";

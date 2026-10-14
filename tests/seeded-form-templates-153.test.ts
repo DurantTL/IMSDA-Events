@@ -81,4 +81,18 @@ describe("seeded form templates (#153)", () => {
     expect(await loadSeededFormTemplate(missing as never, "simple_rsvp")).toBeNull();
     expect(missing.seededFormTemplate.findUnique).toHaveBeenCalledTimes(1);
   });
+
+  it("falls back to the bundled seed, logging only the key, when a stored row fails validation", async () => {
+    const bundled = bundledSeededFormTemplates[0]!;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const bad = { seededFormTemplate: { findUnique: vi.fn().mockResolvedValue({ key: bundled.key, version: bundled.version + 1, name: "Stored", description: "", audience: bundled.audience, definition: { sections: "synthetic-secret-marker" } }) } };
+    const result = await loadSeededFormTemplate(bad as never, bundled.key);
+    expect(result).toMatchObject({ key: bundled.key, version: bundled.version, name: bundled.name });
+    expect(digest(result!.definition)).toBe(digest(bundled.definition));
+    expect(warn).toHaveBeenCalledTimes(1);
+    const line = String(warn.mock.calls[0]![0]);
+    expect(line).toContain(bundled.key);
+    expect(line).not.toContain("synthetic-secret-marker");
+    warn.mockRestore();
+  });
 });
