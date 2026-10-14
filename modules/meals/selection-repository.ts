@@ -35,6 +35,7 @@ import {
   type ServiceShape,
 } from "@/modules/meals/domain";
 import { MealError, type MealErrorCode } from "@/modules/meals/errors";
+import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { serviceSnapshot } from "@/modules/meals/config-repository";
 import { syncSelectionTickets } from "@/modules/meals/ticket-repository";
 
@@ -55,11 +56,12 @@ import { syncSelectionTickets } from "@/modules/meals/ticket-repository";
 type Tx = Prisma.TransactionClient;
 
 async function mealTransaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
       return await getPrisma().$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000, maxWait: 10_000 });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 2) continue;
+      // A raw query that loses a serialization conflict reports P2010/40001, not P2034; both are retried.
+      if (isSerializationFailure(error) && attempt < 7) { await pauseBeforeRetry(attempt); continue; }
       throw error;
     }
   }
@@ -225,7 +227,7 @@ async function createSelection(tx: Tx, p: CreateParams) {
     }
     throw error;
   }
-  await syncSelectionTickets(tx, selection);
+  await syncSelectionTickets(tx, selection, { isNew: true });
   const change = await recordChange(tx, p.eventId, p.actor, { selectionId: selection.id, type: p.changeType ?? "CREATED", reason: p.reason, before: null, after: view(selection) });
   const charge = p.plan.payer === "CONFERENCE" ? null : chargeEntry(p.quantity, p.price.unitPriceCents);
   if (charge) {

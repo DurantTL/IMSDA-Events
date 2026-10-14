@@ -302,6 +302,7 @@ describe("café scanner CSV (#916)", () => {
     expect(row).toHaveLength(scannerTicketCsvHeader.length);
     expect(mealTicketId(7)).toBe("MT-00007");
     expect(mealTicketId(123456)).toBe("MT-123456");
+    expect(mealTicketId(99999)).toBe("MT-99999");
   });
 
   it("prices: whole dollars, decimals when cents remain, zero when the conference pays", () => {
@@ -353,6 +354,14 @@ describe("café scanner CSV (#916)", () => {
     expect(scannerCsv([ticket({ guestName: "+1" })])).toContain(",'+1,");
   });
 
+  it("defuses leading -, @, tab and CR with minimal quoting", () => {
+    expect(scannerCsv([ticket({ guestName: "-5 Test" })])).toContain(",'-5 Test,");
+    expect(scannerCsv([ticket({ guestName: "@home" })])).toContain(",'@home,");
+    expect(scannerCsv([ticket({ guestName: "\tTab" })])).toContain(",'\tTab,");
+    // A leading CR is prefixed, and the CR then forces quoting.
+    expect(scannerCsv([ticket({ guestName: "\rCarriage" })])).toContain(`,"'\rCarriage",`);
+  });
+
   it("leaves the default writer quoting every cell", () => {
     expect(toCsv([["a", "b"]])).toBe('"a","b"\r\n');
   });
@@ -365,6 +374,12 @@ describe("meal ticket number migration (#916)", () => {
     expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|TYPE)/i);
     expect(sql).toContain(`CREATE UNIQUE INDEX "EventMealTicket_eventId_number_key" ON "EventMealTicket"("eventId", "number")`);
     expect(sql).toContain(`ORDER BY s."createdAt", s."id", u.unit`);
+  });
+
+  it("numbers from a sequence started past the backfill, with no event-wide counter", () => {
+    expect(sql).toContain(`CREATE SEQUENCE "EventMealTicket_number_seq"`);
+    expect(sql).toContain(`setval('"EventMealTicket_number_seq"'`);
+    expect(sql).not.toContain("mealTicketSeq");
   });
 });
 

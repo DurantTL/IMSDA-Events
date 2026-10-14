@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
+import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { applyCampMeetingMealPreset } from "@/modules/meals/config-repository";
 import { cancelMealSelection, changeMealQuantity, createMealOrder, entitleAttendeeToPlan, syncFormMealSelections } from "@/modules/meals/selection-repository";
 import { loadScannerTickets, mealTicketSummaryCsv, mealTicketsCsv } from "@/modules/meals/view-repository";
@@ -59,6 +60,18 @@ async function cleanup() {
   await prisma.person.deleteMany({ where: { OR: [{ lastName: surname }, { normalizedEmail: { startsWith: `${P}.` } }] } });
   await prisma.auditLog.deleteMany({ where: { OR: [{ actorUserId: userId }, { eventId: { in: events } }] } });
   await prisma.user.deleteMany({ where: { id: userId } });
+}
+
+/** Retries a caller-owned unit of work that lost a serialization conflict, like the production callers do. */
+async function withRetry<T>(work: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await work();
+    } catch (error) {
+      if (isSerializationFailure(error) && attempt < 12) { await pauseBeforeRetry(attempt); continue; }
+      throw error;
+    }
+  }
 }
 
 let counter = 0;
@@ -203,16 +216,66 @@ async function main() {
   assert(JSON.stringify(afterRepair.rows) === JSON.stringify(rows), "the repaired ids are stable too");
 
   // ---- concurrency -------------------------------------------------------------------------------------------------------
-  const racers = await Promise.all(["x", "y", "z"].map((tag) => makeRegistration(tag)));
-  const results = await Promise.allSettled(racers.map((racer) => createMealOrder(eventId, userId, {
-    registrationId: racer.id, registrationAttendeeId: racer.attendeeId, mealType: "BREAKFAST", serviceId: wedBreakfast.id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID(),
-  })));
-  assert(results.every((result) => result.status === "fulfilled"), `concurrent orders all succeed (${results.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)).join("; ")})`);
+  // Eight orders at once, each for its own service (orders for one service queue on that service's row lock by design).
+  const raceServices = services.filter((row) => row.ticketing === "TICKETED" && row.status === "ACTIVE" && ["BREAKFAST", "LUNCH", "SUPPER"].includes(row.mealType)).slice(0, 8);
+  assert(raceServices.length === 8, "the preset has eight ticketed services to race on");
+  const racers = await Promise.all(raceServices.map((_, index) => makeRegistration(`k${index + 1}`)));
+  // On these tiny test tables PostgreSQL takes relation-level predicate locks, so overlapping inserts can lose a
+  // serialization conflict that a production-sized table would not; the caller's retry (as in production) absorbs it.
+  const results = await Promise.allSettled(racers.map((racer, index) => withRetry(() => createMealOrder(eventId, userId, {
+    registrationId: racer.id, registrationAttendeeId: racer.attendeeId, mealType: raceServices[index]!.mealType, serviceId: raceServices[index]!.id, ageGroup: "ADULT", quantity: 2, clientRequestId: randomUUID(),
+  }))));
+  assert(results.every((result) => result.status === "fulfilled"), `${racers.length} concurrent orders all succeed (${results.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)).join("; ")})`);
   ({ rows } = await exportRows());
   assert(racers.every((racer) => idsOf(rows, racer.code).length === 2), "each concurrent order got its two tickets, with unique ids");
-  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { mealTicketSeq: true } });
-  const stored = await prisma.eventMealTicket.aggregate({ where: { eventId }, _max: { number: true }, _count: true });
-  assert(event.mealTicketSeq === stored._max.number && stored._count === stored._max.number, "the counter and the stored numbers agree, with no gaps");
+  const stored = await prisma.eventMealTicket.findMany({ where: { eventId }, select: { number: true } });
+  assert(new Set(stored.map((row) => row.number)).size === stored.length, "every stored ticket number is unique within the event (gaps are allowed)");
+  assert(new Set(rows.map((row) => row.ticket_id)).size === rows.length, "every exported id is unique");
+  assert((await loadScannerTickets(eventId)).length === rows.length, "the loader and the file agree");
+
+  // ---- concurrent meal-bearing form submissions: no write to any event-wide row -----------------------------------------------
+  const eventBefore = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${eventId}`;
+  const more = await Promise.all(["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10"].map((tag) => makeRegistration(tag)));
+  // Like the public form path: SERIALIZABLE with a bounded retry on a serialization failure.
+  const submitForm = (racer: { id: string }) => withRetry(() => prisma.$transaction((tx) => syncFormMealSelections(tx, {
+    eventId, registrationId: racer.id, formVersionId: `${P}_fv`, responses: { supper_adult_qty: 2 }, lineItems: [{ key: "supper_adult_qty", amountCents: 1500 }], previousResponses: null,
+  }), { isolationLevel: "Serializable" }));
+  const formResults = await Promise.allSettled(more.map(submitForm));
+  assert(formResults.every((result) => result.status === "fulfilled"), `ten concurrent serializable form submissions with meals all succeed (${formResults.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)).join("; ")})`);
+  ({ rows } = await exportRows());
+  assert(more.every((racer) => idsOf(rows, racer.code).length === 2) && new Set(rows.map((row) => row.ticket_id)).size === rows.length, "the form submissions each got two tickets, all ids unique");
+  const eventAfter = await prisma.$queryRaw<Array<{ xmin: string }>>`SELECT xmin::text AS xmin FROM "Event" WHERE "id" = ${eventId}`;
+  assert(eventBefore[0]!.xmin === eventAfter[0]!.xmin, "meal-bearing writes never touch the event row");
+
+  // ---- the export-time repair under concurrency ---------------------------------------------------------------------------------
+  const repair = await Promise.all(["e1", "e2"].map((tag) => makeRegistration(tag)));
+  const repairSelections = await Promise.all(repair.map((reg) => prisma.eventMealSelection.create({
+    data: { eventId, planId: ticketPlan.id, mealType: "LUNCH", serviceId: service("Thursday lunch").id, registrationId: reg.id, ageGroup: "ADULT", quantity: 3, source: "STAFF", payer: "ATTENDEE", unitPriceCents: 800, pricingSnapshot: {} },
+  })));
+  const writesBefore = await prisma.eventMealTicket.count({ where: { eventId } });
+  await Promise.all([mealTicketsCsv(eventId), mealTicketsCsv(eventId), mealTicketsCsv(eventId)]);
+  for (const selection of repairSelections) {
+    assert(await prisma.eventMealTicket.count({ where: { selectionId: selection.id, cancelledAt: null } }) === 3, "concurrent exports give a selection exactly its quantity of active tickets");
+  }
+  assert(await prisma.eventMealTicket.count({ where: { eventId } }) === writesBefore + 6, "concurrent exports inserted no extra tickets");
+  const countBeforeGet = await prisma.eventMealTicket.count({ where: { eventId } });
+  const csvOne = await mealTicketsCsv(eventId);
+  assert(csvOne === await mealTicketsCsv(eventId) && await prisma.eventMealTicket.count({ where: { eventId } }) === countBeforeGet, "a normal export writes nothing");
+
+  // An export racing a quantity increase keeps every existing id.
+  const raceReg = await makeRegistration("rc");
+  const raceSelection = await prisma.eventMealSelection.create({
+    data: { eventId, planId: ticketPlan.id, mealType: "LUNCH", serviceId: service("Thursday lunch").id, registrationId: raceReg.id, ageGroup: "ADULT", quantity: 2, source: "STAFF", payer: "ATTENDEE", unitPriceCents: 800, pricingSnapshot: {} },
+  });
+  await mealTicketsCsv(eventId);
+  const idsBefore = (await prisma.eventMealTicket.findMany({ where: { selectionId: raceSelection.id, cancelledAt: null }, select: { id: true } })).map((row) => row.id).sort();
+  assert(idsBefore.length === 2, "the raced selection starts with two tickets");
+  await prisma.eventMealTicket.deleteMany({ where: { id: idsBefore[1]! } });
+  const raced = await Promise.allSettled([mealTicketsCsv(eventId), changeMealQuantity(eventId, raceSelection.id, userId, { quantity: 4, reason: "Racing the export" }), mealTicketsCsv(eventId)]);
+  assert(raced.every((result) => result.status === "fulfilled"), `the export and the quantity change both succeed (${raced.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason)).join("; ")})`);
+  const racedActive = await prisma.eventMealTicket.findMany({ where: { selectionId: raceSelection.id, cancelledAt: null }, select: { id: true } });
+  assert(racedActive.length === 4 && racedActive.some((row) => row.id === idsBefore[0]), "after the race the selection has its new quantity of tickets and the surviving id is kept");
+  ({ rows } = await exportRows());
   assert((await loadScannerTickets(eventId)).length === rows.length, "the loader and the file agree");
 
   // ---- the summary export is kept ------------------------------------------------------------------------------------------

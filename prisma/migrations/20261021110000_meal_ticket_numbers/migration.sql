@@ -1,7 +1,8 @@
--- Stable café ticket numbers (#916). Additive: one counter column and one table.
+-- Stable café ticket numbers (#916). Additive: one sequence and one table. Numbers come from the sequence
+-- (`nextval`, non-transactional), so no event-wide row is ever written when a meal selection is made.
 
--- AlterTable
-ALTER TABLE "Event" ADD COLUMN "mealTicketSeq" INTEGER NOT NULL DEFAULT 0;
+-- CreateSequence
+CREATE SEQUENCE "EventMealTicket_number_seq" AS INTEGER;
 
 -- CreateTable
 CREATE TABLE "EventMealTicket" (
@@ -29,7 +30,7 @@ ALTER TABLE "EventMealTicket" ADD CONSTRAINT "EventMealTicket_selectionId_fkey" 
 
 -- Backfill: one ticket per unit of every ACTIVE selection, numbered per event 1..n in a deterministic order
 -- (selection createdAt, then id, then unit). Cancelled selections get no ticket: they are never exported, and the
--- counter only moves forward, so their units can never collide with a later number. Ids are derived from the
+-- sequence only moves forward, so their units can never collide with a later number. Ids are derived from the
 -- selection id and unit so the backfill is repeatable.
 INSERT INTO "EventMealTicket" ("id", "eventId", "selectionId", "number")
 SELECT 'mtk_' || md5(s."id" || ':' || u.unit::text), s."eventId", s."id",
@@ -38,7 +39,6 @@ FROM "EventMealSelection" s
 CROSS JOIN LATERAL generate_series(1, s."quantity") AS u(unit)
 WHERE s."status" = 'ACTIVE';
 
-UPDATE "Event" e
-SET "mealTicketSeq" = t.max_number
-FROM (SELECT "eventId", max("number") AS max_number FROM "EventMealTicket" GROUP BY "eventId") t
-WHERE t."eventId" = e."id";
+-- Start the sequence past the largest backfilled number (the backfill numbers per event, so the global maximum is
+-- above every event's), so a new number can never collide with a backfilled one in any event.
+SELECT setval('"EventMealTicket_number_seq"', COALESCE((SELECT max("number") FROM "EventMealTicket"), 0) + 1, false);

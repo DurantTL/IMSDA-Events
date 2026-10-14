@@ -474,7 +474,7 @@ export type ScannerTicket = {
   payer: MealPayerValue;
 };
 
-/** `MT-` and the number, at least five digits: `MT-01234`. The number is stored, so the id never changes. */
+/** `MT-` and the number, at least five digits: `MT-01234`. The number is stored, so the id never changes; more digits once it passes 99999. */
 export function mealTicketId(number: number): string {
   return `MT-${String(number).padStart(5, "0")}`;
 }

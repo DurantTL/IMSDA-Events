@@ -1643,8 +1643,6 @@ model Event {
   mealPrices                          EventMealPrice[]
   mealSelections                      EventMealSelection[]
   mealTickets                         EventMealTicket[]
-  /// The last café ticket number handed out for this event (#916). Only ever increases, so a number is never reused.
-  mealTicketSeq                       Int                  @default(0)
   mealSelectionChanges                EventMealSelectionChange[]
   mealLedgerEntries                   EventMealLedgerEntry[]
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
@@ -8431,7 +8429,7 @@ model EventMealSelection {
 
 /// One café ticket (#916): a unit of an active selection, with a number that is unique within the event and is never
 /// reused. A quantity increase adds tickets with new numbers; a decrease or cancellation sets `cancelledAt` on the
-/// highest-numbered active ones. Assigned inside the transaction that creates or changes the selection.
+/// highest-numbered active ones. Numbers come from the sequence "EventMealTicket_number_seq" (see the migration), so no event-wide row is written.
 model EventMealTicket {
   id          String    @id @default(cuid())
   eventId     String

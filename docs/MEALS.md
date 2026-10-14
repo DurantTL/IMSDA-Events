@@ -98,12 +98,21 @@ scanner's format exactly, one row per ticket (a selection of quantity 3 is three
   service). Cancelled selections, donation-only services, walk-up orders, snacks and other non-scanner meal types are left
   out. Sorted by meal date, meal, registration, then guest. A ticket bought on the registration form is good for any
   service of its meal type and is not pinned to a day, so its `meal_day` and `meal_date` are empty.
-- Ticket ids are stable. Each unit of a selection is an `EventMealTicket` row whose number comes from
-  `Event.mealTicketSeq`, advanced inside the transaction that creates or changes the selection (so two orders can never
-  get the same number); `(eventId, number)` is unique. A quantity increase adds tickets with new numbers; a decrease or a
-  cancellation retires the highest-numbered tickets (`cancelledAt`); a retired number is never reused. Re-exporting gives
-  every ticket the same id. A selection written outside the repository is given its missing tickets when the file is
-  exported.
+- Ticket ids are stable. Each unit of a selection is an `EventMealTicket` row whose number comes from the PostgreSQL
+  sequence `EventMealTicket_number_seq` (`nextval`). A sequence never conflicts and never repeats, so overlapping meal
+  submissions do not contend with each other and no event-wide row is written; a rolled-back transaction leaves a gap in
+  the numbers, which is fine because numbers are never reused. The migration numbers existing tickets per event and then
+  moves the sequence past the largest of them. `(eventId, number)` is unique as a backstop. A quantity increase adds
+  tickets with new numbers; a decrease or a cancellation retires the highest-numbered tickets (`cancelledAt`); a retired
+  number is never reused. Re-exporting gives every ticket the same id. A selection written outside the repository is
+  given its missing tickets when the file is exported: the export first checks, read-only, whether any selection is out
+  of step (the normal case is none, and then a GET writes nothing); only on a mismatch does it repair, in a serializable
+  transaction that locks and re-reads each selection.
+- What is not in the scanner file, and what can differ:
+  - Walk-up orders are not in the file: they have no registration, so there is no `reg_id` to carry.
+  - A plan change keeps a ticket's `MT-` id, but its `price` can change with the new plan.
+  - A ticket bought on the registration form has a blank `meal_day` and `meal_date` by owner decision: it is good on any
+    day. A conference-paid staff ticket is pinned to its service, so it carries that service's day and date.
 
 `GET /api/events/:id/exports/meal-ticket-summary` is the earlier per-selection export, kept as the "Meal ticket summary":
 `Confirmation code, Attendee, Attendee type, Age group, Meal, Service date, Service, Quantity, Payer, Source, Ticket id`
