@@ -95,10 +95,24 @@ would hold a snapshot from before the submission it waited for and still be canc
 lock first). `LOCK TABLE` waits without taking the snapshot, so a submission that queued reads everything the earlier ones committed.
 Nothing else changes: the same reads and writes, capacity checks, one-active-slot indexes, ledger, ticket numbers and atomicity with the
 registration. The SERIALIZABLE retry stays as the backstop for a conflict with a transaction that does not use the gate. The gate is global
-(one queue for every event) because a table lock cannot be keyed; a submission holds it for about 65 ms in the benchmark, so a few hundred
+(one queue for every event) because submissions to different events still conflict on cross-event reads (`Person`, `MessageOutbox`), so a
+per-event gate would not stop the aborts; a submission holds it for about 65 ms in the benchmark, so a few hundred
 simultaneous submissions drain in well under the 30 s transaction timeout (`submissionGateTimeoutMs`). Club and group submissions keep their own
 location lock and do not use the gate. Amendments (which also call `syncFormMealSelections`) and staff orders do not use it either; they are
 rarely simultaneous and keep their own retries (8 attempts for staff orders).
+
+**Bounded wait.** The gate wait is capped by `SET LOCAL lock_timeout = '25s'`, issued right before the `LOCK` (it takes no snapshot; the
+database sees exactly BEGIN, SET TRANSACTION ISOLATION LEVEL SERIALIZABLE, SET LOCAL lock_timeout, LOCK TABLE, nothing in between). A
+timeout (SQLSTATE 55P03) or an expired transaction (Prisma P2028) becomes `SUBMISSION_CONFLICT` (409) with "Many people are registering
+right now. Please submit again."; nothing was written, the form keeps the family's entries and idempotency key, and submitting again
+replays safely. `PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS` lowers the wait for the real-database test only.
+
+**Rule: never put slow or external work (payments, email, HTTP, file or network calls) inside the gated transaction.** Everyone behind it
+waits for it; it must stay at about 65 ms of database work. Do that work after commit, as the confirmation email already is.
+
+**Prisma pool during a rush.** Every waiter holds a pool connection (its transaction is open) until it gets the gate or times out, so a
+big opening can use up the pool and starve other requests. Check `connection_limit` (and the database's `max_connections`) before a big
+opening; a few hundred simultaneous submissions need that many connections or they queue for one (`maxWait` is 30 s).
 
 **Lock order** (take them in this order; never wait for the gate while holding anything below it):
 

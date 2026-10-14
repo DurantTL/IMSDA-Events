@@ -10,7 +10,9 @@
  *   tickets numbered uniquely, a ledger that adds up to the prices the form charged, one submission record and one
  *   registration per request;
  * - staff meal orders and a form-answer change (an amendment's meal sync) racing the submissions neither deadlock nor
- *   fail, and the staff order is not lost.
+ *   fail, and the staff order is not lost;
+ * - a submission that waits longer than the gate's lock timeout (lowered here) gets SUBMISSION_CONFLICT with the "many people
+ *   are registering" message, writes nothing, and the same idempotency key succeeds once the gate is free and replays after.
  *
  * Uses fictitious rows it creates and removes itself.
  *
@@ -111,6 +113,41 @@ async function main() {
     assert(staffOrders === runs / 2, `every staff order that raced the submissions was recorded (${staffOrders} of ${runs / 2})`);
     const amended = await prisma.eventMealSelection.findFirstOrThrow({ where: { eventId, registrationId: registration.id, source: "REGISTRATION_FORM", status: "ACTIVE" } });
     assert(amended.quantity === runs, `the form-answer change left its last quantity (${amended.quantity})`);
+
+    // ---- A gate wait that runs out is a clear, safe "submit again" ---------------------------------------------------------------
+    const savedTimeout = process.env.PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS;
+    process.env.PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS = "400";
+    try {
+      const key = randomUUID();
+      let releaseGate!: () => void;
+      const released = new Promise<void>((resolve) => { releaseGate = resolve; });
+      let gateHeld!: () => void;
+      const held = new Promise<void>((resolve) => { gateHeld = resolve; });
+      const holder = prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE`;
+        gateHeld();
+        await released;
+      }, { timeout: 60_000 });
+      await held;
+      const before = await prisma.publicRegistrationSubmission.count({ where: { eventId } });
+      const started = Date.now();
+      const blocked = await harness.submitOnce(key);
+      const waited = Date.now() - started;
+      assert(!blocked.ok && blocked.code === "SUBMISSION_CONFLICT", `a submission stuck behind the gate gets SUBMISSION_CONFLICT (${blocked.code}: ${blocked.message})`);
+      assert(/Many people are registering right now\. Please submit again\./.test(blocked.message ?? ""), "the family is told to submit again");
+      assert(waited >= 300 && waited < 10_000, `it gave up at the lowered lock timeout, not the production one (${waited} ms)`);
+      assert(await prisma.publicRegistrationSubmission.count({ where: { eventId } }) === before, "the timed-out submission wrote nothing");
+      releaseGate();
+      await holder;
+      const retried = await harness.submitOnce(key);
+      assert(retried.ok, `submitting again with the same idempotency key succeeds once the gate is free (${retried.code}: ${retried.message})`);
+      const replayed = await harness.submitOnce(key);
+      assert(replayed.ok && replayed.confirmationCode === retried.confirmationCode, "submitting the same key again replays the same registration");
+      assert(await prisma.publicRegistrationSubmission.count({ where: { eventId } }) === before + 1, "exactly one submission record for the key");
+    } finally {
+      if (savedTimeout === undefined) delete process.env.PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS;
+      else process.env.PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS = savedTimeout;
+    }
 
     console.log(`Meal submission contention verification passed (${runs} runs of ${simultaneous} simultaneous submissions, ${submitted} in all, each queued at the gate).`);
   } finally {

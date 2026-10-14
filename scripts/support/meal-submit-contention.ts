@@ -155,6 +155,23 @@ export async function createContentionHarness() {
     };
   }
 
+  /** One submission through the production path with a chosen idempotency key; reports the error code it failed with. */
+  async function submitOnce(idempotencyKey: string): Promise<{ ok: boolean; code?: string; message?: string; confirmationCode?: string }> {
+    counter += 1;
+    const input = {
+      versionId, idempotencyKey,
+      responses: { primary_contact_first_name: "Mea", primary_contact_last_name: "Holder", email: `${P}.once@meals.example.test`, supper_adult_qty: 2 },
+      attendees: [{ clientId: "p0", responses: { first_name: "Guest", last_name: surname } }],
+      website: "",
+    } as PublicRegistrationInput;
+    try {
+      const confirmation = await submitPublicRegistration(slug, formSlug, input, before);
+      return { ok: true, confirmationCode: confirmation.confirmationCode };
+    } catch (error) {
+      return { ok: false, code: (error as { code?: string }).code, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   /**
    * The meal layer alone: registrations that already exist each sync the same meal tickets in their own SERIALIZABLE
    * transaction, retried like the public path (4 attempts, same pause). Isolates what `syncFormMealSelections` itself contributes.
@@ -195,7 +212,7 @@ export async function createContentionHarness() {
     };
   }
 
-  return { P, eventId, userId, setup, cleanup, submitSimultaneously, syncMealsSimultaneously, slug, formSlug };
+  return { P, eventId, userId, setup, cleanup, submitSimultaneously, submitOnce, syncMealsSimultaneously, slug, formSlug };
 }
 
 /**

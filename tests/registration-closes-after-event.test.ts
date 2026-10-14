@@ -224,6 +224,7 @@ describe("server-side enforcement", () => {
   it("refuses a public submission after the last day with REGISTRATION_CLOSED", async () => {
     const tx = {
       $executeRaw: vi.fn(),
+      $executeRawUnsafe: vi.fn(),
       registrationForm: { findFirst: vi.fn().mockResolvedValue(formRow()) },
       publicRegistrationSubmission: { findUnique: vi.fn().mockResolvedValue(null) },
       registration: { create: vi.fn() },

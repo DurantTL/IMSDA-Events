@@ -2978,9 +2978,11 @@ export function PublicRegistrationForm({
         honors?: { error?: string } | null;
         issues?: FormIssue[];
         message?: string;
+        error?: string;
       };
       if (!response.ok || !result.confirmation) {
-        if (response.status < 500) setIdempotencyKey(null);
+        // A busy-queue conflict wrote nothing; keep the key so submitting again replays safely (#920).
+        if (response.status < 500 && result.error !== "SUBMISSION_CONFLICT") setIdempotencyKey(null);
         const nextIssues = Array.isArray(result.issues)
           ? result.issues.filter((issue) => issue && typeof issue.key === "string" && typeof issue.message === "string")
           : [];

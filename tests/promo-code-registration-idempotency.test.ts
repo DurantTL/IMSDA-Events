@@ -84,6 +84,7 @@ describe("promo-code registration idempotency", () => {
     const tx = {
       // The submission gate (#920): the first statement of an individual submission.
       $executeRaw: vi.fn(),
+      $executeRawUnsafe: vi.fn(),
       registrationForm: {
         findFirst: vi.fn().mockResolvedValue({
           id: "form_1",

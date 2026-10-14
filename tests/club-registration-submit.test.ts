@@ -132,6 +132,7 @@ function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CL
     auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-1" }) },
     // Responsible-adult declarations (#131): none exist yet, so each one is the first for its minor.
     $executeRaw: vi.fn().mockResolvedValue(0),
+    $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     guardianAuthority: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "guardian-1" }), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     guardianAuthorityConflict: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "conflict-1" }) },
   };

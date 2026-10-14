@@ -6,7 +6,7 @@ import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { depositOptionSelected } from "@/modules/payments/deposit-domain";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
-import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
+import { isLockTimeoutError, isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { admitToLocation } from "@/modules/event-locations/admission";
 import { locationWaitlistPlace, recordLocationWaitlistChange } from "@/modules/event-locations/waitlist";
 import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
@@ -1499,6 +1499,21 @@ const submitAttempts = 4;
 /** Room for a submission to wait its turn at the gate: a few hundred simultaneous submissions at roughly 40 ms each. */
 const submissionGateTimeoutMs = 30_000;
 
+/** How long one submission waits for the gate before it gives up and asks the family to submit again (#920). */
+const defaultSubmissionGateLockTimeoutMs = 25_000;
+
+/**
+ * The gate wait, in milliseconds. Production uses 25 s, under the 30 s transaction timeout so the lock gives up first.
+ * `PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS` lowers it for the real-database test only; anything that is not a whole number
+ * from 1 to 25000 is ignored.
+ */
+function submissionGateLockTimeoutMs() {
+  const override = Number(process.env.PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS);
+  return Number.isInteger(override) && override >= 1 && override <= defaultSubmissionGateLockTimeoutMs ? override : defaultSubmissionGateLockTimeoutMs;
+}
+
+const submissionBusyMessage = "Many people are registering right now. Please submit again. Your entries are kept.";
+
 /**
  * Makes simultaneous individual registration submissions queue instead of abort (#920).
  *
@@ -1521,6 +1536,10 @@ const submissionGateTimeoutMs = 30_000;
  * a conflict with a transaction that does not use the gate (an amendment, a staff order, a club submission).
  */
 async function enterSubmissionGate(tx: Prisma.TransactionClient) {
+  // The wait is bounded. `SET LOCAL` takes no snapshot, so the statements the database sees stay exactly
+  // BEGIN / SET TRANSACTION ISOLATION LEVEL SERIALIZABLE / SET LOCAL lock_timeout / LOCK TABLE, with nothing in between
+  // (verified with log_statement=all). Do not put any query before the LOCK.
+  await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '${submissionGateLockTimeoutMs()}ms'`);
   await tx.$executeRaw`LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE`;
 }
 
@@ -1597,6 +1616,12 @@ export async function submitPublicRegistration(
               : result.confirmation.notificationStatus,
       };
     } catch (error) {
+      // Waited too long at the gate (SQLSTATE 55P03), or the transaction expired while queued (P2028): nothing was
+      // written, so ask the family to submit again with their entries and idempotency key kept. Not retried here: another
+      // full wait would not help (#920).
+      if (!bulk && (isLockTimeoutError(error) || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028"))) {
+        throw new PublicRegistrationError("SUBMISSION_CONFLICT", submissionBusyMessage);
+      }
       if (!retryableTransactionError(error)) throw error;
       if (attempt < submitAttempts - 1) await pauseBeforeRetry(attempt);
     }
