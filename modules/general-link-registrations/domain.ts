@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { REGISTRATION_MANAGE_API_SENTINEL, REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
 import { clubFormProblem, lockedClubDirectoryFieldKeys } from "@/modules/club-registrations/domain";
 import { DIRECTORY_NOT_LISTED_VALUE, type RegistrationFormDefinition } from "@/modules/forms/definition";
 
@@ -121,7 +122,10 @@ export const PENDING_RETENTION_DAYS = 30;
 export const EMAIL_TEAM_NAME_MAX = 60;
 
 export function teamNameForEmail(name: string) {
-  const trimmed = name.replace(/\s+/g, " ").trim();
+  const trimmed = [REGISTRATION_MANAGE_LINK_SENTINEL, REGISTRATION_MANAGE_API_SENTINEL]
+    .reduce((text, sentinel) => text.replaceAll(sentinel, ""), name)
+    .replace(/\s+/g, " ")
+    .trim();
   return trimmed.length > EMAIL_TEAM_NAME_MAX ? `${trimmed.slice(0, EMAIL_TEAM_NAME_MAX - 1).trimEnd()}\u2026` : trimmed;
 }
 

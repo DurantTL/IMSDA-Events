@@ -413,6 +413,11 @@ async function main() {
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Nos")), { locationId: null, teamName: "No Site" }, now), "LOCATION_REQUIRED", "a site is required");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Nom"), { club_name: "Gl Club That Is Not In The Directory" }), { locationId: missouri!.id, teamName: "Made Up" }, now), "INVALID_SUBMISSION", "a club that is neither in the directory nor \"Not listed\" is refused");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Non")), { locationId: missouri!.id, teamName: "   " }, now), "TEAM_INVALID", "a team needs a name");
+  for (const sentinel of ["__IMSDA_PRIVATE_MANAGE_LINK__", "__IMSDA_PRIVATE_MANAGE_API__"]) {
+    for (const [email, clubKey] of [[emailOf("dira"), "a"], [emailOf("regc"), "c"]] as const) {
+      await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Sen"), { email, club_name: clubName(clubKey) }), { locationId: missouri!.id, teamName: `Bees ${sentinel}` }, now), "TEAM_INVALID", "a team name with a delivery placeholder is refused for a matching and a non-matching email alike", ["letters, numbers and punctuation"]);
+    }
+  }
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, { ...request(youth("Noq")), versionId: "not-the-live-version" }, { locationId: missouri!.id, teamName: "Old Form" }, now), "FORM_VERSION_CHANGED", "a form that changed while open is refused");
   const afterClose = new Date("2026-12-19T15:00:00Z");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Clo")), { locationId: missouri!.id, teamName: "Too Late" }, afterClose), "REGISTRATION_CLOSED", "after December 18 a matched team is refused");

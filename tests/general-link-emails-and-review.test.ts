@@ -19,6 +19,8 @@ import {
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
+import { REGISTRATION_MANAGE_API_SENTINEL, REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
+import { resolveTeamName } from "@/modules/club-teams/domain";
 import { renderPlainNoteHtml, withPlainLeadNote } from "@/modules/communications/email-html";
 import { PendingTeamsReview } from "@/components/pending-teams-review";
 
@@ -131,5 +133,18 @@ describe("a note that came from a visitor is text, never markup", () => {
   it("puts a note on one line, so a subject or header built from it cannot be split", () => {
     expect(withPlainLeadNote({ body: "b", bodyHtml: "<p>b</p>" }, "one\r\ntwo\nthree").body.split("\n\n")[0]).toBe("one two three");
     expect(withPlainLeadNote({ body: "b", bodyHtml: "<p>b</p>" }, "  ").body).toBe("b");
+  });
+});
+
+describe("a team name cannot carry a delivery placeholder", () => {
+  it.each([REGISTRATION_MANAGE_LINK_SENTINEL, REGISTRATION_MANAGE_API_SENTINEL])("refuses %s in a name, with the ordinary message", (sentinel) => {
+    const settings = { allowMultipleTeams: true };
+    expect(resolveTeamName(settings, `Bees ${sentinel}`)).toEqual({ ok: false, message: "The team name can only use letters, numbers and punctuation." });
+    expect(resolveTeamName(settings, "Bees").ok).toBe(true);
+  });
+
+  it.each([REGISTRATION_MANAGE_LINK_SENTINEL, REGISTRATION_MANAGE_API_SENTINEL])("strips %s from a team name in an email", (sentinel) => {
+    expect(teamNameForEmail(`Bi${sentinel}bles`)).toBe("Bibles");
+    expect(pendingDirectorEmail({ eventName: "E", teamName: `A ${sentinel}`, confirmationCode: "PBE-1" }).bodyText).not.toContain(sentinel);
   });
 });
