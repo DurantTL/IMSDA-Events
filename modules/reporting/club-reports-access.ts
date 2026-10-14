@@ -12,7 +12,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { getPrisma } from "@/lib/prisma";
 
 /**
- * Who may view the Camporee club reports and print a staff-side club packet
+ * Who may view the Club event reports and print a staff-side club packet
  * (Q1, #411): staff with `VIEW_REPORTS` on this event, or a Pathfinder event
  * manager's view-only oversight of this exact club event (#387). Directors
  * get their own club's packet through a separate, roster-access-gated path
