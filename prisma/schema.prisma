@@ -858,10 +858,11 @@ model User {
   recordedInvoiceArPostings    InvoiceArPosting[]                        @relation("InvoiceArPostingRecordedBy")
   recordedInvoicePayments      InvoicePayment[]                          @relation("InvoicePaymentRecordedBy")
 
+  createdConsentPolicies         ConsentPolicy[]        @relation("ConsentPolicyCreatedBy")
+  createdConsentPolicyVersions   ConsentPolicyVersion[] @relation("ConsentPolicyVersionCreatedBy")
+  publishedConsentPolicyVersions ConsentPolicyVersion[] @relation("ConsentPolicyVersionPublishedBy")
+
   @@index([accountStatus])
-  createdConsentPolicies         ConsentPolicy[]                  @relation("ConsentPolicyCreatedBy")
-  createdConsentPolicyVersions   ConsentPolicyVersion[]           @relation("ConsentPolicyVersionCreatedBy")
-  publishedConsentPolicyVersions ConsentPolicyVersion[]           @relation("ConsentPolicyVersionPublishedBy")
 }
 
 model AuthCredential {
@@ -1708,9 +1709,10 @@ model Event {
   modules                             EventModule[]
   moduleRequests                      ModuleRequest[]
 
-  @@index([badgeBackgroundAssetId])
-  consentPolicies ConsentPolicy[]
+  consentPolicies              ConsentPolicy[]
   consentPolicyApplicabilities EventConsentPolicyApplicability[]
+
+  @@index([badgeBackgroundAssetId])
 }
 
 /// A feature turned on for one event (#741). A row means "enabled"; the

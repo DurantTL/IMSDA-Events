@@ -11,7 +11,10 @@ import {
   consentPolicyVersionContentSchema,
   contentHashFor,
   policyApplicabilityInputSchema,
+  mergeApplicabilityUpdate,
   policyApplicabilityUpdateSchema,
+  requirePolicyKind,
+  type PolicyKind,
   policyKinds,
   selectEffectiveVersion,
   type ApplicabilitySubject,
@@ -28,7 +31,8 @@ export class ConsentPolicyError extends Error {
       | "NO_DRAFT"
       | "MATERIAL_CHANGE_REQUIRED"
       | "APPLICABILITY_NOT_FOUND"
-      | "ATTENDEE_TYPE_NOT_FOUND",
+      | "ATTENDEE_TYPE_NOT_FOUND"
+      | "EFFECTIVE_FROM_IN_PAST",
     message: string,
   ) {
     super(message);
@@ -122,15 +126,53 @@ function serializePolicy(policy: PolicyRow) {
   };
 }
 
-/** An event's own policies plus every organization-scoped policy, which the
- * event can reference in its applicability configuration. */
+/** An event's own policies (every version, drafts included) plus every organization-scoped policy, which the
+ * event can reference in its applicability configuration. An organization policy's unpublished drafts belong to
+ * whoever authors it and are never shown to an event: only its published versions are. */
 export async function listConsentPoliciesForEvent(eventId: string) {
-  const policies = await getPrisma().consentPolicy.findMany({
-    where: { OR: [{ eventId }, { eventId: null }] },
-    include: policyInclude,
-    orderBy: [{ scope: "asc" }, { name: "asc" }],
+  const prisma = getPrisma();
+  const [own, organization] = await Promise.all([
+    prisma.consentPolicy.findMany({ where: { eventId }, include: policyInclude }),
+    prisma.consentPolicy.findMany({
+      where: { eventId: null },
+      include: { versions: { ...policyInclude.versions, where: { status: ConsentPolicyVersionStatus.PUBLISHED } } },
+    }),
+  ]);
+  return [...own, ...organization]
+    .sort((left, right) => left.scope.localeCompare(right.scope) || left.name.localeCompare(right.name))
+    .map(serializePolicy);
+}
+
+const slimVersionSelect = {
+  id: true,
+  versionNumber: true,
+  title: true,
+  contentHash: true,
+  effectiveFrom: true,
+  effectiveTo: true,
+  policy: { select: { id: true, kind: true, scope: true, slug: true, name: true } },
+} as const;
+
+/**
+ * Read for form builders (#150): published versions only, with no body text, for the event's own policies and
+ * organization-scoped ones. Drafts never appear, and neither does another event's policy.
+ */
+export async function listPublishedPolicyVersionsForEvent(eventId: string) {
+  const versions = await getPrisma().consentPolicyVersion.findMany({
+    where: { status: ConsentPolicyVersionStatus.PUBLISHED, policy: { OR: [{ eventId }, { eventId: null }] } },
+    select: slimVersionSelect,
+    orderBy: [{ policy: { name: "asc" } }, { versionNumber: "desc" }],
   });
-  return policies.map(serializePolicy);
+  return versions.map((version) => ({
+    id: version.id,
+    versionNumber: version.versionNumber,
+    kind: version.policy.kind,
+    title: version.title,
+    contentHash: version.contentHash,
+    effectiveFrom: version.effectiveFrom?.toISOString() ?? null,
+    effectiveTo: version.effectiveTo?.toISOString() ?? null,
+    policy: version.policy,
+  }));
 }
 
 /**
@@ -250,6 +292,12 @@ export async function updateDraftPolicyVersion(
  */
 export async function publishPolicyVersion(eventId: string | null, policyId: string, actorUserId: string, rawInput: unknown) {
   const input = consentPolicyPublishInputSchema.parse(rawInput);
+  const publishedAt = new Date();
+  // A version cannot take effect before it is published: backdating would rewrite which text applied to
+  // evidence that already exists.
+  if (input.effectiveFrom.getTime() < publishedAt.getTime()) {
+    throw new ConsentPolicyError("EFFECTIVE_FROM_IN_PAST", "The effective-from date cannot be earlier than the moment of publishing. Choose now or a later date.");
+  }
   return getPrisma().$transaction(async (tx) => {
     const policy = await tx.consentPolicy.findFirst({
       where: ownedPolicyWhere(eventId, policyId),
@@ -271,7 +319,7 @@ export async function publishPolicyVersion(eventId: string | null, policyId: str
       },
       data: {
         status: ConsentPolicyVersionStatus.PUBLISHED,
-        publishedAt: new Date(),
+        publishedAt,
         publishedByUserId: actorUserId,
         effectiveFrom: input.effectiveFrom,
         effectiveTo: input.effectiveTo,
@@ -295,14 +343,25 @@ export async function publishPolicyVersion(eventId: string | null, policyId: str
   });
 }
 
+/** A policy is reachable from an event only when it is the event's own or organization-scoped. */
+const reachableFromEvent = (eventId: string) => ({ OR: [{ eventId }, { eventId: null }] });
+
 /**
  * Presentation query: the published version effective at `atDate`, resolved
  * by effective window — never "highest version number" and never a draft.
  * Deliberately separate from `getPolicyVersionForEvidence`: "what applies at
  * this moment" and "what did this person actually see" are different
- * questions and must not share a query.
+ * questions and must not share a query. Scoped to an event: another event's
+ * policy answers not-found. Pass `expectedKind` to refuse a policy of another kind.
+ * Returns null when the policy has no version effective at that date.
  */
-export async function getPolicyVersionEffectiveAt(policyId: string, atDate: Date) {
+export async function getPolicyVersionEffectiveAt(eventId: string, policyId: string, atDate: Date, expectedKind?: PolicyKind) {
+  const policy = await getPrisma().consentPolicy.findFirst({
+    where: { id: policyId, ...reachableFromEvent(eventId) },
+    select: { id: true, kind: true, scope: true, eventId: true },
+  });
+  if (!policy) throw new ConsentPolicyError("POLICY_NOT_FOUND", "That policy was not found for this event.");
+  if (expectedKind) requirePolicyKind(policy, expectedKind);
   const versions = await getPrisma().consentPolicyVersion.findMany({
     where: {
       policyId,
@@ -310,24 +369,26 @@ export async function getPolicyVersionEffectiveAt(policyId: string, atDate: Date
       effectiveFrom: { lte: atDate },
       OR: [{ effectiveTo: null }, { effectiveTo: { gt: atDate } }],
     },
-    select: { ...versionSummarySelect, policy: { select: { id: true, kind: true, scope: true, eventId: true } } },
+    select: versionSummarySelect,
   });
   const selected = selectEffectiveVersion(versions, atDate);
-  return selected ? { ...serializeVersion(selected), policy: selected.policy } : null;
+  return selected ? { ...serializeVersion(selected), policy } : null;
 }
 
 /**
  * Evidence query: the exact published version an evidence row references, by
  * id. Never falls back to "latest" or "effective now" — evidence must resolve
  * to what a person actually saw even after later corrections take effect.
- * Drafts are never valid evidence targets.
+ * Drafts are never valid evidence targets, and a version of another event's
+ * policy is not found. Pass `expectedKind` to refuse a policy of another kind.
  */
-export async function getPolicyVersionForEvidence(versionId: string) {
+export async function getPolicyVersionForEvidence(eventId: string, versionId: string, expectedKind?: PolicyKind) {
   const version = await getPrisma().consentPolicyVersion.findFirst({
-    where: { id: versionId, status: ConsentPolicyVersionStatus.PUBLISHED },
+    where: { id: versionId, status: ConsentPolicyVersionStatus.PUBLISHED, policy: reachableFromEvent(eventId) },
     select: { ...versionSummarySelect, policy: { select: { id: true, kind: true, scope: true, eventId: true } } },
   });
   if (!version) throw new ConsentPolicyError("VERSION_NOT_FOUND", "That published policy version was not found.");
+  if (expectedKind) requirePolicyKind(version.policy, expectedKind);
   return { ...serializeVersion(version), policy: version.policy };
 }
 
@@ -393,12 +454,17 @@ export async function createEventPolicyApplicability(eventId: string, actorUserI
 export async function updateEventPolicyApplicability(eventId: string, applicabilityId: string, actorUserId: string, rawInput: unknown) {
   const input = policyApplicabilityUpdateSchema.parse(rawInput);
   return getPrisma().$transaction(async (tx) => {
-    const existing = await tx.eventConsentPolicyApplicability.findFirst({ where: { id: applicabilityId, eventId }, select: { id: true, policyId: true } });
+    const existing = await tx.eventConsentPolicyApplicability.findFirst({
+      where: { id: applicabilityId, eventId },
+      select: { id: true, policyId: true, minimumAge: true, maximumAge: true },
+    });
     if (!existing) throw new ConsentPolicyError("APPLICABILITY_NOT_FOUND", "That policy configuration was not found for this event.");
-    await assertAttendeeTypeInEvent(tx, eventId, input.attendeeTypeDefinitionId);
+    // Only the fields the caller named are written; the age band is checked on the merged values.
+    const changes = mergeApplicabilityUpdate(existing, input);
+    if (changes.attendeeTypeDefinitionId !== undefined) await assertAttendeeTypeInEvent(tx, eventId, changes.attendeeTypeDefinitionId);
     const updated = await tx.eventConsentPolicyApplicability.update({
       where: { id: applicabilityId },
-      data: input,
+      data: changes,
       include: applicabilityInclude,
     });
     await writeAuditLog({

@@ -150,8 +150,39 @@ export const policyApplicabilityInputSchema = applicabilityBaseSchema
   .superRefine(applicabilityAgeBand);
 
 /** The policy an applicability row points at is fixed; only who it applies to
- * and whether it is required can change. */
-export const policyApplicabilityUpdateSchema = applicabilityBaseSchema.superRefine(applicabilityAgeBand);
+ * and whether it is required can change. Every field is optional with no
+ * default, so a partial update changes only what it names and never resets
+ * the rest. The age band is validated against the merged values by
+ * `mergeApplicabilityUpdate`, not here, because one bound may come from the
+ * stored row. */
+export const policyApplicabilityUpdateSchema = z.object({
+  attendeeTypeDefinitionId: z.string().min(1).nullable().optional(),
+  role: z.string().max(80).nullable().optional().transform((value) => (value === undefined ? undefined : normalizedRole(value))),
+  minimumAge: z.number().int().min(0).max(130).nullable().optional(),
+  maximumAge: z.number().int().min(0).max(130).nullable().optional(),
+  isRequired: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+}).strict();
+export type PolicyApplicabilityUpdate = z.infer<typeof policyApplicabilityUpdateSchema>;
+
+export class ApplicabilityAgeBandError extends Error {
+  constructor() {
+    super("Minimum age cannot exceed maximum age.");
+    this.name = "ApplicabilityAgeBandError";
+  }
+}
+
+/** Applies a partial update to a stored row and validates the age band on the
+ * merged result. Only fields present in `update` are returned as changes. */
+export function mergeApplicabilityUpdate(
+  stored: { minimumAge: number | null; maximumAge: number | null },
+  update: PolicyApplicabilityUpdate,
+): PolicyApplicabilityUpdate {
+  const minimumAge = update.minimumAge === undefined ? stored.minimumAge : update.minimumAge;
+  const maximumAge = update.maximumAge === undefined ? stored.maximumAge : update.maximumAge;
+  if (minimumAge !== null && maximumAge !== null && minimumAge > maximumAge) throw new ApplicabilityAgeBandError();
+  return Object.fromEntries(Object.entries(update).filter(([, value]) => value !== undefined)) as PolicyApplicabilityUpdate;
+}
 
 export type ApplicabilityCondition = {
   attendeeTypeDefinitionId: string | null;

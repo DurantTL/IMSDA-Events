@@ -18,10 +18,16 @@ describe("consent policy persistence", () => {
     expect(migration).toContain("ConsentPolicy_scope_event_check");
   });
 
-  it("rejects any database UPDATE of a published version", () => {
-    expect(migration).toContain("CREATE TRIGGER \"ConsentPolicyVersion_published_immutable\"");
-    expect(migration).toMatch(/BEFORE UPDATE ON "ConsentPolicyVersion"/);
-    expect(migration).toContain("published ConsentPolicyVersion rows are immutable");
+  it("rejects any database UPDATE or DELETE of a published version, with a dedicated SQLSTATE", () => {
+    expect(migration).toContain('CREATE TRIGGER "ConsentPolicyVersion_guard"');
+    expect(migration).toMatch(/BEFORE UPDATE OR DELETE ON "ConsentPolicyVersion"/);
+    expect(migration).toContain("Published ConsentPolicyVersion rows are immutable.");
+    expect(migration).toContain("Published ConsentPolicyVersion rows cannot be deleted.");
+    expect(migration).toContain("imsda.event_deletion");
+    expect(migration).toContain("A ConsentPolicy with a published version cannot be deleted.");
+    expect(migration).not.toMatch(/RAISE EXCEPTION '[^']*'\s*;/);
+    expect(migration.match(/USING ERRCODE = 'CP001'/g)?.length).toBe(7);
+    expect(migration).not.toContain("CREATE OR REPLACE FUNCTION");
   });
 
   it("never archives versions, so every published version stays selectable and referenceable", () => {

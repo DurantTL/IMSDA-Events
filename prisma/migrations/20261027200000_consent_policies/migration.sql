@@ -101,59 +101,72 @@ ALTER TABLE "EventConsentPolicyApplicability" ADD CONSTRAINT "EventConsentPolicy
 ALTER TABLE "EventConsentPolicyApplicability" ADD CONSTRAINT "EventConsentPolicyApplicability_policyId_fkey" FOREIGN KEY ("policyId") REFERENCES "ConsentPolicy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "EventConsentPolicyApplicability" ADD CONSTRAINT "EventConsentPolicyApplicability_attendeeTypeDefinitionId_fkey" FOREIGN KEY ("attendeeTypeDefinitionId") REFERENCES "EventAttendeeType"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- ---------------------------------------------------------------------------
+-- Guards. Every guard raises SQLSTATE 'CP001' so the API can answer 409 for any
+-- of them without matching message text.
+
 -- Published versions are immutable. The repository only ever writes a draft
 -- row, and this trigger rejects any UPDATE of a row that was already
--- published, so no code path — including a future one — can rewrite text a
--- person may have agreed to. A correction is a new version.
-CREATE FUNCTION "reject_published_consent_policy_version_mutation"()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
+-- published, so no code path, including a future one, can rewrite text a
+-- person may have agreed to. A correction is a new version. A published version
+-- is also never deleted and re-inserted: a DELETE is refused unless the
+-- transaction is event deletion (`imsda.event_deletion` = 'on'), which removes
+-- an event's policies together with the event.
+CREATE FUNCTION "ConsentPolicyVersion_guard"() RETURNS trigger AS $$
 BEGIN
-  IF OLD."status" = 'PUBLISHED' THEN
-    RAISE EXCEPTION 'published ConsentPolicyVersion rows are immutable';
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD."status" = 'PUBLISHED' THEN
+      RAISE EXCEPTION 'Published ConsentPolicyVersion rows are immutable.' USING ERRCODE = 'CP001';
+    END IF;
+    RETURN NEW;
   END IF;
-  RETURN NEW;
+  IF OLD."status" = 'PUBLISHED' AND COALESCE(current_setting('imsda.event_deletion', true), '') <> 'on' THEN
+    RAISE EXCEPTION 'Published ConsentPolicyVersion rows cannot be deleted.' USING ERRCODE = 'CP001';
+  END IF;
+  RETURN OLD;
 END;
-$$;
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "ConsentPolicyVersion_published_immutable"
-BEFORE UPDATE ON "ConsentPolicyVersion"
-FOR EACH ROW
-EXECUTE FUNCTION "reject_published_consent_policy_version_mutation"();
+CREATE TRIGGER "ConsentPolicyVersion_guard"
+BEFORE UPDATE OR DELETE ON "ConsentPolicyVersion"
+FOR EACH ROW EXECUTE FUNCTION "ConsentPolicyVersion_guard"();
 
 -- A policy's kind, scope, and owning event are fixed at creation: consent,
 -- waiver, acknowledgment, and approval-required policies are never converted
 -- into one another, because evidence already recorded against a version would
--- silently change meaning.
-CREATE FUNCTION "reject_consent_policy_identity_mutation"()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
+-- silently change meaning. A policy that has a published version cannot be
+-- deleted either, except by event deletion.
+CREATE FUNCTION "ConsentPolicy_guard"() RETURNS trigger AS $$
 BEGIN
-  IF NEW."kind" IS DISTINCT FROM OLD."kind"
-    OR NEW."scope" IS DISTINCT FROM OLD."scope"
-    OR NEW."eventId" IS DISTINCT FROM OLD."eventId" THEN
-    RAISE EXCEPTION 'ConsentPolicy kind, scope, and event are immutable';
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW."kind" IS DISTINCT FROM OLD."kind"
+      OR NEW."scope" IS DISTINCT FROM OLD."scope"
+      OR NEW."eventId" IS DISTINCT FROM OLD."eventId" THEN
+      RAISE EXCEPTION 'ConsentPolicy kind, scope, and event are immutable.' USING ERRCODE = 'CP001';
+    END IF;
+    RETURN NEW;
   END IF;
-  RETURN NEW;
+  IF COALESCE(current_setting('imsda.event_deletion', true), '') <> 'on'
+    AND EXISTS (SELECT 1 FROM "ConsentPolicyVersion" v WHERE v."policyId" = OLD."id" AND v."status" = 'PUBLISHED') THEN
+    RAISE EXCEPTION 'A ConsentPolicy with a published version cannot be deleted.' USING ERRCODE = 'CP001';
+  END IF;
+  RETURN OLD;
 END;
-$$;
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "ConsentPolicy_identity_immutable"
-BEFORE UPDATE OF "kind", "scope", "eventId" ON "ConsentPolicy"
-FOR EACH ROW
-EXECUTE FUNCTION "reject_consent_policy_identity_mutation"();
+CREATE TRIGGER "ConsentPolicy_guard"
+BEFORE UPDATE OF "kind", "scope", "eventId" OR DELETE ON "ConsentPolicy"
+FOR EACH ROW EXECUTE FUNCTION "ConsentPolicy_guard"();
 
 -- The current-version pointer may only reference one of the policy's own
 -- published versions.
-CREATE OR REPLACE FUNCTION enforce_consent_policy_current_version() RETURNS trigger AS $$
+CREATE FUNCTION "ConsentPolicy_current_version_guard"() RETURNS trigger AS $$
 BEGIN
   IF NEW."currentVersionId" IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM "ConsentPolicyVersion" v
     WHERE v."id" = NEW."currentVersionId" AND v."policyId" = NEW."id" AND v."status" = 'PUBLISHED'
   ) THEN
-    RAISE EXCEPTION 'current version must be a published version of this policy';
+    RAISE EXCEPTION 'The current version must be a published version of this policy.' USING ERRCODE = 'CP001';
   END IF;
   RETURN NEW;
 END;
@@ -161,23 +174,23 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "ConsentPolicy_current_version_guard"
 BEFORE INSERT OR UPDATE OF "currentVersionId" ON "ConsentPolicy"
-FOR EACH ROW EXECUTE FUNCTION enforce_consent_policy_current_version();
+FOR EACH ROW EXECUTE FUNCTION "ConsentPolicy_current_version_guard"();
 
 -- Cross-event references are rejected even when an ID exists: an event's
 -- applicability can only reference an organization-scoped policy or one of
 -- its own event-scoped policies, and only its own attendee types.
-CREATE OR REPLACE FUNCTION enforce_consent_policy_applicability_event() RETURNS trigger AS $$
+CREATE FUNCTION "EventConsentPolicyApplicability_event_guard"() RETURNS trigger AS $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM "ConsentPolicy" p
     WHERE p."id" = NEW."policyId" AND (p."eventId" IS NULL OR p."eventId" = NEW."eventId")
   ) THEN
-    RAISE EXCEPTION 'policy belongs to another event';
+    RAISE EXCEPTION 'That policy belongs to another event.' USING ERRCODE = 'CP001';
   END IF;
   IF NEW."attendeeTypeDefinitionId" IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM "EventAttendeeType" t WHERE t."id" = NEW."attendeeTypeDefinitionId" AND t."eventId" = NEW."eventId"
   ) THEN
-    RAISE EXCEPTION 'attendee type belongs to another event';
+    RAISE EXCEPTION 'That attendee type belongs to another event.' USING ERRCODE = 'CP001';
   END IF;
   RETURN NEW;
 END;
@@ -185,4 +198,4 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "EventConsentPolicyApplicability_event_guard"
 BEFORE INSERT OR UPDATE OF "eventId", "policyId", "attendeeTypeDefinitionId" ON "EventConsentPolicyApplicability"
-FOR EACH ROW EXECUTE FUNCTION enforce_consent_policy_applicability_event();
+FOR EACH ROW EXECUTE FUNCTION "EventConsentPolicyApplicability_event_guard"();
