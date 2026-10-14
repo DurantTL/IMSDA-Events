@@ -801,6 +801,8 @@ model User {
   updatedClubMeetingNotes            ClubMeetingNote[]             @relation("ClubMeetingNoteUpdatedByUser")
   submittedClubEventRegistrations    ClubEventRegistration[]      @relation("ClubEventRegistrationSubmittedByUser")
   resolvedGeneralLinkSubmissions     GeneralLinkSubmission[]      @relation("GeneralLinkSubmissionResolvedBy")
+  createdStaffInvitations            StaffInvitation[]            @relation("StaffInvitationCreatedBy")
+  decidedStaffInvitations            StaffInvitation[]            @relation("StaffInvitationDecidedBy")
   updatedClubRegistrationDrafts      ClubRegistrationDraft[]      @relation("ClubRegistrationDraftUpdatedByUser")
   updatedClubSupplyStock             ClubSupplyStock[]            @relation("ClubSupplyStockUpdatedByUser")
   createdClubOrderBatches            ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchCreatedByUser")
@@ -1600,6 +1602,7 @@ model Event {
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
   generalLinkSubmissions              GeneralLinkSubmission[]
+  staffInvitations                    StaffInvitation[]
   groupRegistrations                  GroupEventRegistration[]
   billingResponsibilities             RegistrationBillingResponsibility[]
   billingResponsibilityChanges        RegistrationBillingResponsibilityChange[]
@@ -2728,6 +2731,7 @@ model Registration {
   tagAssignments          RegistrationTagAssignment[]
   clubRegistration        ClubEventRegistration?
   generalLinkSubmission   GeneralLinkSubmission?
+  staffInvitation         StaffInvitation?
   groupRegistration       GroupEventRegistration?
   billingResponsibility        RegistrationBillingResponsibility?
   billingResponsibilityChanges RegistrationBillingResponsibilityChange[]
@@ -4107,6 +4111,7 @@ model MessageOutbox {
   providerEvents  MessageProviderEvent[]
   invoiceRecipients InvoiceDeliveryRecipient[]
   files             MessageOutboxFile[]
+  staffInvitations  StaffInvitation[]
 
   @@index([status, availableAt, createdAt])
   @@index([eventId, createdAt])
@@ -8806,4 +8811,65 @@ model GeneralLinkSubmission {
 
   @@unique([eventId, idempotencyKey])
   @@index([eventId, status, createdAt])
+}
+
+/// Which group a personal staff invitation puts its registration in (#804). Shown beside the registration wherever staff look at it.
+enum StaffInvitationGroup {
+  STAFF
+  PASTOR
+  VOLUNTEER
+}
+
+/// The office's decision on a registration made through a personal staff invitation (#804). The registration itself is a
+/// DRAFT (not a confirmed one) until it is APPROVED, so a waiting one is in no count, report or room list.
+enum StaffInvitationApproval {
+  WAITING
+  APPROVED
+  DECLINED
+}
+
+/// A personal registration link for one person at one event (#804), made in bulk from a CSV of email addresses. One link per
+/// email: it allows exactly one registration (the person plus their eligible family), always for $0, and it waits for the
+/// office to approve it. The link is never stored. It is derived from this row's id and `linkVersion` (HMAC with the
+/// private-link secret), so the office can copy it again, and reissuing bumps `linkVersion` and makes every earlier copy
+/// useless. Invitations are only ever emailed by a person pressing Send; `lastMessageId` is the latest message queued.
+model StaffInvitation {
+  id              String                   @id @default(cuid())
+  eventId         String
+  /// The invited address, normalized (trimmed, lowercase). One invitation per address per event.
+  email           String
+  firstName       String                   @default("")
+  lastName        String                   @default("")
+  group           StaffInvitationGroup
+  linkVersion     Int                      @default(1)
+  /// Which import created it (one id per confirmed CSV), so the office can find a file's rows together.
+  importBatchId   String?
+  createdByUserId String?
+  /// The latest time a person queued this invitation's email, how many times, and the message (its delivery status is the invitation's).
+  sentAt          DateTime?
+  sendCount       Int                      @default(0)
+  lastMessageId   String?
+  revokedAt       DateTime?
+  /// The registration made through the link; set exactly once, in the same transaction that creates it.
+  registrationId  String?                  @unique
+  registeredAt    DateTime?
+  approval        StaffInvitationApproval?
+  decidedAt       DateTime?
+  decidedByUserId String?
+  /// What the invited person said about housing when registering: whether they need on-site housing, and a short note.
+  needsHousing    Boolean?
+  housingNote     String                   @default("")
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  event        Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration Registration?  @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  lastMessage  MessageOutbox? @relation(fields: [lastMessageId], references: [id], onDelete: SetNull)
+  createdBy    User?          @relation("StaffInvitationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  decidedBy    User?          @relation("StaffInvitationDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, email])
+  @@index([eventId, group])
+  @@index([eventId, approval])
+  @@index([lastMessageId])
 }
