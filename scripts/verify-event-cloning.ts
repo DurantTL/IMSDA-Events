@@ -106,6 +106,7 @@ async function buildPopulatedSource(): Promise<Fixture> {
       registrationOpensOn: "2027-01-10", registrationClosesOn: "2027-04-20", seminarPreferenceClosesOn: "2027-04-01", seminarPreferenceSelfServiceLocked: true,
       waitlistEnabled: true, autoPromoteWaitlist: true, collectsShirtSizes: true, checksAdultBackgrounds: true,
       audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", showOnCalendar: false,
+      operationalPacketConfig: { groupingFieldKey: "club", sections: { coverNotes: false } },
     },
   });
   const eventId = event.id;
@@ -348,6 +349,12 @@ async function run() {
   assert(cloneRow.showOnCalendar === false, "showOnCalendar is copied with the event details (the source hides it; the default is shown)");
   assert(cloneRow.audience === "CLUB" && cloneRow.billingMode === "DEFERRED_ORGANIZATION_INVOICE", "audience and billing mode are copied");
   assert(cloneRow.waitlistEnabled && cloneRow.autoPromoteWaitlist && cloneRow.collectsShirtSizes && cloneRow.checksAdultBackgrounds, "module toggles are copied");
+  const clonedPacketConfig = cloneRow.operationalPacketConfig as { groupingFieldKey?: string; sections?: Record<string, boolean> } | null;
+  assert(
+    clonedPacketConfig?.groupingFieldKey === "club" && clonedPacketConfig.sections?.coverNotes === false
+      && Object.keys(clonedPacketConfig.sections).length === 1,
+    "the packet sections and grouping choice are copied with the module settings (#155)",
+  );
   const community = await prisma.eventCommunitySettings.findUniqueOrThrow({ where: { eventId: cloneId } });
   assert(community.isEnabled && !community.allowReplies && community.retentionDays === 45 && community.updatedByUserId === adminId, "community settings are copied");
 

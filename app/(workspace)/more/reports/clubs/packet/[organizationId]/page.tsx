@@ -43,8 +43,8 @@ export default async function StaffClubPacketPage({
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
 
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <p className="eyebrow">Event-day preparation</p>
           <h2>{packet.club.organizationName} packet</h2>

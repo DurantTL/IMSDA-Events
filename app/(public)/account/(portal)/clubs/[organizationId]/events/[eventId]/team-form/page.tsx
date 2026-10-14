@@ -32,8 +32,8 @@ export default async function DirectorTeamFormPage({
   if (!form) notFound();
   const back = `/account/clubs/${organizationId}/events/${eventId}${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`;
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <BackLink href={back}>Back to {form.eventName}</BackLink>
           <h2>{form.title}</h2>

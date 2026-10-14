@@ -1491,6 +1491,10 @@ model Event {
   /// the event's name, which meant only one event could ever collect sizes and
   /// renaming it turned collection off without telling anyone.
   collectsShirtSizes   Boolean            @default(false)
+  /// Event-owned selections for the grouped operational packets (#155): which sections print and which
+  /// registration answer groups them. Null prints the default packet (every section, automatic grouping).
+  /// Parsed by `parseEventPacketConfig`; never read directly.
+  operationalPacketConfig Json?
   /// A youth or children's event, where parents aren't normally present (#388).
   /// Every adult registered is flagged until they have a current Sterling
   /// Volunteers background check on file. Flags only: nothing is blocked.

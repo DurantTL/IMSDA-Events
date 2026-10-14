@@ -104,7 +104,7 @@ describe("every table carries a style that gives its cells padding (#811)", () =
   // file, and the CSS selector that styles them. Any other table in these files still needs a base class.
   const styledByAncestor: Record<string, { tables: number; selector: string }> = {
     "components/check-in-book.tsx": { tables: 1, selector: ".check-in-book-page table" },
-    "app/(workspace)/more/reports/packets/page.tsx": { tables: 2, selector: ".retreat-packet-sheet table" },
+    "app/(workspace)/more/reports/packets/page.tsx": { tables: 2, selector: ".event-packet-sheet table" },
   };
 
   it("has a base class on every table in the app and components", () => {
@@ -120,7 +120,7 @@ describe("every table carries a style that gives its cells padding (#811)", () =
   });
 
   it("keeps the packet's row headers unshaded and lets long last columns grow", () => {
-    expect(css).toMatch(/\.retreat-packet-sheet tbody th\s*\{[^}]*background:\s*transparent/);
+    expect(css).toMatch(/\.event-packet-sheet tbody th\s*\{[^}]*background:\s*transparent/);
     expect(css).toMatch(/\.report-table\.report-table-auto td:last-child\s*\{[^}]*width:\s*auto/);
   });
 

@@ -21,8 +21,8 @@ export default async function StaffBlankTeamFormPage({ searchParams }: { searchP
   const form = await loadBlankTeamForm(event.id);
   if (!form) notFound();
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <p className="eyebrow">{form.eventName}</p>
           <h2>Blank team form</h2>

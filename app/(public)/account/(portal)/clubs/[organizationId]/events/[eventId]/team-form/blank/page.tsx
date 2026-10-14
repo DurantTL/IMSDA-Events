@@ -17,8 +17,8 @@ export default async function DirectorBlankTeamFormPage({ params }: { params: Pr
   const form = await loadBlankTeamForm(eventId, { publishedClubOnly: true });
   if (!form) notFound();
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <BackLink href={`/account/clubs/${organizationId}/events/${eventId}`}>Back to {form.eventName}</BackLink>
           <h2>Blank team form</h2>

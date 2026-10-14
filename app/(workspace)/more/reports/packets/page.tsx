@@ -5,7 +5,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveEventContext } from "@/modules/events/selection";
-import { getRetreatPackets } from "@/modules/reporting/retreat-packets-repository";
+import { getEventPackets } from "@/modules/reporting/event-packets-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ function paragraphs(body: string) {
   return body.split(/\n\s*\n/).map((entry) => entry.trim()).filter(Boolean);
 }
 
-export default async function RetreatPacketsPage({
+export default async function EventPacketsPage({
   searchParams,
 }: {
   searchParams: Promise<{ event?: string; group?: string }>;
@@ -34,20 +34,21 @@ export default async function RetreatPacketsPage({
   const query = await searchParams;
   const { event, permissions } = await resolveEventContext(query.event);
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Retreat packets are restricted" detail="Ask an event administrator for report access." />;
+    return <AccessRestricted title="Event packets are restricted" detail="Ask an event administrator for report access." />;
   }
-  const packets = await getRetreatPackets(event.id);
+  const packets = await getEventPackets(event.id);
   if (!packets) {
     return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
   }
   const selectedGroups = query.group
     ? packets.groups.filter((group) => group.id === query.group)
     : packets.groups;
+  const sections = packets.config.sections;
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
 
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <p className="eyebrow">Event-day preparation</p>
           <h2 className="duplicate-page-title">{staffPageTitles.groupedPackets}</h2>
@@ -64,7 +65,7 @@ export default async function RetreatPacketsPage({
         <p><strong>Operational information only.</strong> Medical, allergy, accessibility, dietary free text, and other sensitive answers are excluded from every packet.</p>
       </div>
 
-      <nav className="retreat-packet-selector" aria-label="Choose retreat packet">
+      <nav className="event-packet-selector" aria-label="Choose event packet">
         <Link className={!query.group ? "active" : ""} href={`/more/reports/packets?${eventQuery}`}>All groups</Link>
         {packets.groups.map((group) => (
           <Link className={query.group === group.id ? "active" : ""} href={`/more/reports/packets?${eventQuery}&group=${encodeURIComponent(group.id)}`} key={group.id}>
@@ -74,7 +75,7 @@ export default async function RetreatPacketsPage({
       </nav>
 
       {!query.group && (
-        <article className="retreat-packet-sheet retreat-packet-cover">
+        <article className="event-packet-sheet event-packet-cover">
           <header>
             <PackageOpen size={34} aria-hidden="true" />
             <div><p>IMSDA Events</p><h1>{packets.event.name}</h1></div>
@@ -85,7 +86,7 @@ export default async function RetreatPacketsPage({
             <div><dt>Groups</dt><dd>{packets.groups.length}</dd></div>
             <div><dt>Expected attendees</dt><dd>{packets.summary.attendees}</dd></div>
           </dl>
-          {packets.event.contentSections.filter((section) => section.kind === "RICH_TEXT").map((section) => (
+          {sections.coverNotes && packets.event.contentSections.filter((section) => section.kind === "RICH_TEXT").map((section) => (
             <section key={section.id}><h2>{section.title}</h2>{paragraphs(section.body).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</section>
           ))}
           <footer>{packets.event.supportContact ?? "Contact the registration desk for assistance."}</footer>
@@ -93,13 +94,13 @@ export default async function RetreatPacketsPage({
       )}
 
       {selectedGroups.map((group) => (
-        <article className="retreat-packet-sheet retreat-group-packet" key={group.id}>
+        <article className="event-packet-sheet event-group-packet" key={group.id}>
           <header>
             <div><p>{packets.event.name}</p><h1>{group.label}</h1><small>{group.fieldLabel ? `Grouped by ${group.fieldLabel}` : "Individual / ungrouped registrations"}</small></div>
             <strong>{group.attendees.length} {group.attendees.length === 1 ? "attendee" : "attendees"}</strong>
           </header>
 
-          <section>
+          {sections.registrationContacts && <section>
             <h2>Registration contacts</h2>
             <table className="table-cards" role="table">
               <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Confirmation</th><th role="columnheader" scope="col">Contact</th><th role="columnheader" scope="col">Email / phone</th><th role="columnheader" scope="col">Arrival</th></tr></thead>
@@ -112,28 +113,28 @@ export default async function RetreatPacketsPage({
                 </tr>
               ))}</tbody>
             </table>
-          </section>
+          </section>}
 
-          <section>
+          {sections.attendeeChecklist && <section>
             <h2>Attendee checklist</h2>
             <table className="table-cards" role="table">
-              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Arrived</th><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Type</th><th role="columnheader" scope="col">Shirt</th><th role="columnheader" scope="col">Assigned sessions</th></tr></thead>
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Arrived</th><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Type</th>{sections.shirtSize && <th role="columnheader" scope="col">Shirt</th>}{sections.assignedSessions && <th role="columnheader" scope="col">Assigned sessions</th>}</tr></thead>
               <tbody role="rowgroup">{group.attendees.map((attendee) => (
                 <tr key={attendee.id} role="row">
                   <td {...cardCell("Arrived")}>{attendee.checkedIn ? <CheckCircle2 size={16} aria-label="Checked in" /> : <Circle size={16} aria-label="Not checked in" />}</td>
                   <th role="rowheader" scope="row"><strong>{attendee.lastName}, {attendee.firstName}</strong><br /><small>{attendee.confirmationCode}</small></th>
                   <td {...cardCell("Type")}>{attendee.attendeeType}</td>
-                  <td {...cardCell("Shirt")}>{attendee.shirtSize ?? "Needed"}</td>
-                  <td {...cardCell("Assigned sessions")}>{attendee.assignments.length > 0
+                  {sections.shirtSize && <td {...cardCell("Shirt")}>{attendee.shirtSize ?? "Needed"}</td>}
+                  {sections.assignedSessions && <td {...cardCell("Assigned sessions")}>{attendee.assignments.length > 0
                     ? attendee.assignments.map((assignment) => <span className="packet-assignment" key={assignment.label}>{assignment.label}: <strong>{assignment.option}</strong></span>)
-                    : "Not assigned"}</td>
+                    : "Not assigned"}</td>}
                 </tr>
               ))}</tbody>
             </table>
-          </section>
+          </section>}
 
-          {(group.mealCounts.length > 0 || group.housingCounts.length > 0) && (
-            <section className="retreat-packet-counts">
+          {sections.planningTotals && (group.mealCounts.length > 0 || group.housingCounts.length > 0) && (
+            <section className="event-packet-counts">
               <h2>Group planning totals</h2>
               <div>
                 {group.mealCounts.map((field) => <article key={field.label}><h3>{field.label}</h3><p>{field.values.join(" · ")}</p></article>)}
