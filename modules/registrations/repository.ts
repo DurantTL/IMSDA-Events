@@ -78,6 +78,7 @@ function getRegistrationQuery(
           registrationAttendeeId: true,
           reversesAdjustmentId: true,
           reversedBy: { select: { id: true } },
+          scholarshipAward: { select: { pledged: true, settledAt: true } },
           createdByNameSnapshot: true,
           createdAt: true,
         },
@@ -355,6 +356,10 @@ function serializeRegistration(registration: RegistrationWithRelations, director
       })(),
       reversesAdjustmentId: adjustment.reversesAdjustmentId,
       reversed: Boolean(adjustment.reversedBy),
+      /** Set when the scholarship draws on the event's scholarship fund (#398). */
+      fundAward: adjustment.scholarshipAward
+        ? { pledged: adjustment.scholarshipAward.pledged, settled: Boolean(adjustment.scholarshipAward.settledAt) }
+        : null,
       createdBy: adjustment.createdByNameSnapshot,
       createdAt: adjustment.createdAt.toISOString(),
     })),

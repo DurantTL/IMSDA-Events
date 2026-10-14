@@ -7,6 +7,7 @@ import { BadgePercent, Banknote, Building2, CircleDollarSign, CreditCard, Receip
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RefundReviewFacts, refundReasonError } from "@/components/refund-review-summary";
+import { ScholarshipFundAwardFields } from "@/components/scholarship-fund-award-fields";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import {
   activeFinancialStatuses,
@@ -171,7 +172,19 @@ export function FinanceWorkspace({
       ? { kind: adjustKind, code: String(form.get("code") ?? ""), reason, attendeeId }
       : adjustKind === "CORRECTION"
         ? { kind: adjustKind, amountCents: form.get("direction") === "RAISE" ? amountCents : -amountCents, reason, attendeeId }
-        : { kind: adjustKind, amountCents, reason, attendeeId };
+        : adjustKind === "SCHOLARSHIP" && form.get("useFund") === "on"
+          ? {
+            kind: adjustKind,
+            amountCents,
+            reason,
+            attendeeId,
+            fundAward: {
+              pledged: form.get("fundPledged") === "on",
+              organizationId: String(form.get("fundOrganizationId") ?? "") || undefined,
+              sponsorName: String(form.get("fundSponsorName") ?? "").trim() || undefined,
+            },
+          }
+          : { kind: adjustKind, amountCents, reason, attendeeId };
     try {
       const response = await fetch(`/api/events/${eventId}/registrations/${selected.id}/adjustments`, {
         method: "POST",
@@ -208,7 +221,7 @@ export function FinanceWorkspace({
 
   return (
     <section className="page-stack">
-      <div className="page-intro"><div><p className="eyebrow">Financial operations</p><h2 className="duplicate-page-title">{staffPageTitles.payments}</h2><p>Search by attendee or payer, record offline payments, review Square card payments, and track confirmed refunds.</p></div><div className="page-intro-actions"><a className="secondary-button" href={`/finance/church-owed?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Owed by churches</a><a className="secondary-button" href={`/finance/billing-responsibility?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Billing responsibility</a><a className="secondary-button" href={`/finance/attendance-reconciliation?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Attendance reconciliation</a><a className="secondary-button" href={`/finance/invoices?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Invoices</a><a className="secondary-button" href={`/finance/cancellation-policy?event=${eventId}`}><WalletCards aria-hidden="true" size={17} /> Cancellation rules</a><a className="secondary-button" href={`/finance/square-payments?event=${eventId}`}><CreditCard aria-hidden="true" size={17} /> Unmatched Square payments</a><span className="count-badge"><WalletCards aria-hidden="true" size={17} /> {registrations.length} registrations</span></div></div>
+      <div className="page-intro"><div><p className="eyebrow">Financial operations</p><h2 className="duplicate-page-title">{staffPageTitles.payments}</h2><p>Search by attendee or payer, record offline payments, review Square card payments, and track confirmed refunds.</p></div><div className="page-intro-actions"><a className="secondary-button" href={`/finance/church-owed?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Owed by churches</a><a className="secondary-button" href={`/finance/billing-responsibility?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Billing responsibility</a><a className="secondary-button" href={`/finance/attendance-reconciliation?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Attendance reconciliation</a><a className="secondary-button" href={`/finance/scholarship-fund?event=${eventId}`}><WalletCards aria-hidden="true" size={17} /> Scholarship fund</a><a className="secondary-button" href={`/finance/invoices?event=${eventId}`}><Building2 aria-hidden="true" size={17} /> Invoices</a><a className="secondary-button" href={`/finance/cancellation-policy?event=${eventId}`}><WalletCards aria-hidden="true" size={17} /> Cancellation rules</a><a className="secondary-button" href={`/finance/square-payments?event=${eventId}`}><CreditCard aria-hidden="true" size={17} /> Unmatched Square payments</a><span className="count-badge"><WalletCards aria-hidden="true" size={17} /> {registrations.length} registrations</span></div></div>
       <section className="finance-summary" aria-label="Financial summary">
         <article className="finance-stat"><span><ReceiptText aria-hidden="true" size={18} /></span><small>Active billed</small><strong>{money(totals.billed)}</strong></article>
         <article className="finance-stat"><span><Banknote aria-hidden="true" size={18} /></span><small>Net received</small><strong>{money(totals.received)}</strong></article>
@@ -271,6 +284,7 @@ export function FinanceWorkspace({
                             {adjustment.amountCents < 0 ? "−" : "+"}{money(Math.abs(adjustment.amountCents))} · {adjustmentKindLabels[adjustment.kind]}
                             {adjustment.promoCode ? ` ${adjustment.promoCode}` : ""}
                             {adjustment.attendeeName ? ` · ${adjustment.attendeeName}` : ""}
+                            {adjustment.fundAward ? ` · from the scholarship fund${adjustment.fundAward.pledged && !adjustment.fundAward.settled ? " (pledged, not yet received)" : ""}` : ""}
                             {adjustment.reversesAdjustmentId ? " (reversal)" : adjustment.reversed ? " (reversed)" : ""}
                           </strong>
                           <small>{adjustment.reason} · {adjustment.createdBy} · {new Date(adjustment.createdAt).toLocaleDateString()}</small>
@@ -321,6 +335,7 @@ export function FinanceWorkspace({
                       <label>Direction<select name="direction" defaultValue="LOWER"><option value="LOWER">{wording.lower}</option><option value="RAISE">{wording.raise}</option></select></label>
                     )}
                     <label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label>
+                    {adjustKind === "SCHOLARSHIP" && !selected.isDeferredOrganizationBilling && <ScholarshipFundAwardFields eventId={eventId} />}
                   </>
                 )}
                 <label>Reason<textarea name="reason" minLength={3} maxLength={500} rows={3} required placeholder="For example: WR26 scholarship approved by the committee" /></label>

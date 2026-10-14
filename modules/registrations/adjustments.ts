@@ -6,6 +6,8 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { claimPromoCode, PromoCodeOperationError, PublicPromoCodeError } from "@/modules/promo-codes/repository";
 import { getRegistrationById } from "@/modules/registrations/repository";
+import { fundAwardSchema } from "@/modules/scholarship-funds/domain";
+import { recordFundAward } from "@/modules/scholarship-funds/repository";
 
 /**
  * Staff adjustments to what a registration owes (#396): scholarships,
@@ -20,7 +22,15 @@ import { getRegistrationById } from "@/modules/registrations/repository";
 
 export const createAdjustmentSchema = z.discriminatedUnion("kind", [
   z.object({
-    kind: z.enum(["SCHOLARSHIP", "DISCOUNT"]),
+    kind: z.literal("SCHOLARSHIP"),
+    amountCents: z.number().int().min(1, "Enter an amount.").max(10_000_000),
+    reason: z.string().trim().min(3, "Enter a reason.").max(500),
+    attendeeId: z.string().trim().min(1).max(64).optional(),
+    /** Draws the scholarship on the event's scholarship fund (#398), optionally marked pledged, not yet received. */
+    fundAward: fundAwardSchema.optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("DISCOUNT"),
     amountCents: z.number().int().min(1, "Enter an amount.").max(10_000_000),
     reason: z.string().trim().min(3, "Enter a reason.").max(500),
     attendeeId: z.string().trim().min(1).max(64).optional(),
@@ -290,6 +300,17 @@ export async function createRegistrationAdjustment(
       where: { id: registrationId },
       data: { totalAmount: nextTotal / 100 },
     });
+    if (input.kind === "SCHOLARSHIP" && input.fundAward) {
+      // Draws on the event's fund inside this same SERIALIZABLE transaction: a refused draw rolls the line back too.
+      await recordFundAward(tx, {
+        eventId,
+        registrationId,
+        adjustmentId: adjustment.id,
+        actorUserId,
+        amountCents: -changeCents,
+        award: input.fundAward,
+      });
+    }
     await writeAuditLog({
       eventId,
       actorUserId,
