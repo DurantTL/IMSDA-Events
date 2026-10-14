@@ -137,9 +137,15 @@ const ids = {
   rmGone: `${P}_rm_gone`,
   rmReg: `${P}_rm_reg`,
   raced: `${P}_raced`,
+  pg1: `${P}_pg_1`,
+  pg2: `${P}_pg_2`,
+  pg3: `${P}_pg_3`,
+  pg4: `${P}_pg_4`,
+  pg5: `${P}_pg_5`,
 };
+const pagers = [ids.pg1, ids.pg2, ids.pg3, ids.pg4, ids.pg5];
 const ineligible = [ids.ineA, ids.ineB, ids.ineC, ids.ineD, ids.ineE];
-const personIds = [ids.holder, ids.minor, ids.adult, ids.unknown, ids.norecord, ids.submitted, ids.plain, ids.elig, ...ineligible, ids.leap, ids.ageNow, ids.ageLater, ids.zero, ids.rmGone, ids.rmReg, ids.raced];
+const personIds = [ids.holder, ids.minor, ids.adult, ids.unknown, ids.norecord, ids.submitted, ids.plain, ids.elig, ...ineligible, ids.leap, ids.ageNow, ids.ageLater, ids.zero, ids.rmGone, ids.rmReg, ids.raced, ...pagers];
 const eventIds = [ids.eventA, ids.eventB, ids.eventC, ids.eventD, ids.eventE];
 
 async function cleanup() {
@@ -532,6 +538,20 @@ async function main() {
   assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.elig, eventId: ids.eventD } })) === 1, "the eligible person was sealed");
   assert((await prisma.healthRecordSnapshot.count({ where: { personId: { in: ineligible } } })) === 0, "the ineligible people were never sealed or tried");
   assert(paged.skipped === 0, "people who can never be sealed are not even tried");
+
+  // 10b2. Sealing a person while paging never makes the sweep skip the next one -------------------
+  // Five more eligible people follow the five ineligible ones in attendee id order. With a page of two the pages are
+  // [ine,ine] [ine,ine] [ine,pg1] [pg2,pg3] [pg4,pg5]: pg1 and pg3 end a page and are sealed (so leave the filter) before the next page is read.
+  for (const [index, personId] of pagers.entries()) {
+    const member = await rosterMember(personId, { birthDate: adultBirth, type: "ADULT" });
+    await repo.saveHealthRecord(directorA, clubId, member.id, record, now);
+    await prisma.registrationAttendee.create({
+      data: { id: `${P}_att_p${index + 1}`, eventId: ids.eventD, registrationId: regD.id, personId, attendeeType: "ADULT", position: 10 + index, profileSnapshot: { firstName: "Verify", lastName: "Verify" } },
+    });
+  }
+  const pagedAll = await snapshots.sealStartedEventSnapshots(now, 500, { pageSize: 2 });
+  assert(pagedAll.taken === pagers.length && pagedAll.failed === 0, `one sweep seals every eligible person at a page boundary (taken=${pagedAll.taken})`);
+  assert((await prisma.healthRecordSnapshot.count({ where: { eventId: ids.eventD, personId: { in: pagers } } })) === pagers.length, "each of them has a copy");
 
   // 10c. Age basis, zero fields, Feb 29, and removal from a roster ------------------------------
   await prisma.event.create({ data: { id: ids.eventE, slug: `${P}-e`, name: "Synthetic Snapshot Camporee E", ...when(-1, 3) } });

@@ -198,7 +198,7 @@ export async function sealStartedEventSnapshots(now = new Date(), limit = 500, o
   let remaining = limit;
   for (const event of events) {
     if (remaining <= 0) break;
-    let cursor: string | undefined;
+    let lastId: string | undefined;
     let sawCandidate = false;
     const tried = new Set<string>();
     while (remaining > 0) {
@@ -207,14 +207,16 @@ export async function sealStartedEventSnapshots(now = new Date(), limit = 500, o
           eventId: event.id,
           registration: { status: "CONFIRMED", clubRegistration: { isNot: null } },
           person: { healthSnapshots: { none: { eventId: event.id } } },
+          // Keyset paging on the id, not a Prisma cursor: a cursor row that has just been sealed has left the filter above,
+          // and `skip: 1` would then drop the next real row.
+          ...(lastId ? { id: { gt: lastId } } : {}),
         },
         select: { id: true, personId: true, registration: { select: { clubRegistration: { select: { organizationId: true } } } } },
         orderBy: { id: "asc" },
         take: pageSize,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       });
       if (page.length === 0) break;
-      cursor = page[page.length - 1]!.id;
+      lastId = page[page.length - 1]!.id;
       const pairs = page.flatMap((row) => {
         const organizationId = row.registration.clubRegistration?.organizationId;
         return organizationId ? [{ personId: row.personId, organizationId }] : [];
@@ -322,6 +324,8 @@ export async function deleteExpiredHealthSnapshots(now = new Date(), options: { 
       if (rows.length === 0) return { ids: [] as string[], held };
       const ids = rows.map((row) => row.id);
       const result = await tx.healthRecordSnapshot.deleteMany({ where: { id: { in: ids } } });
+      // An overlapping run may have deleted these first: write nothing for rows this run did not delete.
+      if (result.count === 0) return { ids: [] as string[], held };
       await writeAuditLog({
         action: "HEALTH_SNAPSHOT_RETENTION_BATCH",
         entityType: "HealthRecordSnapshot",

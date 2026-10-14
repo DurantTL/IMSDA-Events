@@ -196,12 +196,14 @@ export async function deleteEvent(input: {
     const result = await prisma.$transaction(
       async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '10s'");
+        // Lock order: the HealthSnapshotHold table first, then the event row. Placing an EVENT hold takes them in
+        // this same order, so the two can never wait on each other. Like the retention job, a legal hold placed at
+        // this moment either lands before the hold facts are read below or waits until this deletion commits, so a
+        // copy is never deleted under a hold placed a moment earlier.
+        await tx.$executeRaw`LOCK TABLE "HealthSnapshotHold" IN SHARE MODE`;
         // FOR UPDATE conflicts with the FOR KEY SHARE lock every insert of a
         // child row takes on the event, so writers wait, then fail on the FK.
         await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${input.eventId} FOR UPDATE`;
-        // Like the retention job: a legal hold placed at this moment either lands before the hold facts are read below
-        // or waits until this deletion commits, so a copy is never deleted under a hold placed a moment earlier.
-        await tx.$executeRaw`LOCK TABLE "HealthSnapshotHold" IN SHARE MODE`;
         await tx.$executeRawUnsafe("SET LOCAL lock_timeout = 0");
 
         const loaded = await loadDeletionFacts(tx, input.eventId);
