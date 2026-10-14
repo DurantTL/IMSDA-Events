@@ -5,6 +5,8 @@ import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { isSecretEncryptionConfigured, SecretBoxError } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { HEALTH_ACKNOWLEDGMENT_REQUIRED_MESSAGE, hasAcknowledgedHealthPrivacy } from "@/modules/health-records/acknowledgment";
+import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { openSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import {
@@ -41,7 +43,7 @@ import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 
 export class HealthViewError extends Error {
   constructor(
-    public readonly code: "NOT_FOUND" | "FORBIDDEN" | "WINDOW_CLOSED" | "ENCRYPTION_UNAVAILABLE" | "SENSITIVE_UNREADABLE",
+    public readonly code: "NOT_FOUND" | "FORBIDDEN" | "WINDOW_CLOSED" | "ACKNOWLEDGMENT_REQUIRED" | "ENCRYPTION_UNAVAILABLE" | "SENSITIVE_UNREADABLE",
     message: string,
   ) {
     super(message);
@@ -50,6 +52,15 @@ export class HealthViewError extends Error {
 }
 
 export type HealthPurpose = "VIEW" | "EXPORT";
+
+/**
+ * True when the one-time privacy acknowledgment (#923) is still owed before this
+ * viewer may open the sheet. It follows the Health Record's switch: with
+ * HEALTH_RECORDS_ENABLED off (production today) this view behaves as before.
+ */
+export async function healthAcknowledgmentOwed(viewer: HealthViewer): Promise<boolean> {
+  return healthRecordsEnabled() && !(await hasAcknowledgedHealthPrivacy(viewer));
+}
 
 const WINDOW_CLOSED_MESSAGE = "The health information for this event is no longer available. It is hidden once the event ends.";
 
@@ -143,6 +154,8 @@ export async function loadEventHealth(
   }
   if (!event) return deny("NOT_FOUND", "That event could not be found.");
   if (!healthWindowOpen(event, now)) return deny("WINDOW_CLOSED", WINDOW_CLOSED_MESSAGE);
+  // Before anything is read, counted or audited as a view: a prompt, not a refusal, so it is not audited.
+  if (await healthAcknowledgmentOwed(viewer)) throw new HealthViewError("ACKNOWLEDGMENT_REQUIRED", HEALTH_ACKNOWLEDGMENT_REQUIRED_MESSAGE);
 
   const registrations = await prisma.clubEventRegistration.findMany({
     where: {

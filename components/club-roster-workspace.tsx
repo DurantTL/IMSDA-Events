@@ -71,6 +71,7 @@ export function ClubRosterWorkspace({
   complianceFilter: initialComplianceFilter = null,
   headingActions,
   healthTab,
+  healthEntryOnly,
   healthRecordFlags,
   guardians: initialGuardians,
 }: {
@@ -115,7 +116,9 @@ export function ClubRosterWorkspace({
    * the feature is switched on and the viewer is the club's director or
    * deputy; omitted everywhere else, so nothing about health is rendered.
    */
-  healthTab?: Record<string, { status: "NONE" | "CURRENT" | "NEEDS_UPDATE"; hasHealthNote: boolean }>;
+  healthTab?: Record<string, { status: "NONE" | "CURRENT" | "NEEDS_UPDATE" | "LOCKED"; hasHealthNote: boolean }>;
+  /** A Registrar (#923) can enter a health record but not read it: the link says so. */
+  healthEntryOnly?: boolean;
   /** A neutral "Has a health record" marker (#611): a record exists, nothing more. Ids only, never text. */
   healthRecordFlags?: Record<string, boolean>;
   /**
@@ -545,7 +548,7 @@ export function ClubRosterWorkspace({
                                   className="secondary-button"
                                   href={`/account/clubs/${encodeURIComponent(organizationId)}/roster/${encodeURIComponent(member.id)}/health`}
                                 >
-                                  Health{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
+                                  {healthEntryOnly ? "Enter health record" : "Health"}{healthTab[member.id]?.status === "NEEDS_UPDATE" ? ": needs update" : healthTab[member.id]?.status === "NONE" ? ": none yet" : ""}
                                 </a>
                               )}
                               <button aria-label={`Edit ${member.firstName} ${member.lastName}`} className="secondary-button" disabled={saving} onClick={() => openDialog(member)} type="button">

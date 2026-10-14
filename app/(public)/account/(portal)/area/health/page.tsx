@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { EventHealthSheet } from "@/components/event-health-sheet";
+import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
-import { HealthViewError, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
+import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   const viewer = await resolveAreaHealthViewer();
   if (!viewer) notFound();
   const query = await searchParams;
+  // The one-time privacy notice (#923) comes before anything is listed or opened.
+  if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
 
   if (!query.event) {
     const events = await listHealthEvents(viewer);
@@ -53,6 +56,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   try {
     data = await loadEventHealth(viewer, query.event, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
     if (error instanceof HealthViewError) notFound();
     throw error;
   }

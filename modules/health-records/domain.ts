@@ -288,23 +288,43 @@ export function clampHealthLinkDays(days: number | undefined) {
  *   and only for a member registered for one of those events, inside its window.
  * - SYSTEM_ADMIN: view only, any member, all year.
  *
- * There is deliberately no registrar, reporter, or event-staff viewer: none of
- * them can be constructed, whatever other permissions they hold (Event Admins
- * and VIEW_SENSITIVE_DATA holders included).
+ * - CLUB_REGISTRAR (owner decision, 2026-10-14, #923): write-only. Types in or
+ *   replaces a member's record for their own club, and is afterwards shown only
+ *   that a record exists, its status and when it was last confirmed.
+ *
+ * There is deliberately no reporter or event-staff viewer: none of them can be
+ * constructed, whatever other permissions they hold (Event Admins and
+ * VIEW_SENSITIVE_DATA holders included).
  */
 export type HealthViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; accountId: string }
+  /** Write-only (#923): enters or replaces a record, never reads one back. Own club only. */
+  | { kind: "CLUB_REGISTRAR"; organizationId: string; accountId: string }
   | { kind: "AREA_COORDINATOR"; accountId: string }
   | { kind: "HEALTH_ROLE"; userId: string; eventIds: readonly string[] }
   /** `actAsId` is set when the administrator is acting as a club director (#442), so the audit shows it. */
   | { kind: "SYSTEM_ADMIN"; userId: string; actAsId?: string };
 
-export type HealthAction = "VIEW" | "EDIT" | "SEND_LINK";
+/** EDIT is entering or replacing a record from the paper form; CONFIRM re-affirms one that was read. */
+export type HealthAction = "VIEW" | "EDIT" | "CONFIRM" | "SEND_LINK";
 
 export function viewerCan(viewer: HealthViewer, organizationId: string, action: HealthAction) {
-  // Everyone but the club's own leaders only looks.
-  if (viewer.kind !== "CLUB_LEADER") return action === "VIEW";
-  return viewer.organizationId === organizationId;
+  switch (viewer.kind) {
+    case "CLUB_LEADER":
+      return viewer.organizationId === organizationId;
+    // A Registrar may enter or replace a record for their own club and do nothing else: no view, no
+    // confirmation (it would affirm what they cannot read), no parent links.
+    case "CLUB_REGISTRAR":
+      return viewer.organizationId === organizationId && action === "EDIT";
+    // Everyone else only looks.
+    default:
+      return action === "VIEW";
+  }
+}
+
+/** True for a viewer who may be shown a record's values. A Registrar never is. */
+export function viewerCanReadValues(viewer: HealthViewer) {
+  return viewer.kind !== "CLUB_REGISTRAR";
 }
 
 /** Coordinators and the health role see a member only through an event they can access. */
@@ -328,6 +348,7 @@ export function healthAuditActor(viewer: HealthViewer): {
       return { actorUserId: viewer.userId, metadata: { viewerKind: viewer.kind } };
     case "AREA_COORDINATOR":
     case "CLUB_LEADER":
+    case "CLUB_REGISTRAR":
       return { metadata: { viewerKind: viewer.kind, actorAttendeeAccountId: viewer.accountId } };
   }
 }
