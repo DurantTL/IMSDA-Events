@@ -33,7 +33,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[] };
+  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -67,7 +67,7 @@ function fakeDatabase() {
         return {
           _count: {
             householdMembers: 0, heldRegistrations: 0, registrationEvents: referenced, externalIdentities: 0,
-            notes: 0, attendeeAccountLinks: 0, userLinks: 0,
+            notes: 0, attendeeAccountLinks: 0, userLinks: 0, healthSnapshots: db.snapshotReferences.has(person.id) ? 1 : 0,
             memberClassCompletions: db.classCompletions.filter((row) => row.personId === person.id).length,
             clubRosterMemberships: db.members.filter((member) => member.personId === person.id).length,
             ...guardianCounts,
@@ -432,6 +432,20 @@ describe("club roster storage", () => {
     expect(db.people.some((person) => person.id === personId)).toBe(true);
     const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
     expect(removal.metadata).toMatchObject({ personDeleted: false });
+  });
+
+  it("keeps the person while a sealed health copy refers to them, and tells the director nothing new (#924)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.snapshotReferences.add(personId);
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    // The copy's person key is `onDelete: Restrict` and the copy outlives the roster row: the person stays.
+    // `nameKept` (what the director is told) is for ordered items only, so a sealed copy changes nothing they see.
+    expect(db.people.some((person) => person.id === personId)).toBe(true);
+    const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+    expect(removal.metadata).toMatchObject({ personDeleted: false, nameKept: false });
   });
 
   it("cancels an open order need, deletes the person, and audits the count (#566)", async () => {

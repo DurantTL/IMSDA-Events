@@ -170,6 +170,8 @@ export type SourceConfiguration = {
     checksAdultBackgrounds: boolean;
     /** Carried to a copy so a repeat event keeps its backup payment link (#327). */
     hostedPaymentLinkEnabled?: boolean;
+    /** The event's own packet sections and grouping choice (#155). Absent on older sources, which read as the default. */
+    operationalPacketConfig?: unknown;
     community: SourceCommunitySettings | null;
     /**
      * The event's team rules (#809), when it has any. Optional so a source without them reads as before. The age date

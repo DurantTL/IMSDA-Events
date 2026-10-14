@@ -16,8 +16,8 @@ vi.mock("@/modules/events/repository", () => ({
 }));
 
 import {
-  getStaffRetreatHubPreview,
-} from "@/modules/attendee-accounts/retreat-hub-repository";
+  getStaffEventHubPreview,
+} from "@/modules/attendee-accounts/event-hub-repository";
 
 const eventRow = {
   id: "event-1",
@@ -58,7 +58,7 @@ describe("staff retreat-hub preview", () => {
   it("shows shared attendee content without registration-specific data", async () => {
     mocks.listEventsForUser.mockResolvedValue([eventRow]);
 
-    const preview = await getStaffRetreatHubPreview(
+    const preview = await getStaffEventHubPreview(
       { id: "staff-1", globalRole: null },
       "womens-retreat",
     );
@@ -85,7 +85,7 @@ describe("staff retreat-hub preview", () => {
     mocks.getPrisma.mockReturnValue({ event: { findUnique } });
     mocks.listEventsForUser.mockResolvedValue([]);
 
-    await expect(getStaffRetreatHubPreview(
+    await expect(getStaffEventHubPreview(
       { id: "staff-1", globalRole: null },
       "womens-retreat",
     )).resolves.toBeNull();
@@ -95,7 +95,7 @@ describe("staff retreat-hub preview", () => {
   it("asks for the full event list only for a system administrator", async () => {
     mocks.listEventsForUser.mockResolvedValue([eventRow]);
 
-    await getStaffRetreatHubPreview(
+    await getStaffEventHubPreview(
       { id: "admin-1", globalRole: "SYSTEM_ADMIN" },
       "womens-retreat",
     );

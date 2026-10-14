@@ -9,6 +9,7 @@ import {
   undoCheckIn,
 } from "@/modules/checkin/repository";
 import { findActiveMembership } from "@/modules/events/repository";
+import { sealHealthSnapshotAfterCheckIn } from "@/modules/health-records/snapshot-hooks";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -96,6 +97,9 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
       access.user.id,
       input.idempotencyKey
     );
+    // The arrival is recorded first. Sealing the person's health copy for this event (#924) comes after it, is
+    // a no-op with the health records switch off or without a record, and never fails the check-in.
+    if (operation.checkedIn) await sealHealthSnapshotAfterCheckIn(eventId, attendeeId);
     return json(operation);
   } catch (error) {
     return apiError(error);

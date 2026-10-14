@@ -34,8 +34,8 @@ export default async function DirectorClubPacketPage({
   }
 
   return (
-    <section className="page-stack retreat-packet-workspace">
-      <div className="page-intro retreat-packet-intro">
+    <section className="page-stack event-packet-workspace">
+      <div className="page-intro event-packet-intro">
         <div>
           <BackLink href={`/account/clubs/${organizationId}/events/${eventId}${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`}>Back to {packet.event.name}</BackLink>
           <h2>Your club packet</h2>

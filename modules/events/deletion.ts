@@ -26,6 +26,10 @@ export type EventDeletionCounts = {
   announcements: number;
   /** Succeeded payments that are not sandbox (test-mode) card payments. */
   realPayments: number;
+  /** Sealed health copies of this event (#924). Deleted with the event (counts only; never what they hold). */
+  healthSnapshots: number;
+  /** Of those, copies a legal hold covers (an event hold, or a hold on the person). Any one blocks the deletion. */
+  heldHealthSnapshots: number;
 };
 
 export type EventDeletionFacts = {
@@ -63,6 +67,8 @@ export function eventDeletionBlockers(counts: EventDeletionCounts) {
   if (counts.communityPosts > 0) blockers.push(plural(counts.communityPosts, "community post"));
   if (counts.announcements > 0) blockers.push(plural(counts.announcements, "announcement"));
   if (counts.messages > 0) blockers.push(plural(counts.messages, "message"));
+  // A legal hold is never bypassed by deleting the event (#924): lift the hold first.
+  if (counts.heldHealthSnapshots > 0) blockers.push(`${plural(counts.heldHealthSnapshots, "sealed health copy", "sealed health copies")} under a legal hold`);
   return blockers;
 }
 

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAttendee: vi.fn(),
   accountNeedsSecondStep: vi.fn(),
   getRosterAccessStateForPage: vi.fn(),
-  getAttendeeRetreatHub: vi.fn(),
+  getAttendeeEventHub: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`REDIRECT:${path}`);
   }),
@@ -29,9 +29,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
-vi.mock("@/modules/attendee-accounts/retreat-hub-repository", () => ({
-  getAttendeeRetreatHub: mocks.getAttendeeRetreatHub,
-  getStaffRetreatHubPreview: vi.fn(),
+vi.mock("@/modules/attendee-accounts/event-hub-repository", () => ({
+  getAttendeeEventHub: mocks.getAttendeeEventHub,
+  getStaffEventHubPreview: vi.fn(),
 }));
 vi.mock("@/modules/community/repository", () => ({ getAttendeeCommunity: vi.fn(), getStaffCommunity: vi.fn() }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: null }) }));
@@ -197,7 +197,7 @@ describe("second step still owed", () => {
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "a1", verifiedEmail: "p@example.test" }, via: "attendee", sessionId: "s1" });
     mocks.accountNeedsSecondStep.mockResolvedValue("VERIFY");
     await expect(EventHubPage(hubProps)).rejects.toThrow(`REDIRECT:/account/two-step?next=${encodeURIComponent("/account/events/retreat")}`);
-    expect(mocks.getAttendeeRetreatHub).not.toHaveBeenCalled();
+    expect(mocks.getAttendeeEventHub).not.toHaveBeenCalled();
   });
 
   it("the event hub sends a signed-out visitor to sign-in carrying the hub", async () => {
@@ -209,9 +209,9 @@ describe("second step still owed", () => {
   it("the event hub still loads once the second step is passed", async () => {
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "a1", verifiedEmail: "p@example.test" }, via: "attendee", sessionId: "s1" });
     mocks.accountNeedsSecondStep.mockResolvedValue("OK");
-    mocks.getAttendeeRetreatHub.mockResolvedValue(null);
+    mocks.getAttendeeEventHub.mockResolvedValue(null);
     await expect(EventHubPage(hubProps)).rejects.toThrow("NOT_FOUND");
-    expect(mocks.getAttendeeRetreatHub).toHaveBeenCalled();
+    expect(mocks.getAttendeeEventHub).toHaveBeenCalled();
   });
 });
 

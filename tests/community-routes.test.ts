@@ -207,7 +207,7 @@ describe("staff community route", () => {
       isEnabled: true,
       allowNewPosts: true,
       allowReplies: true,
-      conductText: "Be kind, protect privacy, respect one another, and keep every post focused on the retreat.",
+      conductText: "Be kind, protect privacy, respect one another, and keep every post focused on the event.",
       retentionDays: 30,
     };
     const response = await staffPatch(request("PATCH", input), context);

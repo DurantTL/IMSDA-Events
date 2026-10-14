@@ -117,7 +117,7 @@ export const staffPageTitles = {
   clubPacket: "Club packet",
   checkInBook: "Check-in book",
   clubReports: "Camporee club reports",
-  groupedPackets: "Grouped retreat packets",
+  groupedPackets: "Grouped event packets",
   operationalReports: "Operational reports",
   clubMonthlyReport: "Club Monthly Record",
   clubMonthlyReports: "Club Monthly Records",
