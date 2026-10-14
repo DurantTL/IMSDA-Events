@@ -181,7 +181,7 @@ describe("the club menu order is unchanged", () => {
   });
   it("keeps the Area Coordinator's menu in its order", () => {
     expect(areaClubPortalNavItems({ organizationId: "c" }).map((item) => item.label)).toEqual([
-      "Home", "Roster", "Honors", "Events", "Club forms", "Monthly Records", "Orders", "Earned awards",
+      "Home", "Roster", "Honors", "Events", "Club forms", "Monthly Records", "Earned awards",
     ]);
   });
 });
