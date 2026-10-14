@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { isUnchangedFromStored, storedContactPhone, normalizePhoneAnswer, validateEmail, validatePhone, validateZip, type FieldCheck } from "@/lib/field-validation";
 import { clubYearFor, parseCalendarDate } from "@/modules/club-rosters/domain";
-import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 
 /**
  * Pure rules for the Pathfinder Health Record (#611): the field list, input
@@ -338,31 +337,6 @@ export function viewerActorId(viewer: HealthViewer) {
 }
 
 // ---------------------------------------------------------------------------
-// The event window.
+// The event window: one definition shared with the coordinator health view.
 
-/**
- * How long after an event ends its attendees' records stay open to an Area
- * Coordinator or the health role. This is the coordinator health view's rule
- * (#658, `HEALTH_WINDOW_DAYS`): open from registration until 30 days after the
- * event's last day, inclusive, in the event's time zone. It is restated here as
- * one named constant until #658 merges and the two can share a definition.
- */
-export const HEALTH_WINDOW_DAYS = 30;
-
-function addCalendarDays(date: string, days: number) {
-  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-}
-
-/** The last calendar day (event time zone, inclusive) an event's attendee records may be opened. */
-export function healthWindowEndsOn(event: { timezone: string; endsAt: Date }) {
-  return addCalendarDays(calendarDateInEventTimeZone(event.endsAt, event.timezone), HEALTH_WINDOW_DAYS);
-}
-
-/**
- * There is no start bound of its own: a member can only be an attendee after
- * registering, so "from registration" is the attendee check itself.
- */
-export function healthWindowOpen(event: { timezone: string; endsAt: Date }, now: Date) {
-  return calendarDateInEventTimeZone(now, event.timezone) <= healthWindowEndsOn(event);
-}
+export { HEALTH_WINDOW_DAYS, healthWindowEndsOn, healthWindowOpen } from "@/modules/events/health-window";

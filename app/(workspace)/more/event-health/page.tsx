@@ -47,7 +47,7 @@ export default async function EventHealthPage({
         <div>
           <p className="eyebrow">Confidential · read only</p>
           <h2>{data.event.name}: health information</h2>
-          <p>Available through {data.event.availableThrough}, 30 days after the event ends. Every time this is opened or printed it is recorded.</p>
+          <p>Available through {data.event.availableThrough}, the last day of the event. Every time this is opened or printed it is recorded.</p>
         </div>
         <div className="intro-actions">
           {sheet

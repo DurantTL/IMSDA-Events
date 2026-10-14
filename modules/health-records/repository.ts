@@ -79,7 +79,7 @@ async function loadMember(
   memberId: string,
   now: Date,
   // An Area Coordinator's event-scoped view may reach a member whose roster row
-  // is from the club year just ended (the window runs 30 days past the event).
+  // is from the club year just ended (the window runs through the event's last day).
   options: { anyYear?: boolean } = {},
 ) {
   const member = await client.clubRosterMember.findFirst({

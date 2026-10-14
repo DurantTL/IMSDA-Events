@@ -32,7 +32,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
         </section>
         <div className="account-page-body club-roster-stack">
           <BackLink href="/account/clubs">Back to clubs</BackLink>
-          <p className="inline-notice" role="status">Dietary notes as entered, the medical-need flag, and emergency contacts for club events. Each event is available until 30 days after it ends. Every time you open or print one it is recorded.</p>
+          <p className="inline-notice" role="status">Dietary notes as entered, the medical-need flag, and emergency contacts for club events. Each event is available through its last day. Every time you open or print one it is recorded.</p>
           {events.length === 0 ? <p className="quiet-copy">No club event is open for health information right now.</p> : (
             <ul className="account-overview-list">
               {events.map((event) => (
@@ -66,7 +66,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
       </section>
       <div className="account-page-body club-roster-stack">
         <BackLink href="/account/area/health">Back to events</BackLink>
-        <p className="inline-notice" role="status">Available through {data.event.availableThrough}, 30 days after the event ends. This view is recorded.</p>
+        <p className="inline-notice" role="status">Available through {data.event.availableThrough}, the last day of the event. This view is recorded.</p>
         {sheet
           ? <PrintReportButton label="Print confidential sheet" />
           : <a className="secondary-button" href={`/account/area/health?event=${encodeURIComponent(data.event.id)}${query.club ? `&club=${encodeURIComponent(query.club)}` : ""}&sheet=1`}>Open printable sheet</a>}

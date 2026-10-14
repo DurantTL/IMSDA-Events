@@ -33,7 +33,7 @@ export default async function ClubHealthPage({
     const events = await listHealthEvents(viewer);
     return (
       <>
-        <p className="inline-notice" role="status">Confidential. Each event is available until 30 days after it ends, and every time you open or print one it is recorded.</p>
+        <p className="inline-notice" role="status">Confidential. Each event is available through its last day, and every time you open or print one it is recorded.</p>
         {events.length === 0 ? <p className="quiet-copy">No event your club registered for is open for health information.</p> : (
           <ul className="account-overview-list">
             {events.map((event) => (

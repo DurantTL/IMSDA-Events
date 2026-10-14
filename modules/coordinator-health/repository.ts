@@ -14,6 +14,7 @@ import {
   healthAuditActor,
   healthWindowEndsOn,
   healthWindowOpen,
+  HEALTH_WINDOW_DAYS,
   HEALTH_FORM_KEYS,
   medicalFlagFromResponses,
   normalizeName,
@@ -50,7 +51,7 @@ export class HealthViewError extends Error {
 
 export type HealthPurpose = "VIEW" | "EXPORT";
 
-const WINDOW_CLOSED_MESSAGE = "The health information for this event is no longer available. It is hidden 30 days after the event ends.";
+const WINDOW_CLOSED_MESSAGE = "The health information for this event is no longer available. It is hidden once the event ends.";
 
 /** Years a club's forms could cover for the event: the club year of its first and last day. */
 function clubYearsFor(event: { startsAt: Date; endsAt: Date }) {
@@ -67,8 +68,8 @@ export async function listHealthEvents(viewer: HealthViewer, now = new Date()) {
       clubRegistrations: {
         some: viewer.kind === "CLUB_LEADER" ? { organizationId: viewer.organizationId } : {},
       },
-      // A day of slack either side of 30 days; the exact window is applied below in the event's time zone.
-      endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) },
+      // Two days of slack past the window; the exact window is applied below in the event's time zone.
+      endsAt: { gte: new Date(now.getTime() - (HEALTH_WINDOW_DAYS + 2) * 86_400_000) },
       ...(viewer.kind === "HEALTH_ROLE" ? { id: { in: [...viewer.eventIds] } } : {}),
     },
     orderBy: { startsAt: "desc" },

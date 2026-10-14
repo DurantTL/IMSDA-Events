@@ -718,6 +718,7 @@ enum ProgramUnassignedReason {
 
 model User {
   id            String            @id @default(cuid())
+  healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
   email         String            @unique
   displayName   String
   jobTitle      String?
@@ -997,6 +998,7 @@ model PasswordResetToken {
  */
 model AttendeeAccount {
   id                 String                @id @default(cuid())
+  healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
   email              String                @unique
   displayName        String
@@ -6146,6 +6148,9 @@ model HealthRecord {
   /// saved in. Anything else shows "Needs update".
   confirmedClubYear String?
   hasHealthNote     Boolean                   @default(false)
+  /// When it was last saved or confirmed (#923). The one date a Registrar, who can
+  /// enter a record but not read it, is shown. Plain, carries no text.
+  lastConfirmedAt   DateTime?
   lastEnteredVia    HealthRecordEntryChannel?
   /// Who last saved it: an attendee account id, or a staff user id for an act-as. Never shown.
   lastSavedByActor  String?
@@ -6157,6 +6162,26 @@ model HealthRecord {
   fields       HealthRecordField[]
 
   @@index([organizationId])
+}
+
+/// A person's one-time privacy acknowledgment before health access works (#923,
+/// ADR 0005 Addendum B). One row per signed-in person and wording version: a staff
+/// user (`userId`) or an attendee account (`attendeeAccountId`), exactly one of the
+/// two. A new `version` means acknowledging again. It holds no health data and
+/// refers to no event, club, roster row or Person, so event and roster-member
+/// deletion never touch it; it goes with the account that made it.
+model HealthPrivacyAcknowledgment {
+  id                String   @id @default(cuid())
+  userId            String?
+  attendeeAccountId String?
+  version           String
+  acknowledgedAt    DateTime @default(now())
+
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendeeAccount AttendeeAccount? @relation(fields: [attendeeAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, version])
+  @@unique([attendeeAccountId, version])
 }
 
 /// One sealed health field. `sealedValue` is `v1.<nonce>.<tag>.<ciphertext>`
