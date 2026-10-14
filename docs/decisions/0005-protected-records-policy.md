@@ -503,7 +503,8 @@ human can accept, change or reject them before any real record is stored.
   - know that every use is logged.
 
   The Communication Director reviews each use monthly.
-- **Retention: re-confirm every club year.** At the start of each club year,
+- **Retention: re-confirm every club year** (the live record; a sealed copy
+  for each event attended is kept separately, see 2026-10-14, #924). At the start of each club year,
   last year's health records are marked "needs updating". A record the director
   doesn't re-confirm within 60 days is deleted:
   - **Deleted:** the health fields, insurance details and emergency contacts.
@@ -581,8 +582,114 @@ Owner decisions from Caleb, Communication Director, on 2026-10-14.
    break-glass), and Registrars before entry. The coordinator health view
    (Addendum C) asks for it too, while `HEALTH_RECORDS_ENABLED` is on; with the
    switch off (production today) that view behaves as before.
-7. **Backup retention and legal hold:** still open. Research is going to the
-   owner; #923 does not cover it.
+7. **Backup retention and legal hold:** decided later the same day, in the
+   next subsection (#924). #923 did not cover it.
+
+### Decided 2026-10-14 (Communication Director, #924): sealed copy for each event
+
+Owner decision from Caleb, Communication Director, on 2026-10-14: keep a sealed
+copy of the health form for each event attended.
+
+**Why.** The rule above deletes a member's health details when the yearly
+re-confirmation is missed. That could destroy the record the conference needs
+to answer an injury claim. The live record's rules do not change (yearly
+re-confirmation, the 60-day deletion, deletion at once on removal from a
+roster). A separate, sealed, immutable copy covers the claim period.
+
+**What is kept.** When a club member attends an event, the system seals an
+encrypted copy of their health record and signed consent as they stood at that
+moment, with the consent version and the signature date. It is taken:
+
+- when the person is **checked in** (the check-in route calls the sealing step
+  once the arrival is recorded; a failure there never fails a check-in), or
+- when the **event starts**, for a person on a confirmed club registration who
+  has a live record and no copy yet (the scheduled sweep, within three days of
+  the event's start, so a copy is never of a record far later than the event).
+
+Exactly one per person per event (a unique key, so a second attempt or a race
+changes nothing). A person with no live record, or not on a club registration,
+gets none. The copy uses the existing `sealSecret` (`modules/health-records/crypto.ts`,
+purpose `health-snapshot:<snapshotId>:<fieldKey>`), so a copy's value cannot be
+opened as a live record's field or moved to another copy. The copy's row holds
+only dates, the consent version, a field count and the keep-until date: no
+health text and no birth date. It is **immutable in the database**: triggers
+refuse every update and every delete, except the daily retention job's and
+event deletion's.
+
+**How long (configuration, `modules/health-records/snapshot-retention.ts`; counsel
+can change the constants):**
+
+| Person on the event's first day | Kept until |
+| --- | --- |
+| Under 18 (a minor) | Their 26th birthday |
+| 18 or over (an adult) | 5 years after the event's last day |
+| No usable birth date | The longer of 5 years after the event and the 26th birthday on the latest plausible reading |
+
+For "no birth date" the latest plausible reading takes the youngest age the
+person could have had on the event's first day: the age a form reported, else
+the youngest age for their member type (Underage 0, Youth 4, Staff 16, Adult
+18). The 26th birthday on that reading is the keep-until date when it is later
+than 5 years after the event. This errs on keeping the record the conference may
+need; the choice is recorded here for counsel to confirm. The expiry is
+computed once, from the birth date at the event, and stored per copy; the birth
+date itself is not stored. A Feb 29 birthday lands on Mar 1 in a year without a
+Feb 29.
+
+**Sources (research, not legal advice).** In Missouri a minor's personal-injury
+claim can be filed until age 26: RSMo 516.120 gives 5 years and RSMo 516.170
+starts the clock at age 21. Iowa's limit is shorter (2 years, or until age 19
+for a minor: Iowa Code 614.1(2) and 614.8), so the Missouri limit sets the
+period. **Adventist Risk Management or conference counsel is to confirm these
+periods.** They are configuration, so a change needs no migration.
+
+**Daily deletion.** A job deletes every copy whose keep-until date has come,
+unless a legal hold applies. It runs from the existing authenticated outbox
+sweep (the same cron and token as the other periodic work; no second scheduler
+or secret), at most once every 20 hours, and writes one audit row with the ids
+(capped), the number deleted and the number skipped under a hold. It takes a
+table lock on holds so a hold placed at the same moment either lands first or
+waits for the deletion to commit.
+
+**Legal hold.** A system administrator can place a hold on a person's copies or
+on an event's copies, with a typed reason, and lift it with a reason. While a
+hold applies nothing it covers is deleted, and a copy under a hold also blocks
+deleting its event (lift the hold first). One active hold per person and per
+event; placing it twice changes nothing. Holds are kept after they are lifted.
+Placing and lifting are audited with the target, the reason and the number of
+copies covered.
+
+**Access: break-glass only.** A system administrator with the privacy
+acknowledgment (#923) types a reason and gets 24 hours of access to one
+person's copies. Every grant, every view and every refused attempt is audited
+with ids, counts and the typed reason: never a health value. A director,
+deputy, Registrar, Area Coordinator and the event health role never reach a
+copy, and a refusal is audited. The Communication Director reviews each use
+monthly, as for all break-glass access.
+
+**The live record is unchanged,** and deleting it never deletes its copies. A
+person who has a copy is kept when removed from a roster (their name only; email
+and phone are still erased) until the copy is deleted. Deleting an event deletes
+its copies; a copy under a hold blocks the deletion.
+
+**Incident reports for a minor** are kept until the person turns **31** (RSMo
+537.046). Incident records do not exist yet; the rule is recorded here and as a
+constant (`incidentReportMinorKeepUntilAge`, not used by any code today) for
+when they do.
+
+**Backups.** 30 nightly copies, rolling. The sealed copies cover the long-term
+legal need, so the backups do not have to. (The Compose default
+`BACKUP_RETENTION_DAYS` is 14 and the off-site suggestion in #875 was 90 days;
+setting the retention to 30 nightly copies is an operations change for the IT
+Director, not made by #924.)
+
+**Still behind the switch.** Sealing, the sweep, the deletion job, holds and
+break-glass all check `HEALTH_RECORDS_ENABLED`; with it off nothing is sealed,
+swept, held or opened (the check-in route and the sweep still run, and do
+nothing here). Routes: `POST /api/staff/health-snapshots/break-glass`,
+`GET /api/staff/health-snapshots/person/<personId>`,
+`GET|POST /api/staff/health-snapshots/holds`,
+`POST /api/staff/health-snapshots/holds/<holdId>/lift`. There is no page yet;
+a break-glass screen is a follow-up.
 
 ### Still open (blocking production use)
 
@@ -592,9 +699,15 @@ questions this build raised.
 - **Key backup restore test** (decision 2 above): a human has to run it.
 - **Final acceptance:** the full sign-off list below, beyond the interim
   acceptance.
-- **Backup retention and legal hold.** How long off-site backup copies are
-  kept (#875 suggests 90 days), and who can pause deletion under a legal hold.
-  Research is going to the owner.
+- **Retention periods: counsel to confirm.** The keep-until rules for sealed
+  copies (26th birthday for a minor, 5 years for an adult), the incident-report
+  rule (age 31) and the 30 nightly backups were decided by the owner on
+  2026-10-14 (#924, above) from research, not legal advice. Adventist Risk
+  Management or conference counsel is to confirm them. Setting the backup
+  retention to 30 nightly copies is still an operations change (Compose
+  defaults to 14 days).
+- **Break-glass screen.** #924 adds the routes only; a page for a system
+  administrator to start break-glass and place holds is a follow-up.
 - **Acknowledgment wording.** The notice text in
   `modules/health-records/acknowledgment-domain.ts` is a draft for the
   Communication Director to confirm. A change to it needs a new version.

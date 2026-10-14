@@ -26,6 +26,8 @@ const emptyCounts: EventDeletionCounts = {
   communityPosts: 0,
   announcements: 0,
   realPayments: 0,
+  healthSnapshots: 0,
+  heldHealthSnapshots: 0,
 };
 
 function facts(overrides: { isPublished?: boolean; counts?: Partial<EventDeletionCounts> } = {}): EventDeletionFacts {

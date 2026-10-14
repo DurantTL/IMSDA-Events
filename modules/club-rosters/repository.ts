@@ -510,6 +510,9 @@ export async function removeRosterMember(organizationId: string, memberId: strin
               guardianAuthoritiesDeclared: true,
               guardianConflictsAsMinor: true,
               guardianConflictsAsAdult: true,
+              // A sealed per-event health copy (#924) outlives the roster row and the live record, and its person key is
+              // `onDelete: Restrict`: the Person stays (name only, below) until the copy's retention job deletes it.
+              healthSnapshots: true,
             },
           },
         },
@@ -519,21 +522,22 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       const orderedNeeds = await tx.clubOrderNeed.count({ where: { personId: member.personId, status: { not: "NEEDED" } } });
       const openElsewhere = await tx.clubOrderNeed.count({ where: { personId: member.personId, status: "NEEDED" } });
       if (person) {
-        const { heldRegistrations, registrationEvents, ...others } = person._count;
+        const { heldRegistrations, registrationEvents, healthSnapshots, ...others } = person._count;
         const otherUses = Object.values(others).reduce((sum, count) => sum + count, 0) + openElsewhere;
-        if (otherUses === 0 && heldRegistrations === 0 && registrationEvents === 0 && orderedNeeds === 0) {
+        const sealedCopies = healthSnapshots ?? 0;
+        if (otherUses === 0 && heldRegistrations === 0 && registrationEvents === 0 && orderedNeeds === 0 && sealedCopies === 0) {
           await blankTransferText(tx, member.personId);
           const erased = await tx.memberHonorEntry.deleteMany({ where: { personId: member.personId } });
           honorEntriesErased = erased.count;
           await tx.person.delete({ where: { id: member.personId } });
           personDeleted = true;
         } else if (otherUses === 0 && heldRegistrations === 0 && registrationEvents === 0) {
-          // Ordered items are the only reason left: erase every personal field
+          // Ordered items or a sealed health copy (#924) are the only reason left: erase every personal field
           // but the name (§6), and the free text on settled transfer records.
           await blankTransferText(tx, member.personId, { keepPending: true });
           await tx.person.update({ where: { id: member.personId }, data: { normalizedEmail: null, phone: null } });
         }
-        nameKept = !personDeleted && orderedNeeds > 0;
+        nameKept = !personDeleted && (orderedNeeds > 0 || sealedCopies > 0);
       }
     }
     await audit(tx, actor, "CLUB_ROSTER_MEMBER_REMOVED", organizationId, memberId, "Removed a person from a club roster and erased their details.", {

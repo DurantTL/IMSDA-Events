@@ -719,6 +719,9 @@ enum ProgramUnassignedReason {
 model User {
   id            String            @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
+  healthSnapshotHolds          HealthSnapshotHold[]        @relation("HealthSnapshotHoldPlacedBy")
+  healthSnapshotHoldsLifted    HealthSnapshotHold[]        @relation("HealthSnapshotHoldLiftedBy")
+  healthSnapshotBreakGlass     HealthSnapshotBreakGlass[]
   email         String            @unique
   displayName   String
   jobTitle      String?
@@ -1463,6 +1466,8 @@ model PlatformSettings {
 
 model Event {
   id                   String             @id @default(cuid())
+  healthSnapshots      HealthRecordSnapshot[]
+  healthSnapshotHolds  HealthSnapshotHold[]
   slug                 String             @unique
   name                 String
   startsAt             DateTime
@@ -1992,6 +1997,9 @@ model Person {
   matchCandidatesAsA   PersonMatchCandidate[] @relation("PersonMatchCandidateAsA")
   matchCandidatesAsB   PersonMatchCandidate[] @relation("PersonMatchCandidateAsB")
   clubRosterMemberships ClubRosterMember[]
+  healthSnapshots       HealthRecordSnapshot[]
+  healthSnapshotHolds   HealthSnapshotHold[]
+  healthSnapshotBreakGlass HealthSnapshotBreakGlass[]
   honorInstructorRoles  HonorInstructor[]
   backgroundCheckMatch  BackgroundCheckMatch?
   backgroundChecksPre527 BackgroundCheckPre527[] @ignore
@@ -6198,6 +6206,112 @@ model HealthRecordField {
   record HealthRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
 
   @@unique([recordId, fieldKey])
+}
+
+enum HealthSnapshotTrigger {
+  CHECK_IN
+  EVENT_START
+}
+
+/// How a snapshot's keep-until date was worked out (ADR 0005 Addendum B, #924).
+enum HealthSnapshotAgeBasis {
+  /// Under 18 on the event: kept until the 26th birthday.
+  MINOR
+  /// 18 or over on the event: kept 5 years after the event.
+  ADULT
+  /// No birth date: the longer of 5 years after the event and the 26th birthday on the latest plausible reading.
+  UNKNOWN
+}
+
+enum HealthSnapshotHoldScope {
+  PERSON
+  EVENT
+}
+
+/// A sealed, immutable copy of one person's health record and consent as it stood
+/// for one event (#924, ADR 0005 Addendum B). One per person per event. Every
+/// field is a `HealthRecordSnapshotField` row sealed with `lib/secret-box.ts` under
+/// `health-snapshot:<snapshotId>:<fieldKey>`. The row itself holds no health text and no
+/// birth date: only dates, a version and counts. It is separate from the live
+/// record, so deleting the live record leaves it. Database triggers refuse every
+/// UPDATE and every DELETE except the retention job's and event deletion's.
+/// Opened only through break-glass.
+model HealthRecordSnapshot {
+  id             String                 @id @default(cuid())
+  personId       String
+  eventId        String
+  trigger        HealthSnapshotTrigger
+  takenAt        DateTime               @default(now())
+  /// The event's first calendar day (event time zone), the date age was worked out on.
+  eventDate      String
+  consentVersion String?
+  /// The date on the signature (YYYY-MM-DD). Plain; the typed name is sealed.
+  signedOn       String?
+  ageBasis       HealthSnapshotAgeBasis
+  /// The day this copy is deleted, unless a legal hold applies. Computed once, from the birth date at the event.
+  expiresAt      DateTime
+  fieldCount     Int
+  createdAt      DateTime               @default(now())
+
+  /// Restrict: removing a person who has a sealed copy is refused; the copy outlives the roster row.
+  person Person                 @relation(fields: [personId], references: [id], onDelete: Restrict)
+  event  Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fields HealthRecordSnapshotField[]
+
+  @@unique([personId, eventId])
+  @@index([expiresAt])
+  @@index([eventId])
+}
+
+model HealthRecordSnapshotField {
+  id          String @id @default(cuid())
+  snapshotId  String
+  fieldKey    String
+  sealedValue String
+
+  snapshot HealthRecordSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, fieldKey])
+}
+
+/// A legal hold (#924): while one is active nothing it covers is deleted. Placed and
+/// lifted by a system administrator with a reason; both are audited. Exactly one of
+/// `personId` and `eventId`, matching `scope`. Holds are kept after they are lifted.
+model HealthSnapshotHold {
+  id             String                  @id @default(cuid())
+  scope          HealthSnapshotHoldScope
+  personId       String?
+  eventId        String?
+  reason         String
+  placedByUserId String?
+  placedAt       DateTime                @default(now())
+  liftedAt       DateTime?
+  liftedByUserId String?
+  liftReason     String?
+
+  person   Person? @relation(fields: [personId], references: [id], onDelete: Cascade)
+  event    Event?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  placedBy User?   @relation("HealthSnapshotHoldPlacedBy", fields: [placedByUserId], references: [id], onDelete: SetNull)
+  liftedBy User?   @relation("HealthSnapshotHoldLiftedBy", fields: [liftedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([personId])
+  @@index([eventId])
+}
+
+/// A break-glass grant (#924): one system administrator, one person's snapshots, a typed
+/// reason, 24 hours. Every use is audited with ids and counts, never values.
+model HealthSnapshotBreakGlass {
+  id        String   @id @default(cuid())
+  userId    String?
+  personId  String
+  reason    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([userId, personId, expiresAt])
 }
 
 /// A single-use, expiring private link for a parent to fill in one member's

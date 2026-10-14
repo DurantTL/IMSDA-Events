@@ -23,7 +23,10 @@ What happens on `docker compose up`:
    type-checks.
 3. **outbox-sweeper** retries queued email that failed a first delivery attempt, and
    sends the daily location waitlist digest each morning at 7:00 Central
-   (see [LOCATION-WAITLISTS.md](LOCATION-WAITLISTS.md)).
+   (see [LOCATION-WAITLISTS.md](LOCATION-WAITLISTS.md)). With
+   `HEALTH_RECORDS_ENABLED` on, the same sweep also seals the event-start health
+   copies and runs the daily deletion of expired sealed copies, never one under a
+   legal hold (ADR 0005 Addendum B, #924); with it off that step does nothing.
 4. **backup** takes a nightly `pg_dump`, archives uploaded event files, and
    periodically rehearses a database restore.
 

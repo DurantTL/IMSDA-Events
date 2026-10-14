@@ -31,6 +31,15 @@ export class EventDeletionError extends Error {
 
 type Db = Prisma.TransactionClient;
 
+/** How many of the event's sealed health copies an active legal hold covers. Counts only. */
+async function countHeldHealthSnapshots(db: Db, eventId: string) {
+  const holds = await db.healthSnapshotHold.findMany({ where: { liftedAt: null }, select: { scope: true, personId: true, eventId: true } });
+  if (holds.some((hold) => hold.scope === "EVENT" && hold.eventId === eventId)) return db.healthRecordSnapshot.count({ where: { eventId } });
+  const personIds = holds.flatMap((hold) => (hold.scope === "PERSON" && hold.personId ? [hold.personId] : []));
+  if (personIds.length === 0) return 0;
+  return db.healthRecordSnapshot.count({ where: { eventId, personId: { in: personIds } } });
+}
+
 async function loadDeletionFacts(db: Db, eventId: string) {
   const event = await db.event.findUnique({
     where: { id: eventId },
@@ -56,6 +65,8 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     clubRegistrationDrafts,
     communityPosts,
     announcements,
+    healthSnapshots,
+    heldHealthSnapshots,
   ] = await Promise.all([
     db.registration.count({ where: inEvent }),
     db.registrationAttendee.count({ where: inEvent }),
@@ -87,6 +98,10 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     db.clubRegistrationDraft.count({ where: inEvent }),
     db.communityPost.count({ where: inEvent }),
     db.announcement.count({ where: inEvent }),
+    // Sealed health copies (#924): counted here, never opened. A copy under a legal hold (an event hold, or a hold on
+    // the person) blocks the deletion; the rest go with the event.
+    db.healthRecordSnapshot.count({ where: inEvent }),
+    countHeldHealthSnapshots(db, eventId),
   ]);
   const counts: EventDeletionCounts = {
     registrations,
@@ -105,6 +120,8 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     communityPosts,
     announcements,
     realPayments: succeededPayments + openHeldCharges,
+    healthSnapshots,
+    heldHealthSnapshots,
   };
   return { event, facts: { isPublished: event.isPublished, counts } satisfies EventDeletionFacts };
 }
@@ -364,6 +381,11 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   await tx.eventLodgingAssignmentHistory.deleteMany({ where: inEvent });
   await tx.eventLodgingAssignment.deleteMany({ where: inEvent });
   await tx.eventLodgingPlaceholder.deleteMany({ where: inEvent });
+
+  // 9c. Sealed health copies of this event (#924) point at the event and the person only. Their delete trigger accepts
+  //     this transaction's deletes (`imsda.event_deletion`) and refuses every other delete. A copy under a legal hold
+  //     blocks the deletion before this point (`eventDeletionBlockers`).
+  await tx.healthRecordSnapshot.deleteMany({ where: inEvent });
 
   // 10. Registrations: cascades attendees, check-ins, waitlist, club
   //     registrations and assignments, access tokens, transfer moves.

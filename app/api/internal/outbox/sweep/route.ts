@@ -8,6 +8,7 @@ import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminder
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
+import { runHealthSnapshotSweep } from "@/modules/health-records/snapshot-hooks";
 import { runAlertScan } from "@/modules/operations/alert-scan";
 import { sweepHostedCheckouts } from "@/modules/payments/square-hosted-invalidation";
 import { recordSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
@@ -83,6 +84,13 @@ async function postHandler(request: Request) {
       logError("The class waitlist sweep failed after a successful outbox sweep", error);
       return null;
     });
+    // Sealed health copies (#924): the event-start copies that are due, and the daily deletion of copies whose
+    // keep-until date has passed (never one under a legal hold). A no-op with HEALTH_RECORDS_ENABLED off, safe on
+    // every sweep, and it reports counts only. Its failure must not make a successful sweep look failed.
+    const healthSnapshots = await runHealthSnapshotSweep().catch((error) => {
+      logError("The sealed health copy sweep failed after a successful outbox sweep", error);
+      return null;
+    });
     return Response.json({
       sweptEventCount: result.sweptEventIds.length,
       sweptAccountMessages: result.sweptAccountMessages,
@@ -99,6 +107,7 @@ async function postHandler(request: Request) {
       deadlineReminders,
       hostedLinks,
       classWaitlists,
+      healthSnapshots,
       locationWaitlistDigest: locationWaitlistDigest && {
         status: locationWaitlistDigest.status,
         changesCovered: locationWaitlistDigest.changesCovered,
