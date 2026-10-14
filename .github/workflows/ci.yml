@@ -280,6 +280,16 @@ jobs:
       # team, and an event without team rules behaving exactly as before.
       - run: npm run test:pbe-registration
 
+      # Real-database check of the general registration link (#931): a director with no
+      # account registers a PBE team through one public link; a matching director or
+      # deputy email attaches it to the club picked as an ordinary club registration, any
+      # other waits as a pending submission (in no count, invoice or check-in list) until
+      # staff confirm, reassign or reject it, all audited with ids only and safe under
+      # concurrency; the team rules and unique team name hold (also racing); the generic
+      # public route refuses a club form; honeypot, rate limit and idempotency; the optional
+      # roster link; the table constraints.
+      - run: npm run test:general-link-registration
+
       # Check-in desk concurrency (#825): 4 devices checking in the same attendee,
       # the same retry key re-sent, and different attendees of one registration at
       # once, plus check-in racing undo and double undo. One record and one audit

@@ -143,9 +143,14 @@ export const eventTemplatePayloadSchema = z.object({
   registrationClosesOn: calendarDateSchema.optional(),
   /** Team rules for the new event (#809): several teams per club, team size, the alternate, the age date. Club events only. */
   teamSettings: teamSettingsInputSchema.optional(),
+  /** Turns on the event's general registration link (#931): directors with no account register a team through one public link. Club events only. */
+  generalRegistrationLink: z.boolean().optional(),
 }).superRefine((payload, ctx) => {
   if (payload.teamSettings && payload.audience !== "CLUB") {
     ctx.addIssue({ code: "custom", path: ["teamSettings"], message: "Team rules are for club events." });
+  }
+  if (payload.generalRegistrationLink && payload.audience !== "CLUB") {
+    ctx.addIssue({ code: "custom", path: ["generalRegistrationLink"], message: "The general registration link is for club events." });
   }
   const locationNames = new Set<string>();
   (payload.locations ?? []).forEach((location, index) => {

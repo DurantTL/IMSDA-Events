@@ -736,6 +736,8 @@ export function PeopleWorkspace({
             <li><a href={`/people/duplicates?event=${encodeURIComponent(eventId)}`}><CopyCheck aria-hidden="true" size={16} /> Find duplicates</a></li>
             {/* Same permission the review page itself requires (MANAGE_REGISTRATION). */}
             {canEdit && <li><a href={`/people/directory-review?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Directory review</a></li>}
+            {/* Teams registered through the general registration link that wait for a club (#931); the same permission. */}
+            {canEdit && <li><a href={`/people/pending-teams?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Teams waiting for a club</a></li>}
             <li><a href={`/people/responsible-adults?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Responsible adults</a></li>
             <li><a href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Export CSV</a></li>
             {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
