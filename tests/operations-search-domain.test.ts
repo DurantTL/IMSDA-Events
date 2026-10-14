@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { EventPermission } from "@/modules/access/permissions";
-import type { ChoiceQuestion } from "@/modules/registrations/choice-answer-filter";
 import {
   FILTER_KEYS,
   availableOperationsFilters,
@@ -14,13 +13,15 @@ import {
   resolveOperationsSearch,
   serializeOperationsSearchQuery,
   type SearchCatalog,
+  type SearchQuestion,
   type SearchViewer,
 } from "@/modules/registrations/operations-search-domain";
 
 const viewer = (...permissions: EventPermission[]): SearchViewer => ({ eventId: "event-a", permissions });
 const admin = viewer("VIEW_EVENT", "MANAGE_REGISTRATION", "MANAGE_FINANCE", "MANAGE_CHECK_IN", "VIEW_SENSITIVE_DATA");
 
-const meal: ChoiceQuestion = {
+const meal: SearchQuestion = {
+  versionIds: ["version-1", "version-2"],
   id: "ATTENDEE:meal",
   key: "meal",
   label: "Dinner choice",
@@ -36,6 +37,7 @@ function catalog(overrides: Partial<SearchCatalog> = {}): SearchCatalog {
     deferredBilling: false,
     attendeeTypes: [{ code: "ADULT", label: "Adult" }],
     locations: [],
+    organizations: [{ id: "org-1", name: "Eagle Club" }],
     tags: [{ id: "tag-vip", name: "VIP", isActive: true }],
     questions: [meal],
     ...overrides,
@@ -163,6 +165,33 @@ describe("what a viewer may search", () => {
     if (!result.ok) expect(result.issues.map((issue) => issue.filter).sort()).toEqual(["attendeeType", "location", "tag"]);
   });
 
+  it("needs the identity domain to sort by name and the payment domain to sort by total", () => {
+    const sortBy = (qs: string, who: SearchViewer) => resolveOperationsSearch(parse(qs).query, who, catalog());
+    const noIdentity = sortBy("sort=name", viewer("VIEW_EVENT", "MANAGE_FINANCE"));
+    expect(noIdentity.ok).toBe(false);
+    if (!noIdentity.ok) expect(noIdentity.issues).toEqual([expect.objectContaining({ filter: "sort", code: "unavailable" })]);
+    const noFinance = sortBy("sort=total", viewer("VIEW_EVENT", "VIEW_SENSITIVE_DATA"));
+    expect(noFinance.ok).toBe(false);
+    if (!noFinance.ok) expect(noFinance.issues).toEqual([expect.objectContaining({ filter: "sort", code: "unavailable" })]);
+    expect(sortBy("sort=name", viewer("VIEW_EVENT", "VIEW_SENSITIVE_DATA")).ok).toBe(true);
+    expect(sortBy("sort=total", viewer("VIEW_EVENT", "MANAGE_FINANCE")).ok).toBe(true);
+    expect(sortBy("sort=code", viewer("VIEW_EVENT")).ok).toBe(true);
+    // The same refusal as a forbidden filter.
+    const forbiddenFilter = sortBy("payment=PAID", viewer("VIEW_EVENT"));
+    if (!noFinance.ok && !forbiddenFilter.ok) expect(noFinance.issues[0].message).toBe(forbiddenFilter.issues[0].message);
+  });
+
+  it("offers an organization filter only with identity access, and validates the id", () => {
+    expect(availableOperationsFilters(admin, catalog()).map((filter) => filter.key)).toContain("organization");
+    expect(availableOperationsFilters(viewer("VIEW_EVENT"), catalog()).map((filter) => filter.key)).not.toContain("organization");
+    expect(resolveOperationsSearch(parse("organization=org-1").query, admin, catalog()).ok).toBe(true);
+    const stale = resolveOperationsSearch(parse("organization=org-gone").query, admin, catalog());
+    expect(stale.ok).toBe(false);
+    if (!stale.ok) expect(stale.issues).toEqual([expect.objectContaining({ filter: "organization", code: "stale-reference" })]);
+    const hidden = resolveOperationsSearch(parse("organization=org-1").query, viewer("VIEW_EVENT", "MANAGE_REGISTRATION"), catalog());
+    expect(hidden.ok).toBe(false);
+  });
+
   it("offers no balance states on a church-billed event", () => {
     const filters = availableOperationsFilters(admin, catalog({ deferredBilling: true }));
     expect(filters.find((filter) => filter.key === "payment")).toMatchObject({ options: [{ value: "REFUNDED" }] });
@@ -172,7 +201,7 @@ describe("what a viewer may search", () => {
 
   it("offers only the domains that exist and that the viewer holds", () => {
     const keys = (who: SearchViewer, c: SearchCatalog) => availableOperationsFilters(who, c).map((filter) => filter.key);
-    expect(keys(admin, catalog())).toEqual(["q", "status", "attendeeType", "source", "waitlist", "payment", "checkIn", "tag", "answer"]);
+    expect(keys(admin, catalog())).toEqual(["q", "status", "attendeeType", "organization", "source", "waitlist", "payment", "checkIn", "tag", "answer"]);
     expect(keys(viewer("VIEW_EVENT"), catalog())).toEqual(["status", "attendeeType", "source", "waitlist"]);
     expect(keys(admin, emptySearchCatalog())).toEqual(["q", "status", "source", "payment", "checkIn"]);
     expect(keys(viewer(), catalog())).toEqual([]);
@@ -201,6 +230,23 @@ describe("the predicate and the order", () => {
     expect(text.match(/"attendees":\{"some":\{"AND":\[/g)).toHaveLength(1);
     expect(text.match(/Jane/g)!.length).toBeGreaterThan(0);
     expect(text.match(/Smith/g)!.length).toBeGreaterThan(0);
+  });
+
+  it("reads an answer only on registrations submitted through a version that offers the question as a choice", () => {
+    const where = JSON.stringify(buildRegistrationWhere(parse("answer=ATTENDEE:meal=vegan&answer=REGISTRATION:transport=bus").query, {
+      eventId: "event-a",
+      questions: [{ ...meal, versionIds: ["version-2"] }, { ...meal, id: "REGISTRATION:transport", key: "transport", scope: "REGISTRATION", versionIds: ["version-1"] }],
+      paymentRegistrationIds: null,
+    }));
+    expect(where).toContain('"formVersionId":{"in":["version-2"]}');
+    expect(where).toContain('"formVersionId":{"in":["version-1"]}');
+  });
+
+  it("adds the registrations whose attendee answers live only on the submission", () => {
+    const where = buildRegistrationWhere(parse("answer=ATTENDEE:meal=vegan").query, {
+      eventId: "event-a", questions: [meal], paymentRegistrationIds: null, legacyAnswerIds: new Map([["ATTENDEE:meal", ["r-old"]]]),
+    });
+    expect(JSON.stringify(where)).toContain('"id":{"in":["r-old"]}');
   });
 
   it("fails closed for an answer whose question is unknown", () => {

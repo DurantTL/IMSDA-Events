@@ -13,9 +13,10 @@ const catalog: SearchCatalog = {
   deferredBilling: false,
   attendeeTypes: [{ code: "ADULT", label: "Adult" }],
   locations: [],
+  organizations: [{ id: "org-1", name: "Eagle Club" }],
   tags: [],
   questions: [{
-    id: "ATTENDEE:meal", key: "meal", label: "Dinner choice", scope: "ATTENDEE", multi: false, sensitive: false,
+    id: "ATTENDEE:meal", key: "meal", label: "Dinner choice", scope: "ATTENDEE", multi: false, sensitive: false, versionIds: ["v1"],
     choices: [{ value: "vegan", label: "Plant based" }],
   }],
 };

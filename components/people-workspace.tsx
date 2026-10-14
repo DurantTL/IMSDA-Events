@@ -254,6 +254,7 @@ export function PeopleWorkspace({
   responsibleAdults = {},
   locationId = null,
   matchingPersonFilter = false,
+  pageScoped = false,
 }: {
   eventId: string;
   eventSlug: string;
@@ -274,6 +275,8 @@ export function PeopleWorkspace({
   locationId?: string | null;
   /** The list was narrowed by a choice answer (#739): each row holds at least one matching person. */
   matchingPersonFilter?: boolean;
+  /** The rows are one page of a server-side search (#180): this box, filter and count cover that page only, and say so. */
+  pageScoped?: boolean;
 }) {
   const initialSelected = initialRegistrations.find((registration) => registration.id === initialRegistrationId) ?? null;
   const [registrations, setRegistrations] = useState(initialRegistrations);
@@ -724,13 +727,13 @@ export function PeopleWorkspace({
     <section className="page-stack">
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
-        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or confirmation code" /></label>
-        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">Filter registrations</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
+        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
+        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       <div className="page-intro people-intro">
         <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
         <div className="intro-actions">
-          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected</span>
+          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}</span>
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
           <ActionsMenu>
             <li><a href={`/people/duplicates?event=${encodeURIComponent(eventId)}`}><CopyCheck aria-hidden="true" size={16} /> Find duplicates</a></li>
@@ -744,7 +747,7 @@ export function PeopleWorkspace({
           </ActionsMenu>
         </div>
       </div>
-      <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}</p>
+      <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
       <SortOrderNote>{registrationListOrderText}</SortOrderNote>
       {/* Always shown, so "Select all" is findable before anything is ticked. */}
       {canEmail && (selectedIds.size > 0 || visible.length > 0) && (

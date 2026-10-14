@@ -36,6 +36,7 @@ const staffId = `${P}_staff`;
 const formA = `${P}_form_a`;
 const versionOne = `${P}_formver_1`;
 const versionTwo = `${P}_formver_2`;
+const versionZero = `${P}_formver_0`;
 const BULK = 1500;
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -47,6 +48,7 @@ async function cleanup() {
   await prisma.publicRegistrationSubmission.deleteMany({ where: { eventId: { in: events } } });
   await prisma.event.deleteMany({ where: { id: { in: events } } });
   await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
+  await prisma.organization.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.user.deleteMany({ where: { id: staffId } });
 }
 
@@ -89,18 +91,28 @@ async function main() {
       field("f_allergy", "food_allergies", "Food allergies", "SELECT", "ATTENDEE", ["peanut", "none"]),
     ] }],
   });
+  // Version zero (older still) had meal as free text, and flagged badge_color sensitive. Neither may leak into a later version's choice.
+  const definitionZero = registrationFormDefinitionSchema.parse({
+    ...definitionOne,
+    sections: [{ id: `${P}_s1`, title: "Details", description: "", fields: [
+      field("f_meal", "meal", "Meal preference", "TEXT", "ATTENDEE"),
+      field("f_badge", "badge_color", "Badge colour", "SELECT", "REGISTRATION", ["red", "blue"], { sensitive: true }),
+    ] }],
+  });
   const definitionTwo = registrationFormDefinitionSchema.parse({
     ...definitionOne,
     sections: [{ id: `${P}_s1`, title: "Details", description: "", fields: [
       field("f_meal", "meal", "Dinner choice", "SELECT", "ATTENDEE", ["plain", "vegan", "vegetarian", "kosher"], { optionLabels: { vegan: "Plant based" } }),
       field("f_ride", "transport", "How are you travelling", "RADIO", "REGISTRATION", ["bus", "car"]),
       field("f_allergy", "food_allergies", "Food allergies", "SELECT", "ATTENDEE", ["peanut", "none"]),
+      field("f_badge", "badge_color", "Badge colour", "SELECT", "REGISTRATION", ["red", "blue"]),
     ] }],
   });
   await prisma.registrationForm.create({
     data: {
       id: formA, eventId: eventA, createdByUserId: staffId, name: "Search check form", slug: `${P}-form`, status: RegistrationFormStatus.PUBLISHED,
       versions: { create: [
+        { id: versionZero, createdByUserId: staffId, versionNumber: 0, status: RegistrationFormStatus.ARCHIVED, publishedAt: new Date("2026-08-01T00:00:00Z"), definition: definitionZero },
         { id: versionOne, createdByUserId: staffId, versionNumber: 1, status: RegistrationFormStatus.ARCHIVED, publishedAt: new Date("2026-09-01T00:00:00Z"), definition: definitionOne },
         { id: versionTwo, createdByUserId: staffId, versionNumber: 2, status: RegistrationFormStatus.PUBLISHED, publishedAt: new Date("2026-09-15T00:00:00Z"), definition: definitionTwo },
       ] },
@@ -109,12 +121,13 @@ async function main() {
   const tagVip = await prisma.eventTag.create({ data: { id: `${P}_tag_vip`, eventId: eventA, name: "VIP", normalizedName: "vip", color: "#336699" } });
   const tagOld = await prisma.eventTag.create({ data: { id: `${P}_tag_old`, eventId: eventA, name: "Old", normalizedName: "old", color: "#996633", isActive: false } });
 
+  const reg0 = (key: string) => `${P}_r_${key}`;
   let seq = 0;
   type Seed = {
     key: string; code: string; status?: RegistrationStatus; totalCents?: number; submittedAt?: Date | null; createdAt?: Date;
     holder: [string, string, string?, string?];
     attendees: Array<{ first: string; last: string; email?: string; typeCode?: "ADULT" | "YOUTH"; meal?: string; allergy?: string }>;
-    transport?: string; version?: string; event?: string; submission?: boolean;
+    transport?: string; version?: string; event?: string; submission?: boolean; attendeeResponses?: Array<Record<string, unknown>>; registrationResponses?: Record<string, unknown>;
   };
   async function seed(spec: Seed) {
     seq += 1;
@@ -148,8 +161,8 @@ async function main() {
       await prisma.publicRegistrationSubmission.create({
         data: {
           id: `${P}_sub_${spec.key}`, eventId: event, formVersionId: spec.version ?? versionTwo, registrationId: registration.id,
-          idempotencyKey: `${P}-${spec.key}`, requestHash: `${P}-${spec.key}`, responses: spec.transport ? { transport: spec.transport } : {},
-          attendeeResponses: [], pricingSnapshot: {},
+          idempotencyKey: `${P}-${spec.key}`, requestHash: `${P}-${spec.key}`, responses: { ...(spec.transport ? { transport: spec.transport } : {}), ...(spec.registrationResponses ?? {}) },
+          attendeeResponses: (spec.attendeeResponses ?? []) as object[], pricingSnapshot: {},
         },
       });
     }
@@ -195,6 +208,18 @@ async function main() {
   await prisma.staffNoteRevision.create({ data: { noteId: restricted.id, sequence: 1, body: "ZEBRAQUILL restricted note body", authorUserId: staffId } });
   const plain = await prisma.staffNote.create({ data: { id: `${P}_note_s`, eventId: eventA, registrationId: r2.registrationId, visibility: "STAFF", authorUserId: staffId } });
   await prisma.staffNoteRevision.create({ data: { noteId: plain.id, sequence: 1, body: "OTTERQUILL staff note body", authorUserId: staffId } });
+  // Answers from a version that had the question as free text must not match a later version's choice.
+  await seed({ key: "v0_free", code: "OPS-1009", holder: ["Vera", "Zero", "vera.zero@example.test"], version: versionZero, registrationResponses: { badge_color: "red" },
+    attendees: [{ first: "Vera", last: "Zero", typeCode: "ADULT", meal: "vegan" }] });
+  // An attendee whose answers live only on the submission (saved before attendees kept their own), at their position.
+  await seed({ key: "legacy", code: "OPS-1010", holder: ["Lena", "Legacy", "lena.legacy@example.test"], attendeeResponses: [{ meal: "vegan" }, { meal: "plain" }],
+    attendees: [{ first: "Lena", last: "Legacy", typeCode: "ADULT" }, { first: "Leo", last: "Legacy", typeCode: "YOUTH" }] });
+  // A club registration, and a registration at a site of the event.
+  await prisma.organization.create({ data: { id: `${P}_org_eagle`, type: "CLUB", name: "Eagle Ridge Club", normalizedName: "eagle ridge club" } });
+  await prisma.clubEventRegistration.create({ data: { eventId: eventA, organizationId: `${P}_org_eagle`, registrationId: reg0("jane_doe") } });
+  const siteNorth = await prisma.eventLocation.create({ data: { id: `${P}_loc_north`, eventId: eventA, name: "North Site", normalizedName: "north site" } });
+  await prisma.eventLocation.create({ data: { id: `${P}_loc_south`, eventId: eventA, name: "South Site", normalizedName: "south site", sortOrder: 1 } });
+  await prisma.registration.update({ where: { id: reg0("jane_smith") }, data: { locationId: siteNorth.id } });
   // Another event whose people share names and a code prefix with this one.
   await seed({ key: "b_marta", code: "OPS-B-1001", event: eventB, totalCents: 1000, holder: ["Marta", "Alvarez", "marta.b@example.test"], attendees: [{ first: "Marta", last: "Alvarez" }] });
 
@@ -328,15 +353,15 @@ async function main() {
   const staffSourced = await run(registrar, "source=STAFF");
   assert(staffSourced.total === await prisma.registration.count({ where: { eventId: eventA, publicFormSubmission: null } }) && ids(staffSourced).includes(reg("waiting")), "source STAFF is registrations with no submission");
   const types = await run(registrar, "attendeeType=YOUTH");
-  assert(sameSet(ids(types), [reg("marta"), reg("jane_smith"), reg("jane_doe"), reg("arrived")]), "attendee type by code");
+  assert(sameSet(ids(types), [reg("marta"), reg("jane_smith"), reg("jane_doe"), reg("arrived"), reg("legacy")]), "attendee type by code");
   assert((await run(registrar, "attendeeType=GONE")).issues.some((issue) => issue.code === "stale-reference"), "an unknown attendee type is reported");
   assert(sameSet(ids(await run(registrar, "status=CANCELLED,WAITLISTED")), [reg("cancelled"), reg("waiting")]), "lifecycle status");
   console.log("ok  check-in, waitlist, tag, source, attendee type and status filters");
 
   // 7. Form answers: stable key survives the relabel and the version change; stale and sensitive keys are reported.
-  assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan")), [reg("marta"), reg("jane_smith")]), "meal=vegan matches across form versions and the relabelled choice");
+  assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan")), [reg("marta"), reg("jane_smith"), reg("legacy")]), "meal=vegan matches across form versions and the relabelled choice, and an attendee whose answer is only on the submission");
   assert(sameSet(ids(await run(registrar, "answer=REGISTRATION:transport=bus")), [reg("marta")]), "a registration-wide answer from the older form version still matches");
-  assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan&answer=ATTENDEE:meal=vegetarian")), [reg("marta"), reg("jane_smith")]), "values of one key are alternatives");
+  assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan&answer=ATTENDEE:meal=vegetarian")), [reg("marta"), reg("jane_smith"), reg("legacy")]), "values of one key are alternatives");
   assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan&answer=REGISTRATION:transport=car")), [reg("jane_smith")]), "different keys combine");
   const kosher = await run(registrar, "answer=ATTENDEE:meal=kosher");
   assert(kosher.ok && kosher.total === 0, "a choice added by the newer version is offered");
@@ -389,6 +414,49 @@ async function main() {
   assert(roundTrip.ok && roundTrip.registrationIds.join() === viaUrl.registrationIds.join() && viaUrl.queryString === roundTrip.queryString, "a serialized query returns the same rows");
   console.log("ok  query serialization round-trips");
 
+  // 10b. Form versions, submission fallback, sort permissions, location, organization, payment with other filters.
+  const free = await run(registrar, "answer=ATTENDEE:meal=vegan");
+  assert(!ids(free).includes(reg("v0_free")), "a version-zero free-text answer equal to a later choice value does not match");
+  const plainMeal = await run(registrar, "answer=ATTENDEE:meal=plain");
+  assert(ids(plainMeal).includes(reg("legacy")) && ids(plainMeal).includes(reg("marta")), "a second attendee's answer is read at their own position on the submission");
+  assert(!ids(await run(registrar, "answer=ATTENDEE:meal=vegetarian")).includes(reg("legacy")), "the fallback reads only that attendee's own submitted answer");
+  const badge = await run(admin, "answer=REGISTRATION:badge_color=red");
+  assert(!badge.ok && badge.issues.some((issue) => issue.code === "field-unavailable"), "a key that was sensitive in any version is refused, even where a later version offers it unflagged");
+  const sortName = await run(checkIn, "sort=name");
+  assert(!sortName.ok && sortName.total === 0 && sortName.issues[0]?.filter === "sort" && sortName.issues[0]?.code === "unavailable", "sorting by name needs the identity domain");
+  const sortTotalDenied = await run(registrar, "sort=total");
+  assert(!sortTotalDenied.ok && sortTotalDenied.issues[0]?.filter === "sort", "sorting by total needs the payment domain");
+  const sortTotal = await run(finance, "sort=total&size=5");
+  assert(sortTotal.ok && sortTotal.registrationIds[0] === reg("marta"), "finance can sort by total");
+  assert((await run(registrar, "sort=name&size=5")).ok && (await run(readOnly, "sort=code&size=5")).ok, "identity sorts by name; anyone sorts by code");
+  // Location: the service filters; a stale one is reported by the service, and the page falls back to all as the plain list does.
+  assert(sameSet(ids(await run(registrar, `location=${siteNorth.id}`)), [reg("jane_smith")]), "a location filter keeps that site's registrations");
+  const staleSite = await run(registrar, "location=ops_loc_gone");
+  assert(!staleSite.ok && staleSite.issues.some((issue) => issue.code === "stale-reference"), "the service reports an unknown location");
+  const { resolveLocationFilter } = await import("../modules/event-locations/filter");
+  const resolvedSite = await resolveLocationFilter(eventA, "ops_loc_gone");
+  assert(resolvedSite.locationId === null, "the page's own check turns an unknown location into all locations");
+  const pageQuery = { ...domain.parseOperationsSearchParams(new URLSearchParams("status=CONFIRMED&location=ops_loc_gone")).query, location: resolvedSite.locationId ? [resolvedSite.locationId] : [] };
+  const pageResult = await search.searchOperationsRegistrations(registrar, pageQuery);
+  assert(pageResult.ok && pageResult.total === (await run(registrar, "status=CONFIRMED")).total, "as the page builds it, a stale location means all locations");
+  // Organization.
+  assert(sameSet(ids(await run(registrar, `organization=${P}_org_eagle`)), [reg("jane_doe")]), "an organization filter keeps that club's registrations");
+  assert(sameSet(ids(await run(registrar, "q=Eagle+Ridge")), [reg("jane_doe")]), "text also finds a club by name");
+  const staleOrg = await run(registrar, "organization=ops_org_gone");
+  assert(!staleOrg.ok && staleOrg.issues.some((issue) => issue.code === "stale-reference"), "an unknown organization is reported");
+  const noOrg = await run(view(eventA, "VIEW_EVENT", "MANAGE_REGISTRATION"), `organization=${P}_org_eagle`);
+  assert(!noOrg.ok && noOrg.issues[0]?.code === "unavailable", "the organization filter needs identity access");
+  const orgOffered = (await search.describeOperationsSearch(registrar)).filters.find((filter) => filter.key === "organization");
+  assert(orgOffered?.kind === "enum" && orgOffered.options.some((option) => option.value === `${P}_org_eagle`), "the organization filter is offered with the event's clubs");
+  // Money state beside other filters: the cap applies to the registrations the others kept.
+  assert(sameSet(ids(await run(finance, "status=CONFIRMED&payment=PAID")), [reg("marta"), reg("arrived")]), "paid within confirmed");
+  assert(sameSet(ids(await run(finance, "q=Alvarez&payment=PAID")), [reg("marta")]), "paid within a text search");
+  assert((await run(finance, "q=Crowd&payment=PAID")).total === 0, "paid within a bulk text search finds none");
+  assert(sameSet(ids(await run(finance, "payment=PARTIAL,PAID&sort=total.asc&size=100")), [reg("jane_smith"), reg("arrived"), reg("marta")]), "several money states, ordered by total");
+  const shortSuggest = await search.suggestOperationsSearch(readOnly, "M");
+  assert(shortSuggest.ok && shortSuggest.suggestions.length === 0, "a too-short prefix answers without reading");
+  console.log("ok  version rules, submission fallback, sort permissions, location, organization, money state with other filters");
+
   // 11. Large event: canonical paging over tied rows, bounds, indexes.
   const started = Date.now();
   const crowd = await walk(registrar, "q=Crowd", 100);
@@ -416,7 +484,15 @@ async function main() {
     );
   });
   assert(plan.map((row) => row["QUERY PLAN"]).join("\n").includes("Registration_eventId_createdAt_id_idx"), `the canonical order reads the event-scoped index: ${plan.map((row) => row["QUERY PLAN"]).join(" / ")}`);
-  console.log("ok  large event: stable paging, capped sizes, indexed canonical order");
+  const defaultPlan = await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET LOCAL enable_seqscan = off");
+    return tx.$queryRawUnsafe<Array<{ "QUERY PLAN": string }>>(
+      `EXPLAIN SELECT id FROM "Registration" WHERE "eventId" = '${eventA}' ORDER BY "submittedAt" DESC NULLS LAST, "createdAt" DESC, id DESC LIMIT 50`,
+    );
+  });
+  const defaultPlanText = defaultPlan.map((row) => row["QUERY PLAN"]).join(" / ");
+  assert(defaultPlanText.includes("Registration_eventId_submittedAt_createdAt_id_idx") && !/\bSort\b/.test(defaultPlanText), `the default order is served by its index without a sort: ${defaultPlanText}`);
+  console.log("ok  large event: stable paging, capped sizes, indexed canonical and default orders");
 }
 
 main()

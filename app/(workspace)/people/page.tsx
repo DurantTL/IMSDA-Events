@@ -8,6 +8,7 @@ import { listRegistrations } from "@/modules/registrations/repository";
 import { OperationsSearchBar } from "@/components/operations-search-bar";
 import {
   activeFilterKeys,
+  conflictIssue,
   parseOperationsSearchParams,
   pickSearchParams,
   serializeOperationsSearchQuery,
@@ -42,20 +43,28 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   // Structured search (#180) runs on the server when the URL carries a filter beyond the location, a sort, or a page.
   // A plain visit keeps the list as it was: everything loaded, found with the box below.
   const picked = pickSearchParams(rawParams);
-  const { query: searchQuery, issues: searchParseIssues } = parseOperationsSearchParams(picked);
+  const parsedSearch = parseOperationsSearchParams(picked);
+  // The location is the page's own, already checked against the event's sites: a stale or unknown one means all
+  // locations here, exactly as it does on the plain list, rather than a search that finds nothing.
+  const searchQuery = { ...parsedSearch.query, location: locationId ? [locationId] : [] };
+  const searchParseIssues = parsedSearch.issues.filter((issue) => issue.filter !== "location");
   const searchViewer = { eventId: event.id, permissions };
   const { catalog: searchCatalog, filters: searchFilters } = await describeOperationsSearch(searchViewer);
   const serverSearch = activeFilterKeys(searchQuery).some((key) => key !== "location") || picked.has("sort") || picked.has("page") || searchParseIssues.length > 0;
-  const searchResult = serverSearch ? await searchOperationsRegistrations(searchViewer, picked, searchCatalog) : null;
+  // The retired single-answer parameters cannot ride along with a server search: say so instead of ignoring them.
+  const retiredAnswerParams = serverSearch && Boolean(answerQuestion || answerValue) ? [conflictIssue(CHOICE_FILTER_QUESTION_PARAM)] : [];
+  const searchResult = serverSearch ? await searchOperationsRegistrations(searchViewer, searchQuery, searchCatalog, [...searchParseIssues, ...retiredAnswerParams]) : null;
+  // A registration opened by link (?registration=) is shown even when it is not on this page of results.
+  const offPageRegistrationId = searchResult && registration && !searchResult.registrationIds.includes(registration) ? [registration] : [];
   const [loaded, flagged, responsibleByAttendee, optOutRows] = await Promise.all([
     searchResult
-      ? (searchResult.registrationIds.length > 0 ? listRegistrations(event.id, { registrationIds: searchResult.registrationIds }) : Promise.resolve([]))
+      ? ([...searchResult.registrationIds, ...offPageRegistrationId].length > 0 ? listRegistrations(event.id, { registrationIds: [...searchResult.registrationIds, ...offPageRegistrationId] }) : Promise.resolve([]))
       : listRegistrations(event.id, { locationId }),
     backgroundFlaggedAttendeeIds(event.id), getResponsibleAdultsByAttendee(event.id), listEventAnnouncementOptOuts(event.id),
   ]);
-  // The service's canonical order, not the loader's.
+  // The service's canonical order, not the loader's; an off-page registration follows the page.
   const allRegistrations = searchResult
-    ? searchResult.registrationIds.flatMap((id) => loaded.filter((registration) => registration.id === id))
+    ? [...searchResult.registrationIds, ...offPageRegistrationId].flatMap((id) => loaded.filter((candidate) => candidate.id === id))
     : loaded;
   // Who opted out of announcements (#838), marked on the registration: the kind only, never a reason.
   const announcementOptOuts = Object.fromEntries(optOutRows.map((row) => [row.registrationId, row.scope]));
@@ -81,7 +90,10 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
       matches: choice.value ? matchesForChoice(allRegistrations, choice.question, choice.value) : [],
     } : null,
   };
-  const searchParamsForLinks: Record<string, string | undefined> = { ...Object.fromEntries(serializeOperationsSearchQuery(searchQuery) ? new URLSearchParams(serializeOperationsSearchQuery(searchQuery)) : []), event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined };
+  // Links that change the location keep the whole search, including repeated parameters such as several answers.
+  const searchParamsForLinks = new URLSearchParams(serializeOperationsSearchQuery(searchQuery));
+  searchParamsForLinks.set("event", event.id);
+  if (filter) searchParamsForLinks.set("filter", filter);
   return <>
     <OperationsSearchBar
       basePath="/people"
@@ -93,6 +105,6 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     />
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
-    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} />
+    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} />
   </>;
 }

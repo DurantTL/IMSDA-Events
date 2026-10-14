@@ -26,6 +26,7 @@ const definition = {
 function fixture(overrides: { waitlistEnabled?: boolean } = {}) {
   const transaction = {
     $executeRawUnsafe: vi.fn().mockResolvedValue(0),
+    $queryRaw: vi.fn().mockResolvedValue([{ id: "r1" }]),
     registration: {
       count: vi.fn().mockResolvedValue(3),
       findMany: vi.fn().mockResolvedValue([{ id: "r1" }, { id: "r2" }, { id: "r3" }]),
@@ -36,17 +37,11 @@ function fixture(overrides: { waitlistEnabled?: boolean } = {}) {
     event: { findUnique: vi.fn().mockResolvedValue({ waitlistEnabled: overrides.waitlistEnabled ?? true, billingMode: "ATTENDEE_PAY" }) },
     eventAttendeeType: { findMany: vi.fn().mockResolvedValue([{ code: "ADULT", label: "Adult" }]) },
     eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+    clubEventRegistration: { findMany: vi.fn().mockResolvedValue([{ organization: { id: "org-1", name: "Eagle Club" } }]) },
     eventTag: { findMany: vi.fn().mockResolvedValue([{ id: "tag-1", name: "VIP", isActive: true }]) },
     publicRegistrationSubmission: { groupBy: vi.fn().mockResolvedValue([{ formVersionId: "v1" }]) },
-    registrationFormVersion: { findMany: vi.fn().mockResolvedValue([{ definition }]) },
-    $queryRaw: vi.fn().mockResolvedValue([{ id: "r1" }]),
-    $transaction: vi.fn(async (run: (tx: typeof transaction) => unknown) => run(transaction)),
-    registration: {
-      findMany: vi.fn().mockResolvedValue([{
-        id: "r1", confirmationCode: "OPS-1", contactSnapshot: {}, accountHolderPerson: { firstName: "Marta", lastName: "Alvarez" },
-        attendees: [{ profileSnapshot: { firstName: "Diego", lastName: "Alvarez" }, person: { firstName: "Diego", lastName: "Alvarez" } }],
-      }]),
-    },
+    registrationFormVersion: { findMany: vi.fn().mockResolvedValue([{ id: "v1", definition }]) },
+    $transaction: vi.fn(async (run: (tx: typeof transaction) => unknown, options?: { timeout?: number; maxWait?: number }) => { void options; return run(transaction); }),
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return { prisma, transaction };
@@ -83,11 +78,15 @@ describe("count and result equality", () => {
   });
 
   it("gives suggestions the same predicate as a search for the typed text", async () => {
-    const { prisma, transaction } = fixture();
+    const { transaction } = fixture();
     await searchOperationsRegistrations(registrar, params("q=Alv&status=CONFIRMED"));
     const searchWhere = transaction.registration.count.mock.calls[0][0].where;
+    transaction.registration.findMany.mockResolvedValueOnce([{
+      id: "r1", confirmationCode: "OPS-1", contactSnapshot: {}, accountHolderPerson: { firstName: "Marta", lastName: "Alvarez" },
+      attendees: [{ profileSnapshot: { firstName: "Diego", lastName: "Alvarez" }, person: { firstName: "Diego", lastName: "Alvarez" } }],
+    }]);
     const suggested = await suggestOperationsSearch(registrar, "Alv", params("status=CONFIRMED"));
-    expect(prisma.registration.findMany.mock.calls[0][0].where).toEqual(searchWhere);
+    expect(transaction.registration.findMany.mock.calls.at(-1)?.[0].where).toEqual(searchWhere);
     expect(suggested.suggestions).toEqual([
       { label: "Marta Alvarez", registrationId: "r1" },
       { label: "Diego Alvarez", registrationId: "r1" },
@@ -109,11 +108,12 @@ describe("unauthorized and stale requests", () => {
   });
 
   it("does not even load the domains the viewer may not use", async () => {
-    const { prisma } = fixture();
+    const { prisma, transaction } = fixture();
     await searchOperationsRegistrations(viewer("VIEW_EVENT"), params("status=CONFIRMED"));
     expect(prisma.eventTag.findMany).not.toHaveBeenCalled();
     expect(prisma.registrationFormVersion.findMany).not.toHaveBeenCalled();
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prisma.clubEventRegistration.findMany).not.toHaveBeenCalled();
+    expect(transaction.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("gives a viewer without VIEW_EVENT nothing, and reads nothing", async () => {
@@ -126,10 +126,10 @@ describe("unauthorized and stale requests", () => {
   });
 
   it("returns no suggestions to a viewer who may not search by text", async () => {
-    const { prisma } = fixture();
+    const { transaction } = fixture();
     const suggested = await suggestOperationsSearch(viewer("VIEW_EVENT", "MANAGE_FINANCE"), "Marta");
     expect(suggested).toMatchObject({ ok: false, suggestions: [] });
-    expect(prisma.registration.findMany).not.toHaveBeenCalled();
+    expect(transaction.registration.findMany).not.toHaveBeenCalled();
   });
 
   it("reports a stale form key and runs nothing", async () => {
@@ -184,11 +184,102 @@ describe("another event and large data", () => {
   });
 
   it("refuses a money-state filter that would resolve to an unbounded id list", async () => {
-    const { prisma, transaction } = fixture();
-    prisma.$queryRaw.mockResolvedValueOnce(Array.from({ length: 20_001 }, (_, i) => ({ id: `r${i}` })));
+    const { transaction } = fixture();
+    transaction.$queryRaw.mockResolvedValueOnce(Array.from({ length: 20_001 }, (_, i) => ({ id: `r${i}` })));
     const result = await searchOperationsRegistrations(viewer("VIEW_EVENT", "MANAGE_FINANCE", "VIEW_SENSITIVE_DATA"), params("payment=PAID"));
     expect(result.ok).toBe(false);
     expect(result.issues[0]?.code).toBe("too-broad");
+    expect(transaction.registration.count).not.toHaveBeenCalled();
+  });
+
+  it("applies the money-state cap after the other filters, inside the read transaction", async () => {
+    const { prisma, transaction } = fixture();
+    const finance = viewer("VIEW_EVENT", "MANAGE_FINANCE", "VIEW_SENSITIVE_DATA");
+    transaction.registration.findMany.mockResolvedValueOnce([{ id: "r1" }, { id: "r2" }]);
+    const result = await searchOperationsRegistrations(finance, params("status=CONFIRMED&payment=PAID"));
+    expect(result.ok).toBe(true);
+    // The first read is the candidate set the status filter kept, then the money state is looked up for exactly those.
+    const candidates = transaction.registration.findMany.mock.calls[0][0];
+    expect(candidates.where.AND).toEqual([{ status: { in: ["CONFIRMED"] } }]);
+    expect(candidates.take).toBe(20_001);
+    expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(transaction.$queryRaw.mock.calls[0][0].values)).toContain("r2");
+    // The lookup ran in the transaction, not on the shared client.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // Too many candidates is refused before any money lookup.
+    transaction.$queryRaw.mockClear();
+    transaction.registration.findMany.mockResolvedValueOnce(Array.from({ length: 20_001 }, (_, i) => ({ id: `r${i}` })));
+    const tooMany = await searchOperationsRegistrations(finance, params("status=CONFIRMED&payment=PAID"));
+    expect(tooMany.issues[0]?.code).toBe("too-broad");
+    expect(transaction.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("maps a closed or timed-out transaction to the same narrow-it result", async () => {
+    for (const error of [Object.assign(new Error("Transaction API error"), { code: "P2028" }), Object.assign(new Error("conflict"), { code: "P2034" }), new Error("Transaction already closed")]) {
+      const { prisma } = fixture();
+      prisma.$transaction.mockRejectedValueOnce(error);
+      const result = await searchOperationsRegistrations(registrar, params("q=Crowd"));
+      expect(result).toMatchObject({ ok: false, total: 0 });
+      expect(result.issues[0]?.code).toBe("too-broad");
+    }
+    const { prisma } = fixture();
+    prisma.$transaction.mockRejectedValueOnce(new Error("disk on fire"));
+    await expect(searchOperationsRegistrations(registrar, params("q=Crowd"))).rejects.toThrow("disk on fire");
+  });
+
+  it("gives the read transaction room for its statement timeout", async () => {
+    const { prisma } = fixture();
+    await searchOperationsRegistrations(registrar, params("q=Crowd"));
+    const options = prisma.$transaction.mock.calls[0][1];
+    expect(options?.timeout).toBeGreaterThanOrEqual(24_000);
+    expect(options?.maxWait).toBeGreaterThan(0);
+  });
+
+  it("checks the two-character minimum before reading anything", async () => {
+    const { prisma } = fixture();
+    expect(await suggestOperationsSearch(registrar, "M")).toEqual({ ok: true, issues: [], suggestions: [] });
+    expect(prisma.event.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("drops a question that is sensitive in any form version, even one that no longer flags it", async () => {
+    const { prisma } = fixture();
+    const flaggedOld = { ...definition, sections: [{ ...definition.sections[0], fields: [{ ...definition.sections[0].fields[0], sensitive: true }] }] };
+    prisma.registrationFormVersion.findMany.mockResolvedValueOnce([{ id: "v1", definition: flaggedOld }, { id: "v2", definition }]);
+    const { filters } = await describeOperationsSearch(registrar);
+    expect(filters.find((filter) => filter.key === "answer")).toBeUndefined();
+  });
+
+  it("remembers which versions offer a question", async () => {
+    const { prisma } = fixture();
+    const free = { ...definition, sections: [{ ...definition.sections[0], fields: [{ ...definition.sections[0].fields[0], type: "TEXT", options: [] }] }] };
+    prisma.registrationFormVersion.findMany.mockResolvedValueOnce([{ id: "v1", definition: free }, { id: "v2", definition }]);
+    const { catalog } = await describeOperationsSearch(registrar);
+    expect(catalog.questions.find((question) => question.id === "ATTENDEE:meal")?.versionIds).toEqual(["v2"]);
+  });
+
+  it("offers organizations only to a viewer with identity access, and validates them", async () => {
+    fixture();
+    const { filters } = await describeOperationsSearch(registrar);
+    expect(filters.find((filter) => filter.key === "organization")).toMatchObject({ options: [{ value: "org-1", label: "Eagle Club" }] });
+    const stale = await searchOperationsRegistrations(registrar, params("organization=org-gone"));
+    expect(stale.issues).toEqual([expect.objectContaining({ filter: "organization", code: "stale-reference" })]);
+  });
+
+  it("looks up attendee answers kept only on the submission, in the same transaction", async () => {
+    const { transaction } = fixture();
+    transaction.$queryRaw.mockResolvedValueOnce([{ id: "r-old" }]);
+    const result = await searchOperationsRegistrations(registrar, params("answer=ATTENDEE:meal=vegan"));
+    expect(result.ok).toBe(true);
+    expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(transaction.registration.count.mock.calls[0][0].where)).toContain('"id":{"in":["r-old"]}');
+  });
+
+  it("carries issues from the caller and stops the search", async () => {
+    const { transaction } = fixture();
+    const result = await searchOperationsRegistrations(registrar, params("status=CONFIRMED"), undefined, [{ filter: "answerQuestion", code: "conflict", message: "x" }]);
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual([expect.objectContaining({ filter: "answerQuestion", code: "conflict" })]);
     expect(transaction.registration.count).not.toHaveBeenCalled();
   });
 });

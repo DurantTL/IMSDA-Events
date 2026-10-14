@@ -186,7 +186,8 @@ export type SearchIssueCode =
   | "field-unavailable"
   | "value-not-offered"
   | "stale-reference"
-  | "too-broad";
+  | "too-broad"
+  | "conflict";
 
 export type SearchIssue = { filter: string; code: SearchIssueCode; message: string };
 
@@ -198,8 +199,14 @@ function issue(filter: string, code: SearchIssueCode): SearchIssue {
     "value-not-offered": "This choice is no longer offered.",
     "stale-reference": "This item no longer exists for this event.",
     "too-broad": "This search matches too many records to filter this way. Narrow it first.",
+    conflict: "This cannot be combined with the other filters in this search.",
   };
   return { filter, code, message: messages[code] };
+}
+
+/** An issue a caller reports for a request the search itself cannot see (for example a retired URL parameter). */
+export function conflictIssue(filter: string): SearchIssue {
+  return issue(filter, "conflict");
 }
 
 // ---- parsing and serialization ---------------------------------------------
@@ -437,12 +444,22 @@ export type SearchCatalog = {
   /** Sites of the event; empty on a single-location event, where the filter does not exist. */
   locations: Array<{ id: string; name: string }>;
   tags: Array<{ id: string; name: string; isActive: boolean }>;
+  /** Organizations (clubs and churches) with a registration on the event; empty when the viewer may not use identity filters. */
+  organizations: Array<{ id: string; name: string }>;
   /** Non-sensitive choice questions across the event's form versions; empty when the viewer may not use form answers. */
-  questions: ChoiceQuestion[];
+  questions: SearchQuestion[];
 };
 
+/**
+ * A choice question plus the form versions that offer it as a filterable
+ * choice. An answer is read only on a registration submitted through one of
+ * those versions, so a later version that reuses the key for free text is
+ * never read as a choice (the same rule as the in-memory answer filter).
+ */
+export type SearchQuestion = ChoiceQuestion & { versionIds: string[] };
+
 export function emptySearchCatalog(): SearchCatalog {
-  return { waitlistEnabled: false, deferredBilling: false, attendeeTypes: [], locations: [], tags: [], questions: [] };
+  return { waitlistEnabled: false, deferredBilling: false, attendeeTypes: [], locations: [], tags: [], organizations: [], questions: [] };
 }
 
 /** Whether a filter exists for the event at all (before the permission check). */
@@ -450,6 +467,7 @@ function filterExists(key: FilterKey, catalog: SearchCatalog) {
   switch (key) {
     case "attendeeType": return catalog.attendeeTypes.length > 0;
     case "location": return catalog.locations.length > 0;
+    case "organization": return catalog.organizations.length > 0;
     case "waitlist": return catalog.waitlistEnabled;
     case "tag": return catalog.tags.length > 0;
     case "answer": return catalog.questions.length > 0;
@@ -458,10 +476,10 @@ function filterExists(key: FilterKey, catalog: SearchCatalog) {
 }
 
 export type SearchFilterDescriptor =
-  | { key: Exclude<FilterKey, "answer" | "attendeeType" | "location" | "tag" | "status" | "source" | "waitlist" | "payment" | "checkIn">; kind: "text" }
+  | { key: Exclude<FilterKey, "answer" | "attendeeType" | "location" | "organization" | "tag" | "status" | "source" | "waitlist" | "payment" | "checkIn">; kind: "text" }
   | { key: "status" | "source" | "waitlist" | "payment" | "checkIn"; kind: "enum"; options: Array<{ value: string }> }
   | { key: "attendeeType"; kind: "enum"; options: Array<{ value: string; label: string }> }
-  | { key: "location"; kind: "enum"; options: Array<{ value: string; label: string }> }
+  | { key: "location" | "organization"; kind: "enum"; options: Array<{ value: string; label: string }> }
   | { key: "tag"; kind: "enum"; options: Array<{ value: string; label: string }> }
   | { key: "answer"; kind: "questions"; questions: Array<{ question: string; label: string; scope: "REGISTRATION" | "ATTENDEE"; choices: Array<{ value: string; label: string }> }> };
 
@@ -477,6 +495,7 @@ export function availableOperationsFilters(viewer: SearchViewer, catalog: Search
   if (usable("status")) out.push({ key: "status", kind: "enum", options: REGISTRATION_STATUSES.map((value) => ({ value })) });
   if (usable("attendeeType")) out.push({ key: "attendeeType", kind: "enum", options: catalog.attendeeTypes.map((type) => ({ value: type.code, label: type.label })) });
   if (usable("location")) out.push({ key: "location", kind: "enum", options: catalog.locations.map((site) => ({ value: site.id, label: site.name })) });
+  if (usable("organization")) out.push({ key: "organization", kind: "enum", options: catalog.organizations.map((organization) => ({ value: organization.id, label: organization.name })) });
   if (usable("source")) out.push({ key: "source", kind: "enum", options: REGISTRATION_SOURCES.map((value) => ({ value })) });
   if (usable("waitlist")) out.push({ key: "waitlist", kind: "enum", options: WAITLIST_STATES.map((value) => ({ value })) });
   if (usable("payment")) {
@@ -496,7 +515,7 @@ export function availableOperationsFilters(viewer: SearchViewer, catalog: Search
 }
 
 export type ResolvedSearch =
-  | { ok: true; query: OperationsSearchQuery; questions: ChoiceQuestion[] }
+  | { ok: true; query: OperationsSearchQuery; questions: SearchQuestion[] }
   | { ok: false; issues: SearchIssue[] };
 
 /**
@@ -530,6 +549,13 @@ export function resolveOperationsSearch(
     const known = new Set(catalog.locations.map((site) => site.id));
     if (query.location.some((id) => !known.has(id))) issues.push(issue("location", "stale-reference"));
   }
+  if (usableKeys.has("organization")) {
+    const known = new Set(catalog.organizations.map((organization) => organization.id));
+    if (query.organization.some((id) => !known.has(id))) issues.push(issue("organization", "stale-reference"));
+  }
+  // Sorting by a value is reading that value: the sort needs the same domain as the filter on it.
+  if (query.sort === "name" && !viewerCanUseDomain(viewer, "identity")) issues.push(issue("sort", "unavailable"));
+  if (query.sort === "total" && !viewerCanUseDomain(viewer, "payment")) issues.push(issue("sort", "unavailable"));
   if (usableKeys.has("tag")) {
     const known = new Set(catalog.tags.map((tag) => tag.id));
     if (query.tag.some((id) => !known.has(id))) issues.push(issue("tag", "stale-reference"));
@@ -537,7 +563,7 @@ export function resolveOperationsSearch(
   if (usableKeys.has("payment") && catalog.deferredBilling && query.payment.some((state) => state !== "REFUNDED")) {
     issues.push(issue("payment", "value-not-offered"));
   }
-  const questions: ChoiceQuestion[] = [];
+  const questions: SearchQuestion[] = [];
   if (usableKeys.has("answer")) {
     const byId = new Map(catalog.questions.map((question) => [question.id, question]));
     for (const answer of query.answers) {
@@ -569,7 +595,12 @@ function dedupeIssues(issues: readonly SearchIssue[]) {
 
 export type SearchWhereContext = {
   eventId: string;
-  questions: readonly ChoiceQuestion[];
+  questions: readonly SearchQuestion[];
+  /**
+   * Registrations whose attendee answer lives only on the original submission (the attendee row has no answers of its
+   * own), per question id: the in-memory filter reads those at the attendee's position, which SQL resolves for us.
+   */
+  legacyAnswerIds?: ReadonlyMap<string, readonly string[]>;
   /** Registrations whose money state matches, when a payment filter is active (computed by the repository). */
   paymentRegistrationIds: readonly string[] | null;
 };
@@ -658,18 +689,27 @@ function answerValuePredicate(key: string, value: string) {
   return [{ path: [key], equals: value }, { path: [key], array_contains: [value] }];
 }
 
-function answerPredicate(answer: AnswerFilter, question: ChoiceQuestion): Prisma.RegistrationWhereInput {
+function answerPredicate(answer: AnswerFilter, question: SearchQuestion, legacyIds: readonly string[]): Prisma.RegistrationWhereInput {
+  // Only a registration submitted through a version that offers the question as a choice is read.
+  const offeredVersion: Prisma.RegistrationWhereInput = { publicFormSubmission: { is: { formVersionId: { in: question.versionIds } } } };
   if (question.scope === "REGISTRATION") {
     return {
-      publicFormSubmission: {
-        is: { OR: answer.values.flatMap((value) => answerValuePredicate(question.key, value).map((responses) => ({ responses }))) },
-      },
+      AND: [
+        offeredVersion,
+        { publicFormSubmission: { is: { OR: answer.values.flatMap((value) => answerValuePredicate(question.key, value).map((responses) => ({ responses }))) } } },
+      ],
     };
   }
   return {
-    attendees: {
-      some: { OR: answer.values.flatMap((value) => answerValuePredicate(question.key, value).map((formResponses) => ({ formResponses }))) },
-    },
+    OR: [
+      {
+        AND: [
+          offeredVersion,
+          { attendees: { some: { OR: answer.values.flatMap((value) => answerValuePredicate(question.key, value).map((formResponses) => ({ formResponses }))) } } },
+        ],
+      },
+      { id: { in: [...legacyIds] } },
+    ],
   };
 }
 
@@ -706,7 +746,7 @@ export function buildRegistrationWhere(query: OperationsSearchQuery, context: Se
   for (const answer of query.answers) {
     const question = context.questions.find((candidate) => candidate.id === answer.question);
     // Unreachable for a resolved query; failing closed beats matching everything.
-    clauses.push(question ? answerPredicate(answer, question) : { id: { in: [] } });
+    clauses.push(question ? answerPredicate(answer, question, context.legacyAnswerIds?.get(answer.question) ?? []) : { id: { in: [] } });
   }
   return { eventId: context.eventId, ...(clauses.length ? { AND: clauses } : {}) };
 }

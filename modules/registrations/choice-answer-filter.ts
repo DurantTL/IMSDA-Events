@@ -122,6 +122,26 @@ export function questionsFromDefinition(definition: Record<string, unknown>): Ma
 }
 
 /**
+ * Every question id (`${scope}:${key}`) that ONE definition treats as sensitive,
+ * whether or not it is offered as a filter there: health type, flagged, or
+ * linked to a sensitive question. The server-side operations search (#180)
+ * unions these across every version, so a key that was sensitive in any version
+ * is never searchable, even in a later version that dropped the flag.
+ */
+export function sensitiveQuestionIdsFromDefinition(definition: Record<string, unknown>): Set<string> {
+  const ids = new Set<string>();
+  const parsed = registrationFormDefinitionSchema.safeParse(definition);
+  if (!parsed.success) return ids;
+  const paymentKey = parsed.data.payment?.paymentMethodFieldKey ?? null;
+  const allFields = parsed.data.sections.flatMap((section) => section.fields);
+  const context = { allFields, sectionTitleOf: sectionTitleLookup(parsed.data.sections), paymentMethodFieldKey: paymentKey };
+  for (const field of allFields) {
+    if (resolveFieldOffer(field, context).sensitive) ids.add(`${field.scope}:${field.key}`);
+  }
+  return ids;
+}
+
+/**
  * The questions of several form definitions folded into one set, by id. A
  * question that is sensitive in any definition is sensitive in the result, and
  * a later version that adds a choice extends the choices (first-seen order).
