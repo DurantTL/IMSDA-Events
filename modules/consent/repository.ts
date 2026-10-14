@@ -20,6 +20,9 @@ import {
   type ApplicabilitySubject,
 } from "@/modules/consent/domain";
 
+/** How far before the publish moment an effective-from may be, to absorb browser-to-server delay. */
+export const BACKDATE_TOLERANCE_MS = 5 * 60_000;
+
 export class ConsentPolicyError extends Error {
   constructor(
     public readonly code:
@@ -294,9 +297,10 @@ export async function publishPolicyVersion(eventId: string | null, policyId: str
   const input = consentPolicyPublishInputSchema.parse(rawInput);
   const publishedAt = new Date();
   // A version cannot take effect before it is published: backdating would rewrite which text applied to
-  // evidence that already exists.
-  if (input.effectiveFrom.getTime() < publishedAt.getTime()) {
-    throw new ConsentPolicyError("EFFECTIVE_FROM_IN_PAST", "The effective-from date cannot be earlier than the moment of publishing. Choose now or a later date.");
+  // evidence that already exists. "Effective now" sent from a browser reaches the server a little late, so up to
+  // BACKDATE_TOLERANCE_MS before the publish moment is accepted (and stored as sent).
+  if (input.effectiveFrom.getTime() < publishedAt.getTime() - BACKDATE_TOLERANCE_MS) {
+    throw new ConsentPolicyError("EFFECTIVE_FROM_IN_PAST", "The effective-from date cannot be earlier than the moment of publishing (a 5-minute allowance for clock delay aside). Choose now or a later date.");
   }
   return getPrisma().$transaction(async (tx) => {
     const policy = await tx.consentPolicy.findFirst({

@@ -170,10 +170,31 @@ describe("publishing consent policy versions", () => {
     useClient(tx);
 
     await expect(
-      publishPolicyVersion("event-1", "policy-1", "user-1", { effectiveFrom: "2025-11-30T23:59:59Z", isMaterialChange: false }),
+      publishPolicyVersion("event-1", "policy-1", "user-1", { effectiveFrom: "2025-11-30T23:54:59Z", isMaterialChange: false }),
     ).rejects.toMatchObject({ code: "EFFECTIVE_FROM_IN_PAST", message: expect.stringContaining("earlier than the moment of publishing") });
     expect(tx.consentPolicyVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.consentPolicy.update).not.toHaveBeenCalled();
+  });
+
+  it("accepts an effective-from up to 5 minutes before publishing and stores it as sent", async () => {
+    const tx = client();
+    tx.consentPolicy.findFirst.mockResolvedValue(policyWith([{ id: "version-1", status: "DRAFT", versionNumber: 1, ...placeholder }]));
+    tx.consentPolicyVersion.findUniqueOrThrow.mockResolvedValue(versionRow());
+    useClient(tx);
+
+    await publishPolicyVersion("event-1", "policy-1", "user-1", { effectiveFrom: "2025-11-30T23:55:00Z", isMaterialChange: false });
+    expect(tx.consentPolicyVersion.updateMany.mock.calls[0]![0].data.effectiveFrom).toEqual(new Date("2025-11-30T23:55:00Z"));
+  });
+
+  it("refuses an effective-from one second beyond the 5-minute allowance", async () => {
+    const tx = client();
+    tx.consentPolicy.findFirst.mockResolvedValue(policyWith([{ id: "version-1", status: "DRAFT", versionNumber: 1, ...placeholder }]));
+    useClient(tx);
+
+    await expect(
+      publishPolicyVersion("event-1", "policy-1", "user-1", { effectiveFrom: "2025-11-30T23:54:59Z", isMaterialChange: false }),
+    ).rejects.toMatchObject({ code: "EFFECTIVE_FROM_IN_PAST" });
+    expect(tx.consentPolicyVersion.updateMany).not.toHaveBeenCalled();
   });
 
   it("allows publishing effective immediately", async () => {

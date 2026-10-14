@@ -31,7 +31,7 @@ existing form answers belong to later slices.
   answer not-found for a policy that is neither the event's own nor
   organization-scoped; `expectedKind` runs `requirePolicyKind`.
 - A version cannot be backdated: `effectiveFrom` earlier than the moment of
-  publishing is refused (400, `EFFECTIVE_FROM_IN_PAST`), so a publish can never
+  publishing by more than 5 minutes (allowance for browser delay; the value is stored as sent) is refused (400, `EFFECTIVE_FROM_IN_PAST`), so a publish can never
   change which text applied to evidence that already exists.
 - Published versions are also never deleted and re-inserted. A trigger refuses
   `DELETE` of a published version, and of a policy that has one, unless the
