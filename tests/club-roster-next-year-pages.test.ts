@@ -170,6 +170,16 @@ describe("the checklist (#414)", () => {
     expect(html).not.toMatch(/aria-label="Carry Sam Fixture forward"[^>]*checked/);
     expect(html).toContain("Start the 2027-28 roster with 1 person");
   });
+
+  it("notes a declined transfer neutrally and leaves that person ticked", () => {
+    const rows = [{ ...available.candidates[0]!, memberId: "m3", firstName: "Kim", transferring: false, transferWithStaff: true }];
+    const html = renderToStaticMarkup(
+      createElement(ClubRosterCarryForward, { fromClubYear: "2026-27", organizationId: "club-1", rows: rows as never, toClubYear: "2027-28" }),
+    );
+    expect(html).toContain("Transfer request is with conference staff");
+    expect(html).not.toContain("Transferring to another club");
+    expect(html).toMatch(/aria-label="Carry Kim Fixture forward"[^>]*checked/);
+  });
 });
 
 describe("the not-started list for staff and Area Coordinators (#414)", () => {

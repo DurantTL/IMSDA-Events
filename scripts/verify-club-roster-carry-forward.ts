@@ -12,7 +12,9 @@
  *   confirmations leave exactly one winner and no duplicate rows;
  * - another club's person is `MEMBER_NOT_FOUND` and nothing is written;
  * - removal is unchanged: removing a carried person leaves last year's row as it was;
- * - a person with an open outbound transfer is flagged, and a removal that commits during a carry is never carried;
+ * - a person with a pending outbound transfer is flagged and a declined one noted; a removal that commits before a carry
+ *   is never carried, and a removal queued after a carry finishes with no deadlock (both orders, made deterministic by
+ *   holding the club lock and waiting in pg_stat_activity until both are queued);
  * - the oversight list shows clubs that haven't started, counts only;
  * - no audit row, and no carry-forward record, holds a birth date or a name.
  *
@@ -25,7 +27,7 @@ import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { carryRosterForward, getCarryForwardOffer, listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
-import { addRosterMember, eraseRosterRow, listRoster, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
+import { addRosterMember, listRoster, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
 
 loadEnvConfig(process.cwd());
 // Local-only, before any Prisma client or connection exists.
@@ -34,7 +36,7 @@ fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-carry-forward-synthetic-k
 
 const prisma = new PrismaClient();
 const P = "cf414";
-const clubs = { a: `${P}_club_a`, b: `${P}_club_b`, c: `${P}_club_c`, d: `${P}_club_d`, e: `${P}_club_e`, f: `${P}_club_f` };
+const clubs = { a: `${P}_club_a`, b: `${P}_club_b`, c: `${P}_club_c`, d: `${P}_club_d`, e: `${P}_club_e`, f: `${P}_club_f`, g: `${P}_club_g` };
 const from = "2026-27";
 const to = "2027-28";
 // August: the next year is prepared. September 20 is a late club: the same pair of years.
@@ -187,24 +189,75 @@ async function main() {
   assert(eCandidates.find((c) => c.memberId === e[1]!.memberId)?.transferring === true, "a person with an open transfer is flagged");
   assert(eCandidates.find((c) => c.memberId === e[0]!.memberId)?.transferring === false, "everyone else is not");
 
-  // A carry racing a removal: the removal commits first, and the removed person is never carried (club F).
-  const f = [await addPerson(clubs.f, 0), await addPerson(clubs.f, 1)];
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
-  const removal = prisma.$transaction(async (tx) => {
-    await eraseRosterRow(tx, f[0]!.memberId, new Date());
-    await gate;
+  // A DECLINED transfer is with conference staff: flagged neutrally, not as transferring (club E, a third person).
+  const e3 = await addPerson(clubs.e, 2);
+  await prisma.memberTransfer.create({
+    data: {
+      personId: e3.personId, pendingPersonId: e3.personId, clubYear: from, fromOrganizationId: clubs.e, toOrganizationId: clubs.b,
+      fromRosterMemberId: e3.memberId, requestedFirstName: "", requestedLastName: "", reason: "", status: "DECLINED",
+      acknowledgeDueAt: new Date("2027-09-01T00:00:00Z"),
+    },
   });
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  const e2Offer = await getCarryForwardOffer(clubs.e, august);
+  const e2Candidate = (e2Offer.state === "AVAILABLE" ? e2Offer.candidates : []).find((c) => c.memberId === e3.memberId);
+  assert(e2Candidate?.transferring === false && e2Candidate.transferWithStaff === true, "a declined transfer is with staff, not transferring");
+
+  // Deterministic races between a carry and the real removal. The test holds the club's order lock (the one both take
+  // first), starts the two operations in a chosen order, waits until both are provably queued on it, then lets go.
+  async function waitingOnLock(count: number) {
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      const rows = await prisma.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*)::bigint AS n FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'`;
+      if (Number(rows[0]!.n) >= count) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error("FAILED: the operations never queued on the club lock");
+  }
+  async function holdClubLock(organizationId: string) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let held!: () => void;
+    const isHeld = new Promise<void>((resolve) => { held = resolve; });
+    const holder = prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`club-orders:${organizationId}`}))`;
+      held();
+      await gate;
+    }, { timeout: 60_000 });
+    await isHeld;
+    return { release: async () => { release(); await holder; } };
+  }
+
+  // Removal queued first: it commits first, and the removed person is never carried (club F).
+  const f = [await addPerson(clubs.f, 0), await addPerson(clubs.f, 1)];
+  const lockF = await holdClubLock(clubs.f);
+  const removing = removeRosterMember(clubs.f, f[0]!.memberId, actor, august).then(() => null, (error: { code?: string }) => error.code ?? "ERROR");
+  await waitingOnLock(1);
   const racing = codeOf(carryRosterForward(clubs.f, {
     confirm: true, people: f.map((member) => ({ memberId: member.memberId, attendeeType: "YOUTH" as const })),
   }, actor, august));
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  release();
-  await removal;
+  await waitingOnLock(2);
+  await lockF.release();
+  assert((await removing) === null, "the removal finished without a deadlock or error");
   assert((await racing) === "MEMBER_NOT_FOUND", "a person removed while the carry waited is refused, not carried");
   assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.f, clubYear: to } })) === 0, "the racing carry wrote nothing");
   assert((await prisma.clubRosterCarryForward.count({ where: { organizationId: clubs.f } })) === 0, "and left no confirmation");
+
+  // Carry queued first: it commits first, then the removal runs without a deadlock (club G).
+  const g = [await addPerson(clubs.g, 0), await addPerson(clubs.g, 1)];
+  const lockG = await holdClubLock(clubs.g);
+  const carrying = carryRosterForward(clubs.g, {
+    confirm: true, people: g.map((member) => ({ memberId: member.memberId, attendeeType: "YOUTH" as const })),
+  }, actor, august).then((r) => r, (error: { code?: string }) => error.code ?? "ERROR");
+  await waitingOnLock(1);
+  const removingAfter = removeRosterMember(clubs.g, g[0]!.memberId, actor, august).then(() => null, (error: { code?: string }) => error.code ?? "ERROR");
+  await waitingOnLock(2);
+  await lockG.release();
+  const carriedResult = await carrying;
+  assert(typeof carriedResult === "object" && carriedResult.carried === 2, "the carry that queued first carries both");
+  assert((await removingAfter) === null, "the removal after it finishes without a deadlock or error");
+  assert((await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: g[0]!.memberId } })).status === "REMOVED", "the removed row is erased");
+  assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.g, clubYear: to } })) === 2, "the new year's rows stay (removal is unchanged)");
 
   // No plaintext birth date or name in any audit row or confirmation record.
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });

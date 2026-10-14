@@ -23,6 +23,7 @@ export type CarryForwardRow = {
   classLevel: string | null;
   age: number | null;
   transferring?: boolean;
+  transferWithStaff?: boolean;
 };
 
 type Choice = { ticked: boolean; attendeeType: AttendeeType; role: string; classLevel: string };
@@ -99,7 +100,7 @@ export function ClubRosterCarryForward({
       }}
     >
       <p className="field-help">
-        Everyone on the {fromClubYear} roster is ticked, except anyone with an open transfer to another club. Untick anyone who is leaving, and change a type, role or class
+        Everyone on the {fromClubYear} roster is ticked, except anyone with a pending transfer to another club. Untick anyone who is leaving, and change a type, role or class
         for anyone moving up. People you carry keep their record and birth date; the {fromClubYear} roster stays as it was.
       </p>
       <div className="intro-actions">
@@ -136,6 +137,7 @@ export function ClubRosterCarryForward({
                   <th scope="row" translate="no">
                     {fullName}
                     {row.transferring && <small> Transferring to another club</small>}
+                    {row.transferWithStaff && <small> Transfer request is with conference staff</small>}
                   </th>
                   <td data-label="Age">{row.age ?? "—"}</td>
                   <td data-label={`${toClubYear} type`}>

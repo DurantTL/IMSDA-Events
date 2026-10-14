@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
+import { lockClubOrders } from "@/modules/club-orders/repository";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import {
@@ -51,8 +52,10 @@ export type CarryForwardCandidate = {
   attendeeType: "YOUTH" | "STAFF" | "ADULT" | "UNDERAGE";
   role: string;
   classLevel: string | null;
-  /** An open transfer request moves this person to another club: shown flagged and unticked. */
+  /** A pending transfer request moves this person to another club: shown flagged and unticked. */
   transferring: boolean;
+  /** This club declined a transfer request; it is now with conference staff. Shown with a neutral note, still ticked. */
+  transferWithStaff: boolean;
   /** Whole years today, computed here. The birth date itself never leaves the server. */
   age: number | null;
 };
@@ -94,13 +97,17 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
   });
   const present = await personsAlreadyOnTarget(prisma, organizationId, toClubYear, members.flatMap((member) => (member.personId ? [member.personId] : [])));
   const today = calendarDateOf(now);
-  // Open outbound transfer requests (#489): pending or declined, still holding the person.
+  // Open outbound transfer requests (#489): pending (with the other club) or declined (with conference staff).
   const personIds = members.flatMap((member) => (member.personId ? [member.personId] : []));
   const transfers = personIds.length === 0 ? [] : await prisma.memberTransfer.findMany({
     where: { fromOrganizationId: organizationId, status: { in: ["PENDING", "DECLINED"] }, pendingPersonId: { in: personIds } },
-    select: { pendingPersonId: true },
+    select: { pendingPersonId: true, status: true },
   });
-  const transferring = new Set(transfers.flatMap((transfer) => (transfer.pendingPersonId ? [transfer.pendingPersonId] : [])));
+  const personsWith = (status: "PENDING" | "DECLINED") => new Set(
+    transfers.flatMap((transfer) => (transfer.pendingPersonId && transfer.status === status ? [transfer.pendingPersonId] : [])),
+  );
+  const transferring = personsWith("PENDING");
+  const withStaff = personsWith("DECLINED");
   const candidates = members
     .filter((member) => member.personId && !present.has(member.personId))
     .map((member) => ({
@@ -111,6 +118,7 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
       role: member.role,
       classLevel: member.classLevel,
       transferring: member.personId ? transferring.has(member.personId) : false,
+      transferWithStaff: member.personId ? withStaff.has(member.personId) : false,
       age: member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), today) : null,
     }))
     .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.memberId.localeCompare(b.memberId));
@@ -139,6 +147,9 @@ export type CarryForwardResult = {
 export async function carryRosterForward(organizationId: string, input: CarryForwardInput, actor: Actor, now = new Date()): Promise<CarryForwardResult> {
   const { fromClubYear, toClubYear } = carryForwardYears(now);
   return runSerializable(async (tx) => {
+    // The club's order lock, the same one `removeRosterMember` takes first, so a carry and a removal never take the
+    // person and row locks in opposite orders (a deadlock) and a removal that commits first is seen by the carry.
+    await lockClubOrders(tx, organizationId);
     const done = await tx.clubRosterCarryForward.findUnique({
       where: { organizationId_toClubYear: { organizationId, toClubYear } },
       select: { id: true },
