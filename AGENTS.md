@@ -30,7 +30,8 @@ Compose service, `npm run db:deploy`, `npm run db:seed`, `npm run club-forms:syn
 (creates the club form templates, off, and brings them to the code's version),
 `npm run lodging:sync` (creates the Camp Heritage and Sunnydale lodging
 property templates and brings them to the code's version; see
-`docs/LODGING.md`), and `npm run dev`.
+`docs/LODGING.md`), `npm run form-templates:sync` (the seeded Women's Retreat,
+Camp Meeting and Spring Camporee form templates), and `npm run dev`.
 Run focused tests while editing. `npm run verify` is the canonical full check
 (lint, generated route types and TypeScript, tests, and production build);
 GitHub CI also migrates and seeds a clean PostgreSQL database.

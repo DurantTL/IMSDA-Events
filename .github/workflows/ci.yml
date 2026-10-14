@@ -66,6 +66,8 @@ jobs:
       - run: npm run db:seed
       # The lodging property templates are code data synced after migrations (#198).
       - run: npm run lodging:sync
+      # The seeded form templates (Women's Retreat, Camp Meeting, Spring Camporee) are seed-file data synced after migrations (#153).
+      - run: npm run form-templates:sync
       - run: npm run verify
       # Real-database check that Honors Weekend class seats hold under concurrent saves (#359).
       - run: npm run test:honor-capacity
@@ -129,6 +131,9 @@ jobs:
       # Real-database check of event templates: apply, revision isolation, save/publish
       # races, parallel same-key applies, key reuse, and sticky archive (#152).
       - run: npm run test:event-templates
+
+      # Real-database check that the seeded form templates sync and re-sync without changing any existing event, form or published form version, and that a newer template version reaches only forms created after it (#153).
+      - run: npm run test:seeded-form-templates
 
       # Real-database check of reviewed annual event cloning: a populated source clones
       # configuration only, excluded domains, disabled modules, stale sources, parallel

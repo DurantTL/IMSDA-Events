@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
-import { shirtSizeOptions } from "@/modules/registrations/shirt-sizes";
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
 
