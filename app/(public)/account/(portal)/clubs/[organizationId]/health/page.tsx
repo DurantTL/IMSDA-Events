@@ -57,8 +57,6 @@ export default async function ClubHealthPage({
     data = await loadEventHealth(viewer, query.event, { purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
     if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as={viewer.actor.kind === "ATTENDEE" ? "ATTENDEE" : "STAFF"} />;
-    // A system administrator acting as the director still needs break-glass for health data (#929).
-    if (error instanceof HealthViewError && error.code === "BREAK_GLASS_REQUIRED") return <p className="public-manage-empty">{error.message}</p>;
     if (error instanceof HealthViewError) notFound();
     throw error;
   }

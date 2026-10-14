@@ -6309,13 +6309,14 @@ model HealthSnapshotHold {
 model HealthSnapshotBreakGlass {
   id        String   @id @default(cuid())
   userId    String?
-  personId  String
+  personId  String?
   reason    String
   createdAt DateTime @default(now())
   expiresAt DateTime
 
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
-  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Deleting the person keeps the grant (the review trail), with the person id cleared (#929).
+  person Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
 
   healthUses HealthBreakGlassUse[]
 
@@ -6324,8 +6325,6 @@ model HealthSnapshotBreakGlass {
 
 enum HealthBreakGlassUseKind {
   LIVE_RECORD
-  LIVE_EVENT_SHEET
-  LIVE_EVENT_SHEET_EXPORT
   SEALED_COPIES
 }
 
@@ -6333,15 +6332,16 @@ enum HealthBreakGlassUseKind {
 /// live record and sealed copies alike. Ids, a kind and a time only: never a health value. Feeds the monthly review.
 model HealthBreakGlassUse {
   id        String                  @id @default(cuid())
-  grantId   String
+  grantId   String?
   userId    String?
-  personId  String
+  personId  String?
   kind      HealthBreakGlassUseKind
   createdAt DateTime                @default(now())
 
-  grant  HealthSnapshotBreakGlass @relation(fields: [grantId], references: [id], onDelete: Cascade)
-  user   User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  person Person                   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  // The review trail outlives the person and the grant: deleting either keeps the use row with the id cleared.
+  grant  HealthSnapshotBreakGlass? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  user   User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  person Person?                   @relation(fields: [personId], references: [id], onDelete: SetNull)
 
   @@index([grantId, createdAt])
   @@index([createdAt])

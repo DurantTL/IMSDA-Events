@@ -20,7 +20,7 @@ import {
 /**
  * Break-glass is ONE mechanism for a person's live health record and their sealed copies (#929): one grant per
  * person, one administrator, a typed reason, 24 hours, covers both. The shared pieces are in `break-glass.ts`; the
- * live record's gate is in `repository.ts` and the coordinator sheet's in `coordinator-health/repository.ts`.
+ * live record's gate is in `repository.ts`. Both apply only while HEALTH_RECORDS_ENABLED is on.
  *
  * Who may open or hold sealed per-event copies (#924). Only a system
  * administrator, and only through break-glass: a typed reason, 24 hours, every
@@ -331,7 +331,7 @@ export async function listSnapshotHolds(viewer: HealthViewer) {
 /**
  * The break-glass grants, newest first, for the Communication Director's monthly review: who, when, why, whose
  * record and until when, and how the grant was used (#929): a count and the last time for each kind of use (the live
- * record, the coordinator sheet, a sheet export, the sealed copies). Ids, dates, kinds, counts and the typed reason
+ * record, the sealed copies). Ids, dates, kinds, counts and the typed reason
  * only: never a health value. System administrators only, and
  * available with HEALTH_RECORDS_ENABLED off. The listing is itself audited (a count).
  */

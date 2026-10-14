@@ -9,8 +9,9 @@ import { HealthRecordError } from "@/modules/health-records/errors";
 /**
  * The one break-glass mechanism (ADR 0005 Addendum B; #924 built it for sealed copies, #929 extends it to the live
  * record). A grant is one system administrator, one person, a typed reason and 24 hours
- * (`HealthSnapshotBreakGlass`). One grant covers that person's live health record, the coordinator health sheet
- * row for that person, and their sealed per-event copies. Every use writes a `HealthBreakGlassUse` row (for the
+ * (`HealthSnapshotBreakGlass`). One grant covers that person's live Pathfinder Health Record and their sealed
+ * per-event copies. It does not cover the coordinator / event health sheet, which reads registration and club form
+ * data (owner decision 2026-10-14, ADR 0005 Addendum C). Every use writes a `HealthBreakGlassUse` row (for the
  * monthly review) and an audit row. Both hold ids, a kind and a time: never a health value.
  *
  * Act-as: a system administrator "acting as" a club director is still that administrator. The grant is theirs
@@ -20,7 +21,7 @@ import { HealthRecordError } from "@/modules/health-records/errors";
 
 export const BREAK_GLASS_REQUIRED_MESSAGE = "Reading this health information needs break-glass: type a reason first. Access lasts 24 hours.";
 
-export type BreakGlassUseKind = "LIVE_RECORD" | "LIVE_EVENT_SHEET" | "LIVE_EVENT_SHEET_EXPORT" | "SEALED_COPIES";
+export type BreakGlassUseKind = "LIVE_RECORD" | "SEALED_COPIES";
 
 /** The administrator a grant is looked up for. `actAsId` is only for the audit rows. */
 export type BreakGlassActor = { userId: string; actAsId?: string };
@@ -50,7 +51,7 @@ export async function activeGrantsFor(
     select: { id: true, personId: true },
   });
   // Ascending, so the grant that lasts longest is written last and wins.
-  return new Map(grants.map((grant) => [grant.personId, grant.id]));
+  return new Map(grants.flatMap((grant) => (grant.personId ? [[grant.personId, grant.id] as const] : [])));
 }
 
 /**

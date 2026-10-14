@@ -752,20 +752,27 @@ break-glass for sealed copies; #929 applies it to the **live record** and shares
 
 **One grant per person.** A grant (`HealthSnapshotBreakGlass`, unchanged) is one administrator, one person, a typed
 reason of 10 to 500 characters and 24 hours, after the privacy acknowledgment (#923). It now covers that person's
-live record, their row on the coordinator health sheet (a view and a printed export) and their sealed copies. A
+live Pathfinder Health Record and their sealed copies. It does **not** cover the coordinator / event health sheet (see
+"Scope", below). A
 person needs a live record or a sealed copy to start one (one "not found" answer otherwise). Chosen over a second
 table of live-record grants because the reason, the window, the audit and the review are the same, and one grant
 is one line for the Communication Director to review. Grants started under #924 (not in use: the switch is off)
 cover the live record too. Starting one is still `POST /api/staff/health-snapshots/break-glass`. The code is in
 `modules/health-records/break-glass.ts` (grant lookup, refusal audit, use record) and `snapshot-access-repository.ts`.
 
-**Every system-administrator read of live health data needs an active grant.** The grant is the administrator's
+**Scope (owner decision, Caleb, 2026-10-14).** Break-glass covers the Pathfinder Health Record only: the live
+record and its sealed copies. The coordinator / event health sheet (#658, Addendum C) reads registration and club
+form data (diet, the medical flag, and the emergency contacts on permission slips and passenger lists), not
+`HealthRecord`. It stays visible to system administrators as in Addendum C, with no break-glass on the sheet, and an
+administrator acting as a director sees it as before. Everything here applies only while `HEALTH_RECORDS_ENABLED` is
+on: with the switch off there are no health records, and break-glass cannot be started.
+
+**Every system-administrator read of the Health Record needs an active grant.** The grant is the administrator's
 own: another administrator's grant, or one for another person, does not count.
 
 | Read path | Without a grant | With a grant |
 | --- | --- | --- |
 | Health tab and staff health record (`viewHealthRecord`) | Refused, `BREAK_GLASS_REQUIRED` (403) | Opens that person's record; a use is recorded |
-| Coordinator health sheet, view and printed export (`loadEventHealth`) | If no one on the sheet is covered: refused, `BREAK_GLASS_REQUIRED`. Otherwise people without a grant are named but carry no health information | People with a grant are shown; a use per person is recorded |
 | Roster "has a health note" flag (`healthSummariesForMembers`) | Hidden (the status "current" or "needs update" says nothing of the content and stays) | Shown |
 | Sealed copies | Refused, `BREAK_GLASS_REQUIRED` (as #924) | Opens; a use is recorded |
 
@@ -774,23 +781,26 @@ never hold a grant, so an administrator cannot read that record at all. The neut
 (one boolean, shown to anyone who sees the roster) is unchanged.
 
 **Acting as a director does not bypass it.** A system administrator "acting as" a club director (#442) is still that
-administrator. The Health tab represents them as a `SYSTEM_ADMIN` viewer carrying `actAsId`; the coordinator sheet
-represents them as a `CLUB_LEADER` whose actor is `STAFF_ACTING`. Both are held to the same rule, against the
-administrator's own grant, and `actAsId` is written on the refusal, the use and the audit row, so the review shows it.
+administrator. The Health tab represents them as a `SYSTEM_ADMIN` viewer carrying `actAsId`, held to the same rule
+against the administrator's own grant, and `actAsId` is written on the refusal, the use and the audit row, so the
+review shows it.
 Acting as a director never grants more than a director has (view only for administrators, as before).
 
-**Refusals and audit.** A refusal writes `HEALTH_RECORD_ACCESS_REFUSED` (live record) or `COORDINATOR_HEALTH_DENIED`
-(sheet) with `reason: BREAK_GLASS_REQUIRED`, who, the ids and what was attempted: never a health value. An allowed
-read writes its usual audit row (`HEALTH_RECORD_VIEWED`, `COORDINATOR_HEALTH_VIEWED` or `_EXPORTED`) naming the grant, and
+**Refusals and audit.** A refusal writes `HEALTH_RECORD_ACCESS_REFUSED` with `reason: BREAK_GLASS_REQUIRED`, who, the
+ids and what was attempted: never a health value. An allowed read writes its usual audit row (`HEALTH_RECORD_VIEWED`) naming the grant, and
 a `HealthBreakGlassUse` row (grant, person, kind, time) in the same transaction, before any value is opened.
 
 **Monthly review.** `GET /api/staff/health-snapshots/break-glass-grants` lists each grant (who, when, the typed
 reason, the person id, when it ends) with its uses: a total, the last use and a count for each kind
-(`LIVE_RECORD`, `LIVE_EVENT_SHEET`, `LIVE_EVENT_SHEET_EXPORT`, `SEALED_COPIES`). It never shows a health value, and it
+(`LIVE_RECORD`, `SEALED_COPIES`). It never shows a health value, and it
 stays available to system administrators with `HEALTH_RECORDS_ENABLED` off. Everything else is behind the switch.
 
-**Migration.** `20261025200000_health_break_glass_uses` is additive: one enum and one table (`HealthBreakGlassUse`).
-No existing table changes.
+**The review trail survives deleting a person.** The grant's and each use's person id is nullable and set to null
+when the Person is deleted (a use's grant id likewise if a grant is deleted), so the trail is kept and the review
+list shows a null person.
+
+**Migration.** `20261025200000_health_break_glass_uses` adds one enum and one table (`HealthBreakGlassUse`), and
+makes `HealthSnapshotBreakGlass.personId` nullable with `ON DELETE SET NULL` (it was `CASCADE`).
 
 ### Still open (blocking production use)
 
@@ -810,7 +820,7 @@ questions this build raised.
   defaults to 14 days).
 - **Break-glass screen.** #924 and #929 add the routes only (one grant now covers the live record and the sealed
   copies); a page for a system administrator to start break-glass and place holds is a follow-up. Until it exists
-  the coordinator sheet names withheld people with their person id, and the pages explain that break-glass is needed.
+  the Health tab explains that break-glass is needed.
 - **Acknowledgment wording.** The notice text in
   `modules/health-records/acknowledgment-domain.ts` is a draft for the
   Communication Director to confirm. A change to it needs a new version.
@@ -901,7 +911,7 @@ contact matched".
 
 | Who | Access |
 | --- | --- |
-| System administrators | **Break-glass only** (#929, Addendum B): a person's row shows inside that person's 24-hour grant, and an administrator acting as a club director is held to the same rule |
+| System administrators | Automatic. Break-glass (Addendum B) covers the Pathfinder Health Record only; this sheet reads registration and club form data, so it has no break-glass (owner decision, 2026-10-14) |
 | Active Area Coordinators, signed in with the second step passed | Automatic, every club |
 | A user holding `VIEW_HEALTH_INFORMATION` on the event | Only that event; granted by a system administrator |
 | A club's own director or deputy | Their own club's attendees only, past the roster's second step |

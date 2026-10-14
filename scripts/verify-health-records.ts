@@ -111,6 +111,9 @@ async function cleanup() {
   await prisma.auditLog.deleteMany({
     where: { OR: [{ entityId: { in: [...records, ...links, ...members].map((row) => row.id) } }, { entityId: { startsWith: P } }, { actorUserId: { in: [adminUserId, `${P}_admin2_user`] } }] },
   });
+  // Grants and uses outlive a deleted person or user (the review trail), so remove them by the fictitious ids.
+  await prisma.healthBreakGlassUse.deleteMany({ where: { OR: [{ person: { id: { startsWith: `${P}_` } } }, { userId: { in: [adminUserId, `${P}_admin2_user`] } }] } });
+  await prisma.healthSnapshotBreakGlass.deleteMany({ where: { OR: [{ person: { id: { startsWith: `${P}_` } } }, { userId: { in: [adminUserId, `${P}_admin2_user`] } }] } });
   await prisma.healthRecord.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.healthRecordLink.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.messageOutbox.deleteMany({ where: { recipientEmail: { endsWith: `@${emailDomain}` } } });

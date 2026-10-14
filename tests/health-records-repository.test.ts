@@ -962,6 +962,9 @@ describe("break-glass for a system administrator's live read (#929)", () => {
   it("with the feature off answers not found before any grant is looked up", async () => {
     state.env.HEALTH_RECORDS_ENABLED = false;
     await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(viewHealthRecord(actingAdmin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(healthSummariesForMembers(admin, "club-a", ["member-1"], now)).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(state.audit).toHaveLength(0);
+    expect(state.uses).toHaveLength(0);
   });
 });

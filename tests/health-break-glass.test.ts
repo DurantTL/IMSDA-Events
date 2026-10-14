@@ -125,6 +125,16 @@ describe("starting break-glass", () => {
   });
 });
 
+describe("with HEALTH_RECORDS_ENABLED off", () => {
+  it("does not start break-glass or open sealed copies: the whole Health Record surface answers not found", async () => {
+    state.env.HEALTH_RECORDS_ENABLED = false;
+    state.liveRecords = 1;
+    await expect(startSnapshotBreakGlass(admin, { personId: "person-1", reason: REASON }, now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(viewSealedSnapshots(admin, "person-1", now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(state.grants).toHaveLength(0);
+  });
+});
+
 describe("opening sealed copies with the same grant", () => {
   it("is refused with BREAK_GLASS_REQUIRED without a grant and refused after 24 hours, and a use is recorded when allowed", async () => {
     state.liveRecords = 1;
@@ -145,7 +155,7 @@ describe("the monthly review list", () => {
     state.uses.push(
       { grantId, userId: "admin-1", personId: "person-1", kind: "LIVE_RECORD", createdAt: new Date("2026-10-26T13:00:00Z") },
       { grantId, userId: "admin-1", personId: "person-1", kind: "LIVE_RECORD", createdAt: new Date("2026-10-26T14:00:00Z") },
-      { grantId, userId: "admin-1", personId: "person-1", kind: "LIVE_EVENT_SHEET_EXPORT", createdAt: new Date("2026-10-26T15:00:00Z") },
+      { grantId, userId: "admin-1", personId: "person-1", kind: "SEALED_COPIES", createdAt: new Date("2026-10-26T15:00:00Z") },
     );
     const rows = await listSnapshotBreakGlassGrants(admin);
     expect(rows).toEqual([{
@@ -156,10 +166,20 @@ describe("the monthly review list", () => {
       reason: REASON,
       grantedAt: now,
       expiresAt: new Date(now.getTime() + 24 * 3_600_000),
-      uses: { total: 3, lastUsedAt: new Date("2026-10-26T15:00:00Z"), byKind: { LIVE_RECORD: 2, LIVE_EVENT_SHEET_EXPORT: 1 } },
+      uses: { total: 3, lastUsedAt: new Date("2026-10-26T15:00:00Z"), byKind: { LIVE_RECORD: 2, SEALED_COPIES: 1 } },
     }]);
     expect(JSON.stringify(rows)).not.toContain("SYNTHETIC-SEALED-VALUE");
     expect(state.audit.at(-1)).toMatchObject({ action: "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED", metadata: { grantCount: 1 } });
+  });
+
+  it("keeps a grant whose person was deleted, with a null person id", async () => {
+    state.liveRecords = 1;
+    const { grantId } = await startSnapshotBreakGlass(admin, { personId: "person-1", reason: REASON }, now);
+    state.grants[0]!.personId = null;
+    state.uses.push({ grantId, userId: "admin-1", personId: null, kind: "LIVE_RECORD", createdAt: new Date("2026-10-26T13:00:00Z") });
+    const rows = await listSnapshotBreakGlassGrants(admin);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: grantId, personId: null, reason: REASON, uses: { total: 1, byKind: { LIVE_RECORD: 1 } } });
   });
 
   it("stays available with HEALTH_RECORDS_ENABLED off, for a system administrator", async () => {

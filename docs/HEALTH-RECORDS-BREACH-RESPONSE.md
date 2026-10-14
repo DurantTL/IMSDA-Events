@@ -81,8 +81,9 @@ with the decision record.
 ## Related rules
 
 - **Break-glass access** (decided 2026-10-09):
-  - only system administrators may use it, and it is the only way they read a health record (the live record, the
-    coordinator sheet and the sealed copies; #929), one person at a time;
+  - only system administrators may use it, and it is the only way they read a Pathfinder Health Record (the live record
+    and the sealed copies; #929), one person at a time. The coordinator health sheet reads registration and club form
+    data, not the Health Record, and is not behind break-glass (owner decision, 2026-10-14);
   - they must type a reason;
   - access lasts 24 hours and is logged;
   - the incident lead reviews every use each month.

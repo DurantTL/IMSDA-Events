@@ -6,13 +6,11 @@ import { logError } from "@/lib/logger";
 import { isSecretEncryptionConfigured, SecretBoxError } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { HEALTH_ACKNOWLEDGMENT_REQUIRED_MESSAGE, hasAcknowledgedHealthPrivacy } from "@/modules/health-records/acknowledgment";
-import { BREAK_GLASS_REQUIRED_MESSAGE, activeGrantsFor, recordBreakGlassUse } from "@/modules/health-records/break-glass";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { openSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import {
   ACTIVITY_DATE_KEY,
-  breakGlassActorOf,
   dietaryFromResponses,
   eventCalendarDates,
   healthAuditActor,
@@ -45,7 +43,7 @@ import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 
 export class HealthViewError extends Error {
   constructor(
-    public readonly code: "NOT_FOUND" | "FORBIDDEN" | "WINDOW_CLOSED" | "ACKNOWLEDGMENT_REQUIRED" | "BREAK_GLASS_REQUIRED" | "ENCRYPTION_UNAVAILABLE" | "SENSITIVE_UNREADABLE",
+    public readonly code: "NOT_FOUND" | "FORBIDDEN" | "WINDOW_CLOSED" | "ACKNOWLEDGMENT_REQUIRED" | "ENCRYPTION_UNAVAILABLE" | "SENSITIVE_UNREADABLE",
     message: string,
   ) {
     super(message);
@@ -181,18 +179,9 @@ export async function loadEventHealth(
     },
   });
   const attendeeCount = registrations.reduce((total, row) => total + row.registration.attendees.length, 0);
-  const personIds = registrations.flatMap((row) => row.registration.attendees.map((attendee) => attendee.personId));
-
-  // A system administrator, acting as a director or not, sees a person's row only inside an unexpired break-glass
-  // grant for that person (#929). With no grant for anyone on the sheet the request is refused (and audited); with
-  // some, the other attendees are named but carry no health information. This covers the printable sheet too.
-  const breakGlass = breakGlassActorOf(viewer);
-  const grants = breakGlass && attendeeCount > 0 ? await activeGrantsFor(breakGlass, personIds, now) : new Map<string, string>();
-  if (breakGlass && attendeeCount > 0 && grants.size === 0) return deny("BREAK_GLASS_REQUIRED", BREAK_GLASS_REQUIRED_MESSAGE);
-  const canOpen = (personId: string) => breakGlass === null || grants.has(personId);
 
   // Audit first. Nothing sealed is opened, and nothing is returned, if this fails.
-  const viewAudit = {
+  await writeAuditLog({
     eventId,
     actorUserId: who.actorUserId,
     action: purpose === "EXPORT" ? "COORDINATOR_HEALTH_EXPORTED" : "COORDINATOR_HEALTH_VIEWED",
@@ -207,20 +196,11 @@ export async function loadEventHealth(
       organizationId: requestedClub ?? null,
       clubCount: registrations.length,
       attendeeCount,
-      ...(breakGlass ? { breakGlass: true, grantedCount: grants.size, withheldCount: new Set(personIds).size - grants.size, grantIds: [...grants.values()] } : {}),
     },
-  };
-  if (breakGlass && grants.size > 0) {
-    const kind = purpose === "EXPORT" ? "LIVE_EVENT_SHEET_EXPORT" : "LIVE_EVENT_SHEET";
-    await prisma.$transaction(async (tx) => {
-      for (const [personId, grantId] of grants) await recordBreakGlassUse(tx, { grantId, userId: breakGlass.userId, personId, kind });
-      await writeAuditLog(viewAudit, tx);
-    });
-  } else {
-    await writeAuditLog(viewAudit);
-  }
+  });
 
   const organizationIds = registrations.map((row) => row.organization.id);
+  const personIds = registrations.flatMap((row) => row.registration.attendees.map((attendee) => attendee.personId));
   const years = clubYearsFor(event);
   const [rosterMembers, submissions] = organizationIds.length === 0 ? [[], []] : await Promise.all([
     prisma.clubRosterMember.findMany({
@@ -286,9 +266,6 @@ export async function loadEventHealth(
     }
     const rows: HealthAttendeeRow[] = row.registration.attendees.map((attendee) => {
       const name = `${attendee.person.firstName} ${attendee.person.lastName}`.replace(/\s+/g, " ").trim();
-      if (!canOpen(attendee.personId)) {
-        return { attendeeId: attendee.id, name, dietary: null, medicalFlag: null, emergencyContacts: [], emergencyStatus: "NONE_ON_FILE" as const, breakGlassRequired: true as const, personId: attendee.personId };
-      }
       const rosterMemberIds = membersByPerson.get(`${organizationId}:${attendee.personId}`) ?? new Set<string>();
       const wanted = normalizeName(attendee.person.firstName, attendee.person.lastName);
       const nameIsShared = (nameCounts.get(wanted) ?? 0) > 1;
