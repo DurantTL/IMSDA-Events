@@ -31,10 +31,13 @@ function getRegistrationQuery(
   statuses?: readonly RegistrationStatus[],
   tagIds?: readonly string[],
   locationId?: string | null,
+  registrationIds?: readonly string[],
 ) {
   return client.registration.findMany({
     where: {
       eventId,
+      // An explicit page of registrations, e.g. the ids an operations search returned (#180).
+      ...(registrationIds ? { id: { in: [...registrationIds] } } : {}),
       // One location of a multi-location event (#413); none means every location.
       ...(locationId ? { locationId } : {}),
       ...(statuses ? { status: { in: [...statuses] } } : {}),
@@ -433,7 +436,7 @@ export class RegistrationAttendeeOperationError extends Error {
 
 export async function listRegistrations(
   eventId: string,
-  options?: { statuses?: readonly RegistrationStatus[]; tagIds?: readonly string[]; locationId?: string | null },
+  options?: { statuses?: readonly RegistrationStatus[]; tagIds?: readonly string[]; locationId?: string | null; registrationIds?: readonly string[] },
 ) {
   const registrations = await getRegistrationQuery(
     getPrisma(),
@@ -441,6 +444,7 @@ export async function listRegistrations(
     options?.statuses,
     options?.tagIds,
     options?.locationId,
+    options?.registrationIds,
   );
   const directory = await directoryForRegistrations(getPrisma(), registrations);
   const waitlistPlaces = await waitlistPlacesFor(getPrisma(), registrations);

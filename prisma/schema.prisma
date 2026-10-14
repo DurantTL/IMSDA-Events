@@ -2755,6 +2755,8 @@ model Registration {
   @@index([eventId, status])
   @@index([accountHolderPersonId])
   @@index([locationId])
+  /// Operations search (#180): the canonical order inside one event (newest first, id as the tie-break).
+  @@index([eventId, createdAt, id])
 }
 
 model RegistrationPaymentChoiceOperation {
@@ -3283,6 +3285,8 @@ model Refund {
   @@unique([paymentId, idempotencyKey])
   @@index([eventId, status])
   @@index([paymentId])
+  /// Operations search (#180): net-paid per payment without reading refunds outside the event.
+  @@index([eventId, paymentId, status])
 }
 
 /// An event-owned merchandise product (a shirt, a mug). Disabling the product,
