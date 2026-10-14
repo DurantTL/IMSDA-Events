@@ -1,0 +1,520 @@
+{
+  "key": "camp_meeting_export",
+  "version": 1,
+  "name": "Camp Meeting 2026",
+  "description": "Household contact, capacity-aware housing by night, guest roster, adult and child meal tickets, and payment.",
+  "audience": "Household / camp",
+  "definition": {
+    "title": "Camp Meeting 2026 registration",
+    "description": "Choose housing and nights, add every guest, order meal tickets, and review the complete total.",
+    "confirmationMessage": "Your Camp Meeting registration has been received. Watch for an email with confirmation, payment, and check-in details.",
+    "attendeeRoster": {
+      "enabled": true,
+      "minAttendees": 1,
+      "maxAttendees": 20,
+      "attendeeLabel": "Guest",
+      "addButtonLabel": "Add another guest"
+    },
+    "payment": {
+      "enabled": true,
+      "currency": "USD",
+      "paymentMethodFieldKey": "payment_method",
+      "cardOptionValue": "Credit / debit card",
+      "percentageBasisPoints": 290,
+      "fixedFeeCents": 30,
+      "passFeeToRegistrant": true,
+      "deposit": {
+        "enabled": true,
+        "amountCents": 6500,
+        "optionValue": "Pay a $65 deposit now by card"
+      }
+    },
+    "sections": [
+      {
+        "id": "cm_contact",
+        "title": "Contact information",
+        "description": "Primary household contact and mailing address.",
+        "fields": [
+          {
+            "id": "cm_first",
+            "key": "primary_first_name",
+            "label": "First name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_middle",
+            "key": "primary_middle_name",
+            "label": "Middle name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "cm_last",
+            "key": "primary_last_name",
+            "label": "Last name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_address_1",
+            "key": "address_line_1",
+            "label": "Address line 1",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_address_2",
+            "key": "address_line_2",
+            "label": "Address line 2",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "cm_city",
+            "key": "city",
+            "label": "City",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_state",
+            "key": "state",
+            "label": "State / province",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_zip",
+            "key": "zip",
+            "label": "ZIP / postal code",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_country",
+            "key": "country",
+            "label": "Country",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "United States",
+              "Canada",
+              "Other"
+            ]
+          },
+          {
+            "id": "cm_email",
+            "key": "email",
+            "label": "Email",
+            "helpText": "",
+            "type": "EMAIL",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_phone",
+            "key": "phone",
+            "label": "Mobile phone",
+            "helpText": "",
+            "type": "PHONE",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_church",
+            "key": "church_name",
+            "label": "Home church",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "optionSource": "CHURCHES_DIRECTORY"
+          },
+          {
+            "id": "cm_church_other",
+            "key": "church_other",
+            "label": "Home church — not listed",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "church_name",
+              "operator": "EQUALS",
+              "value": "Not listed"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cm_housing",
+        "title": "Housing selection",
+        "description": "Pricing is per night. RV capacity begins at 16 spots and every housing limit can be adjusted.",
+        "fields": [
+          {
+            "id": "cm_housing_choice",
+            "key": "housing_selection",
+            "label": "Housing",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Dorm room",
+              "RV / camper hookup",
+              "Tent campsite",
+              "No housing needed"
+            ],
+            "availabilityMode": "CAPACITY",
+            "choiceLimits": {
+              "RV / camper hookup": 16
+            }
+          },
+          {
+            "id": "cm_dorm_nights",
+            "key": "dorm_nights",
+            "label": "Dorm nights — $25 per night",
+            "helpText": "Dorm rooms require at least four nights. Each room has two twin beds; bring linens.",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday"
+            ],
+            "minSelections": 4,
+            "maxSelections": 5,
+            "choicePricesCents": {
+              "Tuesday": 2500,
+              "Wednesday": 2500,
+              "Thursday": 2500,
+              "Friday": 2500,
+              "Saturday": 2500
+            },
+            "conditional": {
+              "fieldKey": "housing_selection",
+              "operator": "EQUALS",
+              "value": "Dorm room"
+            }
+          },
+          {
+            "id": "cm_rv_nights",
+            "key": "rv_nights",
+            "label": "RV / camper nights — $15 per night",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday"
+            ],
+            "minSelections": 1,
+            "maxSelections": 5,
+            "choicePricesCents": {
+              "Tuesday": 1500,
+              "Wednesday": 1500,
+              "Thursday": 1500,
+              "Friday": 1500,
+              "Saturday": 1500
+            },
+            "conditional": {
+              "fieldKey": "housing_selection",
+              "operator": "EQUALS",
+              "value": "RV / camper hookup"
+            }
+          },
+          {
+            "id": "cm_tent_nights",
+            "key": "tent_nights",
+            "label": "Tent campsite nights — $5 per night",
+            "helpText": "Primitive camping; no hookups or campfires.",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday"
+            ],
+            "minSelections": 1,
+            "maxSelections": 5,
+            "choicePricesCents": {
+              "Tuesday": 500,
+              "Wednesday": 500,
+              "Thursday": 500,
+              "Friday": 500,
+              "Saturday": 500
+            },
+            "conditional": {
+              "fieldKey": "housing_selection",
+              "operator": "EQUALS",
+              "value": "Tent campsite"
+            }
+          },
+          {
+            "id": "cm_floor",
+            "key": "first_floor_needed",
+            "label": "First-floor room needed for health or medical reasons?",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "No",
+              "Yes"
+            ],
+            "conditional": {
+              "fieldKey": "housing_selection",
+              "operator": "EQUALS",
+              "value": "Dorm room"
+            }
+          },
+          {
+            "id": "cm_rv",
+            "key": "rv_details",
+            "label": "RV / camper length and type",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "housing_selection",
+              "operator": "EQUALS",
+              "value": "RV / camper hookup"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cm_guests",
+        "title": "Guest information",
+        "description": "Enter the party totals, then add every adult and child—including yourself—to the guest roster.",
+        "fields": [
+          {
+            "id": "cm_adults",
+            "key": "num_adults",
+            "label": "Number of adults (18 and older)",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_children",
+            "key": "num_children",
+            "label": "Number of children",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_guest_first",
+            "key": "first_name",
+            "label": "First name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_guest_last",
+            "key": "last_name",
+            "label": "Last name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "cm_guest_age",
+            "key": "guest_age",
+            "label": "Age",
+            "helpText": "Children’s ages are used for Sabbath School class placement.",
+            "type": "NUMBER",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "cm_meals",
+        "title": "Meal tickets",
+        "description": "Enter combined ticket totals for everyone. Sabbath lunch is donation-only and needs no ticket.",
+        "fields": [
+          {
+            "id": "cm_bf_adult",
+            "key": "breakfast_adult_qty",
+            "label": "Adult breakfast tickets — $7 each",
+            "helpText": "Available Wednesday through Saturday.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "priceCents": 700
+          },
+          {
+            "id": "cm_bf_child",
+            "key": "breakfast_child_qty",
+            "label": "Child breakfast tickets — $6 each",
+            "helpText": "Available Wednesday through Saturday.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "priceCents": 600
+          },
+          {
+            "id": "cm_lunch_adult",
+            "key": "lunch_adult_qty",
+            "label": "Adult lunch tickets — $8 each",
+            "helpText": "Available Wednesday through Friday.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "priceCents": 800
+          },
+          {
+            "id": "cm_lunch_child",
+            "key": "lunch_child_qty",
+            "label": "Child lunch tickets — $7 each",
+            "helpText": "Available Wednesday through Friday.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "priceCents": 700
+          },
+          {
+            "id": "cm_supper_adult",
+            "key": "supper_adult_qty",
+            "label": "Adult supper tickets — $8 each",
+            "helpText": "Available Tuesday through Saturday.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "priceCents": 800
+          },
+          {
+            "id": "cm_supper_child",
+            "key": "supper_child_qty",
+            "label": "Child supper tickets — $7 each",
+            "helpText": "Available Tuesday through Saturday.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "priceCents": 700
+          },
+          {
+            "id": "cm_dietary",
+            "key": "dietary_restrictions",
+            "label": "Dietary restrictions or allergies",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "cm_payment",
+        "title": "Review & payment",
+        "description": "Card payments include the processing fee. A $65 deposit holds the reservation: pay it now by card (the card fee applies to the deposit only) or mail a check. The balance is due later.",
+        "stepLabel": "Payment",
+        "isReviewStep": true,
+        "fields": [
+          {
+            "id": "cm_pay",
+            "key": "payment_method",
+            "label": "Payment method",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Pay by check",
+              "Pay a $65 deposit now by card",
+              "Credit / debit card"
+            ]
+          },
+          {
+            "id": "cm_deposit",
+            "key": "check_deposit_acknowledgment",
+            "label": "Check deposit acknowledgment",
+            "helpText": "",
+            "type": "CHECKBOX",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "payment_method",
+              "operator": "EQUALS",
+              "value": "Pay by check"
+            },
+            "placeholder": "I understand a $65 mailed deposit is required to hold this reservation."
+          },
+          {
+            "id": "cm_comments",
+            "key": "comments",
+            "label": "Comments",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          }
+        ]
+      }
+    ]
+  }
+}

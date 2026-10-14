@@ -5,6 +5,9 @@ const dependencies = vi.hoisted(() => ({ getPrisma: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 
+/** A database with no synced seeded form template rows: the list falls back to the bundled seeds (#153). */
+const noSeededRows = { seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null) } };
+
 import { applyEventTemplate } from "@/modules/event-templates/repository";
 import { parseEventTemplatePayload, templateBillingMode, validateEventTemplatePayloadReferences } from "@/modules/event-templates/domain";
 import { starterDescription, starterEventTemplates, starterPayload } from "@/modules/event-templates/starters";
@@ -54,13 +57,15 @@ function calculate(definition: RegistrationFormDefinition, responses: Record<str
 }
 
 describe("the #606 form templates", () => {
-  it.each(allKeys)("%s validates, has unique keys, and appears in the template list and picker", (key) => {
+  it.each(allKeys)("%s validates, has unique keys, and appears in the template list and picker", async (key) => {
+    dependencies.getPrisma.mockReturnValue(noSeededRows);
+    const listed = await listFormTemplates();
     const template = getFormTemplate(key)!;
     expect(template).toBeTruthy();
     expect(registrationFormDefinitionSchema.safeParse(template.definition).success).toBe(true);
-    expect(listFormTemplates().some((entry) => entry.key === key)).toBe(true);
-    expect(templatesForPicker(listFormTemplates(), "GENERAL").some((entry) => entry.key === key)).toBe(true);
-    expect(templatesForPicker(listFormTemplates(), "CLUB").some((entry) => entry.key === key)).toBe(true);
+    expect(listed.some((entry) => entry.key === key)).toBe(true);
+    expect(templatesForPicker(listed, "GENERAL").some((entry) => entry.key === key)).toBe(true);
+    expect(templatesForPicker(listed, "CLUB").some((entry) => entry.key === key)).toBe(true);
     expect(formTemplates.filter((entry) => entry.key === key)).toHaveLength(1);
   });
 
@@ -465,8 +470,9 @@ describe("the #606 starters", () => {
 });
 
 describe("payment-enabled forms on church-billed events (#606)", () => {
-  it("are left out of the picker on a church-billed event only, and say to use an attendee-pay event", () => {
-    const templates = listFormTemplates();
+  it("are left out of the picker on a church-billed event only, and say to use an attendee-pay event", async () => {
+    dependencies.getPrisma.mockReturnValue(noSeededRows);
+    const templates = await listFormTemplates();
     const paying = templates.filter((template) => template.collectsPayment).map((template) => template.key);
     expect(paying).toEqual(expect.arrayContaining(["conference_patches_pins", "hispanic_institute"]));
     const churchBilled = templatesForPicker(templates, "GENERAL", "DEFERRED_ORGANIZATION_INVOICE").map((template) => template.key);

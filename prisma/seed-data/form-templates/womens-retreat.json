@@ -1,0 +1,444 @@
+{
+  "key": "womens_retreat_export",
+  "version": 1,
+  "name": "Women’s Retreat 2026",
+  "description": "Primary contact, repeatable attendee roster, shirts, meals, childcare, ranked seminars, late pricing, and payment.",
+  "audience": "Retreat",
+  "definition": {
+    "title": "Women’s Retreat 2026 registration",
+    "description": "Register each attendee, rank two choices for every breakout block, and review the full amount before submitting.",
+    "confirmationMessage": "Your Women’s Retreat registration has been received. Check your email for payment and edit-registration details.",
+    "attendeeRoster": {
+      "enabled": true,
+      "minAttendees": 1,
+      "maxAttendees": 50,
+      "attendeeLabel": "Attendee",
+      "addButtonLabel": "Add another attendee"
+    },
+    "payment": {
+      "enabled": true,
+      "currency": "USD",
+      "paymentMethodFieldKey": "payment_method",
+      "cardOptionValue": "Credit / debit card",
+      "percentageBasisPoints": 290,
+      "fixedFeeCents": 30,
+      "passFeeToRegistrant": true
+    },
+    "sections": [
+      {
+        "id": "wr_contact",
+        "title": "Primary contact",
+        "description": "Confirmation and emergency contact details.",
+        "fields": [
+          {
+            "id": "wr_contact_first",
+            "key": "primary_contact_first_name",
+            "label": "Primary contact first name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_contact_last",
+            "key": "primary_contact_last_name",
+            "label": "Primary contact last name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_email",
+            "key": "email",
+            "label": "Primary contact email",
+            "helpText": "",
+            "type": "EMAIL",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_phone",
+            "key": "phone",
+            "label": "Primary contact phone",
+            "helpText": "",
+            "type": "PHONE",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_church",
+            "key": "church",
+            "label": "Church",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "optionSource": "CHURCHES_DIRECTORY"
+          },
+          {
+            "id": "wr_church_other",
+            "key": "church_other",
+            "label": "Church — not listed, or notes",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "church",
+              "operator": "EQUALS",
+              "value": "Not listed"
+            }
+          },
+          {
+            "id": "wr_emergency_name",
+            "key": "emergency_contact_name",
+            "label": "Emergency contact name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_emergency_phone",
+            "key": "emergency_contact_phone",
+            "label": "Emergency contact phone",
+            "helpText": "",
+            "type": "PHONE",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_special",
+            "key": "special_needs",
+            "label": "Special needs / accessibility",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "wr_attendee",
+        "title": "Attendees",
+        "description": "Add each person once. Shirt, meal, childcare, and seminar answers stay with that attendee.",
+        "fields": [
+          {
+            "id": "wr_attendee_first",
+            "key": "first_name",
+            "label": "First name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_attendee_last",
+            "key": "last_name",
+            "label": "Last name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "wr_attendee_phone",
+            "key": "attendee_phone",
+            "label": "Phone",
+            "helpText": "",
+            "type": "PHONE",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "wr_type",
+            "key": "attendee_type",
+            "label": "Attendee type",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Adult",
+              "Teen",
+              "Child"
+            ]
+          },
+          {
+            "id": "wr_shirt_size",
+            "key": "shirt_size",
+            "label": "T-shirt size",
+            "helpText": "Choose the size this attendee wants for the convention shirt. The private confirmation page can be used to reconfirm it later.",
+            "type": "SELECT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Youth S",
+              "Youth M",
+              "Youth L",
+              "Youth XL",
+              "Adult XS",
+              "Adult S",
+              "Adult M",
+              "Adult L",
+              "Adult XL",
+              "Adult 2XL",
+              "Adult 3XL",
+              "Adult 4XL",
+              "Adult 5XL"
+            ]
+          },
+          {
+            "id": "wr_meal",
+            "key": "meal_preference",
+            "label": "Meal preference",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Standard",
+              "Vegetarian",
+              "Vegan",
+              "Gluten-free",
+              "Other"
+            ]
+          },
+          {
+            "id": "wr_dietary",
+            "key": "dietary_needs",
+            "label": "Dietary needs / allergies",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "wr_childcare",
+            "key": "childcare_needed",
+            "label": "Childcare needed?",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [
+              "No",
+              "Yes"
+            ]
+          },
+          {
+            "id": "wr_childcare_details",
+            "key": "childcare_details",
+            "label": "Childcare ages and notes",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "childcare_needed",
+              "operator": "EQUALS",
+              "value": "Yes"
+            }
+          },
+          {
+            "id": "wr_childcare_children",
+            "key": "childcare_children",
+            "label": "Number of children needing care",
+            "helpText": "Childcare availability will be confirmed closer to the retreat based on registered need.",
+            "type": "NUMBER",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "childcare_needed",
+              "operator": "EQUALS",
+              "value": "Yes"
+            }
+          },
+          {
+            "id": "wr_volunteer",
+            "key": "volunteer",
+            "label": "Willing to volunteer to help at the retreat?",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "No",
+              "Yes"
+            ]
+          },
+          {
+            "id": "wr_session_1",
+            "key": "session_1_preferences",
+            "label": "Friday 4:00–5:00 PM — rank both choices",
+            "helpText": "",
+            "type": "RANKED_CHOICE",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Color Me Golden: Embracing Life in Every Season",
+              "Refined by Fire, Revealed in Beauty"
+            ],
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availabilityMode": "RANKED_INTEREST",
+            "choiceLimits": {},
+            "optionDescriptions": {
+              "Color Me Golden: Embracing Life in Every Season": "Panel Discussion — Every season of a woman’s life holds unique beauty, but later chapters often bring transitions that feel like winding down. God views this stage not as a time of fading, but as a vibrant season of deep impact and fruitfulness. Come hear real stories of faith and uncover fresh avenues for kingdom purpose while exploring practical ways to transform your life experience into a lasting legacy.",
+              "Refined by Fire, Revealed in Beauty": "Rita Tasche — In this seminar we will learn how hard seasons shape strength, depth and resilience. We will learn how to walk through trials without losing our faith and how to find purpose in pain while developing a strength that comes only through surrender to God."
+            }
+          },
+          {
+            "id": "wr_session_2",
+            "key": "session_2_preferences",
+            "label": "Sabbath 2:00–3:15 PM — rank two choices",
+            "helpText": "",
+            "type": "RANKED_CHOICE",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Repainted by Grace",
+              "Color Me Open",
+              "Nourished by Color",
+              "Color Me Prayerful: Discovering the Beautiful Ways We Talk With God"
+            ],
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availabilityMode": "RANKED_INTEREST",
+            "choiceLimits": {},
+            "optionDescriptions": {
+              "Repainted by Grace": "Valerie Haveman — So many women carry the stains of past mistakes, shame, regret, or feelings of not being enough. But God does not define us by the colors of our past. In this breakout session, we’ll explore what it means to accept God’s forgiveness, stop condemning ourselves, and allow His grace to repaint our hearts with truth, freedom, and hope. Through Scripture and personal stories, we’ll discover how God makes broken things beautiful and invites us to see ourselves through His eyes instead of our own.",
+              "Color Me Open": "Mary Kendall — The door is open. Are you? And what does a root canal have to do with church hospitality? More than you’d think. Mary and her husband built Touchstone Endodontics around one mission: “Unforgettable care, start to finish” — and the same principles that turn nervous patients into raving fans can transform how we love our neighbors, our church family, and the stranger in our pew. Mary draws from business, home, and church ministry to share what she’s learning about what it means to truly see the people around us. She doesn’t have it all figured out — but she’s convinced the journey is worth taking, and she’d love some company.",
+              "Nourished by Color": "Stephanie Richards — This seminar explores simple, evidence-based ways to improve overall health by focusing on colorful nutrition, regular movement, and healthy sun exposure. Participants will learn how “eating the rainbow” — incorporating a variety of brightly colored fruits and vegetables — supports immunity, heart health, gut health, and energy. The session will also highlight how daily activity and safe sunshine exposure work together with nutrition to promote long-term wellness and healthy aging.",
+              "Color Me Prayerful: Discovering the Beautiful Ways We Talk With God": "Shannon Pigsley and Penny Gallant — Prayer is powerful—an intimate, ongoing conversation with a God who listens, loves, and responds. In this session, we will explore why prayer matters so deeply in our relationship and discover the many beautiful ways we can communicate with our Heavenly Father. From kneeling in quiet surrender, to praying in community, to whispering private heart-conversations throughout the day, we’ll reflect on how the privilege of prayer draws us closer to God’s heart. Participants will also have the opportunity to visit interactive prayer stations, each designed to help you experience different forms of prayer in meaningful, hands-on ways. This is a space to learn, to practice, and to rediscover the joy of talking with God in every shade of life."
+            }
+          },
+          {
+            "id": "wr_session_3",
+            "key": "session_3_preferences",
+            "label": "Sabbath 4:15–5:30 PM — rank two choices",
+            "helpText": "",
+            "type": "RANKED_CHOICE",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Shades of Peace",
+              "Coloring Through the Chaos: Raising Children with Grace and Truth",
+              "Broken Crayons Still Color"
+            ],
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availabilityMode": "RANKED_INTEREST",
+            "choiceLimits": {},
+            "optionDescriptions": {
+              "Shades of Peace": "Melissa Morris — This is a practical and encouraging seminar on letting go of anger and resentment while discovering the peace that comes through forgiveness in God. Together, we will explore how releasing past hurts can bring healing, restore relationships, and help us experience greater emotional and spiritual freedom.",
+              "Coloring Through the Chaos: Raising Children with Grace and Truth": "Panel Discussion — Raising children today can feel unpredictable and overwhelming but God is still at work both in your child and in you. This season doesn’t require us to control every detail but does require us to guide, love and trust God with the outcome.",
+              "Broken Crayons Still Color": "Domestic violence and alcohol use affect families inside and outside our church. This session is about awareness, growth and safety regarding domestic violence and alcohol use and empowering women to be the hands and feet of Jesus in our struggling world. Matthew 22: 37–39"
+            }
+          },
+          {
+            "id": "wr_session_4",
+            "key": "session_4_attendance",
+            "label": "Sunday 8:15–9:15 AM — Brushstrokes of Leadership",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Attending",
+              "Not attending"
+            ],
+            "optionDescriptions": {
+              "Attending": "Brushstrokes of Leadership — Ami Cook. God uses ordinary women to create extraordinary ministry. In this practical and encouraging workshop, discover how small acts of faith, kindness, and leadership become beautiful brushstrokes in God’s masterpiece. Learn creative ways to build women’s ministry in your local church, encourage connection, and lead with both grace and purpose."
+            }
+          },
+          {
+            "id": "wr_fee",
+            "key": "registration_fee",
+            "label": "Registration fee",
+            "helpText": "",
+            "type": "CALCULATED",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "priceCents": 12500,
+            "latePricing": {
+              "startsOn": "2026-08-15",
+              "label": "Regular registration pricing",
+              "priceCents": 14500
+            }
+          }
+        ]
+      },
+      {
+        "id": "wr_payment",
+        "title": "Payment & acknowledgment",
+        "description": "Choose how you would like to pay and review the final amount.",
+        "stepLabel": "Payment",
+        "isReviewStep": true,
+        "fields": [
+          {
+            "id": "wr_payment_method",
+            "key": "payment_method",
+            "label": "Payment method",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Pay later",
+              "Credit / debit card"
+            ]
+          },
+          {
+            "id": "wr_promo",
+            "key": "promo_code",
+            "label": "Promo code",
+            "helpText": "Enter a code supplied by the event team, then select Apply.",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "wr_notes",
+            "key": "attendee_notes",
+            "label": "Additional notes",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "wr_ack",
+            "key": "acknowledgment",
+            "label": "Acknowledgment",
+            "helpText": "",
+            "type": "CHECKBOX",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "placeholder": "Yes, I understand payment and edit details will be sent by email."
+          }
+        ]
+      }
+    ]
+  }
+}

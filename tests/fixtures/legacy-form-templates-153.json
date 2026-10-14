@@ -1,0 +1,131 @@
+{
+  "_comment": "Frozen from modules/forms/definition.ts as it stood before #153 moved the Women's Retreat, Camp Meeting and Spring Camporee forms to prisma/seed-data/form-templates. sha256 is of the template (key, name, description, audience, definition) as JSON with object keys sorted and undefined dropped. Order is the order of the old formTemplates array.",
+  "templates": [
+    {
+      "key": "simple_rsvp",
+      "sha256": "85a88a6f39ba50e58ea89dde93f0f2722882ee3f9eb5d36a7ffbb20287d04d7a",
+      "sections": 1,
+      "fields": 3
+    },
+    {
+      "key": "retreat_registration",
+      "sha256": "d9bb066acda7343de09d736b0b757cbd961a7976ea57d44bd84655c305b76e2d",
+      "sections": 2,
+      "fields": 6
+    },
+    {
+      "key": "household_interest",
+      "sha256": "bafc9bea1315b168cb72d5359eda4f92193b55da7b45032a6879e6b846a99e39",
+      "sections": 1,
+      "fields": 3
+    },
+    {
+      "key": "womens_retreat_export",
+      "sha256": "c13650c9a14fc4bf92c42c3689ce950416f87025a999cd3799a5682be1b8c750",
+      "sections": 3,
+      "fields": 29
+    },
+    {
+      "key": "man_camp_export",
+      "sha256": "ee69f32a570e039012d3d1b9dc504539999ce6e2380c16b9e3302cef4383c5c9",
+      "sections": 3,
+      "fields": 28
+    },
+    {
+      "key": "spring_camporee_export",
+      "sha256": "69486d3dc00e3c77e1addb0114f21c90f76a3a68ac2ef9f37a10fc159c953a41",
+      "sections": 5,
+      "fields": 45
+    },
+    {
+      "key": "fall_camporee",
+      "sha256": "ab303be65501e246649aa724bad314923d0991fb5eede3b289a5fe7eb0be92ee",
+      "sections": 4,
+      "fields": 22
+    },
+    {
+      "key": "camp_meeting_export",
+      "sha256": "08a58c97d419af5f60bed8cb9207acb599589b6e1b1835e80aea99c2982877ae",
+      "sections": 5,
+      "fields": 34
+    },
+    {
+      "key": "honors_weekend",
+      "sha256": "cb2ce9e32ba3b192d6b2949d803e0451aaa78823c89f0bcd09f8937565206923",
+      "sections": 2,
+      "fields": 15
+    },
+    {
+      "key": "leadership_weekend",
+      "sha256": "9d3bcb4e5d6ce5eef153185c4687600a4f2c2df190045b636653dd0c2db4454c",
+      "sections": 4,
+      "fields": 20
+    },
+    {
+      "key": "tlt_retreat",
+      "sha256": "5335a94045615582f4e2610dc753919f88333937d36665518f833472325f5a98",
+      "sections": 4,
+      "fields": 13
+    },
+    {
+      "key": "outdoor_school",
+      "sha256": "22c335cf42c3569ef56f26b511ca0726d81af8c62d0c490a4478a7816e5b2948",
+      "sections": 5,
+      "fields": 16
+    },
+    {
+      "key": "hispanic_institute",
+      "sha256": "0ddda8a8facb2895b509ccbe40ba4aa907e90f3fe92fe8a450bb5238c12aa87e",
+      "sections": 3,
+      "fields": 10
+    },
+    {
+      "key": "tlt_opportunities",
+      "sha256": "2f717e2bd74bb1fc17b75e4b0c1770075d9b9957609de6098100d011dd06ca78",
+      "sections": 4,
+      "fields": 17
+    },
+    {
+      "key": "pathfinder_of_the_year",
+      "sha256": "8a301934a61902889c3e01d4b80d45484a2a6129ebaf25199cabd14237c8b0f5",
+      "sections": 3,
+      "fields": 15
+    },
+    {
+      "key": "tlt_of_the_year",
+      "sha256": "80fcc06c36361df00cbb89a4884e77e0d5bc7b86f89ee7ee2f34b8bf19c3a6d1",
+      "sections": 3,
+      "fields": 15
+    },
+    {
+      "key": "tlt_application",
+      "sha256": "ff9cf4866de106868d3748fd0036d4c2012ed13442d489e974a9c74615f5954f",
+      "sections": 4,
+      "fields": 17
+    },
+    {
+      "key": "conference_patches_pins",
+      "sha256": "49f60454ccbe5bea11812df74430c48cf7337f3cbfd3ccfe715c9c92ad8b8b7b",
+      "sections": 3,
+      "fields": 10
+    },
+    {
+      "key": "pbe_registration",
+      "sha256": "e34855d0aae4e81b428914505481ec7f282919935a8d8f476e1d6f9cfa7a8566",
+      "sections": 4,
+      "fields": 22
+    },
+    {
+      "key": "blank_form",
+      "sha256": "19ed154532ed47e741801a4292a0d47b0c3e48efa7cf4c194316ebc2a7ab1cd5",
+      "sections": 1,
+      "fields": 4
+    },
+    {
+      "key": "blank_club_form",
+      "sha256": "434234198727b6ecc20f1b18b4eb3071e8cd9c9e68e19ff1850ed1c80c47ff0b",
+      "sections": 2,
+      "fields": 11
+    }
+  ]
+}

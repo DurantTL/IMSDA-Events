@@ -8481,3 +8481,44 @@ model EventMealLedgerEntry {
   @@index([registrationId, createdAt])
   @@index([selectionId])
 }
+
+/// A shared form template whose content is seeded data, not source (#153): the
+/// Women's Retreat, Camp Meeting and Spring Camporee registration forms. The
+/// content lives in `prisma/seed-data/form-templates/*.json`; `npm run
+/// form-templates:sync` brings this row to the file's `version` (the same
+/// versioned-template pattern as `ClubFormTemplate` and `LodgingProperty`).
+/// New forms are created from this row, and creating one copies the
+/// definition into the new form's own `RegistrationFormVersion`, so a later
+/// version here never reaches a form or event that already exists.
+model SeededFormTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  /// Bumped in the seed file when the definition changes; sync applies only a higher version.
+  version     Int
+  name        String
+  description String   @default("")
+  audience    String
+  definition  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions SeededFormTemplateVersion[]
+}
+
+/// A frozen copy of one version of a seeded form template (#153), added by
+/// sync each time a version is applied and never changed or removed, so what a
+/// form was created from can always be read back.
+model SeededFormTemplateVersion {
+  id          String   @id @default(cuid())
+  templateId  String
+  version     Int
+  name        String
+  description String   @default("")
+  audience    String
+  definition  Json
+  createdAt   DateTime @default(now())
+
+  template SeededFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, version])
+}
