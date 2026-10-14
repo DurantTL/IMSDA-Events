@@ -113,7 +113,7 @@ export function OperationsSearchBar({
               <fieldset className="field" key="status">
                 <legend>{filterLabels.status}</legend>
                 {filter.options.map((option) => (
-                  <label key={option.value}>
+                  <label className="checkbox-label" key={option.value}>
                     <input defaultChecked={current.status.includes(option.value)} name="status" type="checkbox" value={option.value} /> {humanize(option.value)}
                   </label>
                 ))}

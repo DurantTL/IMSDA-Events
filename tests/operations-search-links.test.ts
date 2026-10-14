@@ -61,6 +61,8 @@ describe("the search bar carries what it cannot show", () => {
     const html = render("status=CONFIRMED,CANCELLED");
     expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*name="status"[^>]*value="CONFIRMED"/);
     expect(html.match(/checked=""/g)).toHaveLength(2);
+    // The shared checkbox-row styling gives each label the 44px phone tap target the mobile audit requires.
+    expect(html.match(/<label class="checkbox-label"/g)).toHaveLength(5);
   });
 
   it("keeps several values of one filter and several answers instead of dropping them", () => {
