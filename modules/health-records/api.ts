@@ -65,6 +65,7 @@ const statusByCode: Record<HealthRecordError["code"], number> = {
   STEP_UP_REQUIRED: 403,
   ACKNOWLEDGMENT_REQUIRED: 403,
   CONFLICT: 409,
+  RECORD_EXISTS: 409,
   UNREADABLE: 500,
 };
 

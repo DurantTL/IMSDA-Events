@@ -13,6 +13,10 @@
  * - removing a roster member erases the record and withdraws its open links;
  * - the owner decisions of 2026-10-14 (#923): a Registrar enters and replaces a
  *   record but never reads one back (refusals audited, no value in any row),
+ *   and, since the follow-up decision of the same day, only when none exists
+ *   yet: a save over an existing record is refused (audited with ids and a
+ *   reason, no value), including when several Registrar saves for one member
+ *   race, where exactly one creates it;
  *   and nobody reads or enters health data until they have acknowledged the
  *   current privacy wording once (per person and version, staff by user and
  *   everyone else by attendee account, with the table holding no event, club,
@@ -275,9 +279,35 @@ async function main() {
   const statuses = await repo.healthEntryStatusesForMembers(registrarA, clubs.a, [morgan.id], now);
   assert(JSON.stringify(statuses) === JSON.stringify({ [morgan.id]: { status: "CURRENT" } }), "the roster status for a Registrar is the status alone");
 
-  await repo.saveHealthRecord(registrarA, clubs.a, morgan.id, { ...record, medications: "Verify replaced medication" }, now);
-  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_UPDATED", entityId: entered.id } })) === 1, "a Registrar's replacement is audited as an update");
-  assert((await repo.viewHealthRecord(directorA, clubs.a, morgan.id, now)).values.medications === "Verify replaced medication", "the director reads what the Registrar entered");
+  // Only when none exists yet (owner decision of 2026-10-14): a Registrar's save over a record is refused.
+  const fieldsBefore = JSON.stringify((await prisma.healthRecordField.findMany({ where: { recordId: entered.id }, orderBy: { fieldKey: "asc" } })));
+  const refusedSave = await repo.saveHealthRecord(registrarA, clubs.a, morgan.id, { ...record, medications: "Verify replaced medication" }, now).then(() => null, (caught: unknown) => caught);
+  assert(refusedSave instanceof Error && (refusedSave as { code?: string }).code === "RECORD_EXISTS", "a Registrar's save over an existing record is refused");
+  assert(!(refusedSave as Error).message.includes("Verify") && !JSON.stringify(refusedSave).includes("Verify"), "the refusal message holds no value");
+  assert(JSON.stringify(await prisma.healthRecordField.findMany({ where: { recordId: entered.id }, orderBy: { fieldKey: "asc" } })) === fieldsBefore, "the refused save changed nothing");
+  const saveRefusals = await prisma.auditLog.findMany({ where: { action: "HEALTH_RECORD_SAVE_REFUSED", entityId: morgan.id } });
+  assert(saveRefusals.length === 1, "the refused save is audited once");
+  const refusalMetadata = saveRefusals[0]!.metadata as Record<string, unknown>;
+  assert(refusalMetadata.reason === "RECORD_EXISTS" && refusalMetadata.rosterMemberId === morgan.id && refusalMetadata.viewerKind === "CLUB_REGISTRAR", "the refusal names who, which member and the reason");
+  for (const secret of [...SECRETS, "Verify replaced medication"]) assert(!JSON.stringify(saveRefusals).includes(secret), "the save refusal audit row holds no health text");
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_UPDATED", entityId: entered.id } })) === 0, "a Registrar's refused save is never an update");
+  await repo.saveHealthRecord(directorA, clubs.a, morgan.id, { ...record, medications: "Verify replaced medication" }, now);
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_UPDATED", entityId: entered.id } })) === 1, "the director's replacement is audited as an update");
+  assert((await repo.viewHealthRecord(directorA, clubs.a, morgan.id, now)).values.medications === "Verify replaced medication", "the director reads what was saved");
+
+  // Several Registrar saves for one member at once: exactly one creates the record, the rest are refused.
+  await prisma.person.create({ data: { id: `${P}_quinn`, firstName: "Quinn", lastName: "Verify" } });
+  const quinn = await prisma.clubRosterMember.create({
+    data: { organizationId: clubs.a, clubYear, personId: `${P}_quinn`, attendeeType: "YOUTH", role: "Pathfinder", source: "DIRECTOR" },
+  });
+  const raceResults = await Promise.allSettled(Array.from({ length: 8 }, (_, index) => repo.saveHealthRecord(registrarA, clubs.a, quinn.id, { ...record, medications: `Verify race entry ${index}` }, now)));
+  const winners = raceResults.filter((result) => result.status === "fulfilled");
+  const losers = raceResults.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  assert(winners.length === 1, `exactly one of eight racing Registrar saves creates the record (got ${winners.length})`);
+  assert(losers.every((loser) => (loser.reason as { code?: string }).code === "RECORD_EXISTS"), "every losing racer is refused as 'record exists'");
+  assert((await prisma.healthRecord.count({ where: { rosterMemberId: quinn.id } })) === 1, "the race leaves one record");
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_CREATED", entityId: (await prisma.healthRecord.findUniqueOrThrow({ where: { rosterMemberId: quinn.id } })).id } })) === 1, "the race writes one create audit row");
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_SAVE_REFUSED", entityId: quinn.id } })) === 7, "each losing racer is audited");
 
   // 7. The acknowledgment: per person and wording version (#923) ----------
   const version = acknowledgmentDomain.HEALTH_PRIVACY_ACK_VERSION;

@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
  * The Health tab for one roster member (#611). With the feature switched off
  * this page does not exist. Otherwise only the club's own director or deputy
  * gets in, after the roster's second step; opening it is audited. A club
- * Registrar gets the entry page instead (#923): the form, and only whether a
- * record exists, its status and when it was last confirmed. A first visit asks
+ * Registrar gets the entry page instead (#923): the form only while no record
+ * exists, and otherwise only the status (a record on file is changed by the
+ * director or a deputy, owner decision of 2026-10-14). A first visit asks
  * for the one-time privacy acknowledgment.
  */
 export default async function ClubMemberHealthPage({ params }: { params: Promise<{ organizationId: string; memberId: string }> }) {
@@ -52,25 +53,29 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
         <header>
           <h2 translate="no">Health record entry: {entryName}</h2>
           <p><HealthStatusChip status={entry.status} /></p>
-          <p className="quiet-copy">
-            {entry.exists
-              ? `A health record is on file${entry.lastConfirmedAt ? `, last confirmed ${entry.lastConfirmedAt.slice(0, 10)}` : ""}.`
-              : "No health record is on file yet."}
-          </p>
-          <p className="quiet-copy">
-            Registrars can enter a health record but cannot read it back. Saving replaces the whole record, so
-            enter every answer from the paper form. Saving is recorded.
-          </p>
+          {entry.exists ? (
+            <p className="quiet-copy">A health record is on file; the director or a deputy can update it.</p>
+          ) : (
+            <>
+              <p className="quiet-copy">No health record is on file yet.</p>
+              <p className="quiet-copy">
+                Registrars can enter a health record when none exists yet, but cannot read it back. Saving is recorded.
+                Once a record is on file, only the director or a deputy can change it.
+              </p>
+            </>
+          )}
         </header>
-        <HealthRecordForm
-          clubName={entry.club.name}
-          consentText={entry.consentText}
-          doneHref={`${rosterHref}/${encodeURIComponent(memberId)}/health`}
-          initialValues={{}}
-          memberName={entryName}
-          mode={{ kind: "director", organizationId, memberId }}
-          sponsoringChurch={entry.club.sponsoringChurch}
-        />
+        {!entry.exists && (
+          <HealthRecordForm
+            clubName={entry.club.name}
+            consentText={entry.consentText}
+            doneHref={`${rosterHref}/${encodeURIComponent(memberId)}/health`}
+            initialValues={{}}
+            memberName={entryName}
+            mode={{ kind: "director", organizationId, memberId }}
+            sponsoringChurch={entry.club.sponsoringChurch}
+          />
+        )}
       </section>
     );
   }

@@ -52,19 +52,29 @@ beforeEach(() => {
 });
 
 describe("the Health tab page for a club member (#923)", () => {
-  it("gives a Registrar the entry page: the status and last-confirmed date, a blank form, and never reads the record", async () => {
+  it("gives a Registrar the entry page when no record exists: the status and a blank form, and never reads the record", async () => {
     mocks.viewer.mockResolvedValue(registrar);
-    mocks.entry.mockResolvedValue(entry);
+    mocks.entry.mockResolvedValue({ ...entry, exists: false, status: "NONE", lastConfirmedAt: null });
     const element = text(await ClubMemberHealthPage(props));
     expect(mocks.entry).toHaveBeenCalledWith(registrar, "club-a", "member-1");
     expect(mocks.view).not.toHaveBeenCalled();
     expect(mocks.links).not.toHaveBeenCalled();
     expect(element).toContain("cannot read it back");
-    expect(element).toContain("last confirmed 2026-10-05");
+    expect(element).toContain("when none exists yet");
     // The form starts empty: no stored value is passed to it.
     expect(element).toContain('"initialValues":{}');
     expect(element).not.toContain("HealthRecordView");
     expect(element).not.toContain("Confirm this record");
+  });
+
+  it("shows a Registrar the status only, and no form, when a record is on file", async () => {
+    mocks.viewer.mockResolvedValue(registrar);
+    mocks.entry.mockResolvedValue(entry);
+    const element = text(await ClubMemberHealthPage(props));
+    expect(element).toContain("A health record is on file; the director or a deputy can update it.");
+    expect(element).not.toContain("initialValues");
+    expect(element).not.toContain("consentText");
+    expect(mocks.view).not.toHaveBeenCalled();
   });
 
   it("asks a Registrar who has not acknowledged for the one-time notice, and shows nothing else", async () => {

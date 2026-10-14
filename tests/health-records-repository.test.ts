@@ -134,6 +134,7 @@ const client: any = {
       return message;
     },
   },
+  $queryRaw: async () => [],
   $transaction: async (work: (tx: unknown) => unknown) => work(client),
 };
 
@@ -625,16 +626,57 @@ describe("a Registrar can enter a health record but never read one (#923)", () =
     for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
   });
 
-  it("replaces an existing record and audits the update, again without a health value", async () => {
+  it("refuses a Registrar's save when a record already exists: a plain message, no value, nothing changed, audited with ids only", async () => {
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    const before = JSON.stringify([state.records, state.fields]);
     state.audit = [];
-    await saveHealthRecord(registrar, "club-a", "member-1", { ...syntheticRecord, medications: "Synthetic registrar note" }, now);
+    const error = await saveHealthRecord(registrar, "club-a", "member-1", { ...syntheticRecord, medications: "Synthetic registrar note" }, now).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(HealthRecordError);
+    expect(error).toMatchObject({ code: "RECORD_EXISTS", message: "A health record is already on file. The director or a deputy can update it." });
+    for (const marker of [...healthMarkers, "Synthetic registrar note"]) expect(JSON.stringify(error) + (error as Error).message).not.toContain(marker);
+    expect(JSON.stringify([state.records, state.fields])).toBe(before);
+    expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_SAVE_REFUSED"]);
+    expect(state.audit[0]).toMatchObject({
+      entityId: "member-1",
+      metadata: { viewerKind: "CLUB_REGISTRAR", actorAttendeeAccountId: "acct-reg", organizationId: "club-a", rosterMemberId: "member-1", reason: "RECORD_EXISTS" },
+    });
+    for (const marker of [...healthMarkers, "Synthetic registrar note"]) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("refuses a Registrar even for an earlier club year's record of the same person", async () => {
+    state.members.push({ ...state.members[0], id: "member-old", clubYear: "2025-26" });
+    state.records.push({ id: "rec-old", organizationId: "club-a", rosterMemberId: "member-old", confirmedClubYear: "2025-26" });
+    await expect(saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now)).rejects.toMatchObject({ code: "RECORD_EXISTS" });
+    expect(state.records).toHaveLength(1);
+  });
+
+  it("lets the director or a deputy keep updating an existing record", async () => {
+    await saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now);
+    state.audit = [];
+    await expect(saveHealthRecord(leader, "club-a", "member-1", { ...syntheticRecord, medications: "Synthetic director note" }, now)).resolves.toMatchObject({ status: "CURRENT" });
     expect(state.records).toHaveLength(1);
     expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_UPDATED"]);
-    expect(state.audit[0]!.metadata).toMatchObject({ viewerKind: "CLUB_REGISTRAR" });
-    for (const marker of [...healthMarkers, "Synthetic registrar note"]) expect(JSON.stringify(state.audit)).not.toContain(marker);
-    // The director still reads the registrar's entry.
-    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values.medications).toBe("Synthetic registrar note");
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values.medications).toBe("Synthetic director note");
+  });
+
+  it("retries a lost create race and then refuses the Registrar, since the winner's record now exists", async () => {
+    const realCreate = client.healthRecord.create;
+    let raced = false;
+    client.healthRecord.create = async (args: { data: Row }) => {
+      if (!raced) {
+        raced = true;
+        // The other save's record lands first; ours then hits the unique key.
+        await realCreate({ data: { id: "winner", organizationId: "club-a", rosterMemberId: "member-1", confirmedClubYear: "2026-27" } });
+        throw Object.assign(new Error("unique"), { code: "P2002" });
+      }
+      return realCreate(args);
+    };
+    try {
+      await expect(saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now)).rejects.toMatchObject({ code: "RECORD_EXISTS" });
+    } finally {
+      client.healthRecord.create = realCreate;
+    }
+    expect(state.records.map((record) => record.id)).toEqual(["winner"]);
   });
 
   it("refuses every read, audits the refusal with ids only, and opens nothing", async () => {
@@ -688,6 +730,9 @@ describe("a Registrar can enter a health record but never read one (#923)", () =
       "member-1": { status: "NEEDS_UPDATE" },
       "member-2": { status: "NONE" },
     });
+    // An earlier club year's record of the same person counts as on file.
+    state.members.push({ ...state.members[0], id: "member-next", clubYear: "2027-28" });
+    expect((await healthEntryStatusesForMembers(registrar, "club-a", ["member-next"], now))["member-next"]).toEqual({ status: "NEEDS_UPDATE" });
   });
 
   it("leaves the entry status and list to the Registrar: a director or system administrator uses the record itself", async () => {
@@ -730,9 +775,9 @@ describe("the one-time privacy acknowledgment (#923)", () => {
   ];
 
   it.each(everyone)("refuses %s everything until they acknowledge, then lets them in", async (_name, viewer) => {
-    // A record exists, so a refused read would have something to open.
+    // A record exists, so a refused read would have something to open. (Not for a Registrar, who may only create.)
     state.ackAll = true;
-    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    if (viewer.kind !== "CLUB_REGISTRAR") await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
     state.ackAll = false;
     state.audit = [];
     state.prismaTouched.mockClear();

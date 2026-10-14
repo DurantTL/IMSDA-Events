@@ -12,7 +12,7 @@
  * Stored with every acknowledgment. Changing `HEALTH_PRIVACY_ACK_TEXT` means
  * changing this too, so everyone acknowledges the new wording again.
  */
-export const HEALTH_PRIVACY_ACK_VERSION = "health-privacy-ack-2026-10";
+export const HEALTH_PRIVACY_ACK_VERSION = "health-privacy-ack-2026-10-b";
 
 /**
  * Draft wording for the Communication Director to confirm. Kept in one place so
@@ -25,7 +25,7 @@ export const HEALTH_PRIVACY_ACK_TEXT = {
     "I will use health information only to care for the young person it is about, at the event or club activity it was collected for.",
     "I will not copy, photograph, forward, post or share it, and I will not discuss it with anyone who does not need it for that care.",
     "I understand that every time I open, enter, change, print or try to open a health record is recorded, with my name and the time.",
-    "If I am a club Registrar, I understand that I can enter a health record but cannot read it back, and that saving replaces the whole record.",
+    "If I am a club Registrar, I understand that I can enter a health record when none exists yet, but cannot read it back.",
     "I will report anything that looks like a mistake or a leak to the Communication Director right away.",
   ],
   confirm: "I have read this and I agree.",

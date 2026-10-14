@@ -117,7 +117,7 @@ export function ClubRosterWorkspace({
    * deputy; omitted everywhere else, so nothing about health is rendered.
    */
   healthTab?: Record<string, { status: "NONE" | "CURRENT" | "NEEDS_UPDATE" | "LOCKED"; hasHealthNote: boolean }>;
-  /** A Registrar (#923) can enter a health record but not read it: the link says so. */
+  /** A Registrar (#923) can enter a health record only when none exists yet: with one on file, the row shows its status and no link. */
   healthEntryOnly?: boolean;
   /** A neutral "Has a health record" marker (#611): a record exists, nothing more. Ids only, never text. */
   healthRecordFlags?: Record<string, boolean>;
@@ -542,7 +542,10 @@ export function ClubRosterWorkspace({
                               {healthRecordFlags?.[member.id] && (
                                 <span className="status-chip">Has a health record</span>
                               )}
-                              {healthTab && (
+                              {healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE") && (
+                                <span className="status-chip">A health record is on file; the director or a deputy can update it.</span>
+                              )}
+                              {healthTab && !(healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE")) && (
                                 <a
                                   aria-label={`Health record for ${member.firstName} ${member.lastName}`}
                                   className="secondary-button"

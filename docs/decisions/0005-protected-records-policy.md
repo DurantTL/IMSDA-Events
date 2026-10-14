@@ -438,7 +438,7 @@ human can accept, change or reject them before any real record is stored.
    | Role | Health tab and record |
    | --- | --- |
    | That club's Director and Deputy (second step passed) | View and edit, own club only, all year; send and withdraw parent links |
-   | Club Registrar (changed 2026-10-14, #923) | **Write-only.** Can create or replace a member's record for their own club (typing in a paper form), after the one-time privacy acknowledgment. After saving they cannot read it back: they are shown only that a record exists, its status and when it was last confirmed. No view, no confirmation, no parent links, no export, print or CSV. Every save is audited. Also sees the neutral "Has a health record" marker on the roster page |
+   | Club Registrar (changed 2026-10-14, #923) | **Write-only, and only when none exists yet.** Can create a member's record for their own club (typing in a paper form) when the member has none, after the one-time privacy acknowledgment. If a record already exists, the save is refused and only the director or a deputy can update it. They cannot read a record back: they are shown only that a record is on file, its status and no form. No view, no confirmation, no parent links, no export, print or CSV. Every save and every refused save is audited. Also sees the neutral "Has a health record" marker on the roster page |
    | Club Reporter | No |
    | Area Coordinator (verified second step) | **View only** the full record of a member registered for an event (submitted or confirmed registration by that club), from registration through the event's last day (changed 2026-10-14, #923: it was 30 days after); no roster browsing, no Health tab, no edit |
    | Staff holding `VIEW_HEALTH_INFORMATION` on an event membership | **View only**, and only for members registered for that event, inside the same window |
@@ -549,16 +549,27 @@ Owner decisions from Caleb, Communication Director, on 2026-10-14.
    directors and system administrators included.
 4. **Registrars may enter health records but not read them.** This replaces
    the 2026-10-09 rule of no access.
-   - A club Registrar can create or replace a member's health record, for
-     example typing in a paper form. After saving they cannot read it back:
-     they see only that a record exists, its status, and when it was last
-     confirmed. The server enforces this on every read path (API routes,
+   - A club Registrar can create a member's health record when none exists
+     yet, for example typing in a paper form. After saving they cannot read it
+     back: they see only that a record is on file and its status. The server enforces this on every read path (API routes,
      pages, summaries, links); the code that serves a Registrar never selects
      or decrypts a stored value, and no validation message compares against one.
    - A Registrar cannot confirm a record (that would affirm what they cannot
-     read) or send, list or withdraw parent links. Saving replaces the whole
-     record.
-   - Directors and deputies keep full read and write.
+     read) or send, list or withdraw parent links.
+   - **Only when none exists (owner decision of 2026-10-14, follow-up).** If a
+     health record already exists for the member, a Registrar's save is
+     refused on the server with a plain message that says only that a record
+     is already on file and the director or a deputy can update it. It carries
+     no value. The check runs inside the save transaction, with the member's
+     row locked and the unique key as the backstop, so two saves at once
+     cannot get past it. The Registrar's page and roster link then show the
+     status only, with no form: "A health record is on file; the director or a
+     deputy can update it." The refusal is audited
+     (`HEALTH_RECORD_SAVE_REFUSED`) with ids and the reason `RECORD_EXISTS`,
+     never a value. A record kept from an earlier club year counts as
+     existing.
+   - Only directors and deputies change an existing record (and keep full
+     read and write).
 5. **Refused attempts are audited:** confirmed (already decided 2026-10-09).
    A Registrar's refused read writes `HEALTH_RECORD_ACCESS_REFUSED` with ids
    and a reason, never a health value.
@@ -690,8 +701,10 @@ only.
 ### Rules
 
 - **Window.** Open from registration through the event's last day (event time
-  zone, inclusive), then closed for everyone, system administrators included,
-  for the view and for the printable sheet. It was 30 days after the last day
+  zone, inclusive), then closed for everyone, directors and system
+  administrators included, for the view and for the printable sheet. The owner
+  confirmed on 2026-10-14 that it closes for everyone at the end of the event's
+  last day; no exception. It was 30 days after the last day
   until the owner decision of 2026-10-14 (#923, Addendum B); the definition is
   now shared with the Health Record (`modules/events/health-window.ts`). The
   club forms "has not ended" rule is unchanged.

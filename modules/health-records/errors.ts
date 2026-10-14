@@ -10,6 +10,7 @@ export type HealthRecordErrorCode =
   | "STEP_UP_REQUIRED"
   | "ACKNOWLEDGMENT_REQUIRED"
   | "CONFLICT"
+  | "RECORD_EXISTS"
   | "UNREADABLE";
 
 /** A health record rule that stopped a request. Messages never carry a health value. */

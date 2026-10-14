@@ -55,6 +55,9 @@ function unavailable() {
   return new HealthRecordError("LINK_UNAVAILABLE", HEALTH_LINK_UNAVAILABLE_MESSAGE);
 }
 
+/** Says only that a record exists and who can change it. Never a value. */
+export const REGISTRAR_RECORD_EXISTS_MESSAGE = "A health record is already on file. The director or a deputy can update it.";
+
 const REGISTRAR_WRITE_ONLY_MESSAGE = "Registrars can enter a health record but cannot read, confirm or send links for one.";
 
 function isClubViewer(viewer: HealthViewer): viewer is Extract<HealthViewer, { kind: "CLUB_LEADER" | "CLUB_REGISTRAR" }> {
@@ -343,7 +346,10 @@ async function storedTypedValuesForMember(organizationId: string, memberId: stri
   }
 }
 
-/** A director, deputy or Registrar types the record in from the paper form (a director or deputy may also correct it). */
+/**
+ * A director, deputy or Registrar types the record in from the paper form. Only a director or deputy changes
+ * a record that already exists; a Registrar's save over one is refused (owner decision of 2026-10-14).
+ */
 export async function saveHealthRecord(viewer: HealthViewer, organizationId: string, memberId: string, rawInput: unknown, now = new Date()) {
   requireHealthRecordsEnabled();
   allow(viewer, organizationId, "EDIT");
@@ -367,19 +373,46 @@ export async function saveHealthRecord(viewer: HealthViewer, organizationId: str
   }
   requireEncryption();
   const who = healthAuditActor(viewer);
-  return withFirstSaveRetry(() => getPrisma().$transaction(async (tx) => {
-    const member = await loadMember(tx, organizationId, memberId, now);
-    const written = await writeRecord(tx, { organizationId, member, input, via: "DIRECTOR", savedBy: viewerActorId(viewer), now });
-    await writeAuditLog({
-      actorUserId: who.actorUserId,
-      action: written.created ? "HEALTH_RECORD_CREATED" : "HEALTH_RECORD_UPDATED",
-      entityType: "HealthRecord",
-      entityId: written.recordId,
-      summary: written.created ? "Created a member's health record." : "Updated a member's health record.",
-      metadata: { ...who.metadata, organizationId, rosterMemberId: memberId, fieldCount: written.fieldCount, clubYear: clubYearFor(now) },
-    }, tx);
-    return { recordId: written.recordId, status: "CURRENT" as const };
-  }));
+  try {
+    return await withFirstSaveRetry(() => getPrisma().$transaction(async (tx) => {
+      const member = await loadMember(tx, organizationId, memberId, now);
+      if (viewer.kind === "CLUB_REGISTRAR") {
+        // A Registrar may only create (owner decision of 2026-10-14). The member's row is locked so two saves
+        // for the same member run one after the other; the check below then sees the first one's record. If a
+        // create still races past the check, the unique key stops it and the retry lands here again, refused.
+        await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ${member.id} FOR UPDATE`;
+        if (await findRecordMeta(tx, organizationId, member)) throw new HealthRecordError("RECORD_EXISTS", REGISTRAR_RECORD_EXISTS_MESSAGE);
+      }
+      const written = await writeRecord(tx, { organizationId, member, input, via: "DIRECTOR", savedBy: viewerActorId(viewer), now });
+      await writeAuditLog({
+        actorUserId: who.actorUserId,
+        action: written.created ? "HEALTH_RECORD_CREATED" : "HEALTH_RECORD_UPDATED",
+        entityType: "HealthRecord",
+        entityId: written.recordId,
+        summary: written.created ? "Created a member's health record." : "Updated a member's health record.",
+        metadata: { ...who.metadata, organizationId, rosterMemberId: memberId, fieldCount: written.fieldCount, clubYear: clubYearFor(now) },
+      }, tx);
+      return { recordId: written.recordId, status: "CURRENT" as const };
+    }));
+  } catch (refusal) {
+    if (viewer.kind === "CLUB_REGISTRAR" && refusal instanceof HealthRecordError && refusal.code === "RECORD_EXISTS") {
+      // Audited outside the rolled-back transaction: ids and a reason only. The refusal stands if the audit fails.
+      try {
+        await writeAuditLog({
+          actorUserId: who.actorUserId,
+          action: "HEALTH_RECORD_SAVE_REFUSED",
+          entityType: "HealthRecord",
+          entityId: idShaped(memberId),
+          summary: "A Registrar's save over an existing health record was refused.",
+          metadata: { ...who.metadata, organizationId: idShaped(organizationId), rosterMemberId: idShaped(memberId), reason: "RECORD_EXISTS" },
+        });
+      } catch (error) {
+        const action = "Auditing a refused health record save failed";
+        logError(action, error);
+      }
+    }
+    throw refusal;
+  }
 }
 
 /** The director confirms last year's record is still right for this club year. */
@@ -497,12 +530,30 @@ export async function healthEntryStatusesForMembers(
   allow(viewer, organizationId, "EDIT");
   await requireHealthPrivacyAcknowledgment(viewer);
   if (memberIds.length === 0) return {};
-  const records = await getPrisma().healthRecord.findMany({
-    where: { organizationId, rosterMemberId: { in: memberIds } },
-    select: { rosterMemberId: true, confirmedClubYear: true },
+  const prisma = getPrisma();
+  // Same rule as `findRecordMeta`: the person's record from an earlier club year counts as on file, because a
+  // Registrar's save over it would be refused.
+  const members = await prisma.clubRosterMember.findMany({ where: { id: { in: memberIds }, organizationId }, select: { id: true, personId: true } });
+  const personIds = members.flatMap((member) => (member.personId ? [member.personId] : []));
+  const records = await prisma.healthRecord.findMany({
+    where: {
+      organizationId,
+      OR: [{ rosterMemberId: { in: memberIds } }, ...(personIds.length > 0 ? [{ rosterMember: { personId: { in: personIds } } }] : [])],
+    },
+    select: { rosterMemberId: true, confirmedClubYear: true, updatedAt: true, rosterMember: { select: { personId: true } } },
   });
   const byMember = new Map(records.map((record) => [record.rosterMemberId, record]));
-  return Object.fromEntries(memberIds.map((id) => [id, { status: healthRecordStatus(byMember.get(id) ?? null, now) }]));
+  const personOf = new Map(members.map((member) => [member.id, member.personId]));
+  const forMember = (id: string) => {
+    const own = byMember.get(id);
+    if (own) return own;
+    const personId = personOf.get(id);
+    if (!personId) return null;
+    return records
+      .filter((record) => record.rosterMember.personId === personId)
+      .sort((a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0))[0] ?? null;
+  };
+  return Object.fromEntries(memberIds.map((id) => [id, { status: healthRecordStatus(forMember(id), now) }]));
 }
 
 /**

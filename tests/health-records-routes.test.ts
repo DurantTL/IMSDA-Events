@@ -113,6 +113,14 @@ describe("with the feature on", () => {
     expect(state.repo.saveHealthRecord).toHaveBeenCalledWith(registrarViewer, "club-a", "member-1", syntheticRecord);
   });
 
+  it("answers a Registrar's save over an existing record with 409 and the plain message only (#923)", async () => {
+    state.viewerForClub.mockResolvedValue({ kind: "CLUB_REGISTRAR", organizationId: "club-a", accountId: "acct-reg" });
+    state.repo.saveHealthRecord.mockRejectedValue(new HealthRecordError("RECORD_EXISTS", "A health record is already on file. The director or a deputy can update it."));
+    const response = await memberRoute.PUT(request("PUT", syntheticRecord), ctx as never);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "RECORD_EXISTS", message: "A health record is already on file. The director or a deputy can update it." });
+  });
+
   it("answers 403 with the acknowledgment code, and no record content, until the notice is acknowledged (#923)", async () => {
     for (const [route, setup] of [
       [memberRoute.GET, () => state.viewerForClub.mockResolvedValue({ kind: "CLUB_LEADER", organizationId: "club-a", accountId: "a" })],
