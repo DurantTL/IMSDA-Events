@@ -717,119 +717,119 @@ enum ProgramUnassignedReason {
 }
 
 model User {
-  id                           String                        @id @default(cuid())
+  id            String            @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
-  healthSnapshotHolds          HealthSnapshotHold[]          @relation("HealthSnapshotHoldPlacedBy")
-  healthSnapshotHoldsLifted    HealthSnapshotHold[]          @relation("HealthSnapshotHoldLiftedBy")
+  healthSnapshotHolds          HealthSnapshotHold[]        @relation("HealthSnapshotHoldPlacedBy")
+  healthSnapshotHoldsLifted    HealthSnapshotHold[]        @relation("HealthSnapshotHoldLiftedBy")
   healthSnapshotBreakGlass     HealthSnapshotBreakGlass[]
   healthBreakGlassUses         HealthBreakGlassUse[]
-  email                        String                        @unique
-  displayName                  String
-  jobTitle                     String?
-  phone                        String?
-  bio                          String?
-  globalRole                   GlobalRole?
-  accountStatus                UserAccountStatus             @default(ACTIVE)
-  activatedAt                  DateTime?
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
+  email         String            @unique
+  displayName   String
+  jobTitle      String?
+  phone         String?
+  bio           String?
+  globalRole    GlobalRole?
+  accountStatus UserAccountStatus @default(ACTIVE)
+  activatedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
-  memberships                       EventMembership[]
-  credential                        AuthCredential?
-  sessions                          UserSession[]
-  resetTokens                       PasswordResetToken[]
-  announcements                     Announcement[]
-  pinnedAnnouncements               Announcement[]                   @relation("AnnouncementPinnedBy")
-  auditLogs                         AuditLog[]
-  moduleRequests                    ModuleRequest[]                  @relation("ModuleRequestRequester")
-  moduleRequestsDecided             ModuleRequest[]                  @relation("ModuleRequestDecider")
-  importRuns                        ImportRun[]
-  createdRegistrationForms          RegistrationForm[]               @relation("RegistrationFormCreatedBy")
-  createdFormVersions               RegistrationFormVersion[]        @relation("RegistrationFormVersionCreatedBy")
-  formTestSubmissions               FormTestSubmission[]             @relation("FormTestSubmissionSubmittedBy")
-  createdMessageVersions            MessageTemplateVersion[]         @relation("MessageTemplateVersionCreatedBy")
+  memberships               EventMembership[]
+  credential                AuthCredential?
+  sessions                  UserSession[]
+  resetTokens               PasswordResetToken[]
+  announcements             Announcement[]
+  pinnedAnnouncements       Announcement[]        @relation("AnnouncementPinnedBy")
+  auditLogs                 AuditLog[]
+  moduleRequests            ModuleRequest[] @relation("ModuleRequestRequester")
+  moduleRequestsDecided     ModuleRequest[] @relation("ModuleRequestDecider")
+  importRuns                ImportRun[]
+  createdRegistrationForms  RegistrationForm[]        @relation("RegistrationFormCreatedBy")
+  createdFormVersions       RegistrationFormVersion[] @relation("RegistrationFormVersionCreatedBy")
+  formTestSubmissions       FormTestSubmission[]      @relation("FormTestSubmissionSubmittedBy")
+  createdMessageVersions    MessageTemplateVersion[]  @relation("MessageTemplateVersionCreatedBy")
   createdPaymentInstructionVersions EventPaymentInstructionVersion[] @relation("PaymentInstructionVersionApprovedBy")
-  platformSettingsUpdates           PlatformSettings[]               @relation("PlatformSettingsUpdatedBy")
-  uploadedEventAssets               EventAsset[]                     @relation("EventAssetUploadedBy")
-  uploadedMessageFiles              MessageFile[]                    @relation("MessageFileUploadedBy")
-  appliedProgramAssignments         ProgramAssignmentRun[]           @relation("ProgramAssignmentAppliedBy")
-  clubAssignmentUpdates             ClubEventAssignment[]            @relation("ClubEventAssignmentUpdatedBy")
-  teamResultUpdates                 ClubTeamResult[]                 @relation("ClubTeamResultUpdatedBy")
-  teamPermissionDecisions           ClubTeamMemberPermission[]       @relation("ClubTeamPermissionDecidedBy")
-  registrationOperations            RegistrationOperation[]          @relation("RegistrationOperationActor")
-  accountMessages                   MessageOutbox[]                  @relation("AccountMessageRecipient")
-  mfaEnrollment                     UserMfaEnrollment?
-  mfaChallenges                     MfaChallenge[]
-  updatedCommunitySettings          EventCommunitySettings[]         @relation("CommunitySettingsUpdatedBy")
-  moderatedCommunityPosts           CommunityPost[]                  @relation("CommunityPostModeratedBy")
-  resolvedCommunityReports          CommunityReport[]                @relation("CommunityReportResolvedBy")
-  createdMerchandiseAvailability    MerchandiseVariantAvailability[] @relation("MerchandiseAvailabilityCreatedBy")
-  createdMerchandiseOrders          MerchandiseOrder[]               @relation("MerchandiseOrderCreatedBy")
-  merchandiseOrderStatusChanges     MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
-  authoredStaffNotes                StaffNote[]                      @relation("StaffNoteAuthor")
-  authoredStaffNoteRevisions        StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
-  appliedRegistrationTags           RegistrationTagAssignment[]      @relation("RegistrationTagAppliedBy")
-  removedRegistrationTags           RegistrationTagAssignment[]      @relation("RegistrationTagRemovedBy")
-  appliedAttendeeTags               AttendeeTagAssignment[]          @relation("AttendeeTagAppliedBy")
-  dismissedPersonMatchCandidates    PersonMatchCandidate[]           @relation("PersonMatchCandidateDismissedBy")
-  removedAttendeeTags               AttendeeTagAssignment[]          @relation("AttendeeTagRemovedBy")
-  grantedClubDirectorships          ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedBy")
-  revokedClubDirectorships          ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedBy")
-  createdClubInvites                ClubInvite[]                     @relation("ClubInviteCreatedBy")
-  decidedNewClubApplications        NewClubApplication[]             @relation("NewClubApplicationDecider")
-  createdNewClubApplicationInvites  NewClubApplicationInvite[]       @relation("NewClubApplicationInviteCreator")
-  passkeys                          UserPasskey[]
-  driverVerificationsReviewed       DriverVerification[]             @relation("DriverVerificationReviewedByUser")
+  platformSettingsUpdates   PlatformSettings[]        @relation("PlatformSettingsUpdatedBy")
+  uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
+  uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
+  appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
+  clubAssignmentUpdates     ClubEventAssignment[]     @relation("ClubEventAssignmentUpdatedBy")
+  teamResultUpdates         ClubTeamResult[]          @relation("ClubTeamResultUpdatedBy")
+  teamPermissionDecisions   ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedBy")
+  registrationOperations    RegistrationOperation[]   @relation("RegistrationOperationActor")
+  accountMessages           MessageOutbox[]           @relation("AccountMessageRecipient")
+  mfaEnrollment             UserMfaEnrollment?
+  mfaChallenges             MfaChallenge[]
+  updatedCommunitySettings  EventCommunitySettings[]  @relation("CommunitySettingsUpdatedBy")
+  moderatedCommunityPosts   CommunityPost[]           @relation("CommunityPostModeratedBy")
+  resolvedCommunityReports  CommunityReport[]         @relation("CommunityReportResolvedBy")
+  createdMerchandiseAvailability MerchandiseVariantAvailability[] @relation("MerchandiseAvailabilityCreatedBy")
+  createdMerchandiseOrders       MerchandiseOrder[]               @relation("MerchandiseOrderCreatedBy")
+  merchandiseOrderStatusChanges  MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
+  authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
+  authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
+  appliedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagAppliedBy")
+  removedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagRemovedBy")
+  appliedAttendeeTags            AttendeeTagAssignment[]          @relation("AttendeeTagAppliedBy")
+  dismissedPersonMatchCandidates PersonMatchCandidate[]           @relation("PersonMatchCandidateDismissedBy")
+  removedAttendeeTags            AttendeeTagAssignment[]          @relation("AttendeeTagRemovedBy")
+  grantedClubDirectorships       ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedBy")
+  revokedClubDirectorships       ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedBy")
+  createdClubInvites             ClubInvite[]                     @relation("ClubInviteCreatedBy")
+  decidedNewClubApplications     NewClubApplication[]             @relation("NewClubApplicationDecider")
+  createdNewClubApplicationInvites NewClubApplicationInvite[]     @relation("NewClubApplicationInviteCreator")
+  passkeys                       UserPasskey[]
+  driverVerificationsReviewed    DriverVerification[]              @relation("DriverVerificationReviewedByUser")
   /// The person this staff account is explicitly linked to, if any. Grants
   /// nothing by itself — see `UserPersonLink`.
-  personLink                        UserPersonLink?                  @relation("UserPersonLinkUser")
-  actorOnUserPersonLinks            UserPersonLink[]                 @relation("UserPersonLinkActor")
-  actorOnAttendeeAccountPersonLinks AttendeeAccountPersonLink[]      @relation("AttendeeAccountPersonLinkActorUser")
-  staffActAs                        StaffActAs[]                     @relation("StaffActAsUser")
-  createdClubRosterMembers          ClubRosterMember[]               @relation("ClubRosterMemberCreatedByUser")
-  createdRosterExportFormats        ClubRosterExportFormat[]         @relation("ClubRosterExportFormatCreatedByUser")
+  personLink                        UserPersonLink?              @relation("UserPersonLinkUser")
+  actorOnUserPersonLinks             UserPersonLink[]             @relation("UserPersonLinkActor")
+  actorOnAttendeeAccountPersonLinks  AttendeeAccountPersonLink[]  @relation("AttendeeAccountPersonLinkActorUser")
+  staffActAs                         StaffActAs[]                 @relation("StaffActAsUser")
+  createdClubRosterMembers           ClubRosterMember[]           @relation("ClubRosterMemberCreatedByUser")
+  createdRosterExportFormats         ClubRosterExportFormat[]     @relation("ClubRosterExportFormatCreatedByUser")
 
-  recordedMemberHonorEntries      MemberHonorEntry[]               @relation("MemberHonorEntryRecordedByUser")
-  honorEnrollmentOverrides        HonorEnrollment[]                @relation("HonorEnrollmentRequirementOverriddenBy")
-  honorClassWaitlistOverrides     HonorClassWaitlistEntry[]        @relation("HonorClassWaitlistOverriddenBy")
-  voidedMemberHonorEntries        MemberHonorEntryVoid[]           @relation("MemberHonorEntryVoidedByUser")
-  initiatedMemberTransfers        MemberTransfer[]                 @relation("MemberTransferInitiatedByUser")
-  resolvedMemberTransfers         MemberTransfer[]                 @relation("MemberTransferResolvedByUser")
-  memberTransferEvents            MemberTransferEvent[]            @relation("MemberTransferEventActorUser")
-  decidedMemberTransferMoves      MemberTransferRegistrationMove[] @relation("MemberTransferMoveDecidedBy")
-  createdClubMeetingNotes         ClubMeetingNote[]                @relation("ClubMeetingNoteCreatedByUser")
-  updatedClubMeetingNotes         ClubMeetingNote[]                @relation("ClubMeetingNoteUpdatedByUser")
-  submittedClubEventRegistrations ClubEventRegistration[]          @relation("ClubEventRegistrationSubmittedByUser")
-  updatedClubRegistrationDrafts   ClubRegistrationDraft[]          @relation("ClubRegistrationDraftUpdatedByUser")
-  updatedClubSupplyStock          ClubSupplyStock[]                @relation("ClubSupplyStockUpdatedByUser")
-  createdClubOrderBatches         ClubSupplyOrderBatch[]           @relation("ClubSupplyOrderBatchCreatedByUser")
-  receivedClubOrderBatches        ClubSupplyOrderBatch[]           @relation("ClubSupplyOrderBatchReceivedByUser")
+  recordedMemberHonorEntries         MemberHonorEntry[]           @relation("MemberHonorEntryRecordedByUser")
+  honorEnrollmentOverrides           HonorEnrollment[]            @relation("HonorEnrollmentRequirementOverriddenBy")
+  honorClassWaitlistOverrides        HonorClassWaitlistEntry[]    @relation("HonorClassWaitlistOverriddenBy")
+  voidedMemberHonorEntries           MemberHonorEntryVoid[]       @relation("MemberHonorEntryVoidedByUser")
+  initiatedMemberTransfers           MemberTransfer[]             @relation("MemberTransferInitiatedByUser")
+  resolvedMemberTransfers            MemberTransfer[]             @relation("MemberTransferResolvedByUser")
+  memberTransferEvents               MemberTransferEvent[]        @relation("MemberTransferEventActorUser")
+  decidedMemberTransferMoves         MemberTransferRegistrationMove[] @relation("MemberTransferMoveDecidedBy")
+  createdClubMeetingNotes            ClubMeetingNote[]             @relation("ClubMeetingNoteCreatedByUser")
+  updatedClubMeetingNotes            ClubMeetingNote[]             @relation("ClubMeetingNoteUpdatedByUser")
+  submittedClubEventRegistrations    ClubEventRegistration[]      @relation("ClubEventRegistrationSubmittedByUser")
+  updatedClubRegistrationDrafts      ClubRegistrationDraft[]      @relation("ClubRegistrationDraftUpdatedByUser")
+  updatedClubSupplyStock             ClubSupplyStock[]            @relation("ClubSupplyStockUpdatedByUser")
+  createdClubOrderBatches            ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchCreatedByUser")
+  receivedClubOrderBatches           ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchReceivedByUser")
 
-  createdEventTemplates            EventTemplate[]                           @relation("EventTemplateCreatedBy")
-  createdEventTemplateVersions     EventTemplateVersion[]                    @relation("EventTemplateVersionCreatedBy")
-  eventTemplateApplications        EventTemplateApplication[]                @relation("EventTemplateApplicationActor")
-  eventCloneRecords                EventCloneRecord[]                        @relation("EventCloneRecordActor")
-  enabledClubFormTemplates         ClubFormTemplate[]                        @relation("ClubFormTemplateEnabledBy")
-  createdClubFormLinks             ClubFormLink[]                            @relation("ClubFormLinkCreatedByUser")
-  enteredClubFormSubmissions       ClubFormSubmission[]                      @relation("ClubFormSubmissionEnteredByUser")
-  verifiedBillingContacts          OrganizationBillingContact[]              @relation("BillingContactVerifiedBy")
-  createdBillingContacts           OrganizationBillingContact[]              @relation("BillingContactCreatedBy")
-  endedBillingContacts             OrganizationBillingContact[]              @relation("BillingContactEndedBy")
-  setBillingResponsibilities       RegistrationBillingResponsibility[]       @relation("BillingResponsibilitySetBy")
-  billingResponsibilityChanges     RegistrationBillingResponsibilityChange[] @relation("BillingResponsibilityChangeActor")
-  attendanceCorrections            AttendanceCorrection[]                    @relation("AttendanceCorrectionActor")
-  preparedAttendanceVersions       AttendanceReconciliationVersion[]         @relation("AttendanceVersionPreparedBy")
-  approvedAttendanceVersions       AttendanceReconciliationVersion[]         @relation("AttendanceVersionApprovedBy")
-  attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]         @relation("AttendanceReviewAckActor")
-  guardianAuthoritiesDeclared      GuardianAuthority[]                       @relation("GuardianAuthorityActorUser")
-  guardianAuthoritiesRevoked       GuardianAuthority[]                       @relation("GuardianAuthorityRevokedBy")
-  guardianConflictsResolved        GuardianAuthorityConflict[]               @relation("GuardianConflictResolvedBy")
+  createdEventTemplates              EventTemplate[]              @relation("EventTemplateCreatedBy")
+  createdEventTemplateVersions       EventTemplateVersion[]       @relation("EventTemplateVersionCreatedBy")
+  eventTemplateApplications          EventTemplateApplication[]   @relation("EventTemplateApplicationActor")
+  eventCloneRecords                  EventCloneRecord[]           @relation("EventCloneRecordActor")
+  enabledClubFormTemplates           ClubFormTemplate[]           @relation("ClubFormTemplateEnabledBy")
+  createdClubFormLinks               ClubFormLink[]               @relation("ClubFormLinkCreatedByUser")
+  enteredClubFormSubmissions         ClubFormSubmission[]         @relation("ClubFormSubmissionEnteredByUser")
+  verifiedBillingContacts      OrganizationBillingContact[]              @relation("BillingContactVerifiedBy")
+  createdBillingContacts       OrganizationBillingContact[]              @relation("BillingContactCreatedBy")
+  endedBillingContacts         OrganizationBillingContact[]              @relation("BillingContactEndedBy")
+  setBillingResponsibilities   RegistrationBillingResponsibility[]       @relation("BillingResponsibilitySetBy")
+  billingResponsibilityChanges RegistrationBillingResponsibilityChange[] @relation("BillingResponsibilityChangeActor")
+  attendanceCorrections        AttendanceCorrection[]                    @relation("AttendanceCorrectionActor")
+  preparedAttendanceVersions   AttendanceReconciliationVersion[]         @relation("AttendanceVersionPreparedBy")
+  approvedAttendanceVersions   AttendanceReconciliationVersion[]         @relation("AttendanceVersionApprovedBy")
+  attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]     @relation("AttendanceReviewAckActor")
+  guardianAuthoritiesDeclared  GuardianAuthority[]                       @relation("GuardianAuthorityActorUser")
+  guardianAuthoritiesRevoked   GuardianAuthority[]                       @relation("GuardianAuthorityRevokedBy")
+  guardianConflictsResolved    GuardianAuthorityConflict[]               @relation("GuardianConflictResolvedBy")
 
-  createdInvoiceVersions    InvoiceVersion[]   @relation("InvoiceVersionCreatedBy")
-  finalizedInvoiceVersions  InvoiceVersion[]   @relation("InvoiceVersionFinalizedBy")
-  sentInvoiceDeliveries     InvoiceDelivery[]  @relation("InvoiceDeliverySentBy")
-  recordedInvoiceArPostings InvoiceArPosting[] @relation("InvoiceArPostingRecordedBy")
-  recordedInvoicePayments   InvoicePayment[]   @relation("InvoicePaymentRecordedBy")
+  createdInvoiceVersions       InvoiceVersion[]                          @relation("InvoiceVersionCreatedBy")
+  finalizedInvoiceVersions     InvoiceVersion[]                          @relation("InvoiceVersionFinalizedBy")
+  sentInvoiceDeliveries        InvoiceDelivery[]                         @relation("InvoiceDeliverySentBy")
+  recordedInvoiceArPostings    InvoiceArPosting[]                        @relation("InvoiceArPostingRecordedBy")
+  recordedInvoicePayments      InvoicePayment[]                          @relation("InvoicePaymentRecordedBy")
 
   @@index([accountStatus])
 }
@@ -858,9 +858,9 @@ model UserSession {
   userAgentHash String?
   createdAt     DateTime  @default(now())
 
-  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   passkeyChallenges UserPasskeyChallenge[]
-  staffActAs        StaffActAs[]
+  staffActAs StaffActAs[]
 
   @@index([userId, expiresAt])
   @@index([expiresAt, revokedAt])
@@ -877,17 +877,17 @@ model UserSession {
  * new act-as ends the old one first (`REPLACED`) in the same transaction.
  */
 model StaffActAs {
-  id             String               @id @default(cuid())
+  id             String              @id @default(cuid())
   userId         String
   staffSessionId String
   role           StaffActAsRole
   /// Required for CLUB_DIRECTOR; null for AREA_COORDINATOR.
   organizationId String?
-  startedAt      DateTime             @default(now())
+  startedAt      DateTime            @default(now())
   expiresAt      DateTime
   endedAt        DateTime?
   endedReason    StaffActAsEndReason?
-  createdAt      DateTime             @default(now())
+  createdAt      DateTime            @default(now())
 
   user         User          @relation("StaffActAsUser", fields: [userId], references: [id], onDelete: Cascade)
   staffSession UserSession   @relation(fields: [staffSessionId], references: [id], onDelete: Cascade)
@@ -1001,17 +1001,17 @@ model PasswordResetToken {
  * normalised and is only load-bearing once `emailVerifiedAt` is set.
  */
 model AttendeeAccount {
-  id                           String                        @id @default(cuid())
+  id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
-  teamPermissionDecisions      ClubTeamMemberPermission[]    @relation("ClubTeamPermissionDecidedByAccount")
-  email                        String                        @unique
-  displayName                  String
-  firstName                    String?
-  lastName                     String?
-  phone                        String?
-  shirtSize                    String?
-  dietaryNeeds                 String?
-  accessibilityNeeds           String?
+  teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
+  email              String                @unique
+  displayName        String
+  firstName          String?
+  lastName           String?
+  phone              String?
+  shirtSize          String?
+  dietaryNeeds       String?
+  accessibilityNeeds String?
   /// Optional mailing address and emergency contact the attendee keeps for
   /// themselves (#742). Used only to prefill their own registration forms;
   /// never listed or exported for staff. Components follow `AddressValue`.
@@ -1024,32 +1024,32 @@ model AttendeeAccount {
   emergencyContactName         String?
   emergencyContactRelationship String?
   emergencyContactPhone        String?
-  status                       AttendeeAccountStatus         @default(PENDING_VERIFICATION)
-  emailVerifiedAt              DateTime?
+  status             AttendeeAccountStatus @default(PENDING_VERIFICATION)
+  emailVerifiedAt    DateTime?
   /**
    * Shuts the person out, whatever they sign in with. Distinct from
    * `AttendeeCredential.disabledAt`, which retires one method: an account that
    * only ever used Google has no credential row for a method-level flag to
    * live on, so the master switch has to be here.
    */
-  disabledAt                   DateTime?
-  createdAt                    DateTime                      @default(now())
-  updatedAt                    DateTime                      @updatedAt
+  disabledAt         DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
-  honorInstructorRoles              HonorInstructor[]
-  credential                        AttendeeCredential?
-  identities                        AttendeeIdentity[]
-  sessions                          AttendeeSession[]
-  tokens                            AttendeeAccountToken[]
-  mfaEnrollment                     AttendeeMfaEnrollment?
-  passkeys                          AttendeePasskey[]
-  stepUpCodes                       AttendeeStepUpCode[]
-  messages                          MessageOutbox[]             @relation("AttendeeMessageRecipient")
-  communityParticipations           CommunityParticipation[]
-  communityPosts                    CommunityPost[]             @relation("CommunityPostAuthor")
-  communityReports                  CommunityReport[]           @relation("CommunityReportReporter")
-  communityNotifications            CommunityNotification[]     @relation("CommunityNotificationRecipient")
-  communityNotificationActions      CommunityNotification[]     @relation("CommunityNotificationActor")
+  honorInstructorRoles         HonorInstructor[]
+  credential                   AttendeeCredential?
+  identities                   AttendeeIdentity[]
+  sessions                     AttendeeSession[]
+  tokens                       AttendeeAccountToken[]
+  mfaEnrollment                AttendeeMfaEnrollment?
+  passkeys                     AttendeePasskey[]
+  stepUpCodes                  AttendeeStepUpCode[]
+  messages                     MessageOutbox[]          @relation("AttendeeMessageRecipient")
+  communityParticipations      CommunityParticipation[]
+  communityPosts               CommunityPost[]          @relation("CommunityPostAuthor")
+  communityReports             CommunityReport[]        @relation("CommunityReportReporter")
+  communityNotifications       CommunityNotification[]  @relation("CommunityNotificationRecipient")
+  communityNotificationActions CommunityNotification[]  @relation("CommunityNotificationActor")
   /// The person this attendee account is explicitly linked to, if any.
   /// Grants nothing by itself — see `AttendeeAccountPersonLink`.
   personLink                        AttendeeAccountPersonLink?  @relation("AttendeeAccountPersonLinkAccount")
@@ -1058,29 +1058,29 @@ model AttendeeAccount {
   /// Clubs this account directs. Explicit staff grants only — never inferred.
   clubDirectorGrants                ClubDirectorGrant[]
   areaCoordinatorGrant              AreaCoordinatorGrant?
-  coordinatedLocations              EventLocation[]             @relation("EventLocationCoordinator")
-  grantedClubRoles                  ClubDirectorGrant[]         @relation("ClubDirectorGrantGrantedByAccount")
-  acceptedClubInvites               ClubInvite[]                @relation("ClubInviteAcceptedAccount")
-  createdClubInvites                ClubInvite[]                @relation("ClubInviteCreatedByAccount")
-  revokedClubRoles                  ClubDirectorGrant[]         @relation("ClubDirectorGrantRevokedByAccount")
+  coordinatedLocations              EventLocation[]                  @relation("EventLocationCoordinator")
+  grantedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantGrantedByAccount")
+  acceptedClubInvites               ClubInvite[]                     @relation("ClubInviteAcceptedAccount")
+  createdClubInvites                ClubInvite[]                     @relation("ClubInviteCreatedByAccount")
+  revokedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedByAccount")
   createdClubRosterMembers          ClubRosterMember[]          @relation("ClubRosterMemberCreatedBy")
   createdRosterExportFormats        ClubRosterExportFormat[]    @relation("ClubRosterExportFormatCreatedBy")
 
-  recordedMemberHonorEntries    MemberHonorEntry[]      @relation("MemberHonorEntryRecordedBy")
-  voidedMemberHonorEntries      MemberHonorEntryVoid[]  @relation("MemberHonorEntryVoidedBy")
-  initiatedMemberTransfers      MemberTransfer[]        @relation("MemberTransferInitiatedByAccount")
-  resolvedMemberTransfers       MemberTransfer[]        @relation("MemberTransferResolvedByAccount")
-  memberTransferEvents          MemberTransferEvent[]   @relation("MemberTransferEventActorAccount")
-  submittedClubRegistrations    ClubEventRegistration[] @relation("ClubEventRegistrationSubmittedBy")
-  clubRegistrationDrafts        ClubRegistrationDraft[] @relation("ClubRegistrationDraftUpdatedBy")
+  recordedMemberHonorEntries        MemberHonorEntry[]          @relation("MemberHonorEntryRecordedBy")
+  voidedMemberHonorEntries          MemberHonorEntryVoid[]      @relation("MemberHonorEntryVoidedBy")
+  initiatedMemberTransfers          MemberTransfer[]            @relation("MemberTransferInitiatedByAccount")
+  resolvedMemberTransfers           MemberTransfer[]            @relation("MemberTransferResolvedByAccount")
+  memberTransferEvents              MemberTransferEvent[]       @relation("MemberTransferEventActorAccount")
+  submittedClubRegistrations        ClubEventRegistration[]     @relation("ClubEventRegistrationSubmittedBy")
+  clubRegistrationDrafts            ClubRegistrationDraft[]     @relation("ClubRegistrationDraftUpdatedBy")
   /// Club registration amendments this account made as a director reopening
   /// their own club's registration (H3b, #366).
-  amendedRegistrationOperations RegistrationOperation[] @relation("RegistrationOperationActorAttendeeAccount")
-  updatedClubSupplyStock        ClubSupplyStock[]       @relation("ClubSupplyStockUpdatedByAccount")
-  createdClubOrderBatches       ClubSupplyOrderBatch[]  @relation("ClubSupplyOrderBatchCreatedByAccount")
-  receivedClubOrderBatches      ClubSupplyOrderBatch[]  @relation("ClubSupplyOrderBatchReceivedByAccount")
-  createdClubFormLinks          ClubFormLink[]          @relation("ClubFormLinkCreatedByAccount")
-  enteredClubFormSubmissions    ClubFormSubmission[]    @relation("ClubFormSubmissionEnteredByAccount")
+  amendedRegistrationOperations     RegistrationOperation[]     @relation("RegistrationOperationActorAttendeeAccount")
+  updatedClubSupplyStock            ClubSupplyStock[]           @relation("ClubSupplyStockUpdatedByAccount")
+  createdClubOrderBatches           ClubSupplyOrderBatch[]      @relation("ClubSupplyOrderBatchCreatedByAccount")
+  receivedClubOrderBatches          ClubSupplyOrderBatch[]      @relation("ClubSupplyOrderBatchReceivedByAccount")
+  createdClubFormLinks              ClubFormLink[]              @relation("ClubFormLinkCreatedByAccount")
+  enteredClubFormSubmissions        ClubFormSubmission[]        @relation("ClubFormSubmissionEnteredByAccount")
 
   @@index([status])
 }
@@ -1130,17 +1130,17 @@ model AttendeeCredential {
 /// Mirrors `UserSession`. A distinct table and a distinct cookie name are what
 /// stop an attendee session from ever being resolved by `getCurrentSession`.
 model AttendeeSession {
-  id                     String    @id @default(cuid())
-  accountId              String
-  tokenHash              String    @unique
-  expiresAt              DateTime
-  lastSeenAt             DateTime  @default(now())
-  revokedAt              DateTime?
-  userAgentHash          String?
+  id            String    @id @default(cuid())
+  accountId     String
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  lastSeenAt    DateTime  @default(now())
+  revokedAt     DateTime?
+  userAgentHash String?
   /// When this session last passed the authenticator check that opens club
   /// rosters (ADR 0005 Addendum A). Sign-in alone never sets it.
   secondFactorVerifiedAt DateTime?
-  createdAt              DateTime  @default(now())
+  createdAt     DateTime  @default(now())
 
   account           AttendeeAccount            @relation(fields: [accountId], references: [id], onDelete: Cascade)
   passkeyChallenges AttendeePasskeyChallenge[]
@@ -1293,7 +1293,7 @@ model SystemJobHeartbeat {
  * configured (or for a rehearsal).
  */
 model BackupRun {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   kind        String
   startedAt   DateTime
   finishedAt  DateTime
@@ -1415,12 +1415,12 @@ model EventAsset {
   uploadedByUserId String?
   createdAt        DateTime @default(now())
 
-  event                      Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  uploadedBy                 User?                      @relation("EventAssetUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
-  links                      EventContentLink[]
-  blockRefs                  EventContentSectionAsset[]
-  merchandiseArtworkProducts MerchandiseProduct[]       @relation("MerchandiseProductArtwork")
-  badgeBackgroundEvents      Event[]                    @relation("EventBadgeBackground")
+  event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  uploadedBy User?              @relation("EventAssetUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  links      EventContentLink[]
+  blockRefs  EventContentSectionAsset[]
+  merchandiseArtworkProducts MerchandiseProduct[] @relation("MerchandiseProductArtwork")
+  badgeBackgroundEvents      Event[]              @relation("EventBadgeBackground")
 
   @@index([eventId, createdAt])
 }
@@ -1466,54 +1466,54 @@ model PlatformSettings {
 }
 
 model Event {
-  id                                 String                 @id @default(cuid())
-  healthSnapshots                    HealthRecordSnapshot[]
-  healthSnapshotHolds                HealthSnapshotHold[]
-  slug                               String                 @unique
-  name                               String
-  startsAt                           DateTime
-  endsAt                             DateTime
-  timezone                           String                 @default("America/Chicago")
-  location                           String?
-  capacity                           Int?
-  publicInfoUrl                      String?
-  supportContact                     String?
+  id                   String             @id @default(cuid())
+  healthSnapshots      HealthRecordSnapshot[]
+  healthSnapshotHolds  HealthSnapshotHold[]
+  slug                 String             @unique
+  name                 String
+  startsAt             DateTime
+  endsAt               DateTime
+  timezone             String             @default("America/Chicago")
+  location             String?
+  capacity             Int?
+  publicInfoUrl        String?
+  supportContact       String?
   /// Theme or tagline shown in the public event header (#651), e.g. "Lest We Forget".
-  tagline                            String?
+  tagline              String?
   /// One line under the header's dates (#651).
-  subtitle                           String?
+  subtitle             String?
   /// Where the event's help card and notices send people (#651); club events fall back to youth@imsda.org.
-  helpEmail                          String?
+  helpEmail            String?
   /// Refund policy shown to registrants (#891): plain text, paragraphs split on blank lines. Display only; refund rules and processing live elsewhere. Blank hides it.
-  refundPolicy                       String?
-  isPublished                        Boolean                @default(false)
-  registrationOpensOn                String?
-  registrationClosesOn               String?
-  waitlistEnabled                    Boolean                @default(false)
-  autoPromoteWaitlist                Boolean                @default(true)
+  refundPolicy         String?
+  isPublished          Boolean            @default(false)
+  registrationOpensOn  String?
+  registrationClosesOn String?
+  waitlistEnabled      Boolean            @default(false)
+  autoPromoteWaitlist  Boolean            @default(true)
   /// How many hours a club director has to accept a seat offered from an Honors Weekend class waitlist (#831); an offer not accepted in time passes to the next youth in line.
-  honorWaitlistOfferHours            Int                    @default(24)
+  honorWaitlistOfferHours Int             @default(24)
   /// Whether this event collects a shirt size per attendee. Replaces a match on
   /// the event's name, which meant only one event could ever collect sizes and
   /// renaming it turned collection off without telling anyone.
-  collectsShirtSizes                 Boolean                @default(false)
+  collectsShirtSizes   Boolean            @default(false)
   /// Event-owned selections for the grouped operational packets (#155): which sections print and which
   /// registration answer groups them. Null prints the default packet (every section, automatic grouping).
   /// Parsed by `parseEventPacketConfig`; never read directly.
-  operationalPacketConfig            Json?
+  operationalPacketConfig Json?
   /// A youth or children's event, where parents aren't normally present (#388).
   /// Every adult registered is flagged until they have a current Sterling
   /// Volunteers background check on file. Flags only: nothing is blocked.
-  checksAdultBackgrounds             Boolean                @default(false)
+  checksAdultBackgrounds Boolean          @default(false)
   /// Offers "Pay on Square" (Square's hosted checkout page) next to the embedded card form (#327).
   /// Off by default; staff turn it on for attendee-paid events.
-  hostedPaymentLinkEnabled           Boolean                @default(false)
+  hostedPaymentLinkEnabled Boolean        @default(false)
   /// A person is a minor at this event when their age on the event's start date is below this (#131).
-  ageOfMajority                      Int                    @default(18)
-  attendeeEditPolicy                 AttendeeEditPolicy     @default(VERIFY_EVERY_EDIT)
-  billingMode                        EventBillingMode       @default(ATTENDEE_PAY)
+  ageOfMajority        Int                @default(18)
+  attendeeEditPolicy   AttendeeEditPolicy @default(VERIFY_EVERY_EDIT)
+  billingMode          EventBillingMode   @default(ATTENDEE_PAY)
   /// Invoice grouping for a deferred-invoice event (#165); only MANAGE_FINANCE changes it, and every change is audited.
-  invoiceGrouping                    InvoiceGrouping        @default(PER_CHURCH)
+  invoiceGrouping                    InvoiceGrouping    @default(PER_CHURCH)
   /// Explicit invoice-number prefix (#167), letters only; blank derives it from the name. Staff set it
   /// before the first invoice is finalized; a trigger refuses a change after the event has a number series.
   invoiceCode                        String?
@@ -1525,80 +1525,80 @@ model Event {
   /// Explicit audience (#481), independent of `billingMode`: club and church
   /// navigation, club registration oversight, and club reports key off this
   /// field, not the billing mode.
-  audience                           EventAudience          @default(GENERAL)
+  audience             EventAudience      @default(GENERAL)
   seminarPreferenceClosesOn          String?
-  seminarPreferenceSelfServiceLocked Boolean                @default(false)
+  seminarPreferenceSelfServiceLocked Boolean @default(false)
   /// Lodging for this event, rendered into messages through the
   /// `{{hotel_information}}` token. Every field is optional and the block is
   /// omitted entirely when `hotelName` is unset, because most events book no
   /// room block and a hotel embedded in a shared template would follow an event
   /// that never used it.
-  hotelName                          String?
-  hotelBookingUrl                    String?
-  hotelPhone                         String?
-  hotelGroupName                     String?
-  hotelRate                          String?
-  hotelInstructions                  String?
+  hotelName            String?
+  hotelBookingUrl      String?
+  hotelPhone           String?
+  hotelGroupName       String?
+  hotelRate            String?
+  hotelInstructions    String?
   /// Artwork printed behind every attendee name badge for this event. An
   /// event's own uploaded image, so a conference badge does not have to be
   /// laid out in another tool and hand-fed through a printer twice.
-  badgeBackgroundAssetId             String?
+  badgeBackgroundAssetId String?
   /// Published events appear on the public conference calendar unless a
   /// system administrator hides them there (#107). Unpublished events never do.
-  showOnCalendar                     Boolean                @default(true)
+  showOnCalendar       Boolean            @default(true)
   /// Short label for filtering the public calendar, e.g. "Youth" or "Camp meeting".
-  calendarCategory                   String?
-  createdAt                          DateTime               @default(now())
-  updatedAt                          DateTime               @updatedAt
+  calendarCategory     String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  badgeBackground                  EventAsset?                               @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
-  memberships                      EventMembership[]
-  contentSections                  EventContentSection[]
-  assets                           EventAsset[]
-  messageFiles                     MessageFile[]
-  registrations                    Registration[]
-  attendees                        RegistrationAttendee[]
-  payments                         Payment[]
-  registrationAdjustments          RegistrationAdjustment[]
-  refunds                          Refund[]
-  checkIns                         CheckIn[]
-  announcements                    Announcement[]
-  announcementOptOuts              EmailAnnouncementOptOut[]
-  unsubscribeTokens                EmailUnsubscribeToken[]
-  auditLogs                        AuditLog[]
-  importRuns                       ImportRun[]
-  awardItems                       EventAwardItem[]
-  registrationForms                RegistrationForm[]
-  formTestSubmissions              FormTestSubmission[]
-  publicFormSubmissions            PublicRegistrationSubmission[]
-  capacityReservations             RegistrationCapacityReservation[]
-  messageSettings                  EventMessageSettings?
-  messageTemplates                 EventMessageTemplate[]
-  paymentInstructionVersions       EventPaymentInstructionVersion[]
-  messageOutbox                    MessageOutbox[]
-  waitlistEntries                  RegistrationWaitlistEntry[]
-  paymentAttempts                  PaymentAttempt[]
-  squareWebhookEvents              SquareWebhookEvent[]
-  squareHostedCheckouts            SquareHostedCheckout[]
-  squareDuplicateCharges           SquareDuplicateCharge[]
-  promoCodes                       PromoCode[]
-  promoCodeRedemptions             PromoCodeRedemption[]
-  churchSponsorFinanceReviews      ChurchSponsorFinanceReview[]
-  programAssignmentRuns            ProgramAssignmentRun[]
-  honorSessions                    HonorSession[]
-  honorRooms                       HonorRoom[]
-  honorOfferings                   HonorOffering[]
-  honorInstructors                 HonorInstructor[]
-  clubRegistrations                ClubEventRegistration[]
-  teamSettings                     EventTeamSettings?
-  groupRegistrations               GroupEventRegistration[]
-  billingResponsibilities          RegistrationBillingResponsibility[]
-  billingResponsibilityChanges     RegistrationBillingResponsibilityChange[]
-  attendanceCorrections            AttendanceCorrection[]
-  attendanceReconciliationVersions AttendanceReconciliationVersion[]
-  attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]
-  guardianAuthorities              GuardianAuthority[]
-  guardianAuthorityConflicts       GuardianAuthorityConflict[]
+  badgeBackground                     EventAsset?        @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
+  memberships                         EventMembership[]
+  contentSections                     EventContentSection[]
+  assets                              EventAsset[]
+  messageFiles                        MessageFile[]
+  registrations                       Registration[]
+  attendees                           RegistrationAttendee[]
+  payments                            Payment[]
+  registrationAdjustments             RegistrationAdjustment[]
+  refunds                             Refund[]
+  checkIns                            CheckIn[]
+  announcements                       Announcement[]
+  announcementOptOuts                 EmailAnnouncementOptOut[]
+  unsubscribeTokens                   EmailUnsubscribeToken[]
+  auditLogs                           AuditLog[]
+  importRuns                          ImportRun[]
+  awardItems                          EventAwardItem[]
+  registrationForms                   RegistrationForm[]
+  formTestSubmissions                 FormTestSubmission[]
+  publicFormSubmissions               PublicRegistrationSubmission[]
+  capacityReservations                RegistrationCapacityReservation[]
+  messageSettings                     EventMessageSettings?
+  messageTemplates                    EventMessageTemplate[]
+  paymentInstructionVersions          EventPaymentInstructionVersion[]
+  messageOutbox                       MessageOutbox[]
+  waitlistEntries                     RegistrationWaitlistEntry[]
+  paymentAttempts                     PaymentAttempt[]
+  squareWebhookEvents                 SquareWebhookEvent[]
+  squareHostedCheckouts               SquareHostedCheckout[]
+  squareDuplicateCharges              SquareDuplicateCharge[]
+  promoCodes                          PromoCode[]
+  promoCodeRedemptions                PromoCodeRedemption[]
+  churchSponsorFinanceReviews           ChurchSponsorFinanceReview[]
+  programAssignmentRuns               ProgramAssignmentRun[]
+  honorSessions                       HonorSession[]
+  honorRooms                          HonorRoom[]
+  honorOfferings                      HonorOffering[]
+  honorInstructors                    HonorInstructor[]
+  clubRegistrations                   ClubEventRegistration[]
+  teamSettings                        EventTeamSettings?
+  groupRegistrations                  GroupEventRegistration[]
+  billingResponsibilities             RegistrationBillingResponsibility[]
+  billingResponsibilityChanges        RegistrationBillingResponsibilityChange[]
+  attendanceCorrections               AttendanceCorrection[]
+  attendanceReconciliationVersions    AttendanceReconciliationVersion[]
+  attendanceReviewAcknowledgements    AttendanceReviewAcknowledgement[]
+  guardianAuthorities                 GuardianAuthority[]
+  guardianAuthorityConflicts          GuardianAuthorityConflict[]
 
   invoices                            Invoice[]
   invoiceVersions                     InvoiceVersion[]
@@ -1624,7 +1624,7 @@ model Event {
   communityReports                    CommunityReport[]
   communityNotifications              CommunityNotification[]
   merchandiseProducts                 MerchandiseProduct[]
-  merchandiseCatalog                  MerchandiseCatalog?
+  merchandiseCatalog                   MerchandiseCatalog?
   merchandiseOrders                   MerchandiseOrder[]
   merchandiseOrderLines               MerchandiseOrderLine[]
   merchandiseOrderStatusChanges       MerchandiseOrderStatusChange[]
@@ -1663,8 +1663,8 @@ model Event {
   registrationTagAssignments          RegistrationTagAssignment[]
   attendeeTagAssignments              AttendeeTagAssignment[]
   templateApplication                 EventTemplateApplication?
-  cloneRecord                         EventCloneRecord?                    @relation("EventCloneResult")
-  clonedInto                          EventCloneRecord[]                   @relation("EventCloneSource")
+  cloneRecord                         EventCloneRecord?            @relation("EventCloneResult")
+  clonedInto                          EventCloneRecord[]           @relation("EventCloneSource")
   locations                           EventLocation[]
   locationWaitlistChanges             LocationWaitlistChange[]
   modules                             EventModule[]
@@ -1715,9 +1715,9 @@ model ModuleRequest {
   declineReason     String?
   createdAt         DateTime            @default(now())
 
-  event       Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  requestedBy User? @relation("ModuleRequestRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
-  decidedBy   User? @relation("ModuleRequestDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  event       Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  requestedBy User?  @relation("ModuleRequestRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  decidedBy   User?  @relation("ModuleRequestDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
 
   @@index([eventId, createdAt])
   @@index([status, createdAt])
@@ -1814,8 +1814,8 @@ model EventAttendeeType {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  event      Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  attendees  RegistrationAttendee[]
+  event     Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  attendees RegistrationAttendee[]
   mealPrices EventMealPrice[]
 
   @@unique([eventId, code])
@@ -1836,7 +1836,7 @@ model EventAttendeeClassification {
   createdAt   DateTime                   @default(now())
   updatedAt   DateTime                   @updatedAt
 
-  event       Event                                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event       Event                              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   assignments RegistrationAttendeeClassification[]
 
   @@unique([eventId, kind, code])
@@ -1989,42 +1989,42 @@ model Person {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  householdMembers          HouseholdMember[]
-  heldRegistrations         Registration[]
+  householdMembers   HouseholdMember[]
+  heldRegistrations  Registration[]
   groupBillingRegistrations GroupEventRegistration[]
   billingResponsibilities   RegistrationBillingResponsibility[]
-  groupContactOperations    RegistrationOperation[]             @relation("RegistrationOperationActorPerson")
-  registrationEvents        RegistrationAttendee[]
-  externalIdentities        ExternalIdentity[]
-  notes                     StaffNote[]
-  attendeeAccountLinks      AttendeeAccountPersonLink[]
-  userLinks                 UserPersonLink[]
-  matchCandidatesAsA        PersonMatchCandidate[]              @relation("PersonMatchCandidateAsA")
-  matchCandidatesAsB        PersonMatchCandidate[]              @relation("PersonMatchCandidateAsB")
-  clubRosterMemberships     ClubRosterMember[]
-  healthSnapshots           HealthRecordSnapshot[]
-  healthSnapshotHolds       HealthSnapshotHold[]
-  healthSnapshotBreakGlass  HealthSnapshotBreakGlass[]
-  healthBreakGlassUses      HealthBreakGlassUse[]
-  honorInstructorRoles      HonorInstructor[]
-  backgroundCheckMatch      BackgroundCheckMatch?
-  backgroundChecksPre527    BackgroundCheckPre527[]             @ignore
-  driverVerification        DriverVerification?
+  groupContactOperations RegistrationOperation[] @relation("RegistrationOperationActorPerson")
+  registrationEvents RegistrationAttendee[]
+  externalIdentities ExternalIdentity[]
+  notes              StaffNote[]
+  attendeeAccountLinks AttendeeAccountPersonLink[]
+  userLinks            UserPersonLink[]
+  matchCandidatesAsA   PersonMatchCandidate[] @relation("PersonMatchCandidateAsA")
+  matchCandidatesAsB   PersonMatchCandidate[] @relation("PersonMatchCandidateAsB")
+  clubRosterMemberships ClubRosterMember[]
+  healthSnapshots       HealthRecordSnapshot[]
+  healthSnapshotHolds   HealthSnapshotHold[]
+  healthSnapshotBreakGlass HealthSnapshotBreakGlass[]
+  healthBreakGlassUses     HealthBreakGlassUse[]
+  honorInstructorRoles  HonorInstructor[]
+  backgroundCheckMatch  BackgroundCheckMatch?
+  backgroundChecksPre527 BackgroundCheckPre527[] @ignore
+  driverVerification    DriverVerification?
 
-  memberHonorEntries          MemberHonorEntry[]
-  memberTransfers             MemberTransfer[]              @relation("MemberTransferPerson")
-  pendingMemberTransfer       MemberTransfer?               @relation("MemberTransferPendingPerson")
-  clubOrderNeeds              ClubOrderNeed[]
-  memberClassCompletions      MemberClassCompletion[]
-  guardianAuthoritiesAsMinor  GuardianAuthority[]           @relation("GuardianAuthorityMinor")
-  guardianAuthoritiesAsAdult  GuardianAuthority[]           @relation("GuardianAuthorityAdult")
-  guardianAuthoritiesDeclared GuardianAuthority[]           @relation("GuardianAuthorityActorPerson")
-  guardianConflictsAsMinor    GuardianAuthorityConflict[]   @relation("GuardianConflictMinor")
-  guardianConflictsAsAdult    GuardianAuthorityConflict[]   @relation("GuardianConflictAdult")
-  lodgingRoommateAsker        EventLodgingRoommateRequest[] @relation("LodgingRoommateFromPerson")
-  lodgingRoommateAsked        EventLodgingRoommateRequest[] @relation("LodgingRoommateTargetPerson")
-  lodgingRulesAsA             EventLodgingRule[]            @relation("LodgingRulePersonA")
-  lodgingRulesAsB             EventLodgingRule[]            @relation("LodgingRulePersonB")
+  memberHonorEntries    MemberHonorEntry[]
+  memberTransfers       MemberTransfer[] @relation("MemberTransferPerson")
+  pendingMemberTransfer MemberTransfer?  @relation("MemberTransferPendingPerson")
+  clubOrderNeeds        ClubOrderNeed[]
+  memberClassCompletions MemberClassCompletion[]
+  guardianAuthoritiesAsMinor GuardianAuthority[] @relation("GuardianAuthorityMinor")
+  guardianAuthoritiesAsAdult GuardianAuthority[] @relation("GuardianAuthorityAdult")
+  guardianAuthoritiesDeclared GuardianAuthority[] @relation("GuardianAuthorityActorPerson")
+  guardianConflictsAsMinor   GuardianAuthorityConflict[] @relation("GuardianConflictMinor")
+  guardianConflictsAsAdult   GuardianAuthorityConflict[] @relation("GuardianConflictAdult")
+  lodgingRoommateAsker       EventLodgingRoommateRequest[] @relation("LodgingRoommateFromPerson")
+  lodgingRoommateAsked       EventLodgingRoommateRequest[] @relation("LodgingRoommateTargetPerson")
+  lodgingRulesAsA            EventLodgingRule[] @relation("LodgingRulePersonA")
+  lodgingRulesAsB            EventLodgingRule[] @relation("LodgingRulePersonB")
 
   @@index([lastName, firstName])
 }
@@ -2147,10 +2147,10 @@ model HouseholdMember {
 /// One account links to exactly one person (`accountId` is unique); a person
 /// may have several account links.
 model AttendeeAccountPersonLink {
-  id                     String               @id @default(cuid())
-  accountId              String
-  personId               String
-  provenance             PersonLinkProvenance
+  id        String               @id @default(cuid())
+  accountId String
+  personId  String
+  provenance PersonLinkProvenance
   /// Set when `provenance` is SELF_SERVICE_VERIFICATION: the account itself
   /// performed the link. Mutually exclusive with `actorUserId` (enforced by
   /// a database check constraint).
@@ -2158,11 +2158,11 @@ model AttendeeAccountPersonLink {
   /// Set when `provenance` is STAFF_ACTION or IMPORT: the staff member who
   /// performed the link or ran the import. Mutually exclusive with
   /// `actorAttendeeAccountId`.
-  actorUserId            String?
+  actorUserId String?
   /// Free-text pointer to the evidence behind this link (a verification
   /// token id, a staff note id, an import run id, ...). Required.
-  evidenceReference      String
-  createdAt              DateTime             @default(now())
+  evidenceReference String
+  createdAt         DateTime @default(now())
 
   account      AttendeeAccount  @relation("AttendeeAccountPersonLinkAccount", fields: [accountId], references: [id], onDelete: Cascade)
   person       Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
@@ -2177,17 +2177,17 @@ model AttendeeAccountPersonLink {
 /// Same invariant as `AttendeeAccountPersonLink`: grants nothing by itself.
 /// One staff account links to exactly one person (`userId` is unique).
 model UserPersonLink {
-  id                String               @id @default(cuid())
-  userId            String
-  personId          String
-  provenance        PersonLinkProvenance
+  id       String @id @default(cuid())
+  userId   String
+  personId String
+  provenance  PersonLinkProvenance
   /// The staff member who established the link — themself for a
   /// self-service verification of their own identity, or another staff
   /// member for a staff action or import.
-  actorUserId       String
+  actorUserId String
   /// Free-text pointer to the evidence behind this link.
   evidenceReference String
-  createdAt         DateTime             @default(now())
+  createdAt         DateTime @default(now())
 
   user      User   @relation("UserPersonLinkUser", fields: [userId], references: [id], onDelete: Cascade)
   person    Person @relation(fields: [personId], references: [id], onDelete: Cascade)
@@ -2203,76 +2203,76 @@ model UserPersonLink {
  * relationship.
  */
 model Organization {
-  id                          String                       @id @default(cuid())
+  id                   String           @id @default(cuid())
   churchSponsorFinanceReviews ChurchSponsorFinanceReview[] @relation("ChurchSponsorFinanceReviewChurch")
-  healthRecords               HealthRecord[]
-  healthRecordLinks           HealthRecordLink[]
-  type                        OrganizationType
-  name                        String
-  normalizedName              String
-  parentOrganizationId        String?
-  isActive                    Boolean                      @default(true)
+  healthRecords       HealthRecord[]
+  healthRecordLinks   HealthRecordLink[]
+  type                 OrganizationType
+  name                 String
+  normalizedName       String
+  parentOrganizationId String?
+  isActive             Boolean          @default(true)
 
   /// eAdventist organizations export (#649). `eadventistId` is the export's
   /// OrganizationID: unique, and the key a re-import matches on.
-  eadventistId             String?   @unique
-  orgCode                  String?
+  eadventistId         String?          @unique
+  orgCode              String?
   /// The export's OrgType text ("PK-08 School", "Camp/Conf center", ...), kept
   /// because several of them collapse into one `type`.
-  sourceOrgType            String?
-  streetAddress            String?
-  city                     String?
-  state                    String?
-  postalCode               String?
-  website                  String?
-  officePhone              String?
-  district                 String?
-  language                 String?
+  sourceOrgType        String?
+  streetAddress        String?
+  city                 String?
+  state                String?
+  postalCode           String?
+  website              String?
+  officePhone          String?
+  district             String?
+  language             String?
   /// A DisbandedOn date on file. Informational: it never changes `isActive`.
-  disbandedOn              DateTime? @db.Date
+  disbandedOn          DateTime?        @db.Date
   /// The export's SubOrgOf, resolved by name. Kept apart from
   /// `parentOrganizationId`, which means "sponsoring church" for a club.
   affiliatedOrganizationId String?
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
-  parentOrganization          Organization?                       @relation("OrganizationHierarchy", fields: [parentOrganizationId], references: [id], onDelete: Restrict)
-  childOrganizations          Organization[]                      @relation("OrganizationHierarchy")
-  affiliatedOrganization      Organization?                       @relation("OrganizationAffiliation", fields: [affiliatedOrganizationId], references: [id], onDelete: SetNull)
-  affiliatedChildren          Organization[]                      @relation("OrganizationAffiliation")
-  externalIdentities          ExternalIdentity[]
-  directorGrants              ClubDirectorGrant[]
-  rosterMembers               ClubRosterMember[]
-  rosterExportFormats         ClubRosterExportFormat[]
-  eventRegistrations          ClubEventRegistration[]
-  registrationDrafts          ClubRegistrationDraft[]
-  eventAssignments            ClubEventAssignment[]
-  honorEnrollments            HonorEnrollment[]
-  honorClassWaitlist          HonorClassWaitlistEntry[]
-  clubProfile                 ClubProfile?
-  clubInvites                 ClubInvite[]
-  newClubApplicationsAsChurch NewClubApplication[]                @relation("NewClubApplicationChurch")
-  newClubApplicationCreated   NewClubApplication?                 @relation("NewClubApplicationCreatedClub")
-  monthlyReports              ClubMonthlyReport[]
-  yearEndReports              ClubYearEndReport[]
-  meetingNotes                ClubMeetingNote[]
-  yearStandings               ClubYearStanding[]
-  churchLocation              ChurchLocation?
-  churchGeocodeResult         ChurchGeocodeResult?
-  staffActAs                  StaffActAs[]
-  memberHonorEntries          MemberHonorEntry[]
-  transfersReceived           MemberTransfer[]                    @relation("MemberTransferTo")
-  transfersSent               MemberTransfer[]                    @relation("MemberTransferFrom")
-  clubSupplyStock             ClubSupplyStock[]
-  clubOrderNeeds              ClubOrderNeed[]
-  clubOrderBatches            ClubSupplyOrderBatch[]
-  clubOrderListLines          ClubOrderListLine[]
-  memberClassCompletions      MemberClassCompletion[]
-  sponsoredPromoCodes         PromoCode[]                         @relation("PromoCodeSponsor")
-  clubFormSubmissions         ClubFormSubmission[]
-  billingContacts             OrganizationBillingContact[]
-  billingResponsibilities     RegistrationBillingResponsibility[]
-  clubFormLinks               ClubFormLink[]
+  parentOrganization Organization?      @relation("OrganizationHierarchy", fields: [parentOrganizationId], references: [id], onDelete: Restrict)
+  childOrganizations Organization[]     @relation("OrganizationHierarchy")
+  affiliatedOrganization Organization?  @relation("OrganizationAffiliation", fields: [affiliatedOrganizationId], references: [id], onDelete: SetNull)
+  affiliatedChildren Organization[]     @relation("OrganizationAffiliation")
+  externalIdentities ExternalIdentity[]
+  directorGrants     ClubDirectorGrant[]
+  rosterMembers      ClubRosterMember[]
+  rosterExportFormats ClubRosterExportFormat[]
+  eventRegistrations ClubEventRegistration[]
+  registrationDrafts ClubRegistrationDraft[]
+  eventAssignments   ClubEventAssignment[]
+  honorEnrollments   HonorEnrollment[]
+  honorClassWaitlist HonorClassWaitlistEntry[]
+  clubProfile        ClubProfile?
+  clubInvites        ClubInvite[]
+  newClubApplicationsAsChurch NewClubApplication[] @relation("NewClubApplicationChurch")
+  newClubApplicationCreated   NewClubApplication?  @relation("NewClubApplicationCreatedClub")
+  monthlyReports     ClubMonthlyReport[]
+  yearEndReports     ClubYearEndReport[]
+  meetingNotes       ClubMeetingNote[]
+  yearStandings      ClubYearStanding[]
+  churchLocation     ChurchLocation?
+  churchGeocodeResult ChurchGeocodeResult?
+  staffActAs         StaffActAs[]
+  memberHonorEntries MemberHonorEntry[]
+  transfersReceived  MemberTransfer[]   @relation("MemberTransferTo")
+  transfersSent      MemberTransfer[]   @relation("MemberTransferFrom")
+  clubSupplyStock    ClubSupplyStock[]
+  clubOrderNeeds     ClubOrderNeed[]
+  clubOrderBatches   ClubSupplyOrderBatch[]
+  clubOrderListLines ClubOrderListLine[]
+  memberClassCompletions MemberClassCompletion[]
+  sponsoredPromoCodes PromoCode[] @relation("PromoCodeSponsor")
+  clubFormSubmissions ClubFormSubmission[]
+  billingContacts         OrganizationBillingContact[]
+  billingResponsibilities RegistrationBillingResponsibility[]
+  clubFormLinks       ClubFormLink[]
 
   @@index([type, isActive, name])
   @@index([parentOrganizationId, isActive])
@@ -2324,20 +2324,20 @@ enum ChurchGeocodeDecision {
  * reaches ChurchLocation when staff accept it.
  */
 model ChurchGeocodeResult {
-  organizationId String                @id
-  status         ChurchGeocodeStatus
-  decision       ChurchGeocodeDecision @default(PENDING)
-  latitude       Float?
-  longitude      Float?
-  matchedAddress String                @default("")
-  provider       String
+  organizationId  String                @id
+  status          ChurchGeocodeStatus
+  decision        ChurchGeocodeDecision @default(PENDING)
+  latitude        Float?
+  longitude       Float?
+  matchedAddress  String                @default("")
+  provider        String
   /// The address that was sent. Accepting is refused once the church's address no longer matches.
-  inputStreet    String                @default("")
-  inputCity      String                @default("")
-  inputState     String                @default("")
-  inputZip       String                @default("")
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  inputStreet     String                @default("")
+  inputCity       String                @default("")
+  inputState      String                @default("")
+  inputZip        String                @default("")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
@@ -2363,34 +2363,34 @@ model AreaCoordinatorGrant {
 }
 
 model ClubInvite {
-  id                 String           @id @default(cuid())
-  organizationId     String
-  email              String
-  name               String           @default("")
-  role               ClubDirectorRole
-  status             ClubInviteStatus @default(PENDING)
+  id                String           @id @default(cuid())
+  organizationId    String
+  email             String
+  name              String           @default("")
+  role              ClubDirectorRole
+  status            ClubInviteStatus @default(PENDING)
   /// "IMPORT" (the club import, held for staff to Send) or "CLUB" (a club
   /// director or deputy adding a Registrar or Reporter, sent right away; #425).
-  source             String           @default("IMPORT")
-  createdByUserId    String?
+  source            String           @default("IMPORT")
+  createdByUserId   String?
   /// Set when a club's own director or deputy created the invite (#425).
   createdByAccountId String?
-  sentAt             DateTime?
-  sentCount          Int              @default(0)
-  lastMessageId      String?
+  sentAt            DateTime?
+  sentCount         Int              @default(0)
+  lastMessageId     String?
   /// When a SENT invite stops being acceptable (#425). Null for invites
   /// created before expiry existed.
-  expiresAt          DateTime?
-  acceptedAt         DateTime?
-  acceptedAccountId  String?
-  cancelledAt        DateTime?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  expiresAt         DateTime?
+  acceptedAt        DateTime?
+  acceptedAccountId String?
+  cancelledAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy        User?            @relation("ClubInviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  createdByAccount AttendeeAccount? @relation("ClubInviteCreatedByAccount", fields: [createdByAccountId], references: [id], onDelete: SetNull)
-  acceptedAccount  AttendeeAccount? @relation("ClubInviteAcceptedAccount", fields: [acceptedAccountId], references: [id], onDelete: SetNull)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy         User?            @relation("ClubInviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdByAccount  AttendeeAccount? @relation("ClubInviteCreatedByAccount", fields: [createdByAccountId], references: [id], onDelete: SetNull)
+  acceptedAccount   AttendeeAccount? @relation("ClubInviteAcceptedAccount", fields: [acceptedAccountId], references: [id], onDelete: SetNull)
 
   @@index([email, status])
   @@index([organizationId, status])
@@ -2501,11 +2501,11 @@ model ClubMeetingNote {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdByUser User?                   @relation("ClubMeetingNoteCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  updatedByUser User?                   @relation("ClubMeetingNoteUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdByUser   User?        @relation("ClubMeetingNoteCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser   User?        @relation("ClubMeetingNoteUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
   /// Optional per-member check-off (#653). Empty when a club only keeps head counts.
-  attendance    ClubMeetingAttendance[]
+  attendance      ClubMeetingAttendance[]
 
   @@index([organizationId, meetingDate])
 }
@@ -2565,22 +2565,22 @@ model ClubProfile {
  * revoking keeps the row so past actions stay attributed.
  */
 model ClubDirectorGrant {
-  id                 String           @id @default(cuid())
-  organizationId     String
-  attendeeAccountId  String
-  role               ClubDirectorRole @default(DIRECTOR)
-  effectiveFrom      DateTime         @default(now())
-  effectiveTo        DateTime?
-  reason             String
-  grantedByUserId    String?
+  id                String           @id @default(cuid())
+  organizationId    String
+  attendeeAccountId String
+  role              ClubDirectorRole @default(DIRECTOR)
+  effectiveFrom     DateTime         @default(now())
+  effectiveTo       DateTime?
+  reason            String
+  grantedByUserId   String?
   /// Set when the club's own director or deputy gave the role (#375).
   grantedByAccountId String?
-  revokedAt          DateTime?
-  revokedByUserId    String?
+  revokedAt         DateTime?
+  revokedByUserId   String?
   revokedByAccountId String?
-  revokeReason       String?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  revokeReason      String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   attendeeAccount  AttendeeAccount  @relation(fields: [attendeeAccountId], references: [id], onDelete: Restrict)
@@ -2645,30 +2645,30 @@ model ExternalIdentity {
 /// matches the dismissed row, so generation creates a fresh OPEN row instead
 /// of reusing it — see `modules/people/duplicate-match-repository.ts`).
 model PersonMatchCandidate {
-  id                   String                @id @default(cuid())
-  personAId            String
-  personBId            String
-  matchedSignals       PersonMatchSignal[]   @default([])
-  contradictingSignals PersonMatchSignal[]   @default([])
-  confidence           PersonMatchConfidence
+  id                    String                 @id @default(cuid())
+  personAId             String
+  personBId             String
+  matchedSignals        PersonMatchSignal[] @default([])
+  contradictingSignals  PersonMatchSignal[] @default([])
+  confidence            PersonMatchConfidence
   /// Bumped whenever `duplicate-match-domain.ts`'s matching rules change
   /// behavior, so an old candidate never silently claims to have been
   /// produced by rules that no longer exist.
-  ruleVersion          Int
-  state                PersonMatchState      @default(OPEN)
+  ruleVersion           Int
+  state                 PersonMatchState       @default(OPEN)
   /// See the model doc: a hash of the inputs (plus `ruleVersion`) that
   /// produced this candidate.
-  fingerprint          String
-  computedAt           DateTime              @default(now())
-  dismissedAt          DateTime?
-  dismissedByUserId    String?
-  dismissalReason      String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  fingerprint           String
+  computedAt            DateTime               @default(now())
+  dismissedAt           DateTime?
+  dismissedByUserId     String?
+  dismissalReason       String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
-  personA         Person @relation("PersonMatchCandidateAsA", fields: [personAId], references: [id], onDelete: Cascade)
-  personB         Person @relation("PersonMatchCandidateAsB", fields: [personBId], references: [id], onDelete: Cascade)
-  dismissedByUser User?  @relation("PersonMatchCandidateDismissedBy", fields: [dismissedByUserId], references: [id], onDelete: SetNull)
+  personA        Person @relation("PersonMatchCandidateAsA", fields: [personAId], references: [id], onDelete: Cascade)
+  personB        Person @relation("PersonMatchCandidateAsB", fields: [personBId], references: [id], onDelete: Cascade)
+  dismissedByUser User? @relation("PersonMatchCandidateDismissedBy", fields: [dismissedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([personAId, personBId, fingerprint])
   @@index([personAId])
@@ -2692,51 +2692,51 @@ model Registration {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  event                            Event                                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  location                         EventLocation?                            @relation(fields: [locationId], references: [id], onDelete: Restrict)
-  locationWaitlistChanges          LocationWaitlistChange[]
-  accountHolderPerson              Person                                    @relation(fields: [accountHolderPersonId], references: [id])
-  household                        Household?                                @relation(fields: [householdId], references: [id])
-  attendees                        RegistrationAttendee[]
-  payments                         Payment[]
-  publicFormSubmission             PublicRegistrationSubmission?
-  capacityReservations             RegistrationCapacityReservation[]
-  messages                         MessageOutbox[]
-  waitlistEntry                    RegistrationWaitlistEntry?
-  accessTokens                     RegistrationAccessToken[]
-  paymentAttempts                  PaymentAttempt[]
-  squareHostedCheckouts            SquareHostedCheckout[]
-  squareDuplicateCharges           SquareDuplicateCharge[]
-  promoCodeRedemption              PromoCodeRedemption?
-  churchSponsorFinanceReviews      ChurchSponsorFinanceReview[]
-  operations                       RegistrationOperation[]
-  paymentChoiceOperations          RegistrationPaymentChoiceOperation[]
-  merchandiseOrders                MerchandiseOrder[]
-  notes                            StaffNote[]
-  tagAssignments                   RegistrationTagAssignment[]
-  clubRegistration                 ClubEventRegistration?
-  groupRegistration                GroupEventRegistration?
-  billingResponsibility            RegistrationBillingResponsibility?
-  billingResponsibilityChanges     RegistrationBillingResponsibilityChange[]
-  attendanceCorrections            AttendanceCorrection[]
+  event                   Event                                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  location                EventLocation?                       @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  locationWaitlistChanges LocationWaitlistChange[]
+  accountHolderPerson     Person                               @relation(fields: [accountHolderPersonId], references: [id])
+  household               Household?                           @relation(fields: [householdId], references: [id])
+  attendees               RegistrationAttendee[]
+  payments                Payment[]
+  publicFormSubmission    PublicRegistrationSubmission?
+  capacityReservations    RegistrationCapacityReservation[]
+  messages                MessageOutbox[]
+  waitlistEntry           RegistrationWaitlistEntry?
+  accessTokens            RegistrationAccessToken[]
+  paymentAttempts         PaymentAttempt[]
+  squareHostedCheckouts   SquareHostedCheckout[]
+  squareDuplicateCharges  SquareDuplicateCharge[]
+  promoCodeRedemption     PromoCodeRedemption?
+  churchSponsorFinanceReviews ChurchSponsorFinanceReview[]
+  operations              RegistrationOperation[]
+  paymentChoiceOperations RegistrationPaymentChoiceOperation[]
+  merchandiseOrders       MerchandiseOrder[]
+  notes                   StaffNote[]
+  tagAssignments          RegistrationTagAssignment[]
+  clubRegistration        ClubEventRegistration?
+  groupRegistration       GroupEventRegistration?
+  billingResponsibility        RegistrationBillingResponsibility?
+  billingResponsibilityChanges RegistrationBillingResponsibilityChange[]
+  attendanceCorrections        AttendanceCorrection[]
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]
-  guardianAuthorities              GuardianAuthority[]
-  guardianAuthorityConflicts       GuardianAuthorityConflict[]
-  lodgingRequests                  EventLodgingRequest[]
-  lodgingChangeRequests            EventLodgingChangeRequest[]
-  lodgingWaitlistEntries           EventLodgingWaitlistEntry[]
-  assetIssuances                   AssetIssuance[]
-  lodgingAssignmentNotices         EventLodgingAssignmentNotice[]
-  mealSelections                   EventMealSelection[]
-  mealLedgerEntries                EventMealLedgerEntry[]
-  assetLedgerEntries               AssetLedgerEntry[]
-  lodgingRoommateRequestsFrom      EventLodgingRoommateRequest[]             @relation("LodgingRoommateFrom")
-  lodgingRoommateRequestsTo        EventLodgingRoommateRequest[]             @relation("LodgingRoommateTarget")
-  honorEnrollments                 HonorEnrollment[]
-  honorClassWaitlist               HonorClassWaitlistEntry[]
-  adjustments                      RegistrationAdjustment[]
-  memberTransferMovesFrom          MemberTransferRegistrationMove[]          @relation("MemberTransferMoveFrom")
-  memberTransferMovesTo            MemberTransferRegistrationMove[]          @relation("MemberTransferMoveTo")
+  guardianAuthorities     GuardianAuthority[]
+  guardianAuthorityConflicts GuardianAuthorityConflict[]
+  lodgingRequests         EventLodgingRequest[]
+  lodgingChangeRequests   EventLodgingChangeRequest[]
+  lodgingWaitlistEntries  EventLodgingWaitlistEntry[]
+  assetIssuances          AssetIssuance[]
+  lodgingAssignmentNotices EventLodgingAssignmentNotice[]
+  mealSelections          EventMealSelection[]
+  mealLedgerEntries       EventMealLedgerEntry[]
+  assetLedgerEntries      AssetLedgerEntry[]
+  lodgingRoommateRequestsFrom EventLodgingRoommateRequest[] @relation("LodgingRoommateFrom")
+  lodgingRoommateRequestsTo   EventLodgingRoommateRequest[] @relation("LodgingRoommateTarget")
+  honorEnrollments        HonorEnrollment[]
+  honorClassWaitlist      HonorClassWaitlistEntry[]
+  adjustments             RegistrationAdjustment[]
+  memberTransferMovesFrom MemberTransferRegistrationMove[] @relation("MemberTransferMoveFrom")
+  memberTransferMovesTo   MemberTransferRegistrationMove[] @relation("MemberTransferMoveTo")
 
   @@unique([eventId, confirmationCode])
   @@index([eventId, status])
@@ -2769,32 +2769,32 @@ model RegistrationPaymentChoiceOperation {
 }
 
 model PromoCode {
-  id                       String            @id @default(cuid())
-  eventId                  String
-  code                     String
-  normalizedCode           String
-  isActive                 Boolean           @default(true)
-  discountType             PromoDiscountType
-  discountValue            Int
-  startsOn                 String?
-  endsOn                   String?
-  minimumSubtotalCents     Int?
-  maximumUses              Int?
-  maximumDiscountCents     Int?
-  redeemedCount            Int               @default(0)
+  id                   String            @id @default(cuid())
+  eventId              String
+  code                 String
+  normalizedCode       String
+  isActive             Boolean           @default(true)
+  discountType         PromoDiscountType
+  discountValue        Int
+  startsOn             String?
+  endsOn               String?
+  minimumSubtotalCents Int?
+  maximumUses          Int?
+  maximumDiscountCents Int?
+  redeemedCount        Int               @default(0)
   /// Church-sponsored code (#545): the church that owes the discount for each
   /// active registration that redeemed it. Only on a GENERAL event, and only
   /// an active CHURCH organization when linked; staff-set. Nothing is stored
   /// per redemption — what the church owes is computed on demand from
   /// PromoCodeRedemption, like church-billed club registrations (#409).
   sponsoringOrganizationId String?
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  event                  Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  sponsoringOrganization Organization?            @relation("PromoCodeSponsor", fields: [sponsoringOrganizationId], references: [id], onDelete: Restrict)
-  redemptions            PromoCodeRedemption[]
-  adjustments            RegistrationAdjustment[]
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sponsoringOrganization Organization? @relation("PromoCodeSponsor", fields: [sponsoringOrganizationId], references: [id], onDelete: Restrict)
+  redemptions PromoCodeRedemption[]
+  adjustments RegistrationAdjustment[]
 
   @@unique([eventId, normalizedCode])
   @@index([eventId, isActive, updatedAt])
@@ -2836,26 +2836,26 @@ model PromoCodeRedemption {
 /// revised automatically and the church's amount owed is not changed; the finance office sees this row (and clears it
 /// once they have dealt with it). Ids and amounts only. One open row per registration.
 model ChurchSponsorFinanceReview {
-  id                 String    @id @default(cuid())
-  eventId            String
-  registrationId     String
-  churchId           String
+  id                      String    @id @default(cuid())
+  eventId                 String
+  registrationId          String
+  churchId                String
   /// The finalized invoice version the change would have touched.
-  invoiceVersionId   String?
+  invoiceVersionId        String?
   /// What last raised or updated it: "lodging:<request version id>" or "amendment:<id>".
-  sourceKey          String
+  sourceKey               String
   /// The signed difference between what the church's share should be and what it is (and stays, while the invoice is
   /// finalized): the amount the finance office is asked to review. Updated in place while the flag is open.
-  deltaCents         Int
+  deltaCents              Int
   /// What the church's share should be (the recompute) when this flag was last raised or updated.
-  desiredShareCents  Int
-  createdAt          DateTime  @default(now())
-  clearedAt          DateTime?
-  clearedByUserId    String?
-  clearNote          String?
+  desiredShareCents       Int
+  createdAt               DateTime  @default(now())
+  clearedAt               DateTime?
+  clearedByUserId         String?
+  clearNote               String?
   /// Set when the finance office clears the flag: the share they reviewed. A later recompute raises a new flag only if it
   /// differs from this figure. A flag that closes itself (the share returned to the invoiced amount) leaves it null.
-  reviewedShareCents Int?
+  reviewedShareCents      Int?
 
   event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
@@ -2867,15 +2867,15 @@ model ChurchSponsorFinanceReview {
 }
 
 model RegistrationAccessToken {
-  id               String                         @id @default(cuid())
-  registrationId   String
-  tokenHash        String                         @unique
-  purpose          RegistrationAccessTokenPurpose @default(MANAGE_REGISTRATION)
-  expiresAt        DateTime
-  firstUsedAt      DateTime?
+  id             String                         @id @default(cuid())
+  registrationId String
+  tokenHash      String                         @unique
+  purpose        RegistrationAccessTokenPurpose @default(MANAGE_REGISTRATION)
+  expiresAt      DateTime
+  firstUsedAt    DateTime?
   expiryRecordedAt DateTime?
-  revokedAt        DateTime?
-  createdAt        DateTime                       @default(now())
+  revokedAt      DateTime?
+  createdAt      DateTime                       @default(now())
 
   registration    Registration     @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   paymentAttempts PaymentAttempt[]
@@ -2906,38 +2906,38 @@ model RegistrationWaitlistEntry {
 }
 
 model RegistrationAttendee {
-  id                       String                    @id @default(cuid())
-  teamPermission           ClubTeamMemberPermission?
-  eventId                  String
-  registrationId           String
-  personId                 String
-  attendeeType             String
+  id              String   @id @default(cuid())
+  teamPermission  ClubTeamMemberPermission?
+  eventId         String
+  registrationId  String
+  personId        String
+  attendeeType    String
   attendeeTypeDefinitionId String?
-  position                 Int                       @default(0)
-  profileSnapshot          Json
-  formResponses            Json                      @default("{}")
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
+  position        Int      @default(0)
+  profileSnapshot Json
+  formResponses   Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  event                   Event                                @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  registration            Registration                         @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  person                  Person                               @relation(fields: [personId], references: [id])
-  attendeeTypeDefinition  EventAttendeeType?                   @relation(fields: [attendeeTypeDefinitionId], references: [id], onDelete: Restrict)
-  classifications         RegistrationAttendeeClassification[]
-  checkIns                CheckIn[]
-  attendanceCorrections   AttendanceCorrection[]
-  capacityReservations    RegistrationCapacityReservation[]
-  substitutionOperations  RegistrationOperation[]
-  notes                   StaffNote[]
-  tagAssignments          AttendeeTagAssignment[]
-  honorEnrollments        HonorEnrollment[]
-  honorClassWaitlist      HonorClassWaitlistEntry[]
-  adjustments             RegistrationAdjustment[]
-  memberTransferMoves     MemberTransferRegistrationMove[]
-  lodgingAssignments      EventLodgingAssignment[]
-  assetIssuances          AssetIssuance[]
+  event                  Event                             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration           Registration                      @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  person                 Person                            @relation(fields: [personId], references: [id])
+  attendeeTypeDefinition EventAttendeeType?                @relation(fields: [attendeeTypeDefinitionId], references: [id], onDelete: Restrict)
+  classifications        RegistrationAttendeeClassification[]
+  checkIns               CheckIn[]
+  attendanceCorrections  AttendanceCorrection[]
+  capacityReservations   RegistrationCapacityReservation[]
+  substitutionOperations RegistrationOperation[]
+  notes                  StaffNote[]
+  tagAssignments         AttendeeTagAssignment[]
+  honorEnrollments       HonorEnrollment[]
+  honorClassWaitlist     HonorClassWaitlistEntry[]
+  adjustments            RegistrationAdjustment[]
+  memberTransferMoves    MemberTransferRegistrationMove[]
+  lodgingAssignments     EventLodgingAssignment[]
+  assetIssuances         AssetIssuance[]
   lodgingPlaceholderLinks EventLodgingPlaceholder[]
-  mealSelections          EventMealSelection[]
+  mealSelections         EventMealSelection[]
 
   @@unique([registrationId, personId])
   @@index([registrationId, position])
@@ -2948,9 +2948,9 @@ model RegistrationAttendee {
 }
 
 model RegistrationAttendeeClassification {
-  attendeeId       String
+  attendeeId      String
   classificationId String
-  assignedAt       DateTime @default(now())
+  assignedAt      DateTime @default(now())
 
   attendee       RegistrationAttendee        @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
   classification EventAttendeeClassification @relation(fields: [classificationId], references: [id], onDelete: Restrict)
@@ -2960,36 +2960,36 @@ model RegistrationAttendeeClassification {
 }
 
 model RegistrationOperation {
-  id                     String                    @id @default(cuid())
-  eventId                String
-  registrationId         String
-  attendeeId             String?
-  type                   RegistrationOperationType
-  clientRequestId        String
-  requestFingerprint     String
+  id                 String                    @id @default(cuid())
+  eventId            String
+  registrationId     String
+  attendeeId         String?
+  type               RegistrationOperationType
+  clientRequestId    String
+  requestFingerprint String
   /// Set when the amendment engine ran for a staff user. Mutually exclusive
   /// with `actorAttendeeAccountId` (enforced by a database check
   /// constraint), same XOR shape as `AttendeeAccountPersonLink`.
-  actorUserId            String?
+  actorUserId        String?
   /// Set when a club director reopened and amended their own club
   /// registration (H3b, #366) instead of a staff user amending it.
   actorAttendeeAccountId String?
   /// Set when the contact of a "Group" registration (#650) changed it through
   /// the registration's private manage link: a person, not a signed-in account.
   /// Exactly one of the three actor columns is set (database check constraint).
-  actorPersonId          String?
-  actorNameSnapshot      String
-  beforeSnapshot         Json
-  afterSnapshot          Json
-  responseSnapshot       Json
-  createdAt              DateTime                  @default(now())
+  actorPersonId      String?
+  actorNameSnapshot  String
+  beforeSnapshot     Json
+  afterSnapshot      Json
+  responseSnapshot   Json
+  createdAt          DateTime                  @default(now())
 
-  event                Event                 @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  registration         Registration          @relation(fields: [registrationId], references: [id], onDelete: Restrict)
-  attendee             RegistrationAttendee? @relation(fields: [attendeeId], references: [id], onDelete: Restrict)
-  actor                User?                 @relation("RegistrationOperationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  actorAttendeeAccount AttendeeAccount?      @relation("RegistrationOperationActorAttendeeAccount", fields: [actorAttendeeAccountId], references: [id], onDelete: Restrict)
-  actorPerson          Person?               @relation("RegistrationOperationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
+  event               Event                 @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration        Registration          @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  attendee            RegistrationAttendee? @relation(fields: [attendeeId], references: [id], onDelete: Restrict)
+  actor               User?                 @relation("RegistrationOperationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  actorAttendeeAccount AttendeeAccount?     @relation("RegistrationOperationActorAttendeeAccount", fields: [actorAttendeeAccountId], references: [id], onDelete: Restrict)
+  actorPerson         Person?               @relation("RegistrationOperationActorPerson", fields: [actorPersonId], references: [id], onDelete: Restrict)
 
   @@unique([eventId, clientRequestId])
   @@index([registrationId, createdAt])
@@ -3005,28 +3005,28 @@ model RegistrationOperation {
 /// edited; a reversal is a new line pointing at the one it cancels. The
 /// registration total is the priced total plus every line.
 model RegistrationAdjustment {
-  id                     String                     @id @default(cuid())
-  eventId                String
-  registrationId         String
-  kind                   RegistrationAdjustmentKind
-  amountCents            Int
-  reason                 String
-  promoCodeId            String?
-  promoCodeSnapshot      String?
+  id                    String                     @id @default(cuid())
+  eventId               String
+  registrationId        String
+  kind                  RegistrationAdjustmentKind
+  amountCents           Int
+  reason                String
+  promoCodeId           String?
+  promoCodeSnapshot     String?
   /// Set when the adjustment is for one person in the registration (#397).
   registrationAttendeeId String?
-  reversesAdjustmentId   String?                    @unique
-  createdByUserId        String?
-  createdByNameSnapshot  String
-  createdAt              DateTime                   @default(now())
+  reversesAdjustmentId  String?                    @unique
+  createdByUserId       String?
+  createdByNameSnapshot String
+  createdAt             DateTime                   @default(now())
 
-  event            Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  registration     Registration            @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  promoCode        PromoCode?              @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
-  attendee         RegistrationAttendee?   @relation(fields: [registrationAttendeeId], references: [id], onDelete: SetNull)
-  reverses         RegistrationAdjustment? @relation("AdjustmentReversal", fields: [reversesAdjustmentId], references: [id], onDelete: Restrict)
-  reversedBy       RegistrationAdjustment? @relation("AdjustmentReversal")
-  mealLedgerEntry  EventMealLedgerEntry?
+  event        Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration Registration            @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  promoCode    PromoCode?              @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  attendee     RegistrationAttendee?   @relation(fields: [registrationAttendeeId], references: [id], onDelete: SetNull)
+  reverses     RegistrationAdjustment? @relation("AdjustmentReversal", fields: [reversesAdjustmentId], references: [id], onDelete: Restrict)
+  reversedBy   RegistrationAdjustment? @relation("AdjustmentReversal")
+  mealLedgerEntry EventMealLedgerEntry?
   assetLedgerEntry AssetLedgerEntry?
 
   @@index([registrationId, createdAt])
@@ -3071,16 +3071,16 @@ model Payment {
 }
 
 model PaymentAttempt {
-  id                        String                @id @default(cuid())
+  id                        String               @id @default(cuid())
   eventId                   String
   registrationId            String
   registrationAccessTokenId String?
-  paymentId                 String?               @unique
-  provider                  String                @default("SQUARE")
+  paymentId                 String?              @unique
+  provider                  String               @default("SQUARE")
   environment               String
-  clientIdempotencyKey      String                @unique
-  providerIdempotencyKey    String                @unique
-  activeRegistrationKey     String?               @unique
+  clientIdempotencyKey      String               @unique
+  providerIdempotencyKey    String               @unique
+  activeRegistrationKey     String?              @unique
   /// EMBEDDED unless the payer is using Square's hosted checkout page (#327).
   channel                   PaymentAttemptChannel @default(EMBEDDED)
   /// Set when this attempt's payment arrived after another payment had already settled the balance
@@ -3090,26 +3090,26 @@ model PaymentAttempt {
   duplicateReason           String?
   /// This attempt pays the form's fixed reservation deposit, not the whole balance (#415). The
   /// resulting payment is marked `isDeposit`. The surcharge below is the card fee on the deposit.
-  isDeposit                 Boolean               @default(false)
+  isDeposit                 Boolean              @default(false)
   amountCents               Int
   /// The card processing surcharge inside `amountCents`, for a registration
   /// whose total did not already price one in — a pay-later registrant
   /// settling a balance by card. It is added to the registration total when
   /// the payment succeeds, never at quote time, so an abandoned checkout
   /// leaves the balance exactly as it was.
-  surchargeCents            Int                   @default(0)
-  currency                  String                @default("USD")
-  status                    PaymentAttemptStatus  @default(PROCESSING)
-  providerPaymentId         String?               @unique
+  surchargeCents            Int                  @default(0)
+  currency                  String               @default("USD")
+  status                    PaymentAttemptStatus @default(PROCESSING)
+  providerPaymentId         String?              @unique
   providerStatus            String?
   providerStatusAt          DateTime?
   failureCode               String?
   failureMessage            String?
-  requestCount              Int                   @default(1)
+  requestCount              Int                  @default(1)
   lastRequestedAt           DateTime?
   completedAt               DateTime?
-  createdAt                 DateTime              @default(now())
-  updatedAt                 DateTime              @updatedAt
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
 
   event                   Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registration            Registration             @relation(fields: [registrationId], references: [id], onDelete: Cascade)
@@ -3240,7 +3240,7 @@ model CancellationCalculation {
   createdByUserId String?
   createdAt       DateTime @default(now())
 
-  event            Event                           @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  event         Event                           @relation(fields: [eventId], references: [id], onDelete: Restrict)
   policyVersionRow EventCancellationPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
 
   @@index([eventId, createdAt])
@@ -3277,20 +3277,20 @@ model Refund {
 /// without touching the order history already recorded against it (issue
 /// #144). No public checkout exists yet; this is the domain foundation.
 model MerchandiseProduct {
-  id             String   @id @default(cuid())
-  eventId        String
-  name           String
-  description    String?
-  isEnabled      Boolean  @default(true)
-  isArchived     Boolean  @default(false)
-  position       Int      @default(0)
+  id          String   @id @default(cuid())
+  eventId     String
+  name        String
+  description String?
+  isEnabled   Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  position    Int      @default(0)
   artworkAssetId String?
   artworkAltText String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  event      Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  artwork    EventAsset?                 @relation("MerchandiseProductArtwork", fields: [artworkAssetId], references: [id], onDelete: Restrict)
+  event      Event                        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  artwork    EventAsset?                  @relation("MerchandiseProductArtwork", fields: [artworkAssetId], references: [id], onDelete: Restrict)
   variants   MerchandiseProductVariant[]
   orderLines MerchandiseOrderLine[]
 
@@ -3302,17 +3302,17 @@ model MerchandiseProduct {
 /// schema also tolerates deletion (`onDelete: SetNull` on order lines) so a
 /// historical line still reads correctly if a row is ever removed by hand.
 model MerchandiseProductVariant {
-  id         String   @id @default(cuid())
-  productId  String
-  label      String
-  sku        String?
-  position   Int      @default(0)
-  isEnabled  Boolean  @default(true)
+  id        String   @id @default(cuid())
+  productId String
+  label     String
+  sku       String?
+  position  Int      @default(0)
+  isEnabled Boolean  @default(true)
   isArchived Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  product      MerchandiseProduct               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product      MerchandiseProduct                @relation(fields: [productId], references: [id], onDelete: Cascade)
   availability MerchandiseVariantAvailability[]
   orderLines   MerchandiseOrderLine[]
 
@@ -3328,23 +3328,23 @@ model MerchandiseProductVariant {
 /// migration carries the partial unique index Prisma cannot express, plus a
 /// check constraint tying `inventoryQuantity` to `inventoryPolicy`.
 model MerchandiseVariantAvailability {
-  id                   String                     @id @default(cuid())
-  variantId            String
-  versionNumber        Int
-  priceCents           Int
-  taxTreatment         MerchandiseTaxTreatment
-  feePolicy            MerchandiseFeePolicy
-  inventoryPolicy      MerchandiseInventoryPolicy @default(UNLIMITED)
-  inventoryQuantity    Int?
-  isActive             Boolean                    @default(true)
-  createdByUserId      String
-  reason               String?
-  salesStartsAt        DateTime?
-  salesEndsAt          DateTime?
-  minQuantity          Int                        @default(1)
-  maxQuantity          Int?
-  attendeeAvailability String                     @default("ALL")
-  createdAt            DateTime                   @default(now())
+  id                String                     @id @default(cuid())
+  variantId         String
+  versionNumber     Int
+  priceCents        Int
+  taxTreatment      MerchandiseTaxTreatment
+  feePolicy         MerchandiseFeePolicy
+  inventoryPolicy   MerchandiseInventoryPolicy @default(UNLIMITED)
+  inventoryQuantity Int?
+  isActive          Boolean                    @default(true)
+  createdByUserId   String
+  reason            String?
+  salesStartsAt     DateTime?
+  salesEndsAt       DateTime?
+  minQuantity       Int      @default(1)
+  maxQuantity       Int?
+  attendeeAvailability String @default("ALL")
+  createdAt         DateTime                   @default(now())
 
   variant    MerchandiseProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
   createdBy  User                      @relation("MerchandiseAvailabilityCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -3382,22 +3382,22 @@ model MerchandiseCatalog {
 /// through the Square-specific `Payment`/`PaymentAttempt` tables, so cash and
 /// check settlement do not have to pretend to be a card workflow.
 model MerchandiseOrder {
-  id                 String                 @id @default(cuid())
-  eventId            String
-  registrationId     String?
-  purchaserSnapshot  Json
-  clientRequestId    String
+  id                String                 @id @default(cuid())
+  eventId           String
+  registrationId    String?
+  purchaserSnapshot Json
+  clientRequestId   String
   requestFingerprint String
-  status             MerchandiseOrderStatus @default(PENDING)
-  subtotalCents      Int
-  feeCents           Int                    @default(0)
-  taxCents           Int                    @default(0)
-  totalCents         Int
-  paymentMethod      PaymentMethod?
-  paymentReference   String?
-  createdByUserId    String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  status            MerchandiseOrderStatus @default(PENDING)
+  subtotalCents     Int
+  feeCents          Int                    @default(0)
+  taxCents          Int                    @default(0)
+  totalCents        Int
+  paymentMethod     PaymentMethod?
+  paymentReference  String?
+  createdByUserId   String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   event         Event                          @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registration  Registration?                  @relation(fields: [registrationId], references: [id], onDelete: SetNull)
@@ -3432,10 +3432,10 @@ model MerchandiseOrderLine {
   createdAt              DateTime                @default(now())
 
   order        MerchandiseOrder                @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  event        Event                           @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  product      MerchandiseProduct?             @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variant      MerchandiseProductVariant?      @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  availability MerchandiseVariantAvailability? @relation(fields: [availabilityId], references: [id], onDelete: SetNull)
+  event        Event                            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  product      MerchandiseProduct?              @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant      MerchandiseProductVariant?       @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  availability MerchandiseVariantAvailability?  @relation(fields: [availabilityId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([eventId, createdAt])
@@ -3524,9 +3524,9 @@ model Announcement {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  event     Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdBy User               @relation(fields: [createdByUserId], references: [id])
-  pinnedBy  User?              @relation("AnnouncementPinnedBy", fields: [pinnedByUserId], references: [id], onDelete: SetNull)
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User  @relation(fields: [createdByUserId], references: [id])
+  pinnedBy  User? @relation("AnnouncementPinnedBy", fields: [pinnedByUserId], references: [id], onDelete: SetNull)
   files     AnnouncementFile[]
 
   @@index([eventId, status, publishedAt])
@@ -3644,10 +3644,10 @@ model CommunityPost {
 /// The public community surface only shows that a post was edited; revision
 /// contents remain for authorized operational review and audit correlation.
 model CommunityPostRevision {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   postId    String
   body      String
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
 
   post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
@@ -3966,13 +3966,13 @@ model RegistrationCapacityReservation {
 }
 
 model EventPaymentInstructionVersion {
-  id               String   @id @default(cuid())
-  eventId          String
-  versionNumber    Int
-  instructions     String?
+  id              String   @id @default(cuid())
+  eventId         String
+  versionNumber   Int
+  instructions    String?
   approvedByUserId String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   approvedBy User? @relation("PaymentInstructionVersionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
@@ -4022,8 +4022,8 @@ model MessageTemplateVersion {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
-  template  EventMessageTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  createdBy User?                        @relation("MessageTemplateVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  template  EventMessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdBy User?                @relation("MessageTemplateVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   messages  MessageOutbox[]
   files     MessageTemplateVersionFile[]
 
@@ -4082,16 +4082,16 @@ model MessageOutbox {
   createdAt              DateTime                       @default(now())
   updatedAt              DateTime                       @updatedAt
 
-  attachment        MessageAttachment?         @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
-  event             Event?                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  registration      Registration?              @relation(fields: [registrationId], references: [id], onDelete: SetNull)
-  accountUser       User?                      @relation("AccountMessageRecipient", fields: [accountUserId], references: [id], onDelete: Cascade)
-  accountAttendee   AttendeeAccount?           @relation("AttendeeMessageRecipient", fields: [accountAttendeeId], references: [id], onDelete: Cascade)
-  templateVersion   MessageTemplateVersion?    @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
-  retryOf           MessageOutbox?             @relation("MessageRetry", fields: [retryOfMessageId], references: [id], onDelete: SetNull)
-  retries           MessageOutbox[]            @relation("MessageRetry")
-  attempts          MessageDeliveryAttempt[]
-  providerEvents    MessageProviderEvent[]
+  attachment      MessageAttachment?       @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  event           Event?                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration    Registration?            @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  accountUser     User?                    @relation("AccountMessageRecipient", fields: [accountUserId], references: [id], onDelete: Cascade)
+  accountAttendee AttendeeAccount?         @relation("AttendeeMessageRecipient", fields: [accountAttendeeId], references: [id], onDelete: Cascade)
+  templateVersion MessageTemplateVersion?  @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  retryOf         MessageOutbox?           @relation("MessageRetry", fields: [retryOfMessageId], references: [id], onDelete: SetNull)
+  retries         MessageOutbox[]          @relation("MessageRetry")
+  attempts        MessageDeliveryAttempt[]
+  providerEvents  MessageProviderEvent[]
   invoiceRecipients InvoiceDeliveryRecipient[]
   files             MessageOutboxFile[]
 
@@ -4239,7 +4239,7 @@ model MessageProviderEvent {
 }
 
 model ProgramAssignmentRun {
-  id                     String    @id @default(cuid())
+  id                     String   @id @default(cuid())
   eventId                String
   formId                 String
   formVersionId          String
@@ -4258,8 +4258,8 @@ model ProgramAssignmentRun {
   appliedByNameSnapshot  String
   supersedesRunId        String?
   invalidatedAt          DateTime?
-  appliedAt              DateTime  @default(now())
-  createdAt              DateTime  @default(now())
+  appliedAt              DateTime @default(now())
+  createdAt              DateTime @default(now())
 
   event        Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   form         RegistrationForm            @relation(fields: [formId], references: [id], onDelete: Cascade)
@@ -4318,13 +4318,13 @@ model Honor {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  offerings              HonorOffering[]
+  offerings       HonorOffering[]
   /// Every class (offering) that teaches this honor (#812), primary or not.
-  offeringHonors         HonorOfferingHonor[]
-  offeringPrerequisites  HonorOfferingPrerequisite[]
+  offeringHonors  HonorOfferingHonor[]
+  offeringPrerequisites HonorOfferingPrerequisite[]
   weekendCompletionLinks HonorWeekendCompletionLink[]
-  memberEntries          MemberHonorEntry[]
-  clubSupplyItems        ClubSupplyItem[]
+  memberEntries   MemberHonorEntry[]
+  clubSupplyItems ClubSupplyItem[]
   masterAwardGroupHonors MasterAwardRuleGroupHonor[]
 
   @@index([isActive, name])
@@ -4392,12 +4392,12 @@ model ClubSupplyItem {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  honor            Honor?                @relation(fields: [honorId], references: [id], onDelete: SetNull)
-  stock            ClubSupplyStock[]
-  orderNeeds       ClubOrderNeed[]
-  orderLines       ClubSupplyOrderLine[]
-  orderListLines   ClubOrderListLine[]
-  eventAwardItems  EventAwardItem[]
+  honor Honor?            @relation(fields: [honorId], references: [id], onDelete: SetNull)
+  stock ClubSupplyStock[]
+  orderNeeds ClubOrderNeed[]
+  orderLines ClubSupplyOrderLine[]
+  orderListLines ClubOrderListLine[]
+  eventAwardItems EventAwardItem[]
   masterAwardRules MasterAwardRule[]
 
   @@unique([section, normalizedName])
@@ -4523,13 +4523,13 @@ enum ClubSupplyOrderBatchStatus {
 /// line's `quantityOrdered` to the club's stock; awarding a specific person's
 /// item later draws down that same stock.
 model ClubSupplyOrderBatch {
-  id                  String                     @id @default(cuid())
+  id                  String    @id @default(cuid())
   organizationId      String
   status              ClubSupplyOrderBatchStatus @default(ORDERED)
   createdByAccountId  String?
   /// Set instead of `createdByAccountId` for a staff "act as" director (#442).
   createdByUserId     String?
-  createdAt           DateTime                   @default(now())
+  createdAt           DateTime  @default(now())
   receivedAt          DateTime?
   receivedByAccountId String?
   /// Set instead of `receivedByAccountId` for a staff "act as" director (#442).
@@ -4626,52 +4626,52 @@ model HonorRoom {
 /// (`HonorOfferingHonor`); a person enrolled in the class is enrolled in each.
 /// `capacity` counts youth seats only. The migration adds CHECK constraints.
 model HonorOffering {
-  id                  String            @id @default(cuid())
-  eventId             String
+  id           String            @id @default(cuid())
+  eventId      String
   /// The class's PRIMARY honor (#812): the first of its `honors`, kept so older
   /// readers and a plain `honorId` filter still work. A trigger inserts its
   /// `HonorOfferingHonor` row (position 0) with the class, and the repository
   /// keeps the two in step on every change. Never read it to learn what the
   /// class teaches: read `honors`.
-  honorId             String
-  sessionId           String?
+  honorId      String
+  sessionId    String?
   /// Site of an ALL_SESSIONS class (#589); a single-session class takes its
   /// site from its session, so this stays null for it (a CHECK enforces that).
   /// `location` below is the room; this is the site.
-  locationId          String?
-  span                HonorOfferingSpan
-  capacity            Int
-  minimumAge          Int?
+  locationId   String?
+  span         HonorOfferingSpan
+  capacity     Int
+  minimumAge   Int?
   /// The lowest Investiture class level a youth may take this class at (#832),
   /// compared with the member's current class level on the club roster. Null: no minimum.
-  minimumClassLevel   ClubClassLevel?
-  perClubLimit        Int?
-  teacherName         String            @default("")
-  location            String            @default("")
+  minimumClassLevel ClubClassLevel?
+  perClubLimit Int?
+  teacherName  String            @default("")
+  location     String            @default("")
   /// The room the class is placed in on the schedule board (#834); null: not placed.
   /// While set, `location` (the free-text room shown on grids) mirrors the room's name.
   /// A partial unique index (roomId, sessionId) WHERE both set AND active keeps one class
   /// per room per session; an all-sessions class is checked in the repository.
-  roomId              String?
+  roomId       String?
   /// Extra cost of this class in cents (#651); null means none. Shown on the public class grid.
   additionalCostCents Int?
   /// A special requirement shown as a badge on the public class grid (#651), e.g. "Bring a flashlight".
-  requirementNote     String            @default("")
-  isActive            Boolean           @default(true)
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
+  requirementNote String         @default("")
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
-  event             Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  honor             Honor                       @relation(fields: [honorId], references: [id], onDelete: Restrict)
-  session           HonorSession?               @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  site              EventLocation?              @relation(fields: [locationId], references: [id], onDelete: Restrict)
-  room              HonorRoom?                  @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  enrollments       HonorEnrollment[]
-  honors            HonorOfferingHonor[]
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  honor       Honor             @relation(fields: [honorId], references: [id], onDelete: Restrict)
+  session     HonorSession?     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  site        EventLocation?    @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  room        HonorRoom?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  enrollments HonorEnrollment[]
+  honors      HonorOfferingHonor[]
   instructorClasses HonorInstructorClass[]
   /// Honors a youth must have completed first (#832); every one is required.
-  prerequisites     HonorOfferingPrerequisite[]
-  waitlist          HonorClassWaitlistEntry[]
+  prerequisites HonorOfferingPrerequisite[]
+  waitlist     HonorClassWaitlistEntry[]
 
   // "No honor twice in a session" and the all-sessions rules now live on
   // `HonorOfferingHonor`, one row per honor taught (#812).
@@ -4731,8 +4731,8 @@ model HonorOfferingHonor {
 /// stored in plain text (ADR 0005 Addendum A).
 model ClubRosterMember {
   id                   String                 @id @default(cuid())
-  healthRecord         HealthRecord?
-  healthRecordLinks    HealthRecordLink[]
+  healthRecord        HealthRecord?
+  healthRecordLinks   HealthRecordLink[]
   organizationId       String
   clubYear             String
   personId             String?
@@ -4758,21 +4758,21 @@ model ClubRosterMember {
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
-  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  person                Person?                 @relation(fields: [personId], references: [id], onDelete: SetNull)
-  createdBy             AttendeeAccount?        @relation("ClubRosterMemberCreatedBy", fields: [createdByAccountId], references: [id], onDelete: SetNull)
-  createdByUser         User?                   @relation("ClubRosterMemberCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  person             Person?          @relation(fields: [personId], references: [id], onDelete: SetNull)
+  createdBy          AttendeeAccount? @relation("ClubRosterMemberCreatedBy", fields: [createdByAccountId], references: [id], onDelete: SetNull)
+  createdByUser      User?            @relation("ClubRosterMemberCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
   /// Transfer requests (#489) that matched this row as the sending club's member.
-  transferAsSender      MemberTransfer[]        @relation("MemberTransferFromRoster")
+  transferAsSender   MemberTransfer[] @relation("MemberTransferFromRoster")
   /// The transfer, if any, that created this row at the receiving club (#489).
-  transferAsReceiver    MemberTransfer?         @relation("MemberTransferToRoster")
-  clubFormSubmissions   ClubFormSubmission[]
+  transferAsReceiver MemberTransfer?  @relation("MemberTransferToRoster")
+  clubFormSubmissions ClubFormSubmission[]
   /// Submissions added or linked to this member with "Add to roster" (#721).
-  clubFormRosterActions ClubFormSubmission[]    @relation("ClubFormSubmissionRosterAction")
-  clubFormLinks         ClubFormLink[]
-  meetingAttendance     ClubMeetingAttendance[]
+  clubFormRosterActions ClubFormSubmission[] @relation("ClubFormSubmissionRosterAction")
+  clubFormLinks       ClubFormLink[]
+  meetingAttendance   ClubMeetingAttendance[]
   /// Up to two guardian contacts (#510). Deleted with the member's removal.
-  guardians             ClubRosterGuardian[]
+  guardians           ClubRosterGuardian[]
 
   @@unique([organizationId, clubYear, personId])
   @@index([organizationId, clubYear, status])
@@ -4875,25 +4875,25 @@ model BackgroundCheckUpload {
 /// matches anyone today ("the CSV is the base"). Replaced wholesale by the
 /// next upload (cascades from `BackgroundCheckUpload`).
 model BackgroundCheckEntry {
-  id               String                           @id @default(cuid())
-  uploadId         String
-  line             Int
-  firstName        String
-  lastName         String
+  id       String @id @default(cuid())
+  uploadId String
+  line     Int
+  firstName String
+  lastName  String
   /// `matchableName(firstName + " " + lastName)`, indexed so matching a
   /// person against the list is a lookup, not a scan. Computed in
   /// TypeScript only, never in SQL: null on an entry carried over by the #527
   /// migration until the first refresh or upload fills it in
   /// (`backfillNormalizedNames`).
-  normalizedName   String?
-  email            String?
+  normalizedName String?
+  email          String?
   /// Sealed the same way roster birth dates are sealed (ADR 0005 Addendum A,
   /// `modules/club-rosters/birth-dates.ts`). Never stored in plain text.
-  sealedBirthDate  String?
+  sealedBirthDate String?
   /// The person's club or sponsoring church (the roster format's `sites`).
-  site             String?
+  site            String?
   /// The roster CSV's `user_id`, when the row has one (Sterling rows never do).
-  sourceUserId     String?
+  sourceUserId    String?
   /// What recognizes the same entry across uploads
   /// (`backgroundCheckIdentityKey`): `userId:<user_id>` when the row has one
   /// — the same format `ExternalIdentity.externalId` (provider
@@ -4905,17 +4905,17 @@ model BackgroundCheckEntry {
   complianceStatus BackgroundCheckComplianceStatus?
   /// Calendar dates ("2026-09-23"). Current through `expiresOn`. Null for a
   /// roster row, which has no expiration date at all.
-  checkedOn        String?
-  expiresOn        String?
+  checkedOn String?
+  expiresOn String?
   /// The roster row's `issues` column: the check and training dates. Staff
   /// only, never shown to a club director or on a club's own portal roster.
-  issuesNote       String?
-  createdAt        DateTime                         @default(now())
-  updatedAt        DateTime                         @updatedAt
+  issuesNote String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  upload BackgroundCheckUpload  @relation(fields: [uploadId], references: [id], onDelete: Cascade)
-  match  BackgroundCheckMatch?
-  review BackgroundCheckReview?
+  upload  BackgroundCheckUpload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  match   BackgroundCheckMatch?
+  review  BackgroundCheckReview?
 
   @@index([normalizedName])
   @@index([uploadId])
@@ -5027,19 +5027,19 @@ enum BackgroundCheckComplianceStatus {
 /// held #491 driver review decisions and #544 staff overrides). No code reads
 /// or writes it; the table stays until a human-approved migration removes it.
 model DriverVerification {
-  id                  String   @id @default(cuid())
-  personId            String   @unique
+  id                  String    @id @default(cuid())
+  personId            String    @unique
   clearedToTransport  Boolean
-  note                String   @default("")
+  note                String    @default("")
   reviewedByAccountId String?
   reviewedByUserId    String?
   reviewedAt          DateTime
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  person         Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  person         Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
   reviewedBy     AttendeeAccount? @relation("DriverVerificationReviewedBy", fields: [reviewedByAccountId], references: [id], onDelete: SetNull)
-  reviewedByUser User?            @relation("DriverVerificationReviewedByUser", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedByUser User?           @relation("DriverVerificationReviewedByUser", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
 
   @@index([reviewedByAccountId])
   @@index([reviewedByUserId])
@@ -5064,11 +5064,11 @@ model ClubEventRegistration {
   submittedByUserId    String?
   createdAt            DateTime @default(now())
 
-  event           Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  organization    Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  registration    Registration               @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  submittedBy     AttendeeAccount?           @relation("ClubEventRegistrationSubmittedBy", fields: [submittedByAccountId], references: [id], onDelete: SetNull)
-  submittedByUser User?                      @relation("ClubEventRegistrationSubmittedByUser", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  registration    Registration     @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  submittedBy     AttendeeAccount? @relation("ClubEventRegistrationSubmittedBy", fields: [submittedByAccountId], references: [id], onDelete: SetNull)
+  submittedByUser User?            @relation("ClubEventRegistrationSubmittedByUser", fields: [submittedByUserId], references: [id], onDelete: SetNull)
   assignment      ClubEventAssignment?
   teamResults     ClubTeamResult[]
   teamPermissions ClubTeamMemberPermission[]
@@ -5109,26 +5109,26 @@ model GroupEventRegistration {
 /// nothing has been sent yet while something is set), the assignment has
 /// "changed since sent".
 model ClubEventAssignment {
-  id                      String    @id @default(cuid())
+  id                      String   @id @default(cuid())
   eventId                 String
   organizationId          String
-  clubEventRegistrationId String    @unique
-  campsiteLocation        String    @default("")
-  campsiteNotes           String    @default("")
-  dutyLabel               String    @default("")
-  dutyDay                 String    @default("")
-  dutyTime                String    @default("")
-  activityLabel           String    @default("")
-  notes                   String    @default("")
-  version                 Int       @default(1)
+  clubEventRegistrationId String   @unique
+  campsiteLocation        String   @default("")
+  campsiteNotes           String   @default("")
+  dutyLabel               String   @default("")
+  dutyDay                 String   @default("")
+  dutyTime                String   @default("")
+  activityLabel           String   @default("")
+  notes                   String   @default("")
+  version                 Int      @default(1)
   lastEmailSentAt         DateTime?
   lastEmailedVersion      Int?
   updatedByUserId         String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  event                 Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event                 Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization           Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   clubEventRegistration ClubEventRegistration @relation(fields: [clubEventRegistrationId], references: [id], onDelete: Cascade)
   updatedBy             User?                 @relation("ClubEventAssignmentUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
@@ -5194,33 +5194,33 @@ model ClubRegistrationDraft {
 /// inside a serializable transaction with the class rows locked, so a class
 /// can't be overfilled. Only youth consume a seat (`consumesSeat`).
 model HonorEnrollment {
-  id                               String   @id @default(cuid())
-  eventId                          String
-  offeringId                       String
-  registrationId                   String
-  registrationAttendeeId           String
+  id                     String   @id @default(cuid())
+  eventId                String
+  offeringId             String
+  registrationId         String
+  registrationAttendeeId String
   /// The club that holds the seat. Null for a "Group" registration (#650),
   /// which is never attributable to a club: its per-club limit is counted per
   /// registration instead.
-  organizationId                   String?
-  consumesSeat                     Boolean
+  organizationId         String?
+  consumesSeat           Boolean
   /// The director confirmed the youth meets the class's minimum level when the roster had no level (#832).
   /// "ByDirector" also covers staff acting as the director (#442), who set it through the same screen.
-  levelConfirmedByDirector         Boolean  @default(false)
+  levelConfirmedByDirector Boolean @default(false)
   /// The director (or staff acting as the director) confirmed the youth completed the class's prerequisite honors when the honor record showed none (#832).
-  prerequisitesConfirmedByDirector Boolean  @default(false)
+  prerequisitesConfirmedByDirector Boolean @default(false)
   /// Why staff placed the youth although a level or prerequisite rule was not met (#832). Null when no override was used.
-  requirementOverrideReason        String?
+  requirementOverrideReason String?
   /// The staff user who overrode; cleared if that user is deleted (the audit log keeps the entry).
-  requirementOverriddenByUserId    String?
-  requirementOverriddenByUser      User?    @relation("HonorEnrollmentRequirementOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
-  createdAt                        DateTime @default(now())
+  requirementOverriddenByUserId String?
+  requirementOverriddenByUser User? @relation("HonorEnrollmentRequirementOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
+  createdAt              DateTime @default(now())
 
-  event                Event                        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  offering             HonorOffering                @relation(fields: [offeringId], references: [id], onDelete: Restrict)
-  registration         Registration                 @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  registrationAttendee RegistrationAttendee         @relation(fields: [registrationAttendeeId], references: [id], onDelete: Cascade)
-  organization         Organization?                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  event                Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  offering             HonorOffering        @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  registration         Registration         @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  registrationAttendee RegistrationAttendee @relation(fields: [registrationAttendeeId], references: [id], onDelete: Cascade)
+  organization         Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   /// One per honor the class teaches (#812), once written back.
   weekendCompletions   HonorWeekendCompletionLink[]
   /// The class instructor's attendance and completion mark (#833), if any.
@@ -5249,38 +5249,38 @@ enum HonorClassWaitlistStatus {
 
 /// One youth's place on a full Honors Weekend class's waitlist (#831). A spot takes no seat and doesn't count toward a club's per-club limit; only a live offer reserves a seat (counted with the taken seats) and an accepted one becomes an `HonorEnrollment`.
 model HonorClassWaitlistEntry {
-  id                               String                   @id @default(cuid())
-  eventId                          String
-  offeringId                       String
-  registrationId                   String
-  registrationAttendeeId           String
+  id                     String                   @id @default(cuid())
+  eventId                String
+  offeringId             String
+  registrationId         String
+  registrationAttendeeId String
   /// The club that holds the registration; waitlists are for clubs only.
-  organizationId                   String?
+  organizationId         String?
   /// The order they joined, assigned by the database so two joins at once still have a strict order.
-  joinOrder                        Int                      @default(autoincrement())
-  status                           HonorClassWaitlistStatus @default(WAITING)
+  joinOrder              Int                      @default(autoincrement())
+  status                 HonorClassWaitlistStatus @default(WAITING)
   /// How the youth got past the class's level or prerequisite rules when they joined, kept for acceptance (#832): the same facts an enrollment records.
-  levelConfirmedByDirector         Boolean                  @default(false)
-  prerequisitesConfirmedByDirector Boolean                  @default(false)
+  levelConfirmedByDirector         Boolean        @default(false)
+  prerequisitesConfirmedByDirector Boolean        @default(false)
   requirementOverrideReason        String?
   requirementOverriddenByUserId    String?
-  joinedAt                         DateTime                 @default(now())
-  offeredAt                        DateTime?
-  offerExpiresAt                   DateTime?
+  joinedAt               DateTime                 @default(now())
+  offeredAt              DateTime?
+  offerExpiresAt         DateTime?
   /// How many times a seat was offered (an offer released because of a conflict is offered again later).
-  offerCount                       Int                      @default(0)
-  resolvedAt                       DateTime?
+  offerCount             Int                      @default(0)
+  resolvedAt             DateTime?
   /// A short fixed reason for the last change ("Offer expired", "Registration cancelled"); never free text from a person.
-  resolution                       String?
-  createdAt                        DateTime                 @default(now())
-  updatedAt                        DateTime                 @updatedAt
+  resolution             String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
 
-  event                       Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  offering                    HonorOffering        @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  registration                Registration         @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  registrationAttendee        RegistrationAttendee @relation(fields: [registrationAttendeeId], references: [id], onDelete: Cascade)
-  organization                Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  requirementOverriddenByUser User?                @relation("HonorClassWaitlistOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
+  event                Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  offering             HonorOffering        @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  registration         Registration         @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  registrationAttendee RegistrationAttendee @relation(fields: [registrationAttendeeId], references: [id], onDelete: Cascade)
+  organization         Organization?        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requirementOverriddenByUser User?         @relation("HonorClassWaitlistOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
 
   // One open entry (WAITING or OFFERED) per person and class is a partial unique index in the migration.
   @@index([offeringId, status, joinOrder])
@@ -5319,11 +5319,11 @@ model MemberHonorEntry {
   recordedByUserId    String?
   createdAt           DateTime          @default(now())
 
-  person                 Person                       @relation(fields: [personId], references: [id], onDelete: Restrict)
-  honor                  Honor                        @relation(fields: [honorId], references: [id], onDelete: Restrict)
-  organization           Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  recordedByAccount      AttendeeAccount?             @relation("MemberHonorEntryRecordedBy", fields: [recordedByAccountId], references: [id], onDelete: SetNull)
-  recordedByUser         User?                        @relation("MemberHonorEntryRecordedByUser", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  person            Person           @relation(fields: [personId], references: [id], onDelete: Restrict)
+  honor             Honor            @relation(fields: [honorId], references: [id], onDelete: Restrict)
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  recordedByAccount AttendeeAccount? @relation("MemberHonorEntryRecordedBy", fields: [recordedByAccountId], references: [id], onDelete: SetNull)
+  recordedByUser    User?            @relation("MemberHonorEntryRecordedByUser", fields: [recordedByUserId], references: [id], onDelete: SetNull)
   weekendCompletionLinks HonorWeekendCompletionLink[]
   /// Set when the entry was voided (#591); the entry row itself is never changed.
   void                   MemberHonorEntryVoid?
@@ -5588,23 +5588,23 @@ enum DeadlineReminderStatus {
 /// something registered or managed elsewhere. Dates are calendar dates in the
 /// conference's time zone; `timeLabel` is shown as written ("7–9 pm").
 model CalendarEntry {
-  id                        String              @id @default(cuid())
-  title                     String
-  description               String              @default("")
-  startsOn                  String
-  endsOn                    String
-  timeLabel                 String              @default("")
-  location                  String              @default("")
-  category                  String              @default("")
-  linkUrl                   String?
-  status                    CalendarEntryStatus @default(SCHEDULED)
-  entryType                 CalendarEntryType   @default(STANDARD)
+  id              String              @id @default(cuid())
+  title           String
+  description     String              @default("")
+  startsOn        String
+  endsOn          String
+  timeLabel       String              @default("")
+  location        String              @default("")
+  category        String              @default("")
+  linkUrl         String?
+  status          CalendarEntryStatus @default(SCHEDULED)
+  entryType       CalendarEntryType   @default(STANDARD)
   /// RFC 5545 RRULE value (e.g. `FREQ=WEEKLY;BYDAY=MO,WE;COUNT=6`), or null
   /// for a one-off. `startsOn`/`endsOn` describe the first occurrence.
-  repeatRule                String?
+  repeatRule      String?
   /// Skipped occurrences (EXDATEs): start dates, YYYY-MM-DD, that don't happen.
-  repeatExceptions          String[]            @default([])
-  isPublished               Boolean             @default(false)
+  repeatExceptions String[]           @default([])
+  isPublished     Boolean             @default(false)
   /// Imported from an ICS feed (#444 part B). All null for entries staff made.
   /// The feed link is cleared (not the entry deleted) when its feed is deleted.
   sourceFeedId              String?
@@ -5624,10 +5624,10 @@ model CalendarEntry {
   locallyEditedFields       String[]            @default([])
   /// Hidden by staff here only; a refresh never unhides it.
   isHiddenLocally           Boolean             @default(false)
-  createdByUserId           String
-  updatedByUserId           String
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  createdByUserId String
+  updatedByUserId String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
   sourceFeed CalendarFeed? @relation(fields: [sourceFeedId], references: [id], onDelete: SetNull)
 
@@ -5644,25 +5644,25 @@ model CalendarEntry {
 /// its points prepared again for the new date). `title`, `dueOn` and `linkUrl` follow the entry while the
 /// batch is pending and are frozen once it is decided.
 model DeadlineReminderBatch {
-  id              String                 @id @default(cuid())
-  calendarEntryId String?
+  id                String                 @id @default(cuid())
+  calendarEntryId   String?
   /// 14 or 2 (a check constraint in the migration).
-  daysBefore      Int
-  title           String
-  dueOn           String
-  linkUrl         String?
-  status          DeadlineReminderStatus @default(PENDING)
+  daysBefore        Int
+  title             String
+  dueOn             String
+  linkUrl           String?
+  status            DeadlineReminderStatus @default(PENDING)
   /// Why a batch was withdrawn or dismissed.
-  statusReason    String?
-  preparedAt      DateTime               @default(now())
-  decidedAt       DateTime?
-  decidedByUserId String?
+  statusReason      String?
+  preparedAt        DateTime               @default(now())
+  decidedAt         DateTime?
+  decidedByUserId   String?
   /// Set when it is sent: how many emails were queued.
-  recipientCount  Int?
+  recipientCount    Int?
   /// No longer written since #915 (deadline reminders go to people who opted out of announcements); null on new rows.
-  optedOutCount   Int?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  optedOutCount     Int?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   calendarEntry CalendarEntry? @relation(fields: [calendarEntryId], references: [id], onDelete: SetNull)
 
@@ -5917,7 +5917,7 @@ model MasterAwardRuleGroup {
   /// Honor names from the import that matched no `Honor` row, shown for review.
   unmatchedHonorNames String[]
 
-  rule   MasterAwardRule             @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  rule   MasterAwardRule              @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   honors MasterAwardRuleGroupHonor[]
 
   @@unique([ruleId, position])
@@ -5971,46 +5971,46 @@ enum ClubFormLinkStatus {
 /// is off (`enabled = false`) until a system administrator turns it on, and
 /// clubs never see a disabled one. Sensitive fields are marked per field key.
 model ClubFormTemplate {
-  id                   String    @id @default(cuid())
-  key                  String    @unique
-  name                 String
-  description          String    @default("")
+  id                 String    @id @default(cuid())
+  key                String    @unique
+  name               String
+  description        String    @default("")
   /// Bumped when the seeded definition changes; submissions record the
   /// version they were filled in against.
-  version              Int       @default(1)
-  definition           Json
+  version            Int       @default(1)
+  definition         Json
   /// Display-only paragraphs per section id, for text a field label cannot
   /// carry (the Pathfinder Pledge and Law, approval and waiver text).
-  sectionNotes         Json      @default("{}")
+  sectionNotes       Json      @default("{}")
   /// Field keys whose answers are sealed with `lib/secret-box.ts`, redacted
   /// for Area Coordinators, and left out of CSVs, drafts and logs.
-  sensitiveFieldKeys   String[]  @default([])
+  sensitiveFieldKeys String[]  @default([])
   /// The birth-date class of sensitive field, a subset of `sensitiveFieldKeys`:
   /// readable only by the club's own director and deputies and system
   /// administrators (ADR 0005 Addendum A); Event Admins and Area Coordinators
   /// see "Restricted".
-  birthDateFieldKeys   String[]  @default([])
+  birthDateFieldKeys String[]  @default([])
   /// Field keys a private-link filler never sees (for example office use).
-  staffOnlyFieldKeys   String[]  @default([])
+  staffOnlyFieldKeys String[]  @default([])
   /// "STANDARD", or "PASSENGER_LIST" for the roll-call print layout.
-  printLayout          String    @default("STANDARD")
+  printLayout        String    @default("STANDARD")
   /// Field keys kept in the definition (so their sensitive flags and old
   /// answers stay put) but not offered to new fills (#712).
-  hiddenFieldKeys      String[]  @default([])
+  hiddenFieldKeys    String[]  @default([])
   /// The "Allow adding to the roster" setting (#721): whether a submitted form
   /// can be added to the club roster, as which roster type, and which form
   /// fields fill which roster fields (by field key, never an answer). Null
   /// until set in the builder; a seeded template then falls back to the code's
   /// pre-filled mapping, which is off. Birth-date and sensitive fields map only
   /// to protected roster fields and health fields never map (validated in code).
-  rosterMapping        Json?
-  sortOrder            Int       @default(0)
-  enabled              Boolean   @default(false)
-  enabledAt            DateTime?
-  enabledByUserId      String?
+  rosterMapping      Json?
+  sortOrder          Int       @default(0)
+  enabled            Boolean   @default(false)
+  enabledAt          DateTime?
+  enabledByUserId    String?
   /// Set the first time the template is edited or created in the app (#712).
   /// `club-forms:sync` never overwrites a customized template.
-  customizedAt         DateTime?
+  customizedAt       DateTime?
   /// The unpublished draft of the next version (#712): the whole spec as JSON.
   /// Null when there is no draft. Publishing writes it to the columns above,
   /// bumps `version` and records a `ClubFormTemplateVersion`.
@@ -6019,8 +6019,8 @@ model ClubFormTemplate {
   /// The published `version` the draft was started on (#712). A code sync that moves the version on makes the draft stale.
   draftBaseVersion     Int?
   draftUpdatedByUserId String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   enabledBy   User?                     @relation("ClubFormTemplateEnabledBy", fields: [enabledByUserId], references: [id], onDelete: SetNull)
   submissions ClubFormSubmission[]
@@ -6085,13 +6085,13 @@ model ClubFormSubmission {
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
 
-  template           ClubFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  template         ClubFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
   rosterActionMember ClubRosterMember? @relation("ClubFormSubmissionRosterAction", fields: [rosterActionMemberId], references: [id], onDelete: SetNull)
-  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  rosterMember       ClubRosterMember? @relation(fields: [rosterMemberId], references: [id], onDelete: SetNull)
-  enteredByAccount   AttendeeAccount?  @relation("ClubFormSubmissionEnteredByAccount", fields: [enteredByAccountId], references: [id], onDelete: SetNull)
-  enteredByUser      User?             @relation("ClubFormSubmissionEnteredByUser", fields: [enteredByUserId], references: [id], onDelete: SetNull)
-  link               ClubFormLink?     @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterMember     ClubRosterMember? @relation(fields: [rosterMemberId], references: [id], onDelete: SetNull)
+  enteredByAccount AttendeeAccount?  @relation("ClubFormSubmissionEnteredByAccount", fields: [enteredByAccountId], references: [id], onDelete: SetNull)
+  enteredByUser    User?             @relation("ClubFormSubmissionEnteredByUser", fields: [enteredByUserId], references: [id], onDelete: SetNull)
+  link             ClubFormLink?     @relation(fields: [linkId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, templateId, status])
   @@index([organizationId, clubYear])
@@ -6260,8 +6260,8 @@ model HealthRecordSnapshot {
   createdAt      DateTime               @default(now())
 
   /// Restrict: removing a person who has a sealed copy is refused; the copy outlives the roster row.
-  person Person                      @relation(fields: [personId], references: [id], onDelete: Restrict)
-  event  Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  person Person                 @relation(fields: [personId], references: [id], onDelete: Restrict)
+  event  Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   fields HealthRecordSnapshotField[]
 
   @@unique([personId, eventId])
@@ -6517,9 +6517,9 @@ model AttendanceReconciliationVersion {
   supersededAt          DateTime?
   supersededByVersionId String?
 
-  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  preparedBy      User?            @relation("AttendanceVersionPreparedBy", fields: [preparedByUserId], references: [id], onDelete: SetNull)
-  approvedBy      User?            @relation("AttendanceVersionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  event      Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  preparedBy User? @relation("AttendanceVersionPreparedBy", fields: [preparedByUserId], references: [id], onDelete: SetNull)
+  approvedBy User? @relation("AttendanceVersionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   invoiceVersions InvoiceVersion[]
 
   @@unique([eventId, versionNumber])
@@ -6532,7 +6532,7 @@ model AttendanceReconciliationVersion {
 /// new transfer needs a new acknowledgement. Append-only with supersede (like corrections); the reason is
 /// required and the actor recorded.
 model AttendanceReviewAcknowledgement {
-  id             String                 @id @default(cuid())
+  id             String   @id @default(cuid())
   eventId        String
   registrationId String
   reviewKey      String
@@ -6540,7 +6540,7 @@ model AttendanceReviewAcknowledgement {
   choice         AttendanceReviewChoice
   reason         String
   actorUserId    String?
-  createdAt      DateTime               @default(now())
+  createdAt      DateTime @default(now())
   /// Set when staff acknowledge the same review again with a different choice or reason: the latest wins.
   supersededAt   DateTime?
   supersededById String?
@@ -6561,27 +6561,27 @@ model AttendanceReviewAcknowledgement {
 /// can revoke with a reason, and a trigger refuses every other edit and every delete. Grants no access
 /// to health, incident or other registration data.
 model GuardianAuthority {
-  id                String                  @id @default(cuid())
-  eventId           String
+  id               String                  @id @default(cuid())
+  eventId          String
   /// The registration the declaration was made on (for staff, the minor's registration they acted on).
-  registrationId    String
-  minorPersonId     String
-  adultPersonId     String?
-  source            GuardianAuthoritySource
-  state             GuardianAuthorityState  @default(ACTIVE)
-  declaredAt        DateTime                @default(now())
+  registrationId   String
+  minorPersonId    String
+  adultPersonId    String?
+  source           GuardianAuthoritySource
+  state            GuardianAuthorityState  @default(ACTIVE)
+  declaredAt       DateTime                @default(now())
   /// Why staff set this (required for a staff declaration; null for the registration form).
   declarationReason String?
   /// The private-link access grant a manage-link declaration was made through (plain id: grants are revoked and expire).
-  accessTokenId     String?
+  accessTokenId    String?
   /// Who declared: staff (`actorUserId`) or the registrant (`actorPersonId`).
-  actorUserId       String?
-  actorPersonId     String?
-  revokedAt         DateTime?
-  revokedByUserId   String?
-  revocationReason  String?
-  supersededAt      DateTime?
-  supersededById    String?
+  actorUserId      String?
+  actorPersonId    String?
+  revokedAt        DateTime?
+  revokedByUserId  String?
+  revocationReason String?
+  supersededAt     DateTime?
+  supersededById   String?
 
   event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
@@ -6752,9 +6752,9 @@ model InvoiceReceivable {
   supersededAt          DateTime?
   supersededByVersionId String?
 
-  event          Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  invoice        Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  invoiceVersion InvoiceVersion   @relation(fields: [invoiceVersionId], references: [id], onDelete: Cascade)
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  invoice        Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceVersion InvoiceVersion @relation(fields: [invoiceVersionId], references: [id], onDelete: Cascade)
   payments       InvoicePayment[]
 
   @@index([eventId, status])
@@ -6865,17 +6865,17 @@ model InvoiceDeliveryRecipient {
 /// Staff marked a finalized version "Posted to AR" in the conference's own accounting (#168). One root row per
 /// version; a correction is a new row that corrects the latest one (append-only, never edited).
 model InvoiceArPosting {
-  id                String   @id @default(cuid())
+  id                String            @id @default(cuid())
   eventId           String
   invoiceId         String
   invoiceVersionId  String
-  postedOn          DateTime @db.Date
+  postedOn          DateTime          @db.Date
   reference         String?
-  correctsPostingId String?  @unique
+  correctsPostingId String?           @unique
   reason            String?
   recordedByUserId  String?
   recordedByName    String
-  createdAt         DateTime @default(now())
+  createdAt         DateTime          @default(now())
 
   event          Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   invoice        Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -7069,38 +7069,38 @@ model LodgingBed {
 
 /// An event's use of one property. External hotel details stay on Event and are never inventory.
 model EventLodging {
-  id                                String              @id @default(cuid())
-  eventId                           String              @unique
-  propertyId                        String
-  templateVersion                   Int
+  id              String    @id @default(cuid())
+  eventId         String    @unique
+  propertyId      String
+  templateVersion Int
   /// Optional bookable-night window; defaults to the event's own dates (last night = day before the end date).
-  firstNight                        DateTime?           @db.Date
-  lastNight                         DateTime?           @db.Date
+  firstNight      DateTime? @db.Date
+  lastNight       DateTime? @db.Date
   /// Whether registrants choose a lodging category when they register (#199). Off for club events, where staff assign.
-  collectsPreferences               Boolean             @default(false)
+  collectsPreferences Boolean @default(false)
   /// Last day a registrant may change their lodging preference (inclusive, event time zone); null follows the event's registration close date.
-  preferencesDeadline               DateTime?           @db.Date
+  preferencesDeadline DateTime? @db.Date
   /// What a full category shows: "Full" only, or "Full" with a waitlist (the waitlist itself is #200).
-  fullBehavior                      LodgingFullBehavior @default(SHOW_FULL)
-  settingsUpdatedByUserId           String?
+  fullBehavior    LodgingFullBehavior @default(SHOW_FULL)
+  settingsUpdatedByUserId String?
   /// Attendees see their approved building, room and instructions on the private registration page only after staff
   /// publish assignments (#200). Off by default.
-  showAssignmentsToAttendees        Boolean             @default(false)
+  showAssignmentsToAttendees Boolean @default(false)
   /// Roommates shown by first name only, and only when staff turn this on. Contact details are never shown.
-  showRoommateFirstNames            Boolean             @default(false)
+  showRoommateFirstNames Boolean @default(false)
   /// Event-wide instructions shown beside a published assignment (no personal data).
-  attendeeInstructions              String?
+  attendeeInstructions String?
   assignmentSettingsUpdatedByUserId String?
   /// Bumped by every writer that changes what the event's lodging can hold or has promised (holds, closures, capacity
   /// overrides, requests, submissions), inside its transaction and under the unit locks. A Serializable reader that
   /// read capacity before such a write fails on its own bump of this row and is retried.
-  capacityVersion                   Int                 @default(0)
-  createdByUserId                   String?
-  createdAt                         DateTime            @default(now())
-  updatedAt                         DateTime            @updatedAt
+  capacityVersion Int @default(0)
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  event    Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  property LodgingProperty      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  event    Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  property LodgingProperty    @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   units    EventLodgingUnit[]
   rates    EventLodgingRate[]
   buckets  EventLodgingBucket[]
@@ -7129,10 +7129,10 @@ model EventLodgingUnit {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  eventLodging   EventLodging             @relation(fields: [eventLodgingId, eventId], references: [id, eventId], onDelete: Cascade)
-  unit           LodgingUnit              @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  holds          EventLodgingHold[]
-  assignments    EventLodgingAssignment[]
+  eventLodging EventLodging       @relation(fields: [eventLodgingId, eventId], references: [id, eventId], onDelete: Cascade)
+  unit         LodgingUnit        @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  holds        EventLodgingHold[]
+  assignments  EventLodgingAssignment[]
   facilityIssues FacilityIssue[]
   assetIssuances AssetIssuance[]
 
@@ -7157,8 +7157,8 @@ model EventLodgingHold {
   releasedByUserId   String?
   releaseReason      String?
 
-  eventUnit      EventLodgingUnit          @relation(fields: [eventLodgingUnitId, eventId], references: [id, eventId], onDelete: Cascade)
-  history        EventLodgingHoldHistory[]
+  eventUnit EventLodgingUnit          @relation(fields: [eventLodgingUnitId, eventId], references: [id, eventId], onDelete: Cascade)
+  history   EventLodgingHoldHistory[]
   facilityIssues FacilityIssue[]
 
   @@unique([id, eventId])
@@ -7509,12 +7509,12 @@ model EventLodgingAssignment {
   cancelledByUserId  String?
   cancelReason       String?
 
-  event          Event                           @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  eventUnit      EventLodgingUnit?               @relation(fields: [eventLodgingUnitId, eventId], references: [id, eventId], onDelete: Cascade)
-  bucket         EventLodgingBucket?             @relation(fields: [bucketId, eventId], references: [id, eventId], onDelete: Cascade)
-  attendee       RegistrationAttendee?           @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
-  placeholder    EventLodgingPlaceholder?        @relation(fields: [placeholderId, eventId], references: [id, eventId], onDelete: Cascade)
-  history        EventLodgingAssignmentHistory[]
+  event       Event                           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventUnit   EventLodgingUnit?               @relation(fields: [eventLodgingUnitId, eventId], references: [id, eventId], onDelete: Cascade)
+  bucket      EventLodgingBucket?             @relation(fields: [bucketId, eventId], references: [id, eventId], onDelete: Cascade)
+  attendee    RegistrationAttendee?           @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
+  placeholder EventLodgingPlaceholder?        @relation(fields: [placeholderId, eventId], references: [id, eventId], onDelete: Cascade)
+  history     EventLodgingAssignmentHistory[]
   assetIssuances AssetIssuance[]
 
   /// Migration-level: a night-range exclusion per occupant and a CHECK that exactly one place and one occupant are set.
@@ -7848,9 +7848,9 @@ model HonorInstructor {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  event           Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  person          Person                 @relation(fields: [personId], references: [id], onDelete: Restrict)
-  attendeeAccount AttendeeAccount?       @relation(fields: [attendeeAccountId], references: [id], onDelete: SetNull)
+  event           Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  person          Person           @relation(fields: [personId], references: [id], onDelete: Restrict)
+  attendeeAccount AttendeeAccount? @relation(fields: [attendeeAccountId], references: [id], onDelete: SetNull)
   classes         HonorInstructorClass[]
   marks           HonorEnrollmentMark[]
 
@@ -7897,11 +7897,11 @@ model HonorEnrollmentMark {
 /// Ticking never performs the action it records. The name is a snapshot so the page still reads correctly if the
 /// account is later renamed or removed.
 model SystemReadinessTick {
-  itemKey        String   @id
-  tickedByUserId String?
-  tickedByName   String
-  tickedAt       DateTime @default(now())
-  note           String?
+  itemKey          String   @id
+  tickedByUserId   String?
+  tickedByName     String
+  tickedAt         DateTime @default(now())
+  note             String?
 }
 
 // ---------------------------------------------------------------------------
@@ -8069,8 +8069,8 @@ model IssuedAssetType {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
 
-  event         Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  assets        IssuedAsset[]
+  event  Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assets IssuedAsset[]
   ledgerEntries AssetLedgerEntry[]
 
   @@unique([eventId, name])
@@ -8097,9 +8097,9 @@ model IssuedAsset {
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
-  event          Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  assetType      IssuedAssetType @relation(fields: [assetTypeId, eventId], references: [id, eventId], onDelete: NoAction)
-  issuances      AssetIssuance[]
+  event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assetType IssuedAssetType       @relation(fields: [assetTypeId, eventId], references: [id, eventId], onDelete: NoAction)
+  issuances AssetIssuance[]
   facilityIssues FacilityIssue[]
 
   @@unique([eventId, identifier])
@@ -8149,12 +8149,12 @@ model AssetIssuance {
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
-  event            Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  asset            IssuedAsset             @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: Cascade)
-  attendee         RegistrationAttendee?   @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
-  registration     Registration?           @relation(fields: [registrationId], references: [id], onDelete: NoAction)
-  roomUnit         EventLodgingUnit?       @relation(fields: [roomUnitId, eventId], references: [id, eventId], onDelete: NoAction)
-  sourceAssignment EventLodgingAssignment? @relation(fields: [sourceAssignmentId, eventId], references: [id, eventId], onDelete: NoAction)
+  event            Event                       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  asset            IssuedAsset                  @relation(fields: [assetId, eventId], references: [id, eventId], onDelete: Cascade)
+  attendee         RegistrationAttendee?       @relation(fields: [attendeeId], references: [id], onDelete: NoAction)
+  registration     Registration?               @relation(fields: [registrationId], references: [id], onDelete: NoAction)
+  roomUnit         EventLodgingUnit?           @relation(fields: [roomUnitId, eventId], references: [id, eventId], onDelete: NoAction)
+  sourceAssignment EventLodgingAssignment?     @relation(fields: [sourceAssignmentId, eventId], references: [id, eventId], onDelete: NoAction)
   history          AssetIssuanceHistory[]
   deposits         AssetDepositCover[]
   ledgerEntries    AssetLedgerEntry[]
@@ -8199,13 +8199,13 @@ model AssetIssuanceHistory {
   reviewedCode       String?
   reviewedRefId      String?
   /// The change this row made to a lot's stock count (negative: units taken off the lot). A correction reverses exactly what was applied, never more.
-  stockDelta         Int                     @default(0)
+  stockDelta         Int                   @default(0)
   /// A reference to the evidence of the item's condition (a photo number, an incident or work-order number). Text only.
   evidenceRef        String?
   /// The condition the item was found in (a return, loss or damage).
   condition          IssuedAssetCondition?
 
-  event    Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event    Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   issuance AssetIssuance @relation(fields: [issuanceId, eventId], references: [id, eventId], onDelete: Cascade)
 
   @@unique([eventId, idempotencyKey])
@@ -8219,31 +8219,31 @@ model AssetIssuanceHistory {
 /// registration as an ASSET adjustment line (`registrationAdjustmentId`); a waiver of a posted charge is the reversing line.
 /// Nothing is edited or deleted; the follow-up entries of a deposit or charge are its state.
 model AssetLedgerEntry {
-  id                          String                 @id @default(cuid())
-  eventId                     String
-  kind                        AssetLedgerKind
+  id                       String                  @id @default(cuid())
+  eventId                  String
+  kind                     AssetLedgerKind
   /// Always positive; the kind gives the direction.
-  amountCents                 Int
-  assetTypeId                 String?
-  issuanceId                  String?
-  registrationId              String?
+  amountCents              Int
+  assetTypeId              String?
+  issuanceId               String?
+  registrationId           String?
   /// A return or keep points at the deposit it settles.
-  depositEntryId              String?
+  depositEntryId           String?
   /// A waiver points at the charge it waives.
-  waivesEntryId               String?
-  chargeCategory              AssetChargeCategory?
-  settlement                  AssetLedgerSettlement
-  registrationAdjustmentId    String?                @unique
-  reason                      String
-  actorUserId                 String
-  actorNameSnapshot           String
-  idempotencyKey              String?
+  waivesEntryId            String?
+  chargeCategory           AssetChargeCategory?
+  settlement               AssetLedgerSettlement
+  registrationAdjustmentId String?                 @unique
+  reason                   String
+  actorUserId              String
+  actorNameSnapshot        String
+  idempotencyKey           String?
   /// A received deposit remembers the terms it was taken under, so a later edit of the kind never changes a deposit already held.
-  depositShortfallSnapshot    AssetDepositShortfall?
+  depositShortfallSnapshot AssetDepositShortfall?
   replacementFeeSnapshotCents Int?
   /// A charge made after a deposit already kept money for the same loss is only the part above what the deposit kept.
-  depositOffsetCents          Int                    @default(0)
-  createdAt                   DateTime               @default(now())
+  depositOffsetCents       Int                     @default(0)
+  createdAt                DateTime                @default(now())
 
   event        Event                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   assetType    IssuedAssetType?        @relation(fields: [assetTypeId, eventId], references: [id, eventId], onDelete: NoAction)

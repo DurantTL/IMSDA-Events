@@ -81,7 +81,8 @@ with the decision record.
 ## Related rules
 
 - **Break-glass access** (decided 2026-10-09):
-  - only system administrators may use it;
+  - only system administrators may use it, and it is the only way they read a health record (the live record, the
+    coordinator sheet and the sealed copies; #929), one person at a time;
   - they must type a reason;
   - access lasts 24 hours and is logged;
   - the incident lead reviews every use each month.

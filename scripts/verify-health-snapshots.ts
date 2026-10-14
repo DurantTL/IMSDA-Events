@@ -30,6 +30,10 @@
  *   (a Feb 29 birthday included); the sweep skips people it can never seal and pages past them;
  *   the reported age comes from the event's club year; a record with no usable field gets no copy;
  * - a second administrator is not let in by the first one's break-glass; concurrent holds give one hold;
+ * - one grant covers the live record and the sealed copies (#929): the coordinator health sheet (a view and a
+ *   printed export) shows a system administrator only the people they hold a grant for, refuses one with no grant
+ *   as BREAK_GLASS_REQUIRED (audited), applies to an administrator acting as a director, and every use is recorded
+ *   so the review list counts live-sheet and sealed-copy uses together;
  * - removing a roster member who has a copy keeps the Person (and tells the director what it always did);
  * - the deletion job works in batches, audits each run, and a backlog continues on the next sweep.
  *
@@ -198,6 +202,7 @@ async function main() {
   const checkIn = await import("../modules/checkin/repository");
   const lifecycle = await import("../modules/events/lifecycle");
   const eventDeletion = await import("../modules/events/deletion-repository");
+  const coordinatorHealth = await import("../modules/coordinator-health/repository");
   const envModule = await import("../lib/env");
   type Viewer = import("../modules/health-records/domain").HealthViewer;
   const directorA: Viewer = { kind: "CLUB_LEADER", organizationId: clubId, accountId: accounts.director };
@@ -442,6 +447,33 @@ async function main() {
   await expectCode(access.listSnapshotBreakGlassGrants(directorA), "FORBIDDEN", "a director listing break-glass grants");
   assert((await prisma.auditLog.count({ where: { action: "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED" } })) === 1, "the listing is audited");
   await expectCode(access.viewSealedSnapshots(admin, ids.minor, new Date(now.getTime() + 25 * 3_600_000)), "BREAK_GLASS_REQUIRED", "the grant has ended after 24 hours");
+
+  // 8b. The same grant on the live coordinator health sheet (#929) ----------------
+  const sheetNow = new Date(now.getTime() + 3_600_000);
+  const sheetAdmin2 = { kind: "SYSTEM_ADMIN", userId: admin2UserId } as const;
+  const actingAsDirector = { kind: "CLUB_LEADER", organizationId: clubId, actor: { kind: "STAFF_ACTING", userId: admin2UserId, actAsId: `${P}_act_as` } } as const;
+  await expectCode(coordinatorHealth.loadEventHealth(sheetAdmin2, ids.eventA, {}, sheetNow), "BREAK_GLASS_REQUIRED", "the coordinator sheet for an administrator with no grant");
+  await expectCode(coordinatorHealth.loadEventHealth(sheetAdmin2, ids.eventA, { purpose: "EXPORT" }, sheetNow), "BREAK_GLASS_REQUIRED", "a printed sheet for an administrator with no grant");
+  await expectCode(coordinatorHealth.loadEventHealth(actingAsDirector, ids.eventA, {}, sheetNow), "BREAK_GLASS_REQUIRED", "the sheet for an administrator acting as a director");
+  const sheetDenied = await prisma.auditLog.findMany({ where: { action: "COORDINATOR_HEALTH_DENIED", actorUserId: admin2UserId } });
+  assert(sheetDenied.length === 3 && sheetDenied.every((row) => (row.metadata as { reason?: string }).reason === "BREAK_GLASS_REQUIRED"), "each refused sheet is audited with its reason");
+  assert(sheetDenied.some((row) => (row.metadata as { actAsId?: string }).actAsId === `${P}_act_as`), "the refused act-as sheet carries the act-as id");
+  const sheet = await coordinatorHealth.loadEventHealth(admin, ids.eventA, {}, sheetNow);
+  const sheetRows = sheet.clubs.flatMap((club) => club.attendees);
+  assert(sheetRows.length >= 4, "the sheet lists the registered attendees");
+  assert(sheetRows.filter((row) => !row.breakGlassRequired).length === 1 && sheetRows.filter((row) => row.breakGlassRequired).length === sheetRows.length - 1, "only the person with a grant is shown; the others are withheld");
+  assert(sheetRows.filter((row) => row.breakGlassRequired).every((row) => row.dietary === null && row.medicalFlag === null && row.emergencyContacts.length === 0), "a withheld row carries no health information");
+  await coordinatorHealth.loadEventHealth(admin, ids.eventA, { purpose: "EXPORT" }, sheetNow);
+  const sheetUses = await prisma.healthBreakGlassUse.findMany({ where: { grantId: grant.grantId, kind: { in: ["LIVE_EVENT_SHEET", "LIVE_EVENT_SHEET_EXPORT"] } } });
+  assert(sheetUses.length === 2 && sheetUses.some((use) => use.kind === "LIVE_EVENT_SHEET") && sheetUses.some((use) => use.kind === "LIVE_EVENT_SHEET_EXPORT") && sheetUses.every((use) => use.personId === ids.minor && use.userId === adminUserId), "a view and a printed sheet each record a use");
+  const sheetAudit = await prisma.auditLog.findMany({ where: { action: { in: ["COORDINATOR_HEALTH_VIEWED", "COORDINATOR_HEALTH_EXPORTED"] }, actorUserId: adminUserId } });
+  assert(sheetAudit.length === 2 && sheetAudit.every((row) => (row.metadata as { grantedCount?: number }).grantedCount === 1), "the sheet's audit rows name how many people the grants covered");
+  for (const secret of [...SECRETS, minorBirth, adultBirth]) assert(!JSON.stringify(sheetAudit).includes(secret) && !JSON.stringify(sheetDenied).includes(secret), "no health value is in a sheet audit row");
+  const reviewAfter = await access.listSnapshotBreakGlassGrants(admin);
+  const reviewedGrant = reviewAfter.find((row) => row.id === grant.grantId);
+  assert(reviewedGrant && reviewedGrant.uses.byKind.SEALED_COPIES === 1 && reviewedGrant.uses.byKind.LIVE_EVENT_SHEET === 1 && reviewedGrant.uses.byKind.LIVE_EVENT_SHEET_EXPORT === 1 && reviewedGrant.uses.total === 3, "the review list counts sealed-copy and live-sheet uses of one grant");
+  for (const secret of [...SECRETS, minorBirth, adultBirth]) assert(!JSON.stringify(reviewAfter).includes(secret), "the review list still carries no health value");
+  await expectCode(coordinatorHealth.loadEventHealth(admin, ids.eventA, {}, new Date(now.getTime() + 25 * 3_600_000)), "BREAK_GLASS_REQUIRED", "the sheet after the grant's 24 hours");
 
   // 9. Legal holds and the daily deletion job -------------------------------------
   const farFuture = new Date(adultCopy.expiresAt.getTime() + 30 * DAY);

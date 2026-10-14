@@ -7,6 +7,9 @@
  *   appears in no column, audit row or outbox row; it round-trips for the
  *   club's director, and another club's director is refused;
  * - every view writes one audit row with no health text;
+ * - a system administrator, acting as a director or not, reads a live record only inside an unexpired
+ *   break-glass grant for that person (#929): refused with BREAK_GLASS_REQUIRED and audited without it, allowed
+ *   with it (the use is recorded), refused again after 24 hours, and the review list shows the use;
  * - a parent's private link: minted at delivery, stored only as a hash, works
  *   exactly once even when many submits race, and the record it writes is
  *   Current for this club year; an older club year reads Needs update;
@@ -106,7 +109,7 @@ async function cleanup() {
   const links = await prisma.healthRecordLink.findMany({ where: { organizationId: { in: Object.values(clubs) } }, select: { id: true, messageId: true } });
   const members = await prisma.clubRosterMember.findMany({ where: { organizationId: { in: Object.values(clubs) } }, select: { id: true } });
   await prisma.auditLog.deleteMany({
-    where: { OR: [{ entityId: { in: [...records, ...links, ...members].map((row) => row.id) } }, { entityId: { startsWith: P } }, { actorUserId: adminUserId }] },
+    where: { OR: [{ entityId: { in: [...records, ...links, ...members].map((row) => row.id) } }, { entityId: { startsWith: P } }, { actorUserId: { in: [adminUserId, `${P}_admin2_user`] } }] },
   });
   await prisma.healthRecord.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.healthRecordLink.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
@@ -115,13 +118,15 @@ async function cleanup() {
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: Object.values(accounts) } } });
-  await prisma.user.deleteMany({ where: { id: adminUserId } });
+  await prisma.healthPrivacyAcknowledgment.deleteMany({ where: { userId: { in: [adminUserId, `${P}_admin2_user`] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [adminUserId, `${P}_admin2_user`] } } });
   await prisma.organization.deleteMany({ where: { id: { in: Object.values(clubs) } } });
 }
 
 async function main() {
   const repo = await import("../modules/health-records/repository");
   const acknowledgment = await import("../modules/health-records/acknowledgment");
+  const breakGlass = await import("../modules/health-records/snapshot-access-repository");
   const acknowledgmentDomain = await import("../modules/health-records/acknowledgment-domain");
   const linkEmail = await import("../modules/health-records/link-email");
   const rosterDomain = await import("../modules/club-rosters/domain");
@@ -315,7 +320,45 @@ async function main() {
   await acknowledgment.recordHealthPrivacyAcknowledgment(adminViewer, now);
   await acknowledgment.recordHealthPrivacyAcknowledgment(adminViewer, now);
   assert((await prisma.healthPrivacyAcknowledgment.count({ where: { userId: adminUserId, version } })) === 1, "acknowledging twice stores one row, by user for staff");
-  assert((await repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, now)).values.medications === "Verify replaced medication", "staff read after acknowledging");
+
+  // 7b. A system administrator reads a live record only through break-glass (#929) -----
+  const REASON = "Verify typed reason for a live record";
+  const actingAdminViewer: Viewer = { kind: "SYSTEM_ADMIN", userId: adminUserId, actAsId: "verify-act-as" };
+  await expectCode(repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, now), "BREAK_GLASS_REQUIRED", "an acknowledged administrator without break-glass");
+  await expectCode(repo.viewHealthRecord(actingAdminViewer, clubs.a, morgan.id, now), "BREAK_GLASS_REQUIRED", "an administrator acting as a director without break-glass");
+  const breakGlassRefusals = await prisma.auditLog.findMany({ where: { action: "HEALTH_RECORD_ACCESS_REFUSED", actorUserId: adminUserId } });
+  assert(breakGlassRefusals.length === 2, "each refused live read is audited");
+  assert(breakGlassRefusals.some((row) => (row.metadata as { actAsId?: string }).actAsId === "verify-act-as"), "the refusal carries the act-as id");
+  for (const row of breakGlassRefusals) {
+    assert((row.metadata as { reason?: string }).reason === "BREAK_GLASS_REQUIRED", "the refusal names its reason");
+    for (const secret of ["Verify allergy text only", "Verify replaced medication", "4 Verify Road", "515-555-0188"]) assert(!JSON.stringify(row).includes(secret), "a refusal holds no health value");
+  }
+  assert((await repo.healthSummariesForMembers(adminViewer, clubs.a, [morgan.id], now))[morgan.id]?.hasHealthNote === false, "the has-a-note flag is hidden from an administrator without a grant");
+  await expectCode(breakGlass.startSnapshotBreakGlass(adminViewer, { personId: `${P}_morgan`, reason: "short" }, now), "VALIDATION_FAILED", "break-glass with no real reason");
+  const liveGrant = await breakGlass.startSnapshotBreakGlass(adminViewer, { personId: `${P}_morgan`, reason: REASON }, now);
+  assert(liveGrant.liveRecordCount === 1 && liveGrant.snapshotCount === 0, "break-glass for a person with only a live record");
+  assert(liveGrant.expiresAt.getTime() - now.getTime() === 24 * 3_600_000, "a grant lasts 24 hours");
+  assert((await repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, now)).values.medications === "Verify replaced medication", "an administrator reads the live record during break-glass");
+  assert((await repo.viewHealthRecord(actingAdminViewer, clubs.a, morgan.id, now)).status === "CURRENT", "acting as a director uses the administrator's own grant");
+  assert((await repo.healthSummariesForMembers(adminViewer, clubs.a, [morgan.id], now))[morgan.id]?.hasHealthNote === true, "the has-a-note flag shows during break-glass");
+  const liveUses = await prisma.healthBreakGlassUse.findMany({ where: { grantId: liveGrant.grantId } });
+  assert(liveUses.length === 2 && liveUses.every((use) => use.kind === "LIVE_RECORD" && use.userId === adminUserId && use.personId === `${P}_morgan`), "each live read records a use");
+  const viewAudit = await prisma.auditLog.findMany({ where: { action: "HEALTH_RECORD_VIEWED", actorUserId: adminUserId } });
+  assert(viewAudit.length === 2 && viewAudit.every((row) => (row.metadata as { grantId?: string }).grantId === liveGrant.grantId), "each allowed read is audited with its grant");
+  assert(viewAudit.some((row) => (row.metadata as { actAsId?: string }).actAsId === "verify-act-as"), "the allowed read carries the act-as id");
+  assert(!JSON.stringify(viewAudit).includes("Verify replaced medication"), "an audit row holds no health value");
+  const review = await breakGlass.listSnapshotBreakGlassGrants(adminViewer);
+  const reviewed = review.find((row) => row.id === liveGrant.grantId);
+  assert(reviewed && reviewed.personId === `${P}_morgan` && reviewed.reason === REASON && reviewed.userId === adminUserId, "the review list shows who, the reason and whose record");
+  assert(reviewed.uses.total === 2 && reviewed.uses.byKind.LIVE_RECORD === 2 && reviewed.uses.lastUsedAt !== null, "the review list counts live-record uses");
+  assert(!JSON.stringify(review).includes("Verify replaced medication"), "the review list holds no health value");
+  await expectCode(repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, new Date(liveGrant.expiresAt.getTime())), "BREAK_GLASS_REQUIRED", "an administrator after the grant's 24 hours");
+  await expectCode(repo.viewHealthRecord(adminViewer, clubs.a, morgan.id, new Date(now.getTime() + 25 * 3_600_000)), "BREAK_GLASS_REQUIRED", "an administrator 25 hours later");
+  const secondAdmin = `${P}_admin2_user`;
+  await prisma.user.create({ data: { id: secondAdmin, email: `admin2@${emailDomain}`, displayName: "Verify Admin Two" } });
+  await acknowledgment.recordHealthPrivacyAcknowledgment({ kind: "SYSTEM_ADMIN", userId: secondAdmin }, now);
+  await expectCode(repo.viewHealthRecord({ kind: "SYSTEM_ADMIN", userId: secondAdmin }, clubs.a, morgan.id, now), "BREAK_GLASS_REQUIRED", "a second administrator is not let in by the first one's grant");
+  assert((await repo.viewHealthRecord(directorA, clubs.a, morgan.id, now)).status === "CURRENT", "a director is not asked for break-glass");
   assert((await prisma.healthPrivacyAcknowledgment.count({ where: { attendeeAccountId: accounts.a, version } })) === 1, "a director is acknowledged by attendee account");
   assert((await prisma.healthPrivacyAcknowledgment.count({ where: { attendeeAccountId: accounts.reg, version } })) === 1, "a Registrar is acknowledged by attendee account");
 
