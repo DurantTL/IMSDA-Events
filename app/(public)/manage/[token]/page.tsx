@@ -244,7 +244,7 @@ export default async function PublicManagePage({
                 <>Shirt sizes can be reconfirmed below. </>
               )}
               {view.answerEditing.enabled
-                ? "Eligible session and retreat choices can be updated below. "
+                ? "Eligible session and event choices can be updated below. "
                 : ""}
               Attendance, priced or capacity-controlled choices, identity,
               protected details, and registration fees remain staff-managed.

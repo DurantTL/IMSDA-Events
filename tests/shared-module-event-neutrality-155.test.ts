@@ -1,6 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  DEFAULT_MESSAGE_TEMPLATE_LIST,
+  SAMPLE_MESSAGE_TEMPLATE_CONTEXT,
+} from "@/modules/communications/templates";
 
 /**
  * Guard for #155: shared `modules/` code must not grow event-specific coupling.
@@ -175,6 +179,86 @@ describe("shared modules stay event-neutral (#155)", () => {
       expect(all.has(file)).toBe(true);
       const source = readFileSync(path.join(modulesRoot, file), "utf8");
       for (const name of names) expect(source).toContain(name);
+    }
+  });
+
+  it("keeps components, routes and libraries event-neutral by file and exported names (#104)", () => {
+    const roots = ["components", "app", "lib"];
+    const offenders: string[] = [];
+    for (const root of roots) {
+      const base = path.join(process.cwd(), root);
+      for (const file of listFiles(base)) {
+        const relative = `${root}/${path.relative(base, file).split(path.sep).join("/")}`;
+        if (eventSpecificToken.test(relative)) offenders.push(`${relative}: file name`);
+        if (!/\.(ts|tsx)$/.test(file)) continue;
+        for (const name of exportedNames(readFileSync(file, "utf8"))) {
+          if (eventSpecificToken.test(name)) offenders.push(`${relative}: ${name}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps message template defaults and the preview sample free of event names (#104)", () => {
+    // Template keys are stored (MessageTemplate.key), so they cannot be renamed; none is event-named today.
+    const text = JSON.stringify([DEFAULT_MESSAGE_TEMPLATE_LIST, SAMPLE_MESSAGE_TEMPLATE_CONTEXT]);
+    expect(text).not.toMatch(/women|retreat|camporee|camp meeting|camp-meeting|wr\d{2}/i);
+    expect(DEFAULT_MESSAGE_TEMPLATE_LIST.filter((template) => eventSpecificToken.test(template.key))).toEqual([]);
+  });
+});
+
+/**
+ * Boundary guard for the legacy shirt-size subsystem (#104). Retirement plan: docs/SHIRT-SIZES-RETIREMENT.md.
+ *
+ * `modules/registrations/shirt-sizes.ts` and `modules/communications/shirt-size-audience.ts` may only be
+ * imported by the boundary files in `modules/merchandise/` (and by their own tests). Every other
+ * module, route, component and script goes through the boundary, so retiring the subsystem is a change
+ * to those two files rather than a hunt through the codebase.
+ */
+describe("legacy shirt-size modules stay behind the merchandise boundary (#104)", () => {
+  const repoRoot = process.cwd();
+  const legacySpecifier = /["'`]((?:@\/modules\/|(?:\.{1,2}\/)+)(?:modules\/)?(?:registrations\/shirt-sizes|communications\/shirt-size-audience)|\.\/shirt-sizes|\.\/shirt-size-audience)["'`]/g;
+  const legacyFiles = new Set([
+    "modules/registrations/shirt-sizes.ts",
+    "modules/communications/shirt-size-audience.ts",
+  ]);
+  const boundaryFiles = new Set([
+    "modules/merchandise/legacy-shirt-size-compat.ts",
+    "modules/merchandise/legacy-shirt-size-audience-compat.ts",
+  ]);
+
+  function importsLegacy(source: string) {
+    return [...source.matchAll(legacySpecifier)].map((match) => match[1]);
+  }
+
+  it("has no importer of the legacy modules outside the boundary", () => {
+    const offenders: string[] = [];
+    for (const root of ["modules", "components", "app", "lib", "scripts"]) {
+      for (const file of listFiles(path.join(repoRoot, root))) {
+        if (!/\.(ts|tsx|mts)$/.test(file)) continue;
+        const relative = path.relative(repoRoot, file).split(path.sep).join("/");
+        if (legacyFiles.has(relative) || boundaryFiles.has(relative)) continue;
+        const found = importsLegacy(readFileSync(file, "utf8"));
+        if (found.length > 0) offenders.push(`${relative}: ${found.join(", ")}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("detects a direct import (the guard itself works)", () => {
+    expect(importsLegacy(`import { x } from "@/modules/registrations/shirt-sizes";`)).toHaveLength(1);
+    expect(importsLegacy(`const m = await import("@/modules/communications/shirt-size-audience");`)).toHaveLength(1);
+    expect(importsLegacy(`import { x } from "../registrations/shirt-sizes";`)).toHaveLength(1);
+    expect(importsLegacy(`import { x } from "@/modules/merchandise/legacy-shirt-size-compat";`)).toHaveLength(0);
+  });
+
+  it("keeps the boundary files real and pointing at the legacy modules", () => {
+    expect(readFileSync(path.join(repoRoot, "modules/merchandise/legacy-shirt-size-compat.ts"), "utf8"))
+      .toContain("@/modules/registrations/shirt-sizes");
+    expect(readFileSync(path.join(repoRoot, "modules/merchandise/legacy-shirt-size-audience-compat.ts"), "utf8"))
+      .toContain("@/modules/communications/shirt-size-audience");
+    for (const file of legacyFiles) {
+      expect(readFileSync(path.join(repoRoot, file), "utf8").length).toBeGreaterThan(0);
     }
   });
 });

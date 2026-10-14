@@ -73,7 +73,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
     where: { id: eventId },
     select: {
       id: true, name: true, slug: true, startsAt: true, endsAt: true, timezone: true, isPublished: true,
-      location: true, publicInfoUrl: true, supportContact: true, tagline: true, subtitle: true, helpEmail: true, refundPolicy: true, calendarCategory: true, showOnCalendar: true,
+      location: true, publicInfoUrl: true, supportContact: true, tagline: true, subtitle: true, helpEmail: true, hubTitle: true, hubIntro: true, refundPolicy: true, calendarCategory: true, showOnCalendar: true,
       hotelName: true, hotelBookingUrl: true, hotelPhone: true, hotelGroupName: true, hotelRate: true, hotelInstructions: true,
       audience: true, billingMode: true,
       waitlistEnabled: true, autoPromoteWaitlist: true, collectsShirtSizes: true, checksAdultBackgrounds: true,
@@ -140,7 +140,7 @@ async function loadSourceConfiguration(db: Db, eventId: string): Promise<SourceC
     },
     eventDetails: {
       location: event.location, timezone: event.timezone, publicInfoUrl: event.publicInfoUrl, supportContact: event.supportContact,
-      tagline: event.tagline, subtitle: event.subtitle, helpEmail: event.helpEmail, refundPolicy: event.refundPolicy,
+      tagline: event.tagline, subtitle: event.subtitle, helpEmail: event.helpEmail, hubTitle: event.hubTitle, hubIntro: event.hubIntro, refundPolicy: event.refundPolicy,
       calendarCategory: event.calendarCategory, showOnCalendar: event.showOnCalendar, hotelName: event.hotelName, hotelBookingUrl: event.hotelBookingUrl,
       hotelPhone: event.hotelPhone, hotelGroupName: event.hotelGroupName, hotelRate: event.hotelRate,
       hotelInstructions: event.hotelInstructions, audience: event.audience, billingMode: event.billingMode,
@@ -356,7 +356,7 @@ export async function cloneEvent(actorUserId: string, rawInput: unknown) {
           ...(details ? {
             timezone: details.timezone, location: details.location, publicInfoUrl: details.publicInfoUrl,
             supportContact: details.supportContact,
-            tagline: details.tagline, subtitle: details.subtitle, helpEmail: details.helpEmail, refundPolicy: details.refundPolicy, calendarCategory: details.calendarCategory, showOnCalendar: details.showOnCalendar,
+            tagline: details.tagline, subtitle: details.subtitle, helpEmail: details.helpEmail, hubTitle: details.hubTitle ?? null, hubIntro: details.hubIntro ?? null, refundPolicy: details.refundPolicy, calendarCategory: details.calendarCategory, showOnCalendar: details.showOnCalendar,
             hotelName: details.hotelName, hotelBookingUrl: details.hotelBookingUrl, hotelPhone: details.hotelPhone,
             hotelGroupName: details.hotelGroupName, hotelRate: details.hotelRate, hotelInstructions: details.hotelInstructions,
             audience: details.audience, billingMode: details.billingMode,

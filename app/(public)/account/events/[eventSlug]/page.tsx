@@ -25,9 +25,11 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { splitParagraphs } from "@/modules/communications/account-banner-domain";
 import {
   getAttendeeEventHub,
+  getEventHubTitleBySlug,
   getStaffEventHubPreview,
   type AttendeeEventHub,
 } from "@/modules/attendee-accounts/event-hub-repository";
+import { resolveEventHubCopy } from "@/modules/attendee-accounts/event-hub-copy";
 import {
   getAttendeeCommunity,
   getStaffCommunity,
@@ -35,11 +37,20 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Event hub",
-  description: "Your event schedule, updates, resources, and assigned sessions.",
-  robots: { index: false, follow: false, nocache: true },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ eventSlug: string }>;
+}): Promise<Metadata> {
+  const { eventSlug } = await params;
+  // The title is the event's own setting (#104); a failed lookup keeps the default.
+  const hubTitle = await getEventHubTitleBySlug(eventSlug).catch(() => null);
+  return {
+    title: resolveEventHubCopy({ hubTitle }).documentTitle,
+    description: "Your event schedule, updates, resources, and assigned sessions.",
+    robots: { index: false, follow: false, nocache: true },
+  };
+}
 
 function eventDateLabel(
   startsAt: string,
@@ -108,6 +119,7 @@ export default async function AttendeeEventHubPage({
     hub = attendeeHub;
     attendeeCommunity = await getAttendeeCommunity(attendeeSession.account, eventSlug);
   }
+  const hubCopy = resolveEventHubCopy(hub.event);
   const textSections = hub.contentSections.filter((section) => section.kind === "RICH_TEXT");
   const resourceSections = hub.contentSections.filter((section) => section.kind === "RESOURCE_LINKS");
   const staffTimeline = staffCommunity
@@ -163,10 +175,10 @@ export default async function AttendeeEventHubPage({
       <section className="public-registration-hero attendee-hub-hero">
         <div>
           <p className="public-registration-eyebrow">
-            {staffPreviewEventId ? "Staff preview · Attendee experience" : "Your attendee hub"}
+            {staffPreviewEventId ? "Staff preview · Attendee experience" : hubCopy.eyebrow}
           </p>
           <h1>{hub.event.name}</h1>
-          <p>Schedule, updates, resources, passes and assigned sessions in one signed-in place.</p>
+          <p>{hubCopy.intro}</p>
         </div>
         <div className="public-registration-event-details">
           <span><CalendarDays size={17} aria-hidden="true" /> {eventDateLabel(hub.event.startsAt, hub.event.endsAt, hub.event.timezone)}</span>

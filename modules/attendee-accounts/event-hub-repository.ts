@@ -21,6 +21,8 @@ const eventHubEventSelect = {
   timezone: true,
   location: true,
   supportContact: true,
+  hubTitle: true,
+  hubIntro: true,
   announcements: {
     where: { status: "PUBLISHED" as const },
     orderBy: [
@@ -68,6 +70,8 @@ function eventHubEventRecord(event: {
   timezone: string;
   location: string | null;
   supportContact: string | null;
+  hubTitle: string | null;
+  hubIntro: string | null;
 }) {
   return {
     slug: event.slug,
@@ -77,7 +81,21 @@ function eventHubEventRecord(event: {
     timezone: event.timezone,
     location: event.location,
     supportContact: event.supportContact,
+    hubTitle: event.hubTitle,
+    hubIntro: event.hubIntro,
   };
+}
+
+/**
+ * The configured hub title for an event slug, or null. Read for the document title only; it is the
+ * event's own plain-text setting and reveals nothing about registrations.
+ */
+export async function getEventHubTitleBySlug(eventSlug: string) {
+  const event = await getPrisma().event.findUnique({
+    where: { slug: eventSlug },
+    select: { hubTitle: true },
+  });
+  return event?.hubTitle ?? null;
 }
 
 /**

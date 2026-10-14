@@ -944,7 +944,7 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Readonly<
 > = Object.freeze({
   recipient_name: "Avery Johnson",
   registrant_name: "Avery Johnson",
-  event_name: "IMSDA Women's Retreat 2026",
+  event_name: "IMSDA Sample Event 2026",
   event_dates: "October 9 – 11, 2026",
   event_location: "Des Moines, Iowa",
   confirmation_code: "REG-DEMO123",
@@ -985,7 +985,7 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Readonly<
     "",
     "- Reserve online: [Book your room](https://events.example.test/sample-hotel-booking)",
     "- By phone: (515) 287-2400",
-    "- Ask for the group: IMSDA Women's Retreat",
+    "- Ask for the group: IMSDA Sample Event",
     "- Group rate: $120 per night plus tax",
     "",
     "Pro tip: share a room with a friend and split the cost.",

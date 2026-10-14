@@ -61,6 +61,8 @@ export const settingsFieldBlock: Record<string, SettingsBlockId> = {
   tagline: "public-info",
   subtitle: "public-info",
   helpEmail: "public-info",
+  hubTitle: "public-info",
+  hubIntro: "public-info",
   refundPolicy: "public-info",
   hotelName: "lodging",
   hotelBookingUrl: "lodging",
