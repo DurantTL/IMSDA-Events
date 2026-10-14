@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
     cancelMealService: vi.fn(), createMealOrder: vi.fn(), changeMealQuantity: vi.fn(), cancelMealSelection: vi.fn(), changeMealPlan: vi.fn(),
     substituteMealSelection: vi.fn(), entitleAttendeeToPlan: vi.fn(),
   },
-  view: { loadMealView: vi.fn(), loadRegistrationMeals: vi.fn(), mealTicketsCsv: vi.fn() },
+  view: { loadMealView: vi.fn(), loadRegistrationMeals: vi.fn(), mealTicketsCsv: vi.fn(), mealTicketSummaryCsv: vi.fn() },
 }));
 
 vi.mock("server-only", () => ({}));
@@ -57,6 +57,7 @@ const cases: Case[] = [
   { name: "POST defaults", load: () => import("@/app/api/events/[eventId]/meals/defaults/route"), method: "POST", body: { preset: "camp-meeting-2026" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: true, work: () => mocks.config.applyCampMeetingMealPreset },
   { name: "GET registration meals", load: () => import("@/app/api/events/[eventId]/meals/registrations/[registrationId]/route"), method: "GET", params: { registrationId: "r1" }, allowed: "FINANCE_MANAGER", denied: "REGISTRATION_MANAGER", mutates: false, work: () => mocks.view.loadRegistrationMeals },
   { name: "GET meal tickets CSV", load: () => import("@/app/api/events/[eventId]/exports/meal-tickets/route"), method: "GET", allowed: "FINANCE_MANAGER", denied: "CHECK_IN_STAFF", mutates: false, work: () => mocks.view.mealTicketsCsv },
+  { name: "GET meal ticket summary CSV", load: () => import("@/app/api/events/[eventId]/exports/meal-ticket-summary/route"), method: "GET", allowed: "FINANCE_MANAGER", denied: "CHECK_IN_STAFF", mutates: false, work: () => mocks.view.mealTicketSummaryCsv },
 ];
 
 let role: Role = "EVENT_ADMIN";
@@ -89,6 +90,7 @@ beforeEach(() => {
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   for (const fn of everyRepositoryFunction()) fn.mockResolvedValue({});
   mocks.view.mealTicketsCsv.mockResolvedValue('"Confirmation code"\r\n');
+  mocks.view.mealTicketSummaryCsv.mockResolvedValue('"Confirmation code"\r\n');
   mocks.view.loadMealView.mockResolvedValue({ services: [], plans: [] });
   mocks.view.loadRegistrationMeals.mockResolvedValue([]);
   mocks.selection.cancelMealService.mockResolvedValue({ cancelledSelections: 0 });

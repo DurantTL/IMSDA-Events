@@ -290,6 +290,7 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   //     plans, so they go first, newest layer first. Their append-only triggers accept this transaction's deletes.
   await tx.eventMealLedgerEntry.deleteMany({ where: inEvent });
   await tx.eventMealSelectionChange.deleteMany({ where: inEvent });
+  await tx.eventMealTicket.deleteMany({ where: inEvent });
   await tx.eventMealSelection.deleteMany({ where: inEvent });
   await tx.eventMealServiceChange.deleteMany({ where: inEvent });
 

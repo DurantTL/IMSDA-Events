@@ -80,13 +80,32 @@ Running it again adds only new services; a meal the attendee already holds as a 
 calls it for staff, pastor and volunteer registrations; #212's per-scan usage reporting counts café use against these rows.
 Invitations (#804) and scanning (#211) are not built.
 
-## Meal tickets CSV (for the café's own scanner)
+## Meal tickets CSV (the café scanner's import file, #916)
 
-`GET /api/events/:id/exports/meal-tickets` (VIEW_REPORTS, like the kitchen report; shared formula-safe CSV writer):
-one row per active selection of a submitted or confirmed registration, in a pinned service that is still active or good
-for any service: `Confirmation code, Attendee, Attendee type, Age group, Meal, Service date, Service, Quantity, Payer,
-Source, Ticket id`. A ticket bought as a quantity names the registration's contact (no attendee); `Service date` is empty
-when the ticket is good for any service of that meal. Walk-up orders are paid at the counter and are not listed.
+`GET /api/events/:id/exports/meal-tickets` (VIEW_REPORTS; shared formula-safe CSV writer) matches the conference café
+scanner's format exactly, one row per ticket (a selection of quantity 3 is three rows):
+`ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes`.
+
+- `ticket_id` is `MT-` and the stored number (at least five digits), unique within the event; `reg_id` is the confirmation
+  code; `meal_type` is `breakfast`, `lunch` or `supper`; `meal_day` is `tue` to `sat` (three-letter lowercase) and
+  `meal_date` is `YYYY-MM-DD`, both from the service date, which is already in the event's time zone; `ticket_type` is
+  `adult` or `child`; `price` is the per-ticket price in whole dollars (`7.50` when cents remain; `0` when the conference
+  pays); `redeemed` is `no` and `redeemed_at`, `redeemed_by` and `notes` are empty.
+- Only active selections of a submitted or confirmed registration, in an active ticketed service (or good for any
+  service). Cancelled selections, donation-only services, walk-up orders, snacks and other non-scanner meal types are left
+  out. Sorted by meal date, meal, registration, then guest. A ticket bought on the registration form is good for any
+  service of its meal type and is not pinned to a day, so its `meal_day` and `meal_date` are empty.
+- Ticket ids are stable. Each unit of a selection is an `EventMealTicket` row whose number comes from
+  `Event.mealTicketSeq`, advanced inside the transaction that creates or changes the selection (so two orders can never
+  get the same number); `(eventId, number)` is unique. A quantity increase adds tickets with new numbers; a decrease or a
+  cancellation retires the highest-numbered tickets (`cancelledAt`); a retired number is never reused. Re-exporting gives
+  every ticket the same id. A selection written outside the repository is given its missing tickets when the file is
+  exported.
+
+`GET /api/events/:id/exports/meal-ticket-summary` is the earlier per-selection export, kept as the "Meal ticket summary":
+`Confirmation code, Attendee, Attendee type, Age group, Meal, Service date, Service, Quantity, Payer, Source, Ticket id`
+(the ticket id there is the selection id). A ticket bought as a quantity names the registration's contact (no attendee);
+`Service date` is empty when the ticket is good for any service of that meal. Walk-up orders are not listed.
 
 ## Dietary categories and protected detail
 

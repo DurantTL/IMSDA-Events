@@ -36,6 +36,7 @@ import {
 } from "@/modules/meals/domain";
 import { MealError, type MealErrorCode } from "@/modules/meals/errors";
 import { serviceSnapshot } from "@/modules/meals/config-repository";
+import { syncSelectionTickets } from "@/modules/meals/ticket-repository";
 
 /**
  * Meal selections and the meal ledger (#210).
@@ -224,6 +225,7 @@ async function createSelection(tx: Tx, p: CreateParams) {
     }
     throw error;
   }
+  await syncSelectionTickets(tx, selection);
   const change = await recordChange(tx, p.eventId, p.actor, { selectionId: selection.id, type: p.changeType ?? "CREATED", reason: p.reason, before: null, after: view(selection) });
   const charge = p.plan.payer === "CONFERENCE" ? null : chargeEntry(p.quantity, p.price.unitPriceCents);
   if (charge) {
@@ -358,6 +360,7 @@ export async function changeMealQuantity(eventId: string, selectionId: string, a
     }
     const entries = quantityChangeEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer }, input.quantity);
     const updated = await tx.eventMealSelection.update({ where: { id: selectionId }, data: { quantity: input.quantity } });
+    await syncSelectionTickets(tx, updated);
     const change = await recordChange(tx, eventId, actor, { selectionId, type: "QUANTITY_CHANGED", reason: input.reason, before: view(selection), after: view(updated) });
     // A credit on a cancelled or waitlisted registration is ledgered only; a charge there is refused by the adjustment check.
     await postEntries(tx, eventId, change.id, actor, entries.map((draft) => ({ draft, selection, settlement: draft.kind === "CREDIT" ? settlementForStatus(selection, registrationStatus) : settlementOf(selection), reason: input.reason })));
@@ -376,6 +379,7 @@ function settlementForStatus(selection: { registrationId: string | null; source:
 
 async function cancelCore(tx: Tx, eventId: string, actor: Actor, selection: SelectionRow, type: MealChangeType, reason: string, settlement: MealSettlement = settlementOf(selection), options: { skipBelowPaidCheck?: boolean } = {}) {
   const updated = await tx.eventMealSelection.update({ where: { id: selection.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
+  await syncSelectionTickets(tx, updated);
   const change = await recordChange(tx, eventId, actor, { selectionId: selection.id, type, reason, before: view(selection), after: view(updated) });
   await postEntries(tx, eventId, change.id, actor, cancellationEntries({ quantity: selection.quantity, unitPriceCents: selection.unitPriceCents, payer: selection.payer })
     .map((draft) => ({ draft, selection, settlement, reason })), options);
@@ -516,6 +520,7 @@ export async function entitleAttendeeToPlan(eventId: string, actorUserId: string
           await cancelCore(tx, eventId, actor, paid, "PLAN_CHANGED", input.reason);
         } else {
           const reduced = await tx.eventMealSelection.update({ where: { id: paid.id }, data: { quantity: paid.quantity - 1 } });
+          await syncSelectionTickets(tx, reduced);
           const change = await recordChange(tx, eventId, actor, { selectionId: paid.id, type: "QUANTITY_CHANGED", reason: input.reason, before: view(paid), after: view(reduced) });
           await postEntries(tx, eventId, change.id, actor, quantityChangeEntries({ quantity: paid.quantity, unitPriceCents: paid.unitPriceCents, payer: paid.payer }, paid.quantity - 1)
             .map((draft) => ({ draft, selection: paid, settlement: settlementOf(paid), reason: input.reason })));
@@ -687,6 +692,7 @@ export async function syncFormMealSelections(tx: Tx, input: {
       where: { id: selection.id },
       data: { quantity: action.quantity, ...(reprice ? { unitPriceCents: unit } : {}), sourceFormVersionId: input.formVersionId },
     });
+    await syncSelectionTickets(tx, updated);
     const change = await recordChange(tx, input.eventId, actor, { selectionId: selection.id, type: "QUANTITY_CHANGED", reason: "Changed on the registration form answers.", before: view(selection), after: view(updated) });
     const drafts: LedgerDraft[] = reprice
       ? [creditEntry(selection.quantity, selection.unitPriceCents), chargeEntry(action.quantity, unit)].filter((draft): draft is LedgerDraft => draft !== null)

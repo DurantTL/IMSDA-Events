@@ -14,6 +14,12 @@ import {
   mealTicketBinding,
   mealTicketCsvHeader,
   mealTicketCsvRow,
+  mealTicketId,
+  scannerMealDay,
+  scannerPrice,
+  scannerTicketCsvHeader,
+  scannerTicketCsvRows,
+  type ScannerTicket,
   mealTicketFields,
   mealTypeCoverage,
   quantityChangeEntries,
@@ -278,6 +284,68 @@ describe("meal ticket CSV", () => {
     expect(mealTicketCsvHeader).toEqual(["Confirmation code", "Attendee", "Attendee type", "Age group", "Meal", "Service date", "Service", "Quantity", "Payer", "Source", "Ticket id"]);
     expect(row).toEqual(["CM-1234", "=HYPERLINK(\"x\")", "Staff", "Adult", "Supper", "2026-10-13", "Tuesday supper", "1", "Conference", "PLAN_ASSIGNMENT", "sel-1"]);
     expect(toCsv([[...mealTicketCsvHeader], row])).toContain(`"'=HYPERLINK(""x"")"`);
+  });
+});
+
+describe("café scanner CSV (#916)", () => {
+  const ticket = (over: Partial<ScannerTicket> = {}): ScannerTicket => ({
+    number: 1234, confirmationCode: "CM99-0001", guestName: "Test Guest", mealType: "LUNCH", serviceDate: "2099-06-17", ageGroup: "ADULT", unitPriceCents: 800, payer: "ATTENDEE", ...over,
+  });
+
+  it("has exactly the scanner's columns, in order", () => {
+    expect(scannerTicketCsvHeader.join(",")).toBe("ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes");
+  });
+
+  it("writes one scanner row per ticket with MT- ids, lowercase meal, day, date, type and price", () => {
+    const [row] = scannerTicketCsvRows([ticket()]);
+    expect(row).toEqual(["MT-01234", "CM99-0001", "Test Guest", "lunch", "wed", "2099-06-17", "adult", "8", "no", "", "", ""]);
+    expect(row).toHaveLength(scannerTicketCsvHeader.length);
+    expect(mealTicketId(7)).toBe("MT-00007");
+    expect(mealTicketId(123456)).toBe("MT-123456");
+  });
+
+  it("prices: whole dollars, decimals when cents remain, zero when the conference pays", () => {
+    expect(scannerPrice(700, "ATTENDEE")).toBe("7");
+    expect(scannerPrice(750, "ATTENDEE")).toBe("7.50");
+    expect(scannerPrice(0, "ATTENDEE")).toBe("0");
+    expect(scannerPrice(800, "CONFERENCE")).toBe("0");
+    expect(scannerTicketCsvRows([ticket({ ageGroup: "CHILD", unitPriceCents: 600 })])[0]!.slice(6, 8)).toEqual(["child", "6"]);
+  });
+
+  it("takes the day and date from the event-local calendar date, not an instant", () => {
+    expect(scannerMealDay("2099-06-16")).toBe("tue");
+    expect(scannerMealDay("2099-06-20")).toBe("sat");
+    expect(scannerMealDay("")).toBe("");
+    // A late supper is the next day in UTC; the stored service date (event time) still decides the day.
+    expect(scannerTicketCsvRows([ticket({ mealType: "SUPPER", serviceDate: "2099-06-16" })])[0]!.slice(4, 6)).toEqual(["tue", "2099-06-16"]);
+    expect(scannerTicketCsvRows([ticket({ serviceDate: "" })])[0]!.slice(4, 6)).toEqual(["", ""]);
+  });
+
+  it("sorts by meal date, meal, registration, then guest (undated tickets last)", () => {
+    const rows = scannerTicketCsvRows([
+      ticket({ number: 1, serviceDate: "", mealType: "BREAKFAST" }),
+      ticket({ number: 2, serviceDate: "2099-06-17", mealType: "SUPPER" }),
+      ticket({ number: 3, serviceDate: "2099-06-17", mealType: "BREAKFAST", confirmationCode: "CM99-0002", guestName: "B Guest" }),
+      ticket({ number: 4, serviceDate: "2099-06-17", mealType: "BREAKFAST", confirmationCode: "CM99-0002", guestName: "A Guest" }),
+      ticket({ number: 5, serviceDate: "2099-06-16", mealType: "SUPPER" }),
+    ]);
+    expect(rows.map((row) => row[0])).toEqual(["MT-00005", "MT-00004", "MT-00003", "MT-00002", "MT-00001"]);
+  });
+
+  it("defuses spreadsheet formulas in the guest name", () => {
+    const csv = toCsv([[...scannerTicketCsvHeader], ...scannerTicketCsvRows([ticket({ guestName: "=HYPERLINK(\"x\")" })])]);
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(csv.split("\r\n")[0]).toBe(scannerTicketCsvHeader.map((name) => `"${name}"`).join(","));
+  });
+});
+
+describe("meal ticket number migration (#916)", () => {
+  const sql = readFileSync("prisma/migrations/20261021110000_meal_ticket_numbers/migration.sql", "utf8");
+
+  it("is additive, unique per event, and backfills deterministically", () => {
+    expect(sql).not.toMatch(/DROP\s+(TABLE|COLUMN|TYPE)/i);
+    expect(sql).toContain(`CREATE UNIQUE INDEX "EventMealTicket_eventId_number_key" ON "EventMealTicket"("eventId", "number")`);
+    expect(sql).toContain(`ORDER BY s."createdAt", s."id", u.unit`);
   });
 });
 

@@ -200,6 +200,9 @@ jobs:
       # Real-database check of meals (#210): the Camp Meeting services and prices, form tickets recorded as selections and followed through an amendment, staff orders priced and posted as MEAL adjustment lines, quantity and plan changes, substitution on a paid registration (charge first), complimentary roles, conference-paid entitlement that keeps paid extras, walk-up orders and capacity, service and registration cancellation, a removed attendee's meals credited, the append-only ledger and histories, clone safety, the backfill script and event deletion.
       - run: npm run test:meals
 
+      # Real-database check of the café scanner's meal ticket export (#916): one row per ticket in the scanner's columns, stable MT- ids across exports, quantity increases and decreases, cancellation and concurrent orders (a number is never reused or duplicated), day and date in event time, a repaired selection with no tickets, the kept summary CSV and event deletion.
+      - run: npm run test:meal-ticket-export
+
       # Real-database check of the reservation deposit (#415): a staff check deposit and a card deposit racing for one registration (including a card transaction that read first while the check commits) leave exactly one counted deposit, the late one held as a duplicate charge or refused, the card fee only on the deposit, and one audit row.
       - run: npm run test:reservation-deposit
 

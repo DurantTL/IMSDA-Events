@@ -449,6 +449,80 @@ export function mealTicketCsvRow(row: MealTicketRow): string[] {
   ];
 }
 
+// ---------------------------------------------------------------------------
+// The café scanner's import file (#916): one row per ticket, stable ticket ids
+// ---------------------------------------------------------------------------
+
+/** The scanner's columns, in its order. The scanner fills redeemed_at and redeemed_by; notes is always empty. */
+export const scannerTicketCsvHeader = [
+  "ticket_id", "reg_id", "guest_name", "meal_type", "meal_day", "meal_date", "ticket_type", "price", "redeemed", "redeemed_at", "redeemed_by", "notes",
+] as const;
+
+/** The meal types the scanner knows, in service order. Snacks and other services are not scanner tickets. */
+export const scannerMealTypes = ["BREAKFAST", "LUNCH", "SUPPER"] as const satisfies readonly MealTypeValue[];
+
+export type ScannerTicket = {
+  /** The event-unique number kept in EventMealTicket. */
+  number: number;
+  confirmationCode: string;
+  guestName: string;
+  mealType: MealTypeValue;
+  /** The event-local service date (YYYY-MM-DD); empty for a ticket good for any service of the meal type. */
+  serviceDate: string;
+  ageGroup: MealAgeGroupValue | null;
+  unitPriceCents: number;
+  payer: MealPayerValue;
+};
+
+/** `MT-` and the number, at least five digits: `MT-01234`. The number is stored, so the id never changes. */
+export function mealTicketId(number: number): string {
+  return `MT-${String(number).padStart(5, "0")}`;
+}
+
+const dayCodes = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+/**
+ * The three-letter lowercase weekday of an event-local calendar date. The service date is already a calendar date in
+ * the event's time zone, so the weekday is read from the date itself (never from an instant converted in the server's zone).
+ */
+export function scannerMealDay(serviceDate: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) return "";
+  const day = new Date(`${serviceDate}T12:00:00Z`);
+  return Number.isNaN(day.getTime()) ? "" : dayCodes[day.getUTCDay()]!;
+}
+
+/** Whole dollars when the cents are 0 (`8`), otherwise a decimal (`7.50`). Zero when the conference pays. */
+export function scannerPrice(unitPriceCents: number, payer: MealPayerValue): string {
+  const cents = payer === "CONFERENCE" ? 0 : Math.max(0, Math.round(unitPriceCents));
+  return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
+}
+
+/** Rows sorted by meal date (undated last), meal, registration, guest, then ticket number. */
+export function scannerTicketCsvRows(tickets: readonly ScannerTicket[]): string[][] {
+  const mealOrder = (mealType: MealTypeValue) => scannerMealTypes.indexOf(mealType as (typeof scannerMealTypes)[number]);
+  const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const sorted = [...tickets].sort((a, b) =>
+    compare(a.serviceDate || "9999-99-99", b.serviceDate || "9999-99-99")
+    || mealOrder(a.mealType) - mealOrder(b.mealType)
+    || compare(a.confirmationCode, b.confirmationCode)
+    || compare(a.guestName, b.guestName)
+    || a.number - b.number);
+  return sorted.map((ticket) => [
+    mealTicketId(ticket.number),
+    ticket.confirmationCode,
+    ticket.guestName,
+    ticket.mealType.toLowerCase(),
+    scannerMealDay(ticket.serviceDate),
+    ticket.serviceDate,
+    ticket.ageGroup === "CHILD" ? "child" : "adult",
+    scannerPrice(ticket.unitPriceCents, ticket.payer),
+    "no",
+    "",
+    "",
+    "",
+  ]);
+}
+
 const liveStatuses = ["SUBMITTED", "CONFIRMED"];
 /** A registration still counts for meals (capacity, the café CSV, totals) while it is submitted or confirmed. */
 export const isLiveRegistrationStatus = (status: string) => liveStatuses.includes(status);
