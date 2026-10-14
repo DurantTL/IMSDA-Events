@@ -9,7 +9,6 @@ import type { PendingReminderBatch, PendingReminders } from "@/modules/calendar/
 type ApiResult = Partial<PendingReminders> & {
   message?: string;
   sent?: number;
-  optedOut?: number;
   reminders?: PendingReminders;
 };
 
@@ -32,7 +31,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
   async function refresh() {
     const response = await fetch("/api/admin/calendar/deadline-reminders");
     const result = await response.json().catch(() => ({})) as ApiResult;
-    if (response.ok && result.batches) setState({ batches: result.batches, emailConfigured: result.emailConfigured ?? false, repeatingDeadlines: result.repeatingDeadlines ?? 0 });
+    if (response.ok && result.batches) setState({ batches: result.batches, emailConfigured: result.emailConfigured ?? false });
   }
 
   async function act(batch: PendingReminderBatch, body: { action: "send"; fingerprint: string } | { action: "dismiss" }) {
@@ -72,16 +71,12 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
       </div>
       <p className="field-help">
         Two weeks and two days before each deadline, a reminder is prepared for every club director and Area Coordinator.
+        A deadline that repeats is reminded for each occurrence, but only at the points that fall after the previous occurrence
+        (after its first occurrence, a weekly deadline gets the 2-day reminder only, and a daily one none).
         Nothing is emailed until you send it here. If a deadline changes or is cancelled first, its reminder follows or is withdrawn.
       </p>
       {!state.emailConfigured && (
         <div className="inline-notice error" role="alert">Account email isn&apos;t set up on this server, so reminders can&apos;t be sent yet.</div>
-      )}
-      {state.repeatingDeadlines > 0 && (
-        <div className="inline-notice" role="note">
-          Repeating deadlines are listed for clubs but don&apos;t get reminder emails.
-          {" "}{state.repeatingDeadlines === 1 ? "One deadline repeats." : `${state.repeatingDeadlines} deadlines repeat.`}
-        </div>
       )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
@@ -107,7 +102,6 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
                     <span className="status-chip gold">Waiting for you</span>
                     <span className="status-chip">{batch.recipientCount} {batch.recipientCount === 1 ? "person" : "people"}</span>
                     <span className="status-chip neutral">{batch.clubRecipients} club, {batch.areaRecipients} area</span>
-                    {batch.optedOutCount > 0 && <span className="status-chip neutral">{batch.optedOutCount} opted out</span>}
                   </span>
                   <details>
                     <summary>Preview the email</summary>

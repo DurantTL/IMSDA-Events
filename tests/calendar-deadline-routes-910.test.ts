@@ -55,7 +55,7 @@ beforeEach(() => {
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.requireSystemAdministrator.mockResolvedValue({ id: "admin-1" });
   mocks.listPendingReminderBatches.mockResolvedValue({ batches: [], emailConfigured: true });
-  mocks.sendReminderBatch.mockResolvedValue({ sent: 2, optedOut: 1, messageIds: ["m1", "m2"] });
+  mocks.sendReminderBatch.mockResolvedValue({ sent: 2, messageIds: ["m1", "m2"] });
   mocks.dismissReminderBatch.mockResolvedValue(undefined);
   mocks.processAccountEmailQueue.mockResolvedValue({ sentIds: ["m1", "m2"] });
 });
@@ -94,7 +94,7 @@ describe("POST /api/admin/calendar/deadline-reminders/[batchId]", () => {
   it("sends with one action, naming the administrator, and delivers only after the response", async () => {
     const response = await post({ action: "send", fingerprint });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ sent: 2, optedOut: 1 });
+    expect(await response.json()).toMatchObject({ sent: 2 });
     expect(mocks.sendReminderBatch).toHaveBeenCalledWith("batch-1", { fingerprint }, "admin-1");
     // Nothing has been handed to the delivery queue yet; it runs after the response.
     expect(mocks.processAccountEmailQueue).not.toHaveBeenCalled();

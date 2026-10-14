@@ -40,7 +40,7 @@ async function postHandler(request: Request, { params }: Context) {
         logError("Deadline reminders were queued but not delivered after the response.", error, { count: result.messageIds.length });
       }
     });
-    return Response.json({ sent: result.sent, optedOut: result.optedOut, reminders: await listPendingReminderBatches() });
+    return Response.json({ sent: result.sent, reminders: await listPendingReminderBatches() });
   } catch (error) {
     return calendarApiError(error, "Updating a deadline reminder");
   }

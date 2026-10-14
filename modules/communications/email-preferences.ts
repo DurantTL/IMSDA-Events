@@ -25,10 +25,11 @@ export const DEADLINE_REMINDER_TEMPLATE_KEY = "DEADLINE_REMINDER";
 
 /**
  * Whether deadline reminders honour an opt-out of ALL IMSDA Events announcements, both when staff preview and send a
- * batch and again at delivery. The one switch for that decision: return false here and reminders ignore opt-outs.
+ * batch and again at delivery. The one switch for that decision. Deadlines count as essential (owner decision, #915),
+ * so it is false: reminders go to everyone, and only provider suppression (bounces, complaints) stops one.
  */
 export function deadlineRemindersHonourAnnouncementOptOut() {
-  return true;
+  return false;
 }
 
 /** Only these template keys can be opted out of. Everything else is sent regardless. */

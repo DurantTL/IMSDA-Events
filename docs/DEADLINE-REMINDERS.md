@@ -53,8 +53,31 @@ due date) and due date; unique on (entry, point, due date), so the same deadline
 point and date is never prepared twice. A sent or dismissed batch is final for that
 due date: if the date moves (even to next year) the point is prepared again for the
 new date. Eligible deadlines are published, not hidden, not removed from their
-feed, status SCHEDULED, one-off (a repeating deadline has no single due date, so
-it gets the list but no reminders; the reminders tab and the entry editor say so), and not yet due.
+feed, status SCHEDULED, and not yet due.
+
+**Repeating deadlines (#915)** are reminded for each occurrence. The occurrences
+come from the calendar's own recurrence expansion (`expandOccurrences` in
+`modules/calendar/recurrence.ts`, also used by the public calendar, feeds and the
+deadline list), as calendar dates in America/Chicago, so a daylight-saving change
+never moves one, and skipped dates (exceptions) get no reminder. Each reconcile
+looks at the **next** occurrence on or after today (its due date is its last day)
+and prepares that occurrence's latest reached point, exactly as for a one-off
+deadline. The batch is keyed on (entry, point, due date), so each occurrence has
+its own batch and the same occurrence is never prepared twice. A waiting batch for
+an occurrence that has passed (or was skipped, or whose rule changed) is withdrawn;
+a sent or dismissed one stays as history. Only a 28-day window around
+today is expanded (a point is reached at most 14 days before its due date), so a
+long-running daily rule is cheap. A repeating deadline's point is prepared only if
+the point's date falls after the previous occurrence's due date, so closely spaced
+occurrences do not produce a batch that is withdrawn days later: after the
+series' first occurrence (which has no previous one and gets both points), a
+weekly (or every-other-week) deadline gets only the 2-day reminder, a daily one
+none, and a monthly one both. When no occurrence is within reach, a waiting batch
+is withdrawn as "moved later" only if a later occurrence exists; if the series has
+ended (UNTIL or COUNT used up) the reason says no occurrence is left. The reminders tab says so. Occurrences are never moved onto one
+another the way a one-off deadline's waiting batch follows a new date. Existing
+calendar items are not re-typed: staff mark an existing "due" item as a Deadline
+themselves.
 
 - **When:** a point is reached at conference midnight of `due - 14` / `due - 2`
   (calendar-date arithmetic, so daylight saving cannot move it). Only the latest
@@ -71,12 +94,13 @@ it gets the list but no reminders; the reminders tab and the entry editor say so
 - **Who:** every account with an active role on an active club (Director, Deputy,
   Registrar, Reporter: all have portal access) and every lasting Area Coordinator
   (a system administrator's temporary "act as" grant is not one), on an active,
-  verified, enabled account. One email per person. People who opted out of **all**
-  IMSDA Events announcements are left out and counted, and the opt-out is checked
-  again at delivery (a person who opts out after Send ends SUPPRESSED). Both go
-  through `deadlineRemindersHonourAnnouncementOptOut()` in
-  `email-preferences.ts`, the one switch if the owner decides reminders ignore
-  opt-outs. Provider-level suppression still applies at delivery.
+  verified, enabled account. One email per person. Deadlines count as essential
+  (owner decision, Oct 14, 2026): people who opted out of **all** IMSDA Events
+  announcements are still reminded, and are neither left out nor counted, in the
+  preview or at delivery. The one switch is
+  `deadlineRemindersHonourAnnouncementOptOut()` in `email-preferences.ts`, now
+  false. Provider-level suppression (bounces and complaints) still applies at
+  delivery and is never mailed.
 - **Approval (human gate):** a **system administrator** reviews the subject, text
   and recipient count in the calendar admin's **Deadline reminders** tab and clicks
   Send (or Don't send). This is the same gate as the calendar admin itself and the

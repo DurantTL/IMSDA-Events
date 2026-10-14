@@ -108,7 +108,7 @@ export function CalendarAdminWorkspace({
   initialEntries,
   initialEvents,
   initialFeeds = [],
-  initialReminders = { batches: [], emailConfigured: true, repeatingDeadlines: 0 },
+  initialReminders = { batches: [], emailConfigured: true },
 }: {
   initialEntries: CalendarAdminEntry[];
   initialEvents: CalendarAdminEvent[];
@@ -716,9 +716,6 @@ function EntryForm({
         </label>
       </div>
       <RepeatEditor draft={repeat} onChange={setRepeat} onSkippedChange={setSkipped} skipped={skipped} startsOn={startsOn} />
-      {entryType === "DEADLINE" && repeat.frequency !== "NEVER" && (
-        <p className="calendar-repeat-hint" role="note">Repeating deadlines are listed for clubs but don&apos;t get reminder emails.</p>
-      )}
       <label>
         Link for more information (optional)
         <input defaultValue={entry?.linkUrl ?? ""} maxLength={500} name="linkUrl" placeholder="https://" type="url" />
