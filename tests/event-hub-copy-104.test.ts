@@ -11,7 +11,10 @@ import { sanitizeSourceForClone, type SourceConfiguration } from "@/modules/even
 
 vi.mock("server-only", () => ({}));
 
-const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), listEventsForUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), listEventsForUser: vi.fn(), matchingRegistrationIds: vi.fn() }));
+vi.mock("@/modules/attendee-accounts/registrations-repository", () => ({
+  matchingRegistrationIdsForVerifiedEmail: mocks.matchingRegistrationIds,
+}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/events/repository", () => ({ listEventsForUser: mocks.listEventsForUser }));
 
@@ -133,13 +136,75 @@ describe("the hub record exposes the copy fields (#104)", () => {
     expect(result?.hub.event).toMatchObject({ hubTitle: "Weekend guide", hubIntro: "Welcome." });
   });
 
-  it("reads the title by slug for the document title", async () => {
-    const { getEventHubTitleBySlug } = await import("@/modules/attendee-accounts/event-hub-repository");
-    const findUnique = vi.fn().mockResolvedValue({ hubTitle: "Weekend guide" });
-    mocks.getPrisma.mockReturnValue({ event: { findUnique } });
-    await expect(getEventHubTitleBySlug("synthetic-weekend")).resolves.toBe("Weekend guide");
-    expect(findUnique).toHaveBeenCalledWith({ where: { slug: "synthetic-weekend" }, select: { hubTitle: true } });
-    mocks.getPrisma.mockReturnValue({ event: { findUnique: vi.fn().mockResolvedValue(null) } });
-    await expect(getEventHubTitleBySlug("missing")).resolves.toBeNull();
+});
+
+describe("the document title never leaks a custom hub title (#104)", () => {
+  const draftRow = { hubTitle: "Secret draft guide" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.matchingRegistrationIds.mockResolvedValue(["registration-1"]);
+  });
+
+  async function loadViewerTitle() {
+    return (await import("@/modules/attendee-accounts/event-hub-repository")).getEventHubTitleForViewer;
+  }
+
+  function attendeeEvent() {
+    return {
+      id: "event-1", slug: "synthetic-weekend", name: "Synthetic Weekend",
+      startsAt: new Date("2026-10-09T21:00:00.000Z"), endsAt: new Date("2026-10-11T17:00:00.000Z"),
+      timezone: "America/Chicago", location: null, supportContact: null,
+      hubTitle: "Weekend guide", hubIntro: null, announcements: [], contentSections: [],
+      registrations: [{ id: "registration-1", confirmationCode: "SYN-1", status: "CONFIRMED", attendees: [] }],
+    };
+  }
+
+  it("returns the custom title to a registered attendee of a published event", async () => {
+    const getEventHubTitleForViewer = await loadViewerTitle();
+    mocks.getPrisma.mockReturnValue({
+      event: {
+        findUnique: vi.fn().mockResolvedValue(attendeeEvent()),
+        findFirst: vi.fn().mockResolvedValue({ hubTitle: "Weekend guide" }),
+      },
+      programAssignmentRun: { findMany: vi.fn().mockResolvedValue([]) },
+    });
+    await expect(
+      getEventHubTitleForViewer({ eventSlug: "synthetic-weekend", attendeeEmail: "guest@example.test" }),
+    ).resolves.toBe("Weekend guide");
+  });
+
+  it("gives an attendee of a draft event no custom title", async () => {
+    const getEventHubTitleForViewer = await loadViewerTitle();
+    const findFirst = vi.fn().mockResolvedValue(null);
+    mocks.getPrisma.mockReturnValue({
+      event: { findUnique: vi.fn().mockResolvedValue(attendeeEvent()), findFirst },
+      programAssignmentRun: { findMany: vi.fn().mockResolvedValue([]) },
+    });
+    const title = await getEventHubTitleForViewer({ eventSlug: "synthetic-weekend", attendeeEmail: "guest@example.test" });
+    expect(title).toBeNull();
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: "synthetic-weekend", isPublished: true } }));
+    expect(resolveEventHubCopy({ hubTitle: title }).documentTitle).toBe(DEFAULT_EVENT_HUB_TITLE);
+  });
+
+  it("gives an unrelated visitor (not registered, or signed out) the default title", async () => {
+    const getEventHubTitleForViewer = await loadViewerTitle();
+    const findFirst = vi.fn().mockResolvedValue(draftRow);
+    mocks.getPrisma.mockReturnValue({ event: { findUnique: vi.fn().mockResolvedValue({ ...attendeeEvent(), registrations: [] }), findFirst } });
+    await expect(
+      getEventHubTitleForViewer({ eventSlug: "synthetic-weekend", attendeeEmail: "stranger@example.test" }),
+    ).resolves.toBeNull();
+    await expect(getEventHubTitleForViewer({ eventSlug: "synthetic-weekend" })).resolves.toBeNull();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+
+  it("gives staff without access to the event the default title, and staff with access the title", async () => {
+    const getEventHubTitleForViewer = await loadViewerTitle();
+    const row = { ...attendeeEvent(), hubTitle: "Weekend guide" };
+    mocks.getPrisma.mockReturnValue({ event: { findUnique: vi.fn().mockResolvedValue(row) } });
+    mocks.listEventsForUser.mockResolvedValue([]);
+    await expect(getEventHubTitleForViewer({ eventSlug: "synthetic-weekend", staffUser: { id: "user-1" } })).resolves.toBeNull();
+    mocks.listEventsForUser.mockResolvedValue([row]);
+    await expect(getEventHubTitleForViewer({ eventSlug: "synthetic-weekend", staffUser: { id: "user-1" } })).resolves.toBe("Weekend guide");
   });
 });

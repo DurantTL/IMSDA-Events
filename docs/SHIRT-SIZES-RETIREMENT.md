@@ -95,3 +95,18 @@ Each step is its own issue and PR. Do not combine them.
 Pricing (paid shirts), capacity or inventory, bulk communications (the request
 batch and its replacement), and any production data migration are human-approved.
 Automation prepares reviewable code and runbooks only.
+
+## Known event-specific leftovers (not part of this retirement)
+
+Shared code still carries event-specific names and copy from the 2026 event
+systems. They were left alone on purpose and are tracked here so a pull request
+can name them:
+
+- "Camporee club reports" (`clubReports` in `components/staff-navigation.ts`).
+  The owner has not decided whether to rename it, so it stays.
+- The Camp Meeting presets (`modules/meals/camp-meeting.ts` and the Camp Meeting
+  defaults in the meals, lodging, cancellation-policy and event-template
+  starters).
+- The WR26 importer copy (`modules/imports/wr26-bundle.ts`,
+  `modules/imports/google-sheets.ts`, `components/import-workspace.tsx` and
+  `scripts/imports/README.md`). It describes a one-time legacy import.

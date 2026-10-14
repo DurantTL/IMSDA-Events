@@ -245,6 +245,22 @@ describe("legacy shirt-size modules stay behind the merchandise boundary (#104)"
     expect(offenders).toEqual([]);
   });
 
+  it("keeps the audience modules out of client bundles (no \"use client\" file imports them)", () => {
+    // The audience builder uses node:crypto and is not marked `server-only` (the tsx script runs it),
+    // so this is the enforcement: a client component must never import it or its boundary file.
+    const audienceSpecifier = /["'`][^"'`]*(?:legacy-shirt-size-audience-compat|communications\/shirt-size-audience|\.\/shirt-size-audience)["'`]/;
+    const offenders: string[] = [];
+    for (const root of ["modules", "components", "app", "lib"]) {
+      for (const file of listFiles(path.join(repoRoot, root))) {
+        if (!/\.(ts|tsx|mts)$/.test(file)) continue;
+        const source = readFileSync(file, "utf8");
+        if (!/^\s*["']use client["']/m.test(source.slice(0, 400))) continue;
+        if (audienceSpecifier.test(source)) offenders.push(path.relative(repoRoot, file).split(path.sep).join("/"));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("detects a direct import (the guard itself works)", () => {
     expect(importsLegacy(`import { x } from "@/modules/registrations/shirt-sizes";`)).toHaveLength(1);
     expect(importsLegacy(`const m = await import("@/modules/communications/shirt-size-audience");`)).toHaveLength(1);

@@ -19,13 +19,13 @@ import { AttendeeCommunityBoard } from "@/components/attendee-community-board";
 import { AttendeePassGrid } from "@/components/attendee-pass-grid";
 import { BrandMark } from "@/components/brand-mark";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSecondStepPending, requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { splitParagraphs } from "@/modules/communications/account-banner-domain";
 import {
   getAttendeeEventHub,
-  getEventHubTitleBySlug,
+  getEventHubTitleForViewer,
   getStaffEventHubPreview,
   type AttendeeEventHub,
 } from "@/modules/attendee-accounts/event-hub-repository";
@@ -39,12 +39,23 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ eventSlug: string }>;
+  searchParams: Promise<{ preview?: string }>;
 }): Promise<Metadata> {
-  const { eventSlug } = await params;
-  // The title is the event's own setting (#104); a failed lookup keeps the default.
-  const hubTitle = await getEventHubTitleBySlug(eventSlug).catch(() => null);
+  const [{ eventSlug }, query] = await Promise.all([params, searchParams]);
+  // The custom title is the event's own setting (#104), shown only to a viewer the page itself would
+  // serve: staff previewing an event they can access, or an attendee registered for a published event.
+  // Anyone else, and any failed lookup, gets the default title.
+  const hubTitle = await (async () => {
+    const [attendeeSession, staffSession] = await Promise.all([getCurrentAttendee(), getCurrentSession()]);
+    if (query.preview === "staff" && staffSession.user) {
+      return getEventHubTitleForViewer({ eventSlug, staffUser: staffSession.user });
+    }
+    if (!attendeeSession.account || (await attendeeSecondStepPending())) return null;
+    return getEventHubTitleForViewer({ eventSlug, attendeeEmail: attendeeSession.account.verifiedEmail });
+  })().catch(() => null);
   return {
     title: resolveEventHubCopy({ hubTitle }).documentTitle,
     description: "Your event schedule, updates, resources, and assigned sessions.",
