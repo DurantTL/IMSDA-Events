@@ -7,8 +7,8 @@ import { resetServerEnvCache } from "@/lib/env";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 
 /**
- * Deadline reminders at the delivery step (#910): an opt-out of ALL announcements recorded after staff clicked Send
- * (while the reminder waited in the queue) is still honoured, ending the row SUPPRESSED. A synthetic outbox row goes
+ * Deadline reminders at the delivery step (#910, #915): an opt-out of ALL announcements no longer stops a reminder
+ * (the owner counts deadlines as essential), and is not even looked up. A synthetic outbox row goes
  * through the real delivery loop with a fake database and a fake provider.
  */
 const configuration = { apiKey: "re_test_only", apiUrl: "https://api.resend.test" };
@@ -90,19 +90,24 @@ afterEach(() => {
   resetServerEnvCache();
 });
 
-describe("deadline reminders and opt-outs at delivery (#910)", () => {
-  it("does not send to an address that opted out of all announcements after Send, and records why", async () => {
+describe("deadline reminders and opt-outs at delivery (#910, #915)", () => {
+  it("sends to an address that opted out of all announcements: deadlines are essential", async () => {
     const state = store();
     const lookup = vi.fn(async () => "ALL" as const);
     const { sendEmail, done } = run(state, lookup);
-    expect((await done).sentIds).toEqual([]);
-    expect(sendEmail).not.toHaveBeenCalled();
-    expect(state.message.status).toBe("SUPPRESSED");
-    expect(String(state.message.lastError)).toMatch(/opted out of all .*deadline reminder was not sent/i);
-    // No event: only an opt-out of everything can match, never one for a particular event.
-    expect(lookup).toHaveBeenCalledWith("director@example.test", "");
-    expect(state.auditRows).toEqual([expect.objectContaining({ action: "DEADLINE_REMINDER_SKIPPED_OPTED_OUT", metadata: { messageId: "reminder-1", scope: "ALL" } })]);
-    expect(JSON.stringify(state.auditRows)).not.toContain("director@example.test");
+    expect((await done).sentIds).toEqual(["reminder-1"]);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    // The opt-out is not even looked up, so a failing lookup cannot hold a reminder back either.
+    expect(lookup).not.toHaveBeenCalled();
+    expect(state.message.status).not.toBe("SUPPRESSED");
+    expect(state.auditRows).toEqual([]);
+  });
+
+  it("is not held back when the opt-out lookup is unavailable", async () => {
+    const state = store();
+    const { sendEmail, done } = run(state, async () => { throw new Error("database unavailable"); });
+    expect((await done).sentIds).toEqual(["reminder-1"]);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 
   it.each(["CLUB_INVITE", "LOCATION_WAITLIST_DIGEST"])("an opt-out of all announcements does not stop other event-less mail (%s)", async (templateKey) => {
@@ -113,20 +118,5 @@ describe("deadline reminders and opt-outs at delivery (#910)", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(lookup).not.toHaveBeenCalled();
     expect(state.message.status).not.toBe("SUPPRESSED");
-  });
-
-  it("sends when nobody opted out", async () => {
-    const state = store();
-    const { sendEmail, done } = run(state, async () => null);
-    expect((await done).sentIds).toEqual(["reminder-1"]);
-    expect(sendEmail).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not send when the opt-out cannot be checked (fails closed, retried later)", async () => {
-    const state = store();
-    const { sendEmail, done } = run(state, async () => { throw new Error("database unavailable"); });
-    expect((await done).sentIds).toEqual([]);
-    expect(sendEmail).not.toHaveBeenCalled();
-    expect(state.message.status).not.toBe("SENT");
   });
 });

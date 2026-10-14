@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { calendarDateIn } from "@/modules/calendar/domain";
+import { expandOccurrences, parseRepeatRule } from "@/modules/calendar/recurrence";
 import {
   buildDeadlineReminderEmail,
   dueLabel,
@@ -22,6 +23,11 @@ import { deadlineRemindersHonourAnnouncementOptOut } from "@/modules/communicati
  * gets a reminder batch prepared 14 and 2 days before its due date (conference
  * time zone), for every active club role holder and every Area Coordinator.
  *
+ * A repeating deadline is reminded for each occurrence: only the next
+ * occurrence's latest reached point is prepared (occurrences come from the
+ * calendar's own recurrence expansion, in conference time), and the batch of an
+ * occurrence that has passed is withdrawn.
+ *
  * Preparing a batch sends nothing. A batch waits until a system administrator
  * (the same gate as the calendar admin and the club-invite Send) reviews its
  * subject, text and recipient count and sends it with one click, which queues
@@ -33,7 +39,9 @@ import { deadlineRemindersHonourAnnouncementOptOut } from "@/modules/communicati
  *   final, a withdrawn one can be prepared again when the deadline qualifies.
  * - The outbox rows are event-less account email, like the club invites and the
  *   location waitlist digest, delivered by the same queue and sweep.
- * - Recipients who opted out of all announcements are left out, counted.
+ * - Deadlines count as essential (owner decision, #915): people who opted out of
+ *   announcements are still reminded. Provider suppression (bounces and
+ *   complaints) still applies at delivery.
  */
 
 export class DeadlineReminderError extends Error {
@@ -70,16 +78,15 @@ export type ReminderRecipient = {
 
 export type ReminderRecipients = {
   recipients: ReminderRecipient[];
-  /** People left out because they opted out of all IMSDA Events announcements. */
-  optedOut: number;
 };
 
 /**
  * Who a reminder goes to right now: every account holding an active role on an
  * active club, and every lasting Area Coordinator. Disabled or unverified
- * accounts, revoked or ended roles and invalid addresses are left out, one
- * person is one email however many roles they hold, and an opt-out of all
- * announcements is honoured.
+ * accounts, revoked or ended roles and invalid addresses are left out, and one
+ * person is one email however many roles they hold. An opt-out of announcements
+ * does not apply (deadlines are essential) unless the one switch
+ * `deadlineRemindersHonourAnnouncementOptOut()` is turned back on.
  */
 export async function loadReminderRecipients(client: Db, now: Date): Promise<ReminderRecipients> {
   const activeAccount = { disabledAt: null, status: "ACTIVE" as const };
@@ -129,7 +136,7 @@ export async function loadReminderRecipients(client: Db, now: Date): Promise<Rem
     .filter((email) => !optedOut.has(email))
     .sort()
     .map((email) => byEmail.get(email)!);
-  return { recipients, optedOut: emails.length - recipients.length };
+  return { recipients };
 }
 
 /** What staff approved: this batch as it reads now and this exact set of addresses. */
@@ -147,23 +154,31 @@ export function reminderFingerprint(input: {
 }
 
 const entrySelect = {
-  id: true, title: true, endsOn: true, linkUrl: true, status: true, entryType: true, isPublished: true,
+  id: true, title: true, startsOn: true, endsOn: true, repeatExceptions: true, linkUrl: true, status: true, entryType: true, isPublished: true,
   isHiddenLocally: true, sourceRemovedAt: true, repeatRule: true,
 } as const;
 
 type EntryRow = Prisma.CalendarEntryGetPayload<{ select: typeof entrySelect }>;
 
-/** Why a deadline gets no reminder right now, or null when it does (apart from whether a point is reached yet). */
-function ineligibleReason(entry: EntryRow | undefined, today: string): string | null {
-  if (!entry) return "The calendar entry was removed.";
-  if (entry.entryType !== "DEADLINE") return "The entry is no longer marked as a deadline.";
-  if (entry.status === "CANCELLED") return "The deadline was cancelled.";
-  if (entry.status === "POSTPONED") return "The deadline was postponed.";
-  if (!entry.isPublished || entry.isHiddenLocally || entry.sourceRemovedAt) return "The deadline is hidden or unpublished.";
-  // A repeating deadline has a due date per occurrence; reminders are for one-off deadlines.
-  if (entry.repeatRule) return "The deadline repeats; reminders are only prepared for one-off deadlines.";
-  if (entry.endsOn < today) return "The due date has passed.";
-  return null;
+/**
+ * The due date a deadline is reminded for right now, and why it gets no
+ * reminder (null when it does, apart from whether a point is reached yet).
+ * A one-off deadline is due on its end date. A repeating one is reminded for
+ * its next occurrence on or after today, from the calendar's own recurrence
+ * expansion (calendar dates in the conference time zone, so a daylight-saving
+ * change never moves one), skipping the dates staff skipped.
+ */
+function assess(entry: EntryRow | undefined, today: string): { reason: string | null; dueOn: string | null } {
+  const refuse = (reason: string) => ({ reason, dueOn: null });
+  if (!entry) return refuse("The calendar entry was removed.");
+  if (entry.entryType !== "DEADLINE") return refuse("The entry is no longer marked as a deadline.");
+  if (entry.status === "CANCELLED") return refuse("The deadline was cancelled.");
+  if (entry.status === "POSTPONED") return refuse("The deadline was postponed.");
+  if (!entry.isPublished || entry.isHiddenLocally || entry.sourceRemovedAt) return refuse("The deadline is hidden or unpublished.");
+  const rule = parseRepeatRule(entry.repeatRule);
+  const [next] = expandOccurrences(entry, rule, entry.repeatExceptions, today, "9999-12-31");
+  if (!next) return refuse(rule ? "No occurrence of the repeating deadline is left." : "The due date has passed.");
+  return { reason: null, dueOn: next.endsOn };
 }
 
 export type ReconcileResult = { prepared: number; updated: number; withdrawn: number };
@@ -182,7 +197,8 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
 
     const pending = await tx.deadlineReminderBatch.findMany({ where: { status: "PENDING" } });
     const candidates = await tx.calendarEntry.findMany({
-      where: { entryType: "DEADLINE", repeatRule: null, endsOn: { gte: today } },
+      // A repeating deadline can start long before today; its next occurrence is worked out below.
+      where: { entryType: "DEADLINE", OR: [{ endsOn: { gte: today } }, { repeatRule: { not: null } }] },
       select: entrySelect,
     });
     const known = new Map(candidates.map((entry) => [entry.id, entry]));
@@ -191,11 +207,13 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
       for (const entry of await tx.calendarEntry.findMany({ where: { id: { in: missingIds } }, select: entrySelect })) known.set(entry.id, entry);
     }
 
-    const points = new Map<string, DeadlineReminderPoint>();
+    // Per deadline: the occurrence being reminded (its due date) and the latest reminder point reached for it.
+    const points = new Map<string, { point: DeadlineReminderPoint; dueOn: string }>();
     for (const entry of candidates) {
-      if (ineligibleReason(entry, today)) continue;
-      const point = reminderPointFor(entry.endsOn, today);
-      if (point) points.set(entry.id, point);
+      const { reason, dueOn } = assess(entry, today);
+      if (reason || !dueOn) continue;
+      const point = reminderPointFor(dueOn, today);
+      if (point) points.set(entry.id, { point, dueOn });
     }
 
     const withdraw = async (batch: (typeof pending)[number], reason: string) => {
@@ -218,13 +236,17 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
     const stillPending = new Set<string>();
     for (const batch of pending) {
       const entry = batch.calendarEntryId ? known.get(batch.calendarEntryId) : undefined;
-      const point = batch.calendarEntryId ? points.get(batch.calendarEntryId) : undefined;
-      if (entry && point === batch.daysBefore) {
+      const current = batch.calendarEntryId ? points.get(batch.calendarEntryId) : undefined;
+      const repeating = Boolean(entry?.repeatRule);
+      // A one-off deadline's waiting batch follows its date; a repeating one's belongs to its occurrence.
+      if (entry && current?.point === batch.daysBefore && (!repeating || current.dueOn === batch.dueOn)) {
         stillPending.add(batch.id);
         continue;
       }
-      const reason = ineligibleReason(entry, today)
-        ?? (point ? "The reminder point changed with the due date; the right one was prepared." : "The due date moved later; a reminder is prepared when its time comes.");
+      const reason = assess(entry, today).reason
+        ?? (repeating && current && current.dueOn !== batch.dueOn
+          ? "That occurrence has passed or no longer applies; the next one's reminder follows."
+          : current ? "The reminder point changed with the due date; the right one was prepared." : "The due date moved later; a reminder is prepared when its time comes.");
       await withdraw(batch, reason);
     }
 
@@ -233,14 +255,16 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
     const existing = entryIds.length === 0
       ? []
       : await tx.deadlineReminderBatch.findMany({ where: { calendarEntryId: { in: entryIds } } });
-    for (const [entryId, point] of points) {
+    for (const [entryId, { point, dueOn }] of points) {
       const entry = known.get(entryId)!;
-      const snapshot = { title: entry.title, dueOn: entry.endsOn, linkUrl: entry.linkUrl };
+      const repeating = Boolean(entry.repeatRule);
+      const snapshot = { title: entry.title, dueOn, linkUrl: entry.linkUrl };
       const forPoint = existing.filter((candidate) => candidate.calendarEntryId === entryId && candidate.daysBefore === point);
       // A batch is per due date: if the date moved, an earlier due date's SENT or DISMISSED batch is history and this
       // date gets its own; a still-waiting batch for the old date simply moves along.
       const target = forPoint.find((candidate) => candidate.dueOn === snapshot.dueOn);
-      const movable = target ? undefined : forPoint.find((candidate) => candidate.status === "PENDING");
+      // A repeating deadline's occurrences are separate due dates, never moved onto one another.
+      const movable = target || repeating ? undefined : forPoint.find((candidate) => candidate.status === "PENDING");
       let activeId: string;
       if (movable) {
         activeId = movable.id;
@@ -251,7 +275,7 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
           entityType: "DeadlineReminderBatch",
           entityId: movable.id,
           summary: `Updated the ${point}-day reminder for "${entry.title}" to follow the deadline.`,
-          metadata: { daysBefore: point, previousDueOn: movable.dueOn, dueOn: entry.endsOn },
+          metadata: { daysBefore: point, previousDueOn: movable.dueOn, dueOn },
         }, tx);
       } else if (!target) {
         const created = await tx.deadlineReminderBatch.create({ data: { calendarEntryId: entryId, daysBefore: point, ...snapshot } });
@@ -262,7 +286,7 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
           entityType: "DeadlineReminderBatch",
           entityId: created.id,
           summary: `Prepared the ${point}-day reminder for "${entry.title}". It waits for staff to send it.`,
-          metadata: { daysBefore: point, dueOn: entry.endsOn },
+          metadata: { daysBefore: point, dueOn },
         }, tx);
       } else {
         activeId = target.id;
@@ -275,7 +299,7 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
               entityType: "DeadlineReminderBatch",
               entityId: target.id,
               summary: `Updated the ${point}-day reminder for "${entry.title}" to follow the deadline.`,
-              metadata: { daysBefore: point, dueOn: entry.endsOn },
+              metadata: { daysBefore: point, dueOn },
             }, tx);
           }
         } else if (target.status === "WITHDRAWN") {
@@ -290,13 +314,13 @@ export async function reconcileDeadlineReminders(now = new Date()): Promise<Reco
             entityType: "DeadlineReminderBatch",
             entityId: target.id,
             summary: `Prepared the ${point}-day reminder for "${entry.title}" again. It waits for staff to send it.`,
-            metadata: { daysBefore: point, dueOn: entry.endsOn, revived: true },
+            metadata: { daysBefore: point, dueOn, revived: true },
           }, tx);
         }
         // SENT and DISMISSED are final for this due date: the same deadline, point and date are never prepared twice.
       }
       for (const other of forPoint.filter((candidate) => candidate.id !== activeId && candidate.status === "PENDING")) {
-        await withdraw(other, "The due date moved; this reminder was replaced.");
+        await withdraw(other, repeating ? "That occurrence's reminder was replaced." : "The due date moved; this reminder was replaced.");
       }
     }
     return result;
@@ -320,7 +344,6 @@ export type PendingReminderBatch = {
   recipientCount: number;
   clubRecipients: number;
   areaRecipients: number;
-  optedOutCount: number;
   fingerprint: string;
 };
 
@@ -328,8 +351,6 @@ export type PendingReminders = {
   batches: PendingReminderBatch[];
   /** False when account email is not set up on this server, so Send would refuse. */
   emailConfigured: boolean;
-  /** Published Deadlines that repeat: listed for clubs but given no reminder emails. */
-  repeatingDeadlines: number;
 };
 
 function portalUrl(audience: ReminderAudience) {
@@ -352,12 +373,9 @@ function messageFor(batch: { title: string; dueOn: string; linkUrl: string | nul
 export async function listPendingReminderBatches(now = new Date()): Promise<PendingReminders> {
   const prisma = getPrisma();
   const today = calendarDateIn(now);
-  const [batches, audience, repeatingDeadlines] = await Promise.all([
+  const [batches, audience] = await Promise.all([
     prisma.deadlineReminderBatch.findMany({ where: { status: "PENDING" }, orderBy: [{ dueOn: "asc" }, { daysBefore: "asc" }, { id: "asc" }] }),
     loadReminderRecipients(prisma, now),
-    prisma.calendarEntry.count({
-      where: { entryType: "DEADLINE", repeatRule: { not: null }, isPublished: true, isHiddenLocally: false, sourceRemovedAt: null, status: { not: "CANCELLED" } },
-    }),
   ]);
   const emailConfigured = isAccountEmailConfigured();
   const decided = batches.length === 0
@@ -368,7 +386,6 @@ export async function listPendingReminderBatches(now = new Date()): Promise<Pend
     });
   return {
     emailConfigured,
-    repeatingDeadlines,
     batches: batches.map((batch) => {
       const preview = messageFor(batch, { name: "[recipient name]", audience: "CLUB" }, today);
       const areaPreview = messageFor(batch, { name: "[recipient name]", audience: "AREA" }, today);
@@ -390,7 +407,6 @@ export async function listPendingReminderBatches(now = new Date()): Promise<Pend
         recipientCount: audience.recipients.length,
         clubRecipients: audience.recipients.filter((recipient) => recipient.audience === "CLUB").length,
         areaRecipients: audience.recipients.filter((recipient) => recipient.audience === "AREA").length,
-        optedOutCount: audience.optedOut,
         fingerprint: reminderFingerprint({
           batchId: batch.id,
           daysBefore: batch.daysBefore,
@@ -404,7 +420,7 @@ export async function listPendingReminderBatches(now = new Date()): Promise<Pend
   };
 }
 
-export type SendReminderResult = { sent: number; optedOut: number; messageIds: string[] };
+export type SendReminderResult = { sent: number; messageIds: string[] };
 
 /**
  * The one human action: a system administrator approves a batch and its emails
@@ -434,10 +450,10 @@ export async function sendReminderBatch(
     const entry = batch.calendarEntryId
       ? await tx.calendarEntry.findUnique({ where: { id: batch.calendarEntryId }, select: entrySelect })
       : null;
-    const reason = ineligibleReason(entry ?? undefined, today);
-    const point = entry && !reason ? reminderPointFor(entry.endsOn, today) : null;
+    const { reason, dueOn: currentDueOn } = assess(entry ?? undefined, today);
+    const point = currentDueOn && !reason ? reminderPointFor(currentDueOn, today) : null;
     // A batch belongs to one due date: if it moved, this reminder is withdrawn (the next run prepares one for the new date).
-    if (reason || point !== batch.daysBefore || entry!.endsOn !== batch.dueOn) {
+    if (reason || point !== batch.daysBefore || currentDueOn !== batch.dueOn) {
       await tx.deadlineReminderBatch.update({
         where: { id: batch.id },
         data: { status: "WITHDRAWN", statusReason: reason ?? "The due date moved; this reminder no longer applies.", decidedAt: now },
@@ -453,7 +469,7 @@ export async function sendReminderBatch(
       return { kind: "withdrawn" as const };
     }
 
-    const current = { title: entry!.title, dueOn: entry!.endsOn, linkUrl: entry!.linkUrl };
+    const current = { title: entry!.title, dueOn: currentDueOn!, linkUrl: entry!.linkUrl };
     const audience = await loadReminderRecipients(tx, now);
     const fingerprint = reminderFingerprint({
       batchId: batch.id,
@@ -470,7 +486,7 @@ export async function sendReminderBatch(
     // Compare-and-set: of two clicks, exactly one gets past here (and the keys below make a repeat harmless anyway).
     const claimed = await tx.deadlineReminderBatch.updateMany({
       where: { id: batch.id, status: "PENDING" },
-      data: { status: "SENT", decidedAt: now, decidedByUserId: actorUserId, recipientCount: audience.recipients.length, optedOutCount: audience.optedOut },
+      data: { status: "SENT", decidedAt: now, decidedByUserId: actorUserId, recipientCount: audience.recipients.length },
     });
     if (claimed.count !== 1) return { kind: "notPending" as const, status: "SENT" as const };
 
@@ -505,9 +521,9 @@ export async function sendReminderBatch(
       entityType: "DeadlineReminderBatch",
       entityId: batch.id,
       summary: `Approved and sent the ${batch.daysBefore}-day reminder for "${current.title}" to ${audience.recipients.length} ${audience.recipients.length === 1 ? "person" : "people"}.`,
-      metadata: { daysBefore: batch.daysBefore, dueOn: current.dueOn, recipients: audience.recipients.length, optedOut: audience.optedOut },
+      metadata: { daysBefore: batch.daysBefore, dueOn: current.dueOn, recipients: audience.recipients.length },
     }, tx);
-    return { kind: "sent" as const, messageIds, optedOut: audience.optedOut };
+    return { kind: "sent" as const, messageIds };
   }, { timeout: 60_000, maxWait: 10_000 });
 
   switch (outcome.kind) {
@@ -522,7 +538,7 @@ export async function sendReminderBatch(
     case "noRecipients":
       throw new DeadlineReminderError("NO_RECIPIENTS", "There is nobody to send this reminder to.");
     case "sent":
-      return { sent: outcome.messageIds.length, optedOut: outcome.optedOut, messageIds: outcome.messageIds };
+      return { sent: outcome.messageIds.length, messageIds: outcome.messageIds };
   }
 }
 

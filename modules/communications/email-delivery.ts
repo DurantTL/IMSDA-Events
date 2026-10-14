@@ -435,7 +435,8 @@ async function suppressIfAnnouncementOptedOut(
   at: Date,
 ): Promise<OptOutCheckResult> {
   // A deadline reminder has no event (#910): only an opt-out of ALL announcements can apply, which an event id no
-  // row carries ("") cannot match as an EVENT one. Announcements need their event as before.
+  // row carries ("") cannot match as an EVENT one. Deadlines are essential (#915), so the switch is off and a
+  // reminder skips this check; provider suppression is checked elsewhere. Announcements need their event as before.
   const reminder = message.templateKey === DEADLINE_REMINDER_TEMPLATE_KEY;
   if (reminder ? !deadlineRemindersHonourAnnouncementOptOut() : (!isOptOutEligibleTemplate(message.templateKey) || !message.eventId)) return false;
   const optOutEventId = message.eventId ?? "";

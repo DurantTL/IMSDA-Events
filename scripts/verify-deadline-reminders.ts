@@ -22,7 +22,10 @@
  *   (two racing clicks send once), and only then does delivery run;
  * - recipients: active club roles and lasting Area Coordinators, one email per
  *   person, never revoked, ended, future, disabled, unverified, inactive-club,
- *   temporary-coordinator or opted-out (all announcements) accounts;
+ *   or temporary-coordinator accounts; a person who opted out of all
+ *   announcements is still included (deadlines are essential, #915);
+ * - repeating deadlines (#915): each occurrence gets its own batch, only the
+ *   next occurrence is prepared, a passed one is withdrawn, none is duplicated;
  * - a deadline that changes date, is cancelled, hidden or un-marked before
  *   approval updates or withdraws its batch (and an approval attempt on a
  *   withdrawn one sends nothing); a restored deadline revives the same batch.
@@ -260,16 +263,16 @@ async function main() {
     ],
   });
   await prisma.emailAnnouncementOptOut.create({ data: { normalizedEmail: emailOf("optedout"), scope: "ALL", scopeKey: "ALL", source: "verify" } });
-  const included = ["dira", "depa", "regb", "repb", "late", "both", "area"].map(emailOf).sort();
-  const excluded = ["revoked", "ended", "future", "inactiveclub", "disabled", "pending", "areatemp", "arearevoked", "optedout"].map(emailOf);
+  const included = ["dira", "depa", "regb", "repb", "late", "both", "area", "optedout"].map(emailOf).sort();
+  const excluded = ["revoked", "ended", "future", "inactiveclub", "disabled", "pending", "areatemp", "arearevoked"].map(emailOf);
 
   const baseline = await loadReminderRecipients(prisma, realNow);
   const mine = baseline.recipients.filter((recipient) => recipient.email.endsWith(`@${domain}`));
   assert(JSON.stringify(mine.map((recipient) => recipient.email)) === JSON.stringify(included), `recipients are the active role holders and lasting coordinators, one each, got ${JSON.stringify(mine.map((recipient) => recipient.email))}`);
-  assert(excluded.every((email) => !baseline.recipients.some((recipient) => recipient.email === email)), "revoked, ended, future, inactive-club, disabled, unverified, temporary-coordinator and opted-out accounts are left out");
-  assert(baseline.optedOut >= 1, "the opted-out person is counted");
+  assert(excluded.every((email) => !baseline.recipients.some((recipient) => recipient.email === email)), "revoked, ended, future, inactive-club, disabled, unverified and temporary-coordinator accounts are left out");
+  assert(mine.some((recipient) => recipient.email === emailOf("optedout")) && !("optedOut" in baseline), "the person who opted out of all announcements is included and not counted out");
   assert(mine.find((recipient) => recipient.email === emailOf("both"))?.audience === "CLUB" && mine.find((recipient) => recipient.email === emailOf("area"))?.audience === "AREA", "a person in both roles gets the club wording; a coordinator the area wording");
-  console.log("ok  recipients: active roles and lasting coordinators only, one each, opt-outs left out");
+  console.log("ok  recipients: active roles and lasting coordinators only, one each, opt-outs included");
 
   // ---- 5. Timing (fixed dates, explicit clocks in the conference time zone) --------------------------------
   const due = await create("Timing camporee due", "2026-12-05");
@@ -333,7 +336,7 @@ async function main() {
   const view = listing.batches.find((batch) => batch.id === dueBatch.id)!;
   assert(view && view.subject.includes("DLR Timing camporee due") && view.bodyText.includes("https://events.example.test/account/clubs"), "the preview shows the subject, the text and the portal link");
   const myRecipients = view.recipientCount;
-  assert(myRecipients >= included.length && view.optedOutCount >= 1, "the preview counts the recipients and the people left out");
+  assert(myRecipients >= included.length && !("optedOutCount" in view), "the preview counts the recipients and no longer counts opt-outs");
   assert(await prisma.messageOutbox.count({ where: { idempotencyKey: { startsWith: "deadline-reminder:" }, recipientEmail: { endsWith: `@${domain}` } } }) === 0, "preparing and previewing queued nothing");
   assert(delivered.length === 0, "and nothing was delivered");
 
@@ -358,15 +361,12 @@ async function main() {
   const sendAudit = await prisma.auditLog.findMany({ where: { entityType: "DeadlineReminderBatch", entityId: dueBatch.id, action: "DEADLINE_REMINDER_SENT" } });
   assert(sendAudit.length === 1 && sendAudit[0].actorUserId === adminId && !JSON.stringify(sendAudit[0]).includes(domain), "one audit row names the approver and holds no addresses");
   const mineIds = rowsSent.filter((row) => row.recipientEmail.endsWith(`@${domain}`)).map((row) => row.id);
-  // Someone opts out of all announcements after staff clicked Send, while the reminder waits in the queue.
+  // Someone opts out of all announcements after staff clicked Send, while the reminder waits in the queue: deadlines are
+  // essential (#915), so it is still delivered, along with everyone else.
   await prisma.emailAnnouncementOptOut.create({ data: { normalizedEmail: emailOf("late"), scope: "ALL", scopeKey: "ALL", source: "verify" } });
   await deliver(mineIds);
-  const deliveredTo = included.filter((email) => email !== emailOf("late"));
-  assert(deliveredTo.every((email) => delivered.includes(email)) && excluded.every((email) => !delivered.includes(email)), "delivery reaches the included addresses and no excluded one");
-  assert(!delivered.includes(emailOf("late")), "an opt-out recorded after Send is honoured at delivery");
-  const lateRow = await prisma.messageOutbox.findFirstOrThrow({ where: { id: { in: mineIds }, recipientEmail: emailOf("late") } });
-  assert(lateRow.status === "SUPPRESSED" && /deadline reminder was not sent/.test(lateRow.lastError ?? ""), `that row ends SUPPRESSED with the reason, got ${lateRow.status}`);
-  assert((await prisma.messageOutbox.findMany({ where: { id: { in: mineIds }, recipientEmail: { not: emailOf("late") } } })).every((row) => row.status === "SENT"), "the others are recorded as sent");
+  assert(included.every((email) => delivered.includes(email)) && excluded.every((email) => !delivered.includes(email)), "delivery reaches every included address, opted-out ones too, and no excluded one");
+  assert((await prisma.messageOutbox.findMany({ where: { id: { in: mineIds } } })).every((row) => row.status === "SENT"), "every row, including the opted-out people's, is recorded as sent");
   console.log("ok  nothing is queued before approval; one send queues one email per eligible person and is audited");
 
   const again = await caught(sendReminderBatch(dueBatch.id, { fingerprint: view.fingerprint }, adminId, sameClock));
@@ -416,6 +416,33 @@ async function main() {
   assert(withdrawnSend instanceof DeadlineReminderError && withdrawnSend.code === "BATCH_WITHDRAWN", `a send for a deadline cancelled after the preview is withdrawn, got ${String(withdrawnSend)}`);
   assert((await outboxOf(lateBatch.id)).length === 0 && (await batchesOf(lateEntry.id))[0].status === "WITHDRAWN", "nothing was sent and the batch is withdrawn");
   console.log("ok  an approval attempt on a deadline cancelled after the preview sends nothing");
+
+  // ---- 7b. Repeating deadlines: a batch per occurrence (#915) ----------------------------------------------
+  const weekly = await create("Repeat weekly due", "2026-10-02", { repeatRule: "FREQ=WEEKLY;BYDAY=FR;WKST=SU" });
+  const monthly = await create("Repeat monthly due", "2026-10-15", { repeatRule: "FREQ=MONTHLY" });
+  const shape = async (entryId: string) => (await batchesOf(entryId)).map((batch) => `${batch.dueOn}:${batch.daysBefore}:${batch.status}`).sort();
+  await reconcileDeadlineReminders(new Date("2026-11-25T18:00:00Z")); // Wed: next Friday is Nov 27, next 15th is Dec 15
+  assert(JSON.stringify(await shape(weekly.id)) === JSON.stringify(["2026-11-27:2:PENDING"]), `a weekly deadline's next occurrence is prepared, got ${JSON.stringify(await shape(weekly.id))}`);
+  assert((await shape(monthly.id)).length === 0, "a monthly deadline whose next occurrence is out of reach has nothing yet");
+  await reconcileDeadlineReminders(new Date("2026-11-25T18:00:00Z"));
+  await reconcileDeadlineReminders(new Date("2026-11-25T18:00:00Z"));
+  assert((await shape(weekly.id)).length === 1, "no duplicate batch for the same occurrence");
+  await reconcileDeadlineReminders(new Date("2026-11-28T18:00:00Z")); // Sat: Nov 27 has passed
+  assert(JSON.stringify(await shape(weekly.id)) === JSON.stringify(["2026-11-27:2:WITHDRAWN", "2026-12-04:14:PENDING"]), `the passed occurrence is withdrawn and the next prepared, got ${JSON.stringify(await shape(weekly.id))}`);
+  await reconcileDeadlineReminders(new Date("2026-12-02T18:00:00Z")); // Dec 15 minus 14 days is Dec 1
+  assert(JSON.stringify(await shape(monthly.id)) === JSON.stringify(["2026-12-15:14:PENDING"]), `a monthly deadline gets its own batch for its occurrence, got ${JSON.stringify(await shape(monthly.id))}`);
+  const monthlyBatch = (await batchesOf(monthly.id))[0];
+  const monthlyView = (await listPendingReminderBatches(new Date("2026-12-02T18:00:00Z"))).batches.find((batch) => batch.id === monthlyBatch.id)!;
+  assert(monthlyView && monthlyView.dueOn === "2026-12-15", "the preview lists the occurrence's due date");
+  // Across the November daylight-saving change: Saturday Oct 31 is still due at 11:59 PM CDT and has passed at midnight.
+  const saturdays = await create("Repeat saturday due", "2026-10-24", { repeatRule: "FREQ=WEEKLY;BYDAY=SA;WKST=SU" });
+  await reconcileDeadlineReminders(new Date("2026-11-01T04:59:00Z"));
+  assert(JSON.stringify(await shape(saturdays.id)) === JSON.stringify(["2026-10-31:2:PENDING"]), `Oct 31 11:59 PM CDT is still the Oct 31 occurrence, got ${JSON.stringify(await shape(saturdays.id))}`);
+  await reconcileDeadlineReminders(new Date("2026-11-01T05:00:00Z"));
+  assert(JSON.stringify(await shape(saturdays.id)) === JSON.stringify(["2026-10-31:2:WITHDRAWN", "2026-11-07:14:PENDING"]), `midnight CDT on Nov 1 moves to Nov 7, got ${JSON.stringify(await shape(saturdays.id))}`);
+  console.log("ok  repeating deadlines: a batch per occurrence, the passed one withdrawn, no duplicates, across daylight saving");
+  await prisma.deadlineReminderBatch.deleteMany({ where: { title: { startsWith: "DLR Repeat" } } });
+  await prisma.calendarEntry.deleteMany({ where: { title: { startsWith: "DLR Repeat" } } });
 
   // ---- 8. A deadline changes before approval (real clock, through the calendar's own edit path) -------------
   await prisma.calendarEntry.deleteMany({ where: { title: { startsWith: "DLR Timing" } } });
