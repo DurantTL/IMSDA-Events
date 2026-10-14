@@ -13,6 +13,7 @@ import {
   type RegistrationFormDefinition,
 } from "@/modules/forms/definition";
 import { preparePublicRegistration } from "@/modules/forms/public-domain";
+import { loadSeededFormTemplate } from "@/modules/forms/seeded-templates";
 import { loadTicketPrices } from "@/modules/meals/config-repository";
 import { applyMealPricesToDefinition, mealPriceDrift } from "@/modules/meals/domain";
 import { slugCandidate, slugify, slugMatchesTitle } from "@/modules/forms/slug";
@@ -181,8 +182,11 @@ export async function getRegistrationForm(eventId: string, formId: string) {
   return form ? serializeForm(form, attendeeTypes, directory) : null;
 }
 
-export function listFormTemplates() {
-  return formTemplates.map(({ key, name, description, audience, definition }) => ({
+/** The picker's list. Seeded templates (#153) show their synced row, so a newer seeded version is what staff see. */
+export async function listFormTemplates() {
+  const client = getPrisma();
+  const resolved = await Promise.all(formTemplates.map(async (template) => await loadSeededFormTemplate(client, template.key) ?? template));
+  return resolved.map(({ key, name, description, audience, definition }) => ({
     key, name, description, audience, collectsPayment: Boolean(definition.payment?.enabled), sectionCount: definition.sections.length,
     fieldCount: definition.sections.reduce((count, section) => count + section.fields.length, 0),
   }));
@@ -200,12 +204,15 @@ export async function createRegistrationFormFromTemplateInTransaction(
   actorUserId: string,
   templateKey: string,
 ) {
-  const template = getFormTemplate(templateKey);
+  // A seeded template (#153) is read from its synced row; the definition is copied into the new
+  // form's own version, so nothing created here is linked to the template afterwards.
+  const seeded = await loadSeededFormTemplate(tx, templateKey);
+  const template = seeded ?? getFormTemplate(templateKey);
   if (!template) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
   return createRegistrationFormFromDefinitionInTransaction(tx, eventId, actorUserId, {
     definition: template.definition,
     summary: (formName) => `Created ${formName} from the ${template.name} template.`,
-    metadata: { templateKey },
+    metadata: seeded ? { templateKey, templateVersion: seeded.version } : { templateKey },
   });
 }
 

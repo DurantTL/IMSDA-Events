@@ -84,10 +84,11 @@ describe("blank form templates (#592)", () => {
     expect(ok.isValid).toBe(true);
   });
 
-  it("chooses the blank form by event audience and leads the picker with it", () => {
+  it("chooses the blank form by event audience and leads the picker with it", async () => {
     expect(blankFormTemplateKey("CLUB")).toBe(BLANK_CLUB_FORM_KEY);
     expect(blankFormTemplateKey("GENERAL")).toBe(BLANK_FORM_KEY);
-    const templates = listFormTemplates();
+    dependencies.getPrisma.mockReturnValue({ seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null) } });
+    const templates = await listFormTemplates();
     const general = templatesForPicker(templates, "GENERAL");
     const club = templatesForPicker(templates, "CLUB");
     expect(general[0]).toMatchObject({ key: BLANK_FORM_KEY, name: "Blank form" });

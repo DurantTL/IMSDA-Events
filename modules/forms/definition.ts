@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { shirtSizeOptions } from "@/modules/registrations/shirt-sizes";
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
@@ -650,45 +651,18 @@ const manCampRegistrationPackages = [
   "Volunteer — no registration fee",
 ];
 
-const campMeetingHousingOptions = [
-  "Dorm room",
-  "RV / camper hookup",
-  "Tent campsite",
-  "No housing needed",
-];
-
-const campMeetingNights = ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-const wr26SeminarDescriptions = {
-  "Color Me Golden: Embracing Life in Every Season":
-    "Panel Discussion — Every season of a woman’s life holds unique beauty, but later chapters often bring transitions that feel like winding down. God views this stage not as a time of fading, but as a vibrant season of deep impact and fruitfulness. Come hear real stories of faith and uncover fresh avenues for kingdom purpose while exploring practical ways to transform your life experience into a lasting legacy.",
-  "Refined by Fire, Revealed in Beauty":
-    "Rita Tasche — In this seminar we will learn how hard seasons shape strength, depth and resilience. We will learn how to walk through trials without losing our faith and how to find purpose in pain while developing a strength that comes only through surrender to God.",
-  "Repainted by Grace":
-    "Valerie Haveman — So many women carry the stains of past mistakes, shame, regret, or feelings of not being enough. But God does not define us by the colors of our past. In this breakout session, we’ll explore what it means to accept God’s forgiveness, stop condemning ourselves, and allow His grace to repaint our hearts with truth, freedom, and hope. Through Scripture and personal stories, we’ll discover how God makes broken things beautiful and invites us to see ourselves through His eyes instead of our own.",
-  "Color Me Open":
-    "Mary Kendall — The door is open. Are you? And what does a root canal have to do with church hospitality? More than you’d think. Mary and her husband built Touchstone Endodontics around one mission: “Unforgettable care, start to finish” — and the same principles that turn nervous patients into raving fans can transform how we love our neighbors, our church family, and the stranger in our pew. Mary draws from business, home, and church ministry to share what she’s learning about what it means to truly see the people around us. She doesn’t have it all figured out — but she’s convinced the journey is worth taking, and she’d love some company.",
-  "Nourished by Color":
-    "Stephanie Richards — This seminar explores simple, evidence-based ways to improve overall health by focusing on colorful nutrition, regular movement, and healthy sun exposure. Participants will learn how “eating the rainbow” — incorporating a variety of brightly colored fruits and vegetables — supports immunity, heart health, gut health, and energy. The session will also highlight how daily activity and safe sunshine exposure work together with nutrition to promote long-term wellness and healthy aging.",
-  "Color Me Prayerful: Discovering the Beautiful Ways We Talk With God":
-    "Shannon Pigsley and Penny Gallant — Prayer is powerful—an intimate, ongoing conversation with a God who listens, loves, and responds. In this session, we will explore why prayer matters so deeply in our relationship and discover the many beautiful ways we can communicate with our Heavenly Father. From kneeling in quiet surrender, to praying in community, to whispering private heart-conversations throughout the day, we’ll reflect on how the privilege of prayer draws us closer to God’s heart. Participants will also have the opportunity to visit interactive prayer stations, each designed to help you experience different forms of prayer in meaningful, hands-on ways. This is a space to learn, to practice, and to rediscover the joy of talking with God in every shade of life.",
-  "Shades of Peace":
-    "Melissa Morris — This is a practical and encouraging seminar on letting go of anger and resentment while discovering the peace that comes through forgiveness in God. Together, we will explore how releasing past hurts can bring healing, restore relationships, and help us experience greater emotional and spiritual freedom.",
-  "Coloring Through the Chaos: Raising Children with Grace and Truth":
-    "Panel Discussion — Raising children today can feel unpredictable and overwhelming but God is still at work both in your child and in you. This season doesn’t require us to control every detail but does require us to guide, love and trust God with the outcome.",
-  "Broken Crayons Still Color":
-    "Domestic violence and alcohol use affect families inside and outside our church. This session is about awareness, growth and safety regarding domestic violence and alcohol use and empowering women to be the hands and feet of Jesus in our struggling world. Matthew 22: 37–39",
-  "Attending":
-    "Brushstrokes of Leadership — Ami Cook. God uses ordinary women to create extraordinary ministry. In this practical and encouraging workshop, discover how small acts of faith, kindness, and leadership become beautiful brushstrokes in God’s masterpiece. Learn creative ways to build women’s ministry in your local church, encourage connection, and lead with both grace and purpose.",
-} satisfies Record<string, string>;
-
-function wr26DescriptionsFor(options: string[]) {
-  const descriptions = wr26SeminarDescriptions as Record<string, string>;
-  return Object.fromEntries(
-    options.flatMap((option) => (
-      descriptions[option] ? [[option, descriptions[option]]] : []
-    )),
-  );
+/**
+ * Women's Retreat, Camp Meeting and Spring Camporee are seeded data (#153), not
+ * source: their definitions live in `prisma/seed-data/form-templates/` and are
+ * synced into the `SeededFormTemplate` table by `npm run form-templates:sync`.
+ * This file keeps the types, validation and generic behavior only. The bundled
+ * seed stays the in-process copy that sync checks, the Fall Camporee derivation
+ * and the unit tests read; the app creates new forms from the synced row.
+ */
+function seededFormTemplate(key: string): FormTemplate {
+  const seed = bundledSeededFormTemplates.find((entry) => entry.key === key);
+  if (!seed) throw new Error(`The seeded form template ${key} is missing from prisma/seed-data/form-templates.`);
+  return { key: seed.key, name: seed.name, description: seed.description, audience: seed.audience, definition: seed.definition };
 }
 
 export const BLANK_FORM_KEY = "blank_form";
@@ -779,56 +753,7 @@ export const formTemplates: FormTemplate[] = [
       ] }],
     },
   },
-  {
-    key: "womens_retreat_export",
-    name: "Women’s Retreat 2026",
-    description: "Primary contact, repeatable attendee roster, shirts, meals, childcare, ranked seminars, late pricing, and payment.",
-    audience: "Retreat",
-    definition: {
-      title: "Women’s Retreat 2026 registration",
-      description: "Register each attendee, rank two choices for every breakout block, and review the full amount before submitting.",
-      confirmationMessage: "Your Women’s Retreat registration has been received. Check your email for payment and edit-registration details.",
-      attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 50, attendeeLabel: "Attendee", addButtonLabel: "Add another attendee" },
-      payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true },
-      sections: [
-        { id: "wr_contact", title: "Primary contact", description: "Confirmation and emergency contact details.", fields: [
-          templateField("wr_contact_first", "primary_contact_first_name", "Primary contact first name", "TEXT", true),
-          templateField("wr_contact_last", "primary_contact_last_name", "Primary contact last name", "TEXT", true),
-          templateField("wr_email", "email", "Primary contact email", "EMAIL", true),
-          templateField("wr_phone", "phone", "Primary contact phone", "PHONE", true),
-          templateField("wr_church", "church", "Church", "SELECT", true, [], { optionSource: "CHURCHES_DIRECTORY" }),
-          templateField("wr_church_other", "church_other", "Church — not listed, or notes", "TEXT", true, [], { conditional: { fieldKey: "church", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
-          templateField("wr_emergency_name", "emergency_contact_name", "Emergency contact name", "TEXT", true),
-          templateField("wr_emergency_phone", "emergency_contact_phone", "Emergency contact phone", "PHONE", true),
-          templateField("wr_special", "special_needs", "Special needs / accessibility", "LONG_TEXT"),
-        ] },
-        { id: "wr_attendee", title: "Attendees", description: "Add each person once. Shirt, meal, childcare, and seminar answers stay with that attendee.", fields: [
-          templateField("wr_attendee_first", "first_name", "First name", "TEXT", true, [], { scope: "ATTENDEE" }),
-          templateField("wr_attendee_last", "last_name", "Last name", "TEXT", true, [], { scope: "ATTENDEE" }),
-          templateField("wr_attendee_phone", "attendee_phone", "Phone", "PHONE", false, [], { scope: "ATTENDEE" }),
-          templateField("wr_type", "attendee_type", "Attendee type", "RADIO", true, ["Adult", "Teen", "Child"], { scope: "ATTENDEE" }),
-          templateField("wr_shirt_size", "shirt_size", "T-shirt size", "SELECT", true, [...shirtSizeOptions], { scope: "ATTENDEE", helpText: "Choose the size this attendee wants for the convention shirt. The private confirmation page can be used to reconfirm it later." }),
-          templateField("wr_meal", "meal_preference", "Meal preference", "SELECT", true, ["Standard", "Vegetarian", "Vegan", "Gluten-free", "Other"], { scope: "ATTENDEE" }),
-          templateField("wr_dietary", "dietary_needs", "Dietary needs / allergies", "LONG_TEXT", false, [], { scope: "ATTENDEE" }),
-          templateField("wr_childcare", "childcare_needed", "Childcare needed?", "RADIO", false, ["No", "Yes"], { scope: "ATTENDEE" }),
-          templateField("wr_childcare_details", "childcare_details", "Childcare ages and notes", "LONG_TEXT", false, [], { scope: "ATTENDEE", conditional: { fieldKey: "childcare_needed", operator: "EQUALS", value: "Yes" } }),
-          templateField("wr_childcare_children", "childcare_children", "Number of children needing care", "NUMBER", true, [], { scope: "ATTENDEE", conditional: { fieldKey: "childcare_needed", operator: "EQUALS", value: "Yes" }, helpText: "Childcare availability will be confirmed closer to the retreat based on registered need." }),
-          templateField("wr_volunteer", "volunteer", "Willing to volunteer to help at the retreat?", "RADIO", true, ["No", "Yes"], { scope: "ATTENDEE" }),
-          templateField("wr_session_1", "session_1_preferences", "Friday 4:00–5:00 PM — rank both choices", "RANKED_CHOICE", true, ["Color Me Golden: Embracing Life in Every Season", "Refined by Fire, Revealed in Beauty"], { scope: "ATTENDEE", minSelections: 2, maxSelections: 2, availabilityMode: "RANKED_INTEREST", choiceLimits: {}, optionDescriptions: wr26DescriptionsFor(["Color Me Golden: Embracing Life in Every Season", "Refined by Fire, Revealed in Beauty"]) }),
-          templateField("wr_session_2", "session_2_preferences", "Sabbath 2:00–3:15 PM — rank two choices", "RANKED_CHOICE", true, ["Repainted by Grace", "Color Me Open", "Nourished by Color", "Color Me Prayerful: Discovering the Beautiful Ways We Talk With God"], { scope: "ATTENDEE", minSelections: 2, maxSelections: 2, availabilityMode: "RANKED_INTEREST", choiceLimits: {}, optionDescriptions: wr26DescriptionsFor(["Repainted by Grace", "Color Me Open", "Nourished by Color", "Color Me Prayerful: Discovering the Beautiful Ways We Talk With God"]) }),
-          templateField("wr_session_3", "session_3_preferences", "Sabbath 4:15–5:30 PM — rank two choices", "RANKED_CHOICE", true, ["Shades of Peace", "Coloring Through the Chaos: Raising Children with Grace and Truth", "Broken Crayons Still Color"], { scope: "ATTENDEE", minSelections: 2, maxSelections: 2, availabilityMode: "RANKED_INTEREST", choiceLimits: {}, optionDescriptions: wr26DescriptionsFor(["Shades of Peace", "Coloring Through the Chaos: Raising Children with Grace and Truth", "Broken Crayons Still Color"]) }),
-          templateField("wr_session_4", "session_4_attendance", "Sunday 8:15–9:15 AM — Brushstrokes of Leadership", "RADIO", true, ["Attending", "Not attending"], { scope: "ATTENDEE", optionDescriptions: wr26DescriptionsFor(["Attending"]) }),
-          templateField("wr_fee", "registration_fee", "Registration fee", "CALCULATED", false, [], { scope: "ATTENDEE", priceCents: 12500, latePricing: { startsOn: "2026-08-15", label: "Regular registration pricing", priceCents: 14500 } }),
-        ] },
-        { id: "wr_payment", title: "Payment & acknowledgment", description: "Choose how you would like to pay and review the final amount.", stepLabel: "Payment", isReviewStep: true, fields: [
-          templateField("wr_payment_method", "payment_method", "Payment method", "RADIO", true, ["Pay later", "Credit / debit card"]),
-          templateField("wr_promo", "promo_code", "Promo code", "TEXT", false, [], { helpText: "Enter a code supplied by the event team, then select Apply." }),
-          templateField("wr_notes", "attendee_notes", "Additional notes", "LONG_TEXT", false),
-          templateField("wr_ack", "acknowledgment", "Acknowledgment", "CHECKBOX", true, [], { placeholder: "Yes, I understand payment and edit details will be sent by email." }),
-        ] },
-      ],
-    },
-  },
+  seededFormTemplate("womens_retreat_export"),
   {
     key: "man_camp_export",
     name: "Man Camp 2026",
@@ -891,134 +816,8 @@ export const formTemplates: FormTemplate[] = [
       ],
     },
   },
-  {
-    key: "spring_camporee_export",
-    name: "Spring Camporee 2026",
-    description: "Club contact, campsite footprint, complete roster, duties, activities, meal sponsorship, milestones, and late pricing.",
-    audience: "Club / group",
-    definition: {
-      title: "Spring Camporee 2026 registration",
-      description: "Register the club once, add every attendee, and choose duties and activities for the weekend.",
-      confirmationMessage: "Your Spring Camporee registration has been received. The calculated registration amount will be invoiced.",
-      attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 50, attendeeLabel: "Club member", addButtonLabel: "Add another club member" },
-      sections: [
-        { id: "sc_club", title: "Club & contact", description: "Select the Pathfinder club and enter the director’s contact information.", fields: [
-          templateField("sc_club_name", "club_name", "Pathfinder club", "SELECT", true, [], { optionSource: "CLUBS_DIRECTORY" }),
-          templateField("sc_club_other", "club_name_other", "Club name — not listed", "TEXT", true, [], { conditional: { fieldKey: "club_name", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
-          templateField("sc_director", "director_name", "Club director", "TEXT", true),
-          templateField("sc_church", "church_name", "Church", "SELECT", false, [], { optionSource: "CHURCHES_DIRECTORY" }),
-          templateField("sc_church_other", "church_name_other", "Church — not listed", "TEXT", true, [], { conditional: { fieldKey: "church_name", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
-          templateField("sc_email", "email", "Email", "EMAIL", true),
-          templateField("sc_phone", "phone", "Mobile phone", "PHONE", true),
-        ] },
-        { id: "sc_camping", title: "Camping", description: "Describe the full campsite footprint. No generators or pets; hookups require a medical need.", fields: [
-          templateField("sc_tents", "tents", "Number of tents and sizes", "TEXT", true),
-          templateField("sc_trailers", "trailers", "Trailers", "TEXT", true),
-          templateField("sc_canopy", "kitchen_canopy", "Kitchen canopy and size", "TEXT", true),
-          templateField("sc_sqft", "total_sqft", "Total square feet needed", "NUMBER", true),
-          templateField("sc_neighbor", "camp_next_to", "Club you would like to camp next to", "TEXT"),
-        ] },
-        { id: "sc_roster", title: "Club roster", description: "Add Pathfinders, TLTs, staff, and children using full first and last names.", fields: [
-          templateField("sc_member_first", "first_name", "First name", "TEXT", true, [], { scope: "ATTENDEE" }),
-          templateField("sc_member_last", "last_name", "Last name", "TEXT", true, [], { scope: "ATTENDEE" }),
-          templateField("sc_member_age", "attendee_age", "Age", "NUMBER", true, [], { scope: "ATTENDEE" }),
-          templateField("sc_member_gender", "gender", "Gender", "SELECT", false, ["Female", "Male", "Prefer not to answer"], { scope: "ATTENDEE" }),
-          templateField("sc_member_role", "attendee_type", "Roster role", "RADIO", true, ["Pathfinder", "TLT", "Staff", "Child"], { scope: "ATTENDEE" }),
-          templateField("sc_member_first_time", "first_time_camper", "First time at Camporee?", "CHECKBOX", false, [], { scope: "ATTENDEE" }),
-          templateField("sc_member_medical_personnel", "medical_personnel", "Medical personnel?", "CHECKBOX", false, [], { scope: "ATTENDEE", conditional: { fieldKey: "attendee_type", operator: "EQUALS", value: "Staff" } }),
-          templateField("sc_member_master_guide", "master_guide_investiture", "Master Guide investiture?", "CHECKBOX", false, [], { scope: "ATTENDEE", conditional: { fieldKey: "attendee_type", operator: "EQUALS", value: "Staff" } }),
-          templateField("sc_member_dietary", "dietary_needs", "Dietary restrictions", "LONG_TEXT", false, [], { scope: "ATTENDEE" }),
-          templateField("sc_member_medical_flag", "medical_or_accessibility_need", "Has a medical or accessibility need the club director knows about", "RADIO", false, ["No", "Yes"], { scope: "ATTENDEE", helpText: "No details here — talk with your club director about any support the attendee needs." }),
-          templateField("sc_member_fee", "registration_fee", "Registration fee", "CALCULATED", false, [], { scope: "ATTENDEE", priceCents: 900, latePricing: { startsOn: "2026-04-11", label: "Late registration pricing", priceCents: 1400 } }),
-        ] },
-        { id: "sc_activities", title: "Schedule & activities", description: "Choose the club’s duties and activities. Duty choices can be given limits as assignments fill.", fields: [
-          templateField("sc_duties", "duty_areas", "Required duty area", "MULTISELECT", true, ["Flag raising / lowering", "Bathroom clean-up"], { minSelections: 1, maxSelections: 2 }),
-          templateField("sc_flag_slots", "flag_slots", "Flag raising / lowering times", "MULTISELECT", true, ["Thursday evening", "Friday morning", "Friday evening", "Saturday morning — TLTs", "Saturday evening"], { minSelections: 1, maxSelections: 5, availabilityMode: "CAPACITY", choiceLimits: {}, conditional: { fieldKey: "duty_areas", operator: "INCLUDES", value: "Flag raising / lowering" } }),
-          templateField("sc_bathroom_days", "bathroom_days", "Bathroom clean-up days", "MULTISELECT", true, ["Thursday", "Friday", "Saturday", "Sunday morning"], { minSelections: 1, maxSelections: 4, availabilityMode: "CAPACITY", choiceLimits: {}, conditional: { fieldKey: "duty_areas", operator: "INCLUDES", value: "Bathroom clean-up" } }),
-          templateField("sc_special_activities", "special_activities", "Club activities — choose at least one", "MULTISELECT", true, ["Lead mixer Thursday night at vespers", "Special music, poem or skit — Friday vespers", "Adult assist with Oregon Trail Friday afternoon", "Set up chairs in pavilion Friday 4 PM", "Lead singing around campfire at your campsite", "Special music, poem or skit — church or Sabbath School", "Bring a game and/or lead a game Saturday night"], { minSelections: 1, maxSelections: 5 }),
-          templateField("sc_friday_type", "friday_special_type", "Friday vespers contribution", "RADIO", true, ["Special music", "Poem", "Skit"], { conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Special music, poem or skit — Friday vespers" } }),
-          templateField("sc_friday_name", "friday_special_name", "Name of Friday special, poem, or skit", "TEXT", true, [], { conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Special music, poem or skit — Friday vespers" } }),
-          templateField("sc_friday_av", "friday_av_equipment", "Friday AV equipment", "MULTISELECT", false, ["CD", "Apple device", "Computer", "AUX"], { maxSelections: 4, conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Special music, poem or skit — Friday vespers" } }),
-          templateField("sc_church_type", "church_special_type", "Church / Sabbath School contribution", "RADIO", true, ["Special music", "Poem", "Skit"], { conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Special music, poem or skit — church or Sabbath School" } }),
-          templateField("sc_church_name_special", "church_special_name", "Name of church or Sabbath School special", "TEXT", true, [], { conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Special music, poem or skit — church or Sabbath School" } }),
-          templateField("sc_church_av", "church_av_equipment", "Church / Sabbath School AV equipment", "MULTISELECT", false, ["CD", "Apple device", "Computer", "AUX"], { maxSelections: 4, conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Special music, poem or skit — church or Sabbath School" } }),
-          templateField("sc_campfire", "campfire_night", "Campfire singing night", "RADIO", true, ["Friday", "Saturday"], { conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Lead singing around campfire at your campsite" } }),
-          templateField("sc_game_support", "game_support", "Saturday night game help", "MULTISELECT", true, ["Bring a game", "Lead a game"], { minSelections: 1, maxSelections: 2, conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Bring a game and/or lead a game Saturday night" } }),
-          templateField("sc_game", "game_name", "Game name", "TEXT", true, [], { conditional: { fieldKey: "game_support", operator: "INCLUDES", value: "Bring a game" } }),
-          templateField("sc_oregon", "oregon_trail_adult", "Adult assisting with Oregon Trail", "TEXT", true, [], { conditional: { fieldKey: "special_activities", operator: "INCLUDES", value: "Adult assist with Oregon Trail Friday afternoon" } }),
-          templateField("sc_sponsor", "sponsoring_meals", "Will the club sponsor meals?", "RADIO", true, ["No", "Yes"], { helpText: "Sponsoring meals earns a $5 credit per person sponsored, once, off the amount your church owes." }),
-          templateField("sc_sponsor_count", "meal_sponsorship_count", "People your club is sponsoring a meal for", "NUMBER", true, [], { helpText: "A $5 credit per person sponsored (once, however many meals) comes off the amount your church owes, up to the number of people registered.", conditional: { fieldKey: "sponsoring_meals", operator: "EQUALS", value: "Yes" }, creditCentsPerUnit: -500, capUnitsAtAttendeeCount: true }),
-          templateField("sc_meal_times", "meal_times", "Sponsored meal times", "MULTISELECT", true, ["Friday lunch", "Friday lunch — delivered to office", "Friday supper", "Friday supper — delivered to office", "Sabbath lunch", "Sabbath supper"], { minSelections: 1, maxSelections: 6, conditional: { fieldKey: "sponsoring_meals", operator: "EQUALS", value: "Yes" } }),
-          templateField("sc_partner", "partner_club", "Partner club for events", "TEXT"),
-          templateField("sc_ribbons", "event_ribbons", "Would your club like event ribbons?", "RADIO", true, ["Yes", "No"]),
-          templateField("sc_skit", "sabbath_skit", "Name of the club’s Sabbath afternoon skit", "TEXT", true),
-        ] },
-        { id: "sc_milestones", title: "Spiritual milestones", description: "Optional names for pastoral and recognition follow-up.", fields: [
-          templateField("sc_baptism", "baptism_names", "Names interested in baptism", "LONG_TEXT"),
-          templateField("sc_bible", "bible_names", "Names who read the Bible through in a year", "LONG_TEXT"),
-        ] },
-      ],
-    },
-  },
-  {
-    key: "camp_meeting_export",
-    name: "Camp Meeting 2026",
-    description: "Household contact, capacity-aware housing by night, guest roster, adult and child meal tickets, and payment.",
-    audience: "Household / camp",
-    definition: {
-      title: "Camp Meeting 2026 registration",
-      description: "Choose housing and nights, add every guest, order meal tickets, and review the complete total.",
-      confirmationMessage: "Your Camp Meeting registration has been received. Watch for an email with confirmation, payment, and check-in details.",
-      attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 20, attendeeLabel: "Guest", addButtonLabel: "Add another guest" },
-      payment: { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true, deposit: { enabled: true, amountCents: 6500, optionValue: "Pay a $65 deposit now by card" } },
-      sections: [
-        { id: "cm_contact", title: "Contact information", description: "Primary household contact and mailing address.", fields: [
-          templateField("cm_first", "primary_first_name", "First name", "TEXT", true),
-          templateField("cm_middle", "primary_middle_name", "Middle name", "TEXT"),
-          templateField("cm_last", "primary_last_name", "Last name", "TEXT", true),
-          templateField("cm_address_1", "address_line_1", "Address line 1", "TEXT", true),
-          templateField("cm_address_2", "address_line_2", "Address line 2", "TEXT"),
-          templateField("cm_city", "city", "City", "TEXT", true),
-          templateField("cm_state", "state", "State / province", "TEXT", true),
-          templateField("cm_zip", "zip", "ZIP / postal code", "TEXT", true),
-          templateField("cm_country", "country", "Country", "SELECT", true, ["United States", "Canada", "Other"]),
-          templateField("cm_email", "email", "Email", "EMAIL", true),
-          templateField("cm_phone", "phone", "Mobile phone", "PHONE", true),
-          templateField("cm_church", "church_name", "Home church", "SELECT", false, [], { optionSource: "CHURCHES_DIRECTORY" }),
-          templateField("cm_church_other", "church_other", "Home church — not listed", "TEXT", true, [], { conditional: { fieldKey: "church_name", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
-        ] },
-        { id: "cm_housing", title: "Housing selection", description: "Pricing is per night. RV capacity begins at 16 spots and every housing limit can be adjusted.", fields: [
-          templateField("cm_housing_choice", "housing_selection", "Housing", "RADIO", true, campMeetingHousingOptions, { availabilityMode: "CAPACITY", choiceLimits: { "RV / camper hookup": 16 } }),
-          templateField("cm_dorm_nights", "dorm_nights", "Dorm nights — $25 per night", "MULTISELECT", true, campMeetingNights, { minSelections: 4, maxSelections: 5, choicePricesCents: Object.fromEntries(campMeetingNights.map((night) => [night, 2500])), conditional: { fieldKey: "housing_selection", operator: "EQUALS", value: "Dorm room" }, helpText: "Dorm rooms require at least four nights. Each room has two twin beds; bring linens." }),
-          templateField("cm_rv_nights", "rv_nights", "RV / camper nights — $15 per night", "MULTISELECT", true, campMeetingNights, { minSelections: 1, maxSelections: 5, choicePricesCents: Object.fromEntries(campMeetingNights.map((night) => [night, 1500])), conditional: { fieldKey: "housing_selection", operator: "EQUALS", value: "RV / camper hookup" } }),
-          templateField("cm_tent_nights", "tent_nights", "Tent campsite nights — $5 per night", "MULTISELECT", true, campMeetingNights, { minSelections: 1, maxSelections: 5, choicePricesCents: Object.fromEntries(campMeetingNights.map((night) => [night, 500])), conditional: { fieldKey: "housing_selection", operator: "EQUALS", value: "Tent campsite" }, helpText: "Primitive camping; no hookups or campfires." }),
-          templateField("cm_floor", "first_floor_needed", "First-floor room needed for health or medical reasons?", "RADIO", true, ["No", "Yes"], { conditional: { fieldKey: "housing_selection", operator: "EQUALS", value: "Dorm room" } }),
-          templateField("cm_rv", "rv_details", "RV / camper length and type", "TEXT", true, [], { conditional: { fieldKey: "housing_selection", operator: "EQUALS", value: "RV / camper hookup" } }),
-        ] },
-        { id: "cm_guests", title: "Guest information", description: "Enter the party totals, then add every adult and child—including yourself—to the guest roster.", fields: [
-          templateField("cm_adults", "num_adults", "Number of adults (18 and older)", "NUMBER", true),
-          templateField("cm_children", "num_children", "Number of children", "NUMBER", true),
-          templateField("cm_guest_first", "first_name", "First name", "TEXT", true, [], { scope: "ATTENDEE" }),
-          templateField("cm_guest_last", "last_name", "Last name", "TEXT", true, [], { scope: "ATTENDEE" }),
-          templateField("cm_guest_age", "guest_age", "Age", "NUMBER", true, [], { scope: "ATTENDEE", helpText: "Children’s ages are used for Sabbath School class placement." }),
-        ] },
-        { id: "cm_meals", title: "Meal tickets", description: "Enter combined ticket totals for everyone. Sabbath lunch is donation-only and needs no ticket.", fields: [
-          templateField("cm_bf_adult", "breakfast_adult_qty", "Adult breakfast tickets — $7 each", "NUMBER", false, [], { priceCents: 700, helpText: "Available Wednesday through Saturday." }),
-          templateField("cm_bf_child", "breakfast_child_qty", "Child breakfast tickets — $6 each", "NUMBER", false, [], { priceCents: 600, helpText: "Available Wednesday through Saturday." }),
-          templateField("cm_lunch_adult", "lunch_adult_qty", "Adult lunch tickets — $8 each", "NUMBER", false, [], { priceCents: 800, helpText: "Available Wednesday through Friday." }),
-          templateField("cm_lunch_child", "lunch_child_qty", "Child lunch tickets — $7 each", "NUMBER", false, [], { priceCents: 700, helpText: "Available Wednesday through Friday." }),
-          templateField("cm_supper_adult", "supper_adult_qty", "Adult supper tickets — $8 each", "NUMBER", false, [], { priceCents: 800, helpText: "Available Tuesday through Saturday." }),
-          templateField("cm_supper_child", "supper_child_qty", "Child supper tickets — $7 each", "NUMBER", false, [], { priceCents: 700, helpText: "Available Tuesday through Saturday." }),
-          templateField("cm_dietary", "dietary_restrictions", "Dietary restrictions or allergies", "LONG_TEXT"),
-        ] },
-        { id: "cm_payment", title: "Review & payment", description: "Card payments include the processing fee. A $65 deposit holds the reservation: pay it now by card (the card fee applies to the deposit only) or mail a check. The balance is due later.", stepLabel: "Payment", isReviewStep: true, fields: [
-          templateField("cm_pay", "payment_method", "Payment method", "RADIO", true, ["Pay by check", "Pay a $65 deposit now by card", "Credit / debit card"]),
-          templateField("cm_deposit", "check_deposit_acknowledgment", "Check deposit acknowledgment", "CHECKBOX", true, [], { conditional: { fieldKey: "payment_method", operator: "EQUALS", value: "Pay by check" }, placeholder: "I understand a $65 mailed deposit is required to hold this reservation." }),
-          templateField("cm_comments", "comments", "Comments", "LONG_TEXT"),
-        ] },
-      ],
-    },
-  },
+  seededFormTemplate("spring_camporee_export"),
+  seededFormTemplate("camp_meeting_export"),
   {
     key: "honors_weekend",
     name: "Honors Weekend",

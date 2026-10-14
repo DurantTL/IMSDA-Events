@@ -1,0 +1,695 @@
+{
+  "key": "spring_camporee_export",
+  "version": 1,
+  "name": "Spring Camporee 2026",
+  "description": "Club contact, campsite footprint, complete roster, duties, activities, meal sponsorship, milestones, and late pricing.",
+  "audience": "Club / group",
+  "definition": {
+    "title": "Spring Camporee 2026 registration",
+    "description": "Register the club once, add every attendee, and choose duties and activities for the weekend.",
+    "confirmationMessage": "Your Spring Camporee registration has been received. The calculated registration amount will be invoiced.",
+    "attendeeRoster": {
+      "enabled": true,
+      "minAttendees": 1,
+      "maxAttendees": 50,
+      "attendeeLabel": "Club member",
+      "addButtonLabel": "Add another club member"
+    },
+    "sections": [
+      {
+        "id": "sc_club",
+        "title": "Club & contact",
+        "description": "Select the Pathfinder club and enter the director’s contact information.",
+        "fields": [
+          {
+            "id": "sc_club_name",
+            "key": "club_name",
+            "label": "Pathfinder club",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "optionSource": "CLUBS_DIRECTORY"
+          },
+          {
+            "id": "sc_club_other",
+            "key": "club_name_other",
+            "label": "Club name — not listed",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "club_name",
+              "operator": "EQUALS",
+              "value": "Not listed"
+            }
+          },
+          {
+            "id": "sc_director",
+            "key": "director_name",
+            "label": "Club director",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_church",
+            "key": "church_name",
+            "label": "Church",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [],
+            "optionSource": "CHURCHES_DIRECTORY"
+          },
+          {
+            "id": "sc_church_other",
+            "key": "church_name_other",
+            "label": "Church — not listed",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "church_name",
+              "operator": "EQUALS",
+              "value": "Not listed"
+            }
+          },
+          {
+            "id": "sc_email",
+            "key": "email",
+            "label": "Email",
+            "helpText": "",
+            "type": "EMAIL",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_phone",
+            "key": "phone",
+            "label": "Mobile phone",
+            "helpText": "",
+            "type": "PHONE",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "sc_camping",
+        "title": "Camping",
+        "description": "Describe the full campsite footprint. No generators or pets; hookups require a medical need.",
+        "fields": [
+          {
+            "id": "sc_tents",
+            "key": "tents",
+            "label": "Number of tents and sizes",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_trailers",
+            "key": "trailers",
+            "label": "Trailers",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_canopy",
+            "key": "kitchen_canopy",
+            "label": "Kitchen canopy and size",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_sqft",
+            "key": "total_sqft",
+            "label": "Total square feet needed",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_neighbor",
+            "key": "camp_next_to",
+            "label": "Club you would like to camp next to",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "sc_roster",
+        "title": "Club roster",
+        "description": "Add Pathfinders, TLTs, staff, and children using full first and last names.",
+        "fields": [
+          {
+            "id": "sc_member_first",
+            "key": "first_name",
+            "label": "First name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_member_last",
+            "key": "last_name",
+            "label": "Last name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_member_age",
+            "key": "attendee_age",
+            "label": "Age",
+            "helpText": "",
+            "type": "NUMBER",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": []
+          },
+          {
+            "id": "sc_member_gender",
+            "key": "gender",
+            "label": "Gender",
+            "helpText": "",
+            "type": "SELECT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [
+              "Female",
+              "Male",
+              "Prefer not to answer"
+            ]
+          },
+          {
+            "id": "sc_member_role",
+            "key": "attendee_type",
+            "label": "Roster role",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": true,
+            "options": [
+              "Pathfinder",
+              "TLT",
+              "Staff",
+              "Child"
+            ]
+          },
+          {
+            "id": "sc_member_first_time",
+            "key": "first_time_camper",
+            "label": "First time at Camporee?",
+            "helpText": "",
+            "type": "CHECKBOX",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "sc_member_medical_personnel",
+            "key": "medical_personnel",
+            "label": "Medical personnel?",
+            "helpText": "",
+            "type": "CHECKBOX",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "attendee_type",
+              "operator": "EQUALS",
+              "value": "Staff"
+            }
+          },
+          {
+            "id": "sc_member_master_guide",
+            "key": "master_guide_investiture",
+            "label": "Master Guide investiture?",
+            "helpText": "",
+            "type": "CHECKBOX",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "conditional": {
+              "fieldKey": "attendee_type",
+              "operator": "EQUALS",
+              "value": "Staff"
+            }
+          },
+          {
+            "id": "sc_member_dietary",
+            "key": "dietary_needs",
+            "label": "Dietary restrictions",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "sc_member_medical_flag",
+            "key": "medical_or_accessibility_need",
+            "label": "Has a medical or accessibility need the club director knows about",
+            "helpText": "No details here — talk with your club director about any support the attendee needs.",
+            "type": "RADIO",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [
+              "No",
+              "Yes"
+            ]
+          },
+          {
+            "id": "sc_member_fee",
+            "key": "registration_fee",
+            "label": "Registration fee",
+            "helpText": "",
+            "type": "CALCULATED",
+            "scope": "ATTENDEE",
+            "required": false,
+            "options": [],
+            "priceCents": 900,
+            "latePricing": {
+              "startsOn": "2026-04-11",
+              "label": "Late registration pricing",
+              "priceCents": 1400
+            }
+          }
+        ]
+      },
+      {
+        "id": "sc_activities",
+        "title": "Schedule & activities",
+        "description": "Choose the club’s duties and activities. Duty choices can be given limits as assignments fill.",
+        "fields": [
+          {
+            "id": "sc_duties",
+            "key": "duty_areas",
+            "label": "Required duty area",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Flag raising / lowering",
+              "Bathroom clean-up"
+            ],
+            "minSelections": 1,
+            "maxSelections": 2
+          },
+          {
+            "id": "sc_flag_slots",
+            "key": "flag_slots",
+            "label": "Flag raising / lowering times",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Thursday evening",
+              "Friday morning",
+              "Friday evening",
+              "Saturday morning — TLTs",
+              "Saturday evening"
+            ],
+            "minSelections": 1,
+            "maxSelections": 5,
+            "availabilityMode": "CAPACITY",
+            "choiceLimits": {},
+            "conditional": {
+              "fieldKey": "duty_areas",
+              "operator": "INCLUDES",
+              "value": "Flag raising / lowering"
+            }
+          },
+          {
+            "id": "sc_bathroom_days",
+            "key": "bathroom_days",
+            "label": "Bathroom clean-up days",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Thursday",
+              "Friday",
+              "Saturday",
+              "Sunday morning"
+            ],
+            "minSelections": 1,
+            "maxSelections": 4,
+            "availabilityMode": "CAPACITY",
+            "choiceLimits": {},
+            "conditional": {
+              "fieldKey": "duty_areas",
+              "operator": "INCLUDES",
+              "value": "Bathroom clean-up"
+            }
+          },
+          {
+            "id": "sc_special_activities",
+            "key": "special_activities",
+            "label": "Club activities — choose at least one",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Lead mixer Thursday night at vespers",
+              "Special music, poem or skit — Friday vespers",
+              "Adult assist with Oregon Trail Friday afternoon",
+              "Set up chairs in pavilion Friday 4 PM",
+              "Lead singing around campfire at your campsite",
+              "Special music, poem or skit — church or Sabbath School",
+              "Bring a game and/or lead a game Saturday night"
+            ],
+            "minSelections": 1,
+            "maxSelections": 5
+          },
+          {
+            "id": "sc_friday_type",
+            "key": "friday_special_type",
+            "label": "Friday vespers contribution",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Special music",
+              "Poem",
+              "Skit"
+            ],
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Special music, poem or skit — Friday vespers"
+            }
+          },
+          {
+            "id": "sc_friday_name",
+            "key": "friday_special_name",
+            "label": "Name of Friday special, poem, or skit",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Special music, poem or skit — Friday vespers"
+            }
+          },
+          {
+            "id": "sc_friday_av",
+            "key": "friday_av_equipment",
+            "label": "Friday AV equipment",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [
+              "CD",
+              "Apple device",
+              "Computer",
+              "AUX"
+            ],
+            "maxSelections": 4,
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Special music, poem or skit — Friday vespers"
+            }
+          },
+          {
+            "id": "sc_church_type",
+            "key": "church_special_type",
+            "label": "Church / Sabbath School contribution",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Special music",
+              "Poem",
+              "Skit"
+            ],
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Special music, poem or skit — church or Sabbath School"
+            }
+          },
+          {
+            "id": "sc_church_name_special",
+            "key": "church_special_name",
+            "label": "Name of church or Sabbath School special",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Special music, poem or skit — church or Sabbath School"
+            }
+          },
+          {
+            "id": "sc_church_av",
+            "key": "church_av_equipment",
+            "label": "Church / Sabbath School AV equipment",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": [
+              "CD",
+              "Apple device",
+              "Computer",
+              "AUX"
+            ],
+            "maxSelections": 4,
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Special music, poem or skit — church or Sabbath School"
+            }
+          },
+          {
+            "id": "sc_campfire",
+            "key": "campfire_night",
+            "label": "Campfire singing night",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Friday",
+              "Saturday"
+            ],
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Lead singing around campfire at your campsite"
+            }
+          },
+          {
+            "id": "sc_game_support",
+            "key": "game_support",
+            "label": "Saturday night game help",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Bring a game",
+              "Lead a game"
+            ],
+            "minSelections": 1,
+            "maxSelections": 2,
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Bring a game and/or lead a game Saturday night"
+            }
+          },
+          {
+            "id": "sc_game",
+            "key": "game_name",
+            "label": "Game name",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "game_support",
+              "operator": "INCLUDES",
+              "value": "Bring a game"
+            }
+          },
+          {
+            "id": "sc_oregon",
+            "key": "oregon_trail_adult",
+            "label": "Adult assisting with Oregon Trail",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "special_activities",
+              "operator": "INCLUDES",
+              "value": "Adult assist with Oregon Trail Friday afternoon"
+            }
+          },
+          {
+            "id": "sc_sponsor",
+            "key": "sponsoring_meals",
+            "label": "Will the club sponsor meals?",
+            "helpText": "Sponsoring meals earns a $5 credit per person sponsored, once, off the amount your church owes.",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "No",
+              "Yes"
+            ]
+          },
+          {
+            "id": "sc_sponsor_count",
+            "key": "meal_sponsorship_count",
+            "label": "People your club is sponsoring a meal for",
+            "helpText": "A $5 credit per person sponsored (once, however many meals) comes off the amount your church owes, up to the number of people registered.",
+            "type": "NUMBER",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [],
+            "conditional": {
+              "fieldKey": "sponsoring_meals",
+              "operator": "EQUALS",
+              "value": "Yes"
+            },
+            "creditCentsPerUnit": -500,
+            "capUnitsAtAttendeeCount": true
+          },
+          {
+            "id": "sc_meal_times",
+            "key": "meal_times",
+            "label": "Sponsored meal times",
+            "helpText": "",
+            "type": "MULTISELECT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Friday lunch",
+              "Friday lunch — delivered to office",
+              "Friday supper",
+              "Friday supper — delivered to office",
+              "Sabbath lunch",
+              "Sabbath supper"
+            ],
+            "minSelections": 1,
+            "maxSelections": 6,
+            "conditional": {
+              "fieldKey": "sponsoring_meals",
+              "operator": "EQUALS",
+              "value": "Yes"
+            }
+          },
+          {
+            "id": "sc_partner",
+            "key": "partner_club",
+            "label": "Partner club for events",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "sc_ribbons",
+            "key": "event_ribbons",
+            "label": "Would your club like event ribbons?",
+            "helpText": "",
+            "type": "RADIO",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": [
+              "Yes",
+              "No"
+            ]
+          },
+          {
+            "id": "sc_skit",
+            "key": "sabbath_skit",
+            "label": "Name of the club’s Sabbath afternoon skit",
+            "helpText": "",
+            "type": "TEXT",
+            "scope": "REGISTRATION",
+            "required": true,
+            "options": []
+          }
+        ]
+      },
+      {
+        "id": "sc_milestones",
+        "title": "Spiritual milestones",
+        "description": "Optional names for pastoral and recognition follow-up.",
+        "fields": [
+          {
+            "id": "sc_baptism",
+            "key": "baptism_names",
+            "label": "Names interested in baptism",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          },
+          {
+            "id": "sc_bible",
+            "key": "bible_names",
+            "label": "Names who read the Bible through in a year",
+            "helpText": "",
+            "type": "LONG_TEXT",
+            "scope": "REGISTRATION",
+            "required": false,
+            "options": []
+          }
+        ]
+      }
+    ]
+  }
+}

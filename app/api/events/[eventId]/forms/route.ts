@@ -20,7 +20,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
   try {
     const { eventId } = await context.params;
     await requirePermission(await getCurrentSession(), eventId, "MANAGE_FORMS", findActiveMembership);
-    return Response.json({ forms: await listRegistrationForms(eventId), templates: listFormTemplates() });
+    return Response.json({ forms: await listRegistrationForms(eventId), templates: await listFormTemplates() });
   } catch (error) { return apiError(error); }
 }
 
