@@ -28,7 +28,7 @@ export default async function ClubEventReportsPage({
   if (!allowed) {
     return (
       <AccessRestricted
-        title="Camporee club reports are restricted"
+        title="Club event reports are restricted"
         detail="Ask an event administrator for report access, or for Pathfinder event-manager oversight of this club event."
       />
     );

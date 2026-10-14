@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Permission boundary for the four Camporee club reports, their CSVs, and
+ * Permission boundary for the four Club event reports, their CSVs, and
  * the staff club-pass QR (#411): `VIEW_REPORTS` on this event, or a
  * Pathfinder event manager's oversight (#387) — an event administrator, but
  * only on a CLUB-audience event (#481, independent of billing mode).

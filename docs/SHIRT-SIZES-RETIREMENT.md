@@ -102,8 +102,6 @@ Shared code still carries event-specific names and copy from the 2026 event
 systems. They were left alone on purpose and are tracked here so a pull request
 can name them:
 
-- "Camporee club reports" (`clubReports` in `components/staff-navigation.ts`).
-  The owner has not decided whether to rename it, so it stays.
 - The Camp Meeting presets (`modules/meals/camp-meeting.ts` and the Camp Meeting
   defaults in the meals, lodging, cancellation-policy and event-template
   starters).
