@@ -2,7 +2,7 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { applyRateLimitHeaders, type RateLimitOutcome } from "@/modules/rate-limit/domain";
 import { checkPublicRegistrationRateLimit } from "@/modules/rate-limit/service";
 import { INVITATION_RATE_LIMIT_FORM } from "@/modules/staff-invitations/domain";
-import { staffInvitationApiError } from "@/modules/staff-invitations/api-errors";
+import { readBoundedText, staffInvitationApiError } from "@/modules/staff-invitations/api-errors";
 import { submitInvitationRegistration } from "@/modules/staff-invitations/repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -29,9 +29,8 @@ async function postHandler(request: Request, context: Context) {
         rateLimit,
       );
     }
-    const declared = Number(request.headers.get("content-length") ?? "0");
-    const body = Number.isFinite(declared) && declared > maximumBodyBytes ? null : await request.text();
-    if (body === null || Buffer.byteLength(body) > maximumBodyBytes) {
+    const body = await readBoundedText(request, maximumBodyBytes);
+    if (body === null) {
       return applyRateLimitHeaders(
         Response.json({ error: "REQUEST_TOO_LARGE", message: "This request is too large." }, { status: 413, headers: noStore }),
         rateLimit,

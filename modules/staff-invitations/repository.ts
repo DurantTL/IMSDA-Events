@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
+import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
@@ -536,15 +537,25 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
   const suppressed = deliveryMode === "DISABLED";
   const correlationId = randomUUID();
   const ids: string[] = [];
-  for (const notice of input.notices) {
-    if (notice.digestUntil) {
-      const waiting = await tx.messageOutbox.findUnique({ where: { idempotencyKey: notice.idempotencyKey }, select: { id: true, status: true } });
-      if (waiting) {
-        if (waiting.status === "PENDING") {
-          await tx.messageOutbox.update({ where: { id: waiting.id }, data: { subjectSnapshot: notice.subject, bodyTextSnapshot: notice.bodyText } });
+  for (const original of input.notices) {
+    let notice = original;
+    if (original.digestUntil) {
+      // The window's digest still waiting is refreshed in place. One already handed to the worker has gone out without this
+      // registration, so a digest for the next window is queued instead (and so on), and nobody is left out.
+      let placed = false;
+      for (let later = 0; later < 4 && !placed; later += 1) {
+        const key = later === 0 ? original.idempotencyKey : `${original.idempotencyKey}:next${later}`;
+        const waiting = await tx.messageOutbox.findUnique({ where: { idempotencyKey: key }, select: { id: true, status: true } });
+        if (!waiting) {
+          notice = { ...original, idempotencyKey: key, digestUntil: new Date(original.digestUntil.getTime() + later * OFFICE_DIGEST_WINDOW_MS) };
+          placed = true;
+        } else if (waiting.status === "PENDING") {
+          await tx.messageOutbox.update({ where: { id: waiting.id }, data: { subjectSnapshot: original.subject, bodyTextSnapshot: original.bodyText } });
+          placed = true;
+          notice = { ...original, idempotencyKey: "" };
         }
-        continue;
       }
+      if (!placed || notice.idempotencyKey === "") continue;
     }
     const message = await tx.messageOutbox.upsert({
       where: { idempotencyKey: notice.idempotencyKey },
@@ -1027,7 +1038,9 @@ async function entitleMeals(eventId: string, actorUserId: string, registrationId
         reason: "Approved staff, pastor or volunteer registration: the conference pays for every meal.",
       });
       entitledPeople += 1;
-    } catch {
+    } catch (error) {
+      // The class and code only: logError keeps a Prisma error's query and values out, and no name or attendee id is logged.
+      logError("Staff meal entitlement failed", error);
       failed.push(named(attendee));
     }
   }

@@ -292,17 +292,22 @@ async function main() {
   const { applyRegistrantWaitlistAction } = await import("../modules/lodging/waitlist-service");
   const registrant = { kind: "REGISTRANT" as const, accessTokenId: "synthetic-token" };
   for (const [name, attempt] of [
-    ["a save", saveLodgingRequest({ eventId, registrationId: registration.id, actor: registrant, raw: { category: "DORM_ROOM", roomCount: 2 } })],
-    ["a roommate request", changeRegistrantRoommates({ eventId, registrationId: registration.id, accessTokenId: "synthetic-token", raw: { action: "add_by_code", name: "Someone", confirmationCode: "REG-NOTREAL1" } })],
-    ["a waitlist join", applyRegistrantWaitlistAction({ eventId, registrationId: registration.id, accessTokenId: "synthetic-token", raw: { action: "join", category: "DORM_ROOM", partySize: 2 } })],
+    ["a save", () => saveLodgingRequest({ eventId, registrationId: registration.id, actor: registrant, raw: { category: "DORM_ROOM", roomCount: 2 } })],
+    ["a roommate request", () => changeRegistrantRoommates({ eventId, registrationId: registration.id, accessTokenId: "synthetic-token", raw: { action: "add_by_code", name: "Someone", confirmationCode: "REG-NOTREAL1" } })],
+    ["a waitlist join", () => applyRegistrantWaitlistAction({ eventId, registrationId: registration.id, accessTokenId: "synthetic-token", raw: { action: "join", category: "DORM_ROOM", partySize: 2 } })],
   ] as const) {
-    await expectCode(attempt, "STAFF_REGISTRATION", `${name} by the registrant of a staff registration`);
+    await expectCode(attempt(), "STAFF_REGISTRATION", `${name} by the registrant of a staff registration`);
   }
   assert((await prisma.eventLodgingRequest.count({ where: { registrationId: registration.id } })) === 0 && (await prisma.eventLodgingChangeRequest.count({ where: { registrationId: registration.id } })) === 0, "no lodging request or change request was made");
 
   // ---- No single conference-paid plan: approval is refused unless the office says to go ahead, and meals can be retried -------
   const gusToken2 = regained.url.split("/staff-invite/")[1];
+  // A digest the worker already took is not refreshed: the next registration gets a digest for the next window.
+  await prisma.messageOutbox.updateMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" }, data: { status: "SENT", sentAt: new Date() } });
+  const digestsBefore = await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } });
   await repo.submitInvitationRegistration(gusToken2, { firstName: "Gus", lastName: surname, dependants: [{ firstName: "Pip", lastName: surname, age: 3 }] });
+  const laterDigests = await prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL", status: "PENDING" } });
+  assert(laterDigests.length === 1 && (await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } })) === digestsBefore + 1 && laterDigests[0].idempotencyKey.includes(":next") && laterDigests[0].availableAt.getTime() > Date.now(), "a registration after a digest went out is named in a digest for the next window");
   const gusRow = (await repo.listApprovals(eventId)).rows.find((entry) => entry.email === email("gus"))!;
   await prisma.eventMealPlan.updateMany({ where: { eventId, payer: "CONFERENCE" }, data: { isActive: false } });
   await expectCode(repo.approveRegistrations(eventId, userId, [gusRow.id]), "MEAL_PLAN_REQUIRED", "approving without a conference-paid plan");

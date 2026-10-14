@@ -11,15 +11,39 @@ export const STAFF_BODY_MAX_BYTES = 128 * 1024;
 export const IMPORT_BODY_MAX_BYTES = 1024 * 1024;
 
 /**
- * The request's JSON, read only up to `maxBytes`: a declared length over the cap is refused without reading, and so is a body
- * that turns out larger. Call it after the permission check, never before.
+ * The request body as text, read in chunks and counted as it arrives, so a body that is over `maxBytes` is cancelled part way
+ * (a chunked one with no Content-Length included) instead of being held whole. Returns null when it is over the cap.
  */
-export async function readBoundedJson(request: Request, maxBytes = STAFF_BODY_MAX_BYTES): Promise<unknown> {
-  const tooLarge = () => new StaffInvitationError("REQUEST_TOO_LARGE", "That request is too large.");
+export async function readBoundedText(request: Request, maxBytes: number): Promise<string | null> {
   const declared = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > maxBytes) throw tooLarge();
-  const text = await request.text();
-  if (Buffer.byteLength(text) > maxBytes) throw tooLarge();
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/** The request's JSON, read with `readBoundedText`. Call it after the permission check, never before. */
+export async function readBoundedJson(request: Request, maxBytes = STAFF_BODY_MAX_BYTES): Promise<unknown> {
+  const text = await readBoundedText(request, maxBytes);
+  if (text === null) throw new StaffInvitationError("REQUEST_TOO_LARGE", "That request is too large.");
   return JSON.parse(text);
 }
 

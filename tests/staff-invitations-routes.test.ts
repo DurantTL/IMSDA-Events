@@ -66,6 +66,7 @@ import { POST as ACTIONS } from "@/app/api/events/[eventId]/staff-invitations/ac
 import { POST as SEND } from "@/app/api/events/[eventId]/staff-invitations/send/route";
 import { POST as ONE } from "@/app/api/events/[eventId]/staff-invitations/[invitationId]/route";
 import { GET as APPROVALS, POST as DECIDE } from "@/app/api/events/[eventId]/staff-invitations/approvals/route";
+import { readBoundedJson } from "@/modules/staff-invitations/api-errors";
 import { POST as PUBLIC_SUBMIT } from "@/app/api/public/staff-invitations/[token]/route";
 
 const event = { params: Promise.resolve({ eventId: "event-1" }) };
@@ -238,5 +239,40 @@ describe("the public registration route (#804)", () => {
     expect((await PUBLIC_SUBMIT(post("/p", body), publicContext)).status).toBe(409);
     const malformed = await PUBLIC_SUBMIT(post("/p", "{not json"), publicContext);
     expect(malformed.status).toBe(400);
+  });
+});
+
+describe("bounded body reads (#804)", () => {
+  function chunked(chunkCount: number, chunkBytes: number) {
+    let sent = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= chunkCount) return controller.close();
+        sent += 1;
+        controller.enqueue(new TextEncoder().encode("x".repeat(chunkBytes)));
+      },
+      cancel() { cancelled = true; },
+    });
+    const request = new Request("https://events.imsda.test/p", { method: "POST", headers: { origin: "https://events.imsda.test" }, body: stream, duplex: "half" } as RequestInit);
+    return { request, sentChunks: () => sent, wasCancelled: () => cancelled };
+  }
+
+  it("stops reading a chunked body with no Content-Length once it is over the cap, and cancels it", async () => {
+    const body = chunked(1000, 1024);
+    expect(body.request.headers.get("content-length")).toBeNull();
+    await expect(readBoundedJson(body.request, 4096)).rejects.toMatchObject({ code: "REQUEST_TOO_LARGE" });
+    expect(body.wasCancelled()).toBe(true);
+    expect(body.sentChunks()).toBeLessThan(20);
+  });
+
+  it("reads a chunked body that fits, and the public route refuses an oversized chunked one with 413", async () => {
+    const ok = chunked(2, 8);
+    await expect(readBoundedJson(ok.request, 4096)).rejects.toBeInstanceOf(SyntaxError);
+    const big = chunked(200, 1024);
+    mocks.rejectCrossOriginRequest.mockReturnValue(null);
+    expect((await PUBLIC_SUBMIT(big.request, publicContext)).status).toBe(413);
+    expect(big.wasCancelled()).toBe(true);
+    expect(mocks.submitInvitationRegistration).not.toHaveBeenCalled();
   });
 });
