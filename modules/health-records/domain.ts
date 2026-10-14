@@ -288,9 +288,10 @@ export function clampHealthLinkDays(days: number | undefined) {
  *   and only for a member registered for one of those events, inside its window.
  * - SYSTEM_ADMIN: view only, any member, all year.
  *
- * - CLUB_REGISTRAR (owner decision, 2026-10-14, #923): write-only. Types in or
- *   replaces a member's record for their own club, and is afterwards shown only
- *   that a record exists, its status and when it was last confirmed.
+ * - CLUB_REGISTRAR (owner decision, 2026-10-14, #923): write-only. Types in a
+ *   record for a member of their own club only when none exists (directors and
+ *   deputies change an existing one), and is afterwards shown only that a
+ *   record is on file and its status.
  *
  * There is deliberately no reporter or event-staff viewer: none of them can be
  * constructed, whatever other permissions they hold (Event Admins and
@@ -298,21 +299,21 @@ export function clampHealthLinkDays(days: number | undefined) {
  */
 export type HealthViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; accountId: string }
-  /** Write-only (#923): enters or replaces a record, never reads one back. Own club only. */
+  /** Write-only (#923): enters a record only when none exists, never reads one back. Own club only. */
   | { kind: "CLUB_REGISTRAR"; organizationId: string; accountId: string }
   | { kind: "AREA_COORDINATOR"; accountId: string }
   | { kind: "HEALTH_ROLE"; userId: string; eventIds: readonly string[] }
   /** `actAsId` is set when the administrator is acting as a club director (#442), so the audit shows it. */
   | { kind: "SYSTEM_ADMIN"; userId: string; actAsId?: string };
 
-/** EDIT is entering or replacing a record from the paper form; CONFIRM re-affirms one that was read. */
+/** EDIT is entering or changing a record from the paper form (a Registrar only when none exists); CONFIRM re-affirms one that was read. */
 export type HealthAction = "VIEW" | "EDIT" | "CONFIRM" | "SEND_LINK";
 
 export function viewerCan(viewer: HealthViewer, organizationId: string, action: HealthAction) {
   switch (viewer.kind) {
     case "CLUB_LEADER":
       return viewer.organizationId === organizationId;
-    // A Registrar may enter or replace a record for their own club and do nothing else: no view, no
+    // A Registrar may enter a record for their own club (the repository refuses when one exists) and do nothing else: no view, no
     // confirmation (it would affirm what they cannot read), no parent links.
     case "CLUB_REGISTRAR":
       return viewer.organizationId === organizationId && action === "EDIT";

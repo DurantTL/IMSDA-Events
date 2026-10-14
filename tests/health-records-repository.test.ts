@@ -716,13 +716,13 @@ describe("a Registrar can enter a health record but never read one (#923)", () =
     expect(JSON.stringify(error)).not.toContain("not a phone");
   });
 
-  it("shows only that a record exists, its status and when it was last confirmed, never a value", async () => {
+  it("shows only that a record exists, and its status, never a value or a date", async () => {
     const before = await viewHealthEntryStatus(registrar, "club-a", "member-1", now);
-    expect(before).toMatchObject({ exists: false, status: "NONE", lastConfirmedAt: null, member: { firstName: "Casey" } });
+    expect(before).toMatchObject({ exists: false, status: "NONE", member: { firstName: "Casey" } });
     await saveHealthRecord(registrar, "club-a", "member-1", syntheticRecord, now);
     const after = await viewHealthEntryStatus(registrar, "club-a", "member-1", now);
-    expect(after).toMatchObject({ exists: true, status: "CURRENT", lastConfirmedAt: now.toISOString() });
-    expect(Object.keys(after).sort()).toEqual(["club", "consentText", "consentVersion", "exists", "lastConfirmedAt", "member", "status"]);
+    expect(after).toMatchObject({ exists: true, status: "CURRENT" });
+    expect(Object.keys(after).sort()).toEqual(["club", "consentText", "consentVersion", "exists", "member", "status"]);
     for (const marker of healthMarkers) expect(JSON.stringify(after)).not.toContain(marker);
     state.records[0]!.confirmedClubYear = "2025-26";
     expect((await viewHealthEntryStatus(registrar, "club-a", "member-1", now)).status).toBe("NEEDS_UPDATE");

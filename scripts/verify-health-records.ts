@@ -274,7 +274,7 @@ async function main() {
   assert(!(await prisma.auditLog.count({ where: { action: "HEALTH_RECORD_VIEWED", entityId: entered.id } })), "a refused read is never a view");
 
   const entry = await repo.viewHealthEntryStatus(registrarA, clubs.a, morgan.id, now);
-  assert(entry.exists && entry.status === "CURRENT" && entry.lastConfirmedAt !== null, "the Registrar sees that a record exists, its status and when it was confirmed");
+  assert(entry.exists && entry.status === "CURRENT", "the Registrar sees that a record exists and its status");
   for (const secret of SECRETS) assert(!JSON.stringify(entry).includes(secret), "the entry status holds no health text");
   const statuses = await repo.healthEntryStatusesForMembers(registrarA, clubs.a, [morgan.id], now);
   assert(JSON.stringify(statuses) === JSON.stringify({ [morgan.id]: { status: "CURRENT" } }), "the roster status for a Registrar is the status alone");

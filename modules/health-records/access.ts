@@ -22,7 +22,7 @@ import type { HealthViewer } from "@/modules/health-records/domain";
  * - A club's director or deputy, past the roster's second step: their own
  *   club only, all year.
  * - A club Registrar, past the same second step (owner decision, 2026-10-14,
- *   #923): write-only. The viewer can enter or replace a record for their own
+ *   #923): write-only. The viewer can enter a record, only when none exists, for their own
  *   club; `viewerCan` and the repository refuse every read. A reporter or
  *   another club's director is refused by the roster gate or by the role check.
  * - An Area Coordinator with a verified second sign-in step: view only, and

@@ -478,17 +478,16 @@ export async function healthSummariesForMembers(
 export type HealthEntryView = {
   member: { id: string; firstName: string; lastName: string };
   club: { name: string; sponsoringChurch: string | null };
-  /** The one fact a Registrar learns about a stored record, beside its status and date. */
+  /** The one fact a Registrar learns about a stored record, beside its status. */
   exists: boolean;
   status: HealthRecordStatus;
-  lastConfirmedAt: string | null;
   consentText: typeof HEALTH_CONSENT_TEXT;
   consentVersion: string;
 };
 
 /** Record metadata for a member (same person-follows-year rule as `findRecord`), with no field rows. */
 async function findRecordMeta(client: Pick<Client, "healthRecord">, organizationId: string, member: Pick<LoadedMember, "id" | "personId">) {
-  const select = { confirmedClubYear: true, lastConfirmedAt: true, updatedAt: true } as const;
+  const select = { confirmedClubYear: true } as const;
   const own = await client.healthRecord.findUnique({ where: { rosterMemberId: member.id }, select });
   if (own) return own;
   if (!member.personId) return null;
@@ -496,8 +495,8 @@ async function findRecordMeta(client: Pick<Client, "healthRecord">, organization
 }
 
 /**
- * What a Registrar sees for one member: that a record exists, its status, and
- * when it was last confirmed. For the entry page; never a value.
+ * What a Registrar sees for one member: that a record exists and its status.
+ * For the entry page; never a value or a date.
  */
 export async function viewHealthEntryStatus(viewer: HealthViewer, organizationId: string, memberId: string, now = new Date()): Promise<HealthEntryView> {
   requireHealthRecordsEnabled();
@@ -512,7 +511,6 @@ export async function viewHealthEntryStatus(viewer: HealthViewer, organizationId
     club: { name: member.organization.name, sponsoringChurch: member.organization.parentOrganization?.name ?? null },
     exists: record !== null,
     status: healthRecordStatus(record, now),
-    lastConfirmedAt: record ? (record.lastConfirmedAt ?? (record.confirmedClubYear ? record.updatedAt : null))?.toISOString() ?? null : null,
     consentText: HEALTH_CONSENT_TEXT,
     consentVersion: HEALTH_CONSENT_VERSION,
   };

@@ -36,7 +36,6 @@ const entry = {
   club: { name: "Synthetic Pathfinders", sponsoringChurch: null },
   exists: true,
   status: "CURRENT",
-  lastConfirmedAt: "2026-10-05T15:00:00.000Z",
   consentText: { emergencyTreatment: "x", activities: "y", photocopy: "z" },
   consentVersion: "v",
 };
@@ -54,7 +53,7 @@ beforeEach(() => {
 describe("the Health tab page for a club member (#923)", () => {
   it("gives a Registrar the entry page when no record exists: the status and a blank form, and never reads the record", async () => {
     mocks.viewer.mockResolvedValue(registrar);
-    mocks.entry.mockResolvedValue({ ...entry, exists: false, status: "NONE", lastConfirmedAt: null });
+    mocks.entry.mockResolvedValue({ ...entry, exists: false, status: "NONE" });
     const element = text(await ClubMemberHealthPage(props));
     expect(mocks.entry).toHaveBeenCalledWith(registrar, "club-a", "member-1");
     expect(mocks.view).not.toHaveBeenCalled();
