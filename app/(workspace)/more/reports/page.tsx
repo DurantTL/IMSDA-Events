@@ -211,7 +211,7 @@ export default async function OperationalReportsPage({
         <div className="intro-actions report-actions">
           <Link className="secondary-button" href={`/more${peopleQuery}`}>Back to More</Link>
           <Link className="secondary-button" href={`/more/reports/packets${peopleQuery}`}><PackageOpen aria-hidden="true" size={15} /> Group packets</Link>
-          <Link className="secondary-button" href={`/more/reports/clubs${peopleQuery}`}><Tent aria-hidden="true" size={15} /> Camporee club reports</Link>
+          <Link className="secondary-button" href={`/more/reports/clubs${peopleQuery}`}><Tent aria-hidden="true" size={15} /> Club event reports</Link>
           <Link className="secondary-button" href={`/more/reports/clubs/check-in-book${peopleQuery}`}><ClipboardCheck aria-hidden="true" size={15} /> Check-in book</Link>
           <Link className="secondary-button" href={`/more/honors/rosters${peopleQuery}`}><Award aria-hidden="true" size={15} /> Honors rosters</Link>
           <Link className="secondary-button" href={`/more/kitchen-report${peopleQuery}`}><Utensils aria-hidden="true" size={15} /> Kitchen report</Link>
