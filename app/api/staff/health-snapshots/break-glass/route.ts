@@ -7,7 +7,7 @@ import { requireSnapshotAdminViewer, startSnapshotBreakGlass } from "@/modules/h
 const bodySchema = z.object({ personId: z.string().min(1).max(64), reason: z.string().max(2000) }).strict();
 
 /**
- * Break-glass for a person's sealed health copies (#924): a system administrator types a reason and
+ * Break-glass for a person (#924, #929): one grant covers their live health record and sealed copies. A system administrator types a reason and
  * gets 24 hours. Anyone else is refused (audited). With the feature switched off it answers like an unknown route.
  */
 async function postHandler(request: Request) {
@@ -20,7 +20,7 @@ async function postHandler(request: Request) {
     const viewer = await requireSnapshotAdminViewer("BREAK_GLASS_START", null);
     const body = bodySchema.parse(await readHealthJson(request));
     const grant = await startSnapshotBreakGlass(viewer, { personId: body.personId, reason: body.reason });
-    return healthJson({ ok: true, grantId: grant.grantId, expiresAt: grant.expiresAt.toISOString(), snapshotCount: grant.snapshotCount });
+    return healthJson({ ok: true, grantId: grant.grantId, expiresAt: grant.expiresAt.toISOString(), snapshotCount: grant.snapshotCount, liveRecordCount: grant.liveRecordCount });
   } catch (error) {
     return healthApiError(error, "Starting break-glass access to sealed health copies");
   }

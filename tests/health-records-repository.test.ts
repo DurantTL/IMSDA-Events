@@ -19,6 +19,9 @@ const state = vi.hoisted(() => ({
   /** Stored privacy acknowledgments (#923); `ackAll` acknowledges everyone, for the tests that are not about it. */
   acks: [] as Array<Record<string, any>>,
   ackAll: true,
+  /** Break-glass grants and the uses recorded against them (#929). */
+  grants: [] as Array<{ id: string; userId: string; personId: string; expiresAt: Date }>,
+  uses: [] as Array<Record<string, any>>,
 }));
 
 function matches(row: Row, where: Row): boolean {
@@ -127,6 +130,18 @@ const client: any = {
       state.acks.push({ id: `ack-${state.acks.length + 1}`, ...data });
     },
   },
+  healthSnapshotBreakGlass: {
+    findMany: async ({ where }: { where: { userId: string; personId: { in: string[] }; expiresAt: { gt: Date } } }) =>
+      state.grants
+        .filter((grant) => grant.userId === where.userId && where.personId.in.includes(grant.personId) && grant.expiresAt > where.expiresAt.gt)
+        .sort((a, b) => a.expiresAt.getTime() - b.expiresAt.getTime()),
+  },
+  healthBreakGlassUse: {
+    create: async ({ data }: { data: Record<string, any> }) => {
+      state.uses.push({ id: `use-${state.uses.length + 1}`, ...data });
+      return { id: `use-${state.uses.length}` };
+    },
+  },
   messageOutbox: {
     create: async ({ data }: { data: Row }) => {
       const message = { id: `message-${state.outbox.length + 1}`, ...data };
@@ -180,6 +195,13 @@ const admin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "admin-1" };
 const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-coord" };
 const TOKEN = "T".repeat(43);
 
+/** An unexpired break-glass grant (default: 24 hours from `now`) for one administrator and person. */
+function grantBreakGlass(userId: string, personId: string, expiresAt = new Date(now.getTime() + 24 * 3_600_000)) {
+  const id = `grant-${state.grants.length + 1}`;
+  state.grants.push({ id, userId, personId, expiresAt });
+  return id;
+}
+
 function resetState() {
   state.env.HEALTH_RECORDS_ENABLED = true;
   state.audit = [];
@@ -189,6 +211,8 @@ function resetState() {
   state.outbox = [];
   state.acks = [];
   state.ackAll = true;
+  state.grants = [];
+  state.uses = [];
   state.eventRegistrations = [{
     eventId: "event-1",
     organizationId: "club-a",
@@ -328,9 +352,10 @@ describe("director entry and viewing", () => {
     expect(state.records).toHaveLength(0);
   });
 
-  it("lets a system administrator view any club but never edit, confirm or send links", async () => {
+  it("lets a system administrator with break-glass view any club but never edit, confirm or send links", async () => {
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
     state.audit = [];
+    grantBreakGlass("admin-1", "person-1");
     const view = await viewHealthRecord(admin, "club-a", "member-1", now);
     expect(view.canEdit).toBe(false);
     expect(state.audit[0]).toMatchObject({ action: "HEALTH_RECORD_VIEWED", actorUserId: "admin-1", metadata: { viewerKind: "SYSTEM_ADMIN" } });
@@ -342,6 +367,7 @@ describe("director entry and viewing", () => {
   it("records the act-as id when a system administrator is acting as a director", async () => {
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
     state.audit = [];
+    grantBreakGlass("admin-1", "person-1");
     await viewHealthRecord({ kind: "SYSTEM_ADMIN", userId: "admin-1", actAsId: "act-1" }, "club-a", "member-1", now);
     expect(state.audit[0]!.metadata).toMatchObject({ viewerKind: "SYSTEM_ADMIN", actAsId: "act-1" });
   });
@@ -790,6 +816,8 @@ describe("the one-time privacy acknowledgment (#923)", () => {
     expect(state.prismaTouched).not.toHaveBeenCalled();
 
     await recordHealthPrivacyAcknowledgment(viewer, now);
+    // A system administrator also needs break-glass for a live record (#929).
+    if (viewer.kind === "SYSTEM_ADMIN") grantBreakGlass(viewer.userId, "person-1");
     await expect(attempt()).resolves.toBeTruthy();
   });
 
@@ -849,6 +877,91 @@ describe("the one-time privacy acknowledgment (#923)", () => {
     state.env.HEALTH_RECORDS_ENABLED = false;
     await expect(recordHealthPrivacyAcknowledgment(leader, now)).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(state.acks).toHaveLength(0);
+    expect(state.audit).toHaveLength(0);
+  });
+});
+
+describe("break-glass for a system administrator's live read (#929)", () => {
+  const HOUR = 3_600_000;
+  const actingAdmin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "admin-1", actAsId: "act-1" };
+
+  beforeEach(async () => {
+    resetState();
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    state.audit = [];
+  });
+
+  it("refuses a read without a grant with BREAK_GLASS_REQUIRED, opens nothing, and audits ids and a reason only", async () => {
+    await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+    expect(state.audit).toHaveLength(1);
+    expect(state.audit[0]).toMatchObject({
+      actorUserId: "admin-1",
+      action: "HEALTH_RECORD_ACCESS_REFUSED",
+      metadata: { viewerKind: "SYSTEM_ADMIN", organizationId: "club-a", rosterMemberId: "member-1", personId: "person-1", attempted: "VIEW_RECORD", reason: "BREAK_GLASS_REQUIRED" },
+    });
+    for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
+    expect(state.uses).toHaveLength(0);
+  });
+
+  it("allows the read during a grant, and records the use next to the audit row", async () => {
+    const grantId = grantBreakGlass("admin-1", "person-1");
+    const view = await viewHealthRecord(admin, "club-a", "member-1", now);
+    expect(view.values.medications).toBe("Synthetic medication note");
+    expect(state.uses).toEqual([expect.objectContaining({ grantId, userId: "admin-1", personId: "person-1", kind: "LIVE_RECORD" })]);
+    expect(state.audit[0]).toMatchObject({ action: "HEALTH_RECORD_VIEWED", actorUserId: "admin-1", metadata: { viewerKind: "SYSTEM_ADMIN", grantId, personId: "person-1" } });
+    for (const marker of healthMarkers) expect(JSON.stringify(state.audit)).not.toContain(marker);
+  });
+
+  it("refuses once the grant is 24 hours old, and just before that still allows it", async () => {
+    grantBreakGlass("admin-1", "person-1", new Date(now.getTime() + 24 * HOUR));
+    await expect(viewHealthRecord(admin, "club-a", "member-1", new Date(now.getTime() + 24 * HOUR - 1000))).resolves.toBeTruthy();
+    await expect(viewHealthRecord(admin, "club-a", "member-1", new Date(now.getTime() + 24 * HOUR))).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+    await expect(viewHealthRecord(admin, "club-a", "member-1", new Date(now.getTime() + 25 * HOUR))).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+  });
+
+  it("does not accept another administrator's grant, or one for another person", async () => {
+    grantBreakGlass("admin-2", "person-1");
+    grantBreakGlass("admin-1", "person-other");
+    await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+  });
+
+  it("does not let acting as a director bypass it, and records the act-as id on the refusal and the use", async () => {
+    await expect(viewHealthRecord(actingAdmin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+    expect(state.audit[0]).toMatchObject({ action: "HEALTH_RECORD_ACCESS_REFUSED", metadata: { actAsId: "act-1", reason: "BREAK_GLASS_REQUIRED" } });
+    grantBreakGlass("admin-1", "person-1");
+    await viewHealthRecord(actingAdmin, "club-a", "member-1", now);
+    expect(state.audit[1]).toMatchObject({ action: "HEALTH_RECORD_VIEWED", metadata: { actAsId: "act-1" } });
+    expect(state.uses).toHaveLength(1);
+  });
+
+  it("gates a member who has no person row too: no grant can exist, so the read is refused", async () => {
+    state.members[0]!.personId = null;
+    await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+  });
+
+  it("does not gate a person with no record: nothing is opened", async () => {
+    state.records = [];
+    state.fields = [];
+    const view = await viewHealthRecord(admin, "club-a", "member-1", now);
+    expect(view.status).toBe("NONE");
+    expect(state.uses).toHaveLength(0);
+  });
+
+  it("does not ask directors, deputies or the health role for break-glass", async () => {
+    await expect(viewHealthRecord(leader, "club-a", "member-1", now)).resolves.toBeTruthy();
+    await expect(viewHealthRecord(staff, "club-a", "member-1", now, { eventId: "event-1" })).resolves.toBeTruthy();
+    expect(state.uses).toHaveLength(0);
+  });
+
+  it("shows an administrator the has-a-note flag only for people with a grant", async () => {
+    expect((await healthSummariesForMembers(admin, "club-a", ["member-1"], now))["member-1"]).toEqual({ status: "CURRENT", hasHealthNote: false });
+    grantBreakGlass("admin-1", "person-1");
+    expect((await healthSummariesForMembers(admin, "club-a", ["member-1"], now))["member-1"]).toEqual({ status: "CURRENT", hasHealthNote: true });
+  });
+
+  it("with the feature off answers not found before any grant is looked up", async () => {
+    state.env.HEALTH_RECORDS_ENABLED = false;
+    await expect(viewHealthRecord(admin, "club-a", "member-1", now)).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(state.audit).toHaveLength(0);
   });
 });

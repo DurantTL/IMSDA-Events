@@ -47,6 +47,9 @@ export function EventHealthSheet({ clubs, clubLinks }: { clubs: HealthClubSheet[
                   {club.attendees.map((attendee) => (
                     <tr key={attendee.attendeeId}>
                       <th scope="row" translate="no">{attendee.name}</th>
+                      {attendee.breakGlassRequired ? (
+                        <td colSpan={4}>Withheld: a system administrator needs break-glass access for this person.</td>
+                      ) : (<>
                       <td translate="no">{attendee.dietary ?? "None entered"}</td>
                       <td>{attendee.medicalFlag ?? "Not answered"}</td>
                       <td>{HEALTH_TEXT.medicationsValue}</td>
@@ -65,6 +68,7 @@ export function EventHealthSheet({ clubs, clubLinks }: { clubs: HealthClubSheet[
                           </>
                         )}
                       </td>
+                      </>)}
                     </tr>
                   ))}
                 </tbody>

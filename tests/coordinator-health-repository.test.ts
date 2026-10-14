@@ -10,17 +10,36 @@ const mocks = vi.hoisted(() => ({
   registrationFindMany: vi.fn(),
   rosterFindMany: vi.fn(),
   submissionFindMany: vi.fn(),
+  /** Break-glass grants and recorded uses (#929). */
+  grants: [] as Array<{ id: string; userId: string; personId: string; expiresAt: Date }>,
+  uses: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
-  getPrisma: () => ({
+  getPrisma: () => {
+    const client = {
     event: { findUnique: mocks.eventFindUnique, findMany: mocks.eventFindMany },
     clubEventRegistration: { findMany: mocks.registrationFindMany },
     clubRosterMember: { findMany: mocks.rosterFindMany },
     clubFormSubmission: { findMany: mocks.submissionFindMany },
     healthPrivacyAcknowledgment: { findFirst: mocks.ackFindFirst },
-  }),
+    healthSnapshotBreakGlass: {
+      findMany: async ({ where }: { where: { userId: string; personId: { in: string[] }; expiresAt: { gt: Date } } }) =>
+        mocks.grants
+          .filter((grant) => grant.userId === where.userId && where.personId.in.includes(grant.personId) && grant.expiresAt > where.expiresAt.gt)
+          .sort((a, b) => a.expiresAt.getTime() - b.expiresAt.getTime()),
+    },
+    healthBreakGlassUse: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        mocks.uses.push(data);
+        return { id: `use-${mocks.uses.length}` };
+      },
+    },
+    $transaction: async (work: (tx: unknown) => unknown) => work(client),
+    };
+    return client;
+  },
 }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => mocks.env }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError }));
@@ -45,6 +64,11 @@ const CLINIC = "Synthetic Clinic";
 const SLIP_PHONE = "555-0142";
 const PASSENGER_CONTACT = "Parent Test 555-0177";
 const DIETARY = "Synthetic tree-nut allergy";
+
+/** An unexpired grant (24 hours from `now` unless given) for one administrator and person. */
+function grant(userId: string, personId: string, expiresAt = new Date(now.getTime() + 24 * 3_600_000)) {
+  mocks.grants.push({ id: `grant-${userId}-${personId}`, userId, personId, expiresAt });
+}
 
 function attendee(id: string, personId: string, first: string, last: string, responses: Record<string, unknown> = {}) {
   return { id, personId, formResponses: responses, person: { firstName: first, lastName: last } };
@@ -105,6 +129,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.env.HEALTH_RECORDS_ENABLED = false;
   mocks.ackFindFirst.mockResolvedValue(null);
+  mocks.grants = [];
+  mocks.uses = [];
+  // Most tests are about the sheet's content, not break-glass: the administrators have a grant for everyone on it.
+  for (const userId of ["root", "root-acting"]) for (const personId of ["p0", "p1", "p2", "p3"]) grant(userId, personId);
   seed();
 });
 
@@ -345,5 +373,91 @@ describe("the privacy acknowledgment before the sheet opens (#923)", () => {
     mocks.env.HEALTH_RECORDS_ENABLED = true;
     await expect(loadEventHealth(admin, "e1", {}, new Date("2026-10-12T15:00:00Z"))).rejects.toMatchObject({ code: "WINDOW_CLOSED" });
     expect(mocks.ackFindFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("break-glass for a system administrator on the coordinator health sheet (#929)", () => {
+  const HOUR = 3_600_000;
+  const actingLeader: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "root-acting", actAsId: "act-9" } };
+
+  beforeEach(() => {
+    mocks.grants = [];
+  });
+
+  it("refuses a system administrator with no grant for anyone on the sheet, audits ids and a reason, and reads nothing", async () => {
+    await expect(loadEventHealth(admin, "e1", {}, now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({
+      eventId: "e1",
+      actorUserId: "root",
+      action: "COORDINATOR_HEALTH_DENIED",
+      metadata: { viewerKind: "SYSTEM_ADMIN", purpose: "VIEW", reason: "BREAK_GLASS_REQUIRED" },
+    });
+    expect(mocks.submissionFindMany).not.toHaveBeenCalled();
+    expect(mocks.uses).toHaveLength(0);
+    const logged = JSON.stringify(mocks.writeAuditLog.mock.calls[0][0]);
+    for (const text of [DIETARY, SLIP_PHONE, PASSENGER_CONTACT]) expect(logged).not.toContain(text);
+  });
+
+  it("refuses a printable sheet (export) the same way, audited as an export attempt", async () => {
+    await expect(loadEventHealth(admin, "e1", { purpose: "EXPORT" }, now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+    expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ action: "COORDINATOR_HEALTH_DENIED", metadata: { purpose: "EXPORT", reason: "BREAK_GLASS_REQUIRED" } });
+  });
+
+  it("shows only the people with a grant, names the rest and shows them nothing", async () => {
+    grant("root", "p1");
+    const sheet = await loadEventHealth(admin, "e1", {}, now);
+    const [avery, blake, casey] = sheet.clubs[0].attendees;
+    expect(avery).toMatchObject({ name: "Avery Test", dietary: DIETARY, medicalFlag: "Yes" });
+    expect(avery.breakGlassRequired).toBeUndefined();
+    expect(blake).toEqual({ attendeeId: "att-2", name: "Blake Test", dietary: null, medicalFlag: null, emergencyContacts: [], emergencyStatus: "NONE_ON_FILE", breakGlassRequired: true, personId: "p2" });
+    expect(casey).toMatchObject({ name: "Casey Test", breakGlassRequired: true });
+    // The passenger list holds Blake's contact, but Blake is not covered by a grant.
+    expect(JSON.stringify(sheet)).not.toContain(PASSENGER_CONTACT);
+  });
+
+  it("records a use for each granted person and audits the grants, with no health text", async () => {
+    grant("root", "p1");
+    grant("root", "p2");
+    await loadEventHealth(admin, "e1", { purpose: "EXPORT" }, now);
+    expect(mocks.uses).toEqual([
+      { grantId: "grant-root-p1", userId: "root", personId: "p1", kind: "LIVE_EVENT_SHEET_EXPORT" },
+      { grantId: "grant-root-p2", userId: "root", personId: "p2", kind: "LIVE_EVENT_SHEET_EXPORT" },
+    ]);
+    const entry = mocks.writeAuditLog.mock.calls[0][0];
+    expect(entry).toMatchObject({ action: "COORDINATOR_HEALTH_EXPORTED", metadata: { breakGlass: true, grantedCount: 2, withheldCount: 1, grantIds: ["grant-root-p1", "grant-root-p2"] } });
+    for (const text of [DIETARY, SLIP_PHONE, PASSENGER_CONTACT, "Avery"]) expect(JSON.stringify(entry)).not.toContain(text);
+  });
+
+  it("refuses again once the grants are 24 hours old", async () => {
+    for (const personId of ["p1", "p2", "p3"]) grant("root", personId, new Date(now.getTime() + 24 * HOUR));
+    // An event still open then, so only the grant rule is under test.
+    mocks.eventFindUnique.mockResolvedValue({ ...event, endsAt: new Date(now.getTime() + 3 * 24 * HOUR) });
+    await expect(loadEventHealth(admin, "e1", {}, new Date(now.getTime() + 24 * HOUR - 1000))).resolves.toBeTruthy();
+    await expect(loadEventHealth(admin, "e1", {}, new Date(now.getTime() + 24 * HOUR))).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+  });
+
+  it("does not use another administrator's grant", async () => {
+    for (const personId of ["p1", "p2", "p3"]) grant("someone-else", personId);
+    await expect(loadEventHealth(admin, "e1", {}, now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+  });
+
+  it("makes a system administrator acting as the club's director pass break-glass too, with the act-as id audited", async () => {
+    await expect(loadEventHealth(actingLeader, "e1", {}, now)).rejects.toMatchObject({ code: "BREAK_GLASS_REQUIRED" });
+    expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({
+      actorUserId: "root-acting",
+      action: "COORDINATOR_HEALTH_DENIED",
+      metadata: { viewerKind: "CLUB_LEADER", actAsId: "act-9", reason: "BREAK_GLASS_REQUIRED" },
+    });
+    grant("root-acting", "p1");
+    const sheet = await loadEventHealth(actingLeader, "e1", {}, now);
+    expect(sheet.clubs[0].attendees[0]).toMatchObject({ dietary: DIETARY });
+    expect(sheet.clubs[0].attendees[1]).toMatchObject({ breakGlassRequired: true });
+    expect(mocks.writeAuditLog.mock.calls[1][0]).toMatchObject({ metadata: { actAsId: "act-9", breakGlass: true, grantedCount: 1 } });
+  });
+
+  it("does not ask the club's own director (signed in as an attendee), a coordinator or the health role for break-glass", async () => {
+    for (const viewer of [ownLeader, coordinator, roleHolder]) await expect(loadEventHealth(viewer, "e1", {}, now)).resolves.toBeTruthy();
+    expect(mocks.uses).toHaveLength(0);
   });
 });

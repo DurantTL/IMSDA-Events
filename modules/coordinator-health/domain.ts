@@ -69,6 +69,18 @@ export function viewerCanSeeClub(viewer: HealthViewer, organizationId: string) {
   return viewer.kind !== "CLUB_LEADER" || viewer.organizationId === organizationId;
 }
 
+/**
+ * The system administrator behind a viewer who must pass break-glass (#929, ADR 0005 Addendum B), or null for
+ * everyone else. That is a system administrator and also one acting as a club director (a `CLUB_LEADER` whose actor
+ * is `STAFF_ACTING`): acting as a director never bypasses break-glass for health data. The grant is the
+ * administrator's own (`userId`); `actAsId` is carried for the audit rows only.
+ */
+export function breakGlassActorOf(viewer: HealthViewer): { userId: string; actAsId?: string } | null {
+  if (viewer.kind === "SYSTEM_ADMIN") return { userId: viewer.userId };
+  if (viewer.kind === "CLUB_LEADER" && viewer.actor.kind === "STAFF_ACTING") return { userId: viewer.actor.userId, actAsId: viewer.actor.actAsId };
+  return null;
+}
+
 /** Audit fields that say who looked, never what they saw. */
 export function healthAuditActor(viewer: HealthViewer): {
   actorUserId?: string;
@@ -116,6 +128,12 @@ export type HealthAttendeeRow = {
   medicalFlag: "Yes" | "No" | null;
   emergencyContacts: EmergencyContact[];
   emergencyStatus: EmergencyStatus;
+  /**
+   * Set for a system administrator with no unexpired break-glass grant for this person (#929): the row names the
+   * attendee and carries no health information. `personId` is there so the administrator can start break-glass.
+   */
+  breakGlassRequired?: true;
+  personId?: string;
 };
 
 export type HealthClubSheet = {
