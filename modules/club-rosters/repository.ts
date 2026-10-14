@@ -23,7 +23,9 @@ export type RosterErrorCode =
   | "MEMBER_REMOVED"
   | "GENDER_REQUIRED"
   | "GUARDIANS_PRIOR_YEAR"
-  | "GUARDIAN_PHONE_INVALID";
+  | "GUARDIAN_PHONE_INVALID"
+  | "CARRY_FORWARD_DONE"
+  | "CARRY_FORWARD_BUSY";
 
 export class RosterOperationError extends Error {
   constructor(public readonly code: RosterErrorCode, message: string) {
@@ -464,7 +466,19 @@ export async function removeRosterMember(organizationId: string, memberId: strin
     }
     // Both waits are done: a stuck lock gave up fast (55P03 -> 503) above.
     await tx.$executeRawUnsafe("SET LOCAL lock_timeout = 0");
-    const { guardiansErased } = await eraseRosterRow(tx, memberId, now);
+    const erasedRow = await eraseRosterRow(tx, memberId, now);
+    let guardiansErased = erasedRow.guardiansErased;
+    // A person carried forward (#414) has one row per club year, all with the same sealed birth date. Removal
+    // (§6) erases the person, not one year's copy, so this club's other rows for them are erased too.
+    const otherYearRows = member.personId
+      ? await tx.clubRosterMember.findMany({
+        where: { organizationId, personId: member.personId, status: { not: "REMOVED" }, id: { not: memberId } },
+        select: { id: true },
+      })
+      : [];
+    for (const otherRow of otherYearRows) {
+      guardiansErased += (await eraseRosterRow(tx, otherRow.id, now)).guardiansErased;
+    }
     // A need this club has not ordered yet has no reason to outlive the
     // membership (#566). ORDERED, RECEIVED and AWARDED needs are history and stay.
     let ordersCancelled = 0;
@@ -551,6 +565,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       classCompletionsErased,
       guardiansErased,
       nameKept,
+      otherYearRowsErased: otherYearRows.length,
     });
     // The person kept (still registered, on another roster…) is refreshed by the caller (#527).
     return { personId: personDeleted ? null : member.personId, nameKept };

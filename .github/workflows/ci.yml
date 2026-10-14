@@ -190,6 +190,9 @@ jobs:
       # Real-database check of roster guardian contacts: slot constraints, replace-on-edit, prior-year writes refused, deletion on removal, reader scoping, and no guardian value in any audit row (#510).
       - run: npm run test:club-roster-guardians
 
+      # Real-database check of carrying a club roster forward to the next club year: the offer lists only last year's active people with no birth date, one confirmation carries the ticked people with the same Person and the same sealed birth date, a Pathfinder becoming staff changes type and role, last year's roster stays readable, a repeat (and eight racing confirmations) leaves one winner and no duplicate rows, another club's person is refused as not found, removal erases every year's row, the oversight list of clubs that have not started, and no birth date or name in any audit row or record (#414).
+      - run: npm run test:club-roster-carry-forward
+
       # Real-database check of billing responsibility and organization billing contacts: the resolver is idempotent and race-safe, staff decisions survive re-resolution, one active contact per organization even under parallel replacement with history kept, the constraints and append-only history hold, and no audit row holds contact details (#165).
       - run: npm run test:billing-responsibility
 

@@ -788,6 +788,7 @@ model User {
   staffActAs                         StaffActAs[]                 @relation("StaffActAsUser")
   createdClubRosterMembers           ClubRosterMember[]           @relation("ClubRosterMemberCreatedByUser")
   createdRosterExportFormats         ClubRosterExportFormat[]     @relation("ClubRosterExportFormatCreatedByUser")
+  confirmedRosterCarryForwards       ClubRosterCarryForward[]     @relation("ClubRosterCarryForwardByUser")
 
   recordedMemberHonorEntries         MemberHonorEntry[]           @relation("MemberHonorEntryRecordedByUser")
   honorEnrollmentOverrides           HonorEnrollment[]            @relation("HonorEnrollmentRequirementOverriddenBy")
@@ -1066,6 +1067,7 @@ model AttendeeAccount {
   revokedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedByAccount")
   createdClubRosterMembers          ClubRosterMember[]          @relation("ClubRosterMemberCreatedBy")
   createdRosterExportFormats        ClubRosterExportFormat[]    @relation("ClubRosterExportFormatCreatedBy")
+  confirmedRosterCarryForwards      ClubRosterCarryForward[]    @relation("ClubRosterCarryForwardByAccount")
 
   recordedMemberHonorEntries        MemberHonorEntry[]          @relation("MemberHonorEntryRecordedBy")
   voidedMemberHonorEntries          MemberHonorEntryVoid[]      @relation("MemberHonorEntryVoidedBy")
@@ -2254,6 +2256,7 @@ model Organization {
   directorGrants     ClubDirectorGrant[]
   rosterMembers      ClubRosterMember[]
   rosterExportFormats ClubRosterExportFormat[]
+  rosterCarryForwards ClubRosterCarryForward[]
   eventRegistrations ClubEventRegistration[]
   generalLinkSubmissionsAsClub GeneralLinkSubmission[] @relation("GeneralLinkSubmissionClub")
   generalLinkSubmissionsSuggested GeneralLinkSubmission[] @relation("GeneralLinkSubmissionSuggestedClub")
@@ -4835,6 +4838,33 @@ model ClubRosterExportFormat {
   createdByUser User?            @relation("ClubRosterExportFormatCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, name])
+}
+
+/// A director confirming that a club started its next club year's roster by
+/// carrying last year's people forward (#414). One row per club and target
+/// year (the unique key makes a repeat refuse cleanly), recording counts only:
+/// never a person, a name or a birth date. The carried people are ordinary
+/// `ClubRosterMember` rows for the new year.
+model ClubRosterCarryForward {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  fromClubYear         String
+  toClubYear           String
+  carriedCount         Int
+  /// Last year's active people the director left unticked.
+  leftBehindCount      Int
+  /// Carried people whose type changed (a Pathfinder becoming staff, say).
+  typeChangedCount     Int
+  confirmedByAccountId String?
+  /// Set instead of `confirmedByAccountId` for a staff "act as" director (#442).
+  confirmedByUserId    String?
+  createdAt            DateTime @default(now())
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  confirmedBy     AttendeeAccount? @relation("ClubRosterCarryForwardByAccount", fields: [confirmedByAccountId], references: [id], onDelete: SetNull)
+  confirmedByUser User?            @relation("ClubRosterCarryForwardByUser", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, toClubYear])
 }
 
 /// The pre-#527 one-row-per-person background-check table, kept read-only
