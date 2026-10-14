@@ -89,6 +89,8 @@ async function cleanup() {
     prisma.$executeRawUnsafe("DROP TRIGGER IF EXISTS \"evdel_fail_tag_delete\" ON \"EventTag\""),
     prisma.$executeRawUnsafe("DROP FUNCTION IF EXISTS evdel_fail_tag_delete()"),
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
+    // Sealed health copies (#924) accept deletes only under the same transaction-local setting.
+    prisma.healthRecordSnapshot.deleteMany({ where: inEvents }),
     prisma.registrationOperation.deleteMany({ where: inEvents }),
     prisma.registrationPaymentChoiceOperation.deleteMany({ where: inEvents }),
   ]);
@@ -735,6 +737,32 @@ async function main() {
       + (await prisma.messageTemplateVersionFile.count({ where: { templateVersionId: mfVersion.id } })) === 0,
     "and so are the links from announcements, outbox rows and template versions",
   );
+
+  // ---- Sealed health copies (#924): immutable, so only deleting their event removes them, and the person is kept. ----
+  const snapEventId = id("snapshot_event");
+  await prisma.event.create({ data: { id: snapEventId, slug: `${P}-snapshot`, name: "Evdel Sealed Copies 2028", ...eventBase } });
+  const snapshot = await prisma.healthRecordSnapshot.create({
+    data: {
+      personId: attendeePeople[1].id, eventId: snapEventId, trigger: "CHECK_IN", eventDate: "2028-10-13", ageBasis: "ADULT",
+      expiresAt: new Date("2033-10-15T00:00:00Z"), fieldCount: 1, fields: { create: [{ fieldKey: "consent", sealedValue: "v1.synthetic.sealed.value" }] },
+    },
+  });
+  const refusedDirectDelete = await caught(prisma.event.delete({ where: { id: snapEventId } }));
+  assert(refusedDirectDelete && /Sealed health snapshots/.test(String(refusedDirectDelete)), "the database refuses to cascade a sealed copy away outside event deletion");
+  assert(await prisma.healthRecordSnapshot.count({ where: { id: snapshot.id } }) === 1, "the refused delete left the copy");
+  const snapPreview = await getEventDeletionPreview(snapEventId, { userId: adminId, globalRole: "SYSTEM_ADMIN" });
+  assert(snapPreview && snapPreview.counts.healthSnapshots === 1 && snapPreview.counts.heldHealthSnapshots === 0 && snapPreview.decision.allowed, "an unheld copy is counted and does not block its event's deletion");
+  await prisma.healthSnapshotHold.create({ data: { scope: "EVENT", eventId: snapEventId, reason: "Synthetic hold for the deletion check", placedByUserId: adminId } });
+  const heldPreview = await getEventDeletionPreview(snapEventId, { userId: adminId, globalRole: "SYSTEM_ADMIN" });
+  assert(heldPreview && heldPreview.counts.heldHealthSnapshots === 1 && !heldPreview.decision.allowed, "a copy under a legal hold blocks its event's deletion");
+  await prisma.healthSnapshotHold.deleteMany({ where: { eventId: snapEventId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await removeEventOwnedRows(tx, snapEventId);
+  }, { timeout: 60_000 });
+  assert(await prisma.event.count({ where: { id: snapEventId } }) === 0, "the event with a sealed copy is deleted");
+  assert(await prisma.healthRecordSnapshot.count({ where: { id: snapshot.id } }) + await prisma.healthRecordSnapshotField.count({ where: { snapshotId: snapshot.id } }) === 0, "its sealed copy and fields went with it");
+  assert(await prisma.person.count({ where: { id: attendeePeople[1].id } }) === 1, "the person was kept");
 
   console.log("Event deletion verified: refusal with records attached changes nothing, setup-only event deleted cleanly, shared records kept, permissions, audit row, rollback, large setup.");
 }
