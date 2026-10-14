@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   logError: vi.fn(),
   refreshDueCalendarFeeds: vi.fn(),
   sweepHostedCheckouts: vi.fn(),
+  runHealthSnapshotSweep: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,6 +26,7 @@ vi.mock("@/modules/community/repository", () => ({ pruneExpiredCommunityContent:
 vi.mock("@/modules/operations/alert-scan", () => ({ runAlertScan: mocks.runAlertScan }));
 vi.mock("@/modules/operations/sweep-heartbeat-repository", () => ({ recordSweepHeartbeat: mocks.recordSweepHeartbeat }));
 vi.mock("@/modules/payments/square-hosted-invalidation", () => ({ sweepHostedCheckouts: mocks.sweepHostedCheckouts }));
+vi.mock("@/modules/health-records/snapshot-hooks", () => ({ runHealthSnapshotSweep: mocks.runHealthSnapshotSweep }));
 vi.mock("@/modules/calendar/feeds", () => ({ refreshDueCalendarFeeds: mocks.refreshDueCalendarFeeds }));
 vi.mock("@/modules/event-locations/waitlist-digest", () => ({ sendDueLocationWaitlistDigests: mocks.sendDueLocationWaitlistDigests }));
 
@@ -45,7 +47,22 @@ beforeEach(() => {
   mocks.pruneExpiredCommunityContent.mockResolvedValue({ removed: 0 });
   mocks.refreshDueCalendarFeeds.mockResolvedValue({ due: 0, refreshed: 0, failed: 0 });
   mocks.sweepHostedCheckouts.mockResolvedValue({ withdrawn: 0, deleted: 0, failed: 0 });
+  mocks.runHealthSnapshotSweep.mockResolvedValue(null);
   mocks.sendDueLocationWaitlistDigests.mockResolvedValue({ status: "QUEUED", dateKey: "2026-10-06", changesCovered: 4, recipients: 2, messageIds: ["m1", "m2"], delivered: 2 });
+});
+
+describe("the sweep and sealed health copies (#924)", () => {
+  it("runs the sealed health copy sweep and reports its counts, and a failure there does not fail the sweep", async () => {
+    mocks.runHealthSnapshotSweep.mockResolvedValueOnce({ started: { taken: 1 }, retention: { deleted: 2 } });
+    const response = await POST(request());
+    expect(response.status).toBe(200);
+    expect((await response.json()).healthSnapshots).toEqual({ started: { taken: 1 }, retention: { deleted: 2 } });
+
+    mocks.runHealthSnapshotSweep.mockRejectedValueOnce(new Error("synthetic failure"));
+    const failed = await POST(request());
+    expect(failed.status).toBe(200);
+    expect((await failed.json()).healthSnapshots).toBeNull();
+  });
 });
 
 describe("the sweep and the daily waitlist digest", () => {

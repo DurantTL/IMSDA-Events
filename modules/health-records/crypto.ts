@@ -25,3 +25,24 @@ export function openHealthField(recordId: string, fieldKey: string, sealed: stri
     throw new HealthRecordError("UNREADABLE", "A health record could not be read. Ask a system administrator to check the encryption key.");
   }
 }
+
+/**
+ * Sealed per-event copies (#924) use their own purpose, which names the
+ * snapshot and the field, so a copy's value cannot be opened as a live record's
+ * (or the other way round) and cannot be moved to another snapshot.
+ */
+function snapshotPurposeFor(snapshotId: string, fieldKey: string) {
+  return `health-snapshot:${snapshotId}:${fieldKey}`;
+}
+
+export function sealSnapshotField(snapshotId: string, fieldKey: string, value: unknown) {
+  return sealSecret(JSON.stringify(value), snapshotPurposeFor(snapshotId, fieldKey));
+}
+
+export function openSnapshotField(snapshotId: string, fieldKey: string, sealed: string): unknown {
+  try {
+    return JSON.parse(openSecret(sealed, snapshotPurposeFor(snapshotId, fieldKey))) as unknown;
+  } catch {
+    throw new HealthRecordError("UNREADABLE", "A sealed health copy could not be read. Ask a system administrator to check the encryption key.");
+  }
+}
