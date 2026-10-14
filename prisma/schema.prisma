@@ -8471,6 +8471,14 @@ model EventMealTicket {
   @@index([selectionId, cancelledAt])
 }
 
+/// Never holds a row (#920). A public registration submission locks this table (`LOCK TABLE ... IN EXCLUSIVE MODE`) as the
+/// first statement of its SERIALIZABLE transaction, so simultaneous submissions queue instead of aborting each other:
+/// the lock wait must happen before the transaction's snapshot is taken, and a table lock is the one lock that can
+/// (`pg_advisory_xact_lock` is a query, so it takes the snapshot first). See docs/MEALS.md, "Simultaneous submissions".
+model PublicSubmissionGate {
+  id Int @id
+}
+
 /// Append-only history of a selection: every creation, quantity change, plan change, substitution and
 /// cancellation, with who did it, why, and the selection before and after.
 model EventMealSelectionChange {

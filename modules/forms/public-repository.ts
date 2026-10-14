@@ -6,7 +6,7 @@ import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { depositOptionSelected } from "@/modules/payments/deposit-domain";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
-import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
+import { isLockTimeoutError, isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { admitToLocation } from "@/modules/event-locations/admission";
 import { locationWaitlistPlace, recordLocationWaitlistChange } from "@/modules/event-locations/waitlist";
 import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
@@ -693,6 +693,9 @@ async function createPublicRegistrationTransaction(
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
   let input = submittedInput;
+  // Lock order (#920): this gate comes first, before any read or write, so nothing a submission holds can be waited on
+  // by a transaction that is itself waiting for the gate. Club and group submissions (`bulk`) keep their own location lock.
+  if (!bulk) await enterSubmissionGate(tx);
   const form = await tx.registrationForm.findFirst(publishedFormQuery(eventSlug, formSlug));
   const version = form?.versions[0];
   if (!form || !version) throw new PublicRegistrationError("FORM_NOT_FOUND", "That public registration form is not available.");
@@ -1493,6 +1496,53 @@ async function createPublicRegistrationTransaction(
 
 const submitAttempts = 4;
 
+/** Room for a submission to wait its turn at the gate: a few hundred simultaneous submissions at roughly 40 ms each. */
+const submissionGateTimeoutMs = 30_000;
+
+/** How long one submission waits for the gate before it gives up and asks the family to submit again (#920). */
+const defaultSubmissionGateLockTimeoutMs = 25_000;
+
+/**
+ * The gate wait, in milliseconds. Production uses 25 s, under the 30 s transaction timeout so the lock gives up first.
+ * `PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS` lowers it for the real-database test only; anything that is not a whole number
+ * from 1 to 25000 is ignored.
+ */
+function submissionGateLockTimeoutMs() {
+  const override = Number(process.env.PUBLIC_SUBMISSION_GATE_LOCK_TIMEOUT_MS);
+  return Number.isInteger(override) && override >= 1 && override <= defaultSubmissionGateLockTimeoutMs ? override : defaultSubmissionGateLockTimeoutMs;
+}
+
+const submissionBusyMessage = "Many people are registering right now. Please submit again. Your entries are kept.";
+
+/**
+ * Makes simultaneous individual registration submissions queue instead of abort (#920).
+ *
+ * Every submission to an event reads the event's attendee count, the form's capacity reservations, the meal plan and
+ * its selections, the person directory and the message outbox, and then writes rows into the same ranges. Under
+ * SERIALIZABLE two overlapping submissions therefore depend on each other both ways, and PostgreSQL cancels one with a
+ * serialization failure: about 80% of ten simultaneous submissions on the first try, with or without meal tickets, and
+ * enough to exhaust the retries below. Retrying cannot fix a stampede; queueing can.
+ *
+ * The lock is `LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE`, the first statement of the transaction, because
+ * a SERIALIZABLE transaction's snapshot is frozen when its first query starts. `pg_advisory_xact_lock` is a query:
+ * the snapshot would be taken before the wait, the waiter would then read a world that excludes the submission it
+ * waited for, and it would still be cancelled (measured: 80% first-try failures with an advisory lock first, 0% with
+ * the table lock). `LOCK TABLE` waits without taking the snapshot, so a submission that waited reads everything the
+ * earlier ones committed and conflicts with nobody. The table is never written; the lock goes at commit or rollback.
+ *
+ * Nothing else locks this table, so the gate cannot be part of a deadlock cycle; it is always the first thing a
+ * submission takes (see docs/MEALS.md for the full order). Behavior is unchanged: the same reads and writes run, the same
+ * unique indexes, capacity checks and ledger rows apply, and the SERIALIZABLE retry below stays as the backstop against
+ * a conflict with a transaction that does not use the gate (an amendment, a staff order, a club submission).
+ */
+async function enterSubmissionGate(tx: Prisma.TransactionClient) {
+  // The wait is bounded. `SET LOCAL` takes no snapshot, so the statements the database sees stay exactly
+  // BEGIN / SET TRANSACTION ISOLATION LEVEL SERIALIZABLE / SET LOCAL lock_timeout / LOCK TABLE, with nothing in between
+  // (verified with log_statement=all). Do not put any query before the LOCK.
+  await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '${submissionGateLockTimeoutMs()}ms'`);
+  await tx.$executeRaw`LOCK TABLE "PublicSubmissionGate" IN EXCLUSIVE MODE`;
+}
+
 function retryableTransactionError(error: unknown) {
   return (
     isSerializationFailure(error)
@@ -1519,8 +1569,11 @@ export async function submitPublicRegistration(
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the
           // default 5s transaction timeout would expire before that wait ends. A submission that carries lodging
-          // waits for the unit locks the same way (#199), so it gets the lodging transaction's room too.
-          ...(bulk ? { timeout: locationTransactionTimeoutMs } : input.lodging ? { timeout: lodgingTransactionTimeoutMs, maxWait: lodgingTransactionTimeoutMs } : {}),
+          // waits for the unit locks the same way (#199), so it gets the lodging transaction's room too. Every individual
+          // submission may also wait its turn at the submission gate (#920), so it gets room for the whole queue.
+          ...(bulk
+            ? { timeout: locationTransactionTimeoutMs }
+            : { timeout: Math.max(submissionGateTimeoutMs, lodgingTransactionTimeoutMs), maxWait: Math.max(submissionGateTimeoutMs, lodgingTransactionTimeoutMs) }),
         }
       );
       // #527: a registrant already on the Sterling Volunteers list is matched
@@ -1563,6 +1616,12 @@ export async function submitPublicRegistration(
               : result.confirmation.notificationStatus,
       };
     } catch (error) {
+      // Waited too long at the gate (SQLSTATE 55P03), or the transaction expired while queued (P2028): nothing was
+      // written, so ask the family to submit again with their entries and idempotency key kept. Not retried here: another
+      // full wait would not help (#920).
+      if (!bulk && (isLockTimeoutError(error) || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028"))) {
+        throw new PublicRegistrationError("SUBMISSION_CONFLICT", submissionBusyMessage);
+      }
       if (!retryableTransactionError(error)) throw error;
       if (attempt < submitAttempts - 1) await pauseBeforeRetry(attempt);
     }
