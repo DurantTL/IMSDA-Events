@@ -46,6 +46,13 @@ function assert(condition: unknown, message: string): asserts condition {
 async function cleanup() {
   const events = [eventA, eventB];
   await prisma.publicRegistrationSubmission.deleteMany({ where: { eventId: { in: events } } });
+  // Amendment records are immutable by trigger; this script's own synthetic rows are removed with the trigger off for
+  // that one transaction, and it is back on before anything else can write.
+  await prisma.$transaction([
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" DISABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.registrationOperation.deleteMany({ where: { eventId: { in: events } } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" ENABLE TRIGGER "RegistrationOperation_immutable"'),
+  ]);
   await prisma.event.deleteMany({ where: { id: { in: events } } });
   await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.organization.deleteMany({ where: { id: { startsWith: `${P}_` } } });
@@ -214,6 +221,25 @@ async function main() {
   // An attendee whose answers live only on the submission (saved before attendees kept their own), at their position.
   await seed({ key: "legacy", code: "OPS-1010", holder: ["Lena", "Legacy", "lena.legacy@example.test"], attendeeResponses: [{ meal: "vegan" }, { meal: "plain" }],
     attendees: [{ first: "Lena", last: "Legacy", typeCode: "ADULT" }, { first: "Leo", last: "Legacy", typeCode: "YOUTH" }] });
+  // Amended answers: the People list reads the latest amendment's registration answers, else the submission's.
+  const amend = (key: string, transport: string, at: string) => prisma.registrationOperation.create({
+    data: {
+      id: `${P}_op_${key}`, eventId: eventA, registrationId: reg0(key), type: "AMENDMENT", clientRequestId: `${P}-${key}`, requestFingerprint: `${P}-${key}`,
+      actorUserId: staffId, actorNameSnapshot: "Search Check Staff", beforeSnapshot: {}, afterSnapshot: { registrationResponses: { transport } }, responseSnapshot: {},
+      createdAt: new Date(at),
+    },
+  });
+  await seed({ key: "amended_car", code: "OPS-1011", holder: ["Ada", "Amended", "ada.amended@example.test"], transport: "bus", attendees: [{ first: "Ada", last: "Amended" }] });
+  await amend("amended_car", "car", "2026-10-05T10:00:00Z");
+  await seed({ key: "amended_twice", code: "OPS-1012", holder: ["Abe", "Twice", "abe.twice@example.test"], transport: "bus", attendees: [{ first: "Abe", last: "Twice" }] });
+  await prisma.registrationOperation.create({
+    data: {
+      id: `${P}_op_amended_twice_2`, eventId: eventA, registrationId: reg0("amended_twice"), type: "AMENDMENT", clientRequestId: `${P}-amended_twice_2`, requestFingerprint: `${P}-amended_twice_2`,
+      actorUserId: staffId, actorNameSnapshot: "Search Check Staff", beforeSnapshot: {}, afterSnapshot: { registrationResponses: { transport: "bus" } }, responseSnapshot: {},
+      createdAt: new Date("2026-10-07T10:00:00Z"),
+    },
+  });
+  await amend("amended_twice", "car", "2026-10-06T10:00:00Z");
   // A club registration, and a registration at a site of the event.
   await prisma.organization.create({ data: { id: `${P}_org_eagle`, type: "CLUB", name: "Eagle Ridge Club", normalizedName: "eagle ridge club" } });
   await prisma.clubEventRegistration.create({ data: { eventId: eventA, organizationId: `${P}_org_eagle`, registrationId: reg0("jane_doe") } });
@@ -360,7 +386,7 @@ async function main() {
 
   // 7. Form answers: stable key survives the relabel and the version change; stale and sensitive keys are reported.
   assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan")), [reg("marta"), reg("jane_smith"), reg("legacy")]), "meal=vegan matches across form versions and the relabelled choice, and an attendee whose answer is only on the submission");
-  assert(sameSet(ids(await run(registrar, "answer=REGISTRATION:transport=bus")), [reg("marta")]), "a registration-wide answer from the older form version still matches");
+  assert(sameSet(ids(await run(registrar, "answer=REGISTRATION:transport=bus")), [reg("marta"), reg("amended_twice")]), "a registration-wide answer from the older form version still matches, and a later amendment back to the original counts");
   assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan&answer=ATTENDEE:meal=vegetarian")), [reg("marta"), reg("jane_smith"), reg("legacy")]), "values of one key are alternatives");
   assert(sameSet(ids(await run(registrar, "answer=ATTENDEE:meal=vegan&answer=REGISTRATION:transport=car")), [reg("jane_smith")]), "different keys combine");
   const kosher = await run(registrar, "answer=ATTENDEE:meal=kosher");
@@ -429,6 +455,12 @@ async function main() {
   const sortTotal = await run(finance, "sort=total&size=5");
   assert(sortTotal.ok && sortTotal.registrationIds[0] === reg("marta"), "finance can sort by total");
   assert((await run(registrar, "sort=name&size=5")).ok && (await run(readOnly, "sort=code&size=5")).ok, "identity sorts by name; anyone sorts by code");
+  // Amendments: the answer is the latest amendment's, else the submission's.
+  const car = await run(registrar, "answer=REGISTRATION:transport=car");
+  assert(ids(car).includes(reg("amended_car")), "a registration amended from bus to car matches car");
+  assert(!ids(await run(registrar, "answer=REGISTRATION:transport=bus")).includes(reg("amended_car")), "a registration amended from bus to car no longer matches bus");
+  assert(ids(car).includes(reg("jane_smith")) && !ids(car).includes(reg("amended_twice")), "the latest of two amendments wins, and an unamended registration keeps its submitted answer");
+  assert(sameSet(ids(await run(registrar, "answer=REGISTRATION:transport=car&answer=ATTENDEE:meal=vegan")), [reg("jane_smith")]), "an amended answer combines with an attendee answer");
   // Location: the service filters; a stale one is reported by the service, and the page falls back to all as the plain list does.
   assert(sameSet(ids(await run(registrar, `location=${siteNorth.id}`)), [reg("jane_smith")]), "a location filter keeps that site's registrations");
   const staleSite = await run(registrar, "location=ops_loc_gone");

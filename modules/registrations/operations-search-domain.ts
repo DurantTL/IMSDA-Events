@@ -597,10 +597,11 @@ export type SearchWhereContext = {
   eventId: string;
   questions: readonly SearchQuestion[];
   /**
-   * Registrations whose attendee answer lives only on the original submission (the attendee row has no answers of its
-   * own), per question id: the in-memory filter reads those at the attendee's position, which SQL resolves for us.
+   * Registrations the repository resolved in SQL, per question id. For a registration-wide question: those whose current
+   * answer (latest amendment, else the submission) matches. For an attendee question: those whose answer lives only on the
+   * original submission (the attendee row has no answers of its own), read at the attendee's position.
    */
-  legacyAnswerIds?: ReadonlyMap<string, readonly string[]>;
+  answerRegistrationIds?: ReadonlyMap<string, readonly string[]>;
   /** Registrations whose money state matches, when a payment filter is active (computed by the repository). */
   paymentRegistrationIds: readonly string[] | null;
 };
@@ -689,17 +690,13 @@ function answerValuePredicate(key: string, value: string) {
   return [{ path: [key], equals: value }, { path: [key], array_contains: [value] }];
 }
 
-function answerPredicate(answer: AnswerFilter, question: SearchQuestion, legacyIds: readonly string[]): Prisma.RegistrationWhereInput {
-  // Only a registration submitted through a version that offers the question as a choice is read.
+function answerPredicate(answer: AnswerFilter, question: SearchQuestion, lookedUpIds: readonly string[]): Prisma.RegistrationWhereInput {
+  // A registration-wide answer is whatever the latest amendment says, else the original submission: SQL resolves that
+  // (see `registrationAnswerIds`), already limited to the versions that offer the question, so the ids are the answer.
+  if (question.scope === "REGISTRATION") return { id: { in: [...lookedUpIds] } };
+  // An attendee's own answers are kept on the attendee row (amendments update it in place). Only a registration submitted
+  // through a version that offers the question as a choice is read; answers kept only on the submission come from the lookup.
   const offeredVersion: Prisma.RegistrationWhereInput = { publicFormSubmission: { is: { formVersionId: { in: question.versionIds } } } };
-  if (question.scope === "REGISTRATION") {
-    return {
-      AND: [
-        offeredVersion,
-        { publicFormSubmission: { is: { OR: answer.values.flatMap((value) => answerValuePredicate(question.key, value).map((responses) => ({ responses }))) } } },
-      ],
-    };
-  }
   return {
     OR: [
       {
@@ -708,7 +705,7 @@ function answerPredicate(answer: AnswerFilter, question: SearchQuestion, legacyI
           { attendees: { some: { OR: answer.values.flatMap((value) => answerValuePredicate(question.key, value).map((formResponses) => ({ formResponses }))) } } },
         ],
       },
-      { id: { in: [...legacyIds] } },
+      { id: { in: [...lookedUpIds] } },
     ],
   };
 }
@@ -746,7 +743,7 @@ export function buildRegistrationWhere(query: OperationsSearchQuery, context: Se
   for (const answer of query.answers) {
     const question = context.questions.find((candidate) => candidate.id === answer.question);
     // Unreachable for a resolved query; failing closed beats matching everything.
-    clauses.push(question ? answerPredicate(answer, question, context.legacyAnswerIds?.get(answer.question) ?? []) : { id: { in: [] } });
+    clauses.push(question ? answerPredicate(answer, question, context.answerRegistrationIds?.get(answer.question) ?? []) : { id: { in: [] } });
   }
   return { eventId: context.eventId, ...(clauses.length ? { AND: clauses } : {}) };
 }

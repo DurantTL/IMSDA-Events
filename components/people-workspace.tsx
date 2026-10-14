@@ -39,7 +39,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { attendeeCountPhrase, lifecycleActionButtonClass, registrationLifecycleLabel } from "@/lib/confirmation-copy";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
-import { registrationMatchesSearch } from "@/modules/registrations/search";
+import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/registrations/search";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
@@ -255,6 +255,7 @@ export function PeopleWorkspace({
   locationId = null,
   matchingPersonFilter = false,
   pageScoped = false,
+  openOnlyRegistration = null,
 }: {
   eventId: string;
   eventSlug: string;
@@ -277,8 +278,10 @@ export function PeopleWorkspace({
   matchingPersonFilter?: boolean;
   /** The rows are one page of a server-side search (#180): this box, filter and count cover that page only, and say so. */
   pageScoped?: boolean;
+  /** A registration opened by link (?registration=) that is not on this page of a search: it opens the detail and is never a row, a count or a selection. */
+  openOnlyRegistration?: RegistrationRecord | null;
 }) {
-  const initialSelected = initialRegistrations.find((registration) => registration.id === initialRegistrationId) ?? null;
+  const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState(initialFilter);
@@ -308,6 +311,8 @@ export function PeopleWorkspace({
   // disappearing (back/forward) closes it, state only.
   const registrationsRef = useRef(registrations);
   useEffect(() => { registrationsRef.current = registrations; }, [registrations]);
+  const openOnlyRef = useRef(openOnlyRegistration);
+  useEffect(() => { openOnlyRef.current = openOnlyRegistration; }, [openOnlyRegistration]);
   const openedFromParamRef = useRef<ParamOpened>(null);
   const mountedRef = useRef(false);
   useEffect(() => {
@@ -318,7 +323,7 @@ export function PeopleWorkspace({
       openedFromParamRef.current = null;
       resetModalState();
     } else if (action === "open") {
-      const record = registrationsRef.current.find((registration) => registration.id === initialRegistrationId);
+      const record = findRegistrationToOpen(registrationsRef.current, openOnlyRef.current, initialRegistrationId);
       if (!record) return;
       openedFromParamRef.current = { id: record.id, hardLoad: firstRun };
       openDetail(record);

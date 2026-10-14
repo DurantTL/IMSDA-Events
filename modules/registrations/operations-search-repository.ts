@@ -277,6 +277,39 @@ async function legacyAttendeeAnswerIds(tx: ReadClient, eventId: string, question
   return rows.map((row) => row.id);
 }
 
+/**
+ * Registrations whose registration-wide answer matches, as the People list reads it: the answers of the latest
+ * AMENDMENT operation when it recorded any, else the original submission's (`latestRegistrationResponses` in
+ * `repository.ts`). Limited to registrations submitted through a version that offers the question as a choice.
+ */
+async function registrationAnswerIds(tx: ReadClient, eventId: string, question: SearchQuestion, values: readonly string[]) {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT x.id
+    FROM (
+      SELECT r.id,
+             CASE WHEN jsonb_typeof(a.resp) = 'object' AND a.resp <> '{}'::jsonb THEN a.resp ELSE s.responses END AS answers
+      FROM "Registration" r
+      JOIN "PublicRegistrationSubmission" s ON s."registrationId" = r.id
+      LEFT JOIN LATERAL (
+        SELECT o."afterSnapshot" -> 'registrationResponses' AS resp
+        FROM "RegistrationOperation" o
+        WHERE o."registrationId" = r.id AND o.type = 'AMENDMENT'
+        ORDER BY o."createdAt" DESC
+        LIMIT 1
+      ) a ON TRUE
+      WHERE r."eventId" = ${eventId} AND s."formVersionId" = ANY(${question.versionIds}::text[])
+    ) x
+    WHERE EXISTS (
+      SELECT 1 FROM unnest(${[...values]}::text[]) AS wanted(value)
+      WHERE x.answers -> ${question.key}::text = to_jsonb(wanted.value)
+         OR x.answers -> ${question.key}::text @> jsonb_build_array(wanted.value)
+    )
+    LIMIT ${ID_LIST_CAP + 1}
+  `);
+  if (rows.length > ID_LIST_CAP) throw new TooBroadError();
+  return rows.map((row) => row.id);
+}
+
 type Prepared =
   | { ok: false; result: OperationsSearchResult }
   | { ok: true; viewer: SearchViewer; query: OperationsSearchQuery; questions: SearchQuestion[]; deferredBilling: boolean };
@@ -302,14 +335,18 @@ async function prepare(viewer: SearchViewer, query: OperationsSearchQuery, carri
  */
 async function readWhere(tx: ReadClient, prepared: Extract<Prepared, { ok: true }>): Promise<Prisma.RegistrationWhereInput> {
   const { viewer, query, questions } = prepared;
-  const legacyAnswerIds = new Map<string, string[]>();
+  const answerRegistrationIds = new Map<string, string[]>();
   for (const answer of query.answers) {
     const question = questions.find((candidate) => candidate.id === answer.question);
-    if (question?.scope === "ATTENDEE") {
-      legacyAnswerIds.set(answer.question, await legacyAttendeeAnswerIds(tx, viewer.eventId, question, answer.values));
-    }
+    if (!question) continue;
+    answerRegistrationIds.set(
+      answer.question,
+      question.scope === "ATTENDEE"
+        ? await legacyAttendeeAnswerIds(tx, viewer.eventId, question, answer.values)
+        : await registrationAnswerIds(tx, viewer.eventId, question, answer.values),
+    );
   }
-  const base = buildRegistrationWhere(query, { eventId: viewer.eventId, questions, legacyAnswerIds, paymentRegistrationIds: null });
+  const base = buildRegistrationWhere(query, { eventId: viewer.eventId, questions, answerRegistrationIds, paymentRegistrationIds: null });
   if (query.payment.length === 0) return base;
 
   const narrowed = activeFilterKeys(query).some((key) => key !== "payment");
@@ -320,7 +357,7 @@ async function readWhere(tx: ReadClient, prepared: Extract<Prepared, { ok: true 
     candidateIds = candidates.map((row) => row.id);
   }
   const paymentRegistrationIds = await paymentStateRegistrationIds(tx, viewer.eventId, query.payment, prepared.deferredBilling, candidateIds);
-  return buildRegistrationWhere(query, { eventId: viewer.eventId, questions, legacyAnswerIds, paymentRegistrationIds });
+  return buildRegistrationWhere(query, { eventId: viewer.eventId, questions, answerRegistrationIds, paymentRegistrationIds });
 }
 
 /** One repeatable-read snapshot with a statement timeout, and room for the timeout to fire before the transaction's own. */

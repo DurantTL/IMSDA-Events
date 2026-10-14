@@ -2758,6 +2758,7 @@ model Registration {
   /// Operations search (#180): the canonical order inside one event (newest first, id as the tie-break).
   @@index([eventId, createdAt, id])
   /// Operations search (#180): the default order (submitted newest first, unknown last; the migration builds it NULLS LAST).
+  /// scripts/verify-operations-search.ts asserts the default-order EXPLAIN plan uses this index with no Sort node.
   @@index([eventId, submittedAt(sort: Desc), createdAt(sort: Desc), id(sort: Desc)], map: "Registration_eventId_submittedAt_createdAt_id_idx")
 }
 

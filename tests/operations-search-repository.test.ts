@@ -17,6 +17,7 @@ const definition = {
     id: "section-one", title: "Details", description: "",
     fields: [
       { id: "field-meal", key: "meal", label: "Dinner choice", helpText: "", type: "SELECT", scope: "ATTENDEE", required: false, options: ["plain", "vegan"] },
+      { id: "field-ride", key: "transport", label: "Travel", helpText: "", type: "RADIO", scope: "REGISTRATION", required: false, options: ["bus", "car"] },
       { id: "field-allergy", key: "food_allergies", label: "Food allergies", helpText: "", type: "SELECT", scope: "ATTENDEE", required: false, options: ["peanut", "none"] },
       { id: "field-flagged", key: "shirt_size", label: "Shirt size", helpText: "", type: "SELECT", scope: "ATTENDEE", required: false, options: ["s", "m"], sensitive: true },
     ],
@@ -146,7 +147,7 @@ describe("unauthorized and stale requests", () => {
     const answers = filters.find((filter) => filter.key === "answer");
     expect(answers).toMatchObject({ kind: "questions" });
     const ids = answers?.kind === "questions" ? answers.questions.map((question) => question.question) : [];
-    expect(ids).toEqual(["ATTENDEE:meal"]);
+    expect(ids).toEqual(["ATTENDEE:meal", "REGISTRATION:transport"]);
   });
 
   it("only offers the waitlist filter on an event that has a waitlist", async () => {
@@ -247,7 +248,9 @@ describe("another event and large data", () => {
     const flaggedOld = { ...definition, sections: [{ ...definition.sections[0], fields: [{ ...definition.sections[0].fields[0], sensitive: true }] }] };
     prisma.registrationFormVersion.findMany.mockResolvedValueOnce([{ id: "v1", definition: flaggedOld }, { id: "v2", definition }]);
     const { filters } = await describeOperationsSearch(registrar);
-    expect(filters.find((filter) => filter.key === "answer")).toBeUndefined();
+    const answers = filters.find((filter) => filter.key === "answer");
+    const offeredIds = answers?.kind === "questions" ? answers.questions.map((question) => question.question) : [];
+    expect(offeredIds).not.toContain("ATTENDEE:meal");
   });
 
   it("remembers which versions offer a question", async () => {
@@ -273,6 +276,22 @@ describe("another event and large data", () => {
     expect(result.ok).toBe(true);
     expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(transaction.registration.count.mock.calls[0][0].where)).toContain('"id":{"in":["r-old"]}');
+  });
+
+  it("resolves a registration-wide answer from the latest amendment, else the submission, in the transaction", async () => {
+    const { transaction } = fixture();
+    transaction.$queryRaw.mockResolvedValueOnce([{ id: "r-amended" }]);
+    const result = await searchOperationsRegistrations(registrar, params("answer=REGISTRATION:transport=car"));
+    expect(result.ok).toBe(true);
+    expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
+    const sql = (transaction.$queryRaw.mock.calls[0][0] as { strings: string[] }).strings.join("?");
+    expect(sql).toContain("'AMENDMENT'");
+    expect(sql).toContain("registrationResponses");
+    expect(sql).toContain("ORDER BY o.\"createdAt\" DESC");
+    // The answer is the id list, never a read of the original submission's responses.
+    const where = JSON.stringify(transaction.registration.count.mock.calls[0][0].where);
+    expect(where).toContain('"id":{"in":["r-amended"]}');
+    expect(where).not.toContain('"responses"');
   });
 
   it("carries issues from the caller and stops the search", async () => {

@@ -62,10 +62,12 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
       : listRegistrations(event.id, { locationId }),
     backgroundFlaggedAttendeeIds(event.id), getResponsibleAdultsByAttendee(event.id), listEventAnnouncementOptOuts(event.id),
   ]);
-  // The service's canonical order, not the loader's; an off-page registration follows the page.
+  // The service's canonical order, not the loader's.
   const allRegistrations = searchResult
-    ? [...searchResult.registrationIds, ...offPageRegistrationId].flatMap((id) => loaded.filter((candidate) => candidate.id === id))
+    ? searchResult.registrationIds.flatMap((id) => loaded.filter((candidate) => candidate.id === id))
     : loaded;
+  // Only opens the detail: it is not a row of the list, its count, or Select all.
+  const openOnlyRegistration = offPageRegistrationId.length > 0 ? loaded.find((candidate) => candidate.id === registration) ?? null : null;
   // Who opted out of announcements (#838), marked on the registration: the kind only, never a reason.
   const announcementOptOuts = Object.fromEntries(optOutRows.map((row) => [row.registrationId, row.scope]));
   // Who is responsible for each minor (#131): names only, shown beside the minor.
@@ -105,6 +107,6 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     />
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
-    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} />
+    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} />
   </>;
 }

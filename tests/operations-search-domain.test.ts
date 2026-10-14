@@ -237,14 +237,17 @@ describe("the predicate and the order", () => {
       eventId: "event-a",
       questions: [{ ...meal, versionIds: ["version-2"] }, { ...meal, id: "REGISTRATION:transport", key: "transport", scope: "REGISTRATION", versionIds: ["version-1"] }],
       paymentRegistrationIds: null,
+      answerRegistrationIds: new Map([["REGISTRATION:transport", ["r-amended"]]]),
     }));
     expect(where).toContain('"formVersionId":{"in":["version-2"]}');
-    expect(where).toContain('"formVersionId":{"in":["version-1"]}');
+    // A registration-wide answer is the id list SQL resolved from the latest amendment, else the submission.
+    expect(where).toContain('"id":{"in":["r-amended"]}');
+    expect(where).not.toContain('"responses"');
   });
 
   it("adds the registrations whose attendee answers live only on the submission", () => {
     const where = buildRegistrationWhere(parse("answer=ATTENDEE:meal=vegan").query, {
-      eventId: "event-a", questions: [meal], paymentRegistrationIds: null, legacyAnswerIds: new Map([["ATTENDEE:meal", ["r-old"]]]),
+      eventId: "event-a", questions: [meal], paymentRegistrationIds: null, answerRegistrationIds: new Map([["ATTENDEE:meal", ["r-old"]]]),
     });
     expect(JSON.stringify(where)).toContain('"id":{"in":["r-old"]}');
   });
