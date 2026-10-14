@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
   viewerForClub: vi.fn(),
   staffViewer: vi.fn(),
   coordinatorViewer: vi.fn(),
+  ackViewer: vi.fn(),
+  recordAck: vi.fn(),
   repo: {
     viewHealthRecord: vi.fn(),
     saveHealthRecord: vi.fn(),
@@ -36,7 +38,9 @@ vi.mock("@/modules/health-records/access", () => ({
   requireHealthViewerForClub: state.viewerForClub,
   requireStaffHealthViewer: state.staffViewer,
   requireAreaCoordinatorHealthViewer: state.coordinatorViewer,
+  resolveAcknowledgmentViewer: state.ackViewer,
 }));
+vi.mock("@/modules/health-records/acknowledgment", () => ({ recordHealthPrivacyAcknowledgment: state.recordAck }));
 vi.mock("@/modules/health-records/repository", () => state.repo);
 vi.mock("@/modules/rate-limit/service", () => ({ checkClubFormLinkRateLimit: state.rateLimit }));
 
@@ -47,6 +51,8 @@ import * as linkRoute from "@/app/api/attendee/clubs/[organizationId]/health/[me
 import * as coordinatorRoute from "@/app/api/attendee/area-clubs/health/[eventId]/[organizationId]/[memberId]/route";
 import * as staffRoute from "@/app/api/staff/health-records/[organizationId]/[memberId]/route";
 import * as publicRoute from "@/app/api/public/health-records/[token]/route";
+import * as acknowledgmentRoute from "@/app/api/health-records/acknowledgment/route";
+import { HEALTH_PRIVACY_ACK_VERSION } from "@/modules/health-records/acknowledgment-domain";
 import { HealthRecordError } from "@/modules/health-records/errors";
 
 const ctx = { params: Promise.resolve({ eventId: "event-1", organizationId: "club-a", memberId: "member-1", linkId: "link-1", token: "T".repeat(43), grantId: "grant-1" }) };
@@ -68,11 +74,12 @@ const allRoutes: Array<[string, Handler, string]> = [
   ["GET coordinator", coordinatorRoute.GET as unknown as Handler, "GET"],
   ["GET public", publicRoute.GET as unknown as Handler, "GET"],
   ["POST public", publicRoute.POST as unknown as Handler, "POST"],
+  ["POST acknowledgment", acknowledgmentRoute.POST as unknown as Handler, "POST"],
 ];
 
 beforeEach(() => {
   state.enabled = false;
-  for (const mock of [state.viewerForClub, state.staffViewer, state.coordinatorViewer, state.rateLimit, ...Object.values(state.repo)]) mock.mockReset();
+  for (const mock of [state.viewerForClub, state.staffViewer, state.coordinatorViewer, state.ackViewer, state.recordAck, state.rateLimit, ...Object.values(state.repo)]) mock.mockReset();
 });
 
 describe("with the feature off", () => {
@@ -81,7 +88,7 @@ describe("with the feature off", () => {
     expect(response.status).toBe(404);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(await response.json()).toEqual({ error: "NOT_FOUND", message: "That page could not be found." });
-    for (const mock of [state.viewerForClub, state.staffViewer, state.coordinatorViewer, state.rateLimit, ...Object.values(state.repo)]) {
+    for (const mock of [state.viewerForClub, state.staffViewer, state.coordinatorViewer, state.ackViewer, state.recordAck, state.rateLimit, ...Object.values(state.repo)]) {
       expect(mock).not.toHaveBeenCalled();
     }
   });
@@ -90,6 +97,56 @@ describe("with the feature off", () => {
 describe("with the feature on", () => {
   beforeEach(() => {
     state.enabled = true;
+  });
+
+  it("answers a Registrar's read with 403 and no record content, and lets their save through (#923)", async () => {
+    const registrarViewer = { kind: "CLUB_REGISTRAR", organizationId: "club-a", accountId: "acct-reg" };
+    state.viewerForClub.mockResolvedValue(registrarViewer);
+    state.repo.viewHealthRecord.mockRejectedValue(new HealthRecordError("FORBIDDEN", "Registrars can enter a health record but cannot read, confirm or send links for one."));
+    const read = await memberRoute.GET(request("GET"), ctx as never);
+    expect(read.status).toBe(403);
+    expect(JSON.stringify(await read.json())).not.toContain("values");
+    state.repo.saveHealthRecord.mockResolvedValue({ recordId: "r1", status: "CURRENT" });
+    const saved = await memberRoute.PUT(request("PUT", syntheticRecord), ctx as never);
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({ ok: true, status: "CURRENT" });
+    expect(state.repo.saveHealthRecord).toHaveBeenCalledWith(registrarViewer, "club-a", "member-1", syntheticRecord);
+  });
+
+  it("answers 403 with the acknowledgment code, and no record content, until the notice is acknowledged (#923)", async () => {
+    for (const [route, setup] of [
+      [memberRoute.GET, () => state.viewerForClub.mockResolvedValue({ kind: "CLUB_LEADER", organizationId: "club-a", accountId: "a" })],
+      [staffRoute.GET, () => state.staffViewer.mockResolvedValue({ kind: "SYSTEM_ADMIN", userId: "u" })],
+      [coordinatorRoute.GET, () => state.coordinatorViewer.mockResolvedValue({ kind: "AREA_COORDINATOR", accountId: "a" })],
+    ] as const) {
+      setup();
+      state.repo.viewHealthRecord.mockRejectedValue(new HealthRecordError("ACKNOWLEDGMENT_REQUIRED", "Read and confirm the health information privacy notice before you continue."));
+      const response = await (route as unknown as Handler)(request("GET"), ctx);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: "ACKNOWLEDGMENT_REQUIRED" });
+    }
+  });
+
+  it("records the acknowledgment for the signed-in person, only for the wording they were shown (#923)", async () => {
+    state.ackViewer.mockResolvedValue({ kind: "CLUB_REGISTRAR", accountId: "acct-reg" });
+    state.recordAck.mockResolvedValue({ version: HEALTH_PRIVACY_ACK_VERSION, alreadyAcknowledged: false });
+    const ok = await acknowledgmentRoute.POST(request("POST", { as: "ATTENDEE", version: HEALTH_PRIVACY_ACK_VERSION }));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ ok: true, version: HEALTH_PRIVACY_ACK_VERSION });
+    expect(state.ackViewer).toHaveBeenCalledWith("ATTENDEE");
+    state.recordAck.mockClear();
+    for (const body of [{ as: "ATTENDEE", version: "an-older-wording" }, { as: "ADMIN", version: HEALTH_PRIVACY_ACK_VERSION }, { as: "STAFF" }, { as: "STAFF", version: HEALTH_PRIVACY_ACK_VERSION, extra: 1 }]) {
+      const bad = await acknowledgmentRoute.POST(request("POST", body));
+      expect(bad.status).toBe(400);
+    }
+    expect(state.recordAck).not.toHaveBeenCalled();
+  });
+
+  it("refuses the acknowledgment to someone the notice is not for", async () => {
+    state.ackViewer.mockRejectedValue(new HealthRecordError("FORBIDDEN", "Health records are for a club's director, deputy or Registrar, an Area Coordinator, or event health staff."));
+    const response = await acknowledgmentRoute.POST(request("POST", { as: "ATTENDEE", version: HEALTH_PRIVACY_ACK_VERSION }));
+    expect(response.status).toBe(403);
+    expect(state.recordAck).not.toHaveBeenCalled();
   });
 
   it("maps a refused role to 403 without any record content", async () => {

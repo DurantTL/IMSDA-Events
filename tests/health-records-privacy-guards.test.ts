@@ -47,6 +47,27 @@ describe("health data stays out of exports, the check-in book, communications an
     }
   });
 
+  it("keeps the Registrar's write-only code free of anything that selects or opens a stored value (#923)", () => {
+    const source = read("modules/health-records/repository.ts");
+    const start = source.indexOf("// The write-only Registrar (#923).");
+    const end = source.indexOf("The plain \"a health record exists\" marker");
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    const section = source.slice(start, end);
+    expect(section).not.toMatch(/openFields|openHealthField|sealedValue|fields:|findRecord\(|hasHealthNote/);
+    // And nothing outside the repository decrypts or selects sealed fields.
+    for (const path of sourceFiles("modules/health-records").filter((file) => !/repository\.ts$|crypto\.ts$/.test(file))) {
+      expect(read(path), path).not.toMatch(/sealedValue|openHealthField/);
+    }
+  });
+
+  it("puts no health value into the acknowledgment code, its table or its audit row (#923)", () => {
+    for (const path of ["modules/health-records/acknowledgment.ts", "modules/health-records/acknowledgment-domain.ts"]) {
+      expect(read(path), path).not.toMatch(/healthRecordField|openHealthField|sealedValue|fieldValues/);
+    }
+    expect(read("prisma/migrations/20261022100000_health_privacy_acknowledgment/migration.sql")).not.toMatch(/sealedValue|fieldKey/);
+  });
+
   it("lets the email worker use only the link email helpers, which carry no health text", () => {
     const delivery = read("modules/communications/email-delivery.ts");
     const imports = [...delivery.matchAll(/from "@\/modules\/health-records\/([a-z-]+)"/g)].map((match) => match[1]);

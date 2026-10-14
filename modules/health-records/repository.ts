@@ -85,8 +85,8 @@ function idShaped(value: string | null | undefined) {
 async function allowRead(viewer: HealthViewer, organizationId: string, memberId: string | null, attempted: string) {
   try {
     allow(viewer, organizationId, "VIEW");
-  } catch (error) {
-    if (viewer.kind === "CLUB_REGISTRAR" && error instanceof HealthRecordError && error.code === "FORBIDDEN") {
+  } catch (refusal) {
+    if (viewer.kind === "CLUB_REGISTRAR" && refusal instanceof HealthRecordError && refusal.code === "FORBIDDEN") {
       const who = healthAuditActor(viewer);
       try {
         await writeAuditLog({
@@ -97,11 +97,12 @@ async function allowRead(viewer: HealthViewer, organizationId: string, memberId:
           summary: "A read of a member's health record was refused.",
           metadata: { ...who.metadata, organizationId: idShaped(organizationId), rosterMemberId: memberId ? idShaped(memberId) : null, attempted, reason: "WRITE_ONLY_ROLE" },
         });
-      } catch (auditError) {
-        logError("A refused health record read could not be audited", auditError);
+      } catch (error) {
+        const action = "Auditing a refused health record read failed";
+        logError(action, error);
       }
     }
-    throw error;
+    throw refusal;
   }
 }
 

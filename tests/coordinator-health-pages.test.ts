@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getRosterAccessStateForPage: vi.fn(),
   loadEventHealth: vi.fn(),
   listHealthEvents: vi.fn(),
+  healthAcknowledgmentOwed: vi.fn(async () => false),
   resolveEventContext: vi.fn(),
   notFound: vi.fn(() => { throw new Error("NEXT_NOT_FOUND"); }),
 }));
@@ -22,6 +23,7 @@ vi.mock("@/modules/coordinator-health/repository", () => ({
   HealthViewError: class HealthViewError extends Error { constructor(public readonly code: string, message: string) { super(message); } },
   loadEventHealth: mocks.loadEventHealth,
   listHealthEvents: mocks.listHealthEvents,
+  healthAcknowledgmentOwed: mocks.healthAcknowledgmentOwed,
 }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
@@ -32,7 +34,36 @@ import StaffEventHealthPage from "@/app/(workspace)/more/event-health/page";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.healthAcknowledgmentOwed.mockResolvedValue(false);
   mocks.resolveEventContext.mockResolvedValue({ event: { id: "e1" } });
+});
+
+describe("the privacy acknowledgment comes before any health page opens (#923)", () => {
+  it("shows the prompt, and loads and lists nothing, until the person has acknowledged", async () => {
+    mocks.healthAcknowledgmentOwed.mockResolvedValue(true);
+    mocks.resolveStaffHealthViewer.mockResolvedValue({ kind: "SYSTEM_ADMIN", userId: "u1" });
+    mocks.resolveAreaHealthViewer.mockResolvedValue({ kind: "AREA_COORDINATOR", accountId: "acct-ac" });
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN", club: { role: "DIRECTOR" } });
+    mocks.clubLeaderHealthViewerFromAccess.mockReturnValue({ kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "a" } });
+    const pages = [
+      await StaffEventHealthPage({ searchParams: Promise.resolve({ event: "e1" }) }),
+      await AreaHealthPage({ searchParams: Promise.resolve({ event: "e1" }) }),
+      await AreaHealthPage({ searchParams: Promise.resolve({}) }),
+      await ClubHealthPage({ params: Promise.resolve({ organizationId: "club-a" }), searchParams: Promise.resolve({ event: "e1" }) }),
+      await ClubHealthPage({ params: Promise.resolve({ organizationId: "club-a" }), searchParams: Promise.resolve({}) }),
+    ];
+    for (const element of pages) expect(JSON.stringify(element)).toContain("\"as\":");
+    expect(mocks.loadEventHealth).not.toHaveBeenCalled();
+    expect(mocks.listHealthEvents).not.toHaveBeenCalled();
+  });
+
+  it("also shows the prompt when the repository itself refuses for the missing acknowledgment", async () => {
+    const { HealthViewError } = await import("@/modules/coordinator-health/repository");
+    mocks.resolveAreaHealthViewer.mockResolvedValue({ kind: "AREA_COORDINATOR", accountId: "acct-ac" });
+    mocks.loadEventHealth.mockRejectedValue(new HealthViewError("ACKNOWLEDGMENT_REQUIRED", "Read the notice."));
+    const element = await AreaHealthPage({ searchParams: Promise.resolve({ event: "e1" }) });
+    expect(JSON.stringify(element)).toContain("\"as\":\"ATTENDEE\"");
+  });
 });
 
 describe("every health page checks access itself on the server (#658)", () => {

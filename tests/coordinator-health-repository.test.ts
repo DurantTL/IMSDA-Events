@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   logError: vi.fn(),
+  env: { SECRET_ENCRYPTION_KEY: "a-synthetic-encryption-key-for-health-view-tests", APP_BASE_URL: "https://events.imsda.test", HEALTH_RECORDS_ENABLED: false } as Record<string, unknown>,
+  ackFindFirst: vi.fn(),
   eventFindUnique: vi.fn(),
   eventFindMany: vi.fn(),
   registrationFindMany: vi.fn(),
@@ -17,11 +19,10 @@ vi.mock("@/lib/prisma", () => ({
     clubEventRegistration: { findMany: mocks.registrationFindMany },
     clubRosterMember: { findMany: mocks.rosterFindMany },
     clubFormSubmission: { findMany: mocks.submissionFindMany },
+    healthPrivacyAcknowledgment: { findFirst: mocks.ackFindFirst },
   }),
 }));
-vi.mock("@/lib/env", () => ({
-  getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-synthetic-encryption-key-for-health-view-tests", APP_BASE_URL: "https://events.imsda.test" }),
-}));
+vi.mock("@/lib/env", () => ({ getServerEnv: () => mocks.env }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
@@ -29,7 +30,8 @@ import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import type { HealthViewer } from "@/modules/coordinator-health/domain";
 import { HealthViewError, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 
-const now = new Date("2026-10-20T15:00:00Z");
+// Mid-day on the event's last day (it ends Sunday 2026-10-11, Central time): the window is still open.
+const now = new Date("2026-10-11T15:00:00Z");
 const event = { id: "e1", name: "Synthetic Camporee", startsAt: new Date("2026-10-09T15:00:00Z"), endsAt: new Date("2026-10-11T22:00:00Z"), timezone: "America/Chicago" };
 
 const admin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "root" };
@@ -101,6 +103,8 @@ function seed() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.env.HEALTH_RECORDS_ENABLED = false;
+  mocks.ackFindFirst.mockResolvedValue(null);
   seed();
 });
 
@@ -155,8 +159,8 @@ describe("loadEventHealth (#658)", () => {
     expect(mocks.submissionFindMany).not.toHaveBeenCalled();
   });
 
-  it("closes for everyone, system administrators included, 30 days after the event ends, audits the refusal and reads nothing", async () => {
-    const late = new Date("2026-11-12T15:00:00Z");
+  it("closes for everyone, system administrators included, when the event's last day ends, audits the refusal and reads nothing", async () => {
+    const late = new Date("2026-10-12T15:00:00Z");
     for (const viewer of [admin, coordinator, roleHolder, ownLeader]) {
       await expect(loadEventHealth(viewer, "e1", {}, late)).rejects.toMatchObject({ code: "WINDOW_CLOSED" });
     }
@@ -167,8 +171,9 @@ describe("loadEventHealth (#658)", () => {
     }
   });
 
-  it("is still open on the last day of the window", async () => {
-    await expect(loadEventHealth(admin, "e1", {}, new Date("2026-11-10T20:00:00Z"))).resolves.toMatchObject({ clubs: expect.any(Array) });
+  it("is still open late on the event's last day and closed just after midnight (Central time)", async () => {
+    await expect(loadEventHealth(admin, "e1", {}, new Date("2026-10-12T04:30:00Z"))).resolves.toMatchObject({ clubs: expect.any(Array) });
+    await expect(loadEventHealth(admin, "e1", {}, new Date("2026-10-12T05:30:00Z"))).rejects.toMatchObject({ code: "WINDOW_CLOSED" });
   });
 
   it("refuses a role holder for an event they were not granted, before reading anything", async () => {
@@ -298,9 +303,47 @@ describe("listHealthEvents (#658)", () => {
     ]);
     const forAdmin = await listHealthEvents(admin, now);
     expect(forAdmin.map((row) => row.id)).toEqual(["e1", "e2"]);
-    expect(forAdmin[0]).toMatchObject({ availableThrough: "2026-11-10" });
+    expect(forAdmin[0]).toMatchObject({ availableThrough: "2026-10-11" });
     expect((await listHealthEvents({ ...roleHolder, eventIds: ["e2"] }, now)).map((row) => row.id)).toEqual(["e2"]);
     await listHealthEvents(ownLeader, now);
     expect(mocks.eventFindMany.mock.calls.at(-1)?.[0].where.clubRegistrations).toEqual({ some: { organizationId: "club-a" } });
+  });
+});
+
+describe("the privacy acknowledgment before the sheet opens (#923)", () => {
+  it("is not asked for while HEALTH_RECORDS_ENABLED is off: the view behaves as it did", async () => {
+    await expect(loadEventHealth(admin, "e1", {}, now)).resolves.toMatchObject({ clubs: expect.any(Array) });
+    expect(mocks.ackFindFirst).not.toHaveBeenCalled();
+    const { healthAcknowledgmentOwed } = await import("@/modules/coordinator-health/repository");
+    await expect(healthAcknowledgmentOwed(admin)).resolves.toBe(false);
+  });
+
+  it("refuses every viewer kind until they acknowledge, before anything is read, counted or audited as a view", async () => {
+    mocks.env.HEALTH_RECORDS_ENABLED = true;
+    for (const viewer of [admin, coordinator, roleHolder, ownLeader]) {
+      await expect(loadEventHealth(viewer, "e1", {}, now)).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_REQUIRED" });
+    }
+    expect(mocks.registrationFindMany).not.toHaveBeenCalled();
+    expect(mocks.submissionFindMany).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("looks the acknowledgment up for the right person and the current wording only", async () => {
+    mocks.env.HEALTH_RECORDS_ENABLED = true;
+    const { HEALTH_PRIVACY_ACK_VERSION } = await import("@/modules/health-records/acknowledgment-domain");
+    mocks.ackFindFirst.mockResolvedValue({ id: "ack-1" });
+    for (const viewer of [admin, coordinator, roleHolder, ownLeader]) await loadEventHealth(viewer, "e1", {}, now);
+    expect(mocks.ackFindFirst.mock.calls.map(([args]) => args.where)).toEqual([
+      { userId: "root", version: HEALTH_PRIVACY_ACK_VERSION },
+      { attendeeAccountId: "acct-ac", version: HEALTH_PRIVACY_ACK_VERSION },
+      { userId: "u-role", version: HEALTH_PRIVACY_ACK_VERSION },
+      { attendeeAccountId: "acct-dir", version: HEALTH_PRIVACY_ACK_VERSION },
+    ]);
+  });
+
+  it("answers a closed window before it asks for the acknowledgment, so a refusal is audited as one", async () => {
+    mocks.env.HEALTH_RECORDS_ENABLED = true;
+    await expect(loadEventHealth(admin, "e1", {}, new Date("2026-10-12T15:00:00Z"))).rejects.toMatchObject({ code: "WINDOW_CLOSED" });
+    expect(mocks.ackFindFirst).not.toHaveBeenCalled();
   });
 });
