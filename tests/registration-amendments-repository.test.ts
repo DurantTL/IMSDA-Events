@@ -806,8 +806,13 @@ describe("registration amendments repository", () => {
         attendee: { attendeeTypeDefinitionId: null },
       };
       tx.eventMealSelection.findMany.mockResolvedValue([selection]);
+      const eventMealTicket = { findMany: vi.fn(async () => [{ id: "ticket-1" }]), updateMany: vi.fn(async () => ({ count: 1 })), createMany: vi.fn(async () => ({ count: 0 })) };
       Object.assign(tx, {
-        $queryRaw: vi.fn(async () => [{ status: "CONFIRMED" }]),
+        // The ticket sync (#916) locks the selection row; every other raw query here is the registration status lock.
+        $queryRaw: vi.fn(async (strings: TemplateStringsArray) => (
+          strings.join("?").includes('FROM "EventMealSelection"') ? [{ eventId: "event-1", status: "CANCELLED", quantity: 1 }] : [{ status: "CONFIRMED" }]
+        )),
+        eventMealTicket,
         user: { findUnique: vi.fn(async () => ({ displayName: "Finance Staff" })) },
         eventMealSelection: { findMany: tx.eventMealSelection.findMany, update: vi.fn(async () => ({ ...selection, status: "CANCELLED" })) },
         eventMealSelectionChange: { create: vi.fn(async () => ({ id: "change-1" })) },
@@ -820,6 +825,8 @@ describe("registration amendments repository", () => {
       await amendRegistration("event-1", "registration-1", { ...input, previewOnly: false as const, quoteFingerprint: preview.quoteFingerprint }, actor, new Date("2026-08-04T13:00:00.000Z"));
       expect((tx.registrationAdjustment as unknown as { create: ReturnType<typeof vi.fn> }).create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "MEAL", amountCents: -800 }) });
       expect(registration.totalAmount).toBe(122);
+      // Cancelling the removed attendee's selection retires their tickets (#916).
+      expect(eventMealTicket.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["ticket-1"] } }, data: { cancelledAt: expect.any(Date) } });
     });
 
     it("refuses with PAYMENT_ADJUSTMENT_REQUIRED when the meal credit would take the total below what was paid", async () => {
