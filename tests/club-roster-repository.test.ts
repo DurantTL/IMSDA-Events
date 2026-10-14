@@ -434,17 +434,18 @@ describe("club roster storage", () => {
     expect(removal.metadata).toMatchObject({ personDeleted: false });
   });
 
-  it("keeps the person, with the name only, while a sealed health copy refers to them (#924)", async () => {
+  it("keeps the person while a sealed health copy refers to them, and tells the director nothing new (#924)", async () => {
     const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
     const personId = db.members[0].personId as string;
     db.snapshotReferences.add(personId);
 
     await removeRosterMember("club-1", id, actor, now);
 
-    // The copy's person key is `onDelete: Restrict` and the copy outlives the roster row: the person stays, personal fields are erased.
+    // The copy's person key is `onDelete: Restrict` and the copy outlives the roster row: the person stays.
+    // `nameKept` (what the director is told) is for ordered items only, so a sealed copy changes nothing they see.
     expect(db.people.some((person) => person.id === personId)).toBe(true);
     const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
-    expect(removal.metadata).toMatchObject({ personDeleted: false, nameKept: true });
+    expect(removal.metadata).toMatchObject({ personDeleted: false, nameKept: false });
   });
 
   it("cancels an open order need, deletes the person, and audits the count (#566)", async () => {

@@ -446,6 +446,9 @@ async function blankTransferText(tx: Prisma.TransactionClient, personId: string,
  * out what was ordered. A registered Person keeps their contact fields:
  * they are registration data that account claiming, dedupe and background
  * check matching rely on. `nameKept` reports that ordered items keep a name.
+ * A sealed per-event health copy (#924) also keeps the Person row (its key is
+ * `Restrict`) but does not change `nameKept`, so what directors are told does not change.
+ * See ADR 0005 Addendum B for exactly what stays.
  */
 export async function removeRosterMember(organizationId: string, memberId: string, actor: Actor, now = new Date()): Promise<{ personId: string | null; nameKept: boolean }> {
   return getPrisma().$transaction(async (tx) => {
@@ -537,7 +540,8 @@ export async function removeRosterMember(organizationId: string, memberId: strin
           await blankTransferText(tx, member.personId, { keepPending: true });
           await tx.person.update({ where: { id: member.personId }, data: { normalizedEmail: null, phone: null } });
         }
-        nameKept = !personDeleted && (orderedNeeds > 0 || sealedCopies > 0);
+        // What directors are told is unchanged by a sealed copy: the name is reported as kept only for ordered items.
+        nameKept = !personDeleted && orderedNeeds > 0;
       }
     }
     await audit(tx, actor, "CLUB_ROSTER_MEMBER_REMOVED", organizationId, memberId, "Removed a person from a club roster and erased their details.", {

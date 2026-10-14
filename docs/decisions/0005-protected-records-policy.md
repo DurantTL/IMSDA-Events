@@ -612,7 +612,11 @@ gets none. The copy uses the existing `sealSecret` (`modules/health-records/cryp
 purpose `health-snapshot:<snapshotId>:<fieldKey>`), so a copy's value cannot be
 opened as a live record's field or moved to another copy. The copy's row holds
 only dates, the consent version, a field count and the keep-until date: no
-health text and no birth date. It is **immutable in the database**: triggers
+health text and no birth date. **The copy keeps the whole health record, as
+the issue asks:** every field of the live record, contact fields included
+(address, phone, email, guardian and emergency contacts, insurance), plus the
+signed consent. Nothing is left out to make it smaller; each field is its own
+ciphertext, and a copy is opened only through break-glass. It is **immutable in the database**: triggers
 refuse every update and every delete, except the daily retention job's and
 event deletion's.
 
@@ -633,7 +637,21 @@ than 5 years after the event. This errs on keeping the record the conference may
 need; the choice is recorded here for counsel to confirm. The expiry is
 computed once, from the birth date at the event, and stored per copy; the birth
 date itself is not stored. A Feb 29 birthday lands on Mar 1 in a year without a
-Feb 29.
+Feb 29. The reported age (used only with no birth date) is taken from the
+roster row for the event's own club year; if only a later year has one, the
+year gap is subtracted (they were younger then); an earlier year's age is used
+as reported, which errs towards the longer keep.
+
+**When a copy actually expires (owner-chosen; counsel to confirm).** The
+keep-until day above is a calendar day. A copy is not deleted when that day
+starts in UTC (which is the evening before in Central time). It becomes
+deletable at the **start of the day after the keep-until day in America/Chicago,
+plus a grace period of 90 days** (`HEALTH_SNAPSHOT_GRACE_DAYS` in
+`snapshot-retention.ts`; days are counted as calendar days, so a daylight saving
+change never moves the hour). So a claim filed on the last day can still get a
+legal hold before the deletion job runs. The 90 days is the owner's choice, not
+a statute; Adventist Risk Management or conference counsel is to confirm it,
+and it is a one-line change that applies to copies sealed afterwards.
 
 **Sources (research, not legal advice).** In Missouri a minor's personal-injury
 claim can be filed until age 26: RSMo 516.120 gives 5 years and RSMo 516.170
@@ -642,33 +660,64 @@ for a minor: Iowa Code 614.1(2) and 614.8), so the Missouri limit sets the
 period. **Adventist Risk Management or conference counsel is to confirm these
 periods.** They are configuration, so a change needs no migration.
 
-**Daily deletion.** A job deletes every copy whose keep-until date has come,
-unless a legal hold applies. It runs from the existing authenticated outbox
-sweep (the same cron and token as the other periodic work; no second scheduler
-or secret), at most once every 20 hours, and writes one audit row with the ids
-(capped), the number deleted and the number skipped under a hold. It takes a
-table lock on holds so a hold placed at the same moment either lands first or
-waits for the deletion to commit.
+**Daily deletion.** A job deletes every copy whose expiry has come (see "When a
+copy actually expires"), unless a legal hold applies. It runs from the existing
+authenticated outbox sweep (the same cron and token as the other periodic work;
+no second scheduler or secret), at most once every 20 hours. It works in
+batches of 500, each batch its own transaction (a commit per batch) with its
+own audit row (ids and count), up to 20 batches per run, so a large backlog
+makes progress; a run that stops at that cap with copies still due does not
+hold the next sweep off for a day. Each run writes one audit row with the
+totals: deleted, skipped under a hold, batches, and whether a backlog remains
+(ids capped, never a value). Each batch takes a table lock on holds so a hold
+placed at the same moment either lands first or waits for the deletion to
+commit. **The job runs whether or not `HEALTH_RECORDS_ENABLED` is on**:
+switching the feature off must never extend how long a copy is kept.
 
 **Legal hold.** A system administrator can place a hold on a person's copies or
 on an event's copies, with a typed reason, and lift it with a reason. While a
 hold applies nothing it covers is deleted, and a copy under a hold also blocks
 deleting its event (lift the hold first). One active hold per person and per
-event; placing it twice changes nothing. Holds are kept after they are lifted.
+event; placing it twice, or two people placing it at the same moment, changes
+nothing and returns the one hold. Holds are kept after they are lifted.
 Placing and lifting are audited with the target, the reason and the number of
-copies covered.
+copies covered. Event deletion takes the same table lock on holds as the
+retention job before it reads the hold facts, so a hold placed at that moment
+either lands first or waits for the deletion to commit.
 
 **Access: break-glass only.** A system administrator with the privacy
 acknowledgment (#923) types a reason and gets 24 hours of access to one
-person's copies. Every grant, every view and every refused attempt is audited
-with ids, counts and the typed reason: never a health value. A director,
-deputy, Registrar, Area Coordinator and the event health role never reach a
-copy, and a refusal is audited. The Communication Director reviews each use
-monthly, as for all break-glass access.
+person's copies. A grant belongs to the administrator who typed it: a second
+administrator is not let in by it and must start their own. Every grant, every
+view and every refused attempt is audited with ids, counts and the typed
+reason: never a health value. A director, deputy, Registrar, Area Coordinator
+and the event health role never reach a copy, and a refusal is audited. The
+Communication Director reviews each use monthly, as for all break-glass access:
+`GET /api/staff/health-snapshots/break-glass-grants` lists the grants (who, when,
+the typed reason, the person id, when each ends; never a value) for system
+administrators only, and each listing is audited with a count.
 
-**The live record is unchanged,** and deleting it never deletes its copies. A
-person who has a copy is kept when removed from a roster (their name only; email
-and phone are still erased) until the copy is deleted. Deleting an event deletes
+**Refused attempts on the staff routes.** Each staff route resolves who is
+asking and checks the role before it reads or parses the body, so a malformed
+body from someone who may not do this is refused as unauthorized (403), not as
+a bad request. A refusal from a **signed-in** staff identity is audited: a
+user with the health permission as that role, a signed-in user without it as
+having no health permission. An **unauthenticated** request (401) cannot be
+attributed to anyone, so it is not audited; it is visible only in the
+request logs.
+
+**The live record is unchanged,** and deleting it never deletes its copies.
+What stays when a roster member is removed and a copy exists, stated exactly:
+the copy's person key is `Restrict`, so the **Person row is kept** until the
+copy is deleted. That is not new for anyone who attended an event: a person
+registered for the event was already kept (the registration needs the row, and a
+registered person keeps their contact fields, as before #924). The Person is
+erased only in the branch where nothing else refers to them (no registration,
+no other roster, no ordered items), and a sealed copy now prevents that erasure.
+When the copy is the only reason left, the Person's email and phone are erased
+and the name remains (the same treatment as ordered items). What a director is
+told does not change: the removal notice reports a kept name only for ordered
+items (`nameKept`), never because of a sealed copy. Deleting an event deletes
 its copies; a copy under a hold blocks the deletion.
 
 **Incident reports for a minor** are kept until the person turns **31** (RSMo
@@ -682,11 +731,16 @@ legal need, so the backups do not have to. (The Compose default
 setting the retention to 30 nightly copies is an operations change for the IT
 Director, not made by #924.)
 
-**Still behind the switch.** Sealing, the sweep, the deletion job, holds and
-break-glass all check `HEALTH_RECORDS_ENABLED`; with it off nothing is sealed,
-swept, held or opened (the check-in route and the sweep still run, and do
-nothing here). Routes: `POST /api/staff/health-snapshots/break-glass`,
+**The switch.** With `HEALTH_RECORDS_ENABLED` off, nothing is sealed (check-in
+and event-start sealing do nothing) and nothing is opened (break-glass and
+viewing answer like an unknown route). Two things deliberately keep working so
+the switch can never weaken retention or block a legal obligation: the **expiry
+deletion** (above) and the **hold routes** (place, lift, list) plus the
+break-glass review list, all for system administrators only (anyone else gets
+the unknown-route answer while the switch is off), so a legal hold can always be
+placed before a deletion. Routes: `POST /api/staff/health-snapshots/break-glass`,
 `GET /api/staff/health-snapshots/person/<personId>`,
+`GET /api/staff/health-snapshots/break-glass-grants`,
 `GET|POST /api/staff/health-snapshots/holds`,
 `POST /api/staff/health-snapshots/holds/<holdId>/lift`. There is no page yet;
 a break-glass screen is a follow-up.
@@ -700,7 +754,8 @@ questions this build raised.
 - **Final acceptance:** the full sign-off list below, beyond the interim
   acceptance.
 - **Retention periods: counsel to confirm.** The keep-until rules for sealed
-  copies (26th birthday for a minor, 5 years for an adult), the incident-report
+  copies (26th birthday for a minor, 5 years for an adult, plus the 90-day
+  grace and the Central-time day boundary), the incident-report
   rule (age 31) and the 30 nightly backups were decided by the owner on
   2026-10-14 (#924, above) from research, not legal advice. Adventist Risk
   Management or conference counsel is to confirm them. Setting the backup

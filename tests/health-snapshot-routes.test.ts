@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   enabled: false,
-  staffViewer: vi.fn(),
   repo: {
+    requireSnapshotAdminViewer: vi.fn(),
+    listSnapshotBreakGlassGrants: vi.fn(),
     startSnapshotBreakGlass: vi.fn(),
     viewSealedSnapshots: vi.fn(),
     placeSnapshotHold: vi.fn(),
@@ -23,11 +24,11 @@ vi.mock("@/modules/club-rosters/access", () => ({
     }
   },
 }));
-vi.mock("@/modules/health-records/access", () => ({ requireStaffHealthViewer: state.staffViewer }));
 vi.mock("@/modules/health-records/snapshot-access-repository", () => state.repo);
 
 import * as breakGlassRoute from "@/app/api/staff/health-snapshots/break-glass/route";
 import * as personRoute from "@/app/api/staff/health-snapshots/person/[personId]/route";
+import * as grantsRoute from "@/app/api/staff/health-snapshots/break-glass-grants/route";
 import * as holdsRoute from "@/app/api/staff/health-snapshots/holds/route";
 import * as liftRoute from "@/app/api/staff/health-snapshots/holds/[holdId]/lift/route";
 import { HealthRecordError } from "@/modules/health-records/errors";
@@ -50,22 +51,81 @@ const get = () => new Request("https://events.imsda.test/api/staff/health-snapsh
 beforeEach(() => {
   vi.clearAllMocks();
   state.enabled = true;
-  state.staffViewer.mockResolvedValue({ kind: "SYSTEM_ADMIN", userId: "admin-1" });
+  state.repo.requireSnapshotAdminViewer.mockResolvedValue({ kind: "SYSTEM_ADMIN", userId: "admin-1" });
 });
 
 describe("with the health records switch off", () => {
-  it("answers every route like an unknown one, before reading a body or a session", async () => {
+  it("answers break-glass and viewing like an unknown route, before reading a body or a session", async () => {
     state.enabled = false;
     const responses = await Promise.all([
       breakGlassRoute.POST(post({ personId: "person-1", reason: REASON })),
       personRoute.GET(get(), ctx),
-      holdsRoute.GET(get()),
-      holdsRoute.POST(post({ scope: "PERSON", personId: "person-1", reason: REASON })),
-      liftRoute.POST(post({ reason: REASON }), ctx),
     ]);
     for (const response of responses) expect(response.status).toBe(404);
-    expect(state.staffViewer).not.toHaveBeenCalled();
-    for (const fn of Object.values(state.repo)) expect(fn).not.toHaveBeenCalled();
+    expect(state.repo.requireSnapshotAdminViewer).not.toHaveBeenCalled();
+    expect(state.repo.startSnapshotBreakGlass).not.toHaveBeenCalled();
+    expect(state.repo.viewSealedSnapshots).not.toHaveBeenCalled();
+  });
+
+  it("keeps the hold routes and the break-glass review list available to a system administrator", async () => {
+    state.enabled = false;
+    state.repo.placeSnapshotHold.mockResolvedValue({ holdId: "hold-1", alreadyHeld: false, snapshotsCovered: 1 });
+    state.repo.liftSnapshotHold.mockResolvedValue({ holdId: "hold-1" });
+    state.repo.listSnapshotHolds.mockResolvedValue([]);
+    state.repo.listSnapshotBreakGlassGrants.mockResolvedValue([]);
+    expect((await holdsRoute.POST(post({ scope: "PERSON", personId: "person-1", reason: REASON }))).status).toBe(200);
+    expect((await holdsRoute.GET(get())).status).toBe(200);
+    expect((await liftRoute.POST(post({ reason: REASON }), ctx)).status).toBe(200);
+    expect((await grantsRoute.GET(get())).status).toBe(200);
+    for (const call of state.repo.requireSnapshotAdminViewer.mock.calls) expect(call[2]).toEqual({ flagOptional: true });
+  });
+
+  it("answers anyone but a system administrator like an unknown route on those routes", async () => {
+    state.enabled = false;
+    state.repo.requireSnapshotAdminViewer.mockRejectedValue(new HealthRecordError("NOT_FOUND", "That page could not be found."));
+    expect((await holdsRoute.GET(get())).status).toBe(404);
+    expect((await grantsRoute.GET(get())).status).toBe(404);
+  });
+});
+
+describe("who is asked before the body is read", () => {
+  it("refuses a malformed body from someone who may not do this as unauthorized, not as a bad request", async () => {
+    state.repo.requireSnapshotAdminViewer.mockRejectedValue(new HealthRecordError("FORBIDDEN", "Sealed health copies can be opened only by a system administrator, with break-glass."));
+    const malformed = () => new Request("https://events.imsda.test/api/staff/health-snapshots", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://events.imsda.test" },
+      body: "{not json",
+    });
+    const responses = await Promise.all([
+      breakGlassRoute.POST(malformed()),
+      holdsRoute.POST(malformed()),
+      liftRoute.POST(malformed(), ctx),
+    ]);
+    for (const response of responses) {
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: "FORBIDDEN" });
+    }
+    expect(state.repo.startSnapshotBreakGlass).not.toHaveBeenCalled();
+    expect(state.repo.placeSnapshotHold).not.toHaveBeenCalled();
+    expect(state.repo.liftSnapshotHold).not.toHaveBeenCalled();
+  });
+
+  it("names the attempt and its target to the resolver, so the refusal can be audited", async () => {
+    await personRoute.GET(get(), ctx);
+    expect(state.repo.requireSnapshotAdminViewer).toHaveBeenLastCalledWith("VIEW_SEALED_COPIES", "person-1");
+    await liftRoute.POST(post({ reason: REASON }), ctx);
+    expect(state.repo.requireSnapshotAdminViewer).toHaveBeenLastCalledWith("LIFT_HOLD", "hold-1", { flagOptional: true });
+  });
+});
+
+describe("the break-glass review list", () => {
+  it("lists grants for the viewer and never carries a value", async () => {
+    state.repo.listSnapshotBreakGlassGrants.mockResolvedValue([{ id: "grant-1", userId: "admin-1", userDisplayName: "Synthetic Admin", personId: "person-1", reason: REASON, grantedAt: new Date("2026-10-14T12:00:00Z"), expiresAt: new Date("2026-10-15T12:00:00Z") }]);
+    const response = await grantsRoute.GET(get());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(await response.json()).toEqual({ grants: [{ id: "grant-1", userId: "admin-1", userDisplayName: "Synthetic Admin", personId: "person-1", reason: REASON, grantedAt: "2026-10-14T12:00:00.000Z", expiresAt: "2026-10-15T12:00:00.000Z" }] });
+    expect(state.repo.listSnapshotBreakGlassGrants).toHaveBeenCalledWith({ kind: "SYSTEM_ADMIN", userId: "admin-1" });
   });
 });
 

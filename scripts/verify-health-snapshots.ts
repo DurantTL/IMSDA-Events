@@ -3,7 +3,8 @@
  * Addendum B) against a real PostgreSQL database, where the unit tests' fake
  * database can't:
  *
- * - with HEALTH_RECORDS_ENABLED off nothing is sealed, swept, held or opened;
+ * - with HEALTH_RECORDS_ENABLED off nothing is sealed, swept or opened, but the expiry
+ *   deletion still runs and a system administrator can still place, list and lift holds;
  * - a copy is sealed at check-in (the same hook the check-in route calls) and,
  *   for a confirmed registrant, at the event's start; once per person per
  *   event, even when many attempts race; a person with no live record, or not
@@ -24,7 +25,13 @@
  *   acknowledgment, a typed reason, 24 hours, audited with ids and counts and
  *   never a value; a director, the health role and an Area Coordinator are
  *   refused, and the refusal is audited;
- * - event deletion removes an event's copies, and refuses while a hold covers one.
+ * - event deletion removes an event's copies, and refuses while a hold covers one;
+ * - expiry is the start of the day after the keep-until day in Central time plus the grace days
+ *   (a Feb 29 birthday included); the sweep skips people it can never seal and pages past them;
+ *   the reported age comes from the event's club year; a record with no usable field gets no copy;
+ * - a second administrator is not let in by the first one's break-glass; concurrent holds give one hold;
+ * - removing a roster member who has a copy keeps the Person (and tells the director what it always did);
+ * - the deletion job works in batches, audits each run, and a backlog continues on the next sweep.
  *
  * Uses fictitious rows it creates and removes itself, and a synthetic key.
  *
@@ -49,6 +56,7 @@ const clubId = `${P}_club`;
 const clubId2 = `${P}_club_2`;
 const accounts = { director: `${P}_acct_dir`, coordinator: `${P}_acct_coord` };
 const adminUserId = `${P}_admin_user`;
+const admin2UserId = `${P}_admin2_user`;
 const healthUserId = `${P}_health_user`;
 const emailDomain = "health.example.test";
 const SECRETS = ["Verify allergy text only", "Verify medication text only", "Verify Mutual Insurer", "4 Verify Road", "515-555-0188", "Pat Verify"];
@@ -114,16 +122,32 @@ const ids = {
   eventA: `${P}_event_a`,
   eventB: `${P}_event_b`,
   eventC: `${P}_event_c`,
+  eventD: `${P}_event_d`,
+  eventE: `${P}_event_e`,
+  elig: `${P}_elig`,
+  ineA: `${P}_ine_a`,
+  ineB: `${P}_ine_b`,
+  ineC: `${P}_ine_c`,
+  ineD: `${P}_ine_d`,
+  ineE: `${P}_ine_e`,
+  leap: `${P}_leap`,
+  ageNow: `${P}_age_now`,
+  ageLater: `${P}_age_later`,
+  zero: `${P}_zero`,
+  rmGone: `${P}_rm_gone`,
+  rmReg: `${P}_rm_reg`,
+  raced: `${P}_raced`,
 };
-const personIds = [ids.holder, ids.minor, ids.adult, ids.unknown, ids.norecord, ids.submitted, ids.plain];
-const eventIds = [ids.eventA, ids.eventB, ids.eventC];
+const ineligible = [ids.ineA, ids.ineB, ids.ineC, ids.ineD, ids.ineE];
+const personIds = [ids.holder, ids.minor, ids.adult, ids.unknown, ids.norecord, ids.submitted, ids.plain, ids.elig, ...ineligible, ids.leap, ids.ageNow, ids.ageLater, ids.zero, ids.rmGone, ids.rmReg, ids.raced];
+const eventIds = [ids.eventA, ids.eventB, ids.eventC, ids.eventD, ids.eventE];
 
 async function cleanup() {
   const registrations = await prisma.registration.findMany({ where: { eventId: { in: eventIds } }, select: { id: true } });
   await prisma.auditLog.deleteMany({
     where: {
       OR: [
-        { actorUserId: { in: [adminUserId, healthUserId] } },
+        { actorUserId: { in: [adminUserId, admin2UserId, healthUserId] } },
         { eventId: { in: eventIds } },
         { action: { startsWith: "HEALTH_SNAPSHOT" } },
         { entityId: { startsWith: P } },
@@ -143,10 +167,10 @@ async function cleanup() {
   await prisma.registration.deleteMany({ where: { eventId: { in: eventIds } } });
   await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: [clubId, clubId2] } } });
-  await prisma.healthPrivacyAcknowledgment.deleteMany({ where: { OR: [{ userId: { in: [adminUserId, healthUserId] } }, { attendeeAccountId: { in: Object.values(accounts) } }] } });
+  await prisma.healthPrivacyAcknowledgment.deleteMany({ where: { OR: [{ userId: { in: [adminUserId, admin2UserId, healthUserId] } }, { attendeeAccountId: { in: Object.values(accounts) } }] } });
   await prisma.person.deleteMany({ where: { id: { in: personIds } } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: Object.values(accounts) } } });
-  await prisma.user.deleteMany({ where: { id: { in: [adminUserId, healthUserId] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [adminUserId, admin2UserId, healthUserId] } } });
   await prisma.organization.deleteMany({ where: { id: { in: [clubId, clubId2] } } });
 }
 
@@ -175,6 +199,7 @@ async function main() {
   const coordinator: Viewer = { kind: "AREA_COORDINATOR", accountId: accounts.coordinator };
   const healthRole: Viewer = { kind: "HEALTH_ROLE", userId: healthUserId, eventIds: [ids.eventA] };
   const admin: Viewer = { kind: "SYSTEM_ADMIN", userId: adminUserId };
+  const admin2: Viewer = { kind: "SYSTEM_ADMIN", userId: admin2UserId };
   const sysAdminActor = { userId: adminUserId, globalRole: "SYSTEM_ADMIN" as const };
   const now = new Date();
   const clubYear = rosterDomain.clubYearFor(now);
@@ -186,6 +211,7 @@ async function main() {
     await prisma.attendeeAccount.create({ data: { id, email: `account-${key}@${emailDomain}`, displayName: `Verify ${key}`, status: "ACTIVE" } });
   }
   await prisma.user.create({ data: { id: adminUserId, email: `admin@${emailDomain}`, displayName: "Verify Admin", globalRole: "SYSTEM_ADMIN" } });
+  await prisma.user.create({ data: { id: admin2UserId, email: `admin2@${emailDomain}`, displayName: "Verify Second Admin", globalRole: "SYSTEM_ADMIN" } });
   await prisma.user.create({ data: { id: healthUserId, email: `health@${emailDomain}`, displayName: "Verify Health Staff" } });
   for (const [key, id] of Object.entries(ids)) {
     if (key.startsWith("event")) continue;
@@ -248,10 +274,18 @@ async function main() {
   // 1. Switched off: nothing is sealed, swept, held or opened ---------------
   assert((await snapshots.sealHealthSnapshot({ eventId: ids.eventA, personId: ids.minor, trigger: "CHECK_IN" })).outcome === "DISABLED", "sealing with the flag off");
   await hooks.sealHealthSnapshotAfterCheckIn(ids.eventA, confirmed.attendeeIds[ids.minor]!);
-  assert((await hooks.runHealthSnapshotSweep()) === null, "the sweep with the flag off");
-  assert((await snapshots.deleteExpiredHealthSnapshots(now, { force: true })).ran === false, "the retention job with the flag off");
+  const offSweep = await hooks.runHealthSnapshotSweep();
+  assert(offSweep !== null && offSweep.started === null && offSweep.retention?.ran === true && offSweep.retention.deleted === 0, "with the flag off the sweep seals nothing but still runs the expiry deletion");
+  assert((await snapshots.deleteExpiredHealthSnapshots(now, { force: true })).ran === true, "the retention job runs with the flag off");
+  await prisma.auditLog.deleteMany({ where: { action: { startsWith: "HEALTH_SNAPSHOT_RETENTION" } } });
   await expectCode(access.viewSealedSnapshots(admin, ids.minor), "NOT_FOUND", "opening with the flag off");
-  await expectCode(access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.minor }, REASON), "NOT_FOUND", "a hold with the flag off");
+  await expectCode(access.startSnapshotBreakGlass(admin, { personId: ids.minor, reason: REASON }), "NOT_FOUND", "break-glass with the flag off");
+  // Holds stay available to a system administrator with the flag off, so one can always be placed before a deletion.
+  const offHold = await access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.minor }, REASON, now);
+  assert(!offHold.alreadyHeld && (await access.listSnapshotHolds(admin)).some((row) => row.id === offHold.holdId), "a hold can be placed and listed with the flag off");
+  await access.liftSnapshotHold(admin, offHold.holdId, REASON, now);
+  assert((await access.listSnapshotBreakGlassGrants(admin)).length === 0, "the break-glass review list works with the flag off");
+  await prisma.auditLog.deleteMany({ where: { action: { in: ["HEALTH_SNAPSHOT_HOLD_PLACED", "HEALTH_SNAPSHOT_HOLD_LIFTED", "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED"] } } });
   assert((await prisma.healthRecordSnapshot.count({ where: { personId: { in: personIds } } })) === 0, "nothing is stored with the flag off");
 
   // 2. Switched on: records for the people -----------------------------------
@@ -320,10 +354,16 @@ async function main() {
   const endDate = lifecycle.calendarDateInEventTimeZone(new Date(now.getTime() - 3_600_000 + 3 * DAY), "America/Chicago");
   const [endY, endM, endD] = endDate.split("-").map(Number) as [number, number, number];
   const [birthY, birthM, birthD] = minorBirth.split("-").map(Number) as [number, number, number];
-  assert(minorCopy.ageBasis === "MINOR" && minorCopy.expiresAt.getTime() === Date.UTC(birthY + 26, birthM - 1, birthD), "a minor's copy expires on their 26th birthday");
-  assert(adultCopy.ageBasis === "ADULT" && adultCopy.expiresAt.getTime() === Date.UTC(endY + 5, endM - 1, endD), "an adult's copy expires 5 years after the event's last day");
+  // A copy is deletable from the start of the day AFTER its keep-until day in Central time, plus the grace days.
+  const deleteFrom = (keepUntil: string) => retention.snapshotDeleteFrom(keepUntil).getTime();
+  const ymdOf = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10);
+  assert(retention.HEALTH_SNAPSHOT_GRACE_DAYS === 90, "the grace period is 90 days");
+  assert(minorCopy.ageBasis === "MINOR" && minorCopy.expiresAt.getTime() === deleteFrom(ymdOf(birthY + 26, birthM, birthD)), "a minor's copy expires after their 26th birthday (plus the day and the grace)");
+  assert(adultCopy.ageBasis === "ADULT" && adultCopy.expiresAt.getTime() === deleteFrom(ymdOf(endY + 5, endM, endD)), "an adult's copy expires after 5 years from the event's last day (plus the day and the grace)");
   assert(unknownCopy.ageBasis === "UNKNOWN" && unknownCopy.expiresAt.getTime() > adultCopy.expiresAt.getTime(), "with no birth date the longer reading applies (reported age 12: the 26th birthday on the latest reading)");
-  assert(unknownCopy.expiresAt.getTime() === Date.UTC(Number(unknownCopy.eventDate.slice(0, 4)) - 12 + 26, Number(unknownCopy.eventDate.slice(5, 7)) - 1, Number(unknownCopy.eventDate.slice(8, 10))), "the unknown reading is the event day plus 26 minus the reported age");
+  assert(unknownCopy.expiresAt.getTime() === deleteFrom(ymdOf(Number(unknownCopy.eventDate.slice(0, 4)) - 12 + 26, Number(unknownCopy.eventDate.slice(5, 7)), Number(unknownCopy.eventDate.slice(8, 10)))), "the unknown reading is the event day plus 26 minus the reported age");
+  // Central midnight, not UTC midnight: the stored instant is the evening or early morning UTC, never 00:00 UTC.
+  assert(minorCopy.expiresAt.getUTCHours() === 5 || minorCopy.expiresAt.getUTCHours() === 6, "the stored expiry is a Central midnight");
   const columns = await prisma.$queryRaw<Array<{ column_name: string }>>`
     SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'HealthRecordSnapshot'`;
   assert(!columns.some((column) => /birth|name|phone|email|address/i.test(column.column_name)), "the copy's table has no birth date, name or contact column");
@@ -385,17 +425,33 @@ async function main() {
   assert(viewAudit.length === 1 && viewMeta.grantId === grant.grantId && viewMeta.snapshotCount === 1 && (viewMeta.snapshotIds as string[])[0] === minorCopy.id && viewMeta.fieldCount === minorCopy.fieldCount, "the view is audited with the grant, the ids and the counts");
   for (const secret of [...SECRETS, minorBirth, adultBirth]) assert(!JSON.stringify(await prisma.auditLog.findMany({ where: { action: { startsWith: "HEALTH_SNAPSHOT" } } })).includes(secret), "no health value is in any sealed-copy audit row");
   await expectCode(access.viewSealedSnapshots(admin, ids.adult, new Date(now.getTime() + 3_600_000)), "BREAK_GLASS_REQUIRED", "a grant for one person does not open another's copies");
+  // One administrator's grant is theirs alone.
+  await acknowledgment.recordHealthPrivacyAcknowledgment(admin2, now);
+  await expectCode(access.viewSealedSnapshots(admin2, ids.minor, new Date(now.getTime() + 3_600_000)), "BREAK_GLASS_REQUIRED", "a second administrator is not let in by the first one's break-glass");
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_SNAPSHOT_ACCESS_REFUSED", actorUserId: admin2UserId } })) === 1, "the second administrator's refused attempt is audited");
+  // The monthly review list: who, when, why, whose; no value; administrators only.
+  const grantList = await access.listSnapshotBreakGlassGrants(admin);
+  assert(grantList.length === 1 && grantList[0]!.id === grant.grantId && grantList[0]!.userId === adminUserId && grantList[0]!.personId === ids.minor && grantList[0]!.reason === REASON && grantList[0]!.grantedAt.getTime() === now.getTime(), "the review list names who, when, why and whose copies");
+  for (const secret of [...SECRETS, minorBirth, adultBirth]) assert(!JSON.stringify(grantList).includes(secret), "the review list carries no health value");
+  await expectCode(access.listSnapshotBreakGlassGrants(directorA), "FORBIDDEN", "a director listing break-glass grants");
+  assert((await prisma.auditLog.count({ where: { action: "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED" } })) === 1, "the listing is audited");
   await expectCode(access.viewSealedSnapshots(admin, ids.minor, new Date(now.getTime() + 25 * 3_600_000)), "BREAK_GLASS_REQUIRED", "the grant has ended after 24 hours");
 
   // 9. Legal holds and the daily deletion job -------------------------------------
-  const farFuture = new Date(Date.UTC(2032, 0, 1));
-  assert(adultCopy.expiresAt.getTime() < farFuture.getTime() && unknownCopy.expiresAt.getTime() > farFuture.getTime() && minorCopy.expiresAt.getTime() > farFuture.getTime(), "on 2032-01-01 only the adult's copy has expired");
+  const farFuture = new Date(adultCopy.expiresAt.getTime() + 30 * DAY);
+  assert(adultCopy.expiresAt.getTime() < farFuture.getTime() && unknownCopy.expiresAt.getTime() > farFuture.getTime() && minorCopy.expiresAt.getTime() > farFuture.getTime(), "30 days after the adult's expiry only the adult's copy has expired");
   await expectCode(access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.adult }, "short", now), "VALIDATION_FAILED", "a hold with no real reason");
   await expectCode(access.placeSnapshotHold(admin, { scope: "PERSON", personId: "no-such-person" }, REASON, now), "MEMBER_NOT_FOUND", "a hold on no one");
   const hold = await access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.adult }, REASON, now);
   assert(!hold.alreadyHeld && hold.snapshotsCovered === 1, "a person hold covers the person's copies");
   assert((await access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.adult }, REASON, now)).alreadyHeld, "placing a hold twice changes nothing");
   assert((await prisma.healthSnapshotHold.count({ where: { personId: ids.adult, liftedAt: null } })) === 1, "one active hold per person");
+  // Placed at the same moment: one hold is made and every caller gets it, never an error.
+  const raceResults = await Promise.all(Array.from({ length: 8 }, () => access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.raced }, REASON, now)));
+  assert(raceResults.filter((row) => !row.alreadyHeld).length === 1 && new Set(raceResults.map((row) => row.holdId)).size === 1, "eight racing holds give one hold, returned to all");
+  assert((await prisma.healthSnapshotHold.count({ where: { personId: ids.raced, liftedAt: null } })) === 1, "one active hold after the race");
+  await access.liftSnapshotHold(admin, raceResults[0]!.holdId, REASON, now);
+  await prisma.auditLog.deleteMany({ where: { action: { in: ["HEALTH_SNAPSHOT_HOLD_PLACED", "HEALTH_SNAPSHOT_HOLD_LIFTED"] }, entityId: raceResults[0]!.holdId } });
   const holdAudit = await prisma.auditLog.findMany({ where: { action: "HEALTH_SNAPSHOT_HOLD_PLACED" } });
   assert(holdAudit.length === 1 && (holdAudit[0]!.metadata as Record<string, unknown>).reason === REASON && (holdAudit[0]!.metadata as Record<string, unknown>).snapshotsCovered === 1, "a hold is audited with its reason and count");
   const held = await snapshots.deleteExpiredHealthSnapshots(farFuture, { force: true });
@@ -421,7 +477,9 @@ async function main() {
   assert((await prisma.healthRecordSnapshotField.count({ where: { snapshotId: adultCopy.id } })) === 0, "its sealed fields went with it");
   const retentionAudit = await prisma.auditLog.findMany({ where: { action: "HEALTH_SNAPSHOT_RETENTION_RUN" }, orderBy: { createdAt: "desc" } });
   const latestRun = retentionAudit[0]!.metadata as Record<string, unknown>;
-  assert(latestRun.deleted === 1 && (latestRun.snapshotIds as string[])[0] === adultCopy.id && JSON.stringify(retentionAudit).indexOf(SECRETS[0]!) < 0, "the deletion is audited with ids and counts");
+  assert(latestRun.deleted === 1 && latestRun.batches === 1 && latestRun.backlogRemaining === false && (latestRun.snapshotIds as string[])[0] === adultCopy.id && JSON.stringify(retentionAudit).indexOf(SECRETS[0]!) < 0, "the deletion is audited with ids and counts");
+  const batchAudit = await prisma.auditLog.findMany({ where: { action: "HEALTH_SNAPSHOT_RETENTION_BATCH" } });
+  assert(batchAudit.length === 1 && (batchAudit[0]!.metadata as { deleted: number }).deleted === 1, "each batch is audited as it commits");
   // Once a day.
   assert((await snapshots.deleteExpiredHealthSnapshots(new Date())).ran === false, "the job does not run twice within a day");
   assert((await snapshots.deleteExpiredHealthSnapshots(new Date(now.getTime() + 2 * DAY))).ran === true, "the job runs again the next day");
@@ -448,11 +506,141 @@ async function main() {
   assert((deletionAudit.metadata as { counts: Record<string, number> }).counts.healthSnapshots === 1, "the deletion audit row counts the copies");
   await prisma.auditLog.deleteMany({ where: { action: "EVENT_DELETED", entityId: ids.eventB } });
 
-  // 11. Back off: nothing more happens ------------------------------------------------
+  // 10b. The sweep skips people it can never seal and pages past them ---------------------
+  // Five people are on a club's registration but their record is on another club's roster, so they can never be sealed. They sort
+  // before the one who can. With a page of two, the old query (first N candidates) would never reach her.
+  await prisma.event.create({ data: { id: ids.eventD, slug: `${P}-d`, name: "Synthetic Snapshot Camporee D", ...when(-1, 3) } });
+  for (const personId of ineligible) {
+    const other = await rosterMember(personId, { birthDate: adultBirth, type: "ADULT", club: clubId2 });
+    await repo.saveHealthRecord(directorB, clubId2, other.id, record, now);
+  }
+  const eligMember = await rosterMember(ids.elig, { birthDate: adultBirth, type: "ADULT" });
+  await repo.saveHealthRecord(directorA, clubId, eligMember.id, record, now);
+  counter += 1;
+  const regD = await prisma.registration.create({ data: { eventId: ids.eventD, accountHolderPersonId: ids.holder, confirmationCode: `${P}-${counter}`, status: "CONFIRMED", totalAmount: "50.00", submittedAt: now }, select: { id: true } });
+  await prisma.clubEventRegistration.create({ data: { eventId: ids.eventD, organizationId: clubId, registrationId: regD.id } });
+  for (const [position, personId] of [...ineligible, ids.elig].entries()) {
+    await prisma.registrationAttendee.create({
+      data: { id: `${P}_att_${position}`, eventId: ids.eventD, registrationId: regD.id, personId, attendeeType: "ADULT", position, profileSnapshot: { firstName: "Verify", lastName: "Verify" } },
+    });
+  }
+  // Event A's adult had a copy that section 9 deleted as expired, and the script's clock still has event A starting: take that
+  // registration out so only the new event is in play (production never re-seals an expired copy: it is refused as expired).
+  await prisma.registrationAttendee.deleteMany({ where: { eventId: ids.eventA, personId: ids.adult } });
+  const paged = await snapshots.sealStartedEventSnapshots(now, 500, { pageSize: 2 });
+  assert(paged.taken === 1 && paged.failed === 0, `the sweep reaches the eligible person past ${ineligible.length} ineligible ones with a page of 2 (taken=${paged.taken})`);
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.elig, eventId: ids.eventD } })) === 1, "the eligible person was sealed");
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: { in: ineligible } } })) === 0, "the ineligible people were never sealed or tried");
+  assert(paged.skipped === 0, "people who can never be sealed are not even tried");
+
+  // 10c. Age basis, zero fields, Feb 29, and removal from a roster ------------------------------
+  await prisma.event.create({ data: { id: ids.eventE, slug: `${P}-e`, name: "Synthetic Snapshot Camporee E", ...when(-1, 3) } });
+  const nextYear = rosterDomain.clubYearChoices(now)[2]!;
+  async function rosterMemberIn(personId: string, year: string, extra: { birthDate?: string; reportedAge?: number; type?: "YOUTH" | "ADULT" }) {
+    return prisma.clubRosterMember.create({
+      data: {
+        organizationId: clubId, clubYear: year, personId, attendeeType: extra.type ?? "YOUTH", role: "Pathfinder", source: "DIRECTOR",
+        ...(extra.birthDate ? { sealedBirthDate: birthDates.sealBirthDate(extra.birthDate) } : {}),
+        ...(extra.reportedAge !== undefined ? { reportedAge: extra.reportedAge } : {}),
+      },
+    });
+  }
+  async function directRecord(rosterMemberId: string, recordId: string, fieldKey: string, value: unknown) {
+    await prisma.healthRecord.create({ data: { id: recordId, organizationId: clubId, rosterMemberId, fields: { create: [{ fieldKey, sealedValue: crypto.sealHealthField(recordId, fieldKey, value) }] } } });
+  }
+  const leapMember = await rosterMemberIn(ids.leap, clubYear, { birthDate: "2012-02-29" });
+  const ageNowMember = await rosterMemberIn(ids.ageNow, clubYear, { reportedAge: 12 });
+  await rosterMemberIn(ids.ageNow, nextYear, { reportedAge: 17 });
+  const ageLaterMember = await rosterMemberIn(ids.ageLater, nextYear, { reportedAge: 15 });
+  const zeroMember = await rosterMemberIn(ids.zero, clubYear, { birthDate: minorBirth });
+  const rmGoneMember = await rosterMemberIn(ids.rmGone, clubYear, { birthDate: minorBirth });
+  const rmRegMember = await rosterMemberIn(ids.rmReg, clubYear, { birthDate: minorBirth });
+  await repo.saveHealthRecord(directorA, clubId, leapMember.id, record, now);
+  await repo.saveHealthRecord(directorA, clubId, ageNowMember.id, record, now);
+  await repo.saveHealthRecord(directorA, clubId, rmGoneMember.id, record, now);
+  await repo.saveHealthRecord(directorA, clubId, rmRegMember.id, record, now);
+  await directRecord(ageLaterMember.id, `${P}_rec_later`, "hasAllergies", "NO");
+  // A record whose only field is one the format does not know: nothing to seal.
+  await directRecord(zeroMember.id, `${P}_rec_zero`, "legacy_unknown_field", "x");
+  const regE = await register(ids.eventE, "CONFIRMED", [ids.leap, ids.ageNow, ids.ageLater, ids.zero, ids.rmReg, ids.rmGone]);
+  await prisma.person.update({ where: { id: ids.rmGone }, data: { normalizedEmail: `rm-gone@${emailDomain}`, phone: "515-555-0100" } });
+  await prisma.person.update({ where: { id: ids.rmReg }, data: { normalizedEmail: `rm-reg@${emailDomain}`, phone: "515-555-0101" } });
+  const eventE = await prisma.event.findUniqueOrThrow({ where: { id: ids.eventE }, select: { startsAt: true, endsAt: true, timezone: true } });
+  const eStart = lifecycle.calendarDateInEventTimeZone(eventE.startsAt, eventE.timezone);
+  const eEnd = lifecycle.calendarDateInEventTimeZone(eventE.endsAt, eventE.timezone);
+  for (const personId of [ids.leap, ids.ageNow, ids.ageLater, ids.rmGone, ids.rmReg]) {
+    assert((await snapshots.sealHealthSnapshot({ eventId: ids.eventE, personId, trigger: "CHECK_IN" })).outcome === "TAKEN", `a copy for ${personId}`);
+  }
+  const copyOf = (personId: string) => prisma.healthRecordSnapshot.findUniqueOrThrow({ where: { personId_eventId: { personId, eventId: ids.eventE } } });
+
+  // Feb 29: a birthday that does not exist in 2038 lands on Mar 1, stored as the Central midnight after it plus the grace.
+  const leapCopy = await copyOf(ids.leap);
+  const leapExpiry = retention.computeSnapshotExpiry({ eventStartDate: eStart, eventEndDate: eEnd, birthDate: "2012-02-29", reportedAge: null, attendeeType: "YOUTH" });
+  assert(leapCopy.ageBasis === "MINOR" && leapExpiry.expiresOn === "2038-03-01", "a Feb 29 birthday's 26th falls on Mar 1, 2038");
+  assert(leapCopy.expiresAt.getTime() === retention.snapshotDeleteFrom("2038-03-01").getTime() && leapCopy.expiresAt.toISOString() === "2038-05-31T05:00:00.000Z", "stored: 2038-03-01 + 1 day + 90 days at Central midnight (CDT)");
+
+  // Age basis: the event's own club year wins over a later year's reported age; a later year alone is lowered by the gap.
+  const ageNowCopy = await copyOf(ids.ageNow);
+  const wantNow = retention.computeSnapshotExpiry({ eventStartDate: eStart, eventEndDate: eEnd, birthDate: null, reportedAge: 12, attendeeType: "YOUTH" });
+  assert(ageNowCopy.ageBasis === "UNKNOWN" && ageNowCopy.expiresAt.getTime() === wantNow.expiresAt.getTime(), "the reported age comes from the event's club year (12), not a later year's (17)");
+  const ageLaterCopy = await copyOf(ids.ageLater);
+  const wantLater = retention.computeSnapshotExpiry({ eventStartDate: eStart, eventEndDate: eEnd, birthDate: null, reportedAge: 14, attendeeType: "YOUTH" });
+  assert(ageLaterCopy.expiresAt.getTime() === wantLater.expiresAt.getTime(), "with only a later year (15), the year gap is subtracted (14)");
+
+  // Zero usable fields: no copy.
+  assert((await snapshots.sealHealthSnapshot({ eventId: ids.eventE, personId: ids.zero, trigger: "CHECK_IN" })).outcome === "NO_RECORD", "a record with no usable field gets no copy");
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.zero } })) === 0, "and nothing was sealed");
+
+  // Removal through removeRosterMember (not only the eraser): the copy keeps the Person row, the director is told what they always were.
+  // This person's registration entry is taken off after the copy was sealed, so nothing but the copy keeps the Person row.
+  await prisma.registrationAttendee.deleteMany({ where: { eventId: ids.eventE, personId: ids.rmGone } });
+  const removedGone = await rosterRepo.removeRosterMember(clubId, rmGoneMember.id, { accountId: accounts.director }, now);
+  assert(removedGone.personId === ids.rmGone && removedGone.nameKept === false, "removal reports the person kept (a copy needs the row) but nameKept stays false: ordered items are what it reports");
+  const goneAfter = await prisma.person.findUnique({ where: { id: ids.rmGone } });
+  assert(goneAfter !== null && goneAfter.normalizedEmail === null && goneAfter.phone === null && goneAfter.firstName.length > 0, "with no registration the Person row stays with email and phone erased, name kept");
+  assert((await prisma.healthRecord.count({ where: { rosterMemberId: rmGoneMember.id } })) === 0 && (await prisma.clubRosterMember.count({ where: { id: rmGoneMember.id } })) === 1, "the live record is gone; the roster row is erased in place");
+  assert((await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: rmGoneMember.id } })).status === "REMOVED", "the roster row is marked removed");
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.rmGone } })) === 1, "the sealed copy is untouched by the removal");
+  const removedReg = await rosterRepo.removeRosterMember(clubId, rmRegMember.id, { accountId: accounts.director }, now);
+  assert(removedReg.personId === ids.rmReg && removedReg.nameKept === false, "a registered person with a copy is kept, and nameKept stays false");
+  const regAfter = await prisma.person.findUniqueOrThrow({ where: { id: ids.rmReg } });
+  assert(regAfter.normalizedEmail !== null && regAfter.phone !== null, "a registered person keeps their contact fields, as before");
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.rmReg } })) === 1 && regE.registrationId.length > 0, "their copy is untouched too");
+
+  // The Central-midnight boundary in the database: the Feb 29 copy stays 1 ms before the instant and goes at it. (Copies due earlier,
+  // such as the adult sealed for the sweep check above, go first; none else is due between then and 2038-06.)
+  await snapshots.deleteExpiredHealthSnapshots(new Date(leapCopy.expiresAt.getTime() - 1), { force: true });
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.leap } })) === 1, "the Feb 29 copy is still there 1 ms before the Central midnight");
+  const at = await snapshots.deleteExpiredHealthSnapshots(leapCopy.expiresAt, { force: true });
+  assert(at.deleted === 1 && (await prisma.healthRecordSnapshot.count({ where: { personId: ids.leap } })) === 0, "the copy is deleted at that instant");
+
+  // 11. Back off: nothing is sealed or opened, but expiry deletion and holds carry on ---------
   process.env.HEALTH_RECORDS_ENABLED = "false";
   envModule.resetServerEnvCache();
   await expectCode(access.viewSealedSnapshots(admin, ids.minor), "NOT_FOUND", "opening after the flag goes off");
   assert((await snapshots.sealStartedEventSnapshots(now)).taken === 0, "no copies after the flag goes off");
+  assert((await snapshots.sealHealthSnapshot({ eventId: ids.eventE, personId: ids.zero, trigger: "CHECK_IN" })).outcome === "DISABLED", "no sealing after the flag goes off");
+  const total = await prisma.healthRecordSnapshot.count({ where: { personId: { in: personIds } } });
+  const offHold2 = await access.placeSnapshotHold(admin, { scope: "PERSON", personId: ids.submitted }, REASON, now);
+  assert(total === 7 && offHold2.snapshotsCovered === 1, `seven copies are left, one under a hold placed with the flag off (total=${total})`);
+  const far = new Date(Date.UTC(2100, 0, 1));
+  // Batches: 2 per batch, at most 2 batches per run, so 4 of the 6 deletable copies go and a backlog is reported.
+  await prisma.auditLog.deleteMany({ where: { action: "HEALTH_SNAPSHOT_RETENTION_RUN" } });
+  const run1 = await snapshots.deleteExpiredHealthSnapshots(far, { force: true, batchSize: 2, maxBatches: 2 });
+  assert(run1.ran && run1.deleted === 4 && run1.batches === 2 && run1.backlogRemaining === true && run1.heldSkipped === 1, `the first run deletes two batches and reports a backlog (${JSON.stringify(run1)})`);
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: { in: personIds } } })) === 3, "three remain: two due, one held");
+  const runAudits = await prisma.auditLog.findMany({ where: { action: "HEALTH_SNAPSHOT_RETENTION_RUN" } });
+  assert(runAudits.some((row) => { const m = row.metadata as Record<string, unknown>; return m.deleted === 4 && m.batches === 2 && m.backlogRemaining === true && m.heldSkipped === 1; }), "the run is audited with its counts");
+  // A run that stopped at the cap does not hold the next sweep off for a day; one that finished does.
+  const next = await snapshots.deleteExpiredHealthSnapshots(new Date());
+  assert(next.ran === true && next.deleted === 0 && next.backlogRemaining === false, "the next sweep is not held off by a backlog run");
+  assert((await snapshots.deleteExpiredHealthSnapshots(new Date())).ran === false, "and once a run has finished the job waits for the next day");
+  const run2 = await snapshots.deleteExpiredHealthSnapshots(far, { force: true, batchSize: 2, maxBatches: 2 });
+  assert(run2.deleted === 2 && run2.backlogRemaining === false, `the backlog is finished (${JSON.stringify(run2)})`);
+  assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.submitted } })) === 1, "the held copy is still there");
+  await access.liftSnapshotHold(admin, offHold2.holdId, REASON, now);
+  const run3 = await snapshots.deleteExpiredHealthSnapshots(far, { force: true });
+  assert(run3.deleted === 1 && (await prisma.healthRecordSnapshot.count({ where: { personId: { in: personIds } } })) === 0, "with the hold lifted (with the flag off) the last copy goes");
   process.env.HEALTH_RECORDS_ENABLED = "true";
   envModule.resetServerEnvCache();
 

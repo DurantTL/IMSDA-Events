@@ -1,3 +1,4 @@
+import { localMidnightInstant, nextDateKey } from "@/modules/cancellation-policy/event-time";
 import { ageOn, parseCalendarDate } from "@/modules/club-rosters/domain";
 
 /**
@@ -44,6 +45,19 @@ export const HEALTH_SNAPSHOT_YOUNGEST_PLAUSIBLE_AGE: Record<string, number> = {
   ADULT: 18,
 };
 
+/**
+ * The time zone a copy's keep-until day is read in: the conference's (Central). The day ends at local midnight here,
+ * not at UTC midnight, which is the evening before.
+ */
+export const HEALTH_SNAPSHOT_EXPIRY_TIME_ZONE = "America/Chicago";
+
+/**
+ * Extra days a copy is kept after the end of its keep-until day, so a claim filed on the last day can still get a
+ * legal hold before the deletion job runs. Owner-chosen (not from a statute); counsel is to confirm it (ADR 0005
+ * Addendum B). A change applies to copies sealed afterwards.
+ */
+export const HEALTH_SNAPSHOT_GRACE_DAYS = 90;
+
 /** Break-glass access lasts this long (ADR 0005, decided 2026-10-09). */
 export const HEALTH_SNAPSHOT_BREAK_GLASS_HOURS = 24;
 
@@ -66,6 +80,40 @@ export function addYearsToCalendarDate(date: string, years: number) {
   return new Date(Date.UTC(parsed.year + years, parsed.month - 1, parsed.day)).toISOString().slice(0, 10);
 }
 
+/** Adds whole days to a calendar date (`YYYY-MM-DD`). Calendar arithmetic only. */
+export function addDaysToCalendarDate(date: string, days: number) {
+  const parsed = parseCalendarDate(date);
+  if (!parsed) throw new Error("Not a calendar date.");
+  return new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * The instant a copy whose keep-until day is `expiresOn` is deleted from: the start of the day AFTER that day in
+ * Central time, plus the grace days (counted as calendar days, so a daylight saving change never shifts the hour).
+ */
+export function snapshotDeleteFrom(expiresOn: string) {
+  const day = nextDateKey(addDaysToCalendarDate(expiresOn, HEALTH_SNAPSHOT_GRACE_DAYS));
+  return localMidnightInstant(day, HEALTH_SNAPSHOT_EXPIRY_TIME_ZONE);
+}
+
+/**
+ * The age a roster says the person was at the event, from the row for the event's own club year. With only a later
+ * year, the reported age is lowered by the year gap (they were younger then). With only an earlier year, its age is
+ * used as reported (never raised, so the reading errs towards the younger age and the longer keep). Null when no row
+ * reports an age. Only the age is read here, never a birth date.
+ */
+export function reportedAgeAtEvent(rows: Array<{ clubYear: string; reportedAge: number | null }>, eventClubYear: string): number | null {
+  const startOf = (clubYear: string) => Number(clubYear.slice(0, 4));
+  const eventYear = startOf(eventClubYear);
+  const withAge = rows.filter((row) => row.reportedAge !== null && Number.isFinite(startOf(row.clubYear)));
+  const same = withAge.find((row) => startOf(row.clubYear) === eventYear);
+  if (same) return same.reportedAge;
+  const later = withAge.filter((row) => startOf(row.clubYear) > eventYear).sort((a, b) => startOf(a.clubYear) - startOf(b.clubYear))[0];
+  if (later) return Math.max(0, (later.reportedAge as number) - (startOf(later.clubYear) - eventYear));
+  const earlier = withAge.filter((row) => startOf(row.clubYear) < eventYear).sort((a, b) => startOf(b.clubYear) - startOf(a.clubYear))[0];
+  return earlier ? earlier.reportedAge : null;
+}
+
 function laterOf(a: string, b: string) {
   return a >= b ? a : b;
 }
@@ -81,7 +129,8 @@ export type SnapshotExpiryInput = {
 };
 
 /**
- * The day a copy expires, worked out from the birth date at the event:
+ * The keep-until day (`expiresOn`) and the instant the copy becomes deletable (`expiresAt`, see `snapshotDeleteFrom`:
+ * the start of the next day in Central time plus the grace days). The keep-until day is worked out from the birth date at the event:
  * - under 18 on the event's first day: their 26th birthday;
  * - 18 or over: 5 years after the event's last day;
  * - no usable birth date: the longer of 5 years after the event and the 26th
@@ -116,10 +165,10 @@ export function computeSnapshotExpiry(input: SnapshotExpiryInput): { ageBasis: S
     const latestBirth = addYearsToCalendarDate(input.eventStartDate, -youngest);
     expiresOn = laterOf(addYearsToCalendarDate(latestBirth, rule.minorKeepUntilAge), adultExpiry);
   }
-  return { ageBasis, expiresOn, expiresAt: new Date(`${expiresOn}T00:00:00.000Z`) };
+  return { ageBasis, expiresOn, expiresAt: snapshotDeleteFrom(expiresOn) };
 }
 
-/** True once the day has come: a copy expiring on a date is deleted from the start of that day (UTC). */
+/** True once `expiresAt` has come (see `snapshotDeleteFrom`). */
 export function snapshotExpired(expiresAt: Date, now: Date) {
   return expiresAt.getTime() <= now.getTime();
 }

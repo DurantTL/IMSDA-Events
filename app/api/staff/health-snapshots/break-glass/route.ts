@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { requireStaffHealthViewer } from "@/modules/health-records/access";
 import { healthApiError, healthDisabledResponse, healthJson, readHealthJson } from "@/modules/health-records/api";
-import { startSnapshotBreakGlass } from "@/modules/health-records/snapshot-access-repository";
+import { requireSnapshotAdminViewer, startSnapshotBreakGlass } from "@/modules/health-records/snapshot-access-repository";
 
 const bodySchema = z.object({ personId: z.string().min(1).max(64), reason: z.string().max(2000) }).strict();
 
@@ -17,8 +16,9 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
+    // Who is asking comes first: a malformed body from someone who may not do this is refused as unauthorized (and audited).
+    const viewer = await requireSnapshotAdminViewer("BREAK_GLASS_START", null);
     const body = bodySchema.parse(await readHealthJson(request));
-    const viewer = await requireStaffHealthViewer();
     const grant = await startSnapshotBreakGlass(viewer, { personId: body.personId, reason: body.reason });
     return healthJson({ ok: true, grantId: grant.grantId, expiresAt: grant.expiresAt.toISOString(), snapshotCount: grant.snapshotCount });
   } catch (error) {

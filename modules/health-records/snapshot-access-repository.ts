@@ -3,11 +3,13 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { AccessDeniedError } from "@/modules/access/authorization";
+import { getCurrentSession } from "@/modules/access/current-session";
 import { requireHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";
 import { openSnapshotField } from "@/modules/health-records/crypto";
 import { healthAuditActor, isHealthFieldKey, type HealthViewer } from "@/modules/health-records/domain";
-import { HealthRecordError } from "@/modules/health-records/errors";
-import { requireHealthRecordsEnabled } from "@/modules/health-records/flag";
+import { HEALTH_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
+import { healthRecordsEnabled, requireHealthRecordsEnabled } from "@/modules/health-records/flag";
 import {
   HEALTH_SNAPSHOT_BREAK_GLASS_HOURS,
   HEALTH_SNAPSHOT_REASON_MAX,
@@ -20,6 +22,10 @@ import {
  * use audited. A director, deputy, Registrar, Area Coordinator or the event
  * health role never reaches a copy, whatever else they may see. Audit rows hold
  * ids, counts, dates and the typed reasons: never a health value.
+ *
+ * Opening a copy and starting break-glass are behind HEALTH_RECORDS_ENABLED. The legal holds (place, lift, list)
+ * and the break-glass review list are not: they stay available to system administrators with the flag off, so a
+ * hold can always be placed before a deletion.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -43,24 +49,58 @@ export function parseSnapshotReason(raw: unknown) {
 
 type SystemAdmin = Extract<HealthViewer, { kind: "SYSTEM_ADMIN" }>;
 
-/** Refuses anyone but a system administrator, auditing the refusal (who by kind, what was attempted, never a value). */
-async function requireSystemAdmin(viewer: HealthViewer, attempted: string, targetId: string | null): Promise<SystemAdmin> {
-  requireHealthRecordsEnabled();
-  if (viewer.kind === "SYSTEM_ADMIN") return viewer;
-  const who = healthAuditActor(viewer);
+/** Records a refused attempt. Never throws; who by kind and id only, what was attempted, never a value. */
+async function auditRefusal(actorUserId: string | undefined, metadata: Record<string, unknown>, attempted: string, targetId: string | null) {
   try {
     await writeAuditLog({
-      actorUserId: who.actorUserId,
+      actorUserId,
       action: "HEALTH_SNAPSHOT_ACCESS_REFUSED",
       entityType: "HealthRecordSnapshot",
       entityId: targetId ? idShaped(targetId) : "none",
       summary: "A request for a sealed health copy was refused.",
-      metadata: { ...who.metadata, attempted, reason: "NOT_SYSTEM_ADMIN" },
+      metadata: { ...metadata, attempted },
     });
   } catch (error) {
     const action = "Auditing a refused sealed health copy request failed";
     logError(action, error);
   }
+}
+
+/**
+ * Refuses anyone but a system administrator, auditing the refusal. `flagOptional` is for the hold routes and the
+ * review list, which work with HEALTH_RECORDS_ENABLED off.
+ */
+async function requireSystemAdmin(viewer: HealthViewer, attempted: string, targetId: string | null, options: { flagOptional?: boolean } = {}): Promise<SystemAdmin> {
+  if (!options.flagOptional) requireHealthRecordsEnabled();
+  if (viewer.kind === "SYSTEM_ADMIN") return viewer;
+  const who = healthAuditActor(viewer);
+  await auditRefusal(who.actorUserId, { ...who.metadata, reason: "NOT_SYSTEM_ADMIN" }, attempted, targetId);
+  throw new HealthRecordError("FORBIDDEN", "Sealed health copies can be opened only by a system administrator, with break-glass.");
+}
+
+/**
+ * The staff routes' first step, before any body is read: who is asking, and is it a system administrator. Sealed
+ * copies are for system administrators only, so anyone else is refused here, and a signed-in staff identity
+ * is audited (a user with the health permission as that role; a signed-in user without it as no permission). An
+ * unauthenticated request is a 401 and cannot be attributed, so it is not audited. With the flag off (`flagOptional`
+ * routes only) anyone but a system administrator gets the unknown-route answer and nothing is audited.
+ */
+export async function requireSnapshotAdminViewer(attempted: string, targetId: string | null, options: { flagOptional?: boolean } = {}): Promise<SystemAdmin> {
+  const flagOn = healthRecordsEnabled();
+  if (!flagOn && !options.flagOptional) requireHealthRecordsEnabled();
+  const { user } = await getCurrentSession();
+  if (!flagOn) {
+    if (user?.globalRole === "SYSTEM_ADMIN") return { kind: "SYSTEM_ADMIN", userId: user.id };
+    throw new HealthRecordError("NOT_FOUND", HEALTH_NOT_FOUND_MESSAGE);
+  }
+  if (!user) throw new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED");
+  if (user.globalRole === "SYSTEM_ADMIN") return { kind: "SYSTEM_ADMIN", userId: user.id };
+  const memberships = await getPrisma().eventMembership.findMany({
+    where: { userId: user.id, status: "ACTIVE", permissions: { has: "VIEW_HEALTH_INFORMATION" } },
+    select: { permissions: true },
+  });
+  const hasHealthRole = memberships.some((membership) => membership.permissions.includes("VIEW_HEALTH_INFORMATION"));
+  await auditRefusal(user.id, { viewerKind: hasHealthRole ? "HEALTH_ROLE" : "STAFF_NO_HEALTH_PERMISSION", reason: "NOT_SYSTEM_ADMIN" }, attempted, targetId);
   throw new HealthRecordError("FORBIDDEN", "Sealed health copies can be opened only by a system administrator, with break-glass.");
 }
 
@@ -130,19 +170,7 @@ export async function viewSealedSnapshots(viewer: HealthViewer, personId: string
     select: { id: true },
   });
   if (!grant) {
-    try {
-      await writeAuditLog({
-        actorUserId: admin.userId,
-        action: "HEALTH_SNAPSHOT_ACCESS_REFUSED",
-        entityType: "HealthRecordSnapshot",
-        entityId: idShaped(personId),
-        summary: "A request for a sealed health copy was refused.",
-        metadata: { ...healthAuditActor(admin).metadata, attempted: "VIEW_SEALED_COPIES", reason: "BREAK_GLASS_REQUIRED" },
-      });
-    } catch (error) {
-      const action = "Auditing a refused sealed health copy request failed";
-      logError(action, error);
-    }
+    await auditRefusal(admin.userId, { ...healthAuditActor(admin).metadata, reason: "BREAK_GLASS_REQUIRED" }, "VIEW_SEALED_COPIES", personId);
     throw new HealthRecordError("BREAK_GLASS_REQUIRED", "Opening a sealed health copy needs break-glass: type a reason first. Access lasts 24 hours.");
   }
   const rows = await prisma.healthRecordSnapshot.findMany({
@@ -210,7 +238,7 @@ export type SnapshotHoldTarget = { scope: "PERSON"; personId: string } | { scope
  * active changes nothing and returns it.
  */
 export async function placeSnapshotHold(viewer: HealthViewer, target: SnapshotHoldTarget, rawReason: unknown, now = new Date()) {
-  const admin = await requireSystemAdmin(viewer, "PLACE_HOLD", target.scope === "PERSON" ? target.personId : target.eventId);
+  const admin = await requireSystemAdmin(viewer, "PLACE_HOLD", target.scope === "PERSON" ? target.personId : target.eventId, { flagOptional: true });
   const reason = parseSnapshotReason(rawReason);
   const prisma = getPrisma();
   const covered = await prisma.healthRecordSnapshot.count({ where: target.scope === "PERSON" ? { personId: target.personId } : { eventId: target.eventId } });
@@ -219,28 +247,38 @@ export async function placeSnapshotHold(viewer: HealthViewer, target: SnapshotHo
     ? await prisma.person.findUnique({ where: { id: target.personId }, select: { id: true } })
     : await prisma.event.findUnique({ where: { id: target.eventId }, select: { id: true } });
   if (!exists) throw new HealthRecordError("MEMBER_NOT_FOUND", "That person or event could not be found.");
-  return prisma.$transaction(async (tx) => {
-    const active = await tx.healthSnapshotHold.findFirst({ where: { scope: target.scope, liftedAt: null, ...targetWhere }, select: { id: true } });
-    if (active) return { holdId: active.id, alreadyHeld: true, snapshotsCovered: covered };
-    const hold = await tx.healthSnapshotHold.create({
-      data: { scope: target.scope, ...targetWhere, reason, placedByUserId: admin.userId, placedAt: now },
-      select: { id: true },
+  const findActive = () => prisma.healthSnapshotHold.findFirst({ where: { scope: target.scope, liftedAt: null, ...targetWhere }, select: { id: true } });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const active = await tx.healthSnapshotHold.findFirst({ where: { scope: target.scope, liftedAt: null, ...targetWhere }, select: { id: true } });
+      if (active) return { holdId: active.id, alreadyHeld: true, snapshotsCovered: covered };
+      const hold = await tx.healthSnapshotHold.create({
+        data: { scope: target.scope, ...targetWhere, reason, placedByUserId: admin.userId, placedAt: now },
+        select: { id: true },
+      });
+      await writeAuditLog({
+        actorUserId: admin.userId,
+        action: "HEALTH_SNAPSHOT_HOLD_PLACED",
+        entityType: "HealthSnapshotHold",
+        entityId: hold.id,
+        summary: "Placed a legal hold on sealed health copies.",
+        metadata: { ...healthAuditActor(admin).metadata, scope: target.scope, ...targetWhere, reason, snapshotsCovered: covered },
+      }, tx);
+      return { holdId: hold.id, alreadyHeld: false, snapshotsCovered: covered };
     });
-    await writeAuditLog({
-      actorUserId: admin.userId,
-      action: "HEALTH_SNAPSHOT_HOLD_PLACED",
-      entityType: "HealthSnapshotHold",
-      entityId: hold.id,
-      summary: "Placed a legal hold on sealed health copies.",
-      metadata: { ...healthAuditActor(admin).metadata, scope: target.scope, ...targetWhere, reason, snapshotsCovered: covered },
-    }, tx);
-    return { holdId: hold.id, alreadyHeld: false, snapshotsCovered: covered };
-  });
+  } catch (error) {
+    // Two holds placed at once: the database allows one active hold per target, so the loser hits the unique index and gets the winner's.
+    if (typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002") {
+      const existing = await findActive();
+      if (existing) return { holdId: existing.id, alreadyHeld: true, snapshotsCovered: covered };
+    }
+    throw error;
+  }
 }
 
 /** Lifts a hold, with a reason. Audited. A hold already lifted is not found. */
 export async function liftSnapshotHold(viewer: HealthViewer, holdId: string, rawReason: unknown, now = new Date()) {
-  const admin = await requireSystemAdmin(viewer, "LIFT_HOLD", holdId);
+  const admin = await requireSystemAdmin(viewer, "LIFT_HOLD", holdId, { flagOptional: true });
   const reason = parseSnapshotReason(rawReason);
   return getPrisma().$transaction(async (tx) => {
     const claimed = await tx.healthSnapshotHold.updateMany({
@@ -263,7 +301,7 @@ export async function liftSnapshotHold(viewer: HealthViewer, holdId: string, raw
 
 /** The holds, active first, with how many copies each covers. Ids, reasons, dates and counts only. */
 export async function listSnapshotHolds(viewer: HealthViewer) {
-  await requireSystemAdmin(viewer, "LIST_HOLDS", null);
+  await requireSystemAdmin(viewer, "LIST_HOLDS", null, { flagOptional: true });
   const prisma = getPrisma();
   const holds = await prisma.healthSnapshotHold.findMany({ orderBy: [{ liftedAt: { sort: "asc", nulls: "first" } }, { placedAt: "desc" }], take: 200 });
   const results = [];
@@ -282,4 +320,36 @@ export async function listSnapshotHolds(viewer: HealthViewer) {
     });
   }
   return results;
+}
+
+/**
+ * The break-glass grants, newest first, for the Communication Director's monthly review: who, when, why, whose
+ * copies and until when. Ids, dates and the typed reason only: never a health value. System administrators only, and
+ * available with HEALTH_RECORDS_ENABLED off. The listing is itself audited (a count).
+ */
+export async function listSnapshotBreakGlassGrants(viewer: HealthViewer, options: { limit?: number } = {}) {
+  const admin = await requireSystemAdmin(viewer, "LIST_BREAK_GLASS", null, { flagOptional: true });
+  const take = Math.min(Math.max(options.limit ?? 200, 1), 500);
+  const grants = await getPrisma().healthSnapshotBreakGlass.findMany({
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take,
+    select: { id: true, userId: true, personId: true, reason: true, createdAt: true, expiresAt: true, user: { select: { displayName: true } } },
+  });
+  await writeAuditLog({
+    actorUserId: admin.userId,
+    action: "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED",
+    entityType: "HealthSnapshotBreakGlass",
+    entityId: "list",
+    summary: "Listed break-glass grants for sealed health copies.",
+    metadata: { ...healthAuditActor(admin).metadata, grantCount: grants.length },
+  });
+  return grants.map((grant) => ({
+    id: grant.id,
+    userId: grant.userId,
+    userDisplayName: grant.user?.displayName ?? null,
+    personId: grant.personId,
+    reason: grant.reason,
+    grantedAt: grant.createdAt,
+    expiresAt: grant.expiresAt,
+  }));
 }

@@ -7,8 +7,10 @@ import { deleteExpiredHealthSnapshots, sealHealthSnapshot, sealStartedEventSnaps
 
 /**
  * The two places the rest of the app calls into sealed health copies (#924).
- * Both are no-ops with HEALTH_RECORDS_ENABLED off, and neither ever throws: a
- * failure here must not fail a check-in or a sweep. They log through the
+ * Neither ever throws: a failure here must not fail a check-in or a sweep.
+ * Sealing (at check-in and at event start) is a no-op with HEALTH_RECORDS_ENABLED
+ * off. The expiry deletion is not: it runs whatever the flag says, so switching the
+ * feature off never extends how long a copy is kept. They log through the
  * redacting logger with the action text and the error only, never an id of a
  * record or a value.
  */
@@ -34,11 +36,12 @@ export async function sealHealthSnapshotAfterCheckIn(eventId: string, attendeeId
 /**
  * Called by the scheduled sweep (the same authenticated outbox sweep that runs the
  * other periodic work). Takes the event-start copies that are due and runs the
- * daily deletion of expired copies. Returns counts only.
+ * daily deletion of expired copies. Returns counts only. With HEALTH_RECORDS_ENABLED
+ * off only the deletion runs (`started` is null): nothing new is sealed, but a copy
+ * that has expired is still deleted, unless a legal hold covers it.
  */
 export async function runHealthSnapshotSweep(now = new Date()) {
-  if (!healthRecordsEnabled()) return null;
-  const started = await sealStartedEventSnapshots(now).catch((error: unknown) => {
+  const started = !healthRecordsEnabled() ? null : await sealStartedEventSnapshots(now).catch((error: unknown) => {
     const action = "Sealing event-start health copies";
     logError(`${action} failed`, error);
     return null;

@@ -83,6 +83,7 @@ describe("health data stays out of exports, the check-in book, communications an
       // Event deletion counts and removes copies with the table, not through the module (no health code imported).
       .sort();
     expect(users).toEqual([
+      "app/api/staff/health-snapshots/break-glass-grants/route.ts",
       "app/api/staff/health-snapshots/break-glass/route.ts",
       "app/api/staff/health-snapshots/holds/[holdId]/lift/route.ts",
       "app/api/staff/health-snapshots/holds/route.ts",

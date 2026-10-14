@@ -1,7 +1,6 @@
 import { withRequestContext } from "@/lib/request-context";
-import { requireStaffHealthViewer } from "@/modules/health-records/access";
 import { healthApiError, healthDisabledResponse, healthJson } from "@/modules/health-records/api";
-import { viewSealedSnapshots } from "@/modules/health-records/snapshot-access-repository";
+import { requireSnapshotAdminViewer, viewSealedSnapshots } from "@/modules/health-records/snapshot-access-repository";
 
 type RouteContext = { params: Promise<{ personId: string }> };
 
@@ -15,7 +14,7 @@ async function getHandler(_request: Request, context: RouteContext) {
   if (disabled) return disabled;
   try {
     const { personId } = await context.params;
-    const viewer = await requireStaffHealthViewer();
+    const viewer = await requireSnapshotAdminViewer("VIEW_SEALED_COPIES", personId);
     return healthJson(await viewSealedSnapshots(viewer, personId));
   } catch (error) {
     return healthApiError(error, "Opening sealed health copies");
