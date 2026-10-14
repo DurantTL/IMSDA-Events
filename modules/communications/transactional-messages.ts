@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { MessagingError } from "@/modules/communications/messaging-error";
@@ -105,7 +106,7 @@ type TransactionalMessageInput = {
   /** An announcement's own attachments, sent alongside the template version's (#824). */
   announcementFileIds?: readonly string[];
   metadata?: Record<string, string | number | boolean | null>;
-  /** One plain line placed at the top of the message (#931: the club a team was attached to). Braces are removed. */
+  /** One plain line placed at the top of the message (#931: the club a team was attached to), added as escaped text, never as template source. */
   leadNote?: string | null;
 };
 
@@ -607,7 +608,7 @@ async function enqueueTransactionalMessage(
   const rendered = renderMessageTemplate(
     {
       subject: unescapeTokenUnderscores(source?.subjectTemplate ?? fallback.subject),
-      body: input.leadNote?.replace(/[{}]/g, "").trim() ? `${input.leadNote.replace(/[{}]/g, "").trim()}\n\n${bodyTemplate}` : bodyTemplate,
+      body: bodyTemplate,
     },
     context,
   );
@@ -623,6 +624,7 @@ async function enqueueTransactionalMessage(
     );
   }
 
+  const shown = withPlainLeadNote(rendered, input.leadNote);
   const suppressed = settings.deliveryMode === "DISABLED"
     || template?.isEnabled === false;
   const message = await tx.messageOutbox.upsert({
@@ -642,8 +644,8 @@ async function enqueueTransactionalMessage(
       senderEmailSnapshot: settings.senderEmail,
       replyToEmailSnapshot: settings.replyToEmail,
       subjectSnapshot: rendered.subject,
-      bodyTextSnapshot: rendered.body,
-      bodyHtmlSnapshot: rendered.bodyHtml,
+      bodyTextSnapshot: shown.body,
+      bodyHtmlSnapshot: shown.bodyHtml,
       metadata: {
         trigger: input.templateKey,
         transitionKey: input.transitionKey,

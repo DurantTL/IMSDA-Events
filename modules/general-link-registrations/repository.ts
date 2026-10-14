@@ -413,15 +413,14 @@ function receivedConfirmation(input: {
   attendeeCount: number;
   attendeeNames: string[];
   pricingDate: string;
-  rejected?: boolean;
+  /** A retry that finds the submission rejected or expired: the same generic words for any path. */
+  closed?: boolean;
 }): GeneralLinkConfirmation {
   return {
     outcome: "RECEIVED",
     clubName: null,
     confirmationCode: input.reference,
-    message: input.rejected
-      ? "This team registration was not accepted by the event team. Check your email for the reason, or contact the event team."
-      : GENERAL_LINK_RECEIVED_MESSAGE,
+    message: input.closed ? "This registration is no longer open. Contact the event team if you need help." : GENERAL_LINK_RECEIVED_MESSAGE,
     email: input.email,
     promoCode: null,
     lineItems: [],
@@ -446,11 +445,11 @@ function receivedConfirmation(input: {
 function replayConfirmation(row: SubmissionRow, pricingDate: string, attendeeNames: string[]) {
   return receivedConfirmation({
     reference: row.confirmationCode,
-    email: row.directorEmail,
+    email: row.status === "REJECTED" || row.status === "EXPIRED" ? "" : row.directorEmail,
     attendeeCount: row.attendeeCount,
-    attendeeNames,
+    attendeeNames: row.status === "REJECTED" || row.status === "EXPIRED" ? [] : attendeeNames,
     pricingDate,
-    rejected: row.status === "REJECTED",
+    closed: row.status === "REJECTED" || row.status === "EXPIRED",
   });
 }
 

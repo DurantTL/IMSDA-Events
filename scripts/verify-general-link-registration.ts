@@ -215,7 +215,7 @@ async function main() {
   const submit = (members: Array<ReturnType<typeof typedMember>>, teamName: string, answers: Record<string, unknown> = {}, site = missouri!.id, key = randomUUID()) =>
     link.submitGeneralLinkRegistration(eventSlug, request(members, answers, key), { locationId: site, teamName }, now);
   const registrationCount = () => prisma.clubEventRegistration.count({ where: { eventId } });
-  const mailsTo = (email: string) => prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: email }, select: { id: true, recipientKind: true, subjectSnapshot: true, bodyTextSnapshot: true } });
+  const mailsTo = (email: string) => prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: email }, select: { id: true, recipientKind: true, subjectSnapshot: true, bodyTextSnapshot: true, bodyHtmlSnapshot: true } });
   // The public answer never says which path a team took; the database does.
   const kind = async (result: { confirmationCode: string }) => (await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { confirmationCode: result.confirmationCode } })).status === "CONFIRMED" ? "ATTACHED" : "PENDING";
   const pendingCount = () => prisma.generalLinkSubmission.count({ where: { eventId, status: "PENDING" } });
@@ -676,6 +676,33 @@ async function main() {
   await link.submitGeneralLinkRegistration(eventSlug, request(youth("Dg2"), { club_name: clubName("c"), email: emailOf("regc") }), { locationId: missouri!.id, teamName: "Digest Next Window" }, new Date(now.getTime() + 20 * 60 * 1000));
   assert(await digestCount() === digestsNow + 1, "the next window sends one more");
   console.log("ok  a waitlisted team is told it is waitlisted; staff get one digest per 15 minutes");
+
+  // 15d2. A team name typed by a visitor is text in every email, never markup: no link or image comes of it.
+  const noMarkup = (html: string | null) => !/<a\s[^>]*a\.test|<img[^>]*a\.test/i.test(html ?? "");
+  const linkName = "[Invoice due - pay here](https://a.test)";
+  const mailsBeforeInjection = new Set((await mailsTo(emailOf("dira"))).map((mail) => mail.id));
+  const injected = await submit(youth("Inj"), linkName, { email: emailOf("dira") });
+  assert(await kind(injected) === "ATTACHED", "a team named like a link, with a director's email, is attached");
+  const injectedMail = (await mailsTo(emailOf("dira"))).filter((mail) => !mailsBeforeInjection.has(mail.id));
+  assert(injectedMail.length === 1 && injectedMail[0]!.bodyHtmlSnapshot !== null && noMarkup(injectedMail[0]!.bodyHtmlSnapshot), `the matched confirmation holds no link or image for the typed team name, got ${injectedMail[0]?.bodyHtmlSnapshot?.slice(0, 400)}`);
+  assert(injectedMail[0]!.bodyTextSnapshot.includes(linkName) && injectedMail[0]!.bodyHtmlSnapshot!.includes("Invoice due - pay here"), "and the name still reads, as plain text, in both parts");
+  const imageName = "![](https://a.test/p.png)";
+  const imagePending = await submit(youth("Img"), imageName, { club_name: clubName("c"), email: emailOf("regc") });
+  assert(await kind(imagePending) === "PENDING", "a team named like an image waits");
+  const pendingMail = (await mailsTo(emailOf("regc"))).find((mail) => mail.bodyTextSnapshot.includes(imageName));
+  assert(pendingMail && noMarkup(pendingMail.bodyHtmlSnapshot) && !/[\r\n]/.test(pendingMail.subjectSnapshot), "the waiting email holds no image or link, and its subject is one line");
+  const htmlName = '<a href="https://a.test">x</a>';
+  await prisma.eventLocation.update({ where: { id: iowa!.id }, data: { capacity: 1 } });
+  await prisma.event.update({ where: { id: eventId }, data: { waitlistEnabled: true } });
+  await submit(youth("Htm"), htmlName, { club_name: clubName("c"), email: emailOf("regc") }, iowa!.id);
+  const mailsBeforeHtml = new Set((await mailsTo(emailOf("regc"))).map((mail) => mail.id));
+  const htmlConfirm = await link.resolvePendingTeam(eventId, (await submissionOf(htmlName)).id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") });
+  assert((await prisma.registration.findUniqueOrThrow({ where: { id: htmlConfirm.registrationId! } })).status === "WAITLISTED", "the confirmed team landed on the waitlist");
+  const htmlMail = (await mailsTo(emailOf("regc"))).filter((mail) => !mailsBeforeHtml.has(mail.id));
+  assert(htmlMail.length === 1 && htmlMail[0]!.bodyHtmlSnapshot !== null && noMarkup(htmlMail[0]!.bodyHtmlSnapshot) && htmlMail[0]!.bodyHtmlSnapshot!.includes("&lt;a href"), `the waitlisted staff confirmation shows the name escaped, as text, got ${htmlMail[0]?.bodyHtmlSnapshot?.slice(0, 400)}`);
+  await prisma.eventLocation.update({ where: { id: iowa!.id }, data: { capacity: iowa!.capacity } });
+  await prisma.event.update({ where: { id: eventId }, data: { waitlistEnabled: false } });
+  console.log("ok  a team name typed as a link, an image or HTML is plain text in every email");
 
   // 15e. The cap on waiting teams per rolling hour: over it, a matching and a non-matching email are refused alike.
   const capRows = Array.from({ length: 60 }, (_, index) => ({

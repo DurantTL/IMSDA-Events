@@ -19,6 +19,7 @@ import {
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
+import { renderPlainNoteHtml, withPlainLeadNote } from "@/modules/communications/email-html";
 import { PendingTeamsReview } from "@/components/pending-teams-review";
 
 describe("the words that reach the person who submitted", () => {
@@ -114,5 +115,21 @@ describe("the review page's team card", () => {
     expect(html).toContain("Synthetic Club");
     expect(html).toContain("director@example.test");
     expect(html).not.toMatch(/\bage\b|years old/i);
+  });
+});
+
+describe("a note that came from a visitor is text, never markup", () => {
+  it.each(["[x](https://a.test)", "![](https://a.test/p.png)", '<a href="https://a.test">x</a>'])("shows %s escaped, with no link or image", (name) => {
+    const { body, bodyHtml } = withPlainLeadNote({ body: "Thanks.", bodyHtml: "<p>Thanks.</p>" }, `Your team "${name}" is attached to Club.`);
+    expect(bodyHtml).not.toMatch(/<a\s|<img/i);
+    expect(bodyHtml).toContain("Your team &quot;");
+    expect(body.startsWith(`Your team "${name}"`)).toBe(true);
+    expect(bodyHtml.endsWith("<p>Thanks.</p>")).toBe(true);
+    expect(renderPlainNoteHtml(name)).not.toMatch(/<a\s|<img/i);
+  });
+
+  it("puts a note on one line, so a subject or header built from it cannot be split", () => {
+    expect(withPlainLeadNote({ body: "b", bodyHtml: "<p>b</p>" }, "one\r\ntwo\nthree").body.split("\n\n")[0]).toBe("one two three");
+    expect(withPlainLeadNote({ body: "b", bodyHtml: "<p>b</p>" }, "  ").body).toBe("b");
   });
 });
