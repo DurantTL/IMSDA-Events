@@ -347,3 +347,21 @@ describe("the privacy acknowledgment before the sheet opens (#923)", () => {
     expect(mocks.ackFindFirst).not.toHaveBeenCalled();
   });
 });
+
+describe("the sheet is not behind break-glass (owner decision 2026-10-14, ADR 0005 Addendum C)", () => {
+  // The sheet reads registration and club form data, not the Pathfinder Health Record. Break-glass covers the record only.
+  const actingAdmin: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "root-acting", actAsId: "act-9" } };
+
+  it.each([false, true])("shows a system administrator and an acting administrator every row with no grant, flag %s", async (flag) => {
+    mocks.env.HEALTH_RECORDS_ENABLED = flag;
+    mocks.ackFindFirst.mockResolvedValue({ id: "ack-1" });
+    for (const viewer of [admin, actingAdmin]) {
+      for (const purpose of ["VIEW", "EXPORT"] as const) {
+        const sheet = await loadEventHealth(viewer, "e1", { purpose }, now);
+        const [avery] = sheet.clubs[0].attendees;
+        expect(avery).toMatchObject({ name: "Avery Test", dietary: DIETARY, medicalFlag: "Yes" });
+        for (const row of sheet.clubs[0].attendees) expect(Object.keys(row)).not.toContain("breakGlassRequired");
+      }
+    }
+  });
+});

@@ -4,6 +4,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
+import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
@@ -39,9 +40,14 @@ export default async function StaffHealthRecordPage({
   const health = await viewHealthRecord(viewer, organizationId, memberId, new Date(), { eventId: event }).catch((error: unknown) => {
     // The one-time privacy notice (#923) comes before any record opens.
     if (error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED") return null;
+    // A system administrator reads a live record only through break-glass (#929); the refusal is already audited.
+    if (error instanceof HealthRecordError && error.code === "BREAK_GLASS_REQUIRED") return "BREAK_GLASS" as const;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (health === "BREAK_GLASS") {
+    return <AccessRestricted detail={BREAK_GLASS_REQUIRED_MESSAGE} title="Break-glass access is required" />;
+  }
   if (!health) return <HealthPrivacyAcknowledgment as="STAFF" />;
   return (
     <section className="page-stack club-form-page">

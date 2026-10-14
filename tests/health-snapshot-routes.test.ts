@@ -131,10 +131,10 @@ describe("the break-glass review list", () => {
 
 describe("break-glass and viewing", () => {
   it("starts break-glass with a typed reason and returns the grant, never a value", async () => {
-    state.repo.startSnapshotBreakGlass.mockResolvedValue({ grantId: "grant-1", expiresAt: new Date("2026-10-15T12:00:00Z"), snapshotCount: 2 });
+    state.repo.startSnapshotBreakGlass.mockResolvedValue({ grantId: "grant-1", expiresAt: new Date("2026-10-15T12:00:00Z"), snapshotCount: 2, liveRecordCount: 1 });
     const response = await breakGlassRoute.POST(post({ personId: "person-1", reason: REASON }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, grantId: "grant-1", expiresAt: "2026-10-15T12:00:00.000Z", snapshotCount: 2 });
+    expect(await response.json()).toEqual({ ok: true, grantId: "grant-1", expiresAt: "2026-10-15T12:00:00.000Z", snapshotCount: 2, liveRecordCount: 1 });
     expect(state.repo.startSnapshotBreakGlass).toHaveBeenCalledWith({ kind: "SYSTEM_ADMIN", userId: "admin-1" }, { personId: "person-1", reason: REASON });
   });
 

@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { requireHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";
+import { activeGrantsFor, breakGlassRequired, idShaped, recordBreakGlassUse, type BreakGlassUseKind } from "@/modules/health-records/break-glass";
 import { openSnapshotField } from "@/modules/health-records/crypto";
 import { healthAuditActor, isHealthFieldKey, type HealthViewer } from "@/modules/health-records/domain";
 import { HEALTH_NOT_FOUND_MESSAGE, HealthRecordError } from "@/modules/health-records/errors";
@@ -17,6 +18,10 @@ import {
 } from "@/modules/health-records/snapshot-retention";
 
 /**
+ * Break-glass is ONE mechanism for a person's live health record and their sealed copies (#929): one grant per
+ * person, one administrator, a typed reason, 24 hours, covers both. The shared pieces are in `break-glass.ts`; the
+ * live record's gate is in `repository.ts`. Both apply only while HEALTH_RECORDS_ENABLED is on.
+ *
  * Who may open or hold sealed per-event copies (#924). Only a system
  * administrator, and only through break-glass: a typed reason, 24 hours, every
  * use audited. A director, deputy, Registrar, Area Coordinator or the event
@@ -29,11 +34,6 @@ import {
  */
 
 const HOUR_MS = 60 * 60 * 1000;
-
-/** Ids are short opaque strings. Anything else is caller-supplied text and is never stored. */
-function idShaped(value: string | null | undefined) {
-  return typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : "invalid";
-}
 
 /** A typed reason: trimmed, control characters removed, within bounds. */
 export function parseSnapshotReason(raw: unknown) {
@@ -108,19 +108,24 @@ async function snapshotCountForPerson(personId: string) {
   return getPrisma().healthRecordSnapshot.count({ where: { personId } });
 }
 
+/** Live records held for a person (a person can have one per club). A count, never a value. */
+async function liveRecordCountForPerson(personId: string) {
+  return getPrisma().healthRecord.count({ where: { rosterMember: { personId } } });
+}
+
 /**
  * Break-glass: a system administrator types a reason and gets 24 hours of
- * access to one person's sealed copies. Audited with the grant id, the person,
- * the count of copies, the expiry and the reason. The one-time privacy
- * acknowledgment applies first.
+ * access to one person's live health record and sealed copies (#929). Audited with the grant id, the person,
+ * the counts, the expiry and the reason. The one-time privacy
+ * acknowledgment applies first. The person must have a live record or a sealed copy.
  */
 export async function startSnapshotBreakGlass(viewer: HealthViewer, input: { personId: string; reason: unknown }, now = new Date()) {
   const admin = await requireSystemAdmin(viewer, "BREAK_GLASS_START", input.personId);
   await requireHealthPrivacyAcknowledgment(admin);
   const reason = parseSnapshotReason(input.reason);
-  const snapshotCount = await snapshotCountForPerson(input.personId);
-  // One answer for a person with no sealed copy and for one that does not exist.
-  if (snapshotCount === 0) throw new HealthRecordError("MEMBER_NOT_FOUND", "No sealed health copy was found for that person.");
+  const [snapshotCount, liveRecordCount] = await Promise.all([snapshotCountForPerson(input.personId), liveRecordCountForPerson(input.personId)]);
+  // One answer for a person with nothing on file and for one that does not exist.
+  if (snapshotCount === 0 && liveRecordCount === 0) throw new HealthRecordError("MEMBER_NOT_FOUND", "No health record or sealed health copy was found for that person.");
   const expiresAt = new Date(now.getTime() + HEALTH_SNAPSHOT_BREAK_GLASS_HOURS * HOUR_MS);
   const prisma = getPrisma();
   const grant = await prisma.$transaction(async (tx) => {
@@ -133,12 +138,12 @@ export async function startSnapshotBreakGlass(viewer: HealthViewer, input: { per
       action: "HEALTH_SNAPSHOT_BREAK_GLASS_STARTED",
       entityType: "HealthSnapshotBreakGlass",
       entityId: created.id,
-      summary: "Started break-glass access to a person's sealed health copies.",
-      metadata: { ...healthAuditActor(admin).metadata, personId: input.personId, snapshotCount, reason, expiresAt: expiresAt.toISOString(), hours: HEALTH_SNAPSHOT_BREAK_GLASS_HOURS },
+      summary: "Started break-glass access to a person's live health record and sealed health copies.",
+      metadata: { ...healthAuditActor(admin).metadata, personId: input.personId, snapshotCount, liveRecordCount, covers: ["LIVE_RECORD", "SEALED_COPIES"], reason, expiresAt: expiresAt.toISOString(), hours: HEALTH_SNAPSHOT_BREAK_GLASS_HOURS },
     }, tx);
     return created;
   });
-  return { grantId: grant.id, expiresAt, snapshotCount };
+  return { grantId: grant.id, expiresAt, snapshotCount, liveRecordCount };
 }
 
 export type SealedSnapshotView = {
@@ -164,15 +169,12 @@ export async function viewSealedSnapshots(viewer: HealthViewer, personId: string
   const admin = await requireSystemAdmin(viewer, "VIEW_SEALED_COPIES", personId);
   await requireHealthPrivacyAcknowledgment(admin);
   const prisma = getPrisma();
-  const grant = await prisma.healthSnapshotBreakGlass.findFirst({
-    where: { userId: admin.userId, personId, expiresAt: { gt: now } },
-    orderBy: { expiresAt: "desc" },
-    select: { id: true },
-  });
-  if (!grant) {
+  const grantId = (await activeGrantsFor(admin, [personId], now)).get(personId);
+  if (!grantId) {
     await auditRefusal(admin.userId, { ...healthAuditActor(admin).metadata, reason: "BREAK_GLASS_REQUIRED" }, "VIEW_SEALED_COPIES", personId);
-    throw new HealthRecordError("BREAK_GLASS_REQUIRED", "Opening a sealed health copy needs break-glass: type a reason first. Access lasts 24 hours.");
+    throw breakGlassRequired();
   }
+  const grant = { id: grantId };
   const rows = await prisma.healthRecordSnapshot.findMany({
     where: { personId },
     orderBy: { takenAt: "asc" },
@@ -190,20 +192,24 @@ export async function viewSealedSnapshots(viewer: HealthViewer, personId: string
       fields: { select: { fieldKey: true, sealedValue: true } },
     },
   });
-  await writeAuditLog({
-    actorUserId: admin.userId,
-    action: "HEALTH_SNAPSHOT_VIEWED",
-    entityType: "HealthRecordSnapshot",
-    entityId: personId,
-    summary: "Opened a person's sealed health copies through break-glass.",
-    metadata: {
-      ...healthAuditActor(admin).metadata,
-      grantId: grant.id,
-      personId,
-      snapshotIds: rows.map((row) => row.id),
-      snapshotCount: rows.length,
-      fieldCount: rows.reduce((sum, row) => sum + row.fieldCount, 0),
-    },
+  const kind: BreakGlassUseKind = "SEALED_COPIES";
+  await prisma.$transaction(async (tx) => {
+    await recordBreakGlassUse(tx, { grantId: grant.id, userId: admin.userId, personId, kind });
+    await writeAuditLog({
+      actorUserId: admin.userId,
+      action: "HEALTH_SNAPSHOT_VIEWED",
+      entityType: "HealthRecordSnapshot",
+      entityId: personId,
+      summary: "Opened a person's sealed health copies through break-glass.",
+      metadata: {
+        ...healthAuditActor(admin).metadata,
+        grantId: grant.id,
+        personId,
+        snapshotIds: rows.map((row) => row.id),
+        snapshotCount: rows.length,
+        fieldCount: rows.reduce((sum, row) => sum + row.fieldCount, 0),
+      },
+    }, tx);
   });
   const snapshots = rows.map((row) => {
     const values: Record<string, unknown> = {};
@@ -324,32 +330,51 @@ export async function listSnapshotHolds(viewer: HealthViewer) {
 
 /**
  * The break-glass grants, newest first, for the Communication Director's monthly review: who, when, why, whose
- * copies and until when. Ids, dates and the typed reason only: never a health value. System administrators only, and
+ * record and until when, and how the grant was used (#929): a count and the last time for each kind of use (the live
+ * record, the sealed copies). Ids, dates, kinds, counts and the typed reason
+ * only: never a health value. System administrators only, and
  * available with HEALTH_RECORDS_ENABLED off. The listing is itself audited (a count).
  */
 export async function listSnapshotBreakGlassGrants(viewer: HealthViewer, options: { limit?: number } = {}) {
   const admin = await requireSystemAdmin(viewer, "LIST_BREAK_GLASS", null, { flagOptional: true });
   const take = Math.min(Math.max(options.limit ?? 200, 1), 500);
-  const grants = await getPrisma().healthSnapshotBreakGlass.findMany({
+  const prisma = getPrisma();
+  const grants = await prisma.healthSnapshotBreakGlass.findMany({
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take,
     select: { id: true, userId: true, personId: true, reason: true, createdAt: true, expiresAt: true, user: { select: { displayName: true } } },
+  });
+  const usage = grants.length === 0 ? [] : await prisma.healthBreakGlassUse.groupBy({
+    by: ["grantId", "kind"],
+    where: { grantId: { in: grants.map((grant) => grant.id) } },
+    _count: { _all: true },
+    _max: { createdAt: true },
   });
   await writeAuditLog({
     actorUserId: admin.userId,
     action: "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED",
     entityType: "HealthSnapshotBreakGlass",
     entityId: "list",
-    summary: "Listed break-glass grants for sealed health copies.",
+    summary: "Listed break-glass grants for health records and sealed copies.",
     metadata: { ...healthAuditActor(admin).metadata, grantCount: grants.length },
   });
-  return grants.map((grant) => ({
-    id: grant.id,
-    userId: grant.userId,
-    userDisplayName: grant.user?.displayName ?? null,
-    personId: grant.personId,
-    reason: grant.reason,
-    grantedAt: grant.createdAt,
-    expiresAt: grant.expiresAt,
-  }));
+  return grants.map((grant) => {
+    const rows = usage.filter((row) => row.grantId === grant.id);
+    const byKind: Partial<Record<BreakGlassUseKind, number>> = {};
+    let lastUsedAt: Date | null = null;
+    for (const row of rows) {
+      byKind[row.kind] = row._count._all;
+      if (row._max.createdAt && (!lastUsedAt || row._max.createdAt > lastUsedAt)) lastUsedAt = row._max.createdAt;
+    }
+    return {
+      id: grant.id,
+      userId: grant.userId,
+      userDisplayName: grant.user?.displayName ?? null,
+      personId: grant.personId,
+      reason: grant.reason,
+      grantedAt: grant.createdAt,
+      expiresAt: grant.expiresAt,
+      uses: { total: rows.reduce((sum, row) => sum + row._count._all, 0), lastUsedAt, byKind },
+    };
+  });
 }

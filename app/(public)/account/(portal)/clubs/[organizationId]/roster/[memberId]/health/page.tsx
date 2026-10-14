@@ -7,6 +7,7 @@ import { HealthRecordForm } from "@/components/health-record-form";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { getRosterAccessStateForPage, RosterAccessError } from "@/modules/club-rosters/access";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
+import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { listHealthRecordLinks, viewHealthEntryStatus, viewHealthRecord } from "@/modules/health-records/repository";
@@ -82,9 +83,12 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
 
   const health = await viewHealthRecord(viewer, organizationId, memberId).catch((error: unknown) => {
     if (needsAck(error)) return null;
+    // A system administrator acting as the director still needs break-glass for a live record (#929).
+    if (error instanceof HealthRecordError && error.code === "BREAK_GLASS_REQUIRED") return "BREAK_GLASS" as const;
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
+  if (health === "BREAK_GLASS") return <p className="public-manage-empty">{BREAK_GLASS_REQUIRED_MESSAGE}</p>;
   if (!health) return <HealthPrivacyAcknowledgment as={viewer.kind === "SYSTEM_ADMIN" ? "STAFF" : "ATTENDEE"} />;
   const links = viewer.kind === "CLUB_LEADER" ? await listHealthRecordLinks(viewer, organizationId, memberId) : [];
   const memberName = `${health.member.firstName} ${health.member.lastName}`.trim();

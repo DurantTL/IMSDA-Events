@@ -30,6 +30,9 @@
  *   (a Feb 29 birthday included); the sweep skips people it can never seal and pages past them;
  *   the reported age comes from the event's club year; a record with no usable field gets no copy;
  * - a second administrator is not let in by the first one's break-glass; concurrent holds give one hold;
+ * - one grant covers the live record and the sealed copies (#929); the coordinator health sheet is not behind
+ *   break-glass (it reads registration and club form data, not the Health Record), so an administrator sees it
+ *   with no grant and no use is recorded for it;
  * - removing a roster member who has a copy keeps the Person (and tells the director what it always did);
  * - the deletion job works in batches, audits each run, and a backlog continues on the next sweep.
  *
@@ -166,7 +169,9 @@ async function cleanup() {
     prisma.healthRecordSnapshot.deleteMany({ where: { personId: { in: personIds } } }),
   ]);
   await prisma.healthSnapshotHold.deleteMany({ where: { OR: [{ personId: { in: personIds } }, { eventId: { in: eventIds } }] } });
-  await prisma.healthSnapshotBreakGlass.deleteMany({ where: { personId: { in: personIds } } });
+  // Grants and uses outlive a deleted person or user (the review trail), so remove them by the fictitious ids.
+  await prisma.healthBreakGlassUse.deleteMany({ where: { OR: [{ personId: { in: personIds } }, { userId: { in: [adminUserId, admin2UserId, healthUserId] } }] } });
+  await prisma.healthSnapshotBreakGlass.deleteMany({ where: { OR: [{ personId: { in: personIds } }, { userId: { in: [adminUserId, admin2UserId, healthUserId] } }] } });
   await prisma.healthRecord.deleteMany({ where: { organizationId: { in: [clubId, clubId2] } } });
   await prisma.checkIn.deleteMany({ where: { eventId: { in: eventIds } } });
   await prisma.clubEventRegistration.deleteMany({ where: { registrationId: { in: registrations.map((row) => row.id) } } });
@@ -198,6 +203,7 @@ async function main() {
   const checkIn = await import("../modules/checkin/repository");
   const lifecycle = await import("../modules/events/lifecycle");
   const eventDeletion = await import("../modules/events/deletion-repository");
+  const coordinatorHealth = await import("../modules/coordinator-health/repository");
   const envModule = await import("../lib/env");
   type Viewer = import("../modules/health-records/domain").HealthViewer;
   const directorA: Viewer = { kind: "CLUB_LEADER", organizationId: clubId, accountId: accounts.director };
@@ -442,6 +448,22 @@ async function main() {
   await expectCode(access.listSnapshotBreakGlassGrants(directorA), "FORBIDDEN", "a director listing break-glass grants");
   assert((await prisma.auditLog.count({ where: { action: "HEALTH_SNAPSHOT_BREAK_GLASS_LISTED" } })) === 1, "the listing is audited");
   await expectCode(access.viewSealedSnapshots(admin, ids.minor, new Date(now.getTime() + 25 * 3_600_000)), "BREAK_GLASS_REQUIRED", "the grant has ended after 24 hours");
+
+  // 8b. The coordinator health sheet is NOT behind break-glass (owner decision 2026-10-14) ---------
+  // It reads registration and club form data, not the Health Record. An administrator with no grant, and one acting
+  // as a director, see it as on main; no use is recorded for it.
+  const sheetNow = new Date(now.getTime() + 3_600_000);
+  const sheetAdmin2 = { kind: "SYSTEM_ADMIN", userId: admin2UserId } as const;
+  const actingAsDirector = { kind: "CLUB_LEADER", organizationId: clubId, actor: { kind: "STAFF_ACTING", userId: admin2UserId, actAsId: `${P}_act_as` } } as const;
+  const sheet = await coordinatorHealth.loadEventHealth(sheetAdmin2, ids.eventA, {}, sheetNow);
+  assert(sheet.clubs.flatMap((club) => club.attendees).length >= 4, "an administrator with no grant sees the sheet's attendees");
+  await coordinatorHealth.loadEventHealth(sheetAdmin2, ids.eventA, { purpose: "EXPORT" }, sheetNow);
+  await coordinatorHealth.loadEventHealth(actingAsDirector, ids.eventA, {}, sheetNow);
+  assert((await prisma.healthBreakGlassUse.count({ where: { userId: admin2UserId } })) === 0, "reading the sheet records no break-glass use");
+  const reviewAfter = await access.listSnapshotBreakGlassGrants(admin);
+  const reviewedGrant = reviewAfter.find((row) => row.id === grant.grantId);
+  assert(reviewedGrant && reviewedGrant.uses.byKind.SEALED_COPIES === 1 && reviewedGrant.uses.total === 1, "the review list counts the sealed-copy use of the grant");
+  for (const secret of [...SECRETS, minorBirth, adultBirth]) assert(!JSON.stringify(reviewAfter).includes(secret), "the review list still carries no health value");
 
   // 9. Legal holds and the daily deletion job -------------------------------------
   const farFuture = new Date(adultCopy.expiresAt.getTime() + 30 * DAY);

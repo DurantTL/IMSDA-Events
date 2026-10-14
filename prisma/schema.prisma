@@ -722,6 +722,7 @@ model User {
   healthSnapshotHolds          HealthSnapshotHold[]        @relation("HealthSnapshotHoldPlacedBy")
   healthSnapshotHoldsLifted    HealthSnapshotHold[]        @relation("HealthSnapshotHoldLiftedBy")
   healthSnapshotBreakGlass     HealthSnapshotBreakGlass[]
+  healthBreakGlassUses         HealthBreakGlassUse[]
   email         String            @unique
   displayName   String
   jobTitle      String?
@@ -2004,6 +2005,7 @@ model Person {
   healthSnapshots       HealthRecordSnapshot[]
   healthSnapshotHolds   HealthSnapshotHold[]
   healthSnapshotBreakGlass HealthSnapshotBreakGlass[]
+  healthBreakGlassUses     HealthBreakGlassUse[]
   honorInstructorRoles  HonorInstructor[]
   backgroundCheckMatch  BackgroundCheckMatch?
   backgroundChecksPre527 BackgroundCheckPre527[] @ignore
@@ -6307,15 +6309,42 @@ model HealthSnapshotHold {
 model HealthSnapshotBreakGlass {
   id        String   @id @default(cuid())
   userId    String?
-  personId  String
+  personId  String?
   reason    String
   createdAt DateTime @default(now())
   expiresAt DateTime
 
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
-  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Deleting the person keeps the grant (the review trail), with the person id cleared (#929).
+  person Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  healthUses HealthBreakGlassUse[]
 
   @@index([userId, personId, expiresAt])
+}
+
+enum HealthBreakGlassUseKind {
+  LIVE_RECORD
+  SEALED_COPIES
+}
+
+/// One use of a break-glass grant (#929): which grant, whose record and what was opened. The grant covers a person's
+/// live record and sealed copies alike. Ids, a kind and a time only: never a health value. Feeds the monthly review.
+model HealthBreakGlassUse {
+  id        String                  @id @default(cuid())
+  grantId   String?
+  userId    String?
+  personId  String?
+  kind      HealthBreakGlassUseKind
+  createdAt DateTime                @default(now())
+
+  // The review trail outlives the person and the grant: deleting either keeps the use row with the id cleared.
+  grant  HealthSnapshotBreakGlass? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  user   User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  person Person?                   @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  @@index([grantId, createdAt])
+  @@index([createdAt])
 }
 
 /// A single-use, expiring private link for a parent to fill in one member's
