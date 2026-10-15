@@ -31,6 +31,10 @@ vi.mock("@/modules/events/repository", () => ({
   EventOperationError: mocks.EventOperationError,
   findActiveMembership: mocks.findActiveMembership,
 }));
+vi.mock("@/lib/request-context", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/request-context")>()),
+  currentCorrelationId: () => "corr-fixed-1",
+}));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     $transaction: async (run: (tx: unknown) => unknown) => run({
@@ -86,7 +90,7 @@ describe.each(routes)("POST /api/events/[eventId]/%s", (name, post) => {
     expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
     const data = mocks.auditCreate.mock.calls[0][0].data;
     expect(data).toMatchObject({ eventId: "event-a", actorUserId: "admin-a", entityId: "event-a", metadata: { eventId: "event-a" } });
-    expect(data.correlationId).toEqual(expect.any(String));
+    expect(data.correlationId).toBe("corr-fixed-1");
   });
 
   it("lets a system administrator through", async () => {

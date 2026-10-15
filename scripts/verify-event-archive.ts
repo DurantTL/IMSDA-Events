@@ -203,7 +203,7 @@ async function main() {
   assert(!again.archived && !again.changed, "unarchiving a live event changes nothing");
 
   // ---- The class waitlist sweep leaves an archived event's live offers alone (they are not lapsed, and unarchiving could not undo that). ----
-  const { sweepClassWaitlists } = await import("../modules/honors/waitlist-repository");
+  const { sweepClassWaitlists, promoteClassWaitlists } = await import("../modules/honors/waitlist-repository");
   const sweepNow = new Date("2028-10-01T12:00:00Z");
   async function offeredEntry(forEventId: string, key: string) {
     const honor = await prisma.honor.create({ data: { id: id(`honor_${key}`), code: `EVARC-${key}`, name: `Evarc honor ${key}`, normalizedName: `evarc honor ${key}` } });
@@ -229,8 +229,14 @@ async function main() {
   assert(sweep.failed === 0, "the sweep ran cleanly");
   assert(JSON.stringify(await readEntry(liveEntry.id)) === JSON.stringify(liveBefore), "the sweep leaves an archived event's OFFERED entry exactly as it was");
   assert((await readEntry(controlEntry.id)).status === "EXPIRED", "the same sweep still lapses an expired offer on an event that is not archived");
+  // Direct promotion (what a cancellation, transfer or staff action on the event runs) is a no-op for an archived event too.
+  const direct = await prisma.$transaction((tx) => promoteClassWaitlists(tx, eventId, [liveEntry.offeringId], sweepNow));
+  assert(direct.lapsed === 0 && direct.offered === 0 && direct.messageIds.length === 0, "promoting on an archived event does nothing");
+  assert(JSON.stringify(await readEntry(liveEntry.id)) === JSON.stringify(liveBefore), "direct promotion leaves an archived event's OFFERED entry exactly as it was");
   await unarchiveEvent({ eventId, actor: actor(adminId, null, "SYSTEM_ADMIN") });
   assert(JSON.stringify(await readEntry(liveEntry.id)) === JSON.stringify(liveBefore), "unarchiving finds the entry unchanged");
+  const afterUnarchive = await prisma.$transaction((tx) => promoteClassWaitlists(tx, eventId, [liveEntry.offeringId], sweepNow));
+  assert(afterUnarchive.lapsed === 1 && (await readEntry(liveEntry.id)).status === "EXPIRED", "after unarchive the first promotion lapses an offer whose time ran out meanwhile");
 
   // ---- A deleted archiver does not block anything. ----
   await archiveEvent({ eventId, actor: actor(staffId, "EVENT_ADMIN") });

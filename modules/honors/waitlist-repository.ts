@@ -229,6 +229,8 @@ export async function promoteClassWaitlists(tx: Tx, eventId: string, offeringIds
   await lockOfferings(tx, ids);
   const event = await tx.event.findUnique({ where: { id: eventId }, select: lifecycleEvent });
   if (!event) return result;
+  // An archived event (#635) is frozen: a cancellation, transfer or staff action on it must not lapse live offers, and unarchiving could not undo that.
+  if (event.archivedAt) return result;
   const offeringsById = new Map((await loadOfferings(tx, eventId)).map((offering) => [offering.id, offering]));
   const prerequisiteHonorIds = await eventPrerequisiteHonorIds(tx, eventId);
   for (const offeringId of ids) {
