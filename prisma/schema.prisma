@@ -1602,6 +1602,7 @@ model Event {
   attendees                           RegistrationAttendee[]
   payments                            Payment[]
   registrationAdjustments             RegistrationAdjustment[]
+  scholarshipFund                     ScholarshipFund?
   refunds                             Refund[]
   checkIns                            CheckIn[]
   announcements                       Announcement[]
@@ -2253,6 +2254,8 @@ model UserPersonLink {
  */
 model Organization {
   id                   String           @id @default(cuid())
+  scholarshipContributions ScholarshipContribution[]
+  scholarshipAwards    ScholarshipAward[]
   churchSponsorFinanceReviews ChurchSponsorFinanceReview[] @relation("ChurchSponsorFinanceReviewChurch")
   healthRecords       HealthRecord[]
   healthRecordLinks   HealthRecordLink[]
@@ -2789,6 +2792,7 @@ model Registration {
   honorEnrollments        HonorEnrollment[]
   honorClassWaitlist      HonorClassWaitlistEntry[]
   adjustments             RegistrationAdjustment[]
+  scholarshipAwards       ScholarshipAward[]
   memberTransferMovesFrom MemberTransferRegistrationMove[] @relation("MemberTransferMoveFrom")
   memberTransferMovesTo   MemberTransferRegistrationMove[] @relation("MemberTransferMoveTo")
 
@@ -3087,6 +3091,7 @@ model RegistrationAdjustment {
   reversedBy   RegistrationAdjustment? @relation("AdjustmentReversal")
   mealLedgerEntry EventMealLedgerEntry?
   assetLedgerEntry AssetLedgerEntry?
+  scholarshipAward ScholarshipAward?
 
   @@index([registrationId, createdAt])
   @@index([eventId, kind])
@@ -8974,6 +8979,92 @@ model GeneralLinkSubmission {
 
   @@unique([eventId, idempotencyKey])
   @@index([eventId, status, createdAt])
+}
+
+/// An event's scholarship fund (#398): one per event, and nothing carries over
+/// to another event or year. Contributions record money received from a church
+/// or a sponsor; awards are scholarship adjustment lines (#396) that draw on it.
+/// This records money; it never moves any.
+model ScholarshipFund {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  createdAt DateTime @default(now())
+
+  event         Event                     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  contributions ScholarshipContribution[]
+  awards        ScholarshipAward[]
+
+  /// Lets contributions and awards prove they belong to the fund's own event.
+  @@unique([id, eventId])
+}
+
+enum ScholarshipContributionMethod {
+  CASH
+  CHECK
+  CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+/// Money received into an event's fund, in integer cents. Lines are never
+/// edited: a mistake is cancelled by a negative reversal line pointing at the
+/// original. `sponsorKey` groups lines for matching: the directory
+/// organization's id, else the normalized free-text name.
+model ScholarshipContribution {
+  id                     String                        @id @default(cuid())
+  eventId                String
+  fundId                 String
+  organizationId         String?
+  sponsorName            String
+  sponsorKey             String
+  amountCents            Int
+  receivedOn             DateTime                      @db.Date
+  method                 ScholarshipContributionMethod
+  /// A check number or short note; for a reversal, the reason.
+  note                   String?
+  reversesContributionId String?                       @unique
+  createdByUserId        String?
+  createdByNameSnapshot  String
+  createdAt              DateTime                      @default(now())
+
+  fund         ScholarshipFund          @relation(fields: [fundId, eventId], references: [id, eventId], onDelete: Cascade)
+  organization Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  reverses     ScholarshipContribution? @relation("ScholarshipContributionReversal", fields: [reversesContributionId], references: [id], onDelete: Restrict)
+  reversedBy   ScholarshipContribution? @relation("ScholarshipContributionReversal")
+
+  @@index([fundId, receivedOn])
+  @@index([fundId, sponsorKey])
+}
+
+/// One scholarship adjustment line that draws on the fund. It counts against
+/// the fund only while its adjustment line has not been reversed. A funded
+/// award cannot take the fund below zero; a pledged one (`pledged` and not yet
+/// `settledAt`) is promised money that has not arrived, so it can exceed the
+/// balance and shows as outstanding for its sponsor until staff settle it.
+model ScholarshipAward {
+  id              String    @id @default(cuid())
+  eventId         String
+  fundId          String
+  registrationId  String
+  adjustmentId    String    @unique
+  /// Positive cents; the adjustment line itself is negative.
+  amountCents     Int
+  pledged         Boolean   @default(false)
+  organizationId  String?
+  sponsorName     String?
+  sponsorKey      String?
+  settledAt       DateTime?
+  settledByUserId String?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  fund         ScholarshipFund        @relation(fields: [fundId, eventId], references: [id, eventId], onDelete: Cascade)
+  registration Registration           @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  adjustment   RegistrationAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  organization Organization?          @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([fundId, sponsorKey])
+  @@index([registrationId])
 }
 
 /// Which group a personal staff invitation puts its registration in (#804). Shown beside the registration wherever staff look at it.
