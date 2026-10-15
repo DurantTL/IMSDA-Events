@@ -83,6 +83,8 @@ jobs:
       - run: npm run test:user-attendee-link
       # Real-database check of one account per person, slice (b) (#554): with the switch off activation links nothing; with it on a new staff user gets a verified linked attendee account, unverified or already-linked accounts are never taken, a reset links nothing, and no attendee password, Google or email-code sign-in yields a staff session.
       - run: npm run test:staff-attendee-activation
+      # Real-database check of one account per person, slice (c) (#554), with the switch both on and off: the single password sign-in gives a staff person both sessions and an attendee-only person one, an attendee password never yields a staff session or challenge (even with a valid staff code), the staff and attendee credentials are checked independently, every refusal is the same and takes about as long, an administrator's email change clears the attendee's verification (re-verified by a reset code or Google), hand-linking and unlinking by a system administrator (reason required, ids-only audit, refuses a linked side, never a staff session), and no enumeration through sign-up, reset or Google.
+      - run: npm run test:unified-sign-in
       # Real-database check of club member transfers: unique indexes, transfer back, duplicate recipients, removal orders (#489).
       - run: npm run test:club-transfers
 

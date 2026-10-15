@@ -11,6 +11,11 @@ import { resolvePostLoginDestination } from "@/modules/access/post-login-destina
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { SESSION_COOKIE_NAME, SESSION_LIFETIME_SECONDS } from "@/modules/access/session-store";
 import { cookies } from "next/headers";
+import { issueLinkedAttendeeSession } from "@/modules/account-merge/unified-sign-in";
+import {
+  ATTENDEE_SESSION_COOKIE_NAME,
+  ATTENDEE_SESSION_LIFETIME_SECONDS,
+} from "@/modules/attendee-accounts/session-store";
 import {
   applyRateLimitHeaders,
   type RateLimitOutcome,
@@ -113,6 +118,21 @@ async function postHandler(request: Request) {
       maxAge: SESSION_LIFETIME_SECONDS,
       priority: "high",
     });
+    // One account per person (#554): with the one-sign-in switch on, a staff person who just
+    // passed the staff second factor also gets their linked attendee session, marked as having
+    // passed the second step. Does nothing (null) with the switch off or with no usable link.
+    const attendeeSession = await issueLinkedAttendeeSession(result.userId, request.headers.get("user-agent"), { secondFactorVerified: true });
+    if (attendeeSession) {
+      (await cookies()).set(ATTENDEE_SESSION_COOKIE_NAME, attendeeSession.session.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        expires: attendeeSession.session.expiresAt,
+        maxAge: ATTENDEE_SESSION_LIFETIME_SECONDS,
+        priority: "high",
+      });
+    }
     const redirectTo = await postLoginDestinationOrDefault(
       { id: result.userId, globalRole: result.globalRole },
       input.next,

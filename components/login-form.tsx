@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
 import { OneTimeCodeInput } from "@/components/one-time-code-input";
+import {
+  attendeeAuthReturnPathFromHash,
+  attendeeSignUpEmailPrefill,
+  removeAttendeeAuthFragment,
+  takeAttendeeAuthReturnPath,
+} from "@/modules/attendee-accounts/sign-up-prefill";
 
 /**
  * A secret shown once, with the copy affordance next to it. Selecting on focus
@@ -63,8 +69,32 @@ const DEFAULT_DESTINATION = "/overview";
  * query string (#108 queue 1); it is resent with every sign-in request and
  * the server decides — via `resolvePostLoginDestination` — whether it, or
  * role-based routing, decides where sign-in lands.
+ *
+ * `unified` is the single sign-in page (#554, ADR 0013, slice (c)): the same one form and
+ * one submit, posted to `/api/sign-in`, which checks the staff and the attendee credential
+ * and says the same thing for every failure. Nothing on this form changes after the
+ * email is typed; the staff second step appears only after the password was right.
  */
-export function LoginForm({ demoCredentials, next }: { demoCredentials?: { email: string; password: string }; next?: string }) {
+export function LoginForm({
+  demoCredentials,
+  next,
+  unified = false,
+}: {
+  demoCredentials?: { email: string; password: string };
+  next?: string;
+  unified?: boolean;
+}) {
+  const emailRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // The post-registration offer links here with the address and return path in the fragment,
+    // which keeps them out of server logs. Same handling as the attendee form it replaces.
+    if (!unified || !window.location.hash) return;
+    attendeeAuthReturnPathFromHash(window.location.hash);
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const prefill = attendeeSignUpEmailPrefill(fragment.get("email") ?? undefined);
+    if (prefill && emailRef.current) emailRef.current.value = prefill;
+    removeAttendeeAuthFragment();
+  }, [unified]);
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -96,7 +126,7 @@ export function LoginForm({ demoCredentials, next }: { demoCredentials?: { email
     setError("");
     const form = new FormData(event.currentTarget);
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(unified ? "/api/sign-in" : "/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: form.get("email"), password: form.get("password"), next }),
@@ -128,7 +158,10 @@ export function LoginForm({ demoCredentials, next }: { demoCredentials?: { email
         return;
       }
 
-      router.replace(result.redirectTo ?? DEFAULT_DESTINATION);
+      const landing: string = result.redirectTo ?? DEFAULT_DESTINATION;
+      // Registrants return to where they came from (the account area), staff to their workspace.
+      const attendeeReturn = unified && (landing === "/account" || landing.startsWith("/account/")) ? takeAttendeeAuthReturnPath() : null;
+      router.replace(attendeeReturn ?? landing);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to sign in.");
@@ -239,11 +272,20 @@ export function LoginForm({ demoCredentials, next }: { demoCredentials?: { email
 
   return (
     <form className="auth-form" onSubmit={submit}>
-      <label>Email address<input name="email" type="email" autoComplete="username" required defaultValue={demoCredentials?.email} /></label>
+      <label>Email address<input name="email" type="email" autoComplete="username" required defaultValue={demoCredentials?.email} ref={emailRef} /></label>
       <label>Password<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span></label>
-      <div className="auth-form-row"><label className="checkbox-label"><input type="checkbox" name="remember" /> Keep email on this device</label><Link href="/forgot-password">Forgot password?</Link></div>
+      <div className="auth-form-row"><label className="checkbox-label"><input type="checkbox" name="remember" /> Keep email on this device</label>{unified ? <Link href="/account/forgot-password">Forgot password?</Link> : <Link href="/forgot-password">Forgot password?</Link>}</div>
+      {unified && <p className="field-help">Team member who cannot sign in? <Link href="/forgot-password">Reset a team password</Link>.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}><LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}</button>
+      {unified && (
+        <div className="auth-alternate">
+          <strong>New to IMSDA Events?</strong>
+          <span>Want one place to manage future registrations? Create an optional account. Registration itself never requires one.</span>
+          <Link className="secondary-button full-button" href="/account/sign-up">Create an account</Link>
+          <p className="field-help"><Link href="/recover-registration">Manage my registration without an account</Link>.</p>
+        </div>
+      )}
     </form>
   );
 }

@@ -12,7 +12,7 @@ import { takeAttendeeAuthReturnPath } from "@/modules/attendee-accounts/sign-up-
  * Sign in with a passkey (#374): the device shows its own fingerprint, face,
  * or PIN prompt and offers this site's passkeys. No email or password.
  */
-export function PasskeySignInButton({ next }: { next?: string }) {
+export function PasskeySignInButton({ next, label = "Sign in with a passkey" }: { next?: string; label?: string }) {
   const router = useRouter();
   const [supported, setSupported] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -44,7 +44,7 @@ export function PasskeySignInButton({ next }: { next?: string }) {
   return (
     <div className="passkey-sign-in">
       <button className="secondary-button passkey-sign-in-button" disabled={busy} onClick={signIn} type="button">
-        <Fingerprint aria-hidden="true" size={17} /> {busy ? "Waiting for your passkey…" : "Sign in with a passkey"}
+        <Fingerprint aria-hidden="true" size={17} /> {busy ? "Waiting for your passkey…" : label}
       </button>
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>

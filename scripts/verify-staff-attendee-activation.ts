@@ -12,8 +12,7 @@
  * - activation never creates a staff session, and a password reset of an ACTIVE user links nothing;
  * - no attendee-grade method (attendee password, Google sign-in, email verification code) yields a
  *   staff session for a linked person, and the resolver never reports a staff side from an attendee session;
- * - the attendee-passkey-as-second-factor decision refuses without the staff password, without user
- *   verification, with the switch off, and for another person's passkey.
+ * - an attendee passkey is never a staff second factor (the helper is retired).
  * Uses fictitious rows it creates and removes itself, and restores the switch afterwards.
  *
  *   npm run test:staff-attendee-activation
@@ -26,7 +25,7 @@ import { issueAccountTokenForUser, resetPassword } from "../modules/access/auth-
 import { hashPassword } from "../modules/access/passwords";
 import { hashOpaqueToken } from "../modules/access/tokens";
 import { resolvePersonFrom } from "../modules/account-merge/person";
-import { attendeePasskeyCountsAsStaffSecondFactor } from "../modules/account-merge/staff-elevation";
+import * as staffElevation from "../modules/account-merge/staff-elevation";
 import { authenticateAttendee, verifyAttendeeEmail } from "../modules/attendee-accounts/account-service";
 import { createOneTimeCode, hashOneTimeCode } from "../modules/attendee-accounts/codes";
 import { signInWithGoogle } from "../modules/attendee-accounts/federated-sign-in";
@@ -326,13 +325,9 @@ async function main() {
   }, prisma);
   assert(withLink.link?.attendeeAccountId === gradeAccount.id, "switch on: a staff session resolves its linked account");
 
-  // Attendee passkey as a staff second factor: decision 5.
-  const base = { switchEnabled: true, staffPasswordVerified: true, passkeyAccountId: gradeAccount.id, linkedAttendeeAccountId: gradeAccount.id, assertionUserVerified: true };
-  assert(attendeePasskeyCountsAsStaffSecondFactor(base).counts === true, "a user-verified linked passkey after the staff password counts");
-  assert(attendeePasskeyCountsAsStaffSecondFactor({ ...base, assertionUserVerified: false }).counts === false, "a passkey without user verification is refused");
-  assert(attendeePasskeyCountsAsStaffSecondFactor({ ...base, staffPasswordVerified: false }).counts === false, "a passkey without the staff password first is refused");
-  assert(attendeePasskeyCountsAsStaffSecondFactor({ ...base, switchEnabled: false }).counts === false, "switch off: the passkey never counts");
-  assert(attendeePasskeyCountsAsStaffSecondFactor({ ...base, passkeyAccountId: "someone-else" }).counts === false, "another person's passkey is refused");
+  // An attendee passkey is never a staff second factor (Caleb, Oct 15, 2026): the helper is retired.
+  assert(!("attendeePasskeyCountsAsStaffSecondFactor" in staffElevation), "the attendee-passkey second-factor helper no longer exists");
+  assert(staffElevation.staffSessionAllowedFor("ATTENDEE_PASSKEY").allowed === false, "an attendee passkey never opens a staff session");
 
   console.log("Staff/attendee activation verification passed.");
 }

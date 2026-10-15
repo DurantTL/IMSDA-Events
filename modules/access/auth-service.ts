@@ -127,49 +127,116 @@ type LockableCredential = {
  * locking attempt is indistinguishable from any other failure.
  */
 async function checkPasswordWithLockout(credential: LockableCredential, userId: string, password: string) {
+  const result = await verifyPasswordNoCount(credential, password);
+  if (result === "wrong") await countPasswordMiss(credential, userId);
+  return result === "ok";
+}
+
+/**
+ * Verification without counting (#554 slice c). Still exactly ONE password
+ * derivation whatever the answer. "blocked" is a locked or disabled credential
+ * (no derivation result is used); "wrong" has NOT been counted yet: the caller
+ * decides, by calling {@link countPasswordMiss}. A right password clears the
+ * counter, as it always has.
+ */
+async function verifyPasswordNoCount(credential: LockableCredential, password: string): Promise<"ok" | "wrong" | "blocked"> {
   if (credential.disabledAt || (credential.lockedUntil && credential.lockedUntil > new Date())) {
     await spendPasswordCheck(password);
-    return false;
+    return "blocked";
   }
-
-  const valid = await verifyPassword(password, credential.passwordHash);
-  if (!valid) {
-    const now = new Date();
-    // Counted only while no live lock stands, so wrong passwords that raced
-    // past the check above while another request set the lock cannot re-arm
-    // the counter for the next lock (#456 re-review).
-    const counted = await getPrisma().authCredential.updateMany({
-      where: { id: credential.id, OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }] },
-      data: { failedAttempts: { increment: 1 } },
-    });
-    if (counted.count === 1) {
-      const lockedUntil = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
-      const claimed = await getPrisma().authCredential.updateMany({
-        where: {
-          id: credential.id,
-          failedAttempts: { gte: MAX_FAILED_ATTEMPTS },
-          OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
-        },
-        data: { lockedUntil, failedAttempts: 0 },
-      });
-      if (claimed.count === 1) {
-        scheduleLockoutEmails({
-          audience: "STAFF",
-          kind: "PASSWORD",
-          accountUserId: userId,
-          lockedUntil,
-          now,
-        });
-      }
-    }
-    return false;
-  }
-
+  if (!(await verifyPassword(password, credential.passwordHash))) return "wrong";
   await getPrisma().authCredential.update({
     where: { id: credential.id },
     data: { failedAttempts: 0, lockedUntil: null },
   });
-  return true;
+  return "ok";
+}
+
+async function countPasswordMiss(credential: LockableCredential, userId: string) {
+  const now = new Date();
+  // Counted only while no live lock stands, so wrong passwords that raced
+  // past the check above while another request set the lock cannot re-arm
+  // the counter for the next lock (#456 re-review).
+  const counted = await getPrisma().authCredential.updateMany({
+    where: { id: credential.id, OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }] },
+    data: { failedAttempts: { increment: 1 } },
+  });
+  if (counted.count === 1) {
+    const lockedUntil = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
+    const claimed = await getPrisma().authCredential.updateMany({
+      where: {
+        id: credential.id,
+        failedAttempts: { gte: MAX_FAILED_ATTEMPTS },
+        OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
+      },
+      data: { lockedUntil, failedAttempts: 0 },
+    });
+    if (claimed.count === 1) {
+      scheduleLockoutEmails({
+        audience: "STAFF",
+        kind: "PASSWORD",
+        accountUserId: userId,
+        lockedUntil,
+        now,
+      });
+    }
+  }
+}
+
+export type StaffPasswordCheck =
+  | { kind: "unavailable" }
+  | { kind: "wrong"; countMiss: () => Promise<void> }
+  | { kind: "ok"; complete: (userAgent: string | null) => Promise<PasswordAuthentication> };
+
+/**
+ * The staff password check for the single sign-in (#554 slice c): the same
+ * lookup, the same pending/locked/disabled rules and exactly one derivation as
+ * {@link authenticateWithPassword}, but a wrong password is NOT counted here and
+ * no session or challenge is made. The caller counts the miss only when the
+ * attendee side did not succeed, and calls `complete` only on "ok".
+ * `authenticateWithPassword` itself is unchanged for `/api/auth/login`.
+ */
+export async function checkStaffPasswordNoCount(email: string, password: string): Promise<StaffPasswordCheck> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await getPrisma().user.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      id: true,
+      accountStatus: true,
+      globalRole: true,
+      memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      mfaEnrollment: { select: { status: true } },
+      passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
+      credential: {
+        select: { id: true, passwordHash: true, failedAttempts: true, lockedUntil: true, disabledAt: true },
+      },
+    },
+  });
+  if (!user?.credential || user.accountStatus !== "ACTIVE") {
+    await spendPasswordCheck(password);
+    return { kind: "unavailable" };
+  }
+  const credential = user.credential;
+  const result = await verifyPasswordNoCount(credential, password);
+  if (result === "blocked") return { kind: "unavailable" };
+  if (result === "wrong") return { kind: "wrong", countMiss: () => countPasswordMiss(credential, user.id) };
+  return {
+    kind: "ok",
+    complete: async (userAgent) => {
+      const gate = mfaGateFor(
+        { globalRole: user.globalRole, activeEventRoles: user.memberships.map((membership) => membership.role) },
+        user.mfaEnrollment,
+      );
+      if (gate.kind === "enrol" && user.passkeys.length > 0) return { outcome: "passkey_required", userId: user.id };
+      if (gate.kind !== "not_required") return { outcome: "mfa", userId: user.id, gate: gate.kind };
+      return {
+        outcome: "session",
+        userId: user.id,
+        globalRole: user.globalRole,
+        session: await createDatabaseSession(user.id, userAgent),
+      };
+    },
+  };
 }
 
 /**

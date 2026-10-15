@@ -57,12 +57,13 @@ export async function queueAttendeeVerificationEmail(input: {
   email: string;
   displayName: string;
   alreadyRegistered: boolean;
+  adminSent?: boolean;
 }): Promise<AttendeeEmailDispatch> {
   return queue({
     accountId: input.accountId,
     email: input.email,
     displayName: input.displayName,
-    selection: { kind: "verification", alreadyRegistered: input.alreadyRegistered },
+    selection: { kind: "verification", alreadyRegistered: input.alreadyRegistered, adminSent: input.adminSent },
   });
 }
 

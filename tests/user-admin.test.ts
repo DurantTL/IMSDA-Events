@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   attendeeMfaDeleteMany: vi.fn(),
   passkeyUpdateMany: vi.fn(),
   userPasskeyUpdateMany: vi.fn(),
+  resetTokenUpdateMany: vi.fn(),
   revokeAllUserSessions: vi.fn(),
   revokeAllAttendeeSessions: vi.fn(),
   sendAccountRecoveryEmail: vi.fn(),
@@ -23,6 +24,7 @@ const client = {
   user: { findUnique: mocks.userFindUnique, findFirst: mocks.userFindFirst, update: mocks.userUpdate },
   userMfaEnrollment: { deleteMany: mocks.mfaDeleteMany },
   userPasskey: { updateMany: mocks.userPasskeyUpdateMany },
+  passwordResetToken: { updateMany: mocks.resetTokenUpdateMany },
   attendeeAccount: { findUnique: mocks.accountFindUnique, findFirst: mocks.accountFindFirst, update: mocks.accountUpdate },
   attendeeMfaEnrollment: { deleteMany: mocks.attendeeMfaDeleteMany },
   // The one-sign-in switch (#554): no settings row means off.
@@ -81,6 +83,8 @@ describe("system administrator account tools (#386)", () => {
     await expect(changeStaffEmail("user-2", "taken@example.test", "admin-1")).rejects.toMatchObject({ code: "EMAIL_IN_USE" });
     await changeStaffEmail("user-2", "new@example.test", "admin-1");
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "user-2" }, data: { email: "new@example.test" } });
+    // A reset link emailed to the old address is spent with the change.
+    expect(mocks.resetTokenUpdateMany).toHaveBeenCalledWith({ where: { userId: "user-2", usedAt: null }, data: { usedAt: expect.any(Date) } });
     expect(mocks.revokeAllUserSessions).toHaveBeenCalledWith("user-2");
   });
 
