@@ -342,14 +342,26 @@ describe("audience resolution", () => {
     expect(run(rows, { roles: ["REGISTRATION_CONTACT"] }).recipients).toHaveLength(1);
   });
 
-  it("an attendee whose type has no age information is excluded on an event with youth types, and reachable on one without", () => {
-    const rows = [row({ registrationId: "r1", attendees: [attendee("guest", { attendeeType: "GUEST" }), attendee("none", { attendeeType: "" })] })];
-    const withYouth = run(rows, { roles: ["ATTENDEE"] });
-    expect(withYouth.recipients).toEqual([]);
-    expect(withYouth.exclusions[0]!.code).toBe("MINOR_ATTENDEE");
-    expect(withYouth.exclusions[0]!.contactCount).toBe(2);
-    const adultOnly = run(rows, { roles: ["ATTENDEE"] }, undefined, { attendeeAge: new Map<string, AttendeeAgeClass>([["GUEST", "UNKNOWN"]]) });
-    expect(adultOnly.recipients.map((recipient) => recipient.email).sort()).toEqual(["guest@example.test", "none@example.test"]);
+  it("fails closed: only an 18-and-over type is reachable; unknown, open-ended and typeless attendees are excluded with their own wording", () => {
+    const rows = [row({ registrationId: "r1", attendees: [
+      attendee("guest", { attendeeType: "GUEST" }),
+      attendee("none", { attendeeType: "" }),
+      attendee("kid", { attendeeType: "YOUTH" }),
+      attendee("grown", { attendeeType: "ADULT" }),
+    ] })];
+    const result = run(rows, { roles: ["ATTENDEE"] });
+    expect(result.recipients.map((recipient) => recipient.email)).toEqual(["grown@example.test"]);
+    const byLabel = Object.fromEntries(result.exclusions.map((exclusion) => [exclusion.label, exclusion]));
+    expect(Object.keys(byLabel).sort()).toEqual([
+      "Attendee is under 18, so they are not messaged directly",
+      "Attendee's age group is unknown, so they are not messaged directly",
+    ]);
+    expect(byLabel["Attendee's age group is unknown, so they are not messaged directly"]!.contactCount).toBe(2);
+    expect(result.exclusions.every((exclusion) => exclusion.code === "MINOR_ATTENDEE" && exclusion.email === null)).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/guest@|none@|kid@/);
+    // No event-level exception: with no minor type configured at all, unknown is still excluded.
+    const noMinorTypes = run(rows, { roles: ["ATTENDEE"] }, undefined, { attendeeAge: new Map<string, AttendeeAgeClass>([["GUEST", "UNKNOWN"], ["ADULT", "ADULT"]]) });
+    expect(noMinorTypes.recipients.map((recipient) => recipient.email)).toEqual(["grown@example.test"]);
   });
 
   it("classifies an attendee type by its configured ages only", () => {
@@ -360,6 +372,9 @@ describe("audience resolution", () => {
     expect(classifyAttendeeType({ minimumAge: null, maximumAge: null })).toBe("UNKNOWN");
     expect(classifyAttendeeType({ minimumAge: 16, maximumAge: null })).toBe("UNKNOWN");
     expect(classifyAttendeeType({ minimumAge: 10, maximumAge: 40 })).toBe("UNKNOWN");
+    // Open-ended and unset ranges are never adult; a contradictory range is minor first.
+    expect(classifyAttendeeType({ minimumAge: 10, maximumAge: null })).toBe("UNKNOWN");
+    expect(classifyAttendeeType({ minimumAge: 18, maximumAge: 17 })).toBe("MINOR");
   });
 
   it("readiness is only the normalized status, never what a response says", () => {

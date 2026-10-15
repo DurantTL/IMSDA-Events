@@ -45,7 +45,7 @@ function prismaFixture(options: { bounced?: Array<{ email: string; status: strin
   const registrationFindMany = vi.fn(async ({ where }: BatchArgs) => where.id.in.map(options.rows ?? registrationRow));
   const queryRaw = vi.fn().mockResolvedValue(options.bounced ?? []);
   const prisma = {
-    $transaction: vi.fn(async (work: (tx: unknown) => unknown) => work({ $executeRaw: vi.fn().mockResolvedValue(1), $queryRaw: queryRaw })),
+    $transaction: vi.fn<(work: (tx: unknown) => unknown, options?: unknown) => Promise<unknown>>(async (work) => work({ $executeRaw: vi.fn().mockResolvedValue(1), $queryRaw: queryRaw })),
     eventAttendeeType: { findMany: vi.fn().mockResolvedValue(options.types ?? []) },
     eventAudienceSnapshot: { findFirst: vi.fn().mockResolvedValue(null), findUnique: vi.fn() },
     event: { findUnique: vi.fn().mockResolvedValue({ audience: "OPEN", billingMode: "ATTENDEE_PAY" }) },
@@ -155,21 +155,51 @@ describe("the audience builder selects registrations through the operations sear
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
-  it("never writes to a minor or unknown-age attendee, deciding from the event's attendee types", async () => {
+  it("fails closed on age: only a type of 18 and over is reachable; unset, open-ended and typeless attendees are not", async () => {
     const attendee = (id: string, code: string | null) => ({
       id, attendeeTypeDefinition: code ? { code } : null, tagAssignments: [],
       person: { firstName: "A", lastName: id, normalizedEmail: `${id}@example.test` },
     });
-    const { prisma } = prismaFixture({
-      types: [{ code: "ADULT", minimumAge: 18, maximumAge: null }, { code: "YOUTH", minimumAge: 0, maximumAge: 17 }],
-      rows: (id) => ({ ...registrationRow(id), attendees: [attendee("grown", "ADULT"), attendee("kid", "YOUTH"), attendee("typeless", null)] }),
-    });
+    const run = async (types: Array<{ code: string; minimumAge: number | null; maximumAge: number | null }>) => {
+      const { prisma } = prismaFixture({
+        types,
+        rows: (id) => ({ ...registrationRow(id), attendees: [attendee("grown", "ADULT"), attendee("kid", "YOUTH"), attendee("child", "CHILD"), attendee("teen", "TEEN"), attendee("typeless", null)] }),
+      });
+      mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
+      const out = await evaluateEventAudience("event-a", sensitiveComms, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" });
+      expect(prisma.eventAttendeeType.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event-a" } }));
+      return out.result;
+    };
+    // Youth types with no ages configured at all: nobody but the 18+ type is reachable.
+    const unset = await run([{ code: "ADULT", minimumAge: 18, maximumAge: null }, { code: "YOUTH", minimumAge: null, maximumAge: null }, { code: "CHILD", minimumAge: null, maximumAge: null }, { code: "TEEN", minimumAge: 10, maximumAge: null }]);
+    expect(unset.recipients.map((recipient) => recipient.email)).toEqual(["grown@example.test"]);
+    expect(unset.exclusions.reduce((total, exclusion) => total + exclusion.contactCount, 0)).toBe(4);
+    expect(JSON.stringify(unset)).not.toMatch(/kid@|child@|teen@|typeless@/);
+    // No age on the adult type either: nobody is reachable.
+    const none = await run([{ code: "ADULT", minimumAge: null, maximumAge: null }, { code: "YOUTH", minimumAge: 0, maximumAge: 17 }]);
+    expect(none.recipients).toEqual([]);
+    expect(none.exclusions.map((exclusion) => exclusion.code)).toEqual(["MINOR_ATTENDEE", "MINOR_ATTENDEE"]);
+  });
+
+  it("answers a suppression lookup that timed out or lost its transaction as AUDIENCE_TOO_BROAD, and gives the transaction room above the statement timeout", async () => {
+    for (const failure of [
+      Object.assign(new Error("Transaction API error: Transaction already closed"), { code: "P2028" }),
+      new Error('canceling statement due to statement timeout (57014)'),
+    ]) {
+      const { prisma } = prismaFixture();
+      mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
+      prisma.$transaction.mockRejectedValue(failure);
+      const error = await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" }).catch((caught) => caught);
+      expect(error).toBeInstanceOf(MessagingError);
+      expect((error as MessagingError).code).toBe("AUDIENCE_TOO_BROAD");
+    }
+    const { prisma } = prismaFixture();
     mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
-    const { result } = await evaluateEventAudience("event-a", sensitiveComms, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" });
-    expect(result.recipients.map((recipient) => recipient.email)).toEqual(["grown@example.test"]);
-    expect(result.exclusions.map((exclusion) => [exclusion.code, exclusion.contactCount])).toEqual([["MINOR_ATTENDEE", 2]]);
-    expect(JSON.stringify(result)).not.toMatch(/kid@|typeless@/);
-    expect(prisma.eventAttendeeType.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event-a" } }));
+    await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" });
+    expect(prisma.$transaction.mock.calls[0]![1]).toEqual({ timeout: 20_000, maxWait: 5_000 });
+    // Anything else stays a real error.
+    prisma.$transaction.mockRejectedValue(new Error("connection refused"));
+    await expect(evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" })).rejects.toThrow("connection refused");
   });
 
   it("never returns a truncated audience: one larger than the search can enumerate is AUDIENCE_TOO_BROAD", async () => {

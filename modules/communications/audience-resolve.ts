@@ -39,8 +39,9 @@ export type AudienceAttendeeRow = {
 
 /**
  * How an attendee type's configured age range classifies its attendees. Decided from the type only (ADR 0005 Addendum A:
- * never from a birth date). A type whose maximum age is under 18 is MINOR; one whose minimum age is 18 or more is ADULT;
- * anything else (no age range, or one that spans 18) is UNKNOWN.
+ * never from a birth date). Fail closed: only a type whose minimum age is 18 or more is ADULT. A maximum age under 18 is
+ * MINOR (checked first, so a contradictory range is never ADULT); everything else is UNKNOWN: no age range, an open-ended
+ * range such as 10 and over, or no type definition at all.
  */
 export type AttendeeAgeClass = "ADULT" | "MINOR" | "UNKNOWN";
 
@@ -72,9 +73,9 @@ export type AudienceEvaluationContext = {
   tagNames: ReadonlyMap<string, string>;
   attendeeTypeLabels: ReadonlyMap<string, string>;
   /**
-   * Age class of each of the event's attendee types, by code. An attendee is written to only when their type is ADULT,
-   * or UNKNOWN on an event that has no MINOR type at all (an adult-only event has no youth to protect). A MINOR
-   * attendee, an UNKNOWN one on an event with youth types, and one with no type are excluded as MINOR_ATTENDEE.
+   * Age class of each of the event's attendee types, by code. An attendee is written to only when their type is ADULT
+   * (minimum age 18 or more). A MINOR one, an UNKNOWN one, and one with no type definition are all excluded as
+   * MINOR_ATTENDEE; there is no event-level exception.
    */
   attendeeAge: ReadonlyMap<string, AttendeeAgeClass>;
   /**
@@ -98,6 +99,8 @@ export type AudienceCandidate = {
   reasons: AudienceReason[];
   /** Set when this contact may not be written to; the contact is then an exclusion that carries no address. */
   blocked?: "MINOR_ATTENDEE";
+  /** Why: under 18, or an age group that is not known. Only used to word the exclusion. */
+  blockedAge?: "MINOR" | "UNKNOWN";
 };
 
 const emailSchema = z.email();
@@ -191,14 +194,9 @@ export function evaluateAudienceRegistration(
 
   const balanceCents = audienceBalanceCents(row, context.isOrganizationBilled);
   const candidates: AudienceCandidate[] = [];
-  const eventHasMinorTypes = [...context.attendeeAge.values()].includes("MINOR");
-  const attendeeBlocked = (attendee: AudienceAttendeeRow) => {
-    const age = context.attendeeAge.get(attendee.attendeeType) ?? "UNKNOWN";
-    return age === "MINOR" || (age === "UNKNOWN" && eventHasMinorTypes);
-  };
-  const push = (role: AudienceRole, contact: AudienceContactRow, blocked?: "MINOR_ATTENDEE") => {
+  const push = (role: AudienceRole, contact: AudienceContactRow, blockedAge?: "MINOR" | "UNKNOWN") => {
     candidates.push({
-      ...(blocked ? { blocked } : {}),
+      ...(blockedAge ? { blocked: "MINOR_ATTENDEE" as const, blockedAge } : {}),
       role,
       name: contact.name.trim() || "Recipient",
       email: contact.email,
@@ -220,8 +218,9 @@ export function evaluateAudienceRegistration(
           const hit = row.tagIds.some((id) => tagIds.includes(id)) || attendee.tagIds.some((id) => tagIds.includes(id));
           if (!hit) continue;
         }
-        if (attendeeBlocked(attendee)) push(role, { name: "", email: null }, "MINOR_ATTENDEE");
-        else push(role, { name: attendee.name, email: attendee.email });
+        const age = context.attendeeAge.get(attendee.attendeeType) ?? "UNKNOWN";
+        if (age === "ADULT") push(role, { name: attendee.name, email: attendee.email });
+        else push(role, { name: "", email: null }, age);
       }
     }
   }
@@ -248,10 +247,15 @@ export type AudienceSuppressionCode =
 
 export type AudienceExclusionCode = "NO_EMAIL" | "INVALID_EMAIL" | "MINOR_ATTENDEE" | AudienceSuppressionCode;
 
+const MINOR_EXCLUSION_LABELS = {
+  MINOR: "Attendee is under 18, so they are not messaged directly",
+  UNKNOWN: "Attendee's age group is unknown, so they are not messaged directly",
+} as const;
+
 export const AUDIENCE_EXCLUSION_LABELS: Record<AudienceExclusionCode, string> = {
   NO_EMAIL: "No email address on file",
   INVALID_EMAIL: "Email address is not valid",
-  MINOR_ATTENDEE: "Attendee is a minor or their age group is unknown, so they are not messaged directly",
+  MINOR_ATTENDEE: "Attendee is under 18 or their age group is unknown, so they are not messaged directly",
   OPTED_OUT_EVENT: "Opted out of this event's announcements",
   OPTED_OUT_ALL: "Opted out of all announcements",
   PROVIDER_BOUNCED: "The last email to this address bounced",
@@ -360,7 +364,7 @@ export class AudienceAccumulator {
     const email = candidate.blocked ? "" : normalizeAudienceEmail(candidate.email);
     if (candidate.blocked || !email || !emailSchema.safeParse(email).success) {
       const code: AudienceExclusionCode = candidate.blocked ?? (email ? "INVALID_EMAIL" : "NO_EMAIL");
-      const key = [code, "", candidate.confirmationCode, candidate.role].join("\u0000");
+      const key = [code, candidate.blockedAge ?? "", candidate.confirmationCode, candidate.role].join("\u0000");
       const existing = this.contactExclusions.get(key);
       if (existing) {
         existing.contactCount += 1;
@@ -369,7 +373,7 @@ export class AudienceAccumulator {
       this.contactExclusions.set(key, {
         key,
         code,
-        label: AUDIENCE_EXCLUSION_LABELS[code],
+        label: candidate.blockedAge ? MINOR_EXCLUSION_LABELS[candidate.blockedAge] : AUDIENCE_EXCLUSION_LABELS[code],
         email: null,
         roles: [candidate.role],
         registrations: [{ registrationId: candidate.registrationId, confirmationCode: candidate.confirmationCode }],

@@ -257,11 +257,25 @@ async function main() {
   const adultsOnly = await run(adminPermissions, { roles: ["ATTENDEE"], search: "attendeeType=ADULT", messageKind: "OPERATIONAL" });
   assert(emails(adultsOnly).includes(email("shared")) && !emails(adultsOnly).includes(email("kid")), `adult attendees are reachable: ${emails(adultsOnly)}`);
   assert(adultsOnly.result.recipients.find((recipient) => recipient.email === email("shared"))!.reasons.some((reason) => reason.dimension === "attendeeType" && reason.label === "Attendee type Adult"), "the attendee-type rule is a reason, with its label");
-  // An attendee type with no age information is excluded too, while the event has youth types (fail closed).
+  // Fail closed: an adult type without a minimum age of 18 is not reachable, and a type with no definition never is.
   await prisma.eventAttendeeType.update({ where: { id: typeIds.ADULT }, data: { minimumAge: null } });
   const unknownAge = await run(adminPermissions, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" });
-  assert(emails(unknownAge).length === 0 && unknownAge.result.exclusions.some((exclusion) => exclusion.code === "MINOR_ATTENDEE"), "unknown-age attendees are excluded on an event with youth types");
+  assert(emails(unknownAge).length === 0 && unknownAge.result.exclusions.some((exclusion) => exclusion.label.includes("age group is unknown")), "no age range means unknown, which is excluded");
+  await prisma.eventAttendeeType.update({ where: { id: typeIds.ADULT }, data: { minimumAge: 10 } });
+  assert(emails(await run(adminPermissions, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" })).length === 0, "an open-ended 10-and-over type is not an adult type");
   await prisma.eventAttendeeType.update({ where: { id: typeIds.ADULT }, data: { minimumAge: 18 } });
+  await prisma.eventAttendeeType.update({ where: { id: typeIds.YOUTH }, data: { minimumAge: null, maximumAge: null } });
+  const youthNoAges = await run(adminPermissions, { roles: ["ATTENDEE"], search: "attendeeType=YOUTH", messageKind: "OPERATIONAL" });
+  assert(emails(youthNoAges).length === 0 && youthNoAges.result.exclusions.length === 1 && youthNoAges.result.exclusions[0]!.code === "MINOR_ATTENDEE", "a youth type with no ages set is still excluded");
+  await prisma.eventAttendeeType.update({ where: { id: typeIds.YOUTH }, data: { minimumAge: 0, maximumAge: 17 } });
+  // A legacy attendee with no type definition is excluded.
+  const legacy = await person("Legacy", email("legacy"));
+  const legacyReg = await register("rlegacy", legacy, "CONFIRMED", "10.00", email("legacycontact"), [{ person: legacy }]);
+  await prisma.registrationAttendee.update({ where: { id: legacyReg.attendeeIds[0]! }, data: { attendeeTypeDefinitionId: null } });
+  const legacyRun = await run(adminPermissions, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" });
+  assert(!emails(legacyRun).includes(email("legacy")) && !JSON.stringify(legacyRun).includes(email("legacy")), "an attendee with no type definition is excluded and never shown");
+  await prisma.registrationAttendee.delete({ where: { id: legacyReg.attendeeIds[0]! } });
+  await prisma.registration.delete({ where: { id: legacyReg.id } });
   const defaults = await run(commsPermissions, { messageKind: "OPERATIONAL" });
   assert(!emails(defaults).includes(email("cancelled")) && !emails(defaults).includes(email("draft")), "cancelled and draft are not in the default audience");
   assert(emails(await run(commsPermissions, { search: "status=CANCELLED", messageKind: "OPERATIONAL" })).join() === email("cancelled"), "cancelled can be chosen");

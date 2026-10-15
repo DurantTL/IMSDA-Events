@@ -109,6 +109,13 @@ export async function getAudienceFilterOptions(eventId: string, permissions: rea
 
 const SUPPRESSION_TIMEOUT_MS = 15_000;
 
+/** A statement timeout (SQLSTATE 57014), an expired or closed interactive transaction (P2028), or a pool wait that ran out. */
+export function isSuppressionTimeout(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2028" || error.code === "P2024")) return true;
+  const text = error instanceof Error ? `${(error as { code?: string }).code ?? ""} ${error.message}` : "";
+  return /57014|statement timeout|canceling statement|transaction (already )?closed|transaction.*expired/i.test(text);
+}
+
 async function loadSuppressions(
   client: ReturnType<typeof getPrisma>,
   eventId: string,
@@ -121,6 +128,7 @@ async function loadSuppressions(
     // Provider suppression (a bounce or a spam complaint as the address's latest delivery state) applies to every kind.
     // Addresses are compared lower-cased on both sides, so a mixed-case address stored on an outbox row still matches.
     // One bounded query per chunk: a statement timeout fails the preview closed instead of letting it run on.
+    // The interactive transaction's own limit is above the statement timeout, so the database cancels first.
     const latest = await client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(SUPPRESSION_TIMEOUT_MS)}, true)`;
       return tx.$queryRaw<Array<{ email: string; status: string }>>`
@@ -129,6 +137,11 @@ async function loadSuppressions(
         WHERE lower("recipientEmail") IN (${Prisma.join(chunk)})
           AND "providerDeliveryStatus" IS NOT NULL AND "providerStatusAt" IS NOT NULL
         ORDER BY lower("recipientEmail"), "providerStatusAt" DESC, "id" ASC`;
+    }, { timeout: SUPPRESSION_TIMEOUT_MS + 5_000, maxWait: 5_000 }).catch((error: unknown) => {
+      if (isSuppressionTimeout(error)) {
+        throw new MessagingError("AUDIENCE_TOO_BROAD", "That audience is too large to review at once. Narrow the filters and try again.");
+      }
+      throw error;
     });
     for (const row of latest) {
       if (row.status === "BOUNCED") suppressions.set(row.email, "PROVIDER_BOUNCED");
