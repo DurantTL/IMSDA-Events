@@ -46,7 +46,7 @@ describe("POST /roster/next-year (#414)", () => {
     expect(mocks.carryRosterForward).toHaveBeenCalledWith("club-1", valid, { accountId: "director-1" });
     expect(mocks.refreshBackgroundCheckMatchesSafely).toHaveBeenCalledWith(["person-1"]);
     const body = await response.json();
-    expect(body).toEqual({ fromClubYear: "2026-27", toClubYear: "2027-28", carried: 1, leftBehind: 2, typeChanged: 1, alreadyThere: 0 });
+    expect(body).toEqual({ fromClubYear: "2026-27", toClubYear: "2027-28", carried: 1, leftBehind: 2, typeChanged: 1, alreadyThere: 0, guardiansCopied: 2 });
   });
 
   it("attributes a staff member acting as the director to the staff user, not an attendee account", async () => {
