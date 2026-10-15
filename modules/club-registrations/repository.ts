@@ -1684,13 +1684,10 @@ export async function amendClubRegistration(
           if (saveAgeBack.length > 0) await saveRosterAgesBack(tx, organizationId, clubYearFor(event.startsAt), actor, saveAgeBack);
           if (betweenLevelsOnly) {
             // Checked again where the change is written, so advancement revoked (or the level held) a moment ago cannot let an
-            // edit through, and the price is confirmed unchanged.
+            // edit through. The price is not checked here: it is guaranteed by the preview refusing any change in the total,
+            // and the commit being tied to that preview's quote fingerprint, so a different quote cannot be committed.
             const open = await betweenLevelsWindow(tx, await getTeamSettings(eventId, tx), event, clubRegistration.id, now);
             if (!open.open) throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsClosedMessage);
-            const written = await tx.registration.findUnique({ where: { id: registrationId }, select: { totalAmount: true } });
-            if (!written || moneyToCents(written.totalAmount) !== betweenLevelsPreviousTotal.cents) {
-              throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsPriceMessage);
-            }
           }
         },
       }
@@ -1701,14 +1698,10 @@ export async function amendClubRegistration(
       clubDirectoryOwnedResponses(hydrated, await clubDirectoryIdentity(tx, organizationId))
     ),
   };
-  const betweenLevelsPreviousTotal = { cents: 0 };
   try {
     const preview = await previewRegistrationAmendment(eventId, registrationId, amendmentInput, engineOptions);
     // Between levels nothing may change what the registration costs: a priced change is the event office's to make.
-    if (betweenLevelsOnly) {
-      if (preview.deltaCents !== 0) throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsPriceMessage);
-      betweenLevelsPreviousTotal.cents = preview.previousTotalCents;
-    }
+    if (betweenLevelsOnly && preview.deltaCents !== 0) throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsPriceMessage);
     const response = await amendRegistration(
       eventId,
       registrationId,

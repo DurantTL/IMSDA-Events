@@ -57,6 +57,9 @@ one alternate, ages on the age date, one team per person), and nothing may chang
 (for example adding someone on an event that prices them) is refused with "contact the event office". A team that did not advance
 follows the registration window as before.
 
+On forms with other required per-person fields, adding a new member between levels is refused, and the director is told to
+contact the event office.
+
 ## Migration
 
 `20261101100000_pbe_level_advancement` is additive: two nullable columns on `ClubTeamResult`, the `ClubTeamLevelCheckIn` table, and
