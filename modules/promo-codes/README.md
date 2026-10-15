@@ -57,7 +57,8 @@ when someone looks.
   SUBMITTED or CONFIRMED (the statuses `churchOwedCents` bills). Cancelled,
   waitlisted, and draft registrations drop out on their own.
 - Lines appear on `/finance/church-owed` and its CSV grouped under the church,
-  by confirmation code and amount only, and count in the overview
+  by confirmation code and amount only (the church report panel on that page also
+  shows the registrant's name, #960; the CSV and the invoice do not), and count in the overview
   "Billed to churches" figure. Each surface keeps its existing permission.
 - A church is never billed twice: an event that is a CLUB event, or already
   bills organizations (`DEFERRED_ORGANIZATION_INVOICE`), bills no sponsored
@@ -118,14 +119,24 @@ Automation may prepare a draft and must never finalize or send one.
   a confirmation code or an attendee name; the invoice goes to the church's own
   active billing contact.
 - **The church report** (same page) shows, per church that sponsors a code on the
-  event: who used the code (by confirmation code and code, never a name), covered,
-  invoiced (the live finalized invoice), paid and still owed (both from the
-  invoice ledger), and what is not yet invoiced (or invoiced beyond current use).
+  event: who used the code (the registrant's name as stored, with the confirmation
+  code and the code; #960), covered, invoiced (the live finalized invoice), paid and
+  still owed (both from the invoice ledger), and what is not yet invoiced (or
+  invoiced beyond current use). The names are read on the server by
+  `getChurchCodeReport` only after the page checks `MANAGE_FINANCE`, and are added
+  to the report's own line type, never to the sponsored line the invoice is built
+  from.
+- **Decisions (Caleb, Oct 15, 2026, #960).** (1) The staff church report shows
+  attendee names, the registrant's name as stored (the account holder's first and
+  last name). (2) The church invoice keeps one line per sponsored registration with
+  **no names**, as built; so do the PDF, the send preview and any email to the
+  church. (3) The invoice code is **not** chosen by staff on attendee-paid events;
+  it stays derived from the event name. (4) Audits keep ids only.
 - **Audit** (`CHURCH_CODE_INVOICE_DRAFT_PREPARED`) holds ids, counts and amounts
   only. Money is integer cents throughout.
 - **Not built here** (see the follow-up on issue #399): a church contact
   registering several women at once with the code applied only to the people it
   covers, a contact-only revision of a finalized church code invoice, a CSV of the
-  report, and an invoice code setting for general events.
+  report. (An invoice code setting for general events is not planned: Oct 15 decision above.)
 
 Real-database check: `npm run test:church-code-invoices`.

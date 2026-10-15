@@ -120,13 +120,20 @@ export type ChurchInvoiceFacts = {
   paidCents: number;
 };
 
+/**
+ * A report line: the billed line plus the registrant's name as stored (Caleb, Oct 15, 2026, #960). The name is for the
+ * staff report only; it is added here, never to `ChurchSponsoredPromoLine`, so the invoice builder, its snapshot, the PDF,
+ * the send preview and any email to the church cannot pick it up.
+ */
+export type ChurchCodeReportLine = ChurchSponsoredPromoLine & { registrantName: string };
+
 export type ChurchCodeReportRow = {
   churchId: string;
   churchName: string;
   /** The codes this church sponsors on the event, with how many times each has been used. */
   codes: Array<{ id: string; code: string; isActive: boolean; redeemedCount: number; maximumUses: number | null }>;
-  /** Who used the code: one line per billed redemption, by confirmation code (never a name). */
-  lines: ChurchSponsoredPromoLine[];
+  /** Who used the code: one line per billed redemption, by registrant name and confirmation code (staff report only). */
+  lines: ChurchCodeReportLine[];
   /** What the codes covered: the billed lines added up. */
   coveredCents: number;
   /** What the live finalized invoice bills; 0 until one is finalized. */
@@ -180,6 +187,8 @@ export function buildChurchCodeReportRow(input: {
   church: { id: string; name: string };
   codes: ChurchCodeReportRow["codes"];
   lines: readonly ChurchSponsoredPromoLine[];
+  /** The registrant's name as stored, by confirmation code; a code with no entry shows an empty name. */
+  registrantNames?: ReadonlyMap<string, string>;
   invoice: ChurchInvoiceFacts | null;
   contact: ChurchCodeReportRow["contact"];
 }): ChurchCodeReportRow {
@@ -190,7 +199,10 @@ export function buildChurchCodeReportRow(input: {
     churchId: input.church.id,
     churchName: input.church.name,
     codes: input.codes,
-    lines: churchInvoiceLines(input.lines, input.church.id),
+    lines: churchInvoiceLines(input.lines, input.church.id).map((line) => ({
+      ...line,
+      registrantName: input.registrantNames?.get(line.confirmationCode) ?? "",
+    })),
     coveredCents: figures.amountDueCents,
     invoicedCents,
     paidCents,

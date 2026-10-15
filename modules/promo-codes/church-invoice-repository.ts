@@ -215,10 +215,26 @@ export type ChurchCodeReport = {
   totals: ReturnType<typeof summarizeChurchCodeReport>;
 };
 
+/** The registrant's name as stored (the account holder's first and last name), by confirmation code, for the staff report only. */
+async function loadRegistrantNames(client: PrismaClient, eventId: string, confirmationCodes: string[]) {
+  const names = new Map<string, string>();
+  const unique = [...new Set(confirmationCodes)];
+  if (unique.length === 0) return names;
+  const registrations = await client.registration.findMany({
+    where: { eventId, confirmationCode: { in: unique } },
+    select: { confirmationCode: true, accountHolderPerson: { select: { firstName: true, lastName: true } } },
+  });
+  for (const registration of registrations) {
+    names.set(registration.confirmationCode, `${registration.accountHolderPerson.firstName} ${registration.accountHolderPerson.lastName}`.trim());
+  }
+  return names;
+}
+
 /**
  * For each church that sponsors a code on the event: who used the code (billed redemptions, by confirmation code), what
  * it covered, what its invoice bills, what has been paid and what is still owed. Staff finance only (the page checks
- * MANAGE_FINANCE). Names, emails and amounts only for the church's billing contact; no attendee name or answer.
+ * MANAGE_FINANCE on the server). Each line carries the registrant's name as stored (Caleb, Oct 15, 2026, #960); no
+ * answer, email or phone. The church invoice, its PDF, the send preview and any email to the church never carry a name.
  */
 export async function getChurchCodeReport(eventId: string, client: PrismaClient = getPrisma()): Promise<ChurchCodeReport> {
   const event = await client.event.findUnique({ where: { id: eventId }, select: { id: true, name: true } });
@@ -241,6 +257,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
     }),
     loadEventLedger(eventId, {}, client),
   ]);
+  const registrantNames = await loadRegistrantNames(client, eventId, lines.map((line) => line.confirmationCode));
   const paidByInvoice = new Map(ledger.map((entry) => [entry.invoiceId, entry.figures.paidCents]));
   const invoiceByChurch = new Map<string, ChurchInvoiceFacts>();
   for (const invoice of invoices) {
@@ -273,6 +290,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
       church,
       codes: church.codes,
       lines,
+      registrantNames,
       invoice: invoiceByChurch.get(church.id) ?? null,
       contact: contact ? { name: contact.name, email: contact.email, verified: contact.verified } : null,
     }));

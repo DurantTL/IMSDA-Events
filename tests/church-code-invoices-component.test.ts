@@ -24,6 +24,7 @@ const figures = buildChurchPromoInvoiceFigures({ event, church, lines });
 function report(invoice: Parameters<typeof buildChurchCodeReportRow>[0]["invoice"], eligible = true): ChurchCodeReport {
   const rows = [buildChurchCodeReportRow({
     event, church, lines, invoice,
+    registrantNames: new Map([["WR-0001", "Quillon Fernsby"], ["WR-0002", "Marisol Teague"]]),
     codes: [{ id: "c1", code: "CHURCHA", isActive: true, redeemedCount: 2, maximumUses: 10 }],
     contact: { name: "Tina Treasurer", email: "tina@contact.test", verified: true },
   })];
@@ -33,11 +34,13 @@ function report(invoice: Parameters<typeof buildChurchCodeReportRow>[0]["invoice
 const render = (value: ChurchCodeReport, canFinalize = false) => renderToStaticMarkup(createElement(ChurchCodeInvoices, { eventId: "event-1", report: value, canFinalize }));
 
 describe("Church promo code report", () => {
-  it("shows who used the code, what it covered, and offers to create a draft, with no attendee name", () => {
+  it("shows who used the code by name and confirmation code, what it covered, and offers to create a draft", () => {
     const markup = render(report(null));
     expect(markup).toContain("Church A");
     expect(markup).toContain("WR-0001");
     expect(markup).toContain("WR-0002");
+    expect(markup).toContain("Quillon Fernsby");
+    expect(markup).toContain("Marisol Teague");
     expect(markup).toContain("$75.00");
     expect(markup).toContain("Not invoiced");
     expect(markup).toContain("Create draft invoice");
@@ -45,6 +48,25 @@ describe("Church promo code report", () => {
     expect(markup).toContain("Nothing is sent from here");
     expect(markup).toContain("covers the whole event, whatever location filter");
     expect(markup).not.toMatch(/finalize invoice<\/button>/i);
+  });
+
+  it("says so when a registrant has no name on file, and keeps the report line otherwise", () => {
+    const rows = [buildChurchCodeReportRow({
+      event, church, lines, invoice: null, registrantNames: new Map(),
+      codes: [], contact: null,
+    })];
+    const markup = render({ eventId: "event-1", eligible: true, rows, totals: summarizeChurchCodeReport(rows) });
+    expect(markup).toContain("no name on file");
+    expect(markup).toContain("WR-0001");
+  });
+
+  it("keeps the registrant name out of the church invoice figures, snapshot and layout", () => {
+    const withNames = JSON.stringify(buildChurchPromoInvoiceFigures({ event, church, lines }));
+    expect(withNames).not.toContain("Quillon");
+    expect(withNames).not.toContain("Fernsby");
+    expect(withNames).not.toContain("Marisol");
+    // The report line is a separate type: the shared line the invoice is built from never gains a name.
+    expect(Object.keys(lines[0]!)).not.toContain("registrantName");
   });
 
   it("shows invoiced, paid and owed for a finalized invoice, and links to it", () => {

@@ -111,7 +111,7 @@ function ChurchRow({ eventId, row, canFinalize }: { eventId: string; row: Church
         ? <div className="finance-row"><span><small>No active registration has used this church&apos;s codes yet.</small></span><span /><span /><span /></div>
         : row.lines.map((line) => (
           <div className="finance-row" key={line.lineId}>
-            <span><small>Used by registration {line.confirmationCode} · code {line.promoCode} · {line.status.toLowerCase()}</small></span>
+            <span><small>Used by {line.registrantName || "a registrant with no name on file"}, registration {line.confirmationCode} · code {line.promoCode} · {line.status.toLowerCase()}</small></span>
             <span>{money(line.amountCents)}</span>
             <span />
             <span />

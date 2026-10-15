@@ -16,6 +16,8 @@
  *   it was until the revision is finalized (-R1, the earlier version SUPERSEDED);
  * - the church report agrees with the ledger: who used the code, covered, invoiced, paid and owed, in cents, through a
  *   partial payment and a change after invoicing, and an invoice of another event is never reached;
+ * - the staff report shows the registrant's name as stored (#960), while the PDF text, the snapshot, the send preview
+ *   and the audit rows carry no name;
  * - the PDF and the send preview work for it (to the church's own billing contact; nothing is sent), the invoice
  *   detail is reachable, the deferred-event invoice screens leave church promo code invoices out;
  * - the audit rows hold ids, counts and amounts only: no name, no email, no code.
@@ -27,6 +29,7 @@
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { setOrganizationBillingContact } from "@/modules/billing-responsibility/repository";
@@ -59,6 +62,8 @@ const ids = {
   other: `${P}_ev_other`,
   club: `${P}_ev_club`,
 };
+/** The registrant's stored name (synthetic, and distinctive so a leak is found): on the staff report, nowhere on the church invoice. */
+const REGISTRANT = { first: "Quillon", last: "Fernsby" };
 const events = [ids.general, ids.other, ids.club];
 const EMAIL = { tina: `${P}.tina@contact.test`, sam: `${P}.sam@contact.test` };
 const NAMES = { churchA: `Church Code Check A ${P}`, churchB: `Church Code Check B ${P}`, churchC: `Church Code Check C ${P}` };
@@ -122,6 +127,26 @@ async function redeem(eventId: string, promo: string, status: "SUBMITTED" | "CON
   throw new Error("unreachable");
 }
 
+/** Every shown string in the PDF's content streams (pdf-lib writes them as hex or literal strings). */
+async function extractPdfText(bytes: Uint8Array) {
+  const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+  const texts: string[] = [];
+  for (const page of doc.getPages()) {
+    const contents = page.node.Contents();
+    const array = page.node.get(PDFName.of("Contents"));
+    const resolved = array ? doc.context.lookup(array) : undefined;
+    const refs = resolved && "asArray" in resolved ? (resolved as unknown as { asArray(): unknown[] }).asArray().map((entry) => doc.context.lookup(entry as never)) : [];
+    for (const stream of [...(contents ? [contents] : []), ...refs]) {
+      if (!(stream instanceof PDFRawStream)) continue;
+      const decoded = Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1");
+      for (const match of decoded.matchAll(/<([0-9A-Fa-f]+)>\s*Tj|\(((?:\\.|[^\\)])*)\)\s*Tj/g)) {
+        texts.push(match[1] ? Buffer.from(match[1], "hex").toString("latin1") : match[2]!);
+      }
+    }
+  }
+  return texts.join("\n");
+}
+
 const prepare = (churchId: string, eventId = ids.general) => prepareChurchCodeInvoiceDraft({ eventId, churchId, actorUserId: ids.staff });
 const finalize = (versionId: string, options: { canFinalize?: boolean; idempotencyKey?: string; eventId?: string } = {}) =>
   finalizeInvoiceVersion({
@@ -150,7 +175,7 @@ async function main() {
       { id: ids.treasurer, email: `${P}.treasurer@example.test`, displayName: "Code Check Treasurer" },
     ],
   });
-  await prisma.person.create({ data: { id: ids.holder, firstName: "Sample", lastName: "Registrant" } });
+  await prisma.person.create({ data: { id: ids.holder, firstName: REGISTRANT.first, lastName: REGISTRANT.last } });
   await prisma.organization.createMany({
     data: [
       { id: ids.churchA, type: "CHURCH", name: NAMES.churchA, normalizedName: NAMES.churchA.toLowerCase() },
@@ -276,7 +301,8 @@ async function main() {
   let report = await getChurchCodeReport(ids.general);
   let rowA = report.rows.find((row) => row.churchId === ids.churchA)!;
   assert(rowA.coveredCents === 8_734 && rowA.invoicedCents === 8_734 && rowA.paidCents === 0 && rowA.owedOnInvoiceCents === 8_734 && rowA.notInvoicedCents === 0 && rowA.state === "FINALIZED_CURRENT" && rowA.invoiceNumber === finalized.number, "report: covered, invoiced, paid and owed");
-  assert(rowA.lines.length === 4 && rowA.lines.every((line) => !JSON.stringify(line).includes("Sample")), "report: who used the code, by registration, no attendee name");
+  assert(rowA.lines.length === 4 && rowA.lines.every((line) => line.registrantName === `${REGISTRANT.first} ${REGISTRANT.last}` && line.confirmationCode.length > 0), "report: who used the code, by registrant name as stored and registration (staff report only)");
+  assert(report.rows.every((row) => row.lines.every((line) => line.registrantName === `${REGISTRANT.first} ${REGISTRANT.last}`)), "report: every church's lines carry the registrant name");
   assert(rowA.codes.length === 1 && rowA.codes[0]!.code === "CHURCHA" && rowA.codes[0]!.redeemedCount >= 4, "report: the code and its uses");
   assert(rowA.contact?.email === EMAIL.tina, "report: the church's contact");
   const rowB = report.rows.find((row) => row.churchId === ids.churchB)!;
@@ -288,6 +314,15 @@ async function main() {
   const preview = await getInvoiceSendPreview(ids.general, created.versionId);
   assert(preview.recipients.length === 1 && preview.currentContact?.email === EMAIL.tina && !preview.contactChanged, "the send preview goes to the church's own billing contact");
   assert((await countsOf(ids.general)).deliveries === 0 && (await countsOf(ids.general)).outbox === 0, "previewing sends nothing");
+  // Names stay off everything the church receives: the PDF text, the stored snapshot, the send preview and its email text.
+  const attachment = await prisma.messageAttachment.findUniqueOrThrow({ where: { id: pdf.attachmentId }, select: { content: true } });
+  const pdfText = await extractPdfText(new Uint8Array(attachment.content));
+  assert(pdfText.includes("Total"), "the PDF text was read back");
+  for (const forbidden of [REGISTRANT.first, REGISTRANT.last]) {
+    assert(!pdfText.includes(forbidden), `the invoice PDF never shows ${forbidden}`);
+    assert(!JSON.stringify(draft.snapshot).includes(forbidden), `the invoice snapshot never holds ${forbidden}`);
+    assert(!JSON.stringify(preview).includes(forbidden), `the send preview and its email text never show ${forbidden}`);
+  }
 
   const paid1 = await recordInvoicePayment({ eventId: ids.general, invoiceId: created.invoiceId, amount: "50.00", checkNumber: "1001", receivedOn: "2027-04-20", requestKey: key("pay1"), actorUserId: ids.treasurer });
   assert(paid1.paymentId.length > 0, "a payment is recorded against the invoice");
@@ -333,7 +368,7 @@ async function main() {
     const metadata = entry.metadata as Record<string, unknown>;
     assert(Object.keys(metadata).sort().join() === "amountDueCents,churchId,eventId,invoiceId,lineCount,outcome,previousAmountDueCents,revision,versionId", "audit metadata keys are ids, counts and amounts");
     const text = JSON.stringify(entry);
-    for (const forbidden of [EMAIL.tina, EMAIL.sam, "Tina", "Sam Clerk", "Sue", "CHURCHA", "CHURCHB", NAMES.churchA, NAMES.churchB, "Treasurer"]) {
+    for (const forbidden of [EMAIL.tina, EMAIL.sam, "Tina", "Sam Clerk", "Sue", "CHURCHA", "CHURCHB", NAMES.churchA, NAMES.churchB, "Treasurer", REGISTRANT.first, REGISTRANT.last]) {
       assert(!text.includes(forbidden), `an audit row never holds ${forbidden}`);
     }
   }
