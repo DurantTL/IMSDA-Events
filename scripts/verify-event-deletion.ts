@@ -764,6 +764,20 @@ async function main() {
   assert(await prisma.healthRecordSnapshot.count({ where: { id: snapshot.id } }) + await prisma.healthRecordSnapshotField.count({ where: { snapshotId: snapshot.id } }) === 0, "its sealed copy and fields went with it");
   assert(await prisma.person.count({ where: { id: attendeePeople[1].id } }) === 1, "the person was kept");
 
+  // ---- Scholarship fund contributions (#398): recorded money is a finance record, so it blocks deletion. ----
+  const fundEventId = id("fund_event");
+  await prisma.event.create({ data: { id: fundEventId, slug: `${P}-fund`, name: "Evdel Scholarship Fund 2028", ...eventBase } });
+  const fundCleanPreview = await getEventDeletionPreview(fundEventId, { userId: adminId, globalRole: "SYSTEM_ADMIN" });
+  assert(fundCleanPreview?.decision.allowed, "an event with no fund contributions can still be deleted");
+  const fund = await prisma.scholarshipFund.create({ data: { eventId: fundEventId } });
+  await prisma.scholarshipContribution.create({
+    data: { eventId: fundEventId, fundId: fund.id, sponsorName: "Evdel Sponsor", sponsorKey: "name:evdel sponsor", amountCents: 5_000, receivedOn: new Date("2028-01-15T00:00:00Z"), method: "CHECK", createdByNameSnapshot: "Evdel Admin" },
+  });
+  const fundPreview = await getEventDeletionPreview(fundEventId, { userId: adminId, globalRole: "SYSTEM_ADMIN" });
+  assert(fundPreview && fundPreview.counts.scholarshipContributions === 1 && !fundPreview.decision.allowed && /1 scholarship fund contribution/.test(fundPreview.decision.reason), "a recorded scholarship contribution blocks the event's deletion and is named");
+  await expectCode(deleteEvent({ eventId: fundEventId, actor: sysAdmin, confirmName: "Evdel Scholarship Fund 2028" }), "EVENT_DELETE_FORBIDDEN", "deleting an event with fund contributions");
+  assert(await prisma.scholarshipContribution.count({ where: { eventId: fundEventId } }) === 1 && await prisma.event.count({ where: { id: fundEventId } }) === 1, "the refused deletion left the event and its contribution");
+
   console.log("Event deletion verified: refusal with records attached changes nothing, setup-only event deleted cleanly, shared records kept, permissions, audit row, rollback, large setup.");
 }
 

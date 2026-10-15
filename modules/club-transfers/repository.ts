@@ -1446,6 +1446,11 @@ async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId:
   });
   // Meal charges (#210) stay with the registration they were ledgered on: a MEAL line is never moved, and a person with
   // active meal selections is not moved until those are cancelled (their selections and ledger rows cannot follow).
+  // A scholarship line that draws on the event's fund (#398) keeps its award row on the same registration as the line.
+  await tx.scholarshipAward.updateMany({
+    where: { registrationId: fromRegistrationId, adjustment: { registrationAttendeeId: attendeeId, kind: { not: "MEAL" } } },
+    data: { registrationId: toRegistrationId },
+  });
   const adjustments = await tx.registrationAdjustment.updateMany({
     where: { registrationAttendeeId: attendeeId, registrationId: fromRegistrationId, kind: { not: "MEAL" } },
     data: { registrationId: toRegistrationId },
