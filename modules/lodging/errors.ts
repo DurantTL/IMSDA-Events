@@ -34,6 +34,8 @@ export type LodgingErrorCode =
   | "ROOM_COUNT_INVALID"
   | "EXTRA_BEDDING_NOT_ACKNOWLEDGED"
   | "REGISTRATION_NOT_ELIGIBLE"
+  /** A staff, pastor or volunteer registration (#804): the office assigns its housing; the registrant never asks for or adds rooms. */
+  | "STAFF_REGISTRATION"
   // Assignment, moves, waitlist and attendee display (#200)
   | "ASSIGNMENT_NOT_FOUND"
   | "OCCUPANT_NOT_FOUND"
@@ -92,6 +94,7 @@ export function lodgingErrorStatus(code: LodgingErrorCode) {
     case "SENSITIVE_DATA_FORBIDDEN":
     case "EDIT_POLICY_REQUIRES_VERIFICATION":
     case "FLAGS_STAFF_ONLY":
+    case "STAFF_REGISTRATION":
       return 403;
     case "PROPERTY_ALREADY_SET":
     case "HOLD_OVERLAP":

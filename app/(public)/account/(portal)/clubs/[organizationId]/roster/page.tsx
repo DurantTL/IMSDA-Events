@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { BackLink } from "@/components/back-link";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
+import { NextYearRosterOffer } from "@/components/club-next-year-offer";
 import { ClubTransfersPanel, RequestTransferButton } from "@/components/club-transfers-panel";
 import { clubPortalComplianceStatuses } from "@/modules/background-checks/repository";
 import { COMPLIANCE_FILTER_VALUES, type ComplianceFilterValue } from "@/modules/background-checks/domain";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { registrationReturnTo } from "@/modules/club-registrations/roster-return";
+import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
+import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
 import { listRoster } from "@/modules/club-rosters/repository";
@@ -71,12 +74,17 @@ export default async function ClubRosterPage({
   // "Has a health record" marker: one boolean saying a record exists, no text (#611).
   const healthRecordFlags = readOnly ? undefined : await healthRecordFlagsForRoster(organizationId, members.map((member) => member.id)).catch(() => undefined);
   const registrationHref = registrationReturnTo(organizationId, returnToParam);
+  const nextYearOffer = access.capabilities.manageTeam && !readOnly && carryForwardOversightOpen(new Date())
+    ? await getCarryForwardOffer(organizationId)
+    : null;
   return (
     <>
       {registrationHref && <BackLink href={registrationHref}>Back to registration</BackLink>}
       <p className="quiet-copy">
         <a href={`/account/clubs/${organizationId}/roster/export`}>Build a roster export</a> for an outside camporee.
       </p>
+      {/* From August a director is offered next year's roster (#414); nothing rolls over until they confirm it. */}
+      <NextYearRosterOffer offer={nextYearOffer} organizationId={organizationId} />
       {readOnly && (
         <p className="inline-notice" role="status">
           Showing the {clubYear} roster, read-only. <a href={`/account/clubs/${organizationId}/roster`}>Back to {currentClubYear}</a> to

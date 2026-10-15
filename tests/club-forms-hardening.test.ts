@@ -19,10 +19,13 @@ describe("private-link tokens never reach a logged path (#610)", () => {
     // An announcement's unsubscribe link (#838), in the page and the one-click API.
     expect(redactTokenPath("/unsubscribe/AbC_123-secretTokenValue")).toBe("/unsubscribe/[redacted]");
     expect(redactTokenPath("/api/public/unsubscribe/AbC_123-secretTokenValue")).toBe("/api/public/unsubscribe/[redacted]");
+    // A personal staff invitation link (#804), in the page and the registration API.
+    expect(redactTokenPath("/staff-invite/cmv8naenq00017d2ez7zkdmkq.AbC_123-secretSignature")).toBe("/staff-invite/[redacted]");
+    expect(redactTokenPath("/api/public/staff-invitations/cmv8naenq00017d2ez7zkdmkq.AbC_123-secretSignature")).toBe("/api/public/staff-invitations/[redacted]");
   });
 
   it("leaves other paths alone", () => {
-    for (const path of ["/", "/api/attendee/clubs/club-1/forms/links", "/more/club-forms", "/more/club-forms/sub-1", "/events/spring/register", "/more/unsubscribe", "/api/events/e1/unsubscribe/x"]) {
+    for (const path of ["/", "/api/attendee/clubs/club-1/forms/links", "/more/club-forms", "/more/club-forms/sub-1", "/events/spring/register", "/more/unsubscribe", "/api/events/e1/unsubscribe/x", "/people/staff-invitations", "/api/events/e1/staff-invitations/inv-1"]) {
       expect(redactTokenPath(path)).toBe(path);
     }
   });

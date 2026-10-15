@@ -231,6 +231,15 @@ const nextConfig: NextConfig = {
         headers: privateRegistrationHeaders,
       },
       {
+        // A personal staff invitation link (#804) is a credential: never cached, never indexed, no referrer.
+        source: "/staff-invite/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
+        source: "/api/public/staff-invitations/:path*",
+        headers: privateRegistrationHeaders,
+      },
+      {
         // Applications carry a director's contact details and a private attachment (#817).
         source: "/account/area-clubs/applications",
         headers: privateRegistrationHeaders,

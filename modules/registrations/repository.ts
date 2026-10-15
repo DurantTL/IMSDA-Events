@@ -57,6 +57,8 @@ function getRegistrationQuery(
       location: { select: { id: true, name: true } },
       // A "Group" registration (#650) is billed to its contact, not to a church.
       groupRegistration: { select: { id: true } },
+      // A registration made through a personal staff, pastor or volunteer link (#804): its group and the office's decision.
+      staffInvitation: { select: { group: true, approval: true } },
       waitlistEntry: { select: { status: true } },
       attendees: {
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
@@ -292,6 +294,8 @@ function serializeRegistration(registration: RegistrationWithRelations, director
     isDeferredOrganizationBilling: registration.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     /** Billed to its contact (the account holder below), not to a church or club (#650). */
     isGroup: Boolean(registration.groupRegistration),
+    /** Set when the registration was made through a personal staff invitation (#804): Staff, Pastor or Volunteer, and whether the office has approved it. */
+    staffInvitation: registration.staffInvitation ? { group: registration.staffInvitation.group, approval: registration.staffInvitation.approval } : null,
     submittedAt: registration.submittedAt?.toISOString() ?? null,
     createdAt: registration.createdAt.toISOString(),
     updatedAt: registration.updatedAt.toISOString(),
@@ -402,7 +406,9 @@ function serializeRegistration(registration: RegistrationWithRelations, director
 }
 
 type SerializedRegistration = ReturnType<typeof serializeRegistration>;
-export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "publicSubmission" | "location" | "locationWaitlistPlace" | "deposit"> & {
+export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "publicSubmission" | "location" | "locationWaitlistPlace" | "deposit" | "staffInvitation"> & {
+  /** Optional so records built before personal staff invitations existed (#804) still type-check. */
+  staffInvitation?: SerializedRegistration["staffInvitation"];
   /** The reservation deposit (#415); optional so records built before it existed still type-check. */
   deposit?: SerializedRegistration["deposit"];
   /** Optional so records built before locations existed (#413) still type-check. */

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Page-level denial for the Area Coordinator Clubs section (#657): layouts do
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getAreaClubsSummary: vi.fn(),
   listAreaClubEvents: vi.fn(),
   listUpcomingDeadlines: vi.fn(),
+  listClubsNewYearStatus: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +25,8 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAtten
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
+// Which clubs haven't started next year's roster (#414) has its own tests.
+vi.mock("@/modules/club-rosters/carry-forward", () => ({ listClubsNewYearStatus: mocks.listClubsNewYearStatus }));
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({
   getAreaClubsSummary: mocks.getAreaClubsSummary,
   listAreaClubEvents: mocks.listAreaClubEvents,
@@ -47,6 +50,7 @@ beforeEach(() => {
   mocks.getAreaClubsSummary.mockResolvedValue([]);
   mocks.listAreaClubEvents.mockResolvedValue([]);
   mocks.listUpcomingDeadlines.mockResolvedValue([]);
+  mocks.listClubsNewYearStatus.mockResolvedValue(null);
 });
 
 describe.each(Object.entries(pages))("area-clubs %s page (#657)", (_name, Page) => {
@@ -77,6 +81,32 @@ describe("Upcoming deadlines for the Area Coordinator (#910)", () => {
     const text = JSON.stringify(tree);
     expect(text).toContain("Points Reports Due");
     expect(text.indexOf("Points Reports Due")).toBeLessThan(text.indexOf("area-overview-page"));
+  });
+});
+
+describe("Clubs that have not started next year's roster (#414)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it.each(["2027-08-15", "2027-09-15", "2027-10-31"])("the overview loads the list on %s", async (day) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${day}T15:00:00Z`));
+    await OverviewPage(props);
+    expect(mocks.listClubsNewYearStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["2027-07-31", "2027-11-01", "2028-02-10"])("the overview does not load it on %s", async (day) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${day}T15:00:00Z`));
+    await OverviewPage(props);
+    expect(mocks.listClubsNewYearStatus).not.toHaveBeenCalled();
+  });
+
+  it("a non-coordinator never reaches it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2027-09-15T15:00:00Z"));
+    mocks.areaGrantFindUnique.mockResolvedValue(null);
+    await expect(OverviewPage(props)).rejects.toThrow("NOT_FOUND");
+    expect(mocks.listClubsNewYearStatus).not.toHaveBeenCalled();
   });
 });
 
