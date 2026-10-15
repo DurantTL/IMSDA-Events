@@ -4,31 +4,34 @@ import {
   AUDIENCE_QUERY_VERSION,
   AUDIENCE_ROLE_LABELS,
   AUDIENCE_ROLE_PRIORITY,
-  type AudienceBalanceState,
-  type AudienceCheckInState,
   type AudienceDimension,
   type AudienceRole,
   type NormalizedAudienceQuery,
 } from "@/modules/communications/audience-query";
+import type { OperationsSearchQuery, SearchCatalog } from "@/modules/registrations/operations-search-domain";
 
 /**
  * Evaluates an audience query over already-loaded registration rows. Pure: no database, no clock, no randomness, so
  * the same rows and query always give the same audience, in the same order, with the same fingerprint.
  *
- * The row type is an allow-list. It carries the few normalized facts the supported filters need (a status, a balance,
- * whether an attendee is checked in, whether responses exist, tag identifiers) and nothing protected: no profile
- * snapshot, no form answers, no health, screening or consent data, no note text. A filter can only qualify a person by
- * what is in these rows, so protected data cannot qualify anyone however a query is written.
+ * Which registrations qualify was decided before a row is loaded, by the operations search (#180): every row given
+ * here already matched the query's `search`. What happens here is per message: which people on a matched registration
+ * are written to (roles), the one readiness narrowing, de-duplication and the reasons.
+ *
+ * The row type is an allow-list. It carries the few normalized facts those steps need (a status, a balance, whether
+ * responses exist, tag identifiers) and nothing protected: no profile snapshot, no form answers, no health, screening or
+ * consent data, no note text. Nobody can be qualified by what is not in these rows, so protected data cannot qualify
+ * anyone however a query is written.
  */
 
 export const AUDIENCE_FINGERPRINT_VERSION = 1;
 
 export type AudienceAttendeeRow = {
   attendeeId: string;
+  /** The event's attendee-type code, the identifier the operations search filters on. */
   attendeeType: string;
   name: string;
   email: string | null;
-  checkedIn: boolean;
   /** Whether any form response exists. The responses themselves never leave the loader. */
   hasResponses: boolean;
   tagIds: readonly string[];
@@ -54,6 +57,14 @@ export type AudienceEvaluationContext = {
   /** The event bills the responsible organization, so an attendee never owes an online balance. */
   isOrganizationBilled: boolean;
   tagNames: ReadonlyMap<string, string>;
+  attendeeTypeLabels: ReadonlyMap<string, string>;
+  /**
+   * What the search selected on, as the operations search read it. Only used to decide which ATTENDEES of a matched
+   * registration are written to: an attendee qualifies on their own type, and on a tag of theirs or of the registration.
+   */
+  selection: { attendeeTypes: readonly string[]; tagIds: readonly string[] };
+  /** The rule each search filter stands for, in words, the same for every matched registration. */
+  searchReasons: readonly AudienceReason[];
 };
 
 export type AudienceReason = { dimension: AudienceDimension; value: string; label: string };
@@ -78,90 +89,88 @@ export function audienceBalanceCents(row: Pick<AudienceRegistrationRow, "totalCe
   return isOrganizationBilled ? 0 : Math.max(row.totalCents - row.netPaidCents, 0);
 }
 
-export function audienceBalanceState(row: AudienceRegistrationRow, isOrganizationBilled: boolean): AudienceBalanceState {
-  if (isOrganizationBilled) return "ORGANIZATION_BILLED";
-  if (audienceBalanceCents(row, false) > 0) return "BALANCE_DUE";
-  return row.totalCents <= 0 ? "NO_CHARGE" : "PAID_IN_FULL";
-}
-
-export function audienceCheckInState(row: AudienceRegistrationRow): AudienceCheckInState {
-  const checkedIn = row.attendees.filter((attendee) => attendee.checkedIn).length;
-  if (checkedIn === 0) return "NOT_CHECKED_IN";
-  return checkedIn === row.attendees.length ? "CHECKED_IN" : "PARTIALLY_CHECKED_IN";
-}
-
 function readinessIncomplete(row: AudienceRegistrationRow) {
   return row.hasPublicSubmission && row.attendees.some((attendee) => !attendee.hasResponses);
 }
 
-const BALANCE_REASON_LABELS: Record<AudienceBalanceState, string> = {
-  BALANCE_DUE: "Balance due",
-  PAID_IN_FULL: "Paid in full",
-  NO_CHARGE: "No charge",
-  ORGANIZATION_BILLED: "Billed to the organization",
-};
-const CHECK_IN_REASON_LABELS: Record<AudienceCheckInState, string> = {
-  CHECKED_IN: "Everyone checked in",
-  PARTIALLY_CHECKED_IN: "Some checked in",
-  NOT_CHECKED_IN: "No one checked in",
-};
+function words(value: string) {
+  return value.toLowerCase().replace(/_/g, " ");
+}
 
 /**
- * Applies the registration-level filters and returns the candidates (one per selected role that has a contact) with the
- * reason each qualified. A registration that fails any filter yields none.
+ * The rule each search filter stands for, in words, for the reasons on every recipient. Labels come from the viewer's
+ * own catalog, so a name the viewer may not see (a tag, an organization) is never written into a reason. Status,
+ * attendee type and tag reasons are made per registration from the row, so they are left out here.
+ */
+export function buildSearchReasons(search: OperationsSearchQuery, catalog: SearchCatalog): AudienceReason[] {
+  const reasons: AudienceReason[] = [];
+  const add = (dimension: AudienceDimension, values: readonly string[], label: string) => {
+    reasons.push({ dimension, value: values.join(","), label });
+  };
+  const named = (values: readonly string[], names: ReadonlyArray<{ id: string; name: string }>) => (
+    values.map((value) => names.find((candidate) => candidate.id === value)?.name ?? value).join(" or ")
+  );
+  if (search.text) add("q", ["text"], "Matched the search text");
+  if (search.source.length) add("source", search.source, `Source ${search.source.map(words).join(" or ")}`);
+  if (search.organization.length) add("organization", search.organization, `Organization ${named(search.organization, catalog.organizations)}`);
+  if (search.location.length) add("location", search.location, `Location ${named(search.location, catalog.locations)}`);
+  if (search.waitlist.length) add("waitlist", search.waitlist, `Waitlist ${search.waitlist.map(words).join(" or ")}`);
+  if (search.payment.length) add("payment", search.payment, `Payment ${search.payment.map(words).join(" or ")}`);
+  if (search.checkIn) add("checkIn", [search.checkIn], `Check-in ${{ ANY: "some checked in", ALL: "everyone checked in", NONE: "no one checked in" }[search.checkIn]}`);
+  for (const answer of search.answers) {
+    const question = catalog.questions.find((candidate) => candidate.id === answer.question);
+    const choices = answer.values.map((value) => question?.choices.find((choice) => choice.value === value)?.label ?? value);
+    reasons.push({
+      dimension: "answer",
+      value: `${answer.question}=${answer.values.join(",")}`,
+      label: `Answered "${question?.label ?? answer.question}": ${choices.join(" or ")}`,
+    });
+  }
+  return reasons;
+}
+
+/**
+ * Applies the readiness narrowing and returns the candidates (one per selected role that has a contact) with the reason
+ * each qualified. The row already matched the operations search; the reasons say which of its rules it matched.
  */
 export function evaluateAudienceRegistration(
   row: AudienceRegistrationRow,
   query: NormalizedAudienceQuery,
   context: AudienceEvaluationContext,
 ): AudienceCandidate[] {
-  if (!query.lifecycles.some((lifecycle) => lifecycle === row.status)) return [];
-
-  const reasons: AudienceReason[] = [{ dimension: "lifecycles", value: row.status, label: `Registration ${row.status.toLowerCase()}` }];
-
-  const balanceCents = audienceBalanceCents(row, context.isOrganizationBilled);
-  if (query.balanceStates.length > 0) {
-    const state = audienceBalanceState(row, context.isOrganizationBilled);
-    if (!query.balanceStates.includes(state)) return [];
-    reasons.push({ dimension: "balanceStates", value: state, label: BALANCE_REASON_LABELS[state] });
-  }
-
-  if (query.checkInStates.length > 0) {
-    const state = audienceCheckInState(row);
-    if (!query.checkInStates.includes(state)) return [];
-    reasons.push({ dimension: "checkInStates", value: state, label: CHECK_IN_REASON_LABELS[state] });
-  }
+  const reasons: AudienceReason[] = [
+    { dimension: "status", value: row.status, label: `Registration ${row.status.toLowerCase()}` },
+    ...context.searchReasons.filter((reason) => reason.dimension !== "status"),
+  ];
 
   if (query.readinessStates.length > 0) {
     if (!query.readinessStates.includes("ATTENDEE_RESPONSES_INCOMPLETE") || !readinessIncomplete(row)) return [];
-    reasons.push({
-      dimension: "readinessStates",
-      value: "ATTENDEE_RESPONSES_INCOMPLETE",
-      label: "Attendee responses incomplete",
-    });
+    reasons.push({ dimension: "readiness", value: "ATTENDEE_RESPONSES_INCOMPLETE", label: "Attendee responses incomplete" });
   }
 
-  if (query.attendeeTypes.length > 0) {
-    const matched = [...new Set(row.attendees.map((attendee) => attendee.attendeeType))]
-      .filter((type) => query.attendeeTypes.includes(type));
-    if (matched.length === 0) return [];
-    for (const type of matched) reasons.push({ dimension: "attendeeTypes", value: type, label: `Attendee type ${type}` });
+  const { attendeeTypes, tagIds } = context.selection;
+  if (attendeeTypes.length > 0) {
+    // The search kept the registration because an attendee has one of the types; say which, from the row itself.
+    for (const type of new Set(row.attendees.map((attendee) => attendee.attendeeType))) {
+      if (attendeeTypes.includes(type)) {
+        reasons.push({ dimension: "attendeeType", value: type, label: `Attendee type ${context.attendeeTypeLabels.get(type) ?? type}` });
+      }
+    }
   }
-
-  if (query.tagIds.length > 0) {
+  if (tagIds.length > 0) {
     const tagged = new Set<string>();
-    for (const tagId of row.tagIds) if (query.tagIds.includes(tagId)) tagged.add(tagId);
+    for (const tagId of row.tagIds) if (tagIds.includes(tagId)) tagged.add(tagId);
     for (const attendee of row.attendees) {
-      for (const tagId of attendee.tagIds) if (query.tagIds.includes(tagId)) tagged.add(tagId);
+      for (const tagId of attendee.tagIds) if (tagIds.includes(tagId)) tagged.add(tagId);
     }
-    if (tagged.size === 0) return [];
     for (const tagId of tagged) {
-      reasons.push({ dimension: "tagIds", value: tagId, label: `Tag ${context.tagNames.get(tagId) ?? "(removed tag)"}` });
+      reasons.push({ dimension: "tag", value: tagId, label: `Tag ${context.tagNames.get(tagId) ?? "(removed tag)"}` });
     }
   }
 
+  const balanceCents = audienceBalanceCents(row, context.isOrganizationBilled);
   const candidates: AudienceCandidate[] = [];
-  const push = (role: AudienceRole, contact: AudienceContactRow, extra: AudienceReason[] = []) => {
+  const push = (role: AudienceRole, contact: AudienceContactRow) => {
     candidates.push({
       role,
       name: contact.name.trim() || "Recipient",
@@ -169,7 +178,7 @@ export function evaluateAudienceRegistration(
       registrationId: row.registrationId,
       confirmationCode: row.confirmationCode,
       balanceCents,
-      reasons: sortReasons([...reasons, ...extra]),
+      reasons: sortReasons(reasons),
     });
   };
 
@@ -179,10 +188,9 @@ export function evaluateAudienceRegistration(
     else if (role === "ORGANIZATION_CONTACT" && row.organizationContact) push(role, row.organizationContact);
     else if (role === "ATTENDEE") {
       for (const attendee of row.attendees) {
-        // An attendee qualifies on their own type and, when tags are filtered, on a tag of theirs or of the registration.
-        if (query.attendeeTypes.length > 0 && !query.attendeeTypes.includes(attendee.attendeeType)) continue;
-        if (query.tagIds.length > 0) {
-          const hit = row.tagIds.some((id) => query.tagIds.includes(id)) || attendee.tagIds.some((id) => query.tagIds.includes(id));
+        if (attendeeTypes.length > 0 && !attendeeTypes.includes(attendee.attendeeType)) continue;
+        if (tagIds.length > 0) {
+          const hit = row.tagIds.some((id) => tagIds.includes(id)) || attendee.tagIds.some((id) => tagIds.includes(id));
           if (!hit) continue;
         }
         push(role, { name: attendee.name, email: attendee.email });

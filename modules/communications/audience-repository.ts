@@ -9,14 +9,17 @@ import {
   AudienceFilterNotAvailableError,
   assertQueryAvailable,
   audienceQueryHash,
+  audienceSearchQuery,
   describeAvailableFilters,
   normalizeAudienceQuery,
+  searchViewerFor,
   type AudienceCapabilities,
   type AudienceDomain,
   type NormalizedAudienceQuery,
 } from "@/modules/communications/audience-query";
 import {
   AudienceAccumulator,
+  buildSearchReasons,
   audiencePageSchema,
   pageAudienceList,
   type AudiencePageInput,
@@ -27,6 +30,10 @@ import {
 import { loadAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
 import { announcementOptOutFor } from "@/modules/communications/email-preferences";
 import { MessagingError } from "@/modules/communications/messaging-error";
+import {
+  enumerateOperationsRegistrationIds,
+  loadOperationsSearchCatalog,
+} from "@/modules/registrations/operations-search-repository";
 
 /**
  * The reviewed event audience builder's loader and snapshot (#176). It extends the WR26 messaging services: it reads
@@ -35,6 +42,11 @@ import { MessagingError } from "@/modules/communications/messaging-error";
  *
  * Preview only. Nothing here writes a message, a batch or a schedule. The one write is the audited snapshot, which
  * records the normalized query, its version, the fingerprint and counts, and holds no recipient.
+ *
+ * WHICH registrations are in the audience is the operations search (#180): `enumerateOperationsRegistrationIds` runs the
+ * query's canonical `search` through the same `prepare` and `readWhere` as the staff lists, for this caller's own
+ * permissions, so a filter the caller may not use is refused before anything is read and health and sensitive answers
+ * are unsearchable. This module then loads the matched ids in batches and decides who on each registration is written to.
  *
  * The loader selects an explicit list of columns. It never reads a registration or attendee profile snapshot, form
  * answers (existence is checked in the database, the content is never loaded), health records, screening or consent
@@ -83,32 +95,15 @@ export async function getAudienceCapabilities(
   return { permissions: new Set(permissions), domains: await loadAudienceDomains(eventId, client) };
 }
 
-/** The filters this caller may compose. Unavailable dimensions are absent; tags are read only when permitted. */
+/** The filters this caller may compose: the operations-search filters they may use, the roles the event has, and readiness. */
 export async function getAudienceFilterOptions(eventId: string, permissions: readonly string[]) {
-  const prisma = getPrisma();
-  const capabilities = await getAudienceCapabilities(eventId, permissions, prisma);
-  const tagsAllowed = capabilities.permissions.has("VIEW_SENSITIVE_DATA");
-  const [tags, types] = await Promise.all([
-    tagsAllowed
-      ? prisma.eventTag.findMany({ where: { eventId, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
-      : Promise.resolve([]),
-    prisma.registrationAttendee.findMany({ where: { eventId }, distinct: ["attendeeType"], select: { attendeeType: true }, orderBy: { attendeeType: "asc" } }),
-  ]);
+  const capabilities = await getAudienceCapabilities(eventId, permissions);
+  const viewer = searchViewerFor(eventId, permissions);
+  const catalog = await loadOperationsSearchCatalog(viewer);
   return {
     sourceQueryVersion: AUDIENCE_QUERY_VERSION,
-    ...describeAvailableFilters(capabilities, { tags, attendeeTypes: types.map((row) => row.attendeeType) }),
+    ...describeAvailableFilters(viewer, catalog, capabilities),
   };
-}
-
-async function loadTagNames(client: Client, eventId: string, query: NormalizedAudienceQuery) {
-  if (query.tagIds.length === 0) return new Map<string, string>();
-  const tags = await client.eventTag.findMany({
-    where: { eventId, id: { in: query.tagIds } },
-    select: { id: true, name: true, isActive: true },
-  });
-  // A tag from another event, or one that does not exist, is indistinguishable from a forbidden filter.
-  if (tags.length !== query.tagIds.length || tags.some((tag) => !tag.isActive)) throw new AudienceFilterNotAvailableError();
-  return new Map(tags.map((tag) => [tag.id, tag.name] as const));
 }
 
 async function loadSuppressions(
@@ -148,16 +143,15 @@ async function loadRegistrationBatch(
   client: Client,
   eventId: string,
   query: NormalizedAudienceQuery,
-  after: string | null,
-  batchSize: number,
+  registrationIds: readonly string[],
   now: Date,
 ): Promise<AudienceRegistrationRow[]> {
   const wantsOrganization = query.roles.includes("ORGANIZATION_CONTACT");
   const wantsGroup = query.roles.includes("GROUP_LEADER");
   const registrations = await client.registration.findMany({
-    where: { eventId, status: { in: query.lifecycles }, ...(after ? { id: { gt: after } } : {}) },
+    // The ids came from the permission-gated search; the event id is still the first guard on every read.
+    where: { eventId, id: { in: [...registrationIds] } },
     orderBy: { id: "asc" },
-    take: batchSize,
     select: {
       id: true,
       confirmationCode: true,
@@ -175,10 +169,9 @@ async function loadRegistrationBatch(
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
           id: true,
-          attendeeType: true,
+          attendeeTypeDefinition: { select: { code: true } },
           person: { select: { firstName: true, lastName: true, normalizedEmail: true } },
           tagAssignments: { where: { removedAt: null, tag: { isActive: true } }, select: { tagId: true } },
-          checkIns: { where: { undoneAt: null }, take: 1, select: { id: true } },
         },
       },
       ...(wantsGroup
@@ -258,10 +251,9 @@ async function loadRegistrationBatch(
       tagIds: registration.tagAssignments.map((assignment) => assignment.tagId),
       attendees: registration.attendees.map((attendee) => ({
         attendeeId: attendee.id,
-        attendeeType: attendee.attendeeType,
+        attendeeType: attendee.attendeeTypeDefinition?.code ?? "",
         name: personName(attendee.person),
         email: attendee.person.normalizedEmail,
-        checkedIn: attendee.checkIns.length > 0,
         hasResponses: withResponses.has(attendee.id),
         tagIds: attendee.tagAssignments.map((assignment) => assignment.tagId),
       })),
@@ -279,42 +271,55 @@ export type AudienceEvaluationOptions = {
 };
 
 /**
- * Evaluates the whole audience in id-ordered batches, so memory holds one batch of registrations plus the compact
- * per-address summary, never every registration at once. The counts and fingerprint always cover the full audience;
- * paging only limits what is returned.
+ * Evaluates the whole audience. The operations search names the registrations (all of them, ids only, one snapshot, at
+ * most its own paging bound); they are then loaded in batches, so memory holds one batch of registrations plus the
+ * compact per-address summary, never every registration at once. The counts and fingerprint always cover the full
+ * audience; paging only limits what is returned.
+ *
+ * Authorization comes first, before any read that could differ by what the event holds. An audience larger than the
+ * search can enumerate is refused (AUDIENCE_TOO_BROAD) rather than truncated into one that looks complete.
  */
 export async function evaluateEventAudience(
   eventId: string,
   permissions: readonly string[],
   rawQuery: unknown,
   options: AudienceEvaluationOptions = {},
-  client: Client = getPrisma(),
 ): Promise<{ query: NormalizedAudienceQuery; queryHash: string; result: AudienceResult }> {
   const query = normalizeAudienceQuery(rawQuery);
-  // Authorization first, before any read that could differ by what the event holds.
-  const capabilities = await getAudienceCapabilities(eventId, permissions, client);
+  const prisma = getPrisma();
+  const capabilities = await getAudienceCapabilities(eventId, permissions, prisma);
   assertQueryAvailable(query, capabilities);
 
-  const event = await client.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
+  const viewer = searchViewerFor(eventId, permissions);
+  const catalog = await loadOperationsSearchCatalog(viewer);
+  const search = audienceSearchQuery(query);
+  const selection = await enumerateOperationsRegistrationIds(viewer, search, catalog);
+  if (!selection.ok) {
+    if (selection.issues.length > 0 && selection.issues.every((issue) => issue.code === "too-broad")) {
+      throw new MessagingError("AUDIENCE_TOO_BROAD", "That audience is too large to review at once. Narrow the filters and try again.");
+    }
+    // Unavailable, stale and invalid filters are all the same answer: it names no filter, value or count.
+    throw new AudienceFilterNotAvailableError();
+  }
+
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
   if (!event) throw new MessagingError("MESSAGE_NOT_FOUND", "That event is no longer available.");
-  const tagNames = await loadTagNames(client, eventId, query);
   const accumulator = new AudienceAccumulator(query, {
     isOrganizationBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
-    tagNames,
+    tagNames: new Map(catalog.tags.map((tag) => [tag.id, tag.name] as const)),
+    attendeeTypeLabels: new Map(catalog.attendeeTypes.map((type) => [type.code, type.label] as const)),
+    selection: { attendeeTypes: search.attendeeType, tagIds: search.tag },
+    searchReasons: buildSearchReasons(search, catalog),
   }, eventId);
 
   const batchSize = Math.max(1, options.batchSize ?? DEFAULT_BATCH_SIZE);
   const now = options.now ?? new Date();
-  let cursor: string | null = null;
-  for (;;) {
-    const rows = await loadRegistrationBatch(client, eventId, query, cursor, batchSize, now);
-    if (rows.length === 0) break;
+  for (let offset = 0; offset < selection.registrationIds.length; offset += batchSize) {
+    const rows = await loadRegistrationBatch(prisma, eventId, query, selection.registrationIds.slice(offset, offset + batchSize), now);
     for (const row of rows) accumulator.consider(row);
-    cursor = rows[rows.length - 1]!.registrationId;
-    if (rows.length < batchSize) break;
   }
 
-  const suppressions = await loadSuppressions(client, eventId, query, accumulator.emails());
+  const suppressions = await loadSuppressions(prisma, eventId, query, accumulator.emails());
   return { query, queryHash: audienceQueryHash(query), result: accumulator.finalize(suppressions) };
 }
 
@@ -416,7 +421,7 @@ export async function createAudienceSnapshot(
 ): Promise<AudienceSnapshotRecord> {
   const input = audienceSnapshotInputSchema.parse(rawInput);
   const prisma = getPrisma();
-  const { query, queryHash, result } = await evaluateEventAudience(eventId, permissions, input.query, options, prisma);
+  const { query, queryHash, result } = await evaluateEventAudience(eventId, permissions, input.query, options);
 
   const reuseError = () => new MessagingError(
     "IDEMPOTENCY_KEY_REUSED",

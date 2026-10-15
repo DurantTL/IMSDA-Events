@@ -81,17 +81,17 @@ describe("audience builder route", () => {
   });
 
   it("passes the caller's effective permissions, not the request, to the evaluator", async () => {
-    const response = await POST(post({ mode: "preview", query: { tagIds: ["t1"] }, permissions: ["VIEW_SENSITIVE_DATA"] }), context);
+    const response = await POST(post({ mode: "preview", query: { search: "tag=t1" }, permissions: ["VIEW_SENSITIVE_DATA"] }), context);
     // An injected permissions field is a validation error, never trusted.
     expect(response.status).toBe(400);
-    const ok = await POST(post({ mode: "preview", query: { tagIds: ["t1"] } }), context);
+    const ok = await POST(post({ mode: "preview", query: { search: "tag=t1" } }), context);
     expect(ok.status).toBe(200);
-    expect(mocks.previewEventAudience).toHaveBeenCalledWith("event-1", ["VIEW_EVENT", "MANAGE_COMMUNICATIONS"], expect.objectContaining({ query: { tagIds: ["t1"] } }));
+    expect(mocks.previewEventAudience).toHaveBeenCalledWith("event-1", ["VIEW_EVENT", "MANAGE_COMMUNICATIONS"], expect.objectContaining({ query: { search: "tag=t1" } }));
   });
 
   it("answers an unavailable filter with one fixed 403 that reveals no value or count", async () => {
     mocks.previewEventAudience.mockRejectedValue(new AudienceFilterNotAvailableError());
-    const response = await POST(post({ mode: "preview", query: { tagIds: ["secret-tag"] } }), context);
+    const response = await POST(post({ mode: "preview", query: { search: "tag=secret-tag" } }), context);
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body).toEqual({ error: "AUDIENCE_FILTER_NOT_AVAILABLE", message: "One of the audience filters is not available to you for this event." });

@@ -1,21 +1,42 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { EventPermission } from "@/modules/access/permissions";
+import {
+  FILTER_KEYS,
+  availableOperationsFilters,
+  emptyOperationsSearchQuery,
+  parseOperationsSearchParams,
+  serializeOperationsSearchQuery,
+  type OperationsSearchQuery,
+  type SearchCatalog,
+  type SearchFilterDescriptor,
+  type SearchViewer,
+} from "@/modules/registrations/operations-search-domain";
 
 /**
  * The query contract of the reviewed event audience builder (#176), the pure half.
  *
  * A query says who an event message would reach. It is preview-only data: nothing here sends, schedules or queues a
- * message, and the query holds no address, name or note, only closed vocabularies and configured tag identifiers.
+ * message, and the query holds no address, name or note.
  *
- * Every filter is a named dimension with the permission and the event domain it needs. A dimension a user may not
- * use, or whose domain the event does not have, is refused with one generic answer that names no value and no count,
- * so a refusal teaches nothing about what the event holds. The query is normalized (sorted, de-duplicated, defaults
- * filled in) before it is hashed, so equal questions always produce equal hashes and fingerprints.
+ * WHICH REGISTRATIONS is not decided here. It is the operations search (#180): the query carries `search`, the canonical
+ * URL-safe operations-search query string, and the repository runs it through that service, so the audience builder and
+ * the staff lists share one definition of "who matches", one set of filter keys, one permission model per domain and one
+ * rule for what can never be searched (note bodies, consent evidence, health and sensitive answers, event membership).
+ * This module adds only what is specific to a message: who on a matched registration is written to (roles), the kind of
+ * message (which opt-outs apply), and one normalized readiness status.
+ *
+ * A filter the viewer may not use, or whose domain the event lacks, is refused with one generic answer that names no
+ * value and no count, so a refusal teaches nothing about what the event holds. The query is normalized (the search
+ * re-serialized to its canonical form with paging and sort reset, defaults filled in) before it is hashed, so equal
+ * questions always produce equal hashes and fingerprints.
  */
 
-/** Bump when the meaning of a query, or how an audience is evaluated from it, changes. Stored on every snapshot. */
-export const AUDIENCE_QUERY_VERSION = "audience-query/1";
+/**
+ * Bump when the meaning of a query, or how an audience is evaluated from it, changes. Stored on every snapshot.
+ * v2 (#180): registration selection is the operations search, carried as its canonical query string.
+ */
+export const AUDIENCE_QUERY_VERSION = "audience-query/2";
 
 export const AUDIENCE_ROLES = [
   "REGISTRATION_CONTACT",
@@ -40,21 +61,14 @@ export const AUDIENCE_ROLE_PRIORITY: Record<AudienceRole, number> = {
   ATTENDEE: 3,
 };
 
-/** DRAFT is never an audience: a draft is not yet a registrant. */
-export const AUDIENCE_LIFECYCLES = ["SUBMITTED", "CONFIRMED", "WAITLISTED", "CANCELLED"] as const;
-export type AudienceLifecycle = (typeof AUDIENCE_LIFECYCLES)[number];
-export const DEFAULT_AUDIENCE_LIFECYCLES: readonly AudienceLifecycle[] = ["SUBMITTED", "CONFIRMED"];
-
-export const AUDIENCE_BALANCE_STATES = ["BALANCE_DUE", "PAID_IN_FULL", "NO_CHARGE", "ORGANIZATION_BILLED"] as const;
-export type AudienceBalanceState = (typeof AUDIENCE_BALANCE_STATES)[number];
-
-export const AUDIENCE_CHECK_IN_STATES = ["CHECKED_IN", "PARTIALLY_CHECKED_IN", "NOT_CHECKED_IN"] as const;
-export type AudienceCheckInState = (typeof AUDIENCE_CHECK_IN_STATES)[number];
+/** DRAFT is never an audience: a draft is not yet a registrant. No lifecycle chosen means these. */
+export const DEFAULT_AUDIENCE_LIFECYCLES = ["SUBMITTED", "CONFIRMED"] as const;
 
 /**
  * Approved normalized actionable statuses only. A readiness value says that something needs doing, derived from
  * whether data exists, never from what the data says. Medical, screening, consent evidence and notes can never be
- * a value here.
+ * a value here. The operations search has no such filter, so this is the one audience-specific narrowing; it is applied
+ * to registrations the search already selected and can only remove, never add.
  */
 export const AUDIENCE_READINESS_STATES = ["ATTENDEE_RESPONSES_INCOMPLETE"] as const;
 export type AudienceReadinessState = (typeof AUDIENCE_READINESS_STATES)[number];
@@ -66,38 +80,12 @@ export type AudienceMessageKind = (typeof AUDIENCE_MESSAGE_KINDS)[number];
 export const AUDIENCE_DOMAINS = ["REGISTRATION", "GROUPS", "ORGANIZATIONS"] as const;
 export type AudienceDomain = (typeof AUDIENCE_DOMAINS)[number];
 
-export const AUDIENCE_DIMENSIONS = [
-  "roles",
-  "lifecycles",
-  "attendeeTypes",
-  "tagIds",
-  "balanceStates",
-  "checkInStates",
-  "readinessStates",
-] as const;
+/** Reason dimensions: the operations-search filter keys, the recipient role, and readiness. */
+export const AUDIENCE_DIMENSIONS = ["roles", ...FILTER_KEYS, "readiness"] as const;
 export type AudienceDimension = (typeof AUDIENCE_DIMENSIONS)[number];
 
-type DimensionRule = {
-  label: string;
-  domain: AudienceDomain;
-  /** Held in addition to MANAGE_COMMUNICATIONS, which the whole builder needs. null means nothing more. */
-  permission: EventPermission | null;
-};
-
-/**
- * Who may use which dimension. Tags are read through VIEW_SENSITIVE_DATA everywhere else (registration tag reads), so
- * the builder does not become a way round that. Check-in state needs the check-in permission, and readiness needs
- * registration management, for the same reason.
- */
-export const AUDIENCE_DIMENSION_RULES: Record<AudienceDimension, DimensionRule> = {
-  roles: { label: "Recipient roles", domain: "REGISTRATION", permission: null },
-  lifecycles: { label: "Registration lifecycle", domain: "REGISTRATION", permission: null },
-  attendeeTypes: { label: "Attendee type", domain: "REGISTRATION", permission: null },
-  tagIds: { label: "Tags", domain: "REGISTRATION", permission: "VIEW_SENSITIVE_DATA" },
-  balanceStates: { label: "Balance state", domain: "REGISTRATION", permission: null },
-  checkInStates: { label: "Check-in status", domain: "REGISTRATION", permission: "MANAGE_CHECK_IN" },
-  readinessStates: { label: "Readiness", domain: "REGISTRATION", permission: "MANAGE_REGISTRATION" },
-};
+/** Held in addition to MANAGE_COMMUNICATIONS, which the whole builder needs, to use the readiness narrowing. */
+export const READINESS_PERMISSION: EventPermission = "MANAGE_REGISTRATION";
 
 /** A role is itself gated by its domain: group and organization contacts exist only on events that have them. */
 export const AUDIENCE_ROLE_DOMAINS: Record<AudienceRole, AudienceDomain> = {
@@ -107,18 +95,15 @@ export const AUDIENCE_ROLE_DOMAINS: Record<AudienceRole, AudienceDomain> = {
   ORGANIZATION_CONTACT: "ORGANIZATIONS",
 };
 
-const identifier = z.string().trim().min(1).max(64);
-const attendeeTypeValue = z.string().trim().min(1).max(64);
-
 /** Strict: an unknown key (a note, medical or consent field, say) is a validation error, not a quiet no-op. */
 export const audienceQuerySchema = z.strictObject({
   messageKind: z.enum(AUDIENCE_MESSAGE_KINDS).default("ANNOUNCEMENT"),
   roles: z.array(z.enum(AUDIENCE_ROLES)).max(AUDIENCE_ROLES.length).default(["REGISTRATION_CONTACT"]),
-  lifecycles: z.array(z.enum(AUDIENCE_LIFECYCLES)).max(AUDIENCE_LIFECYCLES.length).optional(),
-  attendeeTypes: z.array(attendeeTypeValue).max(25).optional(),
-  tagIds: z.array(identifier).max(25).optional(),
-  balanceStates: z.array(z.enum(AUDIENCE_BALANCE_STATES)).max(AUDIENCE_BALANCE_STATES.length).optional(),
-  checkInStates: z.array(z.enum(AUDIENCE_CHECK_IN_STATES)).max(AUDIENCE_CHECK_IN_STATES.length).optional(),
+  /**
+   * The operations-search query string (the URL form the staff lists use, for example `status=CONFIRMED&tag=abc`).
+   * Sort, page and size are presentation and are ignored. An empty string selects the default lifecycles.
+   */
+  search: z.string().max(4_000).default(""),
   readinessStates: z.array(z.enum(AUDIENCE_READINESS_STATES)).max(AUDIENCE_READINESS_STATES.length).optional(),
 });
 
@@ -127,11 +112,8 @@ export type AudienceQueryInput = z.input<typeof audienceQuerySchema>;
 export type NormalizedAudienceQuery = {
   messageKind: AudienceMessageKind;
   roles: AudienceRole[];
-  lifecycles: AudienceLifecycle[];
-  attendeeTypes: string[];
-  tagIds: string[];
-  balanceStates: AudienceBalanceState[];
-  checkInStates: AudienceCheckInState[];
+  /** Canonical operations-search query string: sorted, de-duplicated, defaults filled in, sort and paging reset. */
+  search: string;
   readinessStates: AudienceReadinessState[];
 };
 
@@ -139,19 +121,42 @@ function sortedUnique<T extends string>(values: readonly T[] | undefined): T[] {
   return [...new Set(values ?? [])].sort();
 }
 
-/** An empty list means "this dimension is not filtered", for every dimension but roles and lifecycles (defaulted). */
+export class AudienceFilterNotAvailableError extends Error {
+  readonly code = "AUDIENCE_FILTER_NOT_AVAILABLE";
+  constructor() {
+    // One fixed message: it never names the dimension, a value, or a count.
+    super("One of the audience filters is not available to you for this event.");
+    this.name = "AudienceFilterNotAvailableError";
+  }
+}
+
+/**
+ * The operations-search query an audience query runs. The search is re-read from its canonical string, so the audience
+ * always evaluates the form that was hashed. A normalized query always parses without issues.
+ */
+export function audienceSearchQuery(query: Pick<NormalizedAudienceQuery, "search">): OperationsSearchQuery {
+  return parseOperationsSearchParams(new URLSearchParams(query.search)).query;
+}
+
+/** An empty list means "this dimension is not filtered", for every dimension but roles (defaulted) and lifecycle (see below). */
 export function normalizeAudienceQuery(input: unknown): NormalizedAudienceQuery {
   const parsed = audienceQuerySchema.parse(input);
   const roles = sortedUnique(parsed.roles);
-  const lifecycles = sortedUnique(parsed.lifecycles ?? DEFAULT_AUDIENCE_LIFECYCLES);
+  const { query: search, issues } = parseOperationsSearchParams(new URLSearchParams(parsed.search));
+  // A malformed search is refused like an unavailable one: nothing is half-read.
+  if (issues.length > 0) throw new AudienceFilterNotAvailableError();
+  // A draft is never an audience, and no lifecycle chosen means the registrants who are still coming.
+  if ((search.status as string[]).includes("DRAFT")) throw new AudienceFilterNotAvailableError();
+  if (search.status.length === 0) search.status = [...DEFAULT_AUDIENCE_LIFECYCLES];
+  const presentation = emptyOperationsSearchQuery();
+  search.sort = presentation.sort;
+  search.direction = presentation.direction;
+  search.page = presentation.page;
+  search.pageSize = presentation.pageSize;
   return {
     messageKind: parsed.messageKind,
     roles: roles.length ? roles : ["REGISTRATION_CONTACT"],
-    lifecycles: lifecycles.length ? lifecycles : [...DEFAULT_AUDIENCE_LIFECYCLES],
-    attendeeTypes: sortedUnique(parsed.attendeeTypes),
-    tagIds: sortedUnique(parsed.tagIds),
-    balanceStates: sortedUnique(parsed.balanceStates),
-    checkInStates: sortedUnique(parsed.checkInStates),
+    search: serializeOperationsSearchQuery(search),
     readinessStates: sortedUnique(parsed.readinessStates),
   };
 }
@@ -167,98 +172,62 @@ export type AudienceCapabilities = {
   domains: ReadonlySet<AudienceDomain>;
 };
 
-export function dimensionAvailable(dimension: AudienceDimension, capabilities: AudienceCapabilities) {
-  const rule = AUDIENCE_DIMENSION_RULES[dimension];
-  if (!capabilities.domains.has(rule.domain)) return false;
-  return rule.permission === null || capabilities.permissions.has(rule.permission);
-}
-
 export function roleAvailable(role: AudienceRole, capabilities: AudienceCapabilities) {
   return capabilities.domains.has(AUDIENCE_ROLE_DOMAINS[role]);
 }
 
-/** Which dimensions a normalized query actually narrows on (a non-empty list; roles and lifecycles always count). */
-export function dimensionsInUse(query: NormalizedAudienceQuery): AudienceDimension[] {
-  return AUDIENCE_DIMENSIONS.filter((dimension) => (
-    dimension === "roles" || dimension === "lifecycles" || query[dimension].length > 0
-  ));
-}
-
-export class AudienceFilterNotAvailableError extends Error {
-  readonly code = "AUDIENCE_FILTER_NOT_AVAILABLE";
-  constructor() {
-    // One fixed message: it never names the dimension, a value, or a count.
-    super("One of the audience filters is not available to you for this event.");
-    this.name = "AudienceFilterNotAvailableError";
-  }
+export function readinessAvailable(capabilities: AudienceCapabilities) {
+  return capabilities.permissions.has(READINESS_PERMISSION);
 }
 
 /**
- * Refuses any filter the caller may not use. The refusal is identical whether the filter is forbidden by permission,
- * belongs to a domain the event lacks, or names a value that does not exist, so it reveals nothing about the event.
+ * Refuses what the caller may not use in the audience-specific part of a query: a role whose domain the event lacks, or
+ * the readiness narrowing without its permission. The search filters are decided by the operations search itself (its
+ * `resolveOperationsSearch`), which the repository runs before anything is read. Every refusal is the same fixed error.
  */
 export function assertQueryAvailable(query: NormalizedAudienceQuery, capabilities: AudienceCapabilities) {
-  for (const dimension of dimensionsInUse(query)) {
-    if (!dimensionAvailable(dimension, capabilities)) throw new AudienceFilterNotAvailableError();
-  }
   for (const role of query.roles) {
     if (!roleAvailable(role, capabilities)) throw new AudienceFilterNotAvailableError();
   }
+  if (query.readinessStates.length > 0 && !readinessAvailable(capabilities)) throw new AudienceFilterNotAvailableError();
 }
 
-export type AvailableAudienceFilter = {
-  dimension: AudienceDimension;
-  label: string;
-  values: Array<{ value: string; label: string }>;
+/** The viewer the operations search sees: the caller's own permissions for this one event. */
+export function searchViewerFor(eventId: string, permissions: readonly string[]): SearchViewer {
+  return { eventId, permissions: permissions as readonly EventPermission[] };
+}
+
+export type AvailableAudienceFilters = {
+  roles: Array<{ role: AudienceRole; label: string }>;
+  /** The operations-search filter descriptors this caller may use on this event, minus the one value an audience never takes (DRAFT). */
+  search: SearchFilterDescriptor[];
+  readiness: Array<{ value: AudienceReadinessState; label: string }>;
 };
 
-const LIFECYCLE_LABELS: Record<AudienceLifecycle, string> = {
-  SUBMITTED: "Submitted",
-  CONFIRMED: "Confirmed",
-  WAITLISTED: "Waitlisted",
-  CANCELLED: "Cancelled",
-};
-const BALANCE_LABELS: Record<AudienceBalanceState, string> = {
-  BALANCE_DUE: "Balance due",
-  PAID_IN_FULL: "Paid in full",
-  NO_CHARGE: "No charge",
-  ORGANIZATION_BILLED: "Billed to the organization",
-};
-const CHECK_IN_LABELS: Record<AudienceCheckInState, string> = {
-  CHECKED_IN: "Everyone checked in",
-  PARTIALLY_CHECKED_IN: "Some checked in",
-  NOT_CHECKED_IN: "No one checked in",
-};
 const READINESS_LABELS: Record<AudienceReadinessState, string> = {
   ATTENDEE_RESPONSES_INCOMPLETE: "Attendee responses incomplete",
 };
 
 /**
- * The filters this caller may compose, with their values. A dimension that is unavailable is absent, not empty: the
- * list never says that something exists behind a permission. Tag and attendee-type values are supplied by the
- * server's own lookups and are only offered when their dimension is available.
+ * The filters this caller may compose. They are exactly `availableOperationsFilters` (the one list the staff lists
+ * render), so a filter the viewer may not use is absent, not empty: the list never says something exists behind a
+ * permission. The audience adds its roles (only those whose domain the event has) and readiness (only with its permission).
  */
 export function describeAvailableFilters(
+  viewer: SearchViewer,
+  catalog: SearchCatalog,
   capabilities: AudienceCapabilities,
-  options: {
-    tags: ReadonlyArray<{ id: string; name: string }>;
-    attendeeTypes: readonly string[];
-  },
-): { roles: Array<{ role: AudienceRole; label: string }>; filters: AvailableAudienceFilter[] } {
-  const roles = AUDIENCE_ROLES.filter((role) => roleAvailable(role, capabilities)).map((role) => ({
-    role,
-    label: AUDIENCE_ROLE_LABELS[role],
-  }));
-  const filters: AvailableAudienceFilter[] = [];
-  const add = (dimension: AudienceDimension, values: Array<{ value: string; label: string }>) => {
-    if (!dimensionAvailable(dimension, capabilities) || dimension === "roles") return;
-    filters.push({ dimension, label: AUDIENCE_DIMENSION_RULES[dimension].label, values });
+): AvailableAudienceFilters {
+  const search = availableOperationsFilters(viewer, catalog).map((filter): SearchFilterDescriptor => (
+    filter.key === "status"
+      ? { ...filter, options: filter.options.filter((option) => option.value !== "DRAFT") }
+      : filter
+  ));
+  return {
+    roles: AUDIENCE_ROLES.filter((role) => roleAvailable(role, capabilities)).map((role) => ({ role, label: AUDIENCE_ROLE_LABELS[role] })),
+    search,
+    readiness: readinessAvailable(capabilities)
+      ? AUDIENCE_READINESS_STATES.map((value) => ({ value, label: READINESS_LABELS[value] }))
+      : [],
   };
-  add("lifecycles", AUDIENCE_LIFECYCLES.map((value) => ({ value, label: LIFECYCLE_LABELS[value] })));
-  add("attendeeTypes", options.attendeeTypes.map((value) => ({ value, label: value })));
-  add("tagIds", options.tags.map((tag) => ({ value: tag.id, label: tag.name })));
-  add("balanceStates", AUDIENCE_BALANCE_STATES.map((value) => ({ value, label: BALANCE_LABELS[value] })));
-  add("checkInStates", AUDIENCE_CHECK_IN_STATES.map((value) => ({ value, label: CHECK_IN_LABELS[value] })));
-  add("readinessStates", AUDIENCE_READINESS_STATES.map((value) => ({ value, label: READINESS_LABELS[value] })));
-  return { roles, filters };
 }

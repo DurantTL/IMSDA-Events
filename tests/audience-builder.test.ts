@@ -4,6 +4,7 @@ import {
   AudienceFilterNotAvailableError,
   assertQueryAvailable,
   audienceQueryHash,
+  audienceSearchQuery,
   describeAvailableFilters,
   normalizeAudienceQuery,
   type AudienceCapabilities,
@@ -11,12 +12,28 @@ import {
 } from "@/modules/communications/audience-query";
 import {
   AudienceAccumulator,
+  buildSearchReasons,
   pageAudienceList,
+  type AudienceEvaluationContext,
   type AudienceRegistrationRow,
   type AudienceSuppressionCode,
 } from "@/modules/communications/audience-resolve";
+import {
+  availableOperationsFilters,
+  emptySearchCatalog,
+  parseOperationsSearchParams,
+  resolveOperationsSearch,
+  type SearchCatalog,
+  type SearchViewer,
+} from "@/modules/registrations/operations-search-domain";
 
-const context = { isOrganizationBilled: false, tagNames: new Map([["tag-vip", "VIP"]]) };
+const baseContext: AudienceEvaluationContext = {
+  isOrganizationBilled: false,
+  tagNames: new Map([["tag-vip", "VIP"]]),
+  attendeeTypeLabels: new Map([["YOUTH", "Youth"]]),
+  selection: { attendeeTypes: [], tagIds: [] },
+  searchReasons: [],
+};
 
 function row(overrides: Partial<AudienceRegistrationRow> & { registrationId: string }): AudienceRegistrationRow {
   return {
@@ -40,16 +57,25 @@ function attendee(id: string, extra: Partial<AudienceRegistrationRow["attendees"
     attendeeType: "ADULT",
     name: `Attendee ${id}`,
     email: `${id}@example.test`,
-    checkedIn: false,
     hasResponses: true,
     tagIds: [] as string[],
     ...extra,
   };
 }
 
-function run(rows: AudienceRegistrationRow[], input: unknown, suppressions = new Map<string, AudienceSuppressionCode>()) {
+function run(
+  rows: AudienceRegistrationRow[],
+  input: unknown,
+  suppressions = new Map<string, AudienceSuppressionCode>(),
+  context: Partial<AudienceEvaluationContext> = {},
+) {
   const query = normalizeAudienceQuery(input);
-  const accumulator = new AudienceAccumulator(query, context, "evt");
+  const search = audienceSearchQuery(query);
+  const accumulator = new AudienceAccumulator(query, {
+    ...baseContext,
+    selection: { attendeeTypes: search.attendeeType, tagIds: search.tag },
+    ...context,
+  }, "evt");
   for (const item of rows) accumulator.consider(item);
   return accumulator.finalize(suppressions);
 }
@@ -59,56 +85,105 @@ const caps = (permissions: string[], domains: AudienceDomain[] = ["REGISTRATION"
   domains: new Set(domains),
 });
 
+const catalog: SearchCatalog = {
+  ...emptySearchCatalog(),
+  attendeeTypes: [{ code: "ADULT", label: "Adult" }, { code: "YOUTH", label: "Youth" }],
+  tags: [{ id: "tag-vip", name: "VIP", isActive: true }],
+};
+const viewer = (permissions: SearchViewer["permissions"]): SearchViewer => ({ eventId: "evt", permissions });
+
 describe("audience query contract", () => {
-  it("normalizes to one canonical form and a stable hash", () => {
-    const a = normalizeAudienceQuery({ roles: ["ATTENDEE", "REGISTRATION_CONTACT"], tagIds: ["b", "a", "a"] });
-    const b = normalizeAudienceQuery({ tagIds: ["a", "b"], roles: ["REGISTRATION_CONTACT", "ATTENDEE"], lifecycles: ["CONFIRMED", "SUBMITTED"] });
+  it("is audience-query/2 and normalizes to one canonical form and a stable hash", () => {
+    const a = normalizeAudienceQuery({ roles: ["ATTENDEE", "REGISTRATION_CONTACT"], search: "tag=b,a,a&status=CONFIRMED,SUBMITTED" });
+    const b = normalizeAudienceQuery({ search: "status=SUBMITTED,CONFIRMED&tag=a,b", roles: ["REGISTRATION_CONTACT", "ATTENDEE"] });
     expect(a).toEqual(b);
+    expect(a.search).toBe("status=SUBMITTED%2CCONFIRMED&tag=a%2Cb");
     expect(audienceQueryHash(a)).toBe(audienceQueryHash(b));
     expect(audienceQueryHash(a)).toMatch(/^[0-9a-f]{64}$/);
-    expect(AUDIENCE_QUERY_VERSION).toBe("audience-query/1");
+    expect(AUDIENCE_QUERY_VERSION).toBe("audience-query/2");
+  });
+
+  it("carries the operations search in its canonical URL-safe form, which reads back to the same search", () => {
+    const query = normalizeAudienceQuery({ search: "payment=PARTIAL,UNPAID&checkIn=NONE&answer=ATTENDEE:meal=vegan" });
+    expect(parseOperationsSearchParams(new URLSearchParams(query.search)).issues).toEqual([]);
+    expect(normalizeAudienceQuery({ search: query.search }).search).toBe(query.search);
+    expect(audienceSearchQuery(query).payment).toEqual(["UNPAID", "PARTIAL"]);
+  });
+
+  it("defaults the lifecycle to submitted and confirmed, and ignores sort and paging", () => {
+    expect(audienceSearchQuery(normalizeAudienceQuery({})).status).toEqual(["SUBMITTED", "CONFIRMED"]);
+    const sorted = normalizeAudienceQuery({ search: "sort=name&page=7&size=10&status=CANCELLED" });
+    expect(sorted.search).toBe("status=CANCELLED");
+    expect(audienceSearchQuery(sorted).status).toEqual(["CANCELLED"]);
   });
 
   it("rejects unknown keys, so a protected field can never be a filter", () => {
-    for (const key of ["noteContains", "medicalFlag", "consentEvidence", "screeningStatus", "privateEventMembers", "allergies"]) {
+    for (const key of ["noteContains", "medicalFlag", "consentEvidence", "screeningStatus", "privateEventMembers", "allergies", "tagIds", "balanceStates"]) {
       expect(() => normalizeAudienceQuery({ [key]: ["x"] })).toThrow();
     }
-    expect(() => normalizeAudienceQuery({ lifecycles: ["DRAFT"] })).toThrow();
   });
 
-  it("refuses a dimension the caller may not use with one fixed message that names nothing", () => {
-    const query = normalizeAudienceQuery({ tagIds: ["tag-secret-name"], checkInStates: ["CHECKED_IN"] });
+  it("refuses a draft audience and a malformed search with the one fixed answer", () => {
+    for (const search of ["status=DRAFT", "status=CONFIRMED,DRAFT", "payment=MAYBE", "answer=nonsense", "checkIn=SOME", "tag=bad%20id"]) {
+      expect(() => normalizeAudienceQuery({ search }), search).toThrow(AudienceFilterNotAvailableError);
+    }
+    // An unknown parameter is not a filter and changes nothing.
+    expect(normalizeAudienceQuery({ search: "notAFilter=1" }).search).toBe("status=SUBMITTED%2CCONFIRMED");
+  });
+
+  it("an attendee's health or sensitive answer has no way into the search string", () => {
+    // The search owns its filter keys: there is none for notes, consent, health or membership.
+    for (const search of ["note=x", "health=x", "consent=x", "membership=x", "allergy=peanut"]) {
+      expect(normalizeAudienceQuery({ search }).search).toBe("status=SUBMITTED%2CCONFIRMED");
+    }
+  });
+
+  it("refuses a role whose domain the event lacks, and readiness without its permission, with one fixed message", () => {
+    const group = normalizeAudienceQuery({ roles: ["GROUP_LEADER"] });
+    expect(() => assertQueryAvailable(group, caps([]))).toThrow(AudienceFilterNotAvailableError);
+    expect(() => assertQueryAvailable(group, caps([], ["REGISTRATION", "GROUPS"]))).not.toThrow();
+    const readiness = normalizeAudienceQuery({ readinessStates: ["ATTENDEE_RESPONSES_INCOMPLETE"] });
     let failure: unknown;
     try {
-      assertQueryAvailable(query, caps(["MANAGE_COMMUNICATIONS"]));
+      assertQueryAvailable(readiness, caps(["MANAGE_COMMUNICATIONS"]));
     } catch (error) {
       failure = error;
     }
     expect(failure).toBeInstanceOf(AudienceFilterNotAvailableError);
-    const message = (failure as Error).message;
-    expect(message).not.toMatch(/tag|secret|check|CHECKED/i);
-    expect(() => assertQueryAvailable(query, caps(["VIEW_SENSITIVE_DATA", "MANAGE_CHECK_IN"]))).not.toThrow();
+    expect((failure as Error).message).not.toMatch(/readiness|responses|incomplete/i);
+    expect(() => assertQueryAvailable(readiness, caps(["MANAGE_REGISTRATION"]))).not.toThrow();
   });
 
-  it("refuses a role whose domain the event lacks, identically", () => {
-    const query = normalizeAudienceQuery({ roles: ["GROUP_LEADER"] });
-    expect(() => assertQueryAvailable(query, caps([]))).toThrow(AudienceFilterNotAvailableError);
-    expect(() => assertQueryAvailable(query, caps([], ["REGISTRATION", "GROUPS"]))).not.toThrow();
+  it("a search filter the viewer may not use is refused by the operations search, identically to one the event lacks", () => {
+    const comms = viewer(["VIEW_EVENT", "MANAGE_COMMUNICATIONS"]);
+    const refusals = ["tag=tag-vip", "payment=UNPAID", "checkIn=ANY", "organization=org-1", "q=pat", "answer=ATTENDEE:meal=vegan"].map((search) => {
+      const query = audienceSearchQuery(normalizeAudienceQuery({ search }));
+      return resolveOperationsSearch(query, comms, catalog);
+    });
+    for (const resolved of refusals) {
+      expect(resolved.ok).toBe(false);
+      if (!resolved.ok) expect(resolved.issues.map((issue) => issue.code)).toEqual(["unavailable"]);
+    }
+    const lifecycle = resolveOperationsSearch(audienceSearchQuery(normalizeAudienceQuery({ search: "attendeeType=YOUTH" })), comms, catalog);
+    expect(lifecycle.ok).toBe(true);
   });
 
-  it("offers only available dimensions, with no value for a forbidden one", () => {
-    const options = { tags: [{ id: "tag-vip", name: "VIP" }], attendeeTypes: ["ADULT"] };
-    const limited = describeAvailableFilters(caps(["MANAGE_COMMUNICATIONS"]), options);
-    const dimensions = limited.filters.map((filter) => filter.dimension);
-    expect(dimensions).toEqual(["lifecycles", "attendeeTypes", "balanceStates"]);
+  it("offers only the filters the operations search offers this viewer, never DRAFT, and no value of a forbidden one", () => {
+    const comms = viewer(["VIEW_EVENT", "MANAGE_COMMUNICATIONS"]);
+    const limited = describeAvailableFilters(comms, catalog, caps(["VIEW_EVENT", "MANAGE_COMMUNICATIONS"]));
+    expect(limited.search).toEqual(availableOperationsFilters(comms, catalog).map((filter) => (
+      filter.key === "status" ? { ...filter, options: filter.options.filter((option) => option.value !== "DRAFT") } : filter
+    )));
+    expect(limited.search.map((filter) => filter.key)).not.toContain("tag");
     expect(JSON.stringify(limited)).not.toContain("VIP");
+    expect(JSON.stringify(limited)).not.toContain("DRAFT");
     expect(limited.roles.map((role) => role.role)).toEqual(["REGISTRATION_CONTACT", "ATTENDEE"]);
-    const full = describeAvailableFilters(
-      caps(["VIEW_SENSITIVE_DATA", "MANAGE_CHECK_IN", "MANAGE_REGISTRATION"], ["REGISTRATION", "GROUPS", "ORGANIZATIONS"]),
-      options,
-    );
-    expect(full.filters.map((filter) => filter.dimension)).toContain("tagIds");
+    expect(limited.readiness).toEqual([]);
+    const adminPermissions = ["VIEW_EVENT", "VIEW_SENSITIVE_DATA", "MANAGE_REGISTRATION", "MANAGE_FINANCE", "MANAGE_CHECK_IN"] as const;
+    const full = describeAvailableFilters(viewer(adminPermissions), catalog, caps([...adminPermissions], ["REGISTRATION", "GROUPS", "ORGANIZATIONS"]));
+    expect(full.search.map((filter) => filter.key)).toContain("tag");
     expect(full.roles).toHaveLength(4);
+    expect(full.readiness).toHaveLength(1);
   });
 });
 
@@ -185,20 +260,37 @@ describe("audience resolution", () => {
     expect(result.counts.consideredRegistrationCount).toBe(5);
   });
 
-  it("qualifies only by the supported normalized dimensions, each with its reason", () => {
-    const rows = [
-      row({ registrationId: "r1", totalCents: 5000, netPaidCents: 0, tagIds: ["tag-vip"], attendees: [attendee("a1", { checkedIn: true })] }),
-      row({ registrationId: "r2", totalCents: 5000, netPaidCents: 5000, attendees: [attendee("a2")] }),
-      row({ registrationId: "r3", status: "CANCELLED", totalCents: 5000, netPaidCents: 0 }),
-    ];
-    const due = run(rows, { balanceStates: ["BALANCE_DUE"] });
-    expect(due.recipients.map((recipient) => recipient.registrations[0]!.registrationId)).toEqual(["r1"]);
-    expect(due.recipients[0]!.reasons.map((reason) => `${reason.dimension}:${reason.value}`)).toEqual([
-      "balanceStates:BALANCE_DUE", "lifecycles:CONFIRMED", "roles:REGISTRATION_CONTACT",
+  it("says which search rule qualified each recipient, in the viewer's own words", () => {
+    const search = audienceSearchQuery(normalizeAudienceQuery({ search: "payment=UNPAID,PARTIAL&checkIn=NONE&tag=tag-vip&attendeeType=YOUTH" }));
+    const reasons = buildSearchReasons(search, { ...catalog, tags: [{ id: "tag-vip", name: "VIP", isActive: true }] });
+    expect(reasons.map((reason) => `${reason.dimension}:${reason.value}`)).toEqual(["payment:UNPAID,PARTIAL", "checkIn:NONE"]);
+    const result = run(
+      [row({ registrationId: "r1", tagIds: ["tag-vip"], attendees: [attendee("a1", { attendeeType: "YOUTH" })] })],
+      { search: "payment=UNPAID,PARTIAL&checkIn=NONE&tag=tag-vip&attendeeType=YOUTH" },
+      undefined,
+      { searchReasons: reasons },
+    );
+    expect(result.recipients[0]!.reasons.map((reason) => `${reason.dimension}:${reason.value}`)).toEqual([
+      "attendeeType:YOUTH", "checkIn:NONE", "payment:UNPAID,PARTIAL", "roles:REGISTRATION_CONTACT", "status:CONFIRMED", "tag:tag-vip",
     ]);
-    expect(run(rows, { tagIds: ["tag-vip"] }).counts.recipientCount).toBe(1);
-    expect(run(rows, { checkInStates: ["NOT_CHECKED_IN"] }).recipients.map((recipient) => recipient.registrations[0]!.registrationId)).toEqual(["r2"]);
-    expect(run(rows, { lifecycles: ["CANCELLED"] }).counts.recipientCount).toBe(1);
+    expect(result.recipients[0]!.reasons.find((reason) => reason.dimension === "tag")!.label).toBe("Tag VIP");
+  });
+
+  it("with the attendee role, only attendees of the searched type, or tagged, are written to", () => {
+    const rows = [row({
+      registrationId: "r1",
+      attendees: [attendee("adult", { attendeeType: "ADULT" }), attendee("youth", { attendeeType: "YOUTH" })],
+    })];
+    const youth = run(rows, { roles: ["ATTENDEE"], search: "attendeeType=YOUTH" });
+    expect(youth.recipients.map((recipient) => recipient.email)).toEqual(["youth@example.test"]);
+    const tagged = run([row({
+      registrationId: "r2",
+      attendees: [attendee("t1", { tagIds: ["tag-vip"] }), attendee("t2")],
+    })], { roles: ["ATTENDEE"], search: "tag=tag-vip" });
+    // The tag is on one attendee, so the registration matched; only that attendee qualifies.
+    expect(tagged.recipients.map((recipient) => recipient.email)).toEqual(["t1@example.test"]);
+    const registrationTag = run([row({ registrationId: "r3", tagIds: ["tag-vip"], attendees: [attendee("t3"), attendee("t4")] })], { roles: ["ATTENDEE"], search: "tag=tag-vip" });
+    expect(registrationTag.counts.recipientCount).toBe(2);
   });
 
   it("readiness is only the normalized status, never what a response says", () => {
@@ -208,6 +300,7 @@ describe("audience resolution", () => {
     ];
     const result = run(rows, { readinessStates: ["ATTENDEE_RESPONSES_INCOMPLETE"] });
     expect(result.recipients.map((recipient) => recipient.registrations[0]!.registrationId)).toEqual(["r1"]);
+    expect(result.recipients[0]!.reasons.map((reason) => reason.dimension)).toContain("readiness");
   });
 
   it("restricted notes, medical and consent data have no way in: rows carry none and the output holds none", () => {
@@ -226,11 +319,12 @@ describe("audience resolution", () => {
     }
   });
 
-  it("an organization-billed event never reports a balance due", () => {
-    const query = normalizeAudienceQuery({ balanceStates: ["BALANCE_DUE"] });
-    const billed = new AudienceAccumulator(query, { ...context, isOrganizationBilled: true }, "evt");
+  it("a registration's balance is its own, and zero on an organization-billed event", () => {
+    const query = normalizeAudienceQuery({});
+    const billed = new AudienceAccumulator(query, { ...baseContext, isOrganizationBilled: true }, "evt");
     billed.consider(row({ registrationId: "r1", totalCents: 5000, netPaidCents: 0 }));
-    expect(billed.finalize().counts.recipientCount).toBe(0);
+    expect(billed.finalize().counts.totalBalanceCents).toBe(0);
+    expect(run([row({ registrationId: "r1", totalCents: 5000, netPaidCents: 0 })], {}).counts.totalBalanceCents).toBe(5000);
   });
 
   it("groups several unreachable attendees of one registration into one explained exclusion", () => {
