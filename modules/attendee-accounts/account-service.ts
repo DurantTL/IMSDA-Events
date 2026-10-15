@@ -116,7 +116,9 @@ export async function beginAttendeeSignUp(input: {
   const tokenHash = hashOpaqueToken(token);
 
   if (existing?.status === "ACTIVE") {
-    await issueVerificationToken(existing.id, tokenHash, expiresAt, now);
+    // Anyone can type an existing address into sign-up. That must not cancel a verification code an
+    // administrator sent to its owner, so tokens that already hold a code are left alone here.
+    await issueVerificationToken(existing.id, tokenHash, expiresAt, now, { keepCoded: true });
     return { pendingToken: token, expiresAt, outcome: "existing", accountId: existing.id };
   }
 
@@ -164,10 +166,12 @@ async function issueVerificationToken(
   tokenHash: string,
   expiresAt: Date,
   now: Date,
+  options: { keepCoded?: boolean } = {},
 ) {
   await getPrisma().$transaction([
     getPrisma().attendeeAccountToken.updateMany({
-      where: { accountId, purpose: "EMAIL_VERIFICATION", usedAt: null },
+      // `keepCoded`: a token that already holds a code (one an administrator sent) is not retired.
+      where: { accountId, purpose: "EMAIL_VERIFICATION", usedAt: null, ...(options.keepCoded ? { codeHash: null } : {}) },
       data: { usedAt: now },
     }),
     getPrisma().attendeeAccountToken.create({
@@ -319,7 +323,14 @@ export async function verifyAttendeeEmailByAddress(input: {
     return { outcome: "rejected" };
   }
   const record = await getPrisma().attendeeAccountToken.findFirst({
-    where: { accountId: account.id, purpose: "EMAIL_VERIFICATION", usedAt: null },
+    where: {
+      accountId: account.id,
+      purpose: "EMAIL_VERIFICATION",
+      usedAt: null,
+      codeHash: { not: null },
+      expiresAt: { gt: now },
+      codeExpiresAt: { gt: now },
+    },
     orderBy: { createdAt: "desc" },
     select: VERIFICATION_RECORD_SELECT,
   });

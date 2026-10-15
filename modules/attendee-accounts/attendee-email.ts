@@ -277,6 +277,19 @@ export async function prepareAttendeeEmailBodyForDelivery(input: {
     throw new Error("An attendee email cannot mint a code without an account.");
   }
 
+  if (!edit) {
+    // The address this message was queued for must still be the account's address. An
+    // administrator's email change (or a send that raced one) leaves a message addressed to the
+    // OLD mailbox; a code delivered there must never verify, or reset, the new address.
+    const [message, account] = await Promise.all([
+      getPrisma().messageOutbox.findUnique({ where: { id: input.messageId }, select: { recipientEmail: true } }),
+      getPrisma().attendeeAccount.findUnique({ where: { id: input.accountAttendeeId }, select: { email: true } }),
+    ]);
+    if (!message || !account || message.recipientEmail.trim().toLowerCase() !== account.email.trim().toLowerCase()) {
+      throw new Error("The account's address changed after this message was queued; no code is sent.");
+    }
+  }
+
   const reuse = edit
     ? reuseAttendeeStepUpCode
     : reset

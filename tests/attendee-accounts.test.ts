@@ -447,6 +447,25 @@ describe("sign-up refuses to say whether an address is known", () => {
     }
   });
 
+  it("sign-up for an existing ACTIVE address never retires a token that already holds a code", async () => {
+    // An administrator may have sent that code to the address's owner; anyone can type the address here.
+    prisma.attendeeAccount.findUnique.mockResolvedValue({ id: "acct_active", status: "ACTIVE" });
+    await beginAttendeeSignUp({ email: "someone@example.com", displayName: "Someone", password: "a-long-enough-passphrase" });
+    expect(prisma.attendeeAccountToken.updateMany).toHaveBeenCalledWith({
+      where: { accountId: "acct_active", purpose: "EMAIL_VERIFICATION", usedAt: null, codeHash: null },
+      data: { usedAt: expect.any(Date) },
+    });
+  });
+
+  it("sign-up for an unfinished (not ACTIVE) address still retires every earlier verification, as before", async () => {
+    prisma.attendeeAccount.findUnique.mockResolvedValue({ id: "acct_existing", status: "PENDING_VERIFICATION" });
+    await beginAttendeeSignUp({ email: "someone@example.com", displayName: "Someone", password: "a-long-enough-passphrase" });
+    expect(prisma.attendeeAccountToken.updateMany).toHaveBeenCalledWith({
+      where: { accountId: "acct_existing", purpose: "EMAIL_VERIFICATION", usedAt: null },
+      data: { usedAt: expect.any(Date) },
+    });
+  });
+
   it("normalises an address the way the rest of the platform does", () => {
     expect(normalizeAttendeeEmail("  Mixed.Case@Example.COM  ")).toBe("mixed.case@example.com");
   });

@@ -41,7 +41,8 @@ import {
   enqueueAttendeeEmail,
   prepareAttendeeEmailBodyForDelivery,
 } from "@/modules/attendee-accounts/attendee-email";
-const messageOutbox = { create: vi.fn() };
+const messageOutbox = { create: vi.fn(), findUnique: vi.fn() };
+const attendeeAccount = { findUnique: vi.fn() };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,7 +57,9 @@ beforeEach(() => {
     webhookConfigured: true,
   });
   messageOutbox.create.mockResolvedValue({ id: "msg_1" });
-  dependencies.getPrisma.mockReturnValue({ messageOutbox });
+  messageOutbox.findUnique.mockResolvedValue({ recipientEmail: "person@example.test" });
+  attendeeAccount.findUnique.mockResolvedValue({ email: "person@example.test" });
+  dependencies.getPrisma.mockReturnValue({ messageOutbox, attendeeAccount });
   dependencies.attachVerificationCode.mockResolvedValue(true);
   dependencies.attachPasswordResetCode.mockResolvedValue(true);
   dependencies.reuseVerificationCode.mockResolvedValue(null);
@@ -245,6 +248,34 @@ describe("minting the code at delivery", () => {
       bodyText: VERIFICATION_CODE_SENTINEL,
       now: new Date("2026-07-28T12:00:00Z"),
     })).rejects.toThrow(/no live attendee code/i);
+  });
+
+  it("sends no code to an address the account no longer has (an email change, or a send that raced one)", async () => {
+    attendeeAccount.findUnique.mockResolvedValue({ email: "new.address@example.test" });
+    for (const templateKey of ["ATTENDEE_EMAIL_VERIFICATION", "ATTENDEE_PASSWORD_RESET"]) {
+      await expect(prepareAttendeeEmailBodyForDelivery({
+        messageId: "message-old-address",
+        accountAttendeeId: "acct_1",
+        templateKey,
+        bodyText: templateKey === "ATTENDEE_PASSWORD_RESET" ? PASSWORD_RESET_CODE_SENTINEL : VERIFICATION_CODE_SENTINEL,
+        now: new Date("2026-07-28T12:00:00Z"),
+      })).rejects.toThrow(/address changed/i);
+    }
+    expect(dependencies.attachVerificationCode).not.toHaveBeenCalled();
+    expect(dependencies.attachPasswordResetCode).not.toHaveBeenCalled();
+    expect(dependencies.reuseVerificationCode).not.toHaveBeenCalled();
+  });
+
+  it("still sends when the account's address matches in a different case", async () => {
+    attendeeAccount.findUnique.mockResolvedValue({ email: "Person@Example.Test" });
+    const prepared = await prepareAttendeeEmailBodyForDelivery({
+      messageId: "message-case",
+      accountAttendeeId: "acct_1",
+      templateKey: "ATTENDEE_EMAIL_VERIFICATION",
+      bodyText: VERIFICATION_CODE_SENTINEL,
+      now: new Date("2026-07-28T12:00:00Z"),
+    });
+    expect(prepared.bodyText).toMatch(/\b\d{6}\b/);
   });
 
   it("refuses to mint without an account", async () => {

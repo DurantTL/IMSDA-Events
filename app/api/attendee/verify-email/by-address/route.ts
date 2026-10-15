@@ -63,7 +63,8 @@ async function postHandler(request: Request) {
     });
     return applyRateLimitHeaders(Response.json({ ok: true }), rateLimit);
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    // Malformed JSON is bad input like any other: the same refusal, not a server error.
+    if (error instanceof z.ZodError || error instanceof SyntaxError) {
       const response = Response.json(REFUSAL, { status: 400 });
       return rateLimit ? applyRateLimitHeaders(response, rateLimit) : response;
     }

@@ -310,6 +310,8 @@ async function main() {
   assert(nonAdminSend instanceof Error && (nonAdminSend as { code?: string }).code === "NOT_SYSTEM_ADMIN", "only a system administrator can send it");
   const deliveredCode = createOneTimeCode();
   assert(await attachVerificationCode({ accountId: plain.id, messageId: sendResult.messageId!, code: deliveredCode, now: new Date() }), "delivery mints the code for the pending request");
+  // Typing the address into sign-up must not cancel the code an administrator sent to its owner.
+  await beginAttendeeSignUp({ email: email("plain-latest"), displayName: "Synthetic Person", password: PASSWORD });
   const wrongCode = await verifyAttendeeEmailByAddress({ email: email("plain-latest"), code: deliveredCode === "000000" ? "111111" : "000000", userAgent: null });
   assert(wrongCode.outcome === "rejected", "a wrong code does not verify");
   const byCode = await verifyAttendeeEmailByAddress({ email: email("plain-latest"), code: deliveredCode, userAgent: null });
@@ -328,8 +330,12 @@ async function main() {
       codeExpiresAt: new Date(Date.now() + 10 * 60_000), purpose: "PASSWORD_RESET", expiresAt: new Date(Date.now() + 60 * 60_000),
     },
   });
+  await prisma.passwordResetToken.create({
+    data: { userId: pairUser.id, tokenHash: hashOpaqueToken(`${P}-pair-staff-link`), purpose: "PASSWORD_RESET", expiresAt: new Date(Date.now() + 30 * 60_000) },
+  });
   await changeStaffEmail(pairUser.id, email("pair-new"), adminUser.id);
   assert((await prisma.attendeeAccountToken.count({ where: { accountId: pairAccount.id, usedAt: null } })) === 0, "linked pair: the email change spends every unused attendee token");
+  assert((await prisma.passwordResetToken.count({ where: { userId: pairUser.id, usedAt: null } })) === 0, "linked pair: the email change spends the staff reset links too");
   const pairAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: pairAccount.id }, select: { email: true, emailVerifiedAt: true } });
   assert(pairAfter.email === email("pair-new") && pairAfter.emailVerifiedAt === null, "switch on, linked pair: both emails change and the attendee verification is cleared");
   assert((await prisma.user.findUniqueOrThrow({ where: { id: pairUser.id } })).email === email("pair-new"), "switch on, linked pair: the staff email changed with it");

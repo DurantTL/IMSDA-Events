@@ -55,6 +55,9 @@ async function changeLinkedEmailTogether(
     // The address changed, so nobody has verified the new one yet (Caleb, Oct 15, 2026): the
     // attendee side's verification is cleared with it.
     await tx.attendeeAccount.update({ where: { id: link.attendeeAccountId }, data: { email, emailVerifiedAt: null } });
+    // Staff side of the same rule: an unused password reset or activation link emailed to the OLD
+    // mailbox must not outlive the change.
+    await tx.passwordResetToken.updateMany({ where: { userId: link.userId, usedAt: null }, data: { usedAt: new Date() } });
     // Spend every unused attendee token (reset, verification) in the same transaction: a code
     // emailed to the OLD mailbox must not be able to verify the NEW address.
     await tx.attendeeAccountToken.updateMany({
@@ -137,7 +140,12 @@ export async function changeStaffEmail(userId: string, email: string, actorUserI
   if (link) return changeLinkedEmailTogether(link, email, actorUserId);
   const taken = await getPrisma().user.findFirst({ where: { email, id: { not: userId } }, select: { id: true } });
   if (taken) throw new UserAdminError("EMAIL_IN_USE", "Another team account already uses that email.");
-  await getPrisma().user.update({ where: { id: userId }, data: { email } });
+  // The write and the spend of this user's unused reset links are one transaction (a link
+  // emailed to the old address must not outlive the change).
+  await getPrisma().$transaction([
+    getPrisma().user.update({ where: { id: userId }, data: { email } }),
+    getPrisma().passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } }),
+  ]);
   if (userId !== actorUserId) await revokeAllUserSessions(userId);
   await writeAuditLog({
     actorUserId,
@@ -197,6 +205,7 @@ export async function listAttendeeAccountsWithCap(query: string, sort: AccountSo
       sessions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
       areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true } },
       linkedUser: { select: { id: true } },
+      emailVerifiedAt: true,
       clubDirectorGrants: {
         where: { revokedAt: null, OR: [{ effectiveTo: null }, { effectiveTo: { gt: new Date() } }] },
         select: { role: true, organization: { select: { name: true } } },
@@ -215,6 +224,7 @@ export async function listAttendeeAccountsWithCap(query: string, sort: AccountSo
     passkeyCount: account._count.passkeys,
     /** A boolean only: whether a staff sign-in is linked to this account (#554). */
     linkedToStaff: Boolean(account.linkedUser),
+    emailVerified: account.emailVerifiedAt !== null,
     clubRoles: account.clubDirectorGrants.map((grant) => ({ role: grant.role, clubName: grant.organization.name })),
     areaCoordinator: Boolean(
       account.areaCoordinatorGrant

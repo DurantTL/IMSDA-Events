@@ -363,21 +363,23 @@ export function AttendeeAccountsWorkspace({
                         >
                           <Link2 aria-hidden="true" size={14} /> {account.linkedToStaff ? "Unlink team sign-in" : "Link team sign-in"}
                         </button>
-                        <button
-                          className="secondary-button"
-                          disabled={busy === account.id}
-                          onClick={() => openConfirm({
-                            account,
-                            body: { action: "send-verification" },
-                            title: `Send a verification email to ${account.email}?`,
-                            description: "A six-digit code is emailed to this account's current address. The email counts as verified only when the person enters it. Nothing is marked verified here.",
-                            confirmLabel: "Send verification email",
-                            destructive: false,
-                          })}
-                          type="button"
-                        >
-                          <MailCheck aria-hidden="true" size={14} /> Send verification email
-                        </button>
+                        {!account.emailVerified && (
+                          <button
+                            className="secondary-button"
+                            disabled={busy === account.id}
+                            onClick={() => openConfirm({
+                              account,
+                              body: { action: "send-verification" },
+                              title: `Send a verification email to ${account.email}?`,
+                              description: "A six-digit code is emailed to this account's current address. The email counts as verified only when the person enters it. Nothing is marked verified here.",
+                              confirmLabel: "Send verification email",
+                              destructive: false,
+                            })}
+                            type="button"
+                          >
+                            <MailCheck aria-hidden="true" size={14} /> Send verification email
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

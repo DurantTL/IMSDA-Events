@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   accountFindFirst: vi.fn(),
   accountUpdate: vi.fn(),
   tokenUpdateMany: vi.fn(),
+  resetTokenUpdateMany: vi.fn(),
   revokeAllUserSessions: vi.fn(),
   revokeAllAttendeeSessions: vi.fn(),
   writeAuditLog: vi.fn(),
@@ -18,6 +19,7 @@ const client = {
   user: { findUnique: mocks.userFindUnique, findFirst: mocks.userFindFirst, update: mocks.userUpdate },
   attendeeAccount: { findUnique: mocks.accountFindUnique, findFirst: mocks.accountFindFirst, update: mocks.accountUpdate },
   attendeeAccountToken: { updateMany: mocks.tokenUpdateMany },
+  passwordResetToken: { updateMany: mocks.resetTokenUpdateMany },
   platformSettings: { findUnique: async () => ({ unifiedSignInEnabled: mocks.enabled }) },
   $transaction: async (work: unknown) => (typeof work === "function" ? (work as (c: unknown) => unknown)(client) : Promise.all(work as unknown[])),
 };
@@ -158,6 +160,22 @@ describe("a linked person's email changes on both sides together (decision 3)", 
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "usr_1" }, data: { email: "new@example.test" } });
     expect(mocks.accountUpdate).not.toHaveBeenCalled();
     expect(mocks.revokeAllAttendeeSessions).not.toHaveBeenCalled();
+    // The staff reset links emailed to the old address are spent with the change, even unlinked.
+    expect(mocks.resetTokenUpdateMany).toHaveBeenCalledWith({ where: { userId: "usr_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
+  });
+
+  it("switch on, linked: the staff reset links are spent in the same transaction as both email writes", async () => {
+    mocks.enabled = true;
+    mocks.userFindUnique
+      .mockResolvedValueOnce({ id: "usr_1", email: "old@example.test" })
+      .mockResolvedValueOnce({ id: "usr_1", attendeeAccountId: "acc_1" });
+    const order: string[] = [];
+    mocks.userUpdate.mockImplementation(() => { order.push("user"); return Promise.resolve({}); });
+    mocks.accountUpdate.mockImplementation(() => { order.push("account"); return Promise.resolve({}); });
+    mocks.resetTokenUpdateMany.mockImplementation(() => { order.push("staff-links"); return Promise.resolve({ count: 1 }); });
+    await changeStaffEmail("usr_1", "new@example.test", "admin-1");
+    expect(order).toEqual(["user", "account", "staff-links"]);
+    expect(mocks.resetTokenUpdateMany).toHaveBeenCalledWith({ where: { userId: "usr_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
   });
 });
 

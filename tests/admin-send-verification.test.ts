@@ -122,6 +122,23 @@ describe("verifying with the address and code only", () => {
     expect(tx.attendeeAccount.update).toHaveBeenCalledWith({ where: { id: "acct-1" }, data: { status: "ACTIVE", emailVerifiedAt: expect.any(Date) } });
   });
 
+  it("looks for the newest live token that already has a code", async () => {
+    verifyDatabase(account(), record());
+    await run();
+    const findFirst = (mocks.getPrisma.mock.results.at(-1)!.value as { attendeeAccountToken: { findFirst: ReturnType<typeof vi.fn> } }).attendeeAccountToken.findFirst;
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        accountId: "acct-1",
+        purpose: "EMAIL_VERIFICATION",
+        usedAt: null,
+        codeHash: { not: null },
+        expiresAt: { gt: expect.any(Date) },
+        codeExpiresAt: { gt: expect.any(Date) },
+      }),
+      orderBy: { createdAt: "desc" },
+    }));
+  });
+
   it("refuses a wrong code, an unknown address, a verified account and an unfinished sign-up alike", async () => {
     verifyDatabase(account(), record());
     expect((await run("person@example.test", "000000" === code ? "111111" : "000000")).outcome).toBe("rejected");
