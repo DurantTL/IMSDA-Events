@@ -337,14 +337,20 @@ human-gated and never run from CI.
   new pending `User` is linked at first activation, which reuses the existing verified, unlinked
   account with the same email, so the end state is the same and the link follows inbox proof.
   Linking happens only at first activation.
-- **Never linked at activation (needs review, `STAFF_ATTENDEE_LINK_NEEDS_REVIEW`):** a user who
-  was active before (`PREVIOUSLY_ACTIVE`: any `UserSession`, `UserMfaEnrollment` or `UserPasskey`
-  row exists, because a re-invite, or `scripts/create-admin.ts --promote-existing`, resets the user
-  to `PENDING_ACTIVATION` and clears `activatedAt`), and an activation link that
-  `scripts/create-admin.ts` printed for the operator instead of emailing (`TOKEN_NOT_EMAILED`).
-  Those people are linked only by slice (d). The activation also falls back to needs review
-  (`LINK_CONFLICT`) rather than failing if the account row was linked to someone else meanwhile;
-  the account row is locked (`FOR UPDATE`) while the reuse rule is re-checked.
+- **Never linked at activation (needs review, `STAFF_ATTENDEE_LINK_NEEDS_REVIEW`):**
+  - `PREVIOUSLY_ACTIVE`: the user was active before, meaning any `UserSession`, `UserMfaEnrollment`
+    or `UserPasskey` row exists. A re-invite, or `scripts/create-admin.ts --promote-existing`, resets
+    the user to `PENDING_ACTIVATION` and clears `activatedAt`, so that field cannot be used. This
+    reason wins when more than one applies.
+  - `TOKEN_NOT_EMAILED`: "a link was printed for this user at some point". `scripts/create-admin.ts`
+    printed an activation URL for the operator (its audit row has `passwordSetDirectly: false`), or no
+    account email is configured, so the link is handed over by hand (the memberships route returns
+    `setupUrl`; outside production the password-reset route returns `resetUrl`). It fails safe: it
+    still applies if a later activation was in fact emailed.
+  - Those people are linked only by slice (d).
+  - `LINK_CONFLICT` is a defensive fallback. The account row is locked (`FOR UPDATE`) and re-read, so a
+    concurrent link is normally reported as `EXISTING_ACCOUNT_NOT_REUSABLE`; if the unique index still
+    rejects the link write, a savepoint rolls it back and the activation records review instead of failing.
 - **Attendee mode and the profile page:** `findSwitchableAttendeeAccountForStaff(email, userId)`
   returns the LINKED account for a linked user (no email fallback, null if it is disabled or
   unverified); an unlinked user keeps today's email rule, except that an account already linked to

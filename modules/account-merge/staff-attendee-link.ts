@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
+import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { canReuseAttendeeAccount, normalizeLinkEmail } from "@/modules/account-merge/link-rules";
 
 /**
@@ -98,6 +99,9 @@ export async function linkAttendeeSideAtActivation(
     // create-admin without a password prints the activation URL (passwordSetDirectly is false).
     tx.auditLog.count({
       where: {
+        // actorUserId + entityType keep this on the [actorUserId, createdAt] index.
+        actorUserId: user.id,
+        entityType: "User",
         entityId: user.id,
         action: { in: ["SYSTEM_ADMIN_BOOTSTRAPPED", "SYSTEM_ADMIN_PROMOTED"] },
         metadata: { path: ["passwordSetDirectly"], equals: false },
@@ -106,6 +110,10 @@ export async function linkAttendeeSideAtActivation(
   ]);
   if (sessions + enrollments + passkeys > 0) return markNeedsReview(tx, user.id, null, "PREVIOUSLY_ACTIVE");
   if (printedUrl > 0) return markNeedsReview(tx, user.id, null, "TOKEN_NOT_EMAILED");
+  // With no account email configured the activation link is handed over by hand (the
+  // memberships route returns `setupUrl` to the inviting admin, and outside production the
+  // password-reset route returns `resetUrl`), so it did not prove the inbox either.
+  if (!isAccountEmailConfigured()) return markNeedsReview(tx, user.id, null, "TOKEN_NOT_EMAILED");
 
   const email = normalizeLinkEmail(user.email);
   // ON CONFLICT DO NOTHING: when an account already holds this email, nothing

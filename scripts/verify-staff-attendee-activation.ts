@@ -32,13 +32,18 @@ import { createOneTimeCode, hashOneTimeCode } from "../modules/attendee-accounts
 import { signInWithGoogle } from "../modules/attendee-accounts/federated-sign-in";
 
 loadEnvConfig(process.cwd());
+// Activation links only when the activation link is emailed, which needs account email configured
+// (otherwise the link is handed over by hand). Synthetic values; nothing is ever sent from this script.
+process.env.EMAIL_PROVIDER = "resend";
+process.env.RESEND_API_KEY = "synthetic-key-never-used";
+process.env.ACCOUNT_EMAIL_SENDER_ADDRESS = "accounts@example.test";
 assertLocalDatabase(process.env, "run this verification");
 
 const prisma = new PrismaClient();
 const P = `sau_${randomUUID().slice(0, 8)}`;
 const email = (key: string) => `${P}.${key}@example.test`;
 const PASSWORD = "synthetic-Passphrase-4-verify";
-const keys = ["off", "new", "reuse", "unverified", "taken", "reset", "readd", "promote", "bootstrap", "grade"] as const;
+const keys = ["off", "new", "reuse", "unverified", "taken", "reset", "readd", "promote", "bootstrap", "conflict", "grade"] as const;
 type Key = (typeof keys)[number];
 const userId = (k: Key) => `${P}_user_${k}`;
 
@@ -56,7 +61,13 @@ async function setSwitch(enabled: boolean) {
   });
 }
 
+async function dropConflictTrigger() {
+  await prisma.$executeRawUnsafe('DROP TRIGGER IF EXISTS sau_force_conflict ON "User"');
+  await prisma.$executeRawUnsafe("DROP FUNCTION IF EXISTS sau_force_conflict()");
+}
+
 async function cleanup() {
+  await dropConflictTrigger();
   const ids = keys.map(userId).concat(`${P}_user_holder`);
   await prisma.auditLog.deleteMany({ where: { entityId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });
@@ -209,6 +220,32 @@ async function main() {
   });
   assert((await activate("bootstrap")).attendeeAccountId === null, "a create-admin bootstrapped admin is not linked at activation");
   assert((await accountsFor("bootstrap")).length === 0, "and no attendee account is created for them");
+
+  // A unique-index conflict on the link write (forced here with a temporary trigger that raises
+  // unique_violation on that one update) must not fail the activation: it commits, the user is
+  // active and unlinked, and a LINK_CONFLICT review row is recorded.
+  await prisma.attendeeAccount.create({
+    data: { email: email("conflict"), displayName: "Conflict Synthetic", status: "ACTIVE", emailVerifiedAt: new Date() },
+    select: { id: true },
+  });
+  await pendingStaff("conflict");
+  await prisma.$executeRawUnsafe(`CREATE FUNCTION sau_force_conflict() RETURNS trigger AS $$
+    BEGIN
+      IF NEW."attendeeAccountId" IS NOT NULL AND NEW.id = '${userId("conflict")}' THEN
+        RAISE EXCEPTION 'forced conflict' USING ERRCODE = 'unique_violation';
+      END IF;
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`);
+  await prisma.$executeRawUnsafe(
+    'CREATE TRIGGER sau_force_conflict BEFORE UPDATE ON "User" FOR EACH ROW EXECUTE FUNCTION sau_force_conflict()',
+  );
+  try {
+    assert((await activate("conflict")).attendeeAccountId === null, "a conflicting link write leaves the user unlinked");
+  } finally {
+    await dropConflictTrigger();
+  }
+  const conflictAudit = await prisma.auditLog.findFirst({ where: { entityId: userId("conflict"), action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW" } });
+  assert(JSON.stringify(conflictAudit?.metadata).includes("LINK_CONFLICT"), "the conflict is recorded as LINK_CONFLICT");
 
   // ---- No attendee-grade method yields a staff session for a linked person. ----
   const gradeUser = await pendingStaff("grade");

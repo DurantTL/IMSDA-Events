@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ writeAuditLog: vi.fn() }));
+const mocks = vi.hoisted(() => ({ writeAuditLog: vi.fn(), emailConfigured: true }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
+vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => mocks.emailConfigured }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
 import { canReuseAttendeeAccount } from "@/modules/account-merge/link-rules";
 import { Prisma } from "@prisma/client";
 import { linkAttendeeSideAtActivation } from "@/modules/account-merge/staff-attendee-link";
 
-/** #554 slice (b): activation linking and role-grant linking, switch both ways. Synthetic data only. */
+/** #554 slice (b): activation linking only (nothing links at grant time), switch both ways. Synthetic data only. */
 
 const now = new Date("2026-11-03T12:00:00Z");
 const verified = {
@@ -42,7 +43,10 @@ function tx(options: { enabled: boolean; user?: unknown; account?: unknown; crea
   };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.emailConfigured = true;
+});
 
 describe("canReuseAttendeeAccount", () => {
   const base = { email: "a@example.test", status: "ACTIVE" as const, emailVerifiedAt: now, disabledAt: null, linkedUserId: null };
@@ -127,6 +131,35 @@ describe("never links an existing person at activation (security review B1)", ()
       expect.objectContaining({ metadata: { attendeeAccountId: null, reason: "TOKEN_NOT_EMAILED" } }),
       t,
     );
+  });
+
+  it("account email not configured: the link is handed over by hand, so nothing links", async () => {
+    mocks.emailConfigured = false;
+    const t = tx({ enabled: true, account: verified });
+    await expect(linkAttendeeSideAtActivation(t as never, "usr_1", now)).resolves.toBe("needs_review");
+    expect(t.user.update).not.toHaveBeenCalled();
+    expect(t.attendeeAccount.createMany).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { attendeeAccountId: null, reason: "TOKEN_NOT_EMAILED" } }),
+      t,
+    );
+  });
+
+  it("PREVIOUSLY_ACTIVE wins over a printed URL", async () => {
+    const t = tx({ enabled: true, sessions: 1, printed: 1 });
+    await linkAttendeeSideAtActivation(t as never, "usr_1", now);
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { attendeeAccountId: null, reason: "PREVIOUSLY_ACTIVE" } }),
+      t,
+    );
+  });
+
+  it("looks up the printed-URL audit row by actor and entity type (indexed)", async () => {
+    const t = tx({ enabled: true });
+    await linkAttendeeSideAtActivation(t as never, "usr_1", now);
+    expect(t.auditLog.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({ actorUserId: "usr_1", entityType: "User", entityId: "usr_1" }),
+    });
   });
 
   it("switch off: the history is not even read", async () => {
