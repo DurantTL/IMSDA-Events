@@ -2457,6 +2457,9 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .preview-calculated-field { border: 1px solid #ded2e9; border-radius: 8px; background: var(--imsda-purple-soft); padding: 8px; }
 .preview-check { display: flex; align-items: center; gap: 5px; font-weight: 500; }
 .preview-check input { width: auto; }
+.preview-acknowledgment-text { max-height: 220px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; background: #fff; padding: 10px 12px; }
+.preview-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.acknowledgment-settings textarea { min-height: 120px; }
 .preview-choice-list { display: grid; gap: 6px; margin-top: 4px; }
 .preview-option { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfd; padding: 7px 8px; font-size: max(var(--type-body-floor, 0px), 0.61rem); font-weight: 600; }
 .preview-option input { width: auto; margin: 0; accent-color: var(--imsda-purple); }
@@ -3702,6 +3705,11 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .public-registration-check { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #d2dfe4; border-radius: 12px; background: #fbfcfd; cursor: pointer; padding: 13px; font-weight: 500; line-height: 1.5; }
 .public-registration-check:has(input:checked) { border-color: #ad92c6; background: var(--imsda-purple-soft); }
 .public-registration-check input { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--imsda-purple); }
+/* The exact wording of a recorded acknowledgment (#150): shown in full, scrollable by keyboard and thumb. */
+.public-registration-acknowledgment-text { max-height: 280px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 12px; background: #fff; padding: 13px; line-height: 1.55; overscroll-behavior: contain; }
+.public-registration-acknowledgment-text:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.public-registration-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.public-registration-acknowledgment-text strong { display: block; margin-bottom: 6px; }
 
 .public-registration-calculated { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid #d8c8e6; border-radius: 13px; background: var(--imsda-purple-soft); padding: 14px 16px; }
 .public-registration-calculated > span { display: grid; gap: 3px; }

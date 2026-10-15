@@ -74,8 +74,11 @@ export function ClubRegistrationWorkspace({
   honorsCatalog = null,
   backgroundStates,
   organizationId,
+  staffActingAsDirector = false,
   workspace,
 }: {
+  /** Staff are acting as the director (#442): they cannot give the director's acknowledgments (#150). */
+  staffActingAsDirector?: boolean;
   /** Each staff or adult roster member's Sterling Volunteers state, by roster member id (#853). Only for someone allowed to see it. */
   backgroundStates?: Record<string, ClubComplianceState>;
   contactPrefill: Record<string, string>;
@@ -465,6 +468,7 @@ export function ClubRegistrationWorkspace({
       ];
     },
     blockedReason: draftBlockedReason({ conflict, honorsProblem }),
+    staffActingAsDirector,
     submitUrl: `${base}/registration`,
     onDraftChange,
     onSubmitted: (result?: { honors?: { error?: string } | null }) => {

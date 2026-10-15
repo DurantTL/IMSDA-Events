@@ -518,6 +518,10 @@ export async function removeRosterMember(organizationId: string, memberId: strin
               // A sealed per-event health copy (#924) outlives the roster row and the live record, and its person key is
               // `onDelete: Restrict`: the Person stays (name only, below) until the copy's retention job deletes it.
               healthSnapshots: true,
+              // Acknowledgment evidence (#150), as the person acknowledged for or as the one who acknowledged: append-only,
+              // and both references are `onDelete: Restrict`, so the Person stays rather than failing the removal.
+              acknowledgmentEvidenceAsSubject: true,
+              acknowledgmentEvidenceActed: true,
             },
           },
         },

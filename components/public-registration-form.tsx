@@ -58,6 +58,7 @@ import {
   type RosterPerson,
 } from "@/modules/guardian-authority/domain";
 import { selectUsesRadioCards } from "@/modules/forms/choice-controls";
+import { acknowledgmentFields, type AcknowledgmentDisplay } from "@/modules/acknowledgments/fields";
 import { TranslateHint } from "@/components/translate-hint";
 import { planAttendeeRemoval, withoutAttendee } from "@/modules/forms/attendee-removal";
 import { confirmationEmailHeadline } from "@/modules/forms/confirmation-email-status";
@@ -187,6 +188,8 @@ type PublicForm = {
   versionId: string;
   versionNumber: number;
   definition: RegistrationFormDefinition;
+  /** The wording of each policy-version acknowledgment, by field id (#150). Text acknowledgments carry theirs in the definition. */
+  acknowledgmentContent?: Record<string, AcknowledgmentDisplay>;
 };
 
 type Confirmation = {
@@ -317,6 +320,11 @@ export type PublicRegistrationFormProps = {
     attendeeAttention?: (attendee: RosterAttendee, index: number) => AttentionItem[];
     /** A reason the form can't be sent yet (a class pick that no longer fits), shown instead of submitting. */
     blockedReason?: string | null;
+    /**
+     * Staff acting as the director (#442, #150): they cannot acknowledge for the director, so acknowledgments are shown read-only
+     * with a note, and are not part of the required checks (the server drops them and records no evidence).
+     */
+    staffActingAsDirector?: boolean;
   };
   /**
    * "Group" registration on a club event (#650): people who are not in a club,
@@ -1033,7 +1041,7 @@ export function PublicRegistrationForm({
       && definition.payment?.enabled
       ? [definition.payment.paymentMethodFieldKey]
       : undefined;
-    const validationIssues = rosterEnabled
+    const allValidationIssues = rosterEnabled
       ? validateRosterResponses()
       : validateTestResponses(
           definition,
@@ -1042,6 +1050,11 @@ export function PublicRegistrationForm({
           undefined,
           { ignoredFieldKeys },
         ).issues;
+    // Staff acting as a director cannot give the director's acknowledgments, so they are never required of them.
+    const actingAsDirectorKeys = new Set(club?.staffActingAsDirector ? acknowledgmentFields(definition).map((candidate) => candidate.key) : []);
+    const validationIssues = actingAsDirectorKeys.size === 0
+      ? allValidationIssues
+      : allValidationIssues.filter((issue) => !actingAsDirectorKeys.has(issue.key));
     if (attendeePromoField && attendeeCodes.some(Boolean)) {
       const promoIssues = attendeeCodes.flatMap((code, attendeeIndex) => {
         if (!code) return [];
@@ -1965,6 +1978,47 @@ export function PublicRegistrationForm({
       );
     }
 
+    if (field.type === "ACKNOWLEDGMENT") {
+      // The wording is shown in full, then ticked (#150). What is recorded is exactly this wording, or the published policy
+      // version it comes from; a person acknowledging for a minor is checked on the server against the declared adult.
+      const display: AcknowledgmentDisplay | null = field.acknowledgment?.source === "TEXT"
+        ? { source: "TEXT", title: null, text: field.acknowledgment.text, versionNumber: null }
+        : form.acknowledgmentContent?.[field.id] ?? null;
+      const wordingId = `${id}_wording`;
+      return (
+        <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused && !club?.staffActingAsDirector} aria-describedby={[wordingId, description].filter(Boolean).join(" ")}>
+          <legend>{fieldLabel(field, context)}</legend>
+          {display ? (
+            <div className="public-registration-acknowledgment-text" id={wordingId} tabIndex={0} role="region" aria-label={`Wording for ${field.label}`}>
+              {display.title && <strong>{display.title}</strong>}
+              <p>{display.text}</p>
+            </div>
+          ) : (
+            <p className="public-registration-acknowledgment-text" id={wordingId} role="alert">This acknowledgment is unavailable right now. Contact the event team.</p>
+          )}
+          {club?.staffActingAsDirector ? (
+            <p className="field-help public-registration-acknowledgment-note" role="note">
+              The director must give this acknowledgment themselves, or staff can record a paper copy afterward.
+            </p>
+          ) : (
+            <label className="public-registration-check">
+              <input
+                id={id}
+                type="checkbox"
+                required={field.required && !excused}
+                aria-required={field.required && !excused}
+                disabled={!display}
+                checked={context.values[field.key] === true}
+                onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.checked)}
+              />
+              <span>I acknowledge this.</span>
+            </label>
+          )}
+          {fieldSupport(field, context)}
+        </fieldset>
+      );
+    }
+
     if (field.type === "CHECKBOX") {
       return (
         <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused} aria-describedby={description}>
@@ -2516,6 +2570,7 @@ export function PublicRegistrationForm({
         (scope && field.scope !== scope)
         || field.type === "CALCULATED"
         || field.type === "CHECKBOX"
+        || field.type === "ACKNOWLEDGMENT"
         || !isFieldVisible(field, { ...shared, ...values })
       ) {
         return [];
@@ -2552,7 +2607,7 @@ export function PublicRegistrationForm({
       )
       : null;
     const acknowledgements = allFields.flatMap((field) => {
-      if (field.type !== "CHECKBOX") return [];
+      if (field.type !== "CHECKBOX" && field.type !== "ACKNOWLEDGMENT") return [];
       if (!rosterEnabled) {
         if (!isFieldVisible(field, responses)) return [];
         return [{

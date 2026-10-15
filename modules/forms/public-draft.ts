@@ -120,6 +120,8 @@ export function isDraftExcludedField(
   definition: Pick<RegistrationFormDefinition, "payment">,
 ) {
   if (field.type === "CALCULATED" || field.type === "LONG_TEXT" || field.type === "ADDRESS") return true;
+  // A recorded acknowledgment (#150) is given at submission, never carried over from an earlier visit.
+  if (field.type === "ACKNOWLEDGMENT") return true;
   if (definition.payment?.paymentMethodFieldKey === field.key) return true;
   if (isBirthDateField(field)) return true;
   const text = fieldText(field);

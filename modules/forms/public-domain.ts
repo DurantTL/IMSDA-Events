@@ -69,6 +69,8 @@ export type PublicRegistrationIssue = {
     | "ATTENDEE_TYPE_INVALID"
     | "RESPONSIBLE_ADULT_REQUIRED"
     | "RESPONSIBLE_ADULT_INVALID"
+    | "ACKNOWLEDGMENT_NOT_AUTHORIZED"
+    | "ACKNOWLEDGMENT_UNAVAILABLE"
     | "PROMO_CODE_INVALID";
   fieldId: string | null;
   key: string;

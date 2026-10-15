@@ -67,6 +67,10 @@ import {
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
+import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
+import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
+import { hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
 import { getPublicLodgingOffer, planRegistrationLodging, recordRegistrationLodging, type LodgingPlan, type PublicLodgingOffer } from "@/modules/lodging/registration-form";
@@ -310,6 +314,8 @@ export type PublicRegistrationExperience = {
     versionId: string;
     versionNumber: number;
     definition: RegistrationFormDefinition;
+    /** The wording of each policy-version acknowledgment, by field id (#150). Wording only, never evidence. */
+    acknowledgmentContent: Record<string, AcknowledgmentDisplay>;
   };
   choiceUsage: ChoiceUsage;
   pricingDate: string;
@@ -634,7 +640,14 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
       ageOfMajority: form.event.ageOfMajority,
       refundPolicy: form.event.refundPolicy,
     },
-    form: { slug: form.slug, versionId: version.id, versionNumber: version.versionNumber, definition },
+    form: {
+      slug: form.slug,
+      versionId: version.id,
+      versionNumber: version.versionNumber,
+      definition,
+      // The wording of each policy-version acknowledgment (#150), read by exact version id: only what the form shows.
+      acknowledgmentContent: await loadAcknowledgmentDisplayContent(form.eventId, definition),
+    },
     choiceUsage: usageFromReservations(definition, reservations),
     pricingDate,
     lodging,
@@ -704,6 +717,9 @@ async function findExistingConfirmation(
   };
 }
 
+/** What the server knows about the request itself, for acknowledgment evidence (#150). Only approved metadata is ever stored. */
+export type SubmissionRequestContext = { userAgent?: string | null };
+
 async function createPublicRegistrationTransaction(
   tx: Prisma.TransactionClient,
   eventSlug: string,
@@ -711,6 +727,7 @@ async function createPublicRegistrationTransaction(
   submittedInput: PublicRegistrationInput,
   now: Date,
   bulk?: BulkSubmissionContext,
+  requestContext?: SubmissionRequestContext,
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -890,6 +907,17 @@ async function createPublicRegistrationTransaction(
     }
   }
   assertRegistrationOpen(lifecycle);
+  // The event may have become a club, church-billed or general-link event after this form was published, and club rosters have no
+  // responsible-adult declarations, so a per-attendee recorded acknowledgment could never be recorded: refuse it up front.
+  if (acknowledgmentFields(definition).some((field) => field.scope === "ATTENDEE")) {
+    const eventModes = await tx.event.findUnique({ where: { id: form.eventId }, select: { audience: true, billingMode: true, generalRegistrationLinkEnabled: true } });
+    if (eventModes && (eventModes.audience === "CLUB" || eventModes.billingMode === "DEFERRED_ORGANIZATION_INVOICE" || eventModes.generalRegistrationLinkEnabled)) {
+      throw new PublicRegistrationError(
+        "INVALID_SUBMISSION",
+        "This form asks each attendee for a recorded acknowledgment, which club and group events cannot take. Contact the event team.",
+      );
+    }
+  }
 
   const roster = getAttendeeRosterConfig(definition);
   const requestedAttendees = roster.enabled ? input.attendees?.length ?? 0 : 1;
@@ -922,16 +950,23 @@ async function createPublicRegistrationTransaction(
   const deferredPaymentFieldKey = isWaitlisted && definition.payment?.enabled
     ? definition.payment.paymentMethodFieldKey
     : null;
-  const canonicalInput = deferredPaymentFieldKey
-    ? {
-        ...input,
-        responses: Object.fromEntries(
-          Object.entries(input.responses).filter(
-            ([key]) => key !== deferredPaymentFieldKey,
-          ),
-        ),
-      }
+  const dropKeys = (answers: Record<string, unknown>, keys: ReadonlySet<string>) => (
+    keys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !keys.has(key)))
+  );
+  const withoutDeferredPayment = deferredPaymentFieldKey
+    ? { ...input, responses: dropKeys(input.responses, new Set([deferredPaymentFieldKey])) }
     : input;
+  // Staff acting as a director cannot acknowledge for them (evidence names the person who acknowledged), so an act-as submission
+  // is made without acknowledgments: any ticked answer is dropped, a required one is not asked for, and no evidence is recorded.
+  // The acknowledgment stays "not acknowledged" until the director gives it, or staff record it on paper afterward.
+  const actAsAcknowledgmentKeys = club?.submittedByUserId ? new Set(acknowledgmentFields(definition).map((field) => field.key)) : new Set<string>();
+  const canonicalInput = actAsAcknowledgmentKeys.size > 0
+    ? {
+        ...withoutDeferredPayment,
+        responses: dropKeys(withoutDeferredPayment.responses, actAsAcknowledgmentKeys),
+        attendees: withoutDeferredPayment.attendees?.map((attendee) => ({ ...attendee, responses: dropKeys(attendee.responses, actAsAcknowledgmentKeys) })),
+      }
+    : withoutDeferredPayment;
   const prepared = preparePublicRegistration(definition, canonicalInput, {
     timeZone: form.event.timezone,
     now,
@@ -940,6 +975,7 @@ async function createPublicRegistrationTransaction(
     ignoredFieldKeys: deferredPaymentFieldKey
       ? [deferredPaymentFieldKey]
       : undefined,
+    optionalFieldKeys: actAsAcknowledgmentKeys.size > 0 ? [...actAsAcknowledgmentKeys] : undefined,
   });
   if (!prepared.isValid || !prepared.identity) {
     const capacityIssue = prepared.issues.some((issue) => issue.message.includes("reached its limit"));
@@ -1255,6 +1291,59 @@ async function createPublicRegistrationTransaction(
         adultPersonId: declaration.adultKey ? personByClientId.get(declaration.adultKey)! : null,
       })),
     });
+  }
+  // Acknowledgment evidence (#150): what each ticked acknowledgment showed, recorded with the registration or not at all.
+  // A minor's acknowledgment needs their declared responsible adult, recorded just above; nothing else counts.
+  // Staff acting as a director cannot acknowledge for them: evidence names a person who acknowledged, never a staff stand-in,
+  // and recording it under the director would claim they said something they did not. Their answers were dropped above, so
+  // an act-as registration records no evidence at all.
+  try {
+    await recordSubmissionAcknowledgments(tx, {
+      eventId: form.eventId,
+      registrationId: registration.id,
+      formVersionId: version.id,
+      definition,
+      registrationResponses: prepared.registrationResponses,
+      attendees: createdAttendees.map((attendee) => ({
+        clientId: attendee.clientId,
+        attendeeId: attendee.attendeeId,
+        personId: attendee.personId,
+        responses: attendee.responses,
+      })),
+      actedByPersonId: accountHolder.id,
+      // Only the registrant's own online acknowledgment is recorded here; staff recording uses its own route.
+      channel: "ONLINE",
+      recordedByUserId: null,
+      submissionKey: input.idempotencyKey,
+      acknowledgedAt: now,
+      requestMetadata: {
+        userAgentHash: hashUserAgent(requestContext?.userAgent ?? null),
+        formVersionId: version.id,
+        submissionKey: input.idempotencyKey,
+      },
+      event: { startsAt: form.event.startsAt, timezone: form.event.timezone, ageOfMajority: form.event.ageOfMajority },
+    });
+  } catch (error) {
+    if (!(error instanceof AcknowledgmentError) || error.refusals.length === 0) throw error;
+    const indexByClientId = new Map(prepared.attendees.map((attendee, position) => [attendee.clientId, position]));
+    throw new PublicRegistrationError(
+      "INVALID_SUBMISSION",
+      error.refusals.some((refusal) => refusal.code === "POLICY_VERSION_UNAVAILABLE")
+        ? "An acknowledgment on this form is unavailable right now. Contact the event team."
+        : "An acknowledgment can only be given by the person it is about, or for a minor by their declared responsible adult.",
+      error.refusals.map((refusal) => {
+        const attendeeIndex = refusal.attendeeClientId === null ? null : indexByClientId.get(refusal.attendeeClientId) ?? null;
+        return {
+          kind: refusal.code === "POLICY_VERSION_UNAVAILABLE" ? "configuration" as const : "validation" as const,
+          code: refusal.code === "POLICY_VERSION_UNAVAILABLE" ? "ACKNOWLEDGMENT_UNAVAILABLE" as const : "ACKNOWLEDGMENT_NOT_AUTHORIZED" as const,
+          fieldId: refusal.fieldId,
+          key: refusal.key,
+          path: attendeeIndex === null ? refusal.key : `attendees.${attendeeIndex}.responses.${refusal.key}`,
+          attendeeIndex,
+          message: refusal.message,
+        };
+      }),
+    );
   }
   if (input.lodging && lodgingPlan) {
     try {
@@ -1607,12 +1696,13 @@ export async function submitPublicRegistration(
   input: PublicRegistrationInput,
   now = new Date(),
   bulk?: BulkSubmissionContext,
+  requestContext?: SubmissionRequestContext,
 ) {
   const prisma = getPrisma();
   for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
     try {
       const result = await prisma.$transaction(
-        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk),
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext),
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the

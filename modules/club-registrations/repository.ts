@@ -35,6 +35,7 @@ import {
 } from "@/modules/club-registrations/domain";
 import { pickClubPortalForm } from "@/modules/club-registrations/portal-form";
 import { type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import {
   PublicRegistrationError,
@@ -1049,8 +1050,17 @@ export async function saveClubRegistrationDraft(
   if (guestKeys.size !== input.guests.length) {
     throw new ClubRegistrationError("GUEST_INVALID", "Each extra person needs their own entry. Refresh the page and try again.");
   }
+  // A recorded acknowledgment (#150) is given at submission, never carried in a saved draft: the server copy drops it, as the
+  // browser's own draft does.
+  const draftForm = await publishedClubForm(eventId);
+  const acknowledgmentKeys = new Set(draftForm ? acknowledgmentFields(draftForm.definition).map((field) => field.key) : []);
+  const withoutAcknowledgments = <T,>(answers: Record<string, T>) => (
+    acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
+  );
   const attendeeResponses = Object.fromEntries(
-    Object.entries(input.attendeeResponses).filter(([key]) => allowed.has(key) || guestKeys.has(key)),
+    Object.entries(input.attendeeResponses)
+      .filter(([key]) => allowed.has(key) || guestKeys.has(key))
+      .map(([key, answers]) => [key, withoutAcknowledgments(answers)]),
   );
   const pickable = new Set([...input.selectedMemberIds.map(clubAttendeeClientId), ...guestKeys]);
   const honorSelections = Object.fromEntries(
@@ -1072,7 +1082,7 @@ export async function saveClubRegistrationDraft(
     honorSelections: honorSelections as Prisma.InputJsonValue,
     selectedMemberIds: input.selectedMemberIds,
     guests: input.guests as Prisma.InputJsonValue,
-    responses: input.responses as Prisma.InputJsonValue,
+    responses: withoutAcknowledgments(input.responses) as Prisma.InputJsonValue,
     attendeeResponses: attendeeResponses as Prisma.InputJsonValue,
     teamName: teamSettings?.allowMultipleTeams ? (input.teamName ?? "").slice(0, 200) : "",
     ...("accountId" in actor ? { updatedByAccountId: actor.accountId, updatedByUserId: null } : { updatedByUserId: actor.userId, updatedByAccountId: null }),

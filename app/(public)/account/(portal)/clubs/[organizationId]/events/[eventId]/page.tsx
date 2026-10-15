@@ -396,6 +396,7 @@ export default async function ClubEventRegistrationPage({
           backgroundStates={backgroundStates}
           honorsCatalog={honorsCatalog && honorsCatalog.offerings.length > 0 ? honorsCatalog : null}
           organizationId={organizationId}
+          staffActingAsDirector={access.actor.kind !== "ATTENDEE"}
           workspace={{ ...workspace, experience: workspace.experience }}
         />
       )}
