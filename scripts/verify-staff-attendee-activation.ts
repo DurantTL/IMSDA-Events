@@ -8,6 +8,7 @@
  * - switch ON: an existing account is reused only when verified, active, unlinked and with the same
  *   email; an unverified account, or one linked to someone else, is NOT linked and NOT verified
  *   (a needs-review audit entry instead), and activation still succeeds;
+ * - a previously active user (re-added, or promoted by create-admin with a printed URL) is flagged for review and never linked at activation;
  * - activation never creates a staff session, and a password reset of an ACTIVE user links nothing;
  * - no attendee-grade method (attendee password, Google sign-in, email verification code) yields a
  *   staff session for a linked person, and the resolver never reports a staff side from an attendee session;
@@ -37,7 +38,7 @@ const prisma = new PrismaClient();
 const P = `sau_${randomUUID().slice(0, 8)}`;
 const email = (key: string) => `${P}.${key}@example.test`;
 const PASSWORD = "synthetic-Passphrase-4-verify";
-const keys = ["off", "new", "reuse", "unverified", "taken", "reset", "grade"] as const;
+const keys = ["off", "new", "reuse", "unverified", "taken", "reset", "readd", "promote", "bootstrap", "grade"] as const;
 type Key = (typeof keys)[number];
 const userId = (k: Key) => `${P}_user_${k}`;
 
@@ -75,11 +76,12 @@ async function pendingStaff(k: Key, accountStatus: "PENDING_ACTIVATION" | "ACTIV
 }
 
 async function activate(k: Key) {
+  const sessionsBefore = await prisma.userSession.count({ where: { userId: userId(k) } });
   const issued = await issueAccountTokenForUser(userId(k), { purpose: "ACCOUNT_ACTIVATION" });
   assert(await resetPassword(issued.token, PASSWORD), `activation of ${k} succeeds`);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId(k) } });
   assert(user.accountStatus === "ACTIVE" && user.activatedAt !== null, `${k} is ACTIVE after activation`);
-  assert((await prisma.userSession.count({ where: { userId: userId(k) } })) === 0, `activating ${k} issues no staff session`);
+  assert((await prisma.userSession.count({ where: { userId: userId(k) } })) === sessionsBefore, `activating ${k} issues no staff session`);
   return user;
 }
 
@@ -166,6 +168,47 @@ async function main() {
   assert(await resetPassword(resetToken.token, PASSWORD), "password reset succeeds");
   assert((await prisma.user.findUniqueOrThrow({ where: { id: userId("reset") } })).attendeeAccountId === null, "a password reset links nothing");
   assert((await accountsFor("reset")).length === 0, "a password reset creates no attendee account");
+
+  // Re-add then activate: an existing person (they have a revoked session) is never linked,
+  // even though a re-add cleared activatedAt. A matching verified account would otherwise qualify.
+  await prisma.attendeeAccount.create({
+    data: { email: email("readd"), displayName: "Readd Synthetic", status: "ACTIVE", emailVerifiedAt: new Date() },
+    select: { id: true },
+  });
+  await pendingStaff("readd");
+  await prisma.userSession.create({
+    data: { userId: userId("readd"), tokenHash: `${P}-old-session`, expiresAt: new Date(Date.now() + 3600_000), revokedAt: new Date() },
+  });
+  assert((await activate("readd")).attendeeAccountId === null, "a previously active user (re-added) is not linked at activation");
+  const readdAudit = await prisma.auditLog.findFirst({ where: { entityId: userId("readd"), action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW" } });
+  assert(JSON.stringify(readdAudit?.metadata).includes("PREVIOUSLY_ACTIVE"), "re-add: flagged PREVIOUSLY_ACTIVE");
+
+  // Promote-existing without a password (create-admin prints the URL): not linked, not emailed.
+  await prisma.attendeeAccount.create({
+    data: { email: email("promote"), displayName: "Promote Synthetic", status: "ACTIVE", emailVerifiedAt: new Date() },
+    select: { id: true },
+  });
+  await pendingStaff("promote");
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: userId("promote"), action: "SYSTEM_ADMIN_PROMOTED", entityType: "User", entityId: userId("promote"),
+      correlationId: randomUUID(), summary: "synthetic", metadata: { viaBootstrapScript: true, passwordSetDirectly: false },
+    },
+  });
+  assert((await activate("promote")).attendeeAccountId === null, "promote-existing then activate does not link");
+  const promoteAudit = await prisma.auditLog.findFirst({ where: { entityId: userId("promote"), action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW" } });
+  assert(JSON.stringify(promoteAudit?.metadata).includes("TOKEN_NOT_EMAILED"), "promote-existing: flagged TOKEN_NOT_EMAILED");
+
+  // A brand-new administrator bootstrapped with a printed URL is not linked either.
+  await pendingStaff("bootstrap");
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: userId("bootstrap"), action: "SYSTEM_ADMIN_BOOTSTRAPPED", entityType: "User", entityId: userId("bootstrap"),
+      correlationId: randomUUID(), summary: "synthetic", metadata: { viaBootstrapScript: true, passwordSetDirectly: false },
+    },
+  });
+  assert((await activate("bootstrap")).attendeeAccountId === null, "a create-admin bootstrapped admin is not linked at activation");
+  assert((await accountsFor("bootstrap")).length === 0, "and no attendee account is created for them");
 
   // ---- No attendee-grade method yields a staff session for a linked person. ----
   const gradeUser = await pendingStaff("grade");
