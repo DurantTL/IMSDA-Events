@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Club portal fixes from the owner's iPad review (#918). Items: roster name prominence, Emergency contact
- * wording (and, since #510, minors only), the date field layout rules, the two item searches that must visibly filter, Orders
+ * wording for every member (#510), the date field layout rules, the two item searches that must visibly filter, Orders
  * hidden from Area Coordinators (the server half is in the route tests), and the Team permissions intro.
  * Synthetic data only. The two search tests run the real components on a tiny hook runtime (no DOM here).
  */
@@ -92,7 +92,7 @@ describe("1. roster: the name is the most prominent thing in the row", () => {
   });
 });
 
-describe("2. the contact section reads Emergency contact, and only minors have one (#510)", () => {
+describe("2. the contact section reads Emergency contact for everyone (#510)", () => {
   it("still treats staff, adults, and anyone 18 or over as an adult", () => {
     expect(isAdultRosterPerson("STAFF")).toBe(true);
     expect(isAdultRosterPerson("ADULT")).toBe(true);
@@ -114,22 +114,17 @@ describe("2. the contact section reads Emergency contact, and only minors have o
     expect(html).toContain('aria-label="Emergency contact 2"');
     expect(html).not.toMatch(/Guardian/);
   });
-  it("shows the form's Add to roster contact section for a minor only", () => {
+  it("shows the form's Add to roster contact section as Emergency contact for every member", () => {
     const blank = { name: "", relationship: "", email: "", phone: "" };
     const review = (attendeeType: string, birthDate: string) => ({
       submissionId: "sub-1", organizationId: "club-1", formName: "Synthetic form", clubYear: "2026-27", duplicates: [], canAdd: true,
       prefill: { firstName: "Sam", lastName: "Sample", birthDate, attendeeType, classLevel: "", role: "", gender: "", guardians: [blank, blank] },
     }) as never;
     const render = (attendeeType: string, birthDate: string) => renderToStaticMarkup(createElement(ClubFormRosterAdd, { review: review(attendeeType, birthDate), formHref: "/forms/1" }));
-    for (const html of [render("STAFF", ""), render("ADULT", ""), render("YOUTH", "1980-01-01")]) {
-      expect(html).not.toContain("roster-guardians");
-      expect(html).not.toContain("Emergency contact");
+    for (const html of [render("STAFF", ""), render("ADULT", ""), render("YOUTH", "1980-01-01"), render("YOUTH", "2013-04-09"), render("UNDERAGE", "")]) {
+      expect(html).toContain("<legend>Emergency contacts (optional)</legend>");
+      expect(html).toContain('aria-label="Emergency contact 2"');
       expect(html).not.toContain("Guardian");
-    }
-    for (const minor of [render("YOUTH", "2013-04-09"), render("UNDERAGE", ""), render("YOUTH", "")]) {
-      expect(minor).toContain("<legend>Emergency contacts (optional)</legend>");
-      expect(minor).toContain('aria-label="Emergency contact 2"');
-      expect(minor).not.toContain("Guardian");
     }
   });
   it("labels each row of the read-only contacts panel Emergency contact", async () => {

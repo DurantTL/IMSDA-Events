@@ -12,7 +12,6 @@ import {
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   defaultRosterRole,
-  isMinorRosterPerson,
 } from "@/modules/club-rosters/domain";
 import {
   GUARDIAN_SLOTS,
@@ -45,8 +44,6 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, calendarDateInEventTimeZone(new Date(), "America/Chicago"))
     : null;
 
-  // Emergency contacts are collected for minors only (#510); the server decides again from the sealed birth date.
-  const minor = isMinorRosterPerson(formType, formBirthDate, calendarDateInEventTimeZone(new Date(), "America/Chicago"));
   const term = EMERGENCY_CONTACT_TERM;
 
   async function send(body: unknown) {
@@ -93,7 +90,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
       email: String(form.get(`g${index + 1}Email`) ?? "").trim(),
       phone: String(form.get(`g${index + 1}Phone`) ?? "").trim(),
     }));
-    const guardianProblems = minor ? validateGuardianForm(guardians) : {};
+    const guardianProblems = validateGuardianForm(guardians);
     setGuardianErrors(guardianProblems);
     const firstInvalid = rosterFormFieldOrder.find((field) => errors[field]);
     if (firstInvalid) {
@@ -115,7 +112,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         role: String(form.get("role") ?? ""),
         classLevel: String(form.get("classLevel") ?? "") || null,
         gender: String(form.get("gender") ?? "") || null,
-        ...(minor ? { guardians } : {}),
+        guardians,
       },
     });
   }
@@ -206,9 +203,9 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
           </label>
         </div>
 
-        {minor && <fieldset className="roster-guardians">
+        <fieldset className="roster-guardians">
             <legend>{term.plural} (optional)</legend>
-            <p className="field-help">Up to two emergency contacts for this member under 18, from the parent or guardian details on the form. Only your club&apos;s director and deputy, Area Coordinators and conference staff with sensitive-data access can see them.</p>
+            <p className="field-help">Up to two emergency contacts, from the contact details on the form. Only your club&apos;s director and deputy, Area Coordinators and conference staff with sensitive-data access can see them.</p>
             {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
               const slot = (index + 1) as 1 | 2;
               const value = prefill.guardians[index];
@@ -233,7 +230,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
                 </div>
               );
             })}
-        </fieldset>}
+        </fieldset>
 
         <div className="intro-actions">
           <button className="primary-button" disabled={saving} type="submit">Add to roster</button>

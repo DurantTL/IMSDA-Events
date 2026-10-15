@@ -5,8 +5,8 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
 import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
-import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, isMinorRosterPerson } from "@/modules/club-rosters/domain";
-import { guardianSetPhoneProblem, guardianSlotsFrom, type GuardianValues } from "@/modules/club-rosters/guardians-domain";
+import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole } from "@/modules/club-rosters/domain";
+import { guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
 
@@ -24,7 +24,6 @@ export type RosterErrorCode =
   | "GENDER_REQUIRED"
   | "GUARDIANS_PRIOR_YEAR"
   | "GUARDIAN_PHONE_INVALID"
-  | "CONTACT_MINORS_ONLY"
   | "CARRY_FORWARD_DONE"
   | "CARRY_FORWARD_BUSY";
 
@@ -151,17 +150,6 @@ async function findMember(tx: Prisma.TransactionClient, organizationId: string, 
   return member;
 }
 
-/**
- * Emergency contacts are for minors only (#510). A save that carries a contact
- * for someone who is not a minor is refused; a blank set is fine (it clears).
- * Minor status is worked out here from the member's type and birth date, never
- * trusted from the client.
- */
-function assertContactsAllowed(guardians: readonly GuardianValues[] | undefined, minor: boolean) {
-  if (!guardians || minor || guardianSlotsFrom(guardians).length === 0) return;
-  throw new RosterOperationError("CONTACT_MINORS_ONLY", "Emergency contacts are only kept for members under 18.");
-}
-
 function assertBirthDate(birthDate: string, now: Date) {
   const problem = birthDateProblem(birthDate, calendarDateOf(now));
   if (problem) throw new RosterOperationError("BIRTH_DATE_INVALID", problem);
@@ -242,7 +230,6 @@ export async function addRosterMemberInTransaction(
   options: RosterAddOptions = {},
 ) {
   assertBirthDate(input.birthDate, options.now ?? new Date());
-  assertContactsAllowed(input.guardians, isMinorRosterPerson(input.attendeeType, input.birthDate, calendarDateOf(options.now ?? new Date())));
   await assertNotDuplicate(tx, organizationId, clubYear, input.firstName, input.lastName, input.birthDate);
   const person = await tx.person.create({
     data: { firstName: input.firstName, lastName: input.lastName },
@@ -349,10 +336,6 @@ export async function updateRosterMember(
       },
     });
     if (input.guardians) {
-      assertContactsAllowed(
-        input.guardians,
-        isMinorRosterPerson(finalType, birthDate, calendarDateOf(now), input.birthDate === undefined ? member.reportedAge : null),
-      );
       // An old saved phone left alone passes; a changed one must be valid (#855). Stored rows are this member's only.
       const storedGuardians = await tx.clubRosterGuardian.findMany({ where: { rosterMemberId: memberId }, select: { position: true, phone: true } });
       const phoneProblem = guardianSetPhoneProblem(input.guardians, storedGuardians);

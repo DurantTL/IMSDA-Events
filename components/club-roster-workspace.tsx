@@ -20,7 +20,6 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
-  isMinorRosterPerson,
   missingRosterFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
@@ -196,11 +195,6 @@ export function ClubRosterWorkspace({
   }
 
   const today = calendarDateInEventTimeZone(new Date(), "America/Chicago");
-  /**
-   * Emergency contacts are collected for minors only (#510). A birth date typed in the dialog decides; an
-   * edit that leaves it blank falls back to the age the server worked out for this member.
-   */
-  const minorContact = isMinorRosterPerson(formType, formBirthDate, today, editing ? (editing.age ?? editing.reportedAge) : null);
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, today)
     : null;
@@ -266,12 +260,12 @@ export function ClubRosterWorkspace({
       editing: Boolean(editing),
     });
     setFieldErrors(errors);
-    // Emergency contacts (#510): minors only, two slots, every field optional; only email and phone format are checked.
-    if (canEditGuardians && minorContact && guardianState === "loading") {
+    // Emergency contacts (#510): every member, two slots, every field optional; only email and phone format are checked.
+    if (canEditGuardians && guardianState === "loading") {
       setError("Still loading this person's emergency contacts. Try again in a moment.");
       return;
     }
-    const guardianSlots = canEditGuardians && minorContact && guardianState === "ready"
+    const guardianSlots = canEditGuardians && guardianState === "ready"
       ? Array.from({ length: GUARDIAN_SLOTS }, (_, index) => ({
         name: String(form.get(`g${index + 1}Name`) ?? "").trim(),
         relationship: String(form.get(`g${index + 1}Relationship`) ?? "").trim(),
@@ -659,7 +653,7 @@ export function ClubRosterWorkspace({
             {fieldErrors.gender && <span className="roster-field-error" id="roster-gender-error" role="alert">{fieldErrors.gender}</span>}
           </label>
         </div>
-        {canEditGuardians && minorContact && (
+        {canEditGuardians && (
           <RosterGuardianFields
             errors={guardianErrors}
             guardianState={guardianState}

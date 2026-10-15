@@ -3,8 +3,6 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { openBirthDate } from "@/modules/club-rosters/birth-dates";
-import { calendarDateOf, isMinorRosterPerson } from "@/modules/club-rosters/domain";
 import {
   GUARDIAN_SLOTS,
   guardianAuditActor,
@@ -48,26 +46,6 @@ const guardianSelect = {
 
 function toRecord(row: { position: number; name: string; relationship: string; email: string; phone: string }): GuardianRecord {
   return { position: row.position, name: row.name, relationship: row.relationship, email: row.email, phone: row.phone };
-}
-
-/** The member fields minor status is worked out from. The sealed birth date is opened here and never returned. */
-const minorSelect = { attendeeType: true, reportedAge: true, sealedBirthDate: true } satisfies Prisma.ClubRosterMemberSelect;
-
-type MinorFields = { attendeeType: string; reportedAge: number | null; sealedBirthDate: string | null };
-
-/**
- * Whether a stored member is a minor today (#510), on the roster's own age
- * rules (`isMinorRosterPerson`). Emergency contacts are for minors only, so
- * every read below drops a member who is not one: an adult's old row (from
- * before the Oct 15 decision) stays stored but is never shown or exported.
- */
-export function storedMemberIsMinor(member: MinorFields, today = calendarDateOf(new Date())) {
-  return isMinorRosterPerson(
-    member.attendeeType,
-    member.sealedBirthDate ? openBirthDate(member.sealedBirthDate) : null,
-    today,
-    member.reportedAge,
-  );
 }
 
 /**
@@ -115,13 +93,10 @@ export async function listGuardiansByMember(
   const rows = await getPrisma().clubRosterGuardian.findMany({
     where: { rosterMember: { organizationId, clubYear, status: { not: "REMOVED" } } },
     orderBy: [{ rosterMemberId: "asc" }, { position: "asc" }],
-    select: { rosterMemberId: true, ...guardianSelect, rosterMember: { select: minorSelect } },
+    select: { rosterMemberId: true, ...guardianSelect },
   });
-  const today = calendarDateOf(new Date());
   const byMember: Record<string, GuardianRecord[]> = {};
-  for (const row of rows) {
-    if (storedMemberIsMinor(row.rosterMember, today)) (byMember[row.rosterMemberId] ??= []).push(toRecord(row));
-  }
+  for (const row of rows) (byMember[row.rosterMemberId] ??= []).push(toRecord(row));
   return byMember;
 }
 
@@ -152,16 +127,12 @@ export async function listGuardianContactsForClub(
     select: {
       id: true,
       attendeeType: true,
-      reportedAge: true,
-      sealedBirthDate: true,
       status: true,
       person: { select: { firstName: true, lastName: true } },
       guardians: { orderBy: { position: "asc" }, select: guardianSelect },
     },
   });
-  const today = calendarDateOf(new Date());
   const contacts = members
-    .filter((member) => storedMemberIsMinor(member, today))
     .map((member) => ({
       memberId: member.id,
       firstName: member.person?.firstName ?? "",
@@ -202,12 +173,9 @@ export async function guardiansForExport(organizationId: string, clubYear: strin
       ...(memberIds ? { rosterMemberId: { in: memberIds } } : {}),
     },
     orderBy: [{ rosterMemberId: "asc" }, { position: "asc" }],
-    select: { rosterMemberId: true, ...guardianSelect, rosterMember: { select: minorSelect } },
+    select: { rosterMemberId: true, ...guardianSelect },
   });
-  const today = calendarDateOf(new Date());
   const byMember: Record<string, GuardianRecord[]> = {};
-  for (const row of rows) {
-    if (storedMemberIsMinor(row.rosterMember, today)) (byMember[row.rosterMemberId] ??= []).push(toRecord(row));
-  }
+  for (const row of rows) (byMember[row.rosterMemberId] ??= []).push(toRecord(row));
   return byMember;
 }

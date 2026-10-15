@@ -254,7 +254,7 @@ export function RosterExportBuilder({
 
       {canSeeGuardians && (
         <p className="field-help">
-          Emergency contact columns are sensitive, and only members under 18 have one. Phone numbers that start with + are exported with a leading apostrophe so
+          Emergency contact columns are sensitive. Phone numbers that start with + are exported with a leading apostrophe so
           spreadsheets don&apos;t treat them as formulas.
         </p>
       )}

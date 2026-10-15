@@ -8,9 +8,8 @@ import {
 } from "@/modules/club-rosters/guardians-domain";
 
 /**
- * The emergency contact fieldset in the roster add/edit dialog (#510). Staff see it as "Emergency contact"; it is
- * collected for minors only, so the dialog does not render it for anyone else (and the server refuses a contact
- * for an adult). Two slots, every field optional.
+ * The emergency contact fieldset in the roster add/edit dialog (#510). Staff see it as "Emergency contact", for
+ * every roster member, adult or minor. Two slots, every field optional.
  */
 export function RosterGuardianFields({ errors: guardianErrors, guardianState, records }: {
   errors: GuardianFormErrors;
@@ -22,7 +21,7 @@ export function RosterGuardianFields({ errors: guardianErrors, guardianState, re
     <fieldset className="roster-guardians">
       <legend>{term.plural} (optional)</legend>
       <p className="field-help">
-        Up to two emergency contacts for this member under 18. Your club&apos;s director and deputy, Area Coordinators and conference staff with
+        Up to two emergency contacts. Your club&apos;s director and deputy, Area Coordinators and conference staff with
         sensitive-data access can see them. They are erased when this person is removed from the roster.
       </p>
       {guardianState === "failed" && (

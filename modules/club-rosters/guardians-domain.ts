@@ -8,10 +8,9 @@ const GUARDIAN_PHONE_MESSAGE = "Enter a phone number like (515) 555-0134.";
  * validation, and who may read or change them. Nothing here touches the
  * database, so the roster dialog and the server agree on the same checks.
  *
- * Owner decision (Oct 15, 2026): the contact is collected for minors only (a
- * member under 18, worked out on the server from the sealed birth date), the
- * director and deputy edit it, and it is in the roster export. Staff-facing
- * wording is "Emergency contact".
+ * Owner decision (Oct 15, 2026): every roster member, adult or minor, can
+ * have emergency contacts, the director and deputy edit them, and they are in
+ * the roster export. Staff-facing wording is "Emergency contact" everywhere.
  *
  * Director decision (Oct 1 and Oct 3, 2026): up to two contacts per member,
  * each with a name, relationship, email and cell phone, every field optional,

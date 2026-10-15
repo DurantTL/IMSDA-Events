@@ -139,33 +139,14 @@ export function ageOn(birthDate: string, onDate: string) {
 
 /**
  * Whether a roster person is an adult (#918): registered staff and adults are, and so is anyone whose
- * birth date makes them 18 or over on `today`. Used to word the contact section "Emergency contact"
- * for adults and "Guardian" only for a minor.
+ * birth date makes them 18 or over on `today`. (#918 used it to word the contact section; since #510
+ * every member's contact reads "Emergency contact", so nothing in the roster contact code depends on it.)
  */
 export function isAdultRosterPerson(attendeeType: string | null | undefined, birthDate?: string | null, today?: string) {
   if (attendeeType === "STAFF" || attendeeType === "ADULT") return true;
   if (!birthDate || !today) return false;
   const age = ageOn(birthDate, today);
   return age !== null && age >= youngestAdultAge && age <= 120;
-}
-
-/**
- * Whether a roster person is a minor (#510): the only people who carry an emergency contact. The
- * age follows the roster's own rules: a known birth date decides (under 18 on `today`), then the
- * age reported on an import that had no birth date, and with neither the member type (a youth or
- * an underage child is a minor; staff and adults are not). Always worked out on the server from the
- * sealed birth date; callers pass the date in and never keep or return it.
- */
-export function isMinorRosterPerson(
-  attendeeType: string | null | undefined,
-  birthDate?: string | null,
-  today?: string,
-  reportedAge?: number | null,
-) {
-  const age = birthDate && today ? ageOn(birthDate, today) : null;
-  if (age !== null) return age < youngestAdultAge;
-  if (typeof reportedAge === "number") return reportedAge < youngestAdultAge;
-  return attendeeType === "YOUTH" || attendeeType === "UNDERAGE";
 }
 
 export function calendarDateOf(date: Date) {

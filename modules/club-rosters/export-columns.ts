@@ -7,9 +7,8 @@
  * Medical and insurance data are never offered here. Emergency contacts (#510,
  * stored as `ClubRosterGuardian`, so the column keys still say "guardian") are
  * offered as sensitive columns, and only to someone who may see them
- * (`guardian: true` below): the club's director and deputy. Only members under
- * 18 have one, so an adult's cells are always empty. Only fields the roster
- * already collects appear.
+ * (`guardian: true` below): the club's director and deputy. Only fields the
+ * roster already collects appear.
  */
 type RosterExportColumnDefinition = { header: string; sensitive: boolean; guardian?: true };
 
