@@ -20,9 +20,11 @@ vi.mock("@/components/sign-out-button", () => ({
 }));
 
 import { AppShell } from "@/components/app-shell";
+import { eventFeaturesItem } from "@/components/staff-navigation";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
 import { resolveSidebarGroupOpen } from "@/components/sidebar-groups";
 import {
+  createEventHrefFor,
   systemNavActiveEntryKey,
   systemNavActiveItem,
   systemNavGroups,
@@ -73,7 +75,7 @@ describe("system navigation groups", () => {
     ]) expect(hrefs).toContain(href);
   });
 
-  it("lists only system-administrator pages", () => {
+  it("lists system-administrator pages, plus the staff-scoped Archived events", () => {
     for (const { href } of systemNavGroups.flatMap((group) => group.items)) {
       expect(href.startsWith("/admin") || href.startsWith("/event-setup") || href === "/archived-events", href).toBe(true);
     }
@@ -104,8 +106,8 @@ describe("sidebar on /admin pages", () => {
   it("shows the system groups to a system admin, collapsible, with Catalogs and settings closed", () => {
     const nav = sidebarOf(render(admin));
     for (const label of ["Events", "Clubs", "People", "Catalogs and settings"]) expect(nav).toContain(`<span>${label}</span>`);
-    expect(nav).toContain('href="/admin/clubs/reports"');
-    expect(nav).toContain('href="/event-setup/copy"');
+    expect(nav).toContain('href="/admin/clubs/reports?event=evt_one"');
+    expect(nav).toContain('href="/event-setup/copy?event=evt_one"');
     expect(nav).toMatch(/id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-system-catalogs-toggle"/);
     expect(nav).toMatch(/id="nav-group-system-clubs-toggle"[^>]*aria-expanded="true"|aria-expanded="true"[^>]*id="nav-group-system-clubs-toggle"/);
     // The event workspace sections are not drawn on system pages.
@@ -115,8 +117,17 @@ describe("sidebar on /admin pages", () => {
   it("highlights the current page and opens its group", () => {
     navigation.pathname = "/admin/honors";
     const nav = sidebarOf(render(admin));
-    expect(nav).toMatch(/class="nav-item active"[^>]*aria-current="page"[^>]*href="\/admin\/honors"|href="\/admin\/honors"[^>]*aria-current="page"/);
+    expect(nav).toContain('class="nav-item active" aria-current="page" href="/admin/honors?event=evt_one"');
     expect(nav).toMatch(/aria-expanded="true"[^>]*id="nav-group-system-catalogs-toggle"|id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="true"/);
+  });
+
+  it("keeps the current event on system links and lists Archived events once", () => {
+    navigation.search = "event=evt_one";
+    const markup = render(admin);
+    expect(sidebarOf(markup)).toContain('href="/admin/clubs/reports?event=evt_one"');
+    expect(markup.match(/>Archived events</g)).toHaveLength(1);
+    navigation.pathname = "/overview";
+    expect(render(admin).match(/>Archived events</g)).toHaveLength(1);
   });
 
   it("leaves the event workspace sidebar unchanged off /admin, and never shows system groups to non-admins", () => {
@@ -127,7 +138,7 @@ describe("sidebar on /admin pages", () => {
     navigation.pathname = "/admin";
     const nonAdmin = sidebarOf(render(staff));
     expect(nonAdmin).not.toContain("Catalogs and settings");
-    expect(nonAdmin).not.toContain('href="/admin/clubs/reports"');
+    expect(nonAdmin).not.toContain('href="/admin/clubs/reports?event=evt_one"');
     expect(nonAdmin).not.toContain('href="/event-setup"');
   });
 });
@@ -148,12 +159,12 @@ describe("account menu Create event", () => {
     expect(menu()).not.toContain("Create event");
   });
 
-  it("is given by the shell only to system administrators", () => {
-    expect(render(admin)).toContain('href="/event-setup"');
-    expect(render(staff)).not.toContain('href="/event-setup"');
-    // The popover is closed in static markup; the shell passes the prop only for admins.
+  it("is offered only to system administrators", () => {
+    expect(createEventHrefFor(true)).toBe("/event-setup");
+    expect(createEventHrefFor(false)).toBeUndefined();
+    // The shell reads the helper (the popover itself is closed in static markup).
     const source = readFileSync(join(process.cwd(), "components/app-shell.tsx"), "utf8");
-    expect(source).toContain('createEventHref={isSystemAdmin ? "/event-setup" : undefined}');
+    expect(source).toContain("createEventHref={createEventHrefFor(isSystemAdmin)}");
   });
 });
 
@@ -169,8 +180,9 @@ describe("/admin dashboard page", () => {
   });
 
   it("links each event card to Features, placeholder until #965 lands", () => {
-    expect(source).toContain("eventFeaturesHref");
-    expect(source).toContain("TODO(#965)");
+    expect(source).toContain("eventFeaturesItem.href");
+    expect(source).not.toContain("TODO(#965)");
+    expect(eventFeaturesItem.href.startsWith("/more")).toBe(true);
   });
 
   it("keeps the event operations, health and version panels", () => {

@@ -27,9 +27,10 @@ import {
  * them as task cards and the sidebar draws the same groups, compact and
  * collapsible, on every /admin page, so the two cannot drift.
  *
- * Every destination here is a system-administrator page (each page checks
- * `globalRole === "SYSTEM_ADMIN"` itself); the callers draw these groups only for
- * a system administrator. Nothing here grants access.
+ * Almost every destination is a system-administrator page that checks
+ * `globalRole === "SYSTEM_ADMIN"` itself; Archived events (`/archived-events`)
+ * is staff-scoped and enforces its own access. The callers draw these groups
+ * only for a system administrator. Nothing here grants access.
  */
 export type SystemNavGroupKey = "system-events" | "system-clubs" | "system-people" | "system-catalogs";
 
@@ -138,4 +139,9 @@ export function systemNavActiveEntryKey(pathname: string): string | null {
   // /admin/calendar is both "Set up from calendar" and "Public calendar": light the Events entry only.
   const group = systemNavGroups.find((candidate) => candidate.items.includes(item));
   return group ? systemNavEntryKey(group, item) : null;
+}
+
+/** The account menu's Create event link (#966): only a system administrator gets one. */
+export function createEventHrefFor(isSystemAdmin: boolean): string | undefined {
+  return isSystemAdmin ? "/event-setup" : undefined;
 }

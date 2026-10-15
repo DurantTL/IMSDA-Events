@@ -32,7 +32,7 @@ import {
   subscribeSidebarGroups,
 } from "@/components/sidebar-groups";
 import { SidebarToggle } from "@/components/sidebar-toggle";
-import { systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
+import { createEventHrefFor, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
@@ -328,7 +328,7 @@ export function AppShell({
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </div>
-          <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>
+          {!showSystemNav && <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>}
         </div>}
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
@@ -343,7 +343,7 @@ export function AppShell({
                   const { href, icon: Icon, label } = item;
                   const isActive = activeSystemEntry === systemNavEntryKey(group, item);
                   return (
-                    <Link key={href} className={isActive ? "nav-item active" : "nav-item"} href={href} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
+                    <Link key={href} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
                       <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
                       <span>{label}</span>
                     </Link>
@@ -479,7 +479,7 @@ export function AppShell({
             <StaffAccountMenu
               attendeePreviewHref={attendeePreviewHref}
               canSwitchToAttendee={canSwitchToAttendee}
-              createEventHref={isSystemAdmin ? "/event-setup" : undefined}
+              createEventHref={createEventHrefFor(isSystemAdmin)}
               displayName={user.displayName}
               email={user.email}
               systemAdminContext={systemAdminContext ? { ...systemAdminContext, href: withCurrentEvent(systemAdminContext.href, selectedEventId) } : systemAdminContext}

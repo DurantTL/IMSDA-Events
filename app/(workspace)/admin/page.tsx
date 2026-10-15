@@ -28,7 +28,7 @@ import { listPendingModuleRequests } from "@/modules/event-modules/requests";
 import { getReleaseIdentity } from "@/lib/release";
 import packageInfo from "@/package.json";
 import styles from "./system-admin.module.css";
-import { eventFeaturesHref, staffPageTitles } from "@/components/staff-navigation";
+import { eventFeaturesItem, staffPageTitles } from "@/components/staff-navigation";
 import { systemNavGroups } from "@/components/system-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.systemManagement };
@@ -287,8 +287,7 @@ export default async function SystemAdminPage({
                     </div>
                     <div className={styles.eventLinks}>
                       <Link href={`/registration-builder?${query}`}>Form</Link>
-                      {/* TODO(#965): the Event features page is not merged; this is its placeholder href until it lands. */}
-                      <Link href={withEvent(eventFeaturesHref, query)}>Features</Link>
+                      <Link href={withEvent(eventFeaturesItem.href, query)}>Features</Link>
                       <Link href={`/finance/square-payments?${query}`}>Square matching</Link>
                       <Link href={`/more/promo-codes?${query}`}>Promo codes</Link>
                       <Link href={`/staff?${query}`}>Team</Link>
