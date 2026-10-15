@@ -1,10 +1,12 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { SelectEventList } from "@/components/select-event-list";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { listArchivedEventsForUser } from "@/modules/events/archive-repository";
 import { listEventsForUser } from "@/modules/events/repository";
 
 export const metadata: Metadata = {
@@ -43,7 +45,9 @@ export default async function SelectEventPage({
   if (session.user.globalRole === "SYSTEM_ADMIN") redirect("/admin");
 
   const events = await listEventsForUser(session.user.id, false);
-  if (events.length === 0) redirect("/no-access");
+  // Archived events are not choices (#635); an account whose events are all archived goes to that list.
+  const archivedEvents = await listArchivedEventsForUser(session.user.id, false);
+  if (events.length === 0) redirect(archivedEvents.length > 0 ? "/archived-events" : "/no-access");
   if (events.length === 1 && !unavailable) {
     redirect(`/overview?event=${encodeURIComponent(events[0].id)}`);
   }
@@ -74,6 +78,9 @@ export default async function SelectEventPage({
             dates: formatEventDates(event.startsAt, event.endsAt, event.timezone),
           }))}
         />
+        {archivedEvents.length > 0 && (
+          <Link className="secondary-button full-button" href="/archived-events">Archived events ({archivedEvents.length})</Link>
+        )}
         <SignOutButton className="secondary-button full-button" />
       </section>
     </main>

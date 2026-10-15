@@ -1937,7 +1937,7 @@ export async function backgroundCheckSummary(today = calendarDateInEventTimeZone
     prisma.backgroundCheckReview.count({ where: { dismissedAt: null } }),
     latestUploadForCounts ? prisma.backgroundCheckEntry.count({ where: { uploadId: latestUploadForCounts.id, match: null, ...NO_OPEN_REVIEW } }) : Promise.resolve(0),
     prisma.event.findMany({
-      where: { checksAdultBackgrounds: true, endsAt: { gte: new Date() } },
+      where: { checksAdultBackgrounds: true, archivedAt: null, endsAt: { gte: new Date() } },
       orderBy: { startsAt: "asc" },
       select: { id: true, name: true, startsAt: true, timezone: true },
     }),

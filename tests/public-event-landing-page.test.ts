@@ -195,7 +195,7 @@ describe("public event page for a closed or ended event (#642)", () => {
       ...landing,
       lifecycle: describePublicEventLifecycle(
         {
-          isPublished: true,
+          isPublished: true, archivedAt: null,
           timezone: "America/Chicago",
           capacity: 100,
           registrationOpensOn: "2026-01-01",

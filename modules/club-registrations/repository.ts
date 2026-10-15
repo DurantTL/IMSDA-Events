@@ -158,6 +158,7 @@ export const clubEventSelect = {
   timezone: true,
   location: true,
   isPublished: true,
+  archivedAt: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
@@ -256,7 +257,7 @@ export async function locationSeatCounts(client: Pick<Prisma.TransactionClient, 
  */
 export async function listClubEvents(organizationId: string, now = new Date()) {
   const events = await getPrisma().event.findMany({
-    where: { isPublished: true, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", endsAt: { gte: now } },
+    where: { isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", endsAt: { gte: now } },
     orderBy: { startsAt: "asc" },
     select: {
       ...clubEventSelect,
@@ -541,7 +542,7 @@ export async function clubDirectoryIdentity(
 export async function requireClubEvent(eventId: string): Promise<ClubEvent> {
   const event = await getPrisma().event.findFirst({
     // Same gate as `listClubEvents`: CLUB audience and church billing (#481).
-    where: { id: eventId, isPublished: true, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
+    where: { id: eventId, isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
     select: clubEventSelect,
   });
   if (!event) throw new ClubRegistrationError("EVENT_NOT_FOUND", "That club event could not be found.");

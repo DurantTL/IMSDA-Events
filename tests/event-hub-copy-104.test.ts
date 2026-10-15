@@ -183,7 +183,7 @@ describe("the document title never leaks a custom hub title (#104)", () => {
     });
     const title = await getEventHubTitleForViewer({ eventSlug: "synthetic-weekend", attendeeEmail: "guest@example.test" });
     expect(title).toBeNull();
-    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: "synthetic-weekend", isPublished: true } }));
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { slug: "synthetic-weekend", isPublished: true, archivedAt: null } }));
     expect(resolveEventHubCopy({ hubTitle: title }).documentTitle).toBe(DEFAULT_EVENT_HUB_TITLE);
   });
 

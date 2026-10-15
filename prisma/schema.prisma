@@ -767,6 +767,7 @@ model User {
   announcements             Announcement[]
   pinnedAnnouncements       Announcement[]        @relation("AnnouncementPinnedBy")
   auditLogs                 AuditLog[]
+  archivedEvents            Event[]               @relation("EventArchivedBy")
   moduleRequests            ModuleRequest[] @relation("ModuleRequestRequester")
   moduleRequestsDecided     ModuleRequest[] @relation("ModuleRequestDecider")
   importRuns                ImportRun[]
@@ -1590,8 +1591,15 @@ model Event {
   showOnCalendar       Boolean            @default(true)
   /// Short label for filtering the public calendar, e.g. "Youth" or "Camp meeting".
   calendarCategory     String?
+  /// Set when staff archive the event (#635): hidden from pickers, default selection and every public page, and registration
+  /// is closed, but nothing is deleted or changed. Null means the event is not archived. Unarchiving clears both fields.
+  archivedAt           DateTime?
+  /// Who archived it. Kept as an id only; cleared with `archivedAt`, and null if that account is later deleted.
+  archivedByUserId     String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+
+  archivedBy                          User?              @relation("EventArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
 
   badgeBackground                     EventAsset?        @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
   memberships                         EventMembership[]
@@ -1719,6 +1727,7 @@ model Event {
   consentPolicyApplicabilities EventConsentPolicyApplicability[]
 
   @@index([badgeBackgroundAssetId])
+  @@index([archivedAt])
 }
 
 /// A feature turned on for one event (#741). A row means "enabled"; the

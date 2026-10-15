@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { describePublicEventLifecycle } from "@/modules/events/public-domain";
 
 const baseEvent = {
-  isPublished: true,
+  isPublished: true, archivedAt: null,
   timezone: "America/Chicago",
   capacity: 100,
   registrationOpensOn: "2026-08-01",

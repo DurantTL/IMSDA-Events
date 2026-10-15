@@ -264,7 +264,7 @@ describe("review follow-ups", () => {
     const result = await listPublishedRegistrationInfoCards("synthetic-event");
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: {
-        event: { slug: "synthetic-event", isPublished: true },
+        event: { slug: "synthetic-event", isPublished: true, archivedAt: null },
         isPublished: true,
         // The info cards, plus the text blocks of #816 that may sit on the form.
         kind: { in: ["NOTICE", "STEPS", "CHECKLIST", "FORMATTED_TEXT", "FAQ", "CONTACT"] },

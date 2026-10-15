@@ -18,9 +18,12 @@ export async function getSystemAdminDashboard(now = new Date()) {
   const [events, activeUserCount, pendingUserCount, systemAdminCount, unresolvedAlertCount] =
     await Promise.all([
       prisma.event.findMany({
+        // Archived events (#635) are off the dashboard; the Archived events list holds them.
+        where: { archivedAt: null },
         orderBy: { startsAt: "asc" },
         select: {
           id: true,
+          archivedAt: true,
           slug: true,
           name: true,
           startsAt: true,
@@ -109,6 +112,7 @@ export async function getSystemAdminDashboard(now = new Date()) {
     location: event.location,
     capacity: event.capacity,
     isPublished: event.isPublished,
+    archivedAt: event.archivedAt,
     registrationOpensOn: event.registrationOpensOn,
     registrationClosesOn: event.registrationClosesOn,
     waitlistEnabled: event.waitlistEnabled,

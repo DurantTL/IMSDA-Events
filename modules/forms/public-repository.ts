@@ -333,6 +333,7 @@ const publicEventSelect = {
   location: true,
   capacity: true,
   isPublished: true,
+  archivedAt: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
@@ -348,7 +349,7 @@ const publicEventSelect = {
 
 function publishedFormQuery(eventSlug: string, formSlug: string) {
   return {
-    where: { slug: formSlug, event: { slug: eventSlug, isPublished: true } },
+    where: { slug: formSlug, event: { slug: eventSlug, isPublished: true, archivedAt: null } },
     select: {
       id: true,
       slug: true,

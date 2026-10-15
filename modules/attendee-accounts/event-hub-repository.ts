@@ -105,7 +105,7 @@ export async function getEventHubTitleForViewer(input: {
   const hub = await getAttendeeEventHub(input.attendeeEmail, input.eventSlug);
   if (!hub) return null;
   const published = await getPrisma().event.findFirst({
-    where: { slug: input.eventSlug, isPublished: true },
+    where: { slug: input.eventSlug, isPublished: true, archivedAt: null },
     select: { hubTitle: true },
   });
   return published?.hubTitle ?? null;

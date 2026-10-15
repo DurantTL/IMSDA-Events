@@ -138,10 +138,10 @@ export async function getMerchandiseCatalogForProjection(eventId: string, option
   const prisma = getPrisma();
   const [catalog, event, products] = await Promise.all([
     prisma.merchandiseCatalog.findUnique({ where: { eventId } }),
-    prisma.event.findUnique({ where: { id: eventId }, select: { isPublished: true } }),
+    prisma.event.findUnique({ where: { id: eventId }, select: { isPublished: true, archivedAt: true } }),
     prisma.merchandiseProduct.findMany({ where: { eventId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], include: productInclude }),
   ]);
-  if (!options.includeUnpublishedEvent && (!catalog || !event?.isPublished)) return { eventId, isEnabled: false, status: "DRAFT", products: [] };
+  if (!options.includeUnpublishedEvent && (!catalog || !event?.isPublished || event.archivedAt)) return { eventId, isEnabled: false, status: "DRAFT", products: [] };
   return {
     eventId,
     isEnabled: catalog?.isEnabled ?? false,

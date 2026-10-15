@@ -19,7 +19,7 @@ function event(
     timezone: "America/Chicago",
     location: "Camp Heritage",
     capacity: 100,
-    isPublished: true,
+    isPublished: true, archivedAt: null,
     registrationOpensOn: "2026-01-01",
     registrationClosesOn: "2026-07-31",
     waitlistEnabled: true,

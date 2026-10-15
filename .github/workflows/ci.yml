@@ -284,6 +284,9 @@ jobs:
       # name are enforced, the audit row holds counts only, a mid-deletion failure
       # rolls everything back, and the ledger trigger flag never leaks (#620).
       - run: npm run test:event-deletion
+      # Real-database check of archiving an event (#635): permissions, audit rows with ids only, no other row
+      # changed, hidden from staff lists, the public page and calendar, registration closed, unarchive restores it.
+      - run: npm run test:event-archive
 
       # Real-database check of PBE registration (#809): the starter template, several
       # named teams per club, the name unique per event (also under concurrent

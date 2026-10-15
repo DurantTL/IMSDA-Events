@@ -41,14 +41,25 @@ export async function findActiveMembership(
   return membership;
 }
 
-export async function listEventsForUser(userId: string, isSystemAdmin: boolean) {
+/**
+ * The events an account may open. Archived events (#635) are left out unless
+ * `archived: "include"` asks for them: every picker, switcher, default choice
+ * and listing calls this with the default, so an archived event can only come
+ * back through an explicit choice (the Archived events list, or a direct link
+ * to the event that `resolveEventContext` resolves).
+ */
+export async function listEventsForUser(
+  userId: string,
+  isSystemAdmin: boolean,
+  options: { archived?: "exclude" | "include" } = {},
+) {
+  const membershipFilter = isSystemAdmin ? {} : { memberships: { some: { userId, status: "ACTIVE" as const } } };
   return getPrisma().event.findMany({
-    where: isSystemAdmin
-      ? undefined
-      : { memberships: { some: { userId, status: "ACTIVE" } } },
+    where: options.archived === "include" ? membershipFilter : { ...membershipFilter, archivedAt: null },
     orderBy: { startsAt: "asc" },
     select: {
       id: true,
+      archivedAt: true,
       slug: true,
       name: true,
       startsAt: true,
@@ -149,6 +160,7 @@ export async function getEventSettings(eventId: string) {
         hotelRate: true,
         hotelInstructions: true,
         isPublished: true,
+        archivedAt: true,
         registrationOpensOn: true,
         registrationClosesOn: true,
         waitlistEnabled: true,
@@ -210,6 +222,7 @@ export async function getEventSettings(eventId: string) {
     hotelInstructions: event.hotelInstructions,
     approvedPaymentInstructions: paymentInstructions?.instructions ?? null,
     isPublished: event.isPublished,
+    archivedAt: event.archivedAt?.toISOString() ?? null,
     registrationOpensOn: event.registrationOpensOn,
     registrationClosesOn: event.registrationClosesOn,
     waitlistEnabled: event.waitlistEnabled,
@@ -645,6 +658,7 @@ export async function getEventOverview(eventId: string) {
         location: true,
         capacity: true,
         isPublished: true,
+        archivedAt: true,
         registrationOpensOn: true,
         registrationClosesOn: true,
         waitlistEnabled: true,
@@ -749,6 +763,7 @@ export async function getEventLifecycle(eventId: string, now = new Date()) {
         timezone: true,
         capacity: true,
         isPublished: true,
+        archivedAt: true,
         registrationOpensOn: true,
         registrationClosesOn: true,
         waitlistEnabled: true,

@@ -32,6 +32,7 @@ import { buildRegistrationEmbedCode } from "@/modules/forms/embed";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { PublishEventDialog } from "@/components/publish-event-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
+import { ArchiveEventDialog } from "@/components/archive-event-dialog";
 import { DeleteEventDialog } from "@/components/delete-event-dialog";
 import { SubmitButton } from "@/components/submit-button";
 import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
@@ -67,6 +68,8 @@ type EventSettingsWorkspaceProps = {
   areaCoordinators?: ActiveAreaCoordinator[];
   /** Whether to offer Delete event: system administrators only. The server decides again. */
   canDeleteEvent?: boolean;
+  /** Whether to offer Archive / Unarchive: system administrators and the event's Event Admin (#635). The server decides again. */
+  canArchiveEvent?: boolean;
 };
 
 type PublishBlocker = { text: string; actionLabel?: string; targetId?: string; href?: string };
@@ -148,6 +151,7 @@ export function EventSettingsWorkspace({
   initialLocations,
   areaCoordinators,
   canDeleteEvent = false,
+  canArchiveEvent = false,
 }: EventSettingsWorkspaceProps) {
   const [draft, setDraft] = useState<EventSettingsInput>(() => draftFromEvent(initialEvent));
   const [savedDraft, setSavedDraft] = useState<EventSettingsInput>(() => draftFromEvent(initialEvent));
@@ -162,6 +166,7 @@ export function EventSettingsWorkspace({
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishError, setPublishError] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [unpublishDialogOpen, setUnpublishDialogOpen] = useState(false);
   const [unpublishing, setUnpublishing] = useState(false);
   const [unpublishError, setUnpublishError] = useState("");
@@ -1072,13 +1077,25 @@ export function EventSettingsWorkspace({
             </section>
           )}
 
-          {mode === "edit" && initialEvent && (published || canDeleteEvent) && (
-            <DangerZone className="event-delete-panel" heading="Unpublish or delete this event">
+          {mode === "edit" && initialEvent && (published || canDeleteEvent || canArchiveEvent) && (
+            <DangerZone className="event-delete-panel" heading="Unpublish, archive or delete this event">
               {published && (
                 <DangerZoneItem title="Unpublish this event">
                   <p>Closes every public registration form for {initialEvent.name} immediately. Registrations already taken are kept, and you can publish again later.</p>
                   <button className="secondary-button danger-outline-button full-button" disabled={unpublishing} onClick={openUnpublishDialog} type="button">
                     {unpublishing ? "Unpublishing…" : "Unpublish event…"}
+                  </button>
+                </DangerZoneItem>
+              )}
+              {canArchiveEvent && (
+                <DangerZoneItem title={initialEvent.archivedAt ? "Unarchive this event" : "Archive this event"}>
+                  <p>
+                    {initialEvent.archivedAt
+                      ? "This event is archived: hidden from pickers and the public site, with registration closed. Unarchiving restores it exactly."
+                      : "Hides this event from pickers and the public site and closes registration, without deleting anything. Reports and exports still work from the Archived events list, and you can unarchive it later."}
+                  </p>
+                  <button className="secondary-button danger-outline-button full-button" onClick={() => setArchiveDialogOpen(true)} type="button">
+                    {initialEvent.archivedAt ? "Unarchive event…" : "Archive event…"}
                   </button>
                 </DangerZoneItem>
               )}
@@ -1129,6 +1146,15 @@ export function EventSettingsWorkspace({
           onCancel={cancelPublish}
           onConfirm={() => void publish()}
           open={publishDialogOpen}
+        />
+      )}
+      {mode === "edit" && initialEvent && canArchiveEvent && (
+        <ArchiveEventDialog
+          archived={Boolean(initialEvent.archivedAt)}
+          eventId={initialEvent.id}
+          eventName={initialEvent.name}
+          onCancel={() => setArchiveDialogOpen(false)}
+          open={archiveDialogOpen}
         />
       )}
       {mode === "edit" && initialEvent && canDeleteEvent && (

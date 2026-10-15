@@ -230,6 +230,7 @@ async function generalLinkEvent(eventSlug: string): Promise<ClubEvent> {
     where: {
       slug: eventSlug,
       isPublished: true,
+      archivedAt: null,
       audience: "CLUB",
       billingMode: "DEFERRED_ORGANIZATION_INVOICE",
       generalRegistrationLinkEnabled: true,
@@ -1332,7 +1333,7 @@ export async function expireStalePendingTeams(now = new Date(), options: { event
  */
 export async function clubEventEntryRedirect(eventSlug: string): Promise<string | null> {
   const event = await getPrisma().event.findFirst({
-    where: { slug: eventSlug, isPublished: true, audience: "CLUB" },
+    where: { slug: eventSlug, isPublished: true, archivedAt: null, audience: "CLUB" },
     select: { slug: true, billingMode: true, generalRegistrationLinkEnabled: true },
   });
   if (!event) return null;
