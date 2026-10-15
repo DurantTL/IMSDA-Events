@@ -156,13 +156,13 @@ describe("roster routes and guardian contacts (#510)", () => {
   });
 
   it("refuses another club's director before any contact write, next-year rows included (#959)", async () => {
-    mocks.requireRosterAccess.mockRejectedValue(new RosterAccessError("ROLE_NOT_ALLOWED", 403, "Not your club."));
+    mocks.requireRosterAccess.mockRejectedValue(new RosterAccessError("NOT_FOUND", 404, "Club not found."));
     const response = await patchMember(new Request(`https://events.imsda.test/api/attendee/clubs/club-1/roster/member-1?year=${clubYearChoices()[2]}`, {
       method: "PATCH",
       headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
       body: JSON.stringify({ guardians }),
     }), memberCtx);
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     expect(mocks.updateRosterMember).not.toHaveBeenCalled();
     expect(mocks.listGuardiansByMember).not.toHaveBeenCalled();
   });

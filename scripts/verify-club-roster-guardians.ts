@@ -114,6 +114,7 @@ async function main() {
   assert((await countFor(other.memberId)) === 1, "the other club's refused write changed nothing");
   await prisma.clubRosterMember.update({ where: { id: other.memberId }, data: { clubYear: "2024-25" } });
   assert(await rejects(updateRosterMember(clubs.a, other.memberId, { guardians: [guardian("Verify Past Year")] }, actor, august)), "a past-year row still refuses contact edits in August");
+  assert(await rejects(updateRosterMember(clubs.a, other.memberId, { status: "INACTIVE" }, actor, august)), "a status change on a past-year row is refused too");
   assert((await countFor(other.memberId)) === 1, "the past-year refusal changed nothing");
   await prisma.clubRosterMember.update({ where: { id: other.memberId }, data: { clubYear } });
 

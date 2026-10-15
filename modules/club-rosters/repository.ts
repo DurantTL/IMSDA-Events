@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
 import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
-import { ageOn, birthDateProblem, calendarDateOf, defaultRosterRole, guardianEditableYears } from "@/modules/club-rosters/domain";
+import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole, guardianEditableYears } from "@/modules/club-rosters/domain";
 import { guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
@@ -23,6 +23,7 @@ export type RosterErrorCode =
   | "MEMBER_REMOVED"
   | "GENDER_REQUIRED"
   | "GUARDIANS_PRIOR_YEAR"
+  | "ROSTER_YEAR_READ_ONLY"
   | "GUARDIAN_PHONE_INVALID"
   | "CARRY_FORWARD_DONE"
   | "CARRY_FORWARD_BUSY";
@@ -292,6 +293,13 @@ export async function updateRosterMember(
     // it, or against a year further out, is refused.
     if (input.guardians !== undefined && !guardianEditableYears(now).includes(member.clubYear)) {
       throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts can only be changed on the current or next club year's roster.");
+    }
+    // Only the current club year's row can change anything but its emergency
+    // contacts: next year's details stay read-only until the year starts, and a
+    // past year is history. A crafted request mixing `guardians` with other
+    // fields, or sending status or details alone, is refused whole.
+    if (member.clubYear !== clubYearFor(now) && Object.keys(input).some((field) => field !== "guardians")) {
+      throw new RosterOperationError("ROSTER_YEAR_READ_ONLY", "Only emergency contacts can be changed outside the current club year's roster.");
     }
     // Nothing to change (an older client sending only `willingToDrive`, which
     // the schema strips, or an empty edit): no write, no audit entry.
