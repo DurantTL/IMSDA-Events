@@ -226,8 +226,8 @@ export function AppShell({
   const activeHref = onEventFeatures ? null : sidebarActiveHref(current, visibleHrefs);
   const isItemActive = (item: NavigationItem) => {
     if (isProfileRoute) return false;
-    // Event features has a placeholder href until its page exists (#965): match its route instead.
-    if (item.label === eventFeaturesItem.label) return onEventFeatures;
+    // Event features lights on its own page, which is under /more but must not light More (#965).
+    if (item.href === eventFeaturesItem.href) return onEventFeatures;
     return item.href.startsWith("/admin") ? pathname.startsWith(item.href) : activeHref === item.href;
   };
   function toggleGroup(section: SidebarSection, open: boolean) {
