@@ -293,6 +293,18 @@ export default async function ClubEventRegistrationPage({
               <Link className="text-button" href={`${eventBase}/team-form/blank`}>Blank form to mail or email</Link>
             </p>
           )}
+          {workspace.registration.nextLevel && (
+            <div className="public-manage-card team-results-block" aria-labelledby="team-advanced-heading">
+              <h3 id="team-advanced-heading">Advanced to {teamLevelLabels[workspace.registration.nextLevel.level]}</h3>
+              <p>
+                Your team does not register again.{" "}
+                {workspace.registration.nextLevel.whenWhere
+                  ? <>{teamLevelLabels[workspace.registration.nextLevel.level]}: <strong>{workspace.registration.nextLevel.whenWhere}</strong>.</>
+                  : <>The {teamLevelLabels[workspace.registration.nextLevel.level]} date and place will be announced.</>}{" "}
+                Until then you can update your team&apos;s people below, under the same team rules.
+              </p>
+            </div>
+          )}
           {workspace.registration.results.length > 0 && (
             <div className="public-manage-card team-results-block" aria-labelledby="team-results-heading">
               <h3 id="team-results-heading">Results</h3>

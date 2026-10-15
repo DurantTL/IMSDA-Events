@@ -69,7 +69,8 @@ import { registrationOperationFingerprint } from "@/modules/registrations/operat
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
 import { moneyToCents } from "@/modules/payments/square-domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
-import { NO_TEAM_KEY, draftKeySchema, resolveTeamName, teamLabel, type TeamSettings } from "@/modules/club-teams/domain";
+import { NO_TEAM_KEY, draftKeySchema, resolveTeamName, teamLabel, type TeamLevel, type TeamSettings } from "@/modules/club-teams/domain";
+import { betweenLevelsEditOpen, currentLevelOf, levelInfoFor, levelWhenWhere, placementLabel } from "@/modules/club-teams/results-domain";
 import { ClubTeamError } from "@/modules/club-teams/errors";
 import { ALTERNATE_FIELD_KEY, isAlternateAnswer, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
 import { formHasPrices } from "@/modules/club-registrations/per-person-price";
@@ -635,6 +636,21 @@ export function clubEditWindow(event: ClubEvent, location: (LocationDateSource &
   });
 }
 
+/** Whether an advanced team's director may still change its people between levels (#945). The team's own results and the event's level dates decide. */
+async function betweenLevelsEditOpenFor(event: ClubEvent, clubEventRegistrationId: string, now: Date) {
+  // An event without team rules has no levels, so nothing more is read for it.
+  const settings = await getTeamSettings(event.id);
+  if (!settings) return false;
+  const results = await getPrisma().clubTeamResult.findMany({ where: { clubEventRegistrationId }, select: { level: true, qualified: true } });
+  return betweenLevelsEditOpen({ results: resultsByLevel(results) }, settings.levelInfo, calendarDateInEventTimeZone(now, event.timezone)).open;
+}
+
+function resultsByLevel(rows: ReadonlyArray<{ level: TeamLevel; qualified: boolean }>) {
+  const results: Record<TeamLevel, { qualified: boolean } | null> = { AREA: null, CONFERENCE: null, UNION: null };
+  for (const row of rows) results[row.level] = { qualified: row.qualified };
+  return results;
+}
+
 /**
  * Which of a club's teams the director's page is showing (#809), on an event that lets a club register several:
  * a registered team by its key, or an unsubmitted draft by its draft key. Ignored on every other event.
@@ -664,7 +680,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
         createdAt: true,
         registrationId: true,
         // Staff's results for the team (#809), shown to the director read only.
-        teamResults: { select: { level: true, placement: true, qualified: true, notes: true, updatedAt: true } },
+        teamResults: { select: { level: true, placement: true, placementRank: true, qualified: true, notes: true, updatedAt: true } },
         registration: {
           select: {
             confirmationCode: true,
@@ -722,6 +738,15 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
   const problem = form ? clubFormProblem(form.definition) : "The event has no published registration form yet.";
   const experience = form && !problem ? await getPublicRegistrationExperience(event.slug, form.slug) : null;
   const activeMemberIds = new Set(members.map((member) => member.id));
+  // A team that advanced (#945) is told where its next level is held, and may change its people until it is held.
+  const teamResultLevels = resultsByLevel(clubRegistration?.teamResults ?? []);
+  const reachedLevel = currentLevelOf({ results: teamResultLevels });
+  const advancedTo = clubRegistration && reachedLevel !== "AREA" ? { level: reachedLevel } : null;
+  const baseEditWindow = clubEditWindow(event, registeredLocation, now);
+  const editWindow = !baseEditWindow.open && clubRegistration
+    && betweenLevelsEditOpen({ results: teamResultLevels }, teamSettings?.levelInfo ?? [], calendarDateInEventTimeZone(now, event.timezone)).open
+    ? { open: true as const }
+    : baseEditWindow;
   // A team event with nothing to pay (#809): no priced form field, no lodging, and for a registered team no charge or
   // adjustment on it. Then the page says "No cost." instead of "billed to your church".
   const noCost = teamSettings !== null && experience !== null && !formHasPrices(experience.form.definition)
@@ -782,7 +807,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
       registrationClosesOn: effectiveLocationDates(event, registeredLocation).registrationClosesOn,
       // Whether a submitted registration may still be reopened (H3b, #366),
       // on its location's dates when it has one (#413).
-      edit: clubEditWindow(event, registeredLocation, now),
+      edit: editWindow,
     },
     // The event's active locations (#413). Empty: the event works as always.
     locations: eventLocations.map((location) => clubLocationView(event, location, seatCounts.get(location.id) ?? 0, now)),
@@ -834,8 +859,10 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
           return [{ attendeeId: id, status: flag.status, text: permissionNotice(flag.status, snapshotName(snapshot), tlt) }];
         }),
         results: clubRegistration.teamResults.map((result) => ({
-          level: result.level, placement: result.placement, qualified: result.qualified, notes: result.notes,
+          level: result.level, placement: placementLabel(result), qualified: result.qualified, notes: result.notes,
         })),
+        // The next level's date and place, once the team has advanced (#945), so the director knows where to go.
+        nextLevel: advancedTo ? { level: advancedTo.level, whenWhere: levelWhenWhere(levelInfoFor(teamSettings?.levelInfo ?? [], advancedTo.level)) } : null,
         confirmationCode: clubRegistration.registration.confirmationCode,
         status: clubRegistration.registration.status,
         submittedAt: clubRegistration.createdAt.toISOString(),
@@ -1311,11 +1338,14 @@ export async function amendClubRegistration(
   // Which of the club's registrations is being changed (#809): its team's key, the empty key on an event without teams.
   const clubRegistration = await getPrisma().clubEventRegistration.findUnique({
     where: { eventId_organizationId_teamKey: { eventId, organizationId, teamKey: input.teamKey ?? NO_TEAM_KEY } },
-    select: { registrationId: true, registration: { select: { location: { select: clubLocationSelect } } } },
+    select: { id: true, registrationId: true, registration: { select: { location: { select: clubLocationSelect } } } },
   });
   // The edit window follows the registration's own location when it has one (#413).
   const currentLocation = clubRegistration?.registration?.location ?? null;
-  const window = clubEditWindow(event, currentLocation, now);
+  let window = clubEditWindow(event, currentLocation, now);
+  // A team that advanced to the next level may change its people until that level is held (#945), whatever the
+  // registration window says; the team rules apply to the change exactly as before.
+  if (!window.open && clubRegistration && await betweenLevelsEditOpenFor(event, clubRegistration.id, now)) window = { open: true };
   if (!window.open) throw new ClubRegistrationError("REGISTRATION_CLOSED", window.message);
   const form = await publishedClubForm(event.id);
   if (!form) throw new ClubRegistrationError("FORM_UNAVAILABLE", "The event has no published registration form yet.");

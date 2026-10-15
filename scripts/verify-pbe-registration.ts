@@ -404,20 +404,20 @@ async function main() {
 
   // 12. Results: entered by staff, audited, read by the director, in the report and CSV.
   const swordRow = await rowOf("a", "Sword Drill");
-  await expectCode(saveTeamResult(eventId, "no-such-team", { level: "AREA", placement: "1st" }, staffUserId), "REGISTRATION_NOT_FOUND", "a result needs a team of this event");
-  await saveTeamResult(eventId, swordRow.id, { level: "AREA", placement: "2nd place, 412 points", qualified: true, notes: "Strong in Mark" }, staffUserId);
-  await saveTeamResult(eventId, swordRow.id, { level: "CONFERENCE", placement: "5th", qualified: false }, staffUserId);
-  const unchanged = await saveTeamResult(eventId, swordRow.id, { level: "CONFERENCE", placement: "5th", qualified: false }, staffUserId);
+  await expectCode(saveTeamResult(eventId, "no-such-team", { level: "AREA", placementRank: 1 }, staffUserId), "REGISTRATION_NOT_FOUND", "a result needs a team of this event");
+  await saveTeamResult(eventId, swordRow.id, { level: "AREA", placementRank: 2, notes: "Strong in Mark" }, staffUserId);
+  await saveTeamResult(eventId, swordRow.id, { level: "CONFERENCE", placementRank: 5 }, staffUserId);
+  const unchanged = await saveTeamResult(eventId, swordRow.id, { level: "CONFERENCE", placementRank: 5 }, staffUserId);
   assert(!unchanged.changed, "saving what is stored changes nothing");
   assert(await prisma.auditLog.count({ where: { eventId, action: { startsWith: "CLUB_TEAM_RESULT_" } } }) === 2, "two entries are audited, and the repeat is not");
   const audit = await prisma.auditLog.findFirstOrThrow({ where: { eventId, action: "CLUB_TEAM_RESULT_ENTERED" }, orderBy: { createdAt: "asc" } });
-  assert(JSON.stringify(audit.metadata).includes("2nd place") && audit.actorUserId === staffUserId, "the audit row holds the actor and the values");
+  assert(JSON.stringify(audit.metadata).includes('"placementRank":2') && audit.actorUserId === staffUserId, "the audit row holds the actor and the values");
   const report = await listTeamResults(eventId);
   const swordReport = report.find((row) => row.teamName === "Sword Drill")!;
-  assert(swordReport.results.AREA?.qualified === true && swordReport.results.CONFERENCE?.placement === "5th" && swordReport.results.UNION === null, "the report shows each level");
+  assert(swordReport.results.AREA?.qualified === true && swordReport.results.CONFERENCE?.placementRank === 5 && swordReport.results.UNION === null, "the report shows each level");
   assert(report.length === 9, `every registered team is in the report, got ${report.length}`);
   const csv = teamResultsCsvRows(report);
-  assert(csv[0]!.length === 15 && csv.some((row) => row[0] === "Sword Drill" && row[6] === "2nd place, 412 points" && row[7] === "Yes"), "the CSV has the columns and the row");
+  assert(csv[0]!.length === 15 && csv.some((row) => row[0] === "Sword Drill" && row[6] === "2nd" && row[7] === "Yes"), "the CSV has the columns and the row");
   const directorView = await club.getClubEventWorkspace(clubOf("a"), eventId, now, { teamKey: "sword drill" });
   assert(directorView.registration?.results.length === 2 && directorView.registration.teamName === "Sword Drill", "the director sees the results of their own team");
   const otherTeamView = await club.getClubEventWorkspace(clubOf("a"), eventId, now, { teamKey: "bible bees" });
@@ -782,7 +782,7 @@ async function main() {
   await club.submitClubRegistration(clubOf("a"), plainEventId, actor, plainInput([person("a", "y1"), person("a", "y2")]), now, { locationId: null });
   const plainRow = await prisma.clubEventRegistration.findFirstOrThrow({ where: { eventId: plainEventId } });
   assert(plainRow.teamKey === "" && plainRow.teamName === null, "a plain club registration has no team name and the empty key");
-  await expectCode(saveTeamResult(plainEventId, plainRow.id, { level: "AREA", placement: "1st" }, staffUserId), "RESULT_INVALID", "results can only be entered on an event with team rules");
+  await expectCode(saveTeamResult(plainEventId, plainRow.id, { level: "AREA", placementRank: 1 }, staffUserId), "RESULT_INVALID", "results can only be entered on an event with team rules");
   await expectCode(club.submitClubRegistration(clubOf("a"), plainEventId, actor, { ...plainInput([person("a", "y3"), person("a", "y4")]), idempotencyKey: randomUUID() }, now, { locationId: null }), "CLUB_ALREADY_REGISTERED", "a plain club event still takes one registration per club");
   await expectCode(club.submitClubRegistration(clubOf("c"), plainEventId, actor, plainInput([person("c", "y1"), person("c", "y2")]), now, { locationId: null, teamName: "Surprise" }), "TEAM_INVALID", "a team name is refused on an event with one registration per club");
   await expectCode(club.submitClubRegistration(clubOf("b"), plainEventId, actor, plainInput([person("b", "y1"), person("b", "y2")]), now, { locationId: null, draftKey: draftKey() }), "TEAM_INVALID", "a draft id is refused there too");
