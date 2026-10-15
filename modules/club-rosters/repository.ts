@@ -23,7 +23,9 @@ export type RosterErrorCode =
   | "MEMBER_REMOVED"
   | "GENDER_REQUIRED"
   | "GUARDIANS_PRIOR_YEAR"
-  | "GUARDIAN_PHONE_INVALID";
+  | "GUARDIAN_PHONE_INVALID"
+  | "CARRY_FORWARD_DONE"
+  | "CARRY_FORWARD_BUSY";
 
 export class RosterOperationError extends Error {
   constructor(public readonly code: RosterErrorCode, message: string) {

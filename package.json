@@ -42,6 +42,7 @@
     "test:deadline-reminders": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-deadline-reminders.ts",
     "test:club-form-roster-add": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-form-roster-add.ts",
     "test:club-roster-guardians": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-roster-guardians.ts",
+    "test:club-roster-carry-forward": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-roster-carry-forward.ts",
     "test:billing-responsibility": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-billing-responsibility.ts",
     "test:attendance-reconciliation": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-attendance-reconciliation.ts",
     "test:guardian-authority": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-guardian-authority.ts",

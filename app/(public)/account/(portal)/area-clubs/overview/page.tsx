@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AreaClubSearch, AreaClubsOverview, AreaExportLinks } from "@/components/area-clubs-views";
+import { ClubNewYearStatus } from "@/components/club-new-year-status";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { filterClubsByName, parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
+import { listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
+import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Club overview", robots: { index: false, follow: false, nocache: true } };
@@ -17,7 +20,13 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
-  const [allClubs, deadlines] = await Promise.all([getAreaClubsSummary(clubYear), listUpcomingDeadlines()]);
+  const now = new Date();
+  const [allClubs, deadlines, newYearStatus] = await Promise.all([
+    getAreaClubsSummary(clubYear),
+    listUpcomingDeadlines(),
+    // Which clubs haven't started next year's roster (#414): counts only, August through October.
+    carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
+  ]);
   const clubs = filterClubsByName(allClubs, query);
   return (
     <>
@@ -40,6 +49,7 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
             reportHref: (id, month) => `/account/area/${id}/reports/${month}`,
           }}
         />
+        <ClubNewYearStatus clubHref={(id) => `/account/area/${id}`} status={newYearStatus} />
       </section>
     </>
   );
