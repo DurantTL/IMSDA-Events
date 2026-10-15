@@ -10151,6 +10151,59 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   }
 }
 
+/* #964: shorter, grouped staff sidebar. The daily items sit directly in the
+   nav; Set up and Reports are collapsible groups whose heading is a button.
+   Same heading look as .nav-group-label. Icon-only mode (#446) hides the
+   buttons, keeps every group's links showing (a closed group would otherwise
+   hide destinations with no way to open it) and draws the thin rule between
+   groups. Self-contained block; nothing above this comment is changed by it.
+   (plain comment, not a banner: the #743 block test counts banners) */
+.nav-group { display: grid; gap: 1px; }
+.nav-group-items { display: grid; gap: 1px; }
+.nav-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 7px 0 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #7d97a2;
+  padding: 4px 13px;
+  font: inherit;
+  font-size: max(var(--type-floor, 0px), 0.62rem);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+.nav-group-toggle:hover { color: white; background: rgba(255, 255, 255, 0.07); }
+.nav-group-toggle svg { flex: 0 0 auto; transition: transform 160ms ease; }
+.nav-group-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .nav-group-toggle, .nav-group-toggle svg { transition: none; }
+}
+@media screen {
+  /* #93abb6 clears 4.5:1 on the navy gradient (see the group-label rule above). */
+  .nav-group-toggle { color: #93abb6; }
+  .nav-group-toggle:hover { color: white; }
+}
+@media (min-width: 801px) {
+  html[data-sidebar="collapsed"] .nav-group-toggle { display: none; }
+  html[data-sidebar="collapsed"] .nav-group-items[hidden] { display: grid; }
+  html[data-sidebar="collapsed"] .nav-group::before {
+    content: "";
+    display: block;
+    height: 1px;
+    margin: 7px 8px 4px;
+    background: rgba(255, 255, 255, 0.16);
+  }
+}
+
 /* Calendar repeats, office closures and subscribe buttons (#444) */
 .calendar-chip.calendar-closure a, .calendar-chip.calendar-closure span:not(.sr-only) {
   display: inline-flex; align-items: center; gap: 4px;

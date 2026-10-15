@@ -18,7 +18,9 @@ import {
   Download,
   MailPlus,
   ExternalLink,
+  FileUp,
   Filter,
+  ListChecks,
   ListPlus,
   Mail,
   PencilLine,
@@ -256,6 +258,7 @@ export function PeopleWorkspace({
   initialRegistrations,
   canEdit,
   canEmail,
+  canImport = false,
   initialFilter = "ALL",
   initialRegistrationId,
   backgroundFlaggedAttendeeIds = [],
@@ -273,6 +276,8 @@ export function PeopleWorkspace({
   initialRegistrations: RegistrationRecord[];
   canEdit: boolean;
   canEmail: boolean;
+  /** MANAGE_IMPORTS: shows the Imports link, which left the sidebar (#964). */
+  canImport?: boolean;
   initialFilter?: string;
   initialRegistrationId?: string;
   /** Adults at a youth or children's event without a current check (#388). */
@@ -759,6 +764,9 @@ export function PeopleWorkspace({
           <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}</span>
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
           <ActionsMenu>
+            {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
+            <li><a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
+            {canImport && <li><a href={`/imports?event=${encodeURIComponent(eventId)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
             <li><a href={`/people/duplicates?event=${encodeURIComponent(eventId)}`}><CopyCheck aria-hidden="true" size={16} /> Find duplicates</a></li>
             {/* Same permission the review page itself requires (MANAGE_REGISTRATION). */}
             {canEdit && <li><a href={`/people/directory-review?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Directory review</a></li>}

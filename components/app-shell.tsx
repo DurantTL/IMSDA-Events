@@ -21,6 +21,13 @@ import {
   setSidebarCollapsed,
   subscribeSidebarCollapsed,
 } from "@/components/sidebar-collapse";
+import {
+  getSidebarGroupsServerSnapshot,
+  getSidebarGroupsSnapshot,
+  resolveSidebarGroupOpen,
+  setSidebarGroupOpen,
+  subscribeSidebarGroups,
+} from "@/components/sidebar-groups";
 import { SidebarToggle } from "@/components/sidebar-toggle";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
@@ -31,15 +38,18 @@ import {
   buildMoreDirectoryCards,
   canShowMoreLauncher,
   mobileActiveTabHref,
+  eventFeaturesItem,
+  isEventFeaturesPath,
   mobileNavigationLabels,
   navigation,
-  navigationGroupLabels,
   orderedMobileTabs,
   orderedSidebarItems,
+  sidebarSections,
   staffSubpageTitle,
   systemNavigation,
   withCurrentEvent,
   type NavigationItem,
+  type SidebarSection,
 } from "@/components/staff-navigation";
 
 type ShellEvent = {
@@ -110,6 +120,10 @@ export function AppShell({
     onMouseLeave: () => setTooltip(null),
     onBlur: () => setTooltip(null),
   } : {};
+  // Set up and Reports open and close (#964). Saved per browser; the server
+  // always renders with nothing saved, and the pages inside a group open it.
+  const savedGroups = useSyncExternalStore(subscribeSidebarGroups, getSidebarGroupsSnapshot, getSidebarGroupsServerSnapshot);
+  const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarSection; pathname: string } | null>(null);
   const searchParams = useSearchParams();
   // The staff-only profile page (#623) lives inside the shell but is no nav item.
   const isProfileRoute = pathname === "/profile" || pathname.startsWith("/profile/");
@@ -122,6 +136,10 @@ export function AppShell({
     ), null) ?? navigation[0];
   // The header names the page the staff member is on (#685): a `/more/*`
   // page that isn't a nav item names itself instead of reading "More".
+  // The Event features page (#965) is a Set up item, not More, whatever `current` says.
+  const onEventFeatures = isEventFeaturesPath(pathname);
+  // A page that is no sidebar item lights its parent (Attendee list lights Registrations, #964).
+  const activeHref = onEventFeatures ? null : current.sidebarParent ?? current.href;
   const pageTitle = isProfileRoute ? "Your account" : staffSubpageTitle(pathname) ?? current.label;
   const requestedEventId = searchParams.get("event");
   const defaultEvent = defaultEventId
@@ -189,11 +207,23 @@ export function AppShell({
     eventQuery,
     hiddenCardKeys: selectedHiddenCardKeys,
   }) : [];
-  // The fixed order (#741 slice 4) lives in `orderedSidebarItems`. System
-  // management is not here: it is drawn once, above the event picker.
+  // The fixed order lives in `sidebarSections` (#964) and `orderedSidebarItems`.
+  // System management is not here: it is drawn once, above the event picker.
   const visibleNavigation: NavigationItem[] = eventlessProfile
     ? []
     : orderedSidebarItems(selectedPermissions, showMore);
+  const visibleSections = eventlessProfile ? [] : sidebarSections(selectedPermissions);
+  const moreItemVisible = visibleNavigation.find((item) => item.href === "/more");
+  const isItemActive = (item: NavigationItem) => {
+    if (isProfileRoute) return false;
+    // Event features has a placeholder href until its page exists (#965): match its route instead.
+    if (item.label === eventFeaturesItem.label) return onEventFeatures;
+    return item.href.startsWith("/admin") ? pathname.startsWith(item.href) : activeHref === item.href;
+  };
+  function toggleGroup(section: SidebarSection, open: boolean) {
+    setSidebarGroupOpen(section, !open);
+    setDismissedGroup(open ? { section, pathname } : null);
+  }
   // The mobile tab bar keeps its own, shorter order (see `mobileNavigationOrder`).
   const mobileNavigation = orderedMobileTabs(visibleNavigation);
   const attendeePreviewHref = selectedEvent
@@ -287,43 +317,67 @@ export function AppShell({
         </div>}
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
-          {visibleNavigation.map(({ href, icon: Icon, label, group }, index) => {
-            // Every link carries the current event, /admin included (#616).
-            const isActive = isProfileRoute ? false : href.startsWith("/admin") ? pathname.startsWith(href) : current.href === href;
-            const previousGroup = index > 0 ? visibleNavigation[index - 1].group : undefined;
-            const startsGroup = group && group !== previousGroup;
-            if (href === "/more") {
+          {visibleSections.map(({ section, label: sectionLabel, collapsible, items }) => {
+            const links = items.map((item) => {
+              const { href, icon: Icon, label } = item;
+              const isActive = isItemActive(item);
               return (
-                <MoreLauncher
-                  key={href}
-                  variant="sidebar"
-                  className={isActive ? "nav-item active" : "nav-item"}
-                  href={withCurrentEvent(href, selectedEventId)}
-                  isActive={isActive}
-                  cards={launcherCards}
-                  isSystemAdmin={isSystemAdmin}
-                  canRequestFeature={canRequestFeature}
-                  eventQuery={eventQuery}
-                  eventId={selectedEventId || undefined}
-                removableModules={isSystemAdmin ? selectedEvent?.removableModules : undefined}
-                  userId={user.id ?? ""}
-                  tipProps={tipProps(label)}
-                >
-                  <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                  <span>{label}</span>
-                </MoreLauncher>
-              );
-            }
-            return (
-              <Fragment key={href}>
-                {startsGroup && <span className="nav-group-label">{navigationGroupLabels[group]}</span>}
-                <Link className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
+                <Link key={label} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
                   <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
                   <span>{label}</span>
                 </Link>
-              </Fragment>
+              );
+            });
+            // The daily items: no heading, always visible.
+            if (!collapsible || !sectionLabel) return <Fragment key={section}>{links}</Fragment>;
+            const open = resolveSidebarGroupOpen({
+              saved: savedGroups[section],
+              containsCurrentPage: items.some(isItemActive),
+              dismissedOnThisPage: dismissedGroup?.section === section && dismissedGroup.pathname === pathname,
+            });
+            return (
+              <div className="nav-group" key={section} data-open={open ? "true" : "false"}>
+                <button
+                  type="button"
+                  className="nav-group-toggle"
+                  id={`nav-group-${section}-toggle`}
+                  aria-expanded={open}
+                  aria-controls={`nav-group-${section}`}
+                  onClick={() => toggleGroup(section, open)}
+                >
+                  <span>{sectionLabel}</span>
+                  <ChevronDown aria-hidden="true" size={14} />
+                </button>
+                <div className="nav-group-items" id={`nav-group-${section}`} role="group" aria-labelledby={`nav-group-${section}-toggle`} hidden={!open}>
+                  {links}
+                </div>
+              </div>
             );
           })}
+          {moreItemVisible && (() => {
+            const { href, icon: Icon, label } = moreItemVisible;
+            const isActive = isItemActive(moreItemVisible);
+            return (
+              <MoreLauncher
+                key={href}
+                variant="sidebar"
+                className={isActive ? "nav-item active" : "nav-item"}
+                href={withCurrentEvent(href, selectedEventId)}
+                isActive={isActive}
+                cards={launcherCards}
+                isSystemAdmin={isSystemAdmin}
+                canRequestFeature={canRequestFeature}
+                eventQuery={eventQuery}
+                eventId={selectedEventId || undefined}
+                removableModules={isSystemAdmin ? selectedEvent?.removableModules : undefined}
+                userId={user.id ?? ""}
+                tipProps={tipProps(label)}
+              >
+                <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
+                <span>{label}</span>
+              </MoreLauncher>
+            );
+          })()}
         </nav>
 
         <div className="sidebar-foot">

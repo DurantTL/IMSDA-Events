@@ -26,9 +26,13 @@ import {
   mobileActiveTabHref,
   mobileNavigationLabels,
   mobileNavigationOrder,
+  eventFeaturesHref,
+  eventFeaturesRoute,
   navigation,
-  navigationGroupLabels,
-  navigationGroupOrder,
+  orderedSidebarItems,
+  sidebarSectionLabels,
+  sidebarSectionOrder,
+  sidebarSections,
 } from "@/components/staff-navigation";
 import { areaClubPortalNavItems, clubPortalNavItems, clubReporterNavItems } from "@/modules/club-rosters/portal-nav";
 import { operationalHealthEntryPermissions } from "@/modules/operations/access";
@@ -36,7 +40,7 @@ import { eventPermissions, rolePermissions } from "@/modules/access/permissions"
 import type { EventPermission } from "@/modules/access/permissions";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 
-/** The fixed staff navigation order (#741 slice 4). Synthetic data only. */
+/** The fixed staff navigation order (#741 slice 4), regrouped by #964. Synthetic data only. */
 
 const AppShellElement = AppShell as ComponentType<Omit<Parameters<typeof AppShell>[0], "children">>;
 
@@ -60,15 +64,30 @@ function render({ permissions, systemAdmin = false, pathname = "/overview" }: Vi
   );
 }
 
-/** The sidebar as `Group: item, item`, in document order, More last. */
-function sidebar(viewer: Viewer): string[] {
+const navMarkup = (viewer: Viewer) => {
   const markup = render(viewer);
-  const nav = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf('class="sidebar-foot"'));
+  return markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf('class="sidebar-foot"'));
+};
+
+/** Closed groups keep their links in the markup, inside a `hidden` container. */
+const withoutClosedGroups = (nav: string) => nav.replace(/<div class="nav-group-items"[^>]*\shidden=""[^>]*>.*?<\/div>/g, "");
+
+function tokensOf(nav: string): string[] {
   const tokens: string[] = [];
-  for (const match of nav.matchAll(/<span class="nav-group-label">([^<]+)<\/span>|<a [^>]*class="nav-item[^"]*"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)) {
+  for (const match of nav.matchAll(/<button [^>]*class="nav-group-toggle"[^>]*><span>([^<]+)<\/span>|<a [^>]*class="nav-item[^"]*"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)) {
     tokens.push(match[1] ? `# ${match[1]}` : match[2]);
   }
   return tokens;
+}
+
+/** The sidebar as `# Group` headings and items, in document order, More last. Items in a closed group are included. */
+function sidebar(viewer: Viewer): string[] {
+  return tokensOf(navMarkup(viewer));
+}
+
+/** Only what is visible without expanding anything. */
+function visibleSidebar(viewer: Viewer): string[] {
+  return tokensOf(withoutClosedGroups(navMarkup(viewer)));
 }
 
 function phoneTabs(viewer: Viewer): { labels: string[]; active: string[] } {
@@ -86,20 +105,16 @@ function phoneTabs(viewer: Viewer): { labels: string[]; active: string[] } {
 const systemAdmin: Viewer = { permissions: eventPermissions, systemAdmin: true };
 const eventAdmin: Viewer = { permissions: rolePermissions.EVENT_ADMIN };
 const fullOrder = [
-  "# Main", "Dashboard",
-  "# Run the event", "Check-in", "Registrations", "Attendee list", "Imports",
-  "# Set up the event", "Event settings", "Registration forms", "Attendee setup", "Tags",
-  "# People", "Team", "Emails",
-  "# Money", "Payments", "Promo codes",
+  "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
+  "# Set up", "Event settings", "Event features", "Registration forms", "Attendee setup", "Tags",
   "# Reports", "Operational reports", "Operational health",
   "More",
 ];
 
-describe("sidebar order (#741 slice 4)", () => {
-  it("declares the groups in the fixed order with their names", () => {
-    expect(navigationGroupOrder.map((group) => navigationGroupLabels[group])).toEqual([
-      "Main", "Run the event", "Set up the event", "People", "Money", "Reports",
-    ]);
+describe("sidebar order (#964)", () => {
+  it("declares the daily items, then Set up and Reports, with their names", () => {
+    expect([...sidebarSectionOrder]).toEqual(["daily", "setup", "reports"]);
+    expect(sidebarSectionOrder.map((section) => sidebarSectionLabels[section])).toEqual([null, "Set up", "Reports"]);
   });
 
   it("lists every item in the fixed order for a system admin", () => {
@@ -110,44 +125,58 @@ describe("sidebar order (#741 slice 4)", () => {
     expect(sidebar(eventAdmin)).toEqual(fullOrder);
   });
 
-  it("keeps navigation's own order matching the table, More last", () => {
-    expect(navigation.map((item) => item.label)).toEqual(fullOrder.filter((entry) => !entry.startsWith("# ")));
-    expect(navigation.at(-1)?.href).toBe("/more");
+  it("shows a system admin at most nine links without expanding a group", () => {
+    const visible = visibleSidebar(systemAdmin);
+    expect(visible).toEqual(["Dashboard", "Check-in", "Registrations", "Payments", "Emails", "# Set up", "# Reports", "More"]);
+    expect(visible.filter((entry) => !entry.startsWith("# ")).length).toBeLessThanOrEqual(9);
   });
 
-  it("shows a check-in-only role Dashboard and Check-in, with the other groups hidden", () => {
+  it("keeps navigation's sidebar items in the table's order, with the moved items out and More last", () => {
+    const listed = navigation.filter((item) => item.sidebar).map((item) => item.label);
+    expect(listed).toEqual(fullOrder.filter((entry) => !entry.startsWith("# ") && entry !== "More" && entry !== "Event features"));
+    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Team", "Promo codes"]);
+    expect(navigation.at(-1)?.href).toBe("/more");
+    expect(orderedSidebarItems(new Set(eventPermissions), true).map((item) => item.label)).toEqual(
+      fullOrder.filter((entry) => !entry.startsWith("# ") && entry !== "Event features"),
+    );
+  });
+
+  it("puts Event features in Set up, behind CONFIGURE_EVENT, after Event settings (#965)", () => {
+    const setup = sidebarSections(new Set(["CONFIGURE_EVENT"])).find((view) => view.section === "setup");
+    expect(setup?.items.map((item) => item.label)).toEqual(["Event settings", "Event features", "Attendee setup", "Tags"]);
+    expect(setup?.items[1]).toMatchObject({ href: eventFeaturesHref, requiredPermission: "CONFIGURE_EVENT" });
+    // Until the page exists the item links to /more; TODO(#965) points it at the route.
+    expect(eventFeaturesRoute).toBe("/more/features");
+    expect(sidebar({ permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT") })).not.toContain("Event features");
+    expect(render(eventAdmin)).toContain(`href="${eventFeaturesHref}?event=event_1"`);
+  });
+
+  it("shows a check-in-only role Dashboard, Check-in and Registrations, with no groups", () => {
     expect(sidebar({ permissions: rolePermissions.CHECK_IN_STAFF })).toEqual([
-      "# Main", "Dashboard",
-      "# Run the event", "Check-in", "Registrations", "Attendee list",
+      "Dashboard", "Check-in", "Registrations",
       "More",
     ]);
-    expect(sidebar({ permissions: ["MANAGE_CHECK_IN"] })).toEqual([
-      "# Main", "Dashboard",
-      "# Run the event", "Check-in",
-    ]);
+    expect(sidebar({ permissions: ["MANAGE_CHECK_IN"] })).toEqual(["Dashboard", "Check-in"]);
   });
 
-  it("shows a finance-only role Money and its reports, with the empty groups hidden", () => {
+  it("shows a finance-only role Payments and the Reports group, with the empty Set up group hidden", () => {
     expect(sidebar({ permissions: rolePermissions.FINANCE_MANAGER })).toEqual([
-      "# Main", "Dashboard",
-      "# Run the event", "Registrations", "Attendee list",
-      "# Money", "Payments", "Promo codes",
+      "Dashboard", "Registrations", "Payments",
       "# Reports", "Operational reports", "Operational health",
       "More",
     ]);
   });
 
-  it("shows a communications role Emails under People, with no Team", () => {
+  it("shows a communications role Emails and Operational health, with no Set up group", () => {
     expect(sidebar({ permissions: rolePermissions.COMMUNICATIONS_MANAGER })).toEqual([
-      "# Main", "Dashboard",
-      "# People", "Emails",
+      "Dashboard", "Emails",
       "# Reports", "Operational health",
       "More",
     ]);
   });
 
   it("shows a read-only role only the Dashboard", () => {
-    expect(sidebar({ permissions: rolePermissions.READ_ONLY_STAFF })).toEqual(["# Main", "Dashboard"]);
+    expect(sidebar({ permissions: rolePermissions.READ_ONLY_STAFF })).toEqual(["Dashboard"]);
   });
 
   it("hides every item whose permission the viewer lacks", () => {
@@ -158,9 +187,67 @@ describe("sidebar order (#741 slice 4)", () => {
     }
   });
 
-  it("never lists Clubs and churches or a System group in the sidebar", () => {
+  it("never lists the moved items, Clubs and churches or a System group in the sidebar", () => {
     const entries = sidebar({ ...systemAdmin, permissions: eventPermissions });
+    for (const moved of ["Attendee list", "Imports", "Team", "Promo codes"]) expect(entries).not.toContain(moved);
     expect(entries.join("|")).not.toMatch(/Clubs and churches|# System/);
+  });
+});
+
+describe("collapsible groups (#964)", () => {
+  const toggle = (viewer: Viewer, section: string) => {
+    const nav = navMarkup(viewer);
+    return nav.match(new RegExp(`<button [^>]*id="nav-group-${section}-toggle"[^>]*>`))?.[0] ?? "";
+  };
+
+  it("renders each group heading as a real button with aria-expanded and aria-controls, closed by default", () => {
+    for (const section of ["setup", "reports"]) {
+      const button = toggle(systemAdmin, section);
+      expect(button, section).toContain('type="button"');
+      expect(button).toContain('aria-expanded="false"');
+      expect(button).toContain(`aria-controls="nav-group-${section}"`);
+      const nav = navMarkup(systemAdmin);
+      expect(nav).toMatch(new RegExp(`<div class="nav-group-items" id="nav-group-${section}"[^>]*aria-labelledby="nav-group-${section}-toggle"[^>]*hidden=""`));
+    }
+  });
+
+  it("has no button for the daily items, which are always visible", () => {
+    expect(navMarkup(systemAdmin).match(/class="nav-group-toggle"/g)).toHaveLength(2);
+    expect(navMarkup({ permissions: rolePermissions.CHECK_IN_STAFF })).not.toContain("nav-group-toggle");
+  });
+
+  it("opens the group the current page is in, and only that group", () => {
+    const setupOpen = { ...eventAdmin, pathname: "/more/tags" };
+    expect(toggle(setupOpen, "setup")).toContain('aria-expanded="true"');
+    expect(toggle(setupOpen, "reports")).toContain('aria-expanded="false"');
+    expect(visibleSidebar(setupOpen)).toEqual([
+      "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
+      "# Set up", "Event settings", "Event features", "Registration forms", "Attendee setup", "Tags",
+      "# Reports", "More",
+    ]);
+    const reportsOpen = { ...eventAdmin, pathname: "/more/health" };
+    expect(toggle(reportsOpen, "reports")).toContain('aria-expanded="true"');
+    expect(toggle(reportsOpen, "setup")).toContain('aria-expanded="false"');
+    // The daily items are not groups: nothing opens on the dashboard.
+    expect(toggle(eventAdmin, "setup")).toContain('aria-expanded="false"');
+    expect(toggle(eventAdmin, "reports")).toContain('aria-expanded="false"');
+  });
+
+  it("opens Set up on the Event features page, lights that item, and leaves More alone (#965)", () => {
+    const viewer = { ...eventAdmin, pathname: `${eventFeaturesRoute}` };
+    expect(toggle(viewer, "setup")).toContain('aria-expanded="true"');
+    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    expect(active).toEqual(["Event features"]);
+  });
+
+  it("renders correctly with no browser storage: closed groups, every link still in the document", () => {
+    // renderToStaticMarkup has no window or localStorage, like a private window.
+    const nav = navMarkup(systemAdmin);
+    for (const label of ["Event settings", "Event features", "Tags", "Operational reports", "Operational health"]) expect(nav).toContain(`<span>${label}</span>`);
+  });
+
+  it("keeps links in a closed group out of the tab order by hiding the container, not the links", () => {
+    expect(navMarkup(systemAdmin)).not.toMatch(/<a [^>]*tabindex/);
   });
 });
 
@@ -280,6 +367,13 @@ describe("Operational health and desktop highlight (#741 slice 4)", () => {
     expect(activeItems("/more/reports/packets")).toEqual(["Operational reports"]);
     expect(activeItems("/more/health")).toEqual(["Operational health"]);
     expect(activeItems("/more")).toEqual(["More"]);
+  });
+
+  it("lights the parent item for a page that left the sidebar (#964)", () => {
+    expect(activeItems("/people/attendees")).toEqual(["Registrations"]);
+    expect(activeItems("/imports")).toEqual(["Registrations"]);
+    expect(activeItems("/more/promo-codes")).toEqual(["Payments"]);
+    expect(activeItems("/staff")).toEqual(["More"]);
   });
 });
 
