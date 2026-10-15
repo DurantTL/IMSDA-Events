@@ -58,7 +58,7 @@ import {
   type RosterPerson,
 } from "@/modules/guardian-authority/domain";
 import { selectUsesRadioCards } from "@/modules/forms/choice-controls";
-import { acknowledgmentFields, type AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
+import { acknowledgmentFields, type AcknowledgmentDisplay } from "@/modules/acknowledgments/fields";
 import { TranslateHint } from "@/components/translate-hint";
 import { planAttendeeRemoval, withoutAttendee } from "@/modules/forms/attendee-removal";
 import { confirmationEmailHeadline } from "@/modules/forms/confirmation-email-status";

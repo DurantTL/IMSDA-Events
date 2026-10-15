@@ -5,6 +5,11 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 import type { MinorStatus } from "@/modules/guardian-authority/domain";
+import { acknowledgmentFields } from "@/modules/acknowledgments/fields";
+
+// The client-safe pieces live in `fields.ts`; re-exported so server callers keep importing from here.
+export { acknowledgmentFields } from "@/modules/acknowledgments/fields";
+export type { AcknowledgmentDisplay } from "@/modules/acknowledgments/fields";
 
 /**
  * Acknowledgment evidence (#150): the pure rules, free of the database so they are unit-tested on their own.
@@ -45,11 +50,6 @@ export function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-/** Every acknowledgment field of a definition, in form order. */
-export function acknowledgmentFields(definition: RegistrationFormDefinition): RegistrationFormField[] {
-  return definition.sections.flatMap((section) => section.fields).filter((field) => field.type === "ACKNOWLEDGMENT");
-}
-
 // ---------------------------------------------------------------------------------------------
 // What was shown
 // ---------------------------------------------------------------------------------------------
@@ -74,14 +74,6 @@ export function policyContent(version: { id: string; contentHash: string | null 
     contentRef: `policy:${version.id}`,
   };
 }
-
-/** What a public form or preview renders for one acknowledgment: never evidence, only the wording. */
-export type AcknowledgmentDisplay = {
-  source: "TEXT" | "POLICY_VERSION";
-  title: string | null;
-  text: string;
-  versionNumber: number | null;
-};
 
 // ---------------------------------------------------------------------------------------------
 // Acting for another person
