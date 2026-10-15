@@ -635,6 +635,8 @@ enum MessageTemplateKey {
   NEW_CLUB_APPLICATION_INVITE
   /// A seat in a full Honors Weekend class was offered to a youth on its waitlist (#831): one email to that club's director. Not an event template.
   HONOR_CLASS_WAITLIST_OFFER
+  /// A reinstated or promoted registration came back without some Honors Weekend class picks because the class was full or the club's limit was reached (#880): one email to that club's director. Not an event template.
+  HONOR_CLASS_PICKS_NOT_RESTORED
 }
 
 enum MessageTemplateStatus {

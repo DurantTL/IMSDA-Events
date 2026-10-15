@@ -119,6 +119,7 @@ async function postHandler(
       return Response.json({
         registration: result.registration,
         autoPromotedRegistration: result.autoPromotedRegistration,
+        autoPromotedClassPicksNotRestored: result.autoPromotedClassPicksNotRestored,
       }, { status: 200, headers: noStoreHeaders });
     }
     if (action.data === "reactivate") {
@@ -129,14 +130,20 @@ async function postHandler(
         reason
       );
       await processMessagesAfterCommit(result.pendingMessageIds);
-      return Response.json({ registration: result.registration }, { status: 200, headers: noStoreHeaders });
+      return Response.json({
+        registration: result.registration,
+        classPicksNotRestored: result.classPicksNotRestored,
+      }, { status: 200, headers: noStoreHeaders });
     }
     const result = action.data === "waitlist"
       ? await moveRegistrationToWaitlist(eventId, registrationId, access.user.id, reason)
       : await promoteRegistrationFromWaitlist(eventId, registrationId, access.user.id, reason);
     await processMessagesAfterCommit(result.pendingMessageIds);
     const registration = result.registration;
-    return Response.json({ registration }, { status: 200, headers: noStoreHeaders });
+    return Response.json({
+      registration,
+      ...("classPicksNotRestored" in result ? { classPicksNotRestored: result.classPicksNotRestored } : {}),
+    }, { status: 200, headers: noStoreHeaders });
   } catch (error) {
     return errorResponse(error);
   }

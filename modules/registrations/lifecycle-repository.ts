@@ -31,6 +31,7 @@ import {
   remainingEventCapacity,
 } from "@/modules/events/lifecycle";
 import { getRegistrationById, type RegistrationRecord } from "@/modules/registrations/repository";
+import type { RestoredClassSeats } from "@/modules/honors/restore-seats";
 
 export type RegistrationLifecycleErrorCode =
   | "REGISTRATION_NOT_FOUND"
@@ -469,6 +470,37 @@ async function auditTransition(
   });
 }
 
+type ClassSeatsRestored = RestoredClassSeats;
+
+/** Re-takes a registration's Honors Weekend class seats before it becomes active again (#880). */
+async function restoreClassSeats(
+  tx: Prisma.TransactionClient,
+  registration: LifecycleRegistration,
+  input: {
+    actorUserId: string | null;
+    now: Date;
+    correlationId: string;
+    trigger: "REGISTRATION_REACTIVATED" | "REGISTRATION_PROMOTED_FROM_WAITLIST" | "REGISTRATION_AUTO_PROMOTED_FROM_WAITLIST";
+  },
+): Promise<ClassSeatsRestored> {
+  const { restoreClassSeatsInTransaction } = await import("@/modules/honors/restore-seats");
+  return restoreClassSeatsInTransaction(tx, {
+    eventId: registration.eventId,
+    registrationId: registration.id,
+    now: input.now,
+    actorUserId: input.actorUserId,
+    correlationId: input.correlationId,
+    trigger: input.trigger,
+  });
+}
+
+function classSeatsAuditMetadata(restored: ClassSeatsRestored) {
+  return {
+    ...(restored.droppedCount > 0 ? { classPicksNotRestored: restored.droppedCount } : {}),
+    ...(restored.keptOverCount > 0 ? { classPicksKeptOverCapacity: restored.keptOverCount } : {}),
+  };
+}
+
 async function promoteWithinTransaction(
   tx: Prisma.TransactionClient,
   registration: LifecycleRegistration,
@@ -490,6 +522,9 @@ async function promoteWithinTransaction(
   // Where the club stood at its location, read while it is still waitlisted and waiting (#599).
   const locationPlace = await locationWaitlistPlace(tx, registration.id, registration.locationId);
   const activatedReservations = await activateOptionReservations(tx, registration, claims, now);
+  // Honors Weekend class seats are counted by registration status, so the flip below would put every old pick back (#880).
+  // Re-take them first, under the class locks, and drop what no longer fits.
+  const classSeats = await restoreClassSeats(tx, registration, { actorUserId, now, correlationId, trigger: action });
   await tx.registration.update({
     where: { id: registration.id },
     data: { status: "SUBMITTED", cancelledAt: null },
@@ -528,6 +563,7 @@ async function promoteWithinTransaction(
       totalAmountPreserved: true,
       paymentHistoryPreserved: true,
       lodgingRequestHeld: lodging.hasRequest,
+      ...classSeatsAuditMetadata(classSeats),
     },
   });
   await recordLocationWaitlistChange(tx, {
@@ -537,7 +573,7 @@ async function promoteWithinTransaction(
     place: locationPlace,
     now,
   });
-  return enqueueWaitlistPromotedMessage(tx, {
+  const promotedMessage = await enqueueWaitlistPromotedMessage(tx, {
     eventId: registration.eventId,
     registrationId: registration.id,
     correlationId,
@@ -548,6 +584,11 @@ async function promoteWithinTransaction(
       autoPromoted: action === "REGISTRATION_AUTO_PROMOTED_FROM_WAITLIST",
     },
   });
+  return {
+    ...promotedMessage,
+    pendingMessageIds: [...promotedMessage.pendingMessageIds, ...classSeats.pendingMessageIds],
+    classPicksNotRestored: classSeats.dropped,
+  };
 }
 
 const maximumPromotionRounds = 50;
@@ -649,6 +690,7 @@ async function autoPromoteEarliestFitting(
     return {
       registrationId: candidate.id,
       pendingMessageIds: queued.pendingMessageIds,
+      classPicksNotRestored: queued.classPicksNotRestored.report,
     };
   }
   return null;
@@ -679,9 +721,11 @@ export async function promoteWaitlistAfterSeatsFreed(
 ) {
   const promotedRegistrationIds: string[] = [];
   const pendingMessageIds: string[] = [];
+  // Class picks the promoted registrations could not take back (#880), one line each, for the caller to show staff.
+  const classPicksNotRestored: string[] = [];
   const event = await loadEvent(tx, input.eventId);
   if (!event.waitlistEnabled || !event.autoPromoteWaitlist) {
-    return { promotedRegistrationIds, pendingMessageIds };
+    return { promotedRegistrationIds, pendingMessageIds, classPicksNotRestored };
   }
   const now = input.now ?? new Date();
   const correlationId = input.correlationId ?? crypto.randomUUID();
@@ -692,12 +736,13 @@ export async function promoteWaitlistAfterSeatsFreed(
     if (!promoted) break;
     promotedRegistrationIds.push(promoted.registrationId);
     pendingMessageIds.push(...promoted.pendingMessageIds);
+    classPicksNotRestored.push(...promoted.classPicksNotRestored);
     if (!input.repeat) break;
     if (round === maximumPromotionRounds - 1) {
       logWarn("Waitlist promotion stopped at its round limit with clubs possibly still waiting.", { eventId: input.eventId, rounds: maximumPromotionRounds });
     }
   }
-  return { promotedRegistrationIds, pendingMessageIds };
+  return { promotedRegistrationIds, pendingMessageIds, classPicksNotRestored };
 }
 
 function retryableTransactionError(error: unknown) {
@@ -745,6 +790,7 @@ async function registrationResult(eventId: string, registrationId: string) {
 export type CancelRegistrationResult = {
   registration: RegistrationRecord;
   autoPromotedRegistration: RegistrationRecord | null;
+  autoPromotedClassPicksNotRestored: string[];
   pendingMessageIds: string[];
 };
 
@@ -858,6 +904,7 @@ export async function cancelRegistration(
     return {
       registrationId: registration.id,
       autoPromotedRegistrationId,
+      autoPromotedClassPicksNotRestored: autoPromotion?.classPicksNotRestored ?? [],
       pendingMessageIds: [
         ...cancellationMessage.pendingMessageIds,
         ...(autoPromotion?.pendingMessageIds ?? []),
@@ -874,6 +921,8 @@ export async function cancelRegistration(
     autoPromotedRegistration: result.autoPromotedRegistrationId
       ? await registrationResult(eventId, result.autoPromotedRegistrationId)
       : null,
+    /** Class picks the automatically promoted registration could not take back (#880), one line each. */
+    autoPromotedClassPicksNotRestored: result.autoPromotedClassPicksNotRestored,
     pendingMessageIds: result.pendingMessageIds,
   };
 }
@@ -986,10 +1035,13 @@ export async function promoteRegistrationFromWaitlist(
     return {
       registrationId: registration.id,
       pendingMessageIds: queued.pendingMessageIds,
+      classPicksNotRestored: queued.classPicksNotRestored.report,
     };
   });
   return {
     registration: await registrationResult(eventId, result.registrationId),
+    /** Class picks that could not come back with the promotion (#880), one line each. */
+    classPicksNotRestored: result.classPicksNotRestored,
     pendingMessageIds: result.pendingMessageIds,
   };
 }
@@ -1046,6 +1098,14 @@ export async function reactivateRegistration(
     const targetStatus = priorStatus === "CONFIRMED" ? "CONFIRMED" : "SUBMITTED";
     const correlationId = crypto.randomUUID();
     const activatedReservations = await activateOptionReservations(tx, registration, claims, now);
+    // Class seats are counted by registration status, so the flip below would put every old pick back (#880).
+    // Re-take them first, under the class locks, and drop what no longer fits.
+    const classSeats = await restoreClassSeats(tx, registration, {
+      actorUserId,
+      now,
+      correlationId,
+      trigger: "REGISTRATION_REACTIVATED",
+    });
     await tx.registration.update({
       where: { id: registration.id },
       data: { status: targetStatus, cancelledAt: null },
@@ -1078,6 +1138,7 @@ export async function reactivateRegistration(
         restoredStatus: targetStatus,
         totalAmountPreserved: true,
         paymentHistoryPreserved: true,
+        ...classSeatsAuditMetadata(classSeats),
       },
     });
     const queued = await enqueueRegistrationReactivatedMessage(tx, {
@@ -1093,11 +1154,14 @@ export async function reactivateRegistration(
     });
     return {
       registrationId: registration.id,
-      pendingMessageIds: queued.pendingMessageIds,
+      pendingMessageIds: [...queued.pendingMessageIds, ...classSeats.pendingMessageIds],
+      classPicksNotRestored: classSeats.dropped.report,
     };
   });
   return {
     registration: await registrationResult(eventId, result.registrationId),
+    /** Class picks that could not come back with the reactivation (#880), one line each. */
+    classPicksNotRestored: result.classPicksNotRestored,
     pendingMessageIds: result.pendingMessageIds,
   };
 }
