@@ -230,9 +230,9 @@ async function main() {
   // ---- Admin email change clears verification: switch off, then on. ----
   const adminUser = await staffUser("admin", { globalRole: "SYSTEM_ADMIN" });
   const plain = await attendee("plain");
-  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id } })).emailVerifiedAt !== null, "starts verified");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt !== null, "starts verified");
   await changeAttendeeEmail(plain.id, email("plain-new"), adminUser.id);
-  const plainAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id } });
+  const plainAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } });
   assert(plainAfter.email === email("plain-new") && plainAfter.emailVerifiedAt === null, "switch off: an admin email change clears the verification");
 
   // Re-verification: a password reset code for the new address.
@@ -250,20 +250,20 @@ async function main() {
   });
   const reset = await completeAttendeePasswordReset({ pendingToken, code, passwordHash: await hashPassword(PASSWORD), userAgent: null });
   assert(reset.outcome === "reset", "the reset code for the new address works");
-  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id } })).emailVerifiedAt !== null, "a reset code to the new address verifies it again");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt !== null, "a reset code to the new address verifies it again");
 
   // Google sign-in for the new address verifies it again too.
   await changeAttendeeEmail(plain.id, email("plain-newer"), adminUser.id);
-  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id } })).emailVerifiedAt === null, "cleared again");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt === null, "cleared again");
   const google = await signInWithGoogle({ subject: `${P}-g-plain`, email: email("plain-newer"), emailVerified: true, name: null }, null);
   assert(google.outcome === "signed-in", "Google sign-in for the new address works");
-  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id } })).emailVerifiedAt !== null, "Google for the new address verifies it again");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt !== null, "Google for the new address verifies it again");
 
   await setSwitch(true);
   const pairAccount = await attendee("pair");
   const pairUser = await staffUser("pair", { attendeeAccountId: pairAccount.id });
   await changeStaffEmail(pairUser.id, email("pair-new"), adminUser.id);
-  const pairAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: pairAccount.id } });
+  const pairAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: pairAccount.id }, select: { email: true, emailVerifiedAt: true } });
   assert(pairAfter.email === email("pair-new") && pairAfter.emailVerifiedAt === null, "switch on, linked pair: both emails change and the attendee verification is cleared");
   assert((await prisma.user.findUniqueOrThrow({ where: { id: pairUser.id } })).email === email("pair-new"), "switch on, linked pair: the staff email changed with it");
 

@@ -121,7 +121,7 @@ describe("a linked person's email changes on both sides together (decision 3)", 
       .mockResolvedValueOnce({ id: "usr_1", attendeeAccountId: "acc_1" }); // link
     await changeStaffEmail("usr_1", "new@example.test", "admin-1");
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "usr_1" }, data: { email: "new@example.test" } });
-    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test" } });
+    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test", emailVerifiedAt: null } });
     expect(mocks.revokeAllUserSessions).toHaveBeenCalledWith("usr_1");
     expect(mocks.revokeAllAttendeeSessions).toHaveBeenCalledWith("acc_1");
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(2);
@@ -133,7 +133,7 @@ describe("a linked person's email changes on both sides together (decision 3)", 
     mocks.userFindUnique.mockResolvedValue({ id: "usr_1", attendeeAccountId: "acc_1" });
     await changeAttendeeEmail("acc_1", "new@example.test", "admin-1");
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "usr_1" }, data: { email: "new@example.test" } });
-    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test" } });
+    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test", emailVerifiedAt: null } });
   });
 
   it("refuses, writing nothing, when either side's new address is taken", async () => {

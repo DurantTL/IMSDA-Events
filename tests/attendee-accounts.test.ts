@@ -67,6 +67,7 @@ type PrismaStub = {
     findUnique: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
   };
   attendeeCredential: { update: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
   attendeeAccountToken: {
@@ -87,6 +88,7 @@ function stubPrisma(): PrismaStub {
       findUnique: vi.fn(),
       create: vi.fn().mockResolvedValue({ id: "acct_new" }),
       update: vi.fn().mockResolvedValue({ id: "acct_existing" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     attendeeCredential: {
       update: vi.fn().mockResolvedValue({}),
@@ -927,6 +929,23 @@ describe("spending a reset code", () => {
         }),
       }),
     );
+  });
+
+  it("verifies an account whose verification an administrator cleared, and touches no verified one", async () => {
+    // A reset code goes to the account's current address; typing it back verifies that address.
+    prisma.attendeeAccountToken.findUnique.mockResolvedValue(liveToken());
+
+    await completeAttendeePasswordReset({
+      pendingToken: "pending",
+      code,
+      passwordHash: "scrypt$new",
+      userAgent: null,
+    });
+
+    expect(prisma.attendeeAccount.updateMany).toHaveBeenCalledWith({
+      where: { id: expect.any(String), emailVerifiedAt: null },
+      data: { emailVerifiedAt: expect.any(Date) },
+    });
   });
 
   it("revokes every other session", async () => {
