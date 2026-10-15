@@ -116,7 +116,9 @@ export async function beginAttendeeSignUp(input: {
   const tokenHash = hashOpaqueToken(token);
 
   if (existing?.status === "ACTIVE") {
-    await issueVerificationToken(existing.id, tokenHash, expiresAt, now);
+    // Anyone can type an existing address into sign-up. That must not cancel a verification code an
+    // administrator sent to its owner, so tokens that already hold a code are left alone here.
+    await issueVerificationToken(existing.id, tokenHash, expiresAt, now, { keepCoded: true });
     return { pendingToken: token, expiresAt, outcome: "existing", accountId: existing.id };
   }
 
@@ -164,10 +166,12 @@ async function issueVerificationToken(
   tokenHash: string,
   expiresAt: Date,
   now: Date,
+  options: { keepCoded?: boolean } = {},
 ) {
   await getPrisma().$transaction([
     getPrisma().attendeeAccountToken.updateMany({
-      where: { accountId, purpose: "EMAIL_VERIFICATION", usedAt: null },
+      // `keepCoded`: a token that already holds a code (one an administrator sent) is not retired.
+      where: { accountId, purpose: "EMAIL_VERIFICATION", usedAt: null, ...(options.keepCoded ? { codeHash: null } : {}) },
       data: { usedAt: now },
     }),
     getPrisma().attendeeAccountToken.create({
@@ -280,18 +284,88 @@ export async function verifyAttendeeEmail(input: {
   const now = input.now ?? new Date();
   const record = await getPrisma().attendeeAccountToken.findUnique({
     where: { tokenHash: hashOpaqueToken(input.pendingToken) },
-    select: {
-      id: true,
-      accountId: true,
-      codeHash: true,
-      purpose: true,
-      expiresAt: true,
-      codeExpiresAt: true,
-      usedAt: true,
-      attempts: true,
-    },
+    select: VERIFICATION_RECORD_SELECT,
   });
+  return spendVerificationRecord(record, input.code, input.userAgent, now);
+}
 
+const VERIFICATION_RECORD_SELECT = {
+  id: true,
+  accountId: true,
+  codeHash: true,
+  purpose: true,
+  expiresAt: true,
+  codeExpiresAt: true,
+  usedAt: true,
+  attempts: true,
+} as const;
+
+/**
+ * Verifies an address with the six-digit code only, for the one case where the
+ * person never held the pending-request handle: an ACTIVE account whose
+ * verification an administrator cleared (an email change) and who was sent a
+ * code by "Send verification email". Refused for every other account, in
+ * particular a sign-up that never verified (PENDING_VERIFICATION), whose handle
+ * must stay bound to the browser that asked. Every refusal is the same answer.
+ */
+export async function verifyAttendeeEmailByAddress(input: {
+  email: string;
+  code: string;
+  userAgent: string | null;
+  now?: Date;
+}): Promise<AttendeeVerification> {
+  const now = input.now ?? new Date();
+  const account = await getPrisma().attendeeAccount.findUnique({
+    where: { email: normalizeAttendeeEmail(input.email) },
+    select: { id: true, status: true, disabledAt: true, emailVerifiedAt: true },
+  });
+  if (!account || account.status !== "ACTIVE" || account.disabledAt || account.emailVerifiedAt) {
+    return { outcome: "rejected" };
+  }
+  const record = await getPrisma().attendeeAccountToken.findFirst({
+    where: {
+      accountId: account.id,
+      purpose: "EMAIL_VERIFICATION",
+      usedAt: null,
+      codeHash: { not: null },
+      expiresAt: { gt: now },
+      codeExpiresAt: { gt: now },
+    },
+    orderBy: { createdAt: "desc" },
+    select: VERIFICATION_RECORD_SELECT,
+  });
+  return spendVerificationRecord(record, input.code, input.userAgent, now);
+}
+
+/**
+ * Starts a verification an administrator asked for: retires any outstanding one
+ * and records a handle for the code that delivery will mint. The handle itself
+ * is never given to anyone.
+ */
+export async function beginAdminVerification(accountId: string, now = new Date()) {
+  await issueVerificationToken(
+    accountId,
+    hashOpaqueToken(createOpaqueToken()),
+    pendingRequestExpiresAt(now),
+    now,
+  );
+}
+
+async function spendVerificationRecord(
+  record: {
+    id: string;
+    accountId: string;
+    codeHash: string | null;
+    purpose: string;
+    expiresAt: Date;
+    codeExpiresAt: Date | null;
+    usedAt: Date | null;
+    attempts: number;
+  } | null,
+  code: string,
+  userAgent: string | null,
+  now: Date,
+): Promise<AttendeeVerification> {
   if (
     !record
     || record.purpose !== "EMAIL_VERIFICATION"
@@ -313,7 +387,7 @@ export async function verifyAttendeeEmail(input: {
   });
   if (attempted.count !== 1) return { outcome: "rejected" };
 
-  if (!oneTimeCodeMatches(input.code, record.codeHash)) {
+  if (!oneTimeCodeMatches(code, record.codeHash)) {
     return { outcome: "rejected" };
   }
 
@@ -339,9 +413,10 @@ export async function verifyAttendeeEmail(input: {
   return {
     outcome: "verified",
     accountId: record.accountId,
-    session: await createAttendeeSession(record.accountId, input.userAgent),
+    session: await createAttendeeSession(record.accountId, userAgent),
   };
 }
+
 
 /**
  * Password sign-in for an account that has already verified its address.
@@ -355,6 +430,24 @@ export async function authenticateAttendee(
   password: string,
   userAgent: string | null,
 ): Promise<{ accountId: string; session: { token: string; expiresAt: Date } } | null> {
+  const check = await checkAttendeePasswordNoCount(email, password);
+  if (check.kind === "wrong") await check.countMiss();
+  if (check.kind !== "ok") return null;
+  return check.complete(userAgent);
+}
+
+export type AttendeePasswordCheck =
+  | { kind: "unavailable" }
+  | { kind: "wrong"; countMiss: () => Promise<void> }
+  | { kind: "ok"; accountId: string; complete: (userAgent: string | null) => Promise<{ accountId: string; session: { token: string; expiresAt: Date } }> };
+
+/**
+ * The attendee password check split from its counting (#554 slice c): exactly one
+ * derivation whatever the answer; a wrong password is returned with a `countMiss`
+ * the caller may call; the session is made only by `complete`.
+ * {@link authenticateAttendee} composes the two exactly as before.
+ */
+export async function checkAttendeePasswordNoCount(email: string, password: string): Promise<AttendeePasswordCheck> {
   const account = await getPrisma().attendeeAccount.findUnique({
     where: { email: normalizeAttendeeEmail(email) },
     select: {
@@ -373,50 +466,17 @@ export async function authenticateAttendee(
   // addresses are federated.
   if (!account?.credential || account.status !== "ACTIVE" || account.disabledAt) {
     await spendPasswordCheck(password);
-    return null;
+    return { kind: "unavailable" };
   }
 
   const credential = account.credential;
   if (credential.disabledAt || (credential.lockedUntil && credential.lockedUntil > new Date())) {
     await spendPasswordCheck(password);
-    return null;
+    return { kind: "unavailable" };
   }
 
   if (!await verifyPassword(password, credential.passwordHash)) {
-    const now = new Date();
-    // Counted only while no live lock stands, so wrong passwords that raced
-    // past the check above while another request set the lock cannot re-arm
-    // the counter for the next lock (#456 re-review).
-    const counted = await getPrisma().attendeeCredential.updateMany({
-      where: { id: credential.id, OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }] },
-      data: { failedAttempts: { increment: 1 } },
-    });
-    if (counted.count === 1) {
-      // Only the request that wins this conditional claim on the
-      // not-locked -> locked transition announces it; setting the lock resets
-      // the counter, so a re-lock after expiry needs five new wrong passwords.
-      // The email runs after the response, so this attempt answers exactly
-      // like any other failure (#456).
-      const lockedUntil = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
-      const claimed = await getPrisma().attendeeCredential.updateMany({
-        where: {
-          id: credential.id,
-          failedAttempts: { gte: MAX_FAILED_ATTEMPTS },
-          OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
-        },
-        data: { lockedUntil, failedAttempts: 0 },
-      });
-      if (claimed.count === 1) {
-        scheduleLockoutEmails({
-          audience: "ATTENDEE",
-          kind: "PASSWORD",
-          accountAttendeeId: account.id,
-          lockedUntil,
-          now,
-        });
-      }
-    }
-    return null;
+    return { kind: "wrong", countMiss: () => countAttendeePasswordMiss(credential.id, account.id) };
   }
 
   await getPrisma().attendeeCredential.update({
@@ -425,9 +485,49 @@ export async function authenticateAttendee(
   });
 
   return {
+    kind: "ok",
     accountId: account.id,
-    session: await createAttendeeSession(account.id, userAgent),
+    complete: async (userAgent) => ({
+      accountId: account.id,
+      session: await createAttendeeSession(account.id, userAgent),
+    }),
   };
+}
+
+async function countAttendeePasswordMiss(credentialId: string, accountId: string) {
+  const now = new Date();
+  // Counted only while no live lock stands, so wrong passwords that raced
+  // past the check above while another request set the lock cannot re-arm
+  // the counter for the next lock (#456 re-review).
+  const counted = await getPrisma().attendeeCredential.updateMany({
+    where: { id: credentialId, OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }] },
+    data: { failedAttempts: { increment: 1 } },
+  });
+  if (counted.count === 1) {
+    // Only the request that wins this conditional claim on the
+    // not-locked -> locked transition announces it; setting the lock resets
+    // the counter, so a re-lock after expiry needs five new wrong passwords.
+    // The email runs after the response, so this attempt answers exactly
+    // like any other failure (#456).
+    const lockedUntil = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
+    const claimed = await getPrisma().attendeeCredential.updateMany({
+      where: {
+        id: credentialId,
+        failedAttempts: { gte: MAX_FAILED_ATTEMPTS },
+        OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }],
+      },
+      data: { lockedUntil, failedAttempts: 0 },
+    });
+    if (claimed.count === 1) {
+      scheduleLockoutEmails({
+        audience: "ATTENDEE",
+        kind: "PASSWORD",
+        accountAttendeeId: accountId,
+        lockedUntil,
+        now,
+      });
+    }
+  }
 }
 
 /** Signs every device out of an account. Used when a password changes. */
@@ -617,6 +717,14 @@ export async function completeAttendeePasswordReset(input: {
         failedAttempts: 0,
         lockedUntil: null,
       },
+    });
+    // The code was emailed to the account's CURRENT address and has just been typed back, which
+    // is what verifying an address means. It re-verifies an account whose verification was
+    // cleared by an administrator's email change (Caleb, Oct 15, 2026); for any other account
+    // `emailVerifiedAt` is already set and this matches no row.
+    await tx.attendeeAccount.updateMany({
+      where: { id: record.accountId, emailVerifiedAt: null },
+      data: { emailVerifiedAt: now },
     });
     await tx.attendeeSession.updateMany({
       where: { accountId: record.accountId, revokedAt: null },

@@ -2,11 +2,10 @@
 
 Companion to [ADR 0013](decisions/0013-one-account-per-person.md). Status: Accepted: the
 open questions were answered by Caleb on Oct 15, 2026 (build slice by slice, each its own
-PR, the new sign-in behind a switch that is off by default). One question from the Oct 8
-comment (staff linking different emails by hand) is still open for him. The plan and the read-only dry run (`npm run accounts:dry-run`) shipped
+PR, the new sign-in behind a switch that is off by default), including the questions left open after slice (b) (see ADR 0013, "Oct 15 decisions, latest"). The plan and the read-only dry run (`npm run accounts:dry-run`) shipped
 first. **Slice (a)** adds the link column and the switch with **no behaviour change**: no
 sign-in, session, permission or email changes, and no existing account is linked, created or
-merged. **Slice (b)** (the resolver, linking at activation, linked email changes, the staff-elevation rule) is built behind the switch, off by default; see "What slice (b) added" below. Slices (c) to (e) follow, each its own PR.
+merged. **Slice (b)** (the resolver, linking at activation, linked email changes, the staff-elevation rule) is built behind the switch, off by default; see "What slice (b) added" below. **Slice (c)** (the single sign-in page, the hand-link tool, the admin email-change fix) is built; see "What slice (c) added" below. Slices (d) to (e) follow, each its own PR.
 
 Model in one line: **two tables stay (link, don't merge); a unique nullable
 `User.attendeeAccountId` links a staff `User` to the same person's `AttendeeAccount`.**
@@ -271,10 +270,32 @@ below runs only when `PlatformSettings.unifiedSignInEnabled` is true):
 - **Attendee mode** uses the link for a linked user; **act as** refuses the linked account's email; the
   staff **profile** card shows the linked registration account.
 - A **system-administrator email change** on a linked pair updates both sides in one transaction.
-- `modules/account-merge/staff-elevation.ts` states which methods may open a staff session; the
-  sign-in wiring that uses it, including the attendee-passkey second factor, is slice (c).
+- `modules/account-merge/staff-elevation.ts` states which methods may open a staff session; slice (c)
+  wires it into the sign-in flow (and removed the attendee-passkey second-factor helper).
 - Already ACTIVE staff stay unlinked: linking existing people is slice (d) and a human gate. Sections
   4 and 6 describe it. Verification: `npm run test:staff-attendee-activation`.
+
+**What slice (c) added** (code only: no migration, no new column, no backfill). Sign-in behaviour
+runs only when `PlatformSettings.unifiedSignInEnabled` is true; the admin tools work with it off:
+
+- **`/sign-in`** and `POST /api/sign-in`: one form, one submit. The email and password are checked
+  against the staff and the attendee credential, independently and always both, one password hash each.
+  A staff person gets the staff session and the linked attendee session; an attendee-only person gets the
+  attendee session; an attendee password never gives a staff session or a staff challenge; every failure is one
+  identical 401. A staff second step appears only after the staff password is right, and when it is
+  completed (or a staff passkey signs in) both sessions are issued. `/login` and `/account/sign-in`
+  redirect to it with the switch on.
+- **Admin email change** clears the attendee side's `emailVerifiedAt` and spends every unused attendee
+  token in the same transaction (switch on or off). "Send verification email" (system administrator only,
+  rate-limited, ids-only audit) mails a code to the current address; the person enters it at
+  `/account/verify-email`. A password reset code or a Google sign-in for the current address also verifies
+  it again. There is no "mark verified" toggle.
+- **Hand-link tool** (System administration, Accounts): a system administrator links or unlinks a staff
+  user and an attendee account by hand, for people whose emails differ. Reason code (and optional note) required, never on yourself, unlinking revokes the attendee sessions, audit rows
+  `STAFF_ATTENDEE_HAND_LINKED` / `STAFF_ATTENDEE_UNLINKED` with ids and the reason, refused if either side
+  is already linked. It writes only `User.attendeeAccountId` and never creates a session. It is not the
+  slice (d) apply tool: nothing is linked in bulk, and the dry run still only lists such pairs.
+- Verification: `npm run test:unified-sign-in`.
 
 ## 2. What moves where
 
@@ -324,7 +345,7 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 
 | Item | What happens | Why |
 | --- | --- | --- |
-| **Passkeys** | Both tables stay. `UserPasskey` signs in with staff grade; `AttendeePasskey` signs in with attendee grade (attendee session only). WebAuthn credential ids are unique per registration, so the two sets cannot collide. Passkeys are **moved or merged for nobody**. | A passkey is bound to a relying party and key; copying one is not possible. Decision 5 (Oct 15): an attendee-side passkey **may** count as the staff second factor (after the staff password), but only when verified with `userVerification: required`; an attendee passkey never opens a staff session on its own, and attendee passwords, Google and email links never yield a staff session. That is built in a later slice, not slice (a). |
+| **Passkeys** | Both tables stay. `UserPasskey` signs in with staff grade; `AttendeePasskey` signs in with attendee grade (attendee session only). WebAuthn credential ids are unique per registration, so the two sets cannot collide. Passkeys are **moved or merged for nobody**. | A passkey is bound to a relying party and key; copying one is not possible. Latest Oct 15 decision: an attendee-side passkey **never** counts as the staff second factor (only a staff `UserPasskey` or the staff TOTP and recovery codes do). It signs in the attendee side only and never opens a staff session; attendee passwords, Google sign-in and email links never yield a staff session either. Built in slice (c). |
 | **MFA secrets** | Never copied or merged. Staff sign-in uses `UserMfaEnrollment`. `AttendeeMfaEnrollment` stays for attendee-grade sign-in and is retired in (e). If only the attendee side is enrolled, the person enrols on the staff side before staff access (required). | Two secrets cannot be reconciled, and the staff one is the one the staff rules protect. |
 | **Recovery codes** | Stay with their enrollment. Staff codes are the ones that count. Attendee codes are deleted only when the attendee enrollment is retired in (e). | They are hashed and enrollment-bound. |
 | **Passwords** | Both hashes are salted and cannot be compared, so "different passwords" is assumed. A staff session requires, as today, the `AuthCredential` password followed by an ACTIVE `UserMfaEnrollment` code (or recovery code), or a user-verified `UserPasskey` on its own, and nothing else; an attendee password, attendee passkey or Google only ever yields the attendee session, whatever second factor follows. The attendee credential is **disabled, not deleted** (`disabledAt`), so it can be re-enabled. | Reversible, and one password per person from the person's view. |
@@ -419,7 +440,7 @@ nothing to decide.
 | **Different MFA**: both sides enrolled | `MFA_BOTH_ENROLLED` | review | Staff secret survives; the attendee secret and recovery codes are retired in (e). |
 | **Different MFA**: only the attendee side enrolled | `MFA_ATTENDEE_ONLY` | review | The person enrols on the staff side before staff access (required). |
 | Authenticator lockout in force on either side | `MFA_LOCKED` | review | Wait for the lockout to clear, or reset it deliberately. |
-| Staff role (global role or active membership) but **no confirmed authenticator and no passkey** | `STAFF_NO_SECOND_FACTOR` | blocking | Staff access requires a second factor; the person enrols before any link. (The dry run still counts only staff-side factors, which is the conservative reading; decision 5 lets a user-verified attendee passkey count as a second factor in a later slice.) |
+| Staff role (global role or active membership) but **no confirmed authenticator and no passkey** | `STAFF_NO_SECOND_FACTOR` | blocking | Staff access requires a second factor; the person enrols before any link. (The dry run counts only staff-side factors, which is the rule: an attendee passkey never counts, per the latest Oct 15 decision.) |
 | **Different names** (ignoring case, spacing, accents) | `NAME_MISMATCH` | review | A person picks the surviving display name. Nobody is renamed automatically. |
 | **Disabled** attendee account | `ATTENDEE_DISABLED` | blocking | Find out whether it was deliberate (abuse, request). Do not link a person someone shut out. |
 | **Disabled** staff password sign-in | `STAFF_CREDENTIAL_DISABLED` | blocking | Same question; re-enable only by a human. |

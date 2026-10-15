@@ -45,7 +45,7 @@ export async function signInWithGoogle(
 
   const existing = await prisma.attendeeIdentity.findUnique({
     where: { provider_subject: { provider: "GOOGLE", subject: identity.subject } },
-    select: { id: true, accountId: true, account: { select: { disabledAt: true } } },
+    select: { id: true, accountId: true, account: { select: { disabledAt: true, email: true, emailVerifiedAt: true, status: true } } },
   });
 
   if (existing) {
@@ -54,6 +54,14 @@ export async function signInWithGoogle(
       where: { id: existing.id },
       data: { lastUsedAt: now, email },
     });
+    // Google vouches for exactly this address. When it is the account's own address and an
+    // administrator's email change had cleared its verification, this verifies it again.
+    if (!existing.account.emailVerifiedAt && existing.account.status === "ACTIVE" && existing.account.email === email) {
+      await prisma.attendeeAccount.updateMany({
+        where: { id: existing.accountId, emailVerifiedAt: null },
+        data: { emailVerifiedAt: now },
+      });
+    }
     return {
       outcome: "signed-in",
       accountId: existing.accountId,
@@ -147,7 +155,15 @@ export async function signInWithGoogle(
       },
     });
 
-    if (!claimingPending) return "linked-to-password-account" as const;
+    if (!claimingPending) {
+      // The account is ACTIVE and Google asserts this very address: verify it if an administrator's
+      // email change had cleared the verification.
+      await tx.attendeeAccount.updateMany({
+        where: { id: account.id, emailVerifiedAt: null },
+        data: { emailVerifiedAt: now },
+      });
+      return "linked-to-password-account" as const;
+    }
 
     // The account was created by a password sign-up that never verified the
     // address — so whoever set that password never proved they could read this

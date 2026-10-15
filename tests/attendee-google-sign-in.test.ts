@@ -50,6 +50,7 @@ function stubPrisma() {
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ id: "acct_new" }),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     attendeeCredential: { delete: vi.fn().mockResolvedValue({}) },
     attendeeAccountToken: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
@@ -152,6 +153,12 @@ describe("linking to an account that already exists", () => {
     });
     expect(prisma.attendeeCredential.delete).not.toHaveBeenCalled();
     expect(prisma.attendeeSession.updateMany).not.toHaveBeenCalled();
+    // Google vouched for this very address, so a cleared verification (an administrator's email
+    // change) is restored; an already verified account matches no row.
+    expect(prisma.attendeeAccount.updateMany).toHaveBeenCalledWith({
+      where: { id: "acct_1", emailVerifiedAt: null },
+      data: { emailVerifiedAt: expect.any(Date) },
+    });
   });
 
   it("destroys the password when it claims a sign-up that never verified", async () => {

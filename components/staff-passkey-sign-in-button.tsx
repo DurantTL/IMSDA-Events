@@ -14,7 +14,7 @@ const DEFAULT_DESTINATION = "/overview";
  * and no account is named until the credential itself is checked, so this
  * never reveals whether a given address has a passkey.
  */
-export function StaffPasskeySignInButton({ next }: { next?: string }) {
+export function StaffPasskeySignInButton({ next, label = "Sign in with a passkey" }: { next?: string; label?: string }) {
   const router = useRouter();
   const [supported, setSupported] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -45,7 +45,7 @@ export function StaffPasskeySignInButton({ next }: { next?: string }) {
   return (
     <div className="passkey-sign-in">
       <button className="secondary-button passkey-sign-in-button" disabled={busy} onClick={signIn} type="button">
-        <Fingerprint aria-hidden="true" size={17} /> {busy ? "Waiting for your passkey…" : "Sign in with a passkey"}
+        <Fingerprint aria-hidden="true" size={17} /> {busy ? "Waiting for your passkey…" : label}
       </button>
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>

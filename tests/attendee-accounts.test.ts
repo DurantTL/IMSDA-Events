@@ -67,6 +67,7 @@ type PrismaStub = {
     findUnique: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
   };
   attendeeCredential: { update: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
   attendeeAccountToken: {
@@ -87,6 +88,7 @@ function stubPrisma(): PrismaStub {
       findUnique: vi.fn(),
       create: vi.fn().mockResolvedValue({ id: "acct_new" }),
       update: vi.fn().mockResolvedValue({ id: "acct_existing" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     attendeeCredential: {
       update: vi.fn().mockResolvedValue({}),
@@ -443,6 +445,25 @@ describe("sign-up refuses to say whether an address is known", () => {
       expect(prisma.attendeeAccountToken.create.mock.calls[0][0].data.codeHash)
         .toBeUndefined();
     }
+  });
+
+  it("sign-up for an existing ACTIVE address never retires a token that already holds a code", async () => {
+    // An administrator may have sent that code to the address's owner; anyone can type the address here.
+    prisma.attendeeAccount.findUnique.mockResolvedValue({ id: "acct_active", status: "ACTIVE" });
+    await beginAttendeeSignUp({ email: "someone@example.com", displayName: "Someone", password: "a-long-enough-passphrase" });
+    expect(prisma.attendeeAccountToken.updateMany).toHaveBeenCalledWith({
+      where: { accountId: "acct_active", purpose: "EMAIL_VERIFICATION", usedAt: null, codeHash: null },
+      data: { usedAt: expect.any(Date) },
+    });
+  });
+
+  it("sign-up for an unfinished (not ACTIVE) address still retires every earlier verification, as before", async () => {
+    prisma.attendeeAccount.findUnique.mockResolvedValue({ id: "acct_existing", status: "PENDING_VERIFICATION" });
+    await beginAttendeeSignUp({ email: "someone@example.com", displayName: "Someone", password: "a-long-enough-passphrase" });
+    expect(prisma.attendeeAccountToken.updateMany).toHaveBeenCalledWith({
+      where: { accountId: "acct_existing", purpose: "EMAIL_VERIFICATION", usedAt: null },
+      data: { usedAt: expect.any(Date) },
+    });
   });
 
   it("normalises an address the way the rest of the platform does", () => {
@@ -927,6 +948,23 @@ describe("spending a reset code", () => {
         }),
       }),
     );
+  });
+
+  it("verifies an account whose verification an administrator cleared, and touches no verified one", async () => {
+    // A reset code goes to the account's current address; typing it back verifies that address.
+    prisma.attendeeAccountToken.findUnique.mockResolvedValue(liveToken());
+
+    await completeAttendeePasswordReset({
+      pendingToken: "pending",
+      code,
+      passwordHash: "scrypt$new",
+      userAgent: null,
+    });
+
+    expect(prisma.attendeeAccount.updateMany).toHaveBeenCalledWith({
+      where: { id: expect.any(String), emailVerifiedAt: null },
+      data: { emailVerifiedAt: expect.any(Date) },
+    });
   });
 
   it("revokes every other session", async () => {
