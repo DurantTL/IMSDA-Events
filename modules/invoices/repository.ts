@@ -29,6 +29,8 @@ import {
   amountsFingerprintOf,
   type InvoiceVersionStatus,
 } from "@/modules/invoices/domain";
+import { CHURCH_PROMO_GROUP_KEY_PREFIX, churchIdOfPromoGroupKey } from "@/modules/promo-codes/church-invoice";
+import { loadChurchBillingContact, loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
 import {
   MANUAL_LINES_MAX,
   fingerprintWithManualLines,
@@ -90,7 +92,12 @@ export type InvoiceErrorCode =
   | "PAYMENT_NOT_FOUND"
   | "ALREADY_VOIDED"
   | "INVALID_INPUT"
-  | "PARTY_NOT_FOUND";
+  | "PARTY_NOT_FOUND"
+  // Church promo code invoices (#399)
+  | "CHURCH_CODE_NOT_ELIGIBLE"
+  | "NOT_A_SPONSOR"
+  | "NOTHING_TO_INVOICE"
+  | "CHURCH_CODE_INVOICE_UNSUPPORTED";
 
 export class InvoiceError extends Error {
   constructor(
@@ -121,17 +128,29 @@ function isDatabaseRefusal(error: unknown) {
 // Facts: the approved reconciliation, the live facts, and the current billing contacts
 // ---------------------------------------------------------------------------------------------
 
-async function requireDeferredEvent(client: Client, eventId: string) {
+async function loadInvoiceEvent(client: Client, eventId: string) {
   const event = await client.event.findUnique({
     where: { id: eventId },
     select: { id: true, name: true, startsAt: true, timezone: true, billingMode: true, invoiceGrouping: true, invoiceCode: true, invoiceClubType: true },
   });
   if (!event) throw new InvoiceError("That event does not exist.", "EVENT_NOT_FOUND");
+  return event;
+}
+
+function assertDeferred(event: { billingMode: string }) {
   if (event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE") {
     throw new InvoiceError("This event is not billed to organizations after the event.", "NOT_DEFERRED_EVENT");
   }
+}
+
+async function requireDeferredEvent(client: Client, eventId: string) {
+  const event = await loadInvoiceEvent(client, eventId);
+  assertDeferred(event);
   return event;
 }
+
+/** The invoices of a church's promo codes (#399) are not part of an event's reconciliation invoicing: the draft run and the screens leave them out. */
+const notChurchPromoInvoice = { NOT: { groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } } } satisfies Prisma.InvoiceWhereInput;
 
 export function contactOfGroup(group: BillingGroup | undefined | null): InvoiceContact | null {
   if (!group) return null;
@@ -261,8 +280,9 @@ export type InvoiceVersionSummary = {
   status: InvoiceVersionStatus;
   basis: InvoiceVersionBasis;
   supersedesVersionId: string | null;
-  reconciliationVersionId: string;
-  reconciliationVersionNumber: number;
+  /** Null on a church promo code invoice (#399), which has no reconciliation. */
+  reconciliationVersionId: string | null;
+  reconciliationVersionNumber: number | null;
   number: string | null;
   groupTitle: string;
   organizationName: string;
@@ -293,7 +313,7 @@ function toSummary(row: VersionRow): InvoiceVersionSummary {
     basis: row.basis,
     supersedesVersionId: row.supersedesVersionId,
     reconciliationVersionId: row.reconciliationVersionId,
-    reconciliationVersionNumber: row.reconciliationVersion.versionNumber,
+    reconciliationVersionNumber: row.reconciliationVersion?.versionNumber ?? null,
     number: row.number,
     groupTitle: row.groupTitle,
     organizationName: row.organizationName,
@@ -316,7 +336,7 @@ function toSummary(row: VersionRow): InvoiceVersionSummary {
 }
 
 /** The columns of a version made from the figures; the draft's manual lines (#780) are folded into the total and the fingerprint. */
-function figureColumns(baseFigures: InvoiceFigures, contact: InvoiceContact | null, manualLines: readonly ManualInvoiceLine[] = []) {
+export function figureColumns(baseFigures: InvoiceFigures, contact: InvoiceContact | null, manualLines: readonly ManualInvoiceLine[] = []) {
   const figures = withManualLines(baseFigures, manualLines);
   // A negative manual line can outweigh what the reconciliation now bills; the database refuses a total below $0.
   if (figures.amountDueCents < 0) throw new InvoiceError("Manual lines would make this invoice less than $0. Remove or change a manual line first.", "NEGATIVE_TOTAL");
@@ -460,7 +480,7 @@ export async function createInvoiceDrafts(input: { eventId: string; actorUserId:
       await lockReconciliationEvent(tx, input.eventId);
       await requireDeferredEvent(tx, input.eventId);
       const basis = await loadApprovedBasis(tx, input.eventId);
-      const existing = await tx.invoice.findMany({ where: { eventId: input.eventId }, select: invoiceWithVersionsSelect });
+      const existing = await tx.invoice.findMany({ where: { eventId: input.eventId, ...notChurchPromoInvoice }, select: invoiceWithVersionsSelect });
       if (existing.some((invoice) => invoice.baseNumber !== null && invoice.invoiceGrouping !== basis.approved.invoiceGrouping)) {
         throw new InvoiceError("Some invoices were finalized under a different invoice grouping. Change the grouping back before creating drafts, or revise those invoices.", "GROUPING_CONFLICT");
       }
@@ -631,7 +651,9 @@ export async function discardInvoiceDraft(input: { eventId: string; invoiceId: s
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
     await lockReconciliationEvent(tx, input.eventId);
-    await requireDeferredEvent(tx, input.eventId);
+    // A church's promo code draft (#399) can be thrown away like any other; it needs no deferred-invoice event.
+    const churchInvoice = await tx.invoice.findFirst({ where: { id: input.invoiceId, eventId: input.eventId, groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } }, select: { id: true } });
+    if (!churchInvoice) await requireDeferredEvent(tx, input.eventId);
     const invoice = await requireInvoice(tx, input.eventId, input.invoiceId);
     const draft = invoice.versions[0];
     if (!draft || draft.status !== "DRAFT") throw new InvoiceError("This invoice has no open draft to discard.", "NOT_A_DRAFT");
@@ -818,7 +840,7 @@ export async function finalizeInvoiceVersion(input: {
     return await prisma.$transaction(async (tx) => {
       // Lock first, then read the event: its code may have been frozen by a finalization that just ran.
       await lockReconciliationEvent(tx, input.eventId);
-      const event = await requireDeferredEvent(tx, input.eventId);
+      const event = await loadInvoiceEvent(tx, input.eventId);
       const version = await tx.invoiceVersion.findFirst({
         where: { id: input.versionId, eventId: input.eventId },
         select: {
@@ -827,6 +849,10 @@ export async function finalizeInvoiceVersion(input: {
           invoice: { select: { id: true, groupKey: true, partyKind: true, partyId: true, clubId: true, baseNumber: true, invoiceGrouping: true } },
         },
       });
+      // A church's promo code invoice (#399) is finalized by the same named person with the same permission, on an
+      // attendee-paid event; every other invoice needs the event to bill organizations after the event.
+      const churchBasis = version?.basis === "CHURCH_PROMO_CODES";
+      if (!churchBasis) assertDeferred(event);
       if (!version) throw new InvoiceError("That invoice version does not belong to this event.", "VERSION_NOT_FOUND");
       const used = await tx.invoiceVersion.findUnique({ where: { finalizeIdempotencyKey: input.idempotencyKey }, select: { id: true } });
       if (used && used.id !== version.id) {
@@ -849,13 +875,28 @@ export async function finalizeInvoiceVersion(input: {
       if (version.revision > 0 && (!prior || prior.id !== version.supersedesVersionId)) {
         throw new InvoiceError("The invoice changed after this revision was started. Revise it again.", "DRAFT_STALE");
       }
-      const needsPermission = finalizationNeedsPermission(version, prior);
+      // A church promo code invoice always fixes an amount (an original, or a revision made only when the lines changed).
+      const needsPermission = churchBasis || finalizationNeedsPermission(version, prior);
       if (needsPermission && !input.canFinalizeInvoices) {
         throw new InvoiceError("Finalizing an invoice, or a revision that changes an amount, needs the Finalize invoices permission.", "FINALIZE_PERMISSION_REQUIRED");
       }
       // The contact on the draft must be the contact now (a stale one would be frozen into the invoice).
-      let billing: Awaited<ReturnType<typeof getBillingResponsibilityView>>;
-      if (needsPermission) {
+      let billing: Awaited<ReturnType<typeof getBillingResponsibilityView>> | null = null;
+      let churchContact: InvoiceContact | null = null;
+      if (churchBasis) {
+        // Rebuilt now from the church's redemptions: a draft that is not what the lines say now is never frozen into an invoice.
+        const churchId = churchIdOfPromoGroupKey(invoice.groupKey);
+        const inputs = churchId ? await loadChurchInvoiceInputs(tx, input.eventId, churchId) : null;
+        if (
+          !inputs
+          || !inputs.event.eligible
+          || inputs.figures.amountsFingerprint !== version.amountsFingerprint
+          || inputs.figures.amountDueCents !== version.amountDueCents
+        ) {
+          throw new InvoiceError("The church's promo code redemptions changed after this draft was made. Refresh the draft from the church report first.", "DRAFT_STALE");
+        }
+        churchContact = inputs.contact;
+      } else if (needsPermission) {
         const basis = await loadApprovedBasis(tx, input.eventId);
         if (invoice.invoiceGrouping !== basis.approved.invoiceGrouping) {
           throw invoice.baseNumber === null
@@ -883,7 +924,7 @@ export async function finalizeInvoiceVersion(input: {
       } else {
         billing = await getBillingResponsibilityView(input.eventId, {}, tx);
       }
-      const current = contactOfGroup(billing.groups.find((candidate) => candidate.key === invoice.groupKey));
+      const current = churchBasis ? churchContact : contactOfGroup(billing?.groups.find((candidate) => candidate.key === invoice.groupKey));
       if (!version.contactName || !version.contactEmail) {
         throw new InvoiceError("This invoice has no billing contact. Add one under Billing responsibility, then regenerate the draft.", "CONTACT_MISSING");
       }
@@ -1087,7 +1128,7 @@ export async function getInvoicesView(eventId: string): Promise<InvoicesView> {
   const approvedRow = await prisma.attendanceReconciliationVersion.findFirst({ where: { eventId, status: "APPROVED" }, select: approvedSelect });
   const approvedResult = approvedRow ? (approvedRow.snapshot as unknown as ReconciliationResult) : null;
   const invoices = await prisma.invoice.findMany({
-    where: { eventId },
+    where: { eventId, ...notChurchPromoInvoice },
     orderBy: { createdAt: "asc" },
     select: { id: true, groupKey: true, baseNumber: true, versions: { where: { status: { not: "DISCARDED" } }, orderBy: { revision: "desc" }, select: versionSelect } },
   });
@@ -1230,7 +1271,13 @@ export async function getInvoiceDetail(eventId: string, invoiceId: string, optio
   let freshness: InvoiceDetail["reconciliationFreshness"] = "NONE";
   let approvedId: string | null = null;
   let amountsOutOfDate = false;
-  if (event.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
+  const churchId = churchIdOfPromoGroupKey(invoice.groupKey);
+  if (churchId) {
+    // A church's promo code invoice (#399): the contact is the church's own, and it is out of date when the lines now differ.
+    const inputs = await loadChurchInvoiceInputs(prisma, eventId, churchId);
+    currentContact = inputs?.contact ?? null;
+    if (liveFinalized && inputs) amountsOutOfDate = inputs.figures.amountsFingerprint !== liveFinalized.amountsFingerprint;
+  } else if (event.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
     const billing = await getBillingResponsibilityView(eventId, {}, prisma);
     currentContact = contactOfGroup(billing.groups.find((candidate) => candidate.key === invoice.groupKey));
     const approvedRow = await prisma.attendanceReconciliationVersion.findFirst({ where: { eventId, status: "APPROVED" }, select: approvedSelect });

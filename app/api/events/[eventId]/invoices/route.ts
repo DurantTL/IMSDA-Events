@@ -17,6 +17,7 @@ import {
   setEventInvoiceCode,
 } from "@/modules/invoices/repository";
 import { invoiceActionSchema } from "@/modules/invoices/schemas";
+import { churchOfPromoInvoice, prepareChurchCodeInvoiceDraft } from "@/modules/promo-codes/church-invoice-repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -58,12 +59,23 @@ async function postHandler(request: Request, context: RouteContext) {
     switch (body.action) {
       case "create-drafts":
         return Response.json(await createInvoiceDrafts({ eventId, actorUserId }));
-      case "regenerate":
+      case "regenerate": {
+        // A church's promo code draft (#399) is rebuilt from its redemptions, not from a reconciliation.
+        const churchId = await churchOfPromoInvoice(eventId, body.invoiceId);
+        if (churchId) return Response.json(await prepareChurchCodeInvoiceDraft({ eventId, churchId, actorUserId }));
         return Response.json(await regenerateInvoiceDraft({ eventId, invoiceId: body.invoiceId, actorUserId }));
+      }
       case "discard":
         return Response.json(await discardInvoiceDraft({ eventId, invoiceId: body.invoiceId, actorUserId }));
-      case "revise":
+      case "revise": {
+        const churchId = await churchOfPromoInvoice(eventId, body.invoiceId);
+        if (churchId) {
+          // Only a change to the redemptions revises a church promo code invoice (#399); a contact-only revision is not offered yet.
+          if (body.mode === "CONTACT_ONLY") throw new InvoiceError("A church promo code invoice is revised from the church report when its redemptions change.", "CHURCH_CODE_INVOICE_UNSUPPORTED");
+          return Response.json(await prepareChurchCodeInvoiceDraft({ eventId, churchId, actorUserId }));
+        }
         return Response.json(await reviseInvoice({ eventId, invoiceId: body.invoiceId, mode: body.mode, reason: body.reason, actorUserId }));
+      }
       case "set-code":
         return Response.json(await setEventInvoiceCode({ eventId, code: body.code, actorUserId }));
       case "set-club-type":

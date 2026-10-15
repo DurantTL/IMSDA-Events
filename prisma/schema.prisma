@@ -6819,11 +6819,14 @@ enum InvoiceVersionStatus {
   DISCARDED
 }
 
-/// How a version was built: from the approved attendance reconciliation, or by copying the prior
-/// finalized version with only the billing contact refreshed (a contact-only revision).
+/// How a version was built: from the approved attendance reconciliation, by copying the prior
+/// finalized version with only the billing contact refreshed (a contact-only revision), or from a
+/// church's sponsored promo code redemptions (#399).
 enum InvoiceVersionBasis {
   RECONCILIATION
   CONTACT_ONLY_COPY
+  /// Built from what a church's sponsored promo codes covered on a GENERAL event (#399): no reconciliation behind it.
+  CHURCH_PROMO_CODES
 }
 
 /// What is owed on one finalized invoice version. OPEN until the version is superseded by a revision.
@@ -6875,7 +6878,8 @@ model InvoiceVersion {
   basis                   InvoiceVersionBasis
   /// The finalized version this one revises.
   supersedesVersionId     String?
-  reconciliationVersionId String
+  /// Null only for a version built from a church's promo code redemptions (#399), which has no reconciliation behind it.
+  reconciliationVersionId String?
   /// Full number such as "SC27-0001-R1", assigned at finalization only.
   number                  String?              @unique
   groupTitle              String
@@ -6910,7 +6914,7 @@ model InvoiceVersion {
 
   event                 Event                           @relation(fields: [eventId], references: [id], onDelete: Cascade)
   invoice               Invoice                         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  reconciliationVersion AttendanceReconciliationVersion @relation(fields: [reconciliationVersionId], references: [id], onDelete: NoAction)
+  reconciliationVersion AttendanceReconciliationVersion? @relation(fields: [reconciliationVersionId], references: [id], onDelete: NoAction)
   createdBy             User?                           @relation("InvoiceVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   finalizedBy           User?                           @relation("InvoiceVersionFinalizedBy", fields: [finalizedByUserId], references: [id], onDelete: SetNull)
   receivable            InvoiceReceivable?
