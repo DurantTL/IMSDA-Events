@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
 import Link from "next/link";
@@ -564,7 +565,7 @@ export function ClubHonorsWorkspace({
                 </div>
                 <div className="form-actions">
                   <button className="secondary-button" onClick={closeHistory} type="button">Close</button>
-                  <button className="primary-button" disabled={saving} type="submit">Record</button>
+                  <SubmitButton className="primary-button" label="Record" submitting={saving} submittingLabel="Recording…" />
                 </div>
               </form>
             )}
@@ -601,7 +602,7 @@ export function ClubHonorsWorkspace({
               </label>
               <div className="form-actions">
                 <button className="secondary-button" onClick={closeVoid} type="button">Cancel</button>
-                <button className="primary-button" disabled={saving || voidReason.trim().length < 3} type="submit">Void entry</button>
+                <SubmitButton className="primary-button" disabled={voidReason.trim().length < 3} label="Void entry" submitting={saving} submittingLabel="Voiding…" />
               </div>
             </form>
           </section>

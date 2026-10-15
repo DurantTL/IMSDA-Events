@@ -76,6 +76,7 @@ function clubYearsFor(event: { startsAt: Date; endsAt: Date }) {
 export async function listHealthEvents(viewer: HealthViewer, now = new Date()) {
   const events = await getPrisma().event.findMany({
     where: {
+      archivedAt: null,
       clubRegistrations: {
         some: viewer.kind === "CLUB_LEADER" ? { organizationId: viewer.organizationId } : {},
       },

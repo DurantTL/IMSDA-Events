@@ -68,6 +68,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     scholarshipContributions,
     healthSnapshots,
     heldHealthSnapshots,
+    acknowledgmentEvidence,
   ] = await Promise.all([
     db.registration.count({ where: inEvent }),
     db.registrationAttendee.count({ where: inEvent }),
@@ -104,6 +105,8 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     // the person) blocks the deletion; the rest go with the event.
     db.healthRecordSnapshot.count({ where: inEvent }),
     countHeldHealthSnapshots(db, eventId),
+    // Append-only acknowledgment evidence (#150): counted, never opened. Any row blocks the deletion.
+    db.acknowledgmentEvidence.count({ where: inEvent }),
   ]);
   const counts: EventDeletionCounts = {
     registrations,
@@ -125,6 +128,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     scholarshipContributions,
     healthSnapshots,
     heldHealthSnapshots,
+    acknowledgmentEvidence,
   };
   return { event, facts: { isPublished: event.isPublished, counts } satisfies EventDeletionFacts };
 }
@@ -409,6 +413,10 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   //      first, then the versions and the policies. A published version's delete trigger accepts this transaction's
   //      deletes (`imsda.event_deletion`) and refuses every other delete. Organization-scoped policies have no event
   //      and stay; only this event's applicability rows to them are removed.
+  //      Acknowledgment evidence (#150) is deliberately NOT removed here. It is append-only, retention is a human decision,
+  //      and `eventDeletionBlockers` already refused an event that holds any, so none exists by this point. Were one ever
+  //      to slip through, its RESTRICT references (registration, policy version, event) make the registration delete in
+  //      step 10 fail closed instead of erasing it.
   await tx.eventConsentPolicyApplicability.deleteMany({ where: inEvent });
   await tx.consentPolicyVersion.deleteMany({ where: { policy: { eventId } } });
   await tx.consentPolicy.deleteMany({ where: inEvent });

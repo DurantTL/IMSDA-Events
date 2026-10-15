@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { Ban, Pencil, Send } from "lucide-react";
 import type { ClubInviteRecord } from "@/modules/club-imports/invites";
@@ -43,8 +44,12 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
 
   const sentMessage = (result: InvitesResponse) => `Sent ${result.sent ?? 0} invite${result.sent === 1 ? "" : "s"}.`;
 
-  function send(selection: { organizationId?: string; inviteIds?: string[] }, count: number, label: string) {
-    if (!window.confirm(`Email ${count} invite${count === 1 ? "" : "s"} ${label}?`)) return;
+  async function send(selection: { organizationId?: string; inviteIds?: string[] }, count: number, label: string) {
+    if (!(await askConfirm({
+      title: `Email ${count} invite${count === 1 ? "" : "s"}`,
+      body: <p>{`${count} invite${count === 1 ? "" : "s"} will be emailed ${label} now. Emails can't be recalled once sent.`}</p>,
+      confirmLabel: `Email ${count} invite${count === 1 ? "" : "s"}`,
+    }))) return;
     void call("/api/admin/club-invites/send", "POST", selection, sentMessage);
   }
 
@@ -54,16 +59,23 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
     void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => "Email changed. The invite is waiting to be sent.");
   }
 
-  function cancel(invite: ClubInviteRecord) {
-    if (!window.confirm(`Cancel the invite for ${invite.name || invite.email}?`)) return;
+  async function cancel(invite: ClubInviteRecord) {
+    if (!(await askConfirm({
+      title: `Cancel the invite for ${invite.name || invite.email}`,
+      body: <p>{`The invite to ${invite.club.name} is cancelled and its link stops working.`}</p>,
+      confirmLabel: `Cancel invite for ${invite.name || invite.email}`,
+      destructive: true,
+    }))) return;
     void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { cancel: true }, () => "Invite cancelled.");
   }
 
   const pending = invites.filter((invite) => invite.status === "PENDING");
   const clubs = [...new Map(invites.map((invite) => [invite.club.id, invite.club])).values()];
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Clubs</p>

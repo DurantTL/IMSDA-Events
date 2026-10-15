@@ -58,7 +58,7 @@ import { listPublicCalendarItems } from "@/modules/calendar/repository";
 
 // A Central-time event whose last day is Sunday 2026-10-11 (ends 5pm CDT).
 const event = {
-  isPublished: true,
+  isPublished: true, archivedAt: null,
   timezone: "America/Chicago",
   registrationOpensOn: null,
   registrationClosesOn: null,

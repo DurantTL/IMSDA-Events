@@ -36,5 +36,6 @@ export const config = {
     "/event-setup/:path*",
     "/no-access",
     "/select-event",
+    "/archived-events",
   ],
 };

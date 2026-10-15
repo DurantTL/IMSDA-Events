@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Paperclip, Send } from "lucide-react";
@@ -98,7 +99,12 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
   }
 
   async function withdrawInvite(invite: NewClubInviteRecord) {
-    if (!window.confirm(`Withdraw the link sent to ${invite.email}?`)) return;
+    if (!(await askConfirm({
+      title: `Withdraw the link sent to ${invite.email}`,
+      body: <p>The link stops working right away. The club can&apos;t use it to apply, and you can send a new one.</p>,
+      confirmLabel: `Withdraw link for ${invite.email}`,
+      destructive: true,
+    }))) return;
     setInviteBusy(true);
     setInviteMessage(null);
     try {
@@ -256,8 +262,10 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
     );
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack nca-queue">
+      {confirmDialog}
       {canDecide && (
         <div className="panel">
           <div className="section-heading"><div><h2>Send a private link</h2></div></div>

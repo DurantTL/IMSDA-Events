@@ -32,7 +32,8 @@ describe("the guardian contacts panel on a club page (#510)", () => {
       ],
     }]);
     const html = await render();
-    expect(html).toContain("Guardian and emergency contacts");
+    expect(html).toContain("Emergency contacts");
+    expect(html).not.toContain("Guardian and");
     expect(html).toContain("Test Youth");
     expect(html).toContain("Synthetic Guardian");
     expect(html).toContain('href="tel:5550100101"');
@@ -43,7 +44,7 @@ describe("the guardian contacts panel on a club page (#510)", () => {
 
   it("says so when no guardian is on file", async () => {
     mocks.listGuardianContactsForClub.mockResolvedValue([]);
-    expect(await render()).toContain("No guardian or emergency contacts are on file");
+    expect(await render()).toContain("No emergency contacts are on file");
   });
 
   it("renders nothing for a viewer the repository refuses", async () => {

@@ -35,6 +35,7 @@ import {
 } from "@/modules/club-registrations/domain";
 import { pickClubPortalForm } from "@/modules/club-registrations/portal-form";
 import { type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
 import type { PublicRegistrationInput } from "@/modules/forms/public-domain";
 import {
   PublicRegistrationError,
@@ -69,9 +70,10 @@ import { registrationOperationFingerprint } from "@/modules/registrations/operat
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
 import { moneyToCents } from "@/modules/payments/square-domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
-import { NO_TEAM_KEY, draftKeySchema, resolveTeamName, teamLabel, type TeamSettings } from "@/modules/club-teams/domain";
+import { NO_TEAM_KEY, draftKeySchema, resolveTeamName, teamLabel, type TeamLevel, type TeamSettings } from "@/modules/club-teams/domain";
+import { betweenLevelsEditOpen, currentLevelOf, levelInfoFor, levelWhenWhere, placementLabel } from "@/modules/club-teams/results-domain";
 import { ClubTeamError } from "@/modules/club-teams/errors";
-import { ALTERNATE_FIELD_KEY, isAlternateAnswer, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
+import { ALTERNATE_FIELD_KEY, ROLE_FIELD_KEY, isAlternateAnswer, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
 import { formHasPrices } from "@/modules/club-registrations/per-person-price";
 import { permissionNotice, type PermissionStatus } from "@/modules/club-teams/permission-domain";
 import { permissionNoticesForRegistration, permissionsForRegistration } from "@/modules/club-teams/permission-repository";
@@ -158,6 +160,7 @@ export const clubEventSelect = {
   timezone: true,
   location: true,
   isPublished: true,
+  archivedAt: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
@@ -256,7 +259,7 @@ export async function locationSeatCounts(client: Pick<Prisma.TransactionClient, 
  */
 export async function listClubEvents(organizationId: string, now = new Date()) {
   const events = await getPrisma().event.findMany({
-    where: { isPublished: true, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", endsAt: { gte: now } },
+    where: { isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", endsAt: { gte: now } },
     orderBy: { startsAt: "asc" },
     select: {
       ...clubEventSelect,
@@ -541,7 +544,7 @@ export async function clubDirectoryIdentity(
 export async function requireClubEvent(eventId: string): Promise<ClubEvent> {
   const event = await getPrisma().event.findFirst({
     // Same gate as `listClubEvents`: CLUB audience and church billing (#481).
-    where: { id: eventId, isPublished: true, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
+    where: { id: eventId, isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
     select: clubEventSelect,
   });
   if (!event) throw new ClubRegistrationError("EVENT_NOT_FOUND", "That club event could not be found.");
@@ -635,6 +638,52 @@ export function clubEditWindow(event: ClubEvent, location: (LocationDateSource &
   });
 }
 
+type LevelWindowClient = Pick<Prisma.TransactionClient, "clubTeamResult" | "clubTeamLevelCheckIn">;
+
+/**
+ * Whether an advanced team's director may still change its people between levels (#945). The team's own results and
+ * check-ins and the event's level dates decide. An event without team rules has no levels, so nothing is read for it.
+ */
+async function betweenLevelsWindow(client: LevelWindowClient, settings: TeamSettings | null, event: ClubEvent, clubEventRegistrationId: string, now: Date) {
+  if (!settings) return { open: false as const };
+  const [results, checkIns] = await Promise.all([
+    client.clubTeamResult.findMany({ where: { clubEventRegistrationId }, select: { level: true, qualified: true } }),
+    client.clubTeamLevelCheckIn.findMany({ where: { clubEventRegistrationId, undoneAt: null }, select: { level: true } }),
+  ]);
+  return betweenLevelsEditOpen({ results: resultsByLevel(results) }, settings.levelInfo, calendarDateInEventTimeZone(now, event.timezone), new Set(checkIns.map((row) => row.level)));
+}
+
+const betweenLevelsAreaMessage = "Your team's Area can't be changed after it has advanced. Contact the event office.";
+const betweenLevelsClosedMessage = "Your team's next level is no longer open for changes. Contact the event office to add or remove someone.";
+const betweenLevelsPriceMessage = "This change would change what the registration costs, and between levels only changes that cost nothing can be made here. Contact the event office.";
+const betweenLevelsAnswersMessage = "Between levels you can change who is on the team, their role (team member, TLT or coach) and the alternate. To change anything else, contact the event office.";
+
+/** An answer compared as a form stores it: nothing, an empty answer and an unticked box are the same. */
+function comparableAnswer(value: unknown) {
+  if (value === undefined || value === null || value === "" || value === false) return "";
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+/**
+ * Between levels (#945) only the team-rule answers may change: a person's role and the alternate box. `registered` is the
+ * person's answers as registered (null for someone being added); `ignore` is what the server owns (names, ages).
+ */
+function assertBetweenLevelsAnswers(registered: Record<string, unknown> | null, responses: Record<string, unknown>, ignore: readonly string[] = []) {
+  const skip = new Set<string>([ROLE_FIELD_KEY, ALTERNATE_FIELD_KEY, ...ignore]);
+  for (const key of new Set([...Object.keys(responses), ...Object.keys(registered ?? {})])) {
+    if (skip.has(key)) continue;
+    if (comparableAnswer(responses[key]) !== comparableAnswer(registered?.[key])) {
+      throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsAnswersMessage);
+    }
+  }
+}
+
+function resultsByLevel(rows: ReadonlyArray<{ level: TeamLevel; qualified: boolean }>) {
+  const results: Record<TeamLevel, { qualified: boolean } | null> = { AREA: null, CONFERENCE: null, UNION: null };
+  for (const row of rows) results[row.level] = { qualified: row.qualified };
+  return results;
+}
+
 /**
  * Which of a club's teams the director's page is showing (#809), on an event that lets a club register several:
  * a registered team by its key, or an unsubmitted draft by its draft key. Ignored on every other event.
@@ -664,7 +713,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
         createdAt: true,
         registrationId: true,
         // Staff's results for the team (#809), shown to the director read only.
-        teamResults: { select: { level: true, placement: true, qualified: true, notes: true, updatedAt: true } },
+        teamResults: { select: { level: true, placement: true, placementRank: true, qualified: true, notes: true, updatedAt: true } },
         registration: {
           select: {
             confirmationCode: true,
@@ -722,6 +771,15 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
   const problem = form ? clubFormProblem(form.definition) : "The event has no published registration form yet.";
   const experience = form && !problem ? await getPublicRegistrationExperience(event.slug, form.slug) : null;
   const activeMemberIds = new Set(members.map((member) => member.id));
+  // A team that advanced (#945) is told where its next level is held, and may change its people until it is held.
+  const teamResultLevels = resultsByLevel(clubRegistration?.teamResults ?? []);
+  const reachedLevel = currentLevelOf({ results: teamResultLevels });
+  const advancedTo = clubRegistration && reachedLevel !== "AREA" ? { level: reachedLevel } : null;
+  const baseEditWindow = clubEditWindow(event, registeredLocation, now);
+  const betweenLevels = clubRegistration && advancedTo
+    ? await betweenLevelsWindow(getPrisma(), teamSettings, event, clubRegistration.id, now)
+    : { open: false as const };
+  const editWindow = !baseEditWindow.open && betweenLevels.open ? { open: true as const } : baseEditWindow;
   // A team event with nothing to pay (#809): no priced form field, no lodging, and for a registered team no charge or
   // adjustment on it. Then the page says "No cost." instead of "billed to your church".
   const noCost = teamSettings !== null && experience !== null && !formHasPrices(experience.form.definition)
@@ -782,7 +840,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
       registrationClosesOn: effectiveLocationDates(event, registeredLocation).registrationClosesOn,
       // Whether a submitted registration may still be reopened (H3b, #366),
       // on its location's dates when it has one (#413).
-      edit: clubEditWindow(event, registeredLocation, now),
+      edit: editWindow,
     },
     // The event's active locations (#413). Empty: the event works as always.
     locations: eventLocations.map((location) => clubLocationView(event, location, seatCounts.get(location.id) ?? 0, now)),
@@ -834,8 +892,10 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
           return [{ attendeeId: id, status: flag.status, text: permissionNotice(flag.status, snapshotName(snapshot), tlt) }];
         }),
         results: clubRegistration.teamResults.map((result) => ({
-          level: result.level, placement: result.placement, qualified: result.qualified, notes: result.notes,
+          level: result.level, placement: placementLabel(result), qualified: result.qualified, notes: result.notes,
         })),
+        // The next level's date and place, once the team has advanced (#945), so the director knows where to go.
+        nextLevel: advancedTo ? { level: advancedTo.level, whenWhere: levelWhenWhere(levelInfoFor(teamSettings?.levelInfo ?? [], advancedTo.level)) } : null,
         confirmationCode: clubRegistration.registration.confirmationCode,
         status: clubRegistration.registration.status,
         submittedAt: clubRegistration.createdAt.toISOString(),
@@ -990,8 +1050,17 @@ export async function saveClubRegistrationDraft(
   if (guestKeys.size !== input.guests.length) {
     throw new ClubRegistrationError("GUEST_INVALID", "Each extra person needs their own entry. Refresh the page and try again.");
   }
+  // A recorded acknowledgment (#150) is given at submission, never carried in a saved draft: the server copy drops it, as the
+  // browser's own draft does.
+  const draftForm = await publishedClubForm(eventId);
+  const acknowledgmentKeys = new Set(draftForm ? acknowledgmentFields(draftForm.definition).map((field) => field.key) : []);
+  const withoutAcknowledgments = <T,>(answers: Record<string, T>) => (
+    acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
+  );
   const attendeeResponses = Object.fromEntries(
-    Object.entries(input.attendeeResponses).filter(([key]) => allowed.has(key) || guestKeys.has(key)),
+    Object.entries(input.attendeeResponses)
+      .filter(([key]) => allowed.has(key) || guestKeys.has(key))
+      .map(([key, answers]) => [key, withoutAcknowledgments(answers)]),
   );
   const pickable = new Set([...input.selectedMemberIds.map(clubAttendeeClientId), ...guestKeys]);
   const honorSelections = Object.fromEntries(
@@ -1013,7 +1082,7 @@ export async function saveClubRegistrationDraft(
     honorSelections: honorSelections as Prisma.InputJsonValue,
     selectedMemberIds: input.selectedMemberIds,
     guests: input.guests as Prisma.InputJsonValue,
-    responses: input.responses as Prisma.InputJsonValue,
+    responses: withoutAcknowledgments(input.responses) as Prisma.InputJsonValue,
     attendeeResponses: attendeeResponses as Prisma.InputJsonValue,
     teamName: teamSettings?.allowMultipleTeams ? (input.teamName ?? "").slice(0, 200) : "",
     ...("accountId" in actor ? { updatedByAccountId: actor.accountId, updatedByUserId: null } : { updatedByUserId: actor.userId, updatedByAccountId: null }),
@@ -1311,11 +1380,20 @@ export async function amendClubRegistration(
   // Which of the club's registrations is being changed (#809): its team's key, the empty key on an event without teams.
   const clubRegistration = await getPrisma().clubEventRegistration.findUnique({
     where: { eventId_organizationId_teamKey: { eventId, organizationId, teamKey: input.teamKey ?? NO_TEAM_KEY } },
-    select: { registrationId: true, registration: { select: { location: { select: clubLocationSelect } } } },
+    select: { id: true, registrationId: true, registration: { select: { location: { select: clubLocationSelect } } } },
   });
   // The edit window follows the registration's own location when it has one (#413).
   const currentLocation = clubRegistration?.registration?.location ?? null;
-  const window = clubEditWindow(event, currentLocation, now);
+  let window = clubEditWindow(event, currentLocation, now);
+  // A team that advanced to the next level may change its people until that level is held (#945), whatever the
+  // registration window says. That window reopens only the team's people: its Area, its other answers and its price stay as
+  // they are, and the team rules apply to the change exactly as before (`betweenLevelsOnly`).
+  const teamSettingsForWindow = window.open || !clubRegistration ? null : await getTeamSettings(eventId);
+  let betweenLevelsOnly = false;
+  if (!window.open && clubRegistration && (await betweenLevelsWindow(getPrisma(), teamSettingsForWindow, event, clubRegistration.id, now)).open) {
+    window = { open: true };
+    betweenLevelsOnly = true;
+  }
   if (!window.open) throw new ClubRegistrationError("REGISTRATION_CLOSED", window.message);
   const form = await publishedClubForm(event.id);
   if (!form) throw new ClubRegistrationError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
@@ -1328,6 +1406,9 @@ export async function amendClubRegistration(
   const registrationId = clubRegistration.registrationId;
   // A switch to another location needs that location to still be open; its
   // seats are counted under its lock in the amendment transaction (#413).
+  if (betweenLevelsOnly && input.locationId && input.locationId !== currentLocation?.id) {
+    throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsAreaMessage);
+  }
   if (input.locationId && input.locationId !== currentLocation?.id) {
     const target = await getPrisma().eventLocation.findFirst({
       where: { id: input.locationId, eventId, isActive: true },
@@ -1505,6 +1586,7 @@ export async function amendClubRegistration(
       ...owned,
     };
     if (current) assertSeminarPicksUnchanged(current, responses);
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(current ? recordFromJson(current.formResponses) : null, responses, Object.keys(owned));
     amendmentAttendees.push({ attendeeId: current?.id ?? null, clientId, responses });
     const memberRole = teamRoleFor({ responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: person.ageOnEventDate });
     serverOptions.set(clientId, {
@@ -1529,6 +1611,7 @@ export async function amendClubRegistration(
     const clientId = clubGuestClientId(guestId);
     const responses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
     assertSeminarPicksUnchanged(current, responses);
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses);
     const ageOnEventDate = typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null;
     amendmentAttendees.push({ attendeeId: current.id, clientId, responses });
     const guestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: ageOnEventDate });
@@ -1554,6 +1637,7 @@ export async function amendClubRegistration(
     const clientId = clubExistingAttendeeClientId(attendeeId);
     const responses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
     assertSeminarPicksUnchanged(current, responses);
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses);
     amendmentAttendees.push({ attendeeId: current.id, clientId, responses });
   }
 
@@ -1564,6 +1648,7 @@ export async function amendClubRegistration(
       ...(input.attendeeResponses[clientId] ?? {}),
       ...rosterOwnedResponses(definition, person),
     };
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(null, responses, Object.keys(rosterOwnedResponses(definition, person)));
     amendmentAttendees.push({ attendeeId: null, clientId, responses });
     const newGuestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: guest.age });
     serverOptions.set(clientId, {
@@ -1604,7 +1689,20 @@ export async function amendClubRegistration(
   const engineOptions: AmendmentServerOptions = {
     attendees: serverOptions,
     // Inside the amendment's own transaction, so a failed save changes nothing (#639).
-    ...(saveAgeBack.length > 0 ? { inTransaction: (tx: Prisma.TransactionClient) => saveRosterAgesBack(tx, organizationId, clubYearFor(event.startsAt), actor, saveAgeBack) } : {}),
+    ...(saveAgeBack.length > 0 || betweenLevelsOnly
+      ? {
+        inTransaction: async (tx: Prisma.TransactionClient) => {
+          if (saveAgeBack.length > 0) await saveRosterAgesBack(tx, organizationId, clubYearFor(event.startsAt), actor, saveAgeBack);
+          if (betweenLevelsOnly) {
+            // Checked again where the change is written, so advancement revoked (or the level held) a moment ago cannot let an
+            // edit through. The price is not checked here: it is guaranteed by the preview refusing any change in the total,
+            // and the commit being tied to that preview's quote fingerprint, so a different quote cannot be committed.
+            const open = await betweenLevelsWindow(tx, await getTeamSettings(eventId, tx), event, clubRegistration.id, now);
+            if (!open.open) throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsClosedMessage);
+          }
+        },
+      }
+      : {}),
     requestFingerprint,
     ...(input.locationId ? { locationId: input.locationId } : {}),
     ownedRegistrationResponses: async (hydrated, tx) => (
@@ -1613,6 +1711,8 @@ export async function amendClubRegistration(
   };
   try {
     const preview = await previewRegistrationAmendment(eventId, registrationId, amendmentInput, engineOptions);
+    // Between levels nothing may change what the registration costs: a priced change is the event office's to make.
+    if (betweenLevelsOnly && preview.deltaCents !== 0) throw new ClubRegistrationError("REGISTRATION_CLOSED", betweenLevelsPriceMessage);
     const response = await amendRegistration(
       eventId,
       registrationId,

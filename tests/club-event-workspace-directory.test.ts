@@ -174,11 +174,18 @@ describe("club event workspace locations (#413)", () => {
     Object.assign(prisma, { registration: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) } });
     prisma.clubEventRegistration.findUnique.mockResolvedValue({
       createdAt: new Date("2026-10-10T12:00:00Z"), registrationId: "registration-1", teamKey: "", teamName: null,
-      teamResults: [{ level: "AREA", placement: "2nd place", qualified: true, notes: "Well done", updatedAt: new Date("2027-01-16T20:00:00Z") }],
+      teamResults: [
+        // An old free-text row stays readable; a structured one reads as an ordinal (#945).
+        { level: "AREA", placement: "2nd place", placementRank: null, qualified: true, notes: "Well done", updatedAt: new Date("2027-01-16T20:00:00Z") },
+        { level: "CONFERENCE", placement: "", placementRank: 3, qualified: false, notes: "", updatedAt: new Date("2027-02-20T20:00:00Z") },
+      ],
       registration: { confirmationCode: "REG-CLUB", status: "SUBMITTED", updatedAt: new Date("2026-10-10T12:00:00Z"), location: null, attendees: [], messages: [] },
     });
     const workspace = await getClubEventWorkspace("club-1", "event-1", now);
-    expect(workspace.registration?.results).toEqual([{ level: "AREA", placement: "2nd place", qualified: true, notes: "Well done" }]);
+    expect(workspace.registration?.results).toEqual([
+      { level: "AREA", placement: "2nd place", qualified: true, notes: "Well done" },
+      { level: "CONFERENCE", placement: "3rd", qualified: false, notes: "" },
+    ]);
     // Read only: the director's payload carries no id to write one back with.
     expect(JSON.stringify(workspace.registration?.results)).not.toContain("updatedAt");
   });

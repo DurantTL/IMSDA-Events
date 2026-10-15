@@ -4,10 +4,11 @@
  * builder UI and the server routes agree on what a column key means, without
  * either importing the other's code.
  *
- * Medical and insurance data are never offered here. Guardian contacts (#510,
- * the emergency-contact decision) are offered as sensitive columns, and only
- * to someone who may see guardians (`guardian: true` below): the club's
- * director and deputy. Only fields the roster already collects appear.
+ * Medical and insurance data are never offered here. Emergency contacts (#510,
+ * stored as `ClubRosterGuardian`, so the column keys still say "guardian") are
+ * offered as sensitive columns, and only to someone who may see them
+ * (`guardian: true` below): the club's director and deputy. Only fields the
+ * roster already collects appear.
  */
 type RosterExportColumnDefinition = { header: string; sensitive: boolean; guardian?: true };
 
@@ -19,14 +20,14 @@ export const ROSTER_EXPORT_COLUMNS = {
   gender: { header: "Gender", sensitive: false },
   classLevel: { header: "Class", sensitive: false },
   role: { header: "Role", sensitive: false },
-  guardian1Name: { header: "Guardian 1 name", sensitive: true, guardian: true },
-  guardian1Relationship: { header: "Guardian 1 relationship", sensitive: true, guardian: true },
-  guardian1Email: { header: "Guardian 1 email", sensitive: true, guardian: true },
-  guardian1Phone: { header: "Guardian 1 cell phone", sensitive: true, guardian: true },
-  guardian2Name: { header: "Guardian 2 name", sensitive: true, guardian: true },
-  guardian2Relationship: { header: "Guardian 2 relationship", sensitive: true, guardian: true },
-  guardian2Email: { header: "Guardian 2 email", sensitive: true, guardian: true },
-  guardian2Phone: { header: "Guardian 2 cell phone", sensitive: true, guardian: true },
+  guardian1Name: { header: "Emergency contact 1 name", sensitive: true, guardian: true },
+  guardian1Relationship: { header: "Emergency contact 1 relationship", sensitive: true, guardian: true },
+  guardian1Email: { header: "Emergency contact 1 email", sensitive: true, guardian: true },
+  guardian1Phone: { header: "Emergency contact 1 phone", sensitive: true, guardian: true },
+  guardian2Name: { header: "Emergency contact 2 name", sensitive: true, guardian: true },
+  guardian2Relationship: { header: "Emergency contact 2 relationship", sensitive: true, guardian: true },
+  guardian2Email: { header: "Emergency contact 2 email", sensitive: true, guardian: true },
+  guardian2Phone: { header: "Emergency contact 2 phone", sensitive: true, guardian: true },
 } as const satisfies Record<string, RosterExportColumnDefinition>;
 
 

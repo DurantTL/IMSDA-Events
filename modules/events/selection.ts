@@ -4,6 +4,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { eventPermissions, rolePermissions } from "@/modules/access/permissions";
+import { withoutArchivedEvents } from "@/modules/events/archive";
 import { selectEventContext } from "@/modules/events/context-selection";
 import { readLastUsedEventId } from "@/modules/events/last-used-event";
 import { findActiveMembership, listEventsForUser } from "@/modules/events/repository";
@@ -53,7 +54,8 @@ export async function resolveEventContext(requestedEventId?: string) {
 
   return {
     event,
-    events,
+    /** The account's events for choosing between, never archived ones (#635). */
+    events: withoutArchivedEvents(events),
     user,
     membership,
     permissions,
@@ -65,7 +67,10 @@ export async function resolveEventContext(requestedEventId?: string) {
 async function loadSignedInEvents(options: { allowNoEvents?: boolean; anyStaffWithoutEvents?: boolean } = {}) {
   const user = (await getCurrentSession()).user;
   if (!user) redirect(await staffLoginRedirectPath());
-  const events = await listEventsForUser(user.id, user.globalRole === "SYSTEM_ADMIN");
+  // Archived events are included here (#635) so an explicit `?event=` link can still open one;
+  // `selectEventContext` keeps them out of every automatic choice, and callers that list events
+  // for selection filter them with `withoutArchivedEvents`.
+  const events = await listEventsForUser(user.id, user.globalRole === "SYSTEM_ADMIN", { archived: "include" });
 
   // A system administrator with zero events still owns the global /admin/*
   // pages (#567 F-6), which need no event. Only the workspace layout opts in;

@@ -1,4 +1,6 @@
 "use client";
+import { SubmitButton } from "@/components/submit-button";
+import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { Award, Eye, Pencil, Plus, Power, Save, Trash2, UsersRound, X } from "lucide-react";
@@ -20,7 +22,6 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
-  isAdultRosterPerson,
   missingRosterFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
@@ -196,8 +197,6 @@ export function ClubRosterWorkspace({
   }
 
   const today = calendarDateInEventTimeZone(new Date(), "America/Chicago");
-  /** Adults (staff, adult members, and anyone 18 or over) name an emergency contact; only a minor has a guardian (#918). */
-  const adultContact = isAdultRosterPerson(formType, formBirthDate, today);
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, today)
     : null;
@@ -263,9 +262,9 @@ export function ClubRosterWorkspace({
       editing: Boolean(editing),
     });
     setFieldErrors(errors);
-    // Guardian contacts (#510): two slots, every field optional; only email and phone format are checked.
+    // Emergency contacts (#510): every member, two slots, every field optional; only email and phone format are checked.
     if (canEditGuardians && guardianState === "loading") {
-      setError("Still loading this person's guardian contacts. Try again in a moment.");
+      setError("Still loading this person's emergency contacts. Try again in a moment.");
       return;
     }
     const guardianSlots = canEditGuardians && guardianState === "ready"
@@ -320,16 +319,24 @@ export function ClubRosterWorkspace({
   async function confirmSetStatus(member: RosterMemberRecord) {
     const next = member.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     const verb = next === "INACTIVE" ? "Deactivate" : "Reactivate";
-    const confirmed = window.confirm(`${verb} ${member.firstName} ${member.lastName}?`);
+    const confirmed = await askConfirm({
+      title: `${verb} ${member.firstName} ${member.lastName}`,
+      body: <p>{next === "INACTIVE" ? "They stay on file but are left out of new registrations until reactivated." : "They are available for registrations again."}</p>,
+      confirmLabel: `${verb} ${member.firstName} ${member.lastName}`,
+      destructive: next === "INACTIVE",
+    });
     if (!confirmed) return;
     const result = await setStatus(member, next);
     if (result) closeDialog();
   }
 
   async function remove(member: RosterMemberRecord) {
-    const confirmed = window.confirm(
-      `Remove ${member.firstName} ${member.lastName} from the roster? Their birth date and details are erased. This can't be undone. To keep them on file, mark them inactive instead.`,
-    );
+    const confirmed = await askConfirm({
+      title: `Remove ${member.firstName} ${member.lastName} from the roster`,
+      body: <p>Their birth date and details are erased. This can&apos;t be undone. To keep them on file, mark them inactive instead.</p>,
+      confirmLabel: `Remove ${member.firstName} ${member.lastName}`,
+      destructive: true,
+    });
     if (!confirmed) return;
     const result = await call(`${base}/${encodeURIComponent(member.id)}`, "DELETE", { confirm: true }, "Removed and erased.");
     if (result?.nameKept) setNotice("Removed and erased. Their name stays on items already ordered.");
@@ -340,8 +347,10 @@ export function ClubRosterWorkspace({
     if (result?.birthDates) setBirthDates(result.birthDates);
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <div className="club-roster-stack">
+      {confirmDialog}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
@@ -658,7 +667,6 @@ export function ClubRosterWorkspace({
         </div>
         {canEditGuardians && (
           <RosterGuardianFields
-            adult={adultContact}
             errors={guardianErrors}
             guardianState={guardianState}
             key={`${editing?.id ?? "new"}-${guardianRev}`}
@@ -681,10 +689,7 @@ export function ClubRosterWorkspace({
             </button>
           )}
           <button className="secondary-button" disabled={saving} onClick={closeDialog} type="button">Cancel</button>
-          <button className="primary-button" disabled={saving} type="submit">
-            {editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />}
-            {editing ? " Save" : " Add to roster"}
-          </button>
+          <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? "Save" : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
         </div>
       </form>
       </section>

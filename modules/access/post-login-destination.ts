@@ -1,7 +1,8 @@
 import "server-only";
 
 import type { GlobalRole } from "@prisma/client";
-import { resolveLoginDestination } from "@/modules/access/login-routing";
+import { NO_EVENTS_PATH, resolveLoginDestination } from "@/modules/access/login-routing";
+import { withoutArchivedEvents } from "@/modules/events/archive";
 import { readLastUsedEventId } from "@/modules/events/last-used-event";
 import { listEventsForUser } from "@/modules/events/repository";
 
@@ -16,15 +17,19 @@ export async function resolvePostLoginDestination(
   options: { returnTo?: string | null } = {},
 ): Promise<string> {
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
-  const [events, lastEventId] = await Promise.all([
-    isSystemAdmin ? Promise.resolve([]) : listEventsForUser(user.id, false),
+  const [allEvents, lastEventId] = await Promise.all([
+    isSystemAdmin ? Promise.resolve([]) : listEventsForUser(user.id, false, { archived: "include" }),
     isSystemAdmin ? Promise.resolve(null) : readLastUsedEventId(),
   ]);
+  // Archived events (#635) are never a landing choice.
+  const events = withoutArchivedEvents(allEvents);
 
-  return resolveLoginDestination({
+  const destination = resolveLoginDestination({
     isSystemAdmin,
     events,
     lastEventId,
     returnTo: options.returnTo,
   });
+  // Same as /select-event: someone whose only events are archived goes to that list, not "no access".
+  return destination === NO_EVENTS_PATH && allEvents.length > 0 ? "/archived-events" : destination;
 }

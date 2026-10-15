@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Team results (#809): who may enter and read them, what an entry audits, and the report and CSV. Session, membership and
+ * Team results (#809, #945): who may enter and read them, what an entry audits, and the report and CSV. Session, membership and
  * database are stubbed; the permission checks and the repository are real.
  */
 const mocks = vi.hoisted(() => ({
@@ -36,15 +36,15 @@ const put = (body: unknown) => new Request("https://events.imsda.test/api/events
 });
 
 const stored = (overrides: Record<string, unknown> = {}) => ({
-  id: "result-1", level: "AREA", placement: "2nd place", qualified: true, notes: "", updatedAt: new Date("2027-01-16T20:00:00Z"), ...overrides,
+  id: "result-1", level: "AREA", placement: "", placementRank: 2, advanceOverride: null, qualified: true, notes: "", updatedAt: new Date("2027-01-16T20:00:00Z"), ...overrides,
 });
 
-function database(options: { team?: unknown; existing?: unknown; listRows?: unknown[]; noTeamRules?: boolean } = {}) {
+function database(options: { team?: unknown; existing?: unknown; listRows?: unknown[]; noTeamRules?: boolean; teamResults?: unknown[] } = {}) {
   const tx = {
     clubTeamMemberPermission: { groupBy: vi.fn().mockResolvedValue([{ clubEventRegistrationId: "cer-1", _count: { _all: 1 } }]) },
     eventTeamSettings: { findUnique: vi.fn().mockResolvedValue(options.noTeamRules ? null : { eventId: "event-1" }) },
     clubEventRegistration: {
-      findFirst: vi.fn().mockResolvedValue("team" in options ? options.team : { teamName: "Bible Bees", organization: { name: "Test Pathfinders" }, registration: { status: "CONFIRMED" } }),
+      findFirst: vi.fn().mockResolvedValue("team" in options ? options.team : { teamName: "Bible Bees", organization: { name: "Test Pathfinders" }, registration: { status: "CONFIRMED" }, teamResults: options.teamResults ?? [] }),
       findMany: vi.fn().mockResolvedValue(options.listRows ?? []),
     },
     clubTeamResult: {
@@ -66,14 +66,19 @@ beforeEach(() => {
 });
 
 describe("team result input", () => {
-  it("trims the free text and defaults a level to nothing entered", () => {
-    expect(teamResultInputSchema.parse({ level: "AREA", placement: "  1st place  " })).toEqual({ level: "AREA", placement: "1st place", qualified: false, notes: "" });
+  it("takes the place as a number and defaults a level to nothing entered", () => {
+    expect(teamResultInputSchema.parse({ level: "AREA", placementRank: 1 })).toEqual({ level: "AREA", placementRank: 1, advanceOverride: null, notes: "", clear: false });
+    expect(teamResultInputSchema.parse({ level: "AREA", notes: "  Great  " })).toEqual({ level: "AREA", placementRank: null, advanceOverride: null, notes: "Great", clear: false });
   });
 
   it.each([
     [{ level: "REGIONAL" }, "Invalid option"],
-    [{ level: "AREA", placement: "x".repeat(201) }, "Keep the placement or score to 200 characters or fewer."],
-    [{ level: "AREA", extra: true }, "Unrecognized key"],
+    [{ level: "AREA", placementRank: 0 }, "The place starts at 1."],
+    [{ level: "AREA", placementRank: 1.5 }, "whole number"],
+    [{ level: "AREA", placementRank: "2nd place" }, "expected number"],
+    [{ level: "AREA", notes: "x".repeat(2001) }, "Keep the notes to 2,000 characters or fewer."],
+    [{ level: "AREA", placement: "1st" }, "Unrecognized key"],
+    [{ level: "AREA", qualified: true }, "Unrecognized key"],
   ])("refuses %j", (input, message) => {
     const result = teamResultInputSchema.safeParse(input);
     expect(result.success).toBe(false);
@@ -81,31 +86,32 @@ describe("team result input", () => {
   });
 
   it("calls a result with nothing in it blank", () => {
-    expect(resultIsBlank({ placement: "", qualified: false, notes: "" })).toBe(true);
-    expect(resultIsBlank({ placement: "", qualified: true, notes: "" })).toBe(false);
+    expect(resultIsBlank({ placementRank: null, advanceOverride: null, notes: "" })).toBe(true);
+    expect(resultIsBlank({ placementRank: null, advanceOverride: true, notes: "" })).toBe(false);
+    expect(resultIsBlank({ placementRank: 3, advanceOverride: null, notes: "" })).toBe(false);
   });
 });
 
 describe("PUT /api/events/[eventId]/team-results/[registrationId]", () => {
-  it("lets a registration manager enter a result, and audits it with the values after", async () => {
+  it("lets a registration manager enter a result, marks 2nd place advancing, and audits it with the values after", async () => {
     const { tx } = database();
-    const response = await PUT(put({ level: "AREA", placement: "2nd place", qualified: true }), ctx);
+    const response = await PUT(put({ level: "AREA", placementRank: 2 }), ctx);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ changed: true, result: { level: "AREA", placement: "2nd place", qualified: true } });
+    await expect(response.json()).resolves.toMatchObject({ changed: true, result: { level: "AREA", placementRank: 2, qualified: true } });
     expect(tx.clubTeamResult.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { clubEventRegistrationId_level: { clubEventRegistrationId: "cer-1", level: "AREA" } },
-      create: expect.objectContaining({ updatedByUserId: "staff-1" }),
+      create: expect.objectContaining({ updatedByUserId: "staff-1", placementRank: 2, qualified: true }),
     }));
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       eventId: "event-1", actorUserId: "staff-1", action: "CLUB_TEAM_RESULT_ENTERED",
       summary: "Entered the area result for Bible Bees (Test Pathfinders).",
-      metadata: expect.objectContaining({ before: null, after: { placement: "2nd place", qualified: true, notes: "" } }),
+      metadata: expect.objectContaining({ before: null, after: { placement: "", placementRank: 2, advanceOverride: null, qualified: true, notes: "" } }),
     }), tx);
   });
 
   it("refuses a result on an event without team rules, and writes nothing", async () => {
     const { tx } = database({ noTeamRules: true });
-    const response = await PUT(put({ level: "AREA", placement: "1st place" }), ctx);
+    const response = await PUT(put({ level: "AREA", placementRank: 1 }), ctx);
     expect(response.status).toBe(422);
     expect(tx.clubTeamResult.upsert).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
@@ -113,52 +119,67 @@ describe("PUT /api/events/[eventId]/team-results/[registrationId]", () => {
 
   it("audits a change with the values before and after", async () => {
     const { tx } = database({ existing: stored() });
-    await PUT(put({ level: "AREA", placement: "1st place", qualified: true }), ctx);
+    await PUT(put({ level: "AREA", placementRank: 1 }), ctx);
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       action: "CLUB_TEAM_RESULT_UPDATED",
-      metadata: expect.objectContaining({ before: { placement: "2nd place", qualified: true, notes: "" }, after: { placement: "1st place", qualified: true, notes: "" } }),
+      metadata: expect.objectContaining({
+        before: { placement: "", placementRank: 2, advanceOverride: null, qualified: true, notes: "" },
+        after: { placement: "", placementRank: 1, advanceOverride: null, qualified: true, notes: "" },
+      }),
     }), tx);
   });
 
   it("writes and audits nothing when the result is what is already stored", async () => {
     const { tx } = database({ existing: stored() });
-    const response = await PUT(put({ level: "AREA", placement: "2nd place", qualified: true }), ctx);
+    const response = await PUT(put({ level: "AREA", placementRank: 2 }), ctx);
     await expect(response.json()).resolves.toMatchObject({ changed: false });
     expect(tx.clubTeamResult.upsert).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
-  it("clears a level when it is saved blank, and audits the clearing", async () => {
+  it("clears a level only on an explicit Clear result, and audits the clearing", async () => {
     const { tx } = database({ existing: stored() });
-    const response = await PUT(put({ level: "AREA" }), ctx);
+    const response = await PUT(put({ level: "AREA", clear: true }), ctx);
     await expect(response.json()).resolves.toMatchObject({ changed: true, result: null });
     expect(tx.clubTeamResult.delete).toHaveBeenCalled();
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_RESULT_CLEARED" }), tx);
   });
 
+  it("never deletes a result because the fields were saved empty, old free-text rows included", async () => {
+    const { tx } = database({ existing: stored({ placement: "2nd place", placementRank: null, qualified: true }) });
+    const response = await PUT(put({ level: "AREA" }), ctx);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ error: "RESULT_INVALID", message: expect.stringContaining("Clear result") });
+    expect(tx.clubTeamResult.delete).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+    // Nothing stored and nothing entered is simply nothing.
+    database();
+    await expect((await PUT(put({ level: "AREA" }), ctx)).json()).resolves.toMatchObject({ changed: false, result: null });
+  });
+
   it.each(["FINANCE_MANAGER", "COMMUNICATIONS_MANAGER", "CHECK_IN_STAFF", "READ_ONLY_STAFF"])("refuses %s, who cannot manage registrations", async (role) => {
     mocks.findActiveMembership.mockResolvedValue(membership(role));
     const { prisma } = database();
-    const response = await PUT(put({ level: "AREA", placement: "1st" }), ctx);
+    const response = await PUT(put({ level: "AREA", placementRank: 1 }), ctx);
     expect(response.status).toBe(403);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("allows an event administrator, and refuses a signed-out or cross-origin request", async () => {
     mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
-    database();
-    expect((await PUT(put({ level: "UNION", placement: "3rd" }), ctx)).status).toBe(200);
+    database({ teamResults: [{ level: "AREA", placement: "", placementRank: 1, advanceOverride: null, qualified: true, notes: "", updatedAt: new Date() }, { level: "CONFERENCE", placement: "", placementRank: 1, advanceOverride: null, qualified: true, notes: "", updatedAt: new Date() }] });
+    expect((await PUT(put({ level: "UNION", placementRank: 3 }), ctx)).status).toBe(200);
     mocks.getCurrentSession.mockResolvedValue({ user: null });
-    expect((await PUT(put({ level: "UNION", placement: "3rd" }), ctx)).status).toBe(401);
+    expect((await PUT(put({ level: "UNION", placementRank: 3 }), ctx)).status).toBe(401);
     mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({}, { status: 403 }));
-    expect((await PUT(put({ level: "UNION", placement: "3rd" }), ctx)).status).toBe(403);
+    expect((await PUT(put({ level: "UNION", placementRank: 3 }), ctx)).status).toBe(403);
   });
 
   it("answers 404 for a team of another event, and 422 for one that is waitlisted", async () => {
     database({ team: null });
-    expect((await PUT(put({ level: "AREA", placement: "1st" }), ctx)).status).toBe(404);
-    database({ team: { teamName: "Bible Bees", organization: { name: "Test Pathfinders" }, registration: { status: "WAITLISTED" } } });
-    const response = await PUT(put({ level: "AREA", placement: "1st" }), ctx);
+    expect((await PUT(put({ level: "AREA", placementRank: 1 }), ctx)).status).toBe(404);
+    database({ team: { teamName: "Bible Bees", organization: { name: "Test Pathfinders" }, registration: { status: "WAITLISTED" }, teamResults: [] } });
+    const response = await PUT(put({ level: "AREA", placementRank: 1 }), ctx);
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({ error: "RESULT_INVALID" });
   });
@@ -172,8 +193,8 @@ describe("PUT /api/events/[eventId]/team-results/[registrationId]", () => {
 describe("GET /api/events/[eventId]/team-results", () => {
   const listRow = {
     id: "cer-1", teamName: "Bible Bees", organization: { name: "Test Pathfinders", parentOrganization: { name: "Test SDA Church" } },
-    registration: { confirmationCode: "PBE-1", status: "CONFIRMED", location: { name: "Iowa" } },
-    teamResults: [stored(), stored({ level: "CONFERENCE", placement: "5th", qualified: false, notes: "=SUM(A1)" })],
+    registration: { confirmationCode: "PBE-1", status: "CONFIRMED", locationId: "loc-iowa", location: { name: "Iowa" } },
+    teamResults: [stored(), stored({ level: "CONFERENCE", placementRank: 5, qualified: false, notes: "=SUM(A1)" })],
   };
 
   it("lists each team with a result for every level, to staff with report access", async () => {
@@ -184,7 +205,7 @@ describe("GET /api/events/[eventId]/team-results", () => {
     const body = await response.json() as { teams: TeamResultsRow[] };
     expect(body.teams).toHaveLength(1);
     expect(body.teams[0]).toMatchObject({ teamName: "Bible Bees", clubName: "Test Pathfinders", church: "Test SDA Church", locationName: "Iowa", permissionsPending: 1 });
-    expect(body.teams[0]!.results.AREA).toMatchObject({ placement: "2nd place", qualified: true });
+    expect(body.teams[0]!.results.AREA).toMatchObject({ placementRank: 2, qualified: true });
     expect(body.teams[0]!.results.UNION).toBeNull();
   });
 
@@ -195,8 +216,8 @@ describe("GET /api/events/[eventId]/team-results", () => {
     expect(response.headers.get("content-type")).toContain("text/csv");
     expect(response.headers.get("content-disposition")).toContain("event-1-team-results.csv");
     const csv = await response.text();
-    expect(csv.split("\r\n")[0]).toBe('"Team","Club","Church","Confirmation","Location","AC permission pending","Area placement","Area qualified","Area notes","Conference placement","Conference qualified","Conference notes","Union placement","Union qualified","Union notes"');
-    expect(csv).toContain('"Bible Bees","Test Pathfinders","Test SDA Church","PBE-1","Iowa","1","2nd place","Yes","","5th","No","\'=SUM(A1)","","",""');
+    expect(csv.split("\r\n")[0]).toBe('"Team","Club","Church","Confirmation","Area","AC permission pending","Area place","Area advancing","Area notes","Conference place","Conference advancing","Conference notes","Union place","Union advancing","Union notes"');
+    expect(csv).toContain('"Bible Bees","Test Pathfinders","Test SDA Church","PBE-1","Iowa","1","2nd","Yes","","5th","No","\'=SUM(A1)","","",""');
   });
 
   it("is refused to staff without report access", async () => {
@@ -210,7 +231,7 @@ describe("GET /api/events/[eventId]/team-results", () => {
 describe("results CSV rows", () => {
   it("leaves a level with no result empty rather than saying No", () => {
     const rows = teamResultsCsvRows([{
-      clubEventRegistrationId: "cer-1", teamName: "Bible Bees", clubName: "Test Pathfinders", church: null, confirmationCode: "PBE-1", status: "CONFIRMED", locationName: null, permissionsPending: 2,
+      clubEventRegistrationId: "cer-1", teamName: "Bible Bees", clubName: "Test Pathfinders", church: null, confirmationCode: "PBE-1", status: "CONFIRMED", locationId: null, locationName: null, permissionsPending: 2,
       results: { AREA: null, CONFERENCE: null, UNION: null },
     }]);
     expect(rows[1]!.slice(5)).toEqual([2, "", "", "", "", "", "", "", "", ""]);

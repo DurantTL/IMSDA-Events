@@ -79,7 +79,8 @@ export function ClubRosterCarryForward({
       setError(String(result.body.message ?? "The new year's roster could not be started."));
       return;
     }
-    setDone(`Started the ${toClubYear} roster with ${String(result.body.carried)} ${result.body.carried === 1 ? "person" : "people"}.`);
+    const copied = Number(result.body.guardiansCopied ?? 0);
+    setDone(`Started the ${toClubYear} roster with ${String(result.body.carried)} ${result.body.carried === 1 ? "person" : "people"}${copied > 0 ? `, ${String(copied)} emergency ${copied === 1 ? "contact" : "contacts"} copied` : ""}.`);
     router.refresh();
   }
 
@@ -101,7 +102,7 @@ export function ClubRosterCarryForward({
     >
       <p className="field-help">
         Everyone on the {fromClubYear} roster is ticked, except anyone with a pending transfer to another club. Untick anyone who is leaving, and change a type, role or class
-        for anyone moving up. People you carry keep their record and birth date; the {fromClubYear} roster stays as it was.
+        for anyone moving up. People you carry keep their record, birth date and emergency contacts; the {fromClubYear} roster stays as it was.
       </p>
       <div className="intro-actions">
         <button className="secondary-button" onClick={() => setAll(true)} type="button">Tick everyone</button>

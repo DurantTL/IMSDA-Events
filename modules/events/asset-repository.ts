@@ -402,7 +402,7 @@ export async function findPublishedEventAsset(eventSlug: string, assetId: string
   return getPrisma().eventAsset.findFirst({
     where: {
       id: assetId,
-      event: { slug: eventSlug, isPublished: true },
+      event: { slug: eventSlug, isPublished: true, archivedAt: null },
       OR: [
         { links: { some: { section: { isPublished: true, event: { slug: eventSlug } } } } },
         // A picture a published content block shows (#816).

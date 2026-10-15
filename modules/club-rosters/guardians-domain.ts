@@ -8,8 +8,12 @@ const GUARDIAN_PHONE_MESSAGE = "Enter a phone number like (515) 555-0134.";
  * validation, and who may read or change them. Nothing here touches the
  * database, so the roster dialog and the server agree on the same checks.
  *
- * Director decision (Oct 1 and Oct 3, 2026): up to two guardians per member,
- * each with a name, relationship, email and cell phone, every field optional,
+ * Owner decision (Oct 15, 2026): every roster member, adult or minor, can
+ * have emergency contacts, the director and deputy edit them, and they are in
+ * the roster export. Staff-facing wording is "Emergency contact" everywhere.
+ *
+ * Director decision (Oct 1 and Oct 3, 2026): up to two contacts per member,
+ * each with a name, relationship, email and phone, every field optional,
  * stored as plain text (not encrypted). Readable by the club's director and
  * deputy (who also edit), by every Area Coordinator, and by conference staff
  * holding VIEW_SENSITIVE_DATA. Nobody else.
@@ -24,13 +28,14 @@ export const guardianFieldLabels: Record<GuardianField, string> = {
   name: "Name",
   relationship: "Relationship",
   email: "Email",
-  phone: "Cell phone",
+  phone: "Phone",
 };
 
-/** What a contact is called (#918): an adult names an emergency contact, a minor a guardian. */
-export function guardianTerm(adult: boolean) {
-  return adult ? { singular: "Emergency contact", plural: "Emergency contacts" } : { singular: "Guardian", plural: "Guardians" };
-}
+/**
+ * What staff see this contact called (#510, owner decision Oct 15, 2026): "Emergency contact", never
+ * "Guardian". The stored model keeps its `ClubRosterGuardian` name; only the words change.
+ */
+export const EMERGENCY_CONTACT_TERM = { singular: "Emergency contact", plural: "Emergency contacts" } as const;
 
 export type GuardianValues = Record<GuardianField, string>;
 
@@ -84,7 +89,7 @@ export const guardianInputSchema = z.object({
  * does not block the edit.
  */
 export const guardianUpdateInputSchema = guardianInputSchema.extend({ phone: text(40) });
-export const guardiansUpdateSchema = z.array(guardianUpdateInputSchema).max(GUARDIAN_SLOTS, "A member can have two guardians at most.");
+export const guardiansUpdateSchema = z.array(guardianUpdateInputSchema).max(GUARDIAN_SLOTS, "A member can have two emergency contacts at most.");
 
 /**
  * The guardian set sent with a roster add or edit: slot 1 first, slot 2
@@ -92,7 +97,7 @@ export const guardiansUpdateSchema = z.array(guardianUpdateInputSchema).max(GUAR
  * out) removes that guardian. Leaving `guardians` out of the request leaves
  * the stored guardians alone.
  */
-export const guardiansInputSchema = z.array(guardianInputSchema).max(GUARDIAN_SLOTS, "A member can have two guardians at most.");
+export const guardiansInputSchema = z.array(guardianInputSchema).max(GUARDIAN_SLOTS, "A member can have two emergency contacts at most.");
 
 export type GuardianInput = z.infer<typeof guardianInputSchema>;
 

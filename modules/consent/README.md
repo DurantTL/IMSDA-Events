@@ -52,6 +52,8 @@ existing form answers belong to later slices.
   `MANAGE_FORMS`: published versions only (id, version number, kind, title,
   content hash, effective window), never the body text, for the event's own and
   organization policies (#150).
+- Acknowledgment evidence (#150) references a published version with `ON DELETE RESTRICT`, by exact version id. Event deletion
+  therefore refuses an event that holds evidence instead of removing its policies (see `modules/acknowledgments/README.md`).
 - Applicability updates are partial: a PATCH writes only the fields it names,
   and the age band is validated against the merged values.
 

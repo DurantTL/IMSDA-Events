@@ -151,10 +151,10 @@ const ids = {
 };
 
 async function seedBefore527(clubYear: string) {
-  await db.user.create({ data: { id: ids.user, email: `${P}.admin@example.test`, displayName: "Verify Admin", globalRole: "SYSTEM_ADMIN" } });
   // Before the later migrations are deployed, select only the id: the default
   // RETURNING lists every column of the current client, including ones these
-  // older migrations have not added yet (#649).
+  // older migrations have not added yet (#649, and User.attendeeAccountId, #554).
+  await db.user.create({ data: { id: ids.user, email: `${P}.admin@example.test`, displayName: "Verify Admin", globalRole: "SYSTEM_ADMIN" }, select: { id: true } });
   await db.organization.create({ data: { id: ids.church, type: "CHURCH", name: "Verify Church", normalizedName: "verify church" }, select: { id: true } });
   await db.organization.create({ data: { id: ids.club, type: "CLUB", name: "Verify Pathfinders", normalizedName: "verify pathfinders", parentOrganizationId: ids.church }, select: { id: true } });
   for (const person of people) {

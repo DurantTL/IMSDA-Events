@@ -60,6 +60,7 @@ export type PublicEventAnnouncement = {
 
 type PublicEventLifecycleInput = {
   isPublished: boolean;
+  archivedAt: Date | null;
   timezone: string;
   capacity: number | null;
   registrationOpensOn: string | null;

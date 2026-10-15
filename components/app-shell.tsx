@@ -46,6 +46,8 @@ type ShellEvent = {
   id: string;
   slug: string;
   name: string;
+  /** Archived (#635): left out of the pickers unless it is the event being viewed, and never remembered as the last-used event. */
+  archived?: boolean;
   permissions: readonly EventPermission[];
   /** Whether this event's club oversight (#387) is open to the signed-in user, computed server-side. */
   clubOversight?: boolean;
@@ -201,7 +203,9 @@ export function AppShell({
   // An event named in the URL becomes the remembered selection (#616), so the
   // next page without `?event=` keeps it instead of falling back to the default.
   const lastRememberedId = useRef<string | null>(defaultEventId);
-  const knownEventIds = events.map((event) => event.id).join("|");
+  const knownEventIds = events.filter((event) => !event.archived).map((event) => event.id).join("|");
+  // The pickers list live events only (#635); an archived event being viewed by link stays listed, marked, so the picker is not blank.
+  const pickerEvents = events.filter((event) => !event.archived || event.id === selectedEventId);
   useEffect(() => {
     const toRemember = eventToRemember({
       requestedEventId,
@@ -275,10 +279,11 @@ export function AppShell({
               onChange={(event) => selectEvent(event.target.value)}
             >
               {!selectedEventId && <option value="" disabled>Choose an event</option>}
-              {events.map((event) => <option value={event.id} key={event.id}>{event.name}</option>)}
+              {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </div>
+          <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>
         </div>}
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
@@ -371,7 +376,7 @@ export function AppShell({
               <span className="sr-only">Current event</span>
               <select value={selectedEventId} onChange={(event) => selectEvent(event.target.value)}>
                 {!selectedEventId && <option value="" disabled>Choose an event</option>}
-                {events.map((event) => <option value={event.id} key={event.id}>{event.name}</option>)}
+                {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
               </select>
               <ChevronDown aria-hidden="true" size={15} />
             </label>

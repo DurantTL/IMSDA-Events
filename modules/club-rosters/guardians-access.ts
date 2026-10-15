@@ -36,7 +36,7 @@ export function clubLeaderGuardianViewerFromAccess(access: OpenRosterAccess): Ex
 export function requireGuardianEditor(access: OpenRosterAccess) {
   const viewer = clubLeaderGuardianViewerFromAccess(access);
   if (!viewer) {
-    throw new RosterAccessError("ROLE_NOT_ALLOWED", 403, "Guardian contacts are for your club's director and deputy.");
+    throw new RosterAccessError("ROLE_NOT_ALLOWED", 403, "Emergency contacts are for your club's director and deputy.");
   }
   return viewer;
 }

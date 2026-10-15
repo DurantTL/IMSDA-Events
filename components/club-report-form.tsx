@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleAlert, FileText, RefreshCw, Save, Send, X } from "lucide-react";
 import {
@@ -107,6 +109,8 @@ export function ClubReportForm({
   const [openedNotes] = useState(() => JSON.stringify(notesPrefill ?? null));
   const notesChanged = JSON.stringify(notesPrefill ?? null) !== openedNotes;
   const [saving, setSaving] = useState(false);
+  // Which of the two submit buttons was pressed, so only it shows the busy label.
+  const [savingIntent, setSavingIntent] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -133,6 +137,7 @@ export function ClubReportForm({
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const status: "DRAFT" | "SUBMITTED" = submitter?.value === "draft" ? "DRAFT" : "SUBMITTED";
+    setSavingIntent(status === "DRAFT" ? "draft" : "submit");
     if (status === "SUBMITTED" && problems.length > 0) {
       setError("Fix the items marked below before submitting.");
       return;
@@ -175,7 +180,12 @@ export function ClubReportForm({
 
   async function reopen() {
     if (!reopenEndpoint) return;
-    if (!window.confirm(`Reopen this report as a draft? You must resubmit it by ${dueLabel}. After that date you can't submit changes.`)) return;
+    if (!(await askConfirm({
+      title: `Reopen the ${monthLabel} report`,
+      body: <p>It goes back to a draft. You must resubmit it by {dueLabel}. After that date you can&apos;t submit changes.</p>,
+      confirmLabel: `Reopen ${monthLabel} report`,
+    }))) return;
+    setSavingIntent(null);
     setSaving(true);
     setError("");
     setNotice("");
@@ -192,9 +202,13 @@ export function ClubReportForm({
     }
   }
 
-  function refreshFromNotes() {
+  async function refreshFromNotes() {
     if (!notesPrefill) return;
-    if (!window.confirm("Replace attendance and honors below with this month's meeting-note averages? Anything else you typed stays.")) return;
+    if (!(await askConfirm({
+      title: "Replace attendance and honors with meeting-note averages",
+      body: <p>The attendance counts and honors below are replaced with the averages from {monthLabel} meeting notes. Anything else you typed stays.</p>,
+      confirmLabel: "Replace with meeting-note averages",
+    }))) return;
     setCountsRefresh({
       averageAttendance: notesPrefill.averageAttendance,
       pathfinderCount: notesPrefill.pathfinderCount,
@@ -236,6 +250,8 @@ export function ClubReportForm({
         )}
       </div>
   );
+
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
 
   const formBody = (
     <>
@@ -366,23 +382,20 @@ export function ClubReportForm({
         {!readOnly && (
           <div className="intro-actions">
             {allowDraft && (!report || isDraft) && (
-              <button className="secondary-button" disabled={saving} formNoValidate name="intent" type="submit" value="draft">
-                <Save aria-hidden="true" size={16} /> Save draft
-              </button>
+              <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
             )}
-            <button className="primary-button" disabled={saving || problems.length > 0} name="intent" type="submit" value="submit">
-              <Send aria-hidden="true" size={16} /> {allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · {total} points
-            </button>
+            <SubmitButton className="primary-button" disabled={saving || problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving && savingIntent === "submit"} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
           </div>
         )}
       </fieldset>
     </>
   );
 
-  if (!asDialog) return <form className="club-report-form" onSubmit={save}>{formBody}</form>;
+  if (!asDialog) return <>{confirmDialog}<form className="club-report-form" onSubmit={save}>{formBody}</form></>;
 
   return (
     <>
+      {confirmDialog}
       {renderSummary(false)}
       <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setOpen(false); }} role="presentation" style={open ? undefined : { display: "none" }}>
         <section aria-labelledby="monthly-report-dialog-title" aria-modal="true" className="modal-card modal-card-wide" ref={dialogRef} role="dialog" tabIndex={-1}>

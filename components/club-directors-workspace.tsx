@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { cardCell } from "@/components/table-card-labels";
 import { useState } from "react";
 import { Ban, UserCog, UserPlus } from "lucide-react";
@@ -165,9 +166,7 @@ export function ClubDirectorsWorkspace({
             ask them to create one at /account/sign-up.
           </p>
           <div>
-            <button className="primary-button" disabled={saving} type="submit">
-              <UserPlus aria-hidden="true" size={16} /> Give role
-            </button>
+            <SubmitButton className="primary-button" icon={<UserPlus aria-hidden="true" size={16} />} label="Give role" submitting={saving} submittingLabel="Giving…" />
           </div>
         </form>
       ) : (

@@ -289,7 +289,7 @@ export async function updateRosterMember(
     // Guardian contacts live only on the current club year's row (#510): a
     // crafted request against a prior or later year's row is refused.
     if (input.guardians !== undefined && member.clubYear !== clubYearFor(now)) {
-      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Guardian contacts can only be changed on the current club year's roster.");
+      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts can only be changed on the current club year's roster.");
     }
     // Nothing to change (an older client sending only `willingToDrive`, which
     // the schema strips, or an empty edit): no write, no audit entry.
@@ -518,6 +518,10 @@ export async function removeRosterMember(organizationId: string, memberId: strin
               // A sealed per-event health copy (#924) outlives the roster row and the live record, and its person key is
               // `onDelete: Restrict`: the Person stays (name only, below) until the copy's retention job deletes it.
               healthSnapshots: true,
+              // Acknowledgment evidence (#150), as the person acknowledged for or as the one who acknowledged: append-only,
+              // and both references are `onDelete: Restrict`, so the Person stays rather than failing the removal.
+              acknowledgmentEvidenceAsSubject: true,
+              acknowledgmentEvidenceActed: true,
             },
           },
         },

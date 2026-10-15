@@ -26,6 +26,7 @@ export default function robots(): MetadataRoute.Robots {
         "/registration-builder",
         "/reset-password",
         "/select-event",
+        "/archived-events",
         "/staff",
         "/unsubscribe/",
       ],

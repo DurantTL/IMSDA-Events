@@ -49,6 +49,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
     id: event.id,
     slug: event.slug,
     name: event.name,
+    archived: event.archivedAt !== null,
     permissions: permissionsByEvent.get(event.id) ?? [],
     clubEvent: event.audience === "CLUB",
     hiddenCardKeys: modulesByEvent.has(event.id) ? [...disabledModuleCardKeys(modulesByEvent.get(event.id)!.effective)] : undefined,
@@ -58,7 +59,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
       && (isSystemAdmin || rolesByEvent.get(event.id) === "EVENT_ADMIN"),
   }));
   const attendeeAccountAvailable = Boolean(
-    await findSwitchableAttendeeAccountForStaff(user.email),
+    await findSwitchableAttendeeAccountForStaff(user.email, user.id),
   );
   const acting = await currentStaffActingContext();
 

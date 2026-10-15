@@ -26,6 +26,7 @@ vi.mock("@/lib/prisma", () => ({
     eventTeamSettings: { findUnique: async () => null },
     clubRosterMember: { findMany: mocks.rosterFindMany },
     clubRegistrationDraft: { update: mocks.draftUpdate },
+    registrationForm: { findFirst: async () => null },
     };
     return client;
   },

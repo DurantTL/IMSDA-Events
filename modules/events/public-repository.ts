@@ -25,7 +25,7 @@ async function loadPublicEventLanding(
 ) {
   const prisma = getPrisma();
   const event = await prisma.event.findFirst({
-    where: { slug: eventSlug, isPublished: true },
+    where: { slug: eventSlug, isPublished: true, archivedAt: null },
     select: {
       id: true,
       slug: true,
@@ -40,6 +40,7 @@ async function loadPublicEventLanding(
       refundPolicy: true,
       audience: true,
       isPublished: true,
+      archivedAt: true,
       registrationOpensOn: true,
       registrationClosesOn: true,
       waitlistEnabled: true,
@@ -209,6 +210,7 @@ export async function listPublicEventSitemapEntries() {
   return getPrisma().event.findMany({
     where: {
       isPublished: true,
+      archivedAt: null,
       registrationForms: {
         some: { versions: { some: { status: "PUBLISHED" } } },
       },

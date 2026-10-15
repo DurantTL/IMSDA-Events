@@ -71,6 +71,7 @@ async function attendeeEventAccess(account: AttendeeIdentity, eventIdOrSlug: {
     where: {
       ...eventIdOrSlug,
       isPublished: true,
+      archivedAt: null,
       registrations: {
         some: {
           id: { in: registrationIds },

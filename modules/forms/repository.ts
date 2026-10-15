@@ -23,6 +23,7 @@ import type { AttendeeTypeOption } from "@/modules/attendee-types/domain";
 import { hasDirectoryOptionSource, stripDirectoryOptions, withDirectoryOptions } from "@/modules/organizations/directory-form-options";
 import type { OrganizationDirectory } from "@/modules/organizations/directory-options";
 import { directoryForDefinitions, hydrateFormOptions } from "@/modules/forms/form-options-repository";
+import { AcknowledgmentError, assertAcknowledgmentPoliciesAvailable } from "@/modules/acknowledgments/repository";
 
 /**
  * Every writer of a form's versions or slug (save, test, publish, withdraw, slug update) runs in
@@ -49,9 +50,36 @@ async function formWriteTransaction<T>(operation: (tx: Prisma.TransactionClient)
 
 const emptyDirectory: OrganizationDirectory = { clubs: [], churches: [], schools: [] };
 
+/**
+ * Every policy-version acknowledgment must point at a published acknowledgment version this event can reach (#150). Checked
+ * on every save and again on publish, so a draft carried over from another event (or a version since retired from the
+ * picker) can be saved only once it is fixed, and can never be published pointing at something the event cannot use.
+ */
+async function assertAcknowledgmentPolicies(eventId: string, definition: RegistrationFormDefinition) {
+  // Club and group events take registrations from directors, and club rosters have no responsible-adult declarations (#131),
+  // so an attendee-level acknowledgment could never be recorded for them. Registration-level ones are fine.
+  const attendeeLevel = definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.type === "ACKNOWLEDGMENT" && field.scope === "ATTENDEE");
+  if (attendeeLevel.length > 0) {
+    const event = await getPrisma().event.findUnique({ where: { id: eventId }, select: { audience: true, billingMode: true, generalRegistrationLinkEnabled: true } });
+    if (event && (event.audience === "CLUB" || event.billingMode === "DEFERRED_ORGANIZATION_INVOICE" || event.generalRegistrationLinkEnabled)) {
+      throw new FormOperationError(
+        "ACKNOWLEDGMENT_POLICY_UNAVAILABLE",
+        `${attendeeLevel.map((field) => field.label).join(", ")}: a per-attendee recorded acknowledgment is not available on club or group events, because club rosters have no responsible-adult declarations. Make it a registration-level acknowledgment.`,
+      );
+    }
+  }
+  try {
+    await assertAcknowledgmentPoliciesAvailable(eventId, definition);
+  } catch (error) {
+    if (error instanceof AcknowledgmentError) throw new FormOperationError("ACKNOWLEDGMENT_POLICY_UNAVAILABLE", error.message);
+    throw error;
+  }
+}
+
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE",
     message: string,
   ) {
     super(message);
@@ -278,6 +306,7 @@ export async function updateRegistrationForm(
 ) {
   const definition = registrationFormDefinitionSchema.parse(input.definition);
   assertNoReservedChoiceValues(definition);
+  await assertAcknowledgmentPolicies(eventId, definition);
   try {
   await formWriteTransaction(async (tx) => {
     let invalidatedTestCount = 0;
@@ -410,6 +439,7 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     const draft = form.versions.find((version) => version.status === RegistrationFormStatus.DRAFT);
     if (!draft) throw new FormOperationError("NO_DRAFT", "This form has no draft version to publish.");
     const definition = registrationFormDefinitionSchema.parse(draft.definition);
+    await assertAcknowledgmentPolicies(eventId, definition);
     // Every version is gated on its own valid test submission (#564). A test
     // proves the version being published can be filled in and priced; an
     // earlier version's test says nothing about a new module, a switch to team

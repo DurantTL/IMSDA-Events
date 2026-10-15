@@ -596,6 +596,13 @@ export const builderFieldModules: BuilderModuleDefinition[] = [
     fields: [{ key: "acknowledgment", label: "Acknowledgment", helpText: "", placeholder: "Yes, I understand and agree.", type: "CHECKBOX", scope: "REGISTRATION", required: true, options: [] }],
   },
   {
+    key: "recorded_acknowledgment",
+    category: "Common",
+    name: "Recorded acknowledgment",
+    description: "Records the exact wording or policy version acknowledged",
+    fields: [{ key: "acknowledgment_record", label: "Acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION", required: true, options: [], acknowledgment: { source: "TEXT", text: "Replace this with the statement people acknowledge." } }],
+  },
+  {
     key: "scheduled_fee",
     category: "Common",
     name: "Scheduled registration fee",

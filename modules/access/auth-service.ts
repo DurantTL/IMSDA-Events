@@ -6,6 +6,7 @@ import { hashPassword, spendPasswordCheck, verifyPassword } from "@/modules/acce
 import { createDatabaseSession } from "@/modules/access/session-store";
 import { mfaGateFor } from "@/modules/access/mfa-rules";
 import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
+import { linkAttendeeSideAtActivation } from "@/modules/account-merge/staff-attendee-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { scheduleLockoutEmails } from "@/modules/communications/lockout-email";
 
@@ -319,10 +320,14 @@ export async function resetPassword(token: string, password: string) {
     });
     // Choosing a password is what activates an invited account. Doing it here
     // means the two can never drift apart.
-    await tx.user.updateMany({
+    const activated = await tx.user.updateMany({
       where: { id: reset.userId, accountStatus: "PENDING_ACTIVATION" },
       data: { accountStatus: "ACTIVE", activatedAt: now },
     });
+    // One account per person (#554, ADR 0013 decision 4): a staff member who just
+    // activated gets a verified, linked attendee account. Runs only when the
+    // one-sign-in switch is on, and only for a real activation (not a reset).
+    if (activated.count === 1) await linkAttendeeSideAtActivation(tx, reset.userId, now);
     await tx.userSession.updateMany({
       where: { userId: reset.userId, revokedAt: null },
       data: { revokedAt: now },

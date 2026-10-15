@@ -2,11 +2,12 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import type { HonorImportStep } from "@/modules/honors/catalog-csv";
 import { isRoomBookedIndex, isRoomCapacityRefusal } from "@/modules/honors/room-errors";
 import { eventHasActiveLocations, offeringSiteId } from "@/modules/honors/locations";
-import { countEnrolledYouthNotMeeting } from "@/modules/honors/enrollment-repository";
+import { countEnrolledYouthNotMeeting, liveWaitlistOffer, seatHoldingEnrollment } from "@/modules/honors/enrollment-repository";
 import { clubClassLevels } from "@/modules/club-rosters/domain";
 import {
   classSlotConflict,
@@ -54,6 +55,7 @@ export type HonorErrorCode =
   | "ROOM_NOT_FOUND"
   | "ROOM_NAME_CONFLICT"
   | "ROOM_TOO_SMALL"
+  | "CAPACITY_BELOW_SEATS_TAKEN"
   | "ROOM_IN_USE"
   | "ROOM_BOOKED"
   | "ROOM_WRONG_SITE"
@@ -80,9 +82,6 @@ function isUniqueConstraint(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
-function isSerializationFailure(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
-}
 
 /** Serializable so two staff members can't both pass the same conflict check. */
 export async function serializable<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
@@ -93,7 +92,9 @@ export async function serializable<T>(work: (tx: Prisma.TransactionClient) => Pr
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       });
     } catch (error) {
+      // The shared check also covers deadlocks (40P01) and a 40001 wrapped by a raw query (P2010).
       if (!isSerializationFailure(error) || attempt === 2) throw error;
+      await pauseBeforeRetry(attempt);
     }
   }
 }
@@ -896,6 +897,28 @@ export async function updateHonorOffering(
               enrolled,
             );
           }
+        }
+      }
+
+      // The seat limit can't be set below the seats the class holds plus the seats held for live waitlist offers (#880): the
+      // picks stay, so the class would be over its limit, and an accepted offer would overfill it. Counted the way a pick save
+      // counts a class. Safety against a pick saved at the same moment comes from this transaction being SERIALIZABLE (the
+      // class lock only queues the two, and a lost conflict is retried by `serializable`). Re-saving an unchanged limit is fine.
+      if (details.capacity !== undefined && details.capacity !== existing.capacity) {
+        await tx.$queryRaw`SELECT id FROM "HonorOffering" WHERE id = ${offeringId} FOR UPDATE`;
+        const [seated, offered] = await Promise.all([
+          tx.honorEnrollment.count({ where: { offeringId, ...seatHoldingEnrollment } }),
+          tx.honorClassWaitlistEntry.count({ where: { offeringId, ...liveWaitlistOffer(new Date()) } }),
+        ]);
+        const taken = seated + offered;
+        if (details.capacity < taken) {
+          const held = offered > 0 ? ` and ${offered} held for waitlist offer${offered === 1 ? "" : "s"}` : "";
+          throw new HonorConfigurationError(
+            "CAPACITY_BELOW_SEATS_TAKEN",
+            `This class already has ${seated} seat${seated === 1 ? "" : "s"} taken${held}, so its limit can't be lowered to ${details.capacity}. Remove picks or waitlist offers first, or keep the limit at ${taken} or more.`,
+            undefined,
+            { seatsTaken: seated, seatsHeldForOffers: offered, requestedCapacity: details.capacity },
+          );
         }
       }
 

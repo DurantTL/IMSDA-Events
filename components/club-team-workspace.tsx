@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useCallback, useState } from "react";
 import { Mail, RefreshCw, UserMinus, UserPlus, X, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -254,9 +255,7 @@ export function ClubTeamWorkspace({
               </p>
               <div className="form-actions">
                 <button className="secondary-button" disabled={saving} onClick={closeDialog} type="button">Cancel</button>
-                <button className="primary-button" disabled={saving} type="submit">
-                  <UserPlus aria-hidden="true" size={16} /> Add club admin
-                </button>
+                <SubmitButton className="primary-button" icon={<UserPlus aria-hidden="true" size={16} />} label="Add club admin" submitting={saving} submittingLabel="Adding…" />
               </div>
             </form>
           </section>

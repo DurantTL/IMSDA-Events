@@ -635,6 +635,10 @@ enum MessageTemplateKey {
   NEW_CLUB_APPLICATION_INVITE
   /// A seat in a full Honors Weekend class was offered to a youth on its waitlist (#831): one email to that club's director. Not an event template.
   HONOR_CLASS_WAITLIST_OFFER
+  /// A reinstated or promoted registration came back without some Honors Weekend class picks because the class was full or the club's limit was reached (#880): one email to that club's director. Not an event template.
+  HONOR_CLASS_PICKS_NOT_RESTORED
+  /// A team advanced to the next level of a multi-level event (#945): one email to the team's director, queued and sent only when staff press "Send notices". Not an event template.
+  CLUB_TEAM_ADVANCEMENT_NOTICE
 }
 
 enum MessageTemplateStatus {
@@ -759,6 +763,12 @@ model User {
   activatedAt   DateTime?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
+  /// The person's attendee side (#554, ADR 0013): one staff `User` links 1:1 to one
+  /// `AttendeeAccount`. Nullable and unique; every row starts NULL and nothing reads or
+  /// writes it yet. ON DELETE SET NULL: deleting an attendee account only unlinks, it
+  /// never deletes the staff user (and deleting a user never touches the account).
+  attendeeAccountId String? @unique
+  attendeeAccount   AttendeeAccount? @relation("UserAttendeeLink", fields: [attendeeAccountId], references: [id], onDelete: SetNull)
 
   memberships               EventMembership[]
   credential                AuthCredential?
@@ -767,6 +777,7 @@ model User {
   announcements             Announcement[]
   pinnedAnnouncements       Announcement[]        @relation("AnnouncementPinnedBy")
   auditLogs                 AuditLog[]
+  archivedEvents            Event[]               @relation("EventArchivedBy")
   moduleRequests            ModuleRequest[] @relation("ModuleRequestRequester")
   moduleRequestsDecided     ModuleRequest[] @relation("ModuleRequestDecider")
   importRuns                ImportRun[]
@@ -781,6 +792,7 @@ model User {
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
   clubAssignmentUpdates     ClubEventAssignment[]     @relation("ClubEventAssignmentUpdatedBy")
   teamResultUpdates         ClubTeamResult[]          @relation("ClubTeamResultUpdatedBy")
+  teamLevelCheckIns         ClubTeamLevelCheckIn[]    @relation("ClubTeamLevelCheckInBy")
   teamPermissionDecisions   ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedBy")
   registrationOperations    RegistrationOperation[]   @relation("RegistrationOperationActor")
   accountMessages           MessageOutbox[]           @relation("AccountMessageRecipient")
@@ -793,6 +805,7 @@ model User {
   createdMerchandiseOrders       MerchandiseOrder[]               @relation("MerchandiseOrderCreatedBy")
   merchandiseOrderStatusChanges  MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
+  audienceSnapshots              EventAudienceSnapshot[]          @relation("EventAudienceSnapshotCreatedBy")
   authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
   appliedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagAppliedBy")
   removedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagRemovedBy")
@@ -852,6 +865,8 @@ model User {
   approvedAttendanceVersions   AttendanceReconciliationVersion[]         @relation("AttendanceVersionApprovedBy")
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]     @relation("AttendanceReviewAckActor")
   guardianAuthoritiesDeclared  GuardianAuthority[]                       @relation("GuardianAuthorityActorUser")
+  acknowledgmentEvidenceRecorded AcknowledgmentEvidence[]                 @relation("AcknowledgmentEvidenceRecordedBy")
+  acknowledgmentVoids AcknowledgmentVoid[] @relation("AcknowledgmentVoidedBy")
   guardianAuthoritiesRevoked   GuardianAuthority[]                       @relation("GuardianAuthorityRevokedBy")
   guardianConflictsResolved    GuardianAuthorityConflict[]               @relation("GuardianConflictResolvedBy")
 
@@ -1038,6 +1053,8 @@ model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
+  /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
+  linkedUser         User?                 @relation("UserAttendeeLink")
   email              String                @unique
   displayName        String
   firstName          String?
@@ -1494,6 +1511,9 @@ model PlatformSettings {
   invoiceHeaderPhone        String?
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
+  /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.
+  /// Later slices put the unified sign-in and role-aware landing behind it.
+  unifiedSignInEnabled      Boolean            @default(false)
   updatedAt                 DateTime           @updatedAt
   updatedByUserId           String?
 
@@ -1590,8 +1610,15 @@ model Event {
   showOnCalendar       Boolean            @default(true)
   /// Short label for filtering the public calendar, e.g. "Youth" or "Camp meeting".
   calendarCategory     String?
+  /// Set when staff archive the event (#635): hidden from pickers, default selection and every public page, and registration
+  /// is closed, but nothing is deleted or changed. Null means the event is not archived. Unarchiving clears both fields.
+  archivedAt           DateTime?
+  /// Who archived it. Kept as an id only; cleared with `archivedAt`, and null if that account is later deleted.
+  archivedByUserId     String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
+
+  archivedBy                          User?              @relation("EventArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
 
   badgeBackground                     EventAsset?        @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
   memberships                         EventMembership[]
@@ -1634,6 +1661,7 @@ model Event {
   honorInstructors                    HonorInstructor[]
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
+  teamLevelCheckIns                   ClubTeamLevelCheckIn[]
   generalLinkSubmissions              GeneralLinkSubmission[]
   staffInvitations                    StaffInvitation[]
   groupRegistrations                  GroupEventRegistration[]
@@ -1643,6 +1671,8 @@ model Event {
   attendanceReconciliationVersions    AttendanceReconciliationVersion[]
   attendanceReviewAcknowledgements    AttendanceReviewAcknowledgement[]
   guardianAuthorities                 GuardianAuthority[]
+  acknowledgmentEvidence              AcknowledgmentEvidence[]
+  acknowledgmentVoids AcknowledgmentVoid[]
   guardianAuthorityConflicts          GuardianAuthorityConflict[]
 
   invoices                            Invoice[]
@@ -1705,6 +1735,7 @@ model Event {
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
   lodgingWaitlistHistory              EventLodgingWaitlistHistory[]
   notes                               StaffNote[]
+  audienceSnapshots                   EventAudienceSnapshot[]
   registrationTagAssignments          RegistrationTagAssignment[]
   attendeeTagAssignments              AttendeeTagAssignment[]
   templateApplication                 EventTemplateApplication?
@@ -1719,6 +1750,7 @@ model Event {
   consentPolicyApplicabilities EventConsentPolicyApplicability[]
 
   @@index([badgeBackgroundAssetId])
+  @@index([archivedAt])
 }
 
 /// A feature turned on for one event (#741). A row means "enabled"; the
@@ -2013,6 +2045,30 @@ model StaffNoteRevision {
   @@index([noteId, createdAt])
 }
 
+/// A reviewed, preview-only record of who an event message would reach (#176). It stores the audit facts a later
+/// scheduler (#177) needs to refuse a changed audience: the normalized query, its version, the audience fingerprint and
+/// the counts. It never stores a recipient, an address, a name or a note, and creating one sends or schedules nothing.
+/// `id` is the client-generated UUID, so a lost-response retry with the same fingerprint returns the same row.
+model EventAudienceSnapshot {
+  id                 String   @id
+  eventId            String
+  createdByUserId    String
+  sourceQueryVersion String
+  queryHash          String
+  query              Json
+  fingerprint        String
+  recipientCount     Int
+  exclusionCount     Int
+  registrationCount  Int
+  createdAt          DateTime @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("EventAudienceSnapshotCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, createdAt])
+  @@index([eventId, fingerprint])
+}
+
 model EventMembership {
   id          String            @id @default(cuid())
   eventId     String
@@ -2069,6 +2125,8 @@ model Person {
   guardianAuthoritiesAsMinor GuardianAuthority[] @relation("GuardianAuthorityMinor")
   guardianAuthoritiesAsAdult GuardianAuthority[] @relation("GuardianAuthorityAdult")
   guardianAuthoritiesDeclared GuardianAuthority[] @relation("GuardianAuthorityActorPerson")
+  acknowledgmentEvidenceAsSubject AcknowledgmentEvidence[] @relation("AcknowledgmentEvidenceSubject")
+  acknowledgmentEvidenceActed AcknowledgmentEvidence[] @relation("AcknowledgmentEvidenceActedBy")
   guardianConflictsAsMinor   GuardianAuthorityConflict[] @relation("GuardianConflictMinor")
   guardianConflictsAsAdult   GuardianAuthorityConflict[] @relation("GuardianConflictAdult")
   lodgingRoommateAsker       EventLodgingRoommateRequest[] @relation("LodgingRoommateFromPerson")
@@ -2778,6 +2836,8 @@ model Registration {
   attendanceCorrections        AttendanceCorrection[]
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]
   guardianAuthorities     GuardianAuthority[]
+  acknowledgmentEvidence  AcknowledgmentEvidence[]
+  acknowledgmentVoids AcknowledgmentVoid[]
   guardianAuthorityConflicts GuardianAuthorityConflict[]
   lodgingRequests         EventLodgingRequest[]
   lodgingChangeRequests   EventLodgingChangeRequest[]
@@ -3872,6 +3932,7 @@ model RegistrationFormVersion {
   publicSubmissions     PublicRegistrationSubmission[]
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
+  acknowledgmentEvidence AcknowledgmentEvidence[]
 
   @@unique([formId, versionNumber])
   @@index([formId, status, versionNumber])
@@ -4153,6 +4214,7 @@ model ConsentPolicyVersion {
   currentOfPolicy ConsentPolicy? @relation("ConsentPolicyCurrentVersion")
   createdBy       User           @relation("ConsentPolicyVersionCreatedBy", fields: [createdByUserId], references: [id])
   publishedBy     User?          @relation("ConsentPolicyVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  acknowledgmentEvidence AcknowledgmentEvidence[]
 
   @@unique([policyId, versionNumber])
   @@index([policyId, status, versionNumber])
@@ -5257,6 +5319,7 @@ model ClubEventRegistration {
   submittedByUser User?            @relation("ClubEventRegistrationSubmittedByUser", fields: [submittedByUserId], references: [id], onDelete: SetNull)
   assignment      ClubEventAssignment?
   teamResults     ClubTeamResult[]
+  teamLevelCheckIns ClubTeamLevelCheckIn[]
   teamPermissions ClubTeamMemberPermission[]
 
   @@unique([eventId, organizationId, teamKey])
@@ -6783,6 +6846,106 @@ model GuardianAuthority {
   @@index([adultPersonId])
 }
 
+/// How an acknowledgment was given (#150): the registrant online, staff typing it in for the person, or a paper
+/// form staff recorded.
+enum AcknowledgmentChannel {
+  ONLINE
+  STAFF_ENTERED
+  PAPER
+}
+
+/// What an acknowledgment pointed at: the exact text on the form version, or a published #129 policy version.
+enum AcknowledgmentSource {
+  TEXT
+  POLICY_VERSION
+}
+
+/// Evidence that someone acknowledged exactly what a form showed (#150). Append-only: a trigger refuses every UPDATE
+/// and DELETE (event deletion included; the deletion service refuses an event that holds evidence), so what a person
+/// saw can never be rewritten or silently lost. No typed signature: the submission audit already says who and when.
+/// Every reference is RESTRICT, including the one to the policy version, so evidence can never be orphaned.
+/// `registrationAttendeeId` is a plain id on purpose: an attendee removed later leaves the evidence behind, still
+/// naming the person (`subjectPersonId`). Two partial unique indexes, one per subject kind, stop a retry or a second
+/// entry of the same content from creating a conflicting duplicate. Never read by exports, logs, analytics or messages.
+model AcknowledgmentEvidence {
+  id                     String                @id @default(cuid())
+  eventId                String
+  registrationId         String
+  /// Null when the subject is the registration itself.
+  registrationAttendeeId String?
+  /// The attendee the acknowledgment is about; null for a registration-level one.
+  subjectPersonId        String?
+  /// The person who acknowledged (the registrant, or whoever signed the paper): the subject, or a declared guardian.
+  actedByPersonId        String
+  /// Staff who typed it in or recorded the paper; null online.
+  recordedByUserId       String?
+  channel                AcknowledgmentChannel
+  formVersionId          String
+  fieldId                String
+  fieldKey               String
+  /// The checkbox statement the person ticked, as shown.
+  fieldLabel             String
+  source                 AcknowledgmentSource
+  /// The exact text shown when `source` is TEXT; null for a policy version (the version row holds it).
+  shownText              String?
+  policyVersionId        String?
+  /// SHA-256 of the text, or the policy version's own content hash.
+  contentHash            String
+  /// Identifies what was acknowledged, for the natural-key unique indexes: `text:<hash>` or `policy:<versionId>`.
+  contentRef             String
+  /// MINOR, ADULT or UNKNOWN on the event's start date when it was given.
+  subjectMinorStatus     String
+  /// The #131 declaration that let the person act for a minor (plain id: declarations are never deleted).
+  guardianAuthorityId    String?
+  acknowledgedAt         DateTime
+  recordedAt             DateTime              @default(now())
+  /// Only keys on the approved list (`approvedRequestMetadata`); a check constraint enforces the same list.
+  requestMetadata        Json                  @default("{}")
+  idempotencyKey         String
+  requestHash            String
+  /// How many earlier rows for this same subject, field and content were voided (#150). A voided acknowledgment can be
+  /// recorded again as the next generation; a trigger makes this exactly that count, so there is never a second live row.
+  generation             Int                   @default(0)
+
+  void          AcknowledgmentVoid?
+  event         Event                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration  Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  subjectPerson Person?                 @relation("AcknowledgmentEvidenceSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
+  actedBy       Person                  @relation("AcknowledgmentEvidenceActedBy", fields: [actedByPersonId], references: [id], onDelete: Restrict)
+  recordedBy    User?                   @relation("AcknowledgmentEvidenceRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  formVersion   RegistrationFormVersion @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  policyVersion ConsentPolicyVersion?   @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+
+  /// Migration-level partial unique indexes: one row per (registration, field, content) for a registration subject
+  /// and per (attendee, field, content) for an attendee subject.
+  @@unique([eventId, idempotencyKey])
+  @@index([registrationId, fieldKey, acknowledgedAt])
+  @@index([registrationAttendeeId, fieldKey, acknowledgedAt])
+  @@index([policyVersionId])
+  @@index([subjectPersonId])
+}
+
+/// A correction to acknowledgment evidence (#150): staff with VIEW_SENSITIVE_DATA void a row with a reason. The evidence row is
+/// never modified or deleted; this separate append-only row says it no longer counts. One void per evidence row, so voiding
+/// twice is the same void. The reason is kept here and never in the audit log.
+model AcknowledgmentVoid {
+  id               String   @id @default(cuid())
+  eventId          String
+  registrationId   String
+  evidenceId       String   @unique
+  voidedByUserId   String
+  reason           String
+  voidedAt         DateTime @default(now())
+
+  event        Event                @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration Registration         @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  evidence     AcknowledgmentEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  voidedBy     User                 @relation("AcknowledgmentVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([registrationId])
+  @@index([eventId])
+}
+
 /// A second adult claiming a minor who already has an ACTIVE declaration from a different registration
 /// (#131). Never resolved automatically: it waits for staff, and neither adult is silently blocked.
 /// Changes only from OPEN to RESOLVED, once.
@@ -7862,9 +8025,14 @@ model ClubTeamResult {
   id                      String          @id @default(cuid())
   clubEventRegistrationId String
   level                   TeamResultLevel
-  /// Free text, e.g. "2nd place" or "412 points".
+  /// Free text from before placement was a number (#809): kept readable and flagged for staff to re-enter (#945). New entries leave it empty.
   placement               String          @default("")
+  /// The place as a number (#945): 1 is first. Ties share a number; 1st and 2nd advance. Null until staff enter it.
+  placementRank           Int?
+  /// Whether the team advances to the next level (#945): the rule's answer (placement 1 or 2) unless `advanceOverride` says otherwise.
   qualified               Boolean         @default(false)
+  /// Staff's decision (#945): true advances the team, false keeps it from advancing, whatever its place. Null follows the rule; kept when places are recomputed.
+  advanceOverride         Boolean?
   notes                   String          @default("")
   updatedByUserId         String?
   createdAt               DateTime        @default(now())
@@ -7874,6 +8042,26 @@ model ClubTeamResult {
   updatedBy             User?                 @relation("ClubTeamResultUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([clubEventRegistrationId, level])
+}
+
+/// A team checked in for a level above Area (#945): the Conference or Union day of the same event. The team never
+/// registers again, so this is one row per team and level rather than the per-person Area check-in. Undoing keeps the row.
+model ClubTeamLevelCheckIn {
+  id                      String          @id @default(cuid())
+  eventId                 String
+  clubEventRegistrationId String
+  level                   TeamResultLevel
+  checkedInAt             DateTime        @default(now())
+  checkedInByUserId       String?
+  undoneAt                DateTime?
+  createdAt               DateTime        @default(now())
+
+  event                 Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  clubEventRegistration ClubEventRegistration @relation(fields: [clubEventRegistrationId], references: [id], onDelete: Cascade)
+  checkedInBy           User?                 @relation("ClubTeamLevelCheckInBy", fields: [checkedInByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([clubEventRegistrationId, level])
+  @@index([eventId, level])
 }
 
 enum TeamPermissionStatus {

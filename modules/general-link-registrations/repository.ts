@@ -33,6 +33,7 @@ import { checkLocationSeats, locationOpenProblem } from "@/modules/event-locatio
 import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { evaluateLocationPhase, locationLifecycleSource } from "@/modules/event-locations/domain";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
+import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
 import { preparePublicRegistration, type PublicRegistrationInput } from "@/modules/forms/public-domain";
 import { attendeePromoCodeField, promoCodeField } from "@/modules/promo-codes/domain";
 import {
@@ -86,6 +87,7 @@ export class GeneralLinkError extends Error {
       | "CLUB_INVALID"
       | "REASON_REQUIRED"
       | "LINK_NOT_AVAILABLE"
+      | "FORM_CHANGED"
       | "TOO_MANY_PENDING",
     message: string,
   ) {
@@ -230,6 +232,7 @@ async function generalLinkEvent(eventSlug: string): Promise<ClubEvent> {
     where: {
       slug: eventSlug,
       isPublished: true,
+      archivedAt: null,
       audience: "CLUB",
       billingMode: "DEFERRED_ORGANIZATION_INVOICE",
       generalRegistrationLinkEnabled: true,
@@ -1114,6 +1117,14 @@ export async function resolvePendingTeam(
   if (!experience) throw new GeneralLinkError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
   const stored = row.payload as { responses?: Record<string, unknown>; attendees?: Array<{ clientId: string; responses: Record<string, unknown> }> };
   const resolution = row.suggestedOrganizationId === club.id ? "STAFF_CONFIRMED" as const : "STAFF_REASSIGNED" as const;
+  // Acknowledgment evidence (#150) records the wording the director was shown. Staff confirm against the current form, so when
+  // the form changed after the team was received, its acknowledgment answers were for other wording and are dropped here.
+  const storedVersionId = (row.payload as { versionId?: unknown }).versionId;
+  const formChanged = storedVersionId !== experience.form.versionId;
+  const acknowledgmentKeys = new Set(acknowledgmentFields(experience.form.definition).map((field) => field.key));
+  const withoutAcknowledgments = (answers: Record<string, unknown>) => (
+    !formChanged || acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
+  );
   let attachedHere = false;
   try {
     await submitPublicRegistration(
@@ -1123,8 +1134,8 @@ export async function resolvePendingTeam(
         // The form as it stands now: a team received before a form revision is attached under the current form's rules.
         versionId: experience.form.versionId,
         idempotencyKey: `general-link-confirm:${row.id}`,
-        responses: stored.responses ?? {},
-        attendees: stored.attendees ?? [],
+        responses: withoutAcknowledgments(stored.responses ?? {}),
+        attendees: (stored.attendees ?? []).map((attendee) => ({ ...attendee, responses: withoutAcknowledgments(attendee.responses) })),
         website: "",
       },
       // As of the day the director submitted: a team received before the deadline is not refused because staff confirmed it after.
@@ -1176,6 +1187,12 @@ export async function resolvePendingTeam(
       },
     );
   } catch (error) {
+    // The form changed since the team was received and now asks for an acknowledgment the director never saw: nothing is recorded
+    // for wording they did not see, and the team stays waiting.
+    if (formChanged && error instanceof PublicRegistrationError && error.code === "INVALID_SUBMISSION"
+      && error.issues.some((issue) => acknowledgmentKeys.has(issue.key ?? ""))) {
+      throw new GeneralLinkError("FORM_CHANGED", "The registration form changed after this team was received and now requires an acknowledgment the director has not seen. Ask the director to register again with the current form, then reject this one.");
+    }
     // A second staff member, or a retry, reached the same transaction. Whatever stopped this attempt (the winner's own rows
     // can trip the one-team rule on a retry), the row says what happened: if it is no longer waiting, someone else decided it.
     const now = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true } });
@@ -1332,7 +1349,7 @@ export async function expireStalePendingTeams(now = new Date(), options: { event
  */
 export async function clubEventEntryRedirect(eventSlug: string): Promise<string | null> {
   const event = await getPrisma().event.findFirst({
-    where: { slug: eventSlug, isPublished: true, audience: "CLUB" },
+    where: { slug: eventSlug, isPublished: true, archivedAt: null, audience: "CLUB" },
     select: { slug: true, billingMode: true, generalRegistrationLinkEnabled: true },
   });
   if (!event) return null;
