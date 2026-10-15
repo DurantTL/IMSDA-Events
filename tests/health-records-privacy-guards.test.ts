@@ -37,6 +37,11 @@ describe("health data stays out of exports, the check-in book, communications an
     expect(offenders).toEqual([]);
   });
 
+  it("lets the organizations page import nothing from the health module but the feature flag (#878)", () => {
+    const imports = [...read("app/(workspace)/admin/organizations/page.tsx").matchAll(/from "(@\/modules\/health-records\/[^"]+)"/g)].map((match) => match[1]);
+    expect(imports).toEqual(["@/modules/health-records/flag"]);
+  });
+
   it("is never read by CSV, export, check-in, reporting, club report or message-composing code", () => {
     const guarded = [
       ...sourceFiles("modules/checkin"),

@@ -20,8 +20,6 @@ import type { SheetRows } from "@/modules/health-records/import-files";
  * never dropped.
  */
 
-export const COGNITO_CONSENT_VERSION = "cognito-pathfinder-health-record-2026";
-
 /** The columns the importer cannot work without: who the entry is for and which club it belongs to. */
 const REQUIRED_MAIN_COLUMNS = [
   "PathfinderHealthRecord_Id", "Name_First", "Name_Last", "DateOfBirth", "ChurchAndClubName_First", "ChurchAndClubName_Last",
@@ -40,10 +38,36 @@ export const IMPORT_SECTION_LABELS = {
   insurance: "insurance",
   guardian: "guardian",
   contacts: "emergency contacts",
-  consent: "consent and signature",
 } as const;
 
 export type ImportSection = keyof typeof IMPORT_SECTION_LABELS;
+
+/** The Health tab form's own limits (domain.ts `healthRecordShape`). A longer imported value is flagged, never cut. */
+export const FORM_LIMITS: Record<string, number> = {
+  addressLine1: 120, addressLine2: 120, city: 80, state: 40, zip: 20, phone: 40, email: 160,
+  allergyDetails: 2000, medications: 2000, medicalRestrictions: 2000,
+  insuranceCompany: 160, insuranceGroupNumber: 80, insurancePolicyNumber: 80, insurancePhone: 40,
+  guardianFirstName: 80, guardianLastName: 80, guardianAddress: 300, guardianPhone: 40, guardianEmail: 160,
+};
+const CONTACT_LIMITS = { firstName: 80, lastName: 80, phone: 40, relationship: 80 } as const;
+
+/** Keys of values the Health tab form would refuse as too long. Keys only. */
+export function overLimitFields(values: Record<string, unknown>): string[] {
+  const flagged: string[] = [];
+  for (const [key, limit] of Object.entries(FORM_LIMITS)) {
+    const value = values[key];
+    if (typeof value === "string" && value.length > limit) flagged.push(key);
+  }
+  if (Array.isArray(values.emergencyContacts)) {
+    values.emergencyContacts.forEach((contact, index) => {
+      for (const [field, limit] of Object.entries(CONTACT_LIMITS)) {
+        const value = (contact as Record<string, unknown>)[field];
+        if (typeof value === "string" && value.length > limit) flagged.push(`emergencyContacts.${index}.${field}`);
+      }
+    });
+  }
+  return flagged;
+}
 
 export type ParsedHealthEntry = {
   /** The Cognito entry id. Not health content; it is what the preview and the apply step name a row by. */
@@ -76,12 +100,15 @@ export class HealthImportParseError extends Error {
   }
 }
 
-function clean(value: string | undefined, max = 2000) {
+/** Nothing is cut to the Health tab form's limits: a value over one is kept whole and flagged (see FORM_LIMITS). */
+const TEXT_CAP = 20_000;
+
+function clean(value: string | undefined, max = TEXT_CAP) {
   return (value ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 /** Free text keeps its line breaks (an allergy list is often several lines). */
-function longText(value: string | undefined, max = 2000) {
+function longText(value: string | undefined, max = TEXT_CAP) {
   return (value ?? "").replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max);
 }
 
@@ -95,7 +122,7 @@ export function yesNoAnswer(value: string | undefined): "YES" | "NO" | null {
   return null;
 }
 
-/** A calendar date from an ISO date or date-time, month/day/year, or an Excel serial number. */
+/** A calendar date from an ISO date or date-time, month/day/year, or a 5-digit Excel serial number (10000 to 60000, 1927 to 2063). */
 export function importDate(value: string | undefined): string | null {
   const text = clean(value, 60);
   if (!text) return null;
@@ -103,10 +130,10 @@ export function importDate(value: string | undefined): string | null {
   if (iso) return calendar(Number(iso[1]), Number(iso[2]), Number(iso[3]));
   const us = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:[T\s].*)?$/.exec(text);
   if (us) return calendar(Number(us[3]), Number(us[1]), Number(us[2]));
-  if (/^\d{4,6}(\.\d+)?$/.test(text)) {
+  if (/^\d{5}(\.\d+)?$/.test(text)) {
     // Excel stores a date as the days since 1899-12-30.
     const serial = Math.floor(Number(text));
-    if (serial >= 1 && serial <= 80_000) {
+    if (serial >= 10_000 && serial <= 60_000) {
       const date = new Date(Date.UTC(1899, 11, 30) + serial * 86_400_000);
       return calendar(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
     }
@@ -120,19 +147,19 @@ function calendar(year: number, month: number, day: number) {
 }
 
 function phoneText(value: string | undefined) {
-  const text = clean(value, 40);
+  const text = clean(value);
   return text ? (normalizePhoneAnswer(text) as string) : "";
 }
 
 function emailText(value: string | undefined) {
-  const text = clean(value, 160);
+  const text = clean(value);
   if (!text) return "";
   const check = validateEmail(text);
   return check.ok ? check.value : text;
 }
 
 function zipText(value: string | undefined) {
-  const text = clean(value, 20);
+  const text = clean(value);
   if (!text) return "";
   const check = validateZip(text);
   return check.ok ? check.value : text;
@@ -181,29 +208,35 @@ function entryFrom(
   };
   const sections = new Set<ImportSection>();
 
-  put("addressLine1", clean(row.Address_Line1, 120));
-  put("addressLine2", clean(row.Address_Line2, 120));
-  put("city", clean(row.Address_City, 80));
-  put("state", clean(row.Address_State, 40));
+  put("addressLine1", clean(row.Address_Line1));
+  put("addressLine2", clean(row.Address_Line2));
+  put("city", clean(row.Address_City));
+  put("state", clean(row.Address_State));
   put("zip", zipText(row.Address_PostalCode));
   put("phone", phoneText(row.Phone));
   put("email", emailText(row.Email));
 
-  const booster = clean(row.DateOfLastTetanusBooster, 60);
+  const booster = clean(row.DateOfLastTetanusBooster);
   if (booster) {
     // A date is stored as year-month-day; anything else is kept as typed.
     put("lastTetanusBooster", importDate(booster) ?? booster);
     sections.add("tetanus");
   }
 
-  // Allergies: a "has allergies" answer and the details. Details win over a "No", so a note is never lost.
-  const allergyDetails = longText(row.ListAllergiesReactionsSeverityAndNormalRemedyUsed);
+  // Allergies. The answer column can hold a yes/no or, on a free-text form, the allergy itself, so a non-yes/no answer is
+  // kept as allergy text. Details win over a "No". A blank answer with no details stores nothing: it is never "No".
+  const allergyAnswerText = longText(row.Allergies);
   const allergyAnswer = yesNoAnswer(row.Allergies);
-  const hasDetails = allergyDetails !== "" && !NONE_WORDS.test(allergyDetails);
-  const hasAllergies = hasDetails || allergyAnswer === "YES" ? "YES" : "NO";
-  values.hasAllergies = hasAllergies;
-  if (allergyDetails !== "" && hasAllergies === "YES") put("allergyDetails", allergyDetails);
-  if (hasAllergies === "YES") sections.add("allergies");
+  const allergyTextParts = [allergyAnswer === null ? allergyAnswerText : "", longText(row.ListAllergiesReactionsSeverityAndNormalRemedyUsed)]
+    .filter((part) => part !== "" && !NONE_WORDS.test(part));
+  const allergyText = allergyTextParts.join("\n");
+  if (allergyAnswer === "YES" || allergyText !== "") {
+    values.hasAllergies = "YES";
+    put("allergyDetails", allergyText);
+    sections.add("allergies");
+  } else if (allergyAnswer === "NO") {
+    values.hasAllergies = "NO";
+  }
 
   const medications = longText(row.ListOfMedicationsOrPertinentHealthincludingMentalHealthInformation);
   if (medications !== "" && !NONE_WORDS.test(medications)) {
@@ -218,12 +251,13 @@ function entryFrom(
 
   // Insurance: the combined "group and policy numbers" answer cannot be split reliably, so it is kept whole in the
   // group number field and the policy number is left for the director.
-  const insuranceCompany = clean(row.InsuranceCompany, 160);
-  const insuranceNumbers = clean(row.InsuranceGroupAndPolicyNumbers, 160);
+  const insuranceCompany = clean(row.InsuranceCompany);
+  const insuranceNumbers = clean(row.InsuranceGroupAndPolicyNumbers);
   const insurancePhone = phoneText(row.InsurancePhoneNumber);
   const coveredAnswer = yesNoAnswer(row.IsTheParticipantCoveredByMedicalInsurance);
-  const hasInsurance = coveredAnswer === "YES" || (coveredAnswer === null && (insuranceCompany !== "" || insuranceNumbers !== "")) ? "YES" : "NO";
-  values.hasInsurance = hasInsurance;
+  // Blank with nothing to go on stores nothing; "No" with no company stores No.
+  const hasInsurance = coveredAnswer === "YES" || insuranceCompany !== "" || insuranceNumbers !== "" ? "YES" : coveredAnswer === "NO" ? "NO" : null;
+  if (hasInsurance) values.hasInsurance = hasInsurance;
   if (hasInsurance === "YES") {
     put("insuranceCompany", insuranceCompany);
     put("insuranceGroupNumber", insuranceNumbers);
@@ -236,9 +270,9 @@ function entryFrom(
     sections.add("insurance");
   }
 
-  put("guardianFirstName", clean(row.GuardianName_First, 80));
-  put("guardianLastName", clean(row.GuardianName_Last, 80));
-  put("guardianAddress", join([row.GuardianAddress_Line1, row.GuardianAddress_Line2, row.GuardianAddress_City, row.GuardianAddress_State, zipText(row.GuardianAddress_PostalCode)], ", ").slice(0, 300));
+  put("guardianFirstName", clean(row.GuardianName_First));
+  put("guardianLastName", clean(row.GuardianName_Last));
+  put("guardianAddress", join([row.GuardianAddress_Line1, row.GuardianAddress_Line2, row.GuardianAddress_City, row.GuardianAddress_State, zipText(row.GuardianAddress_PostalCode)], ", "));
   put("guardianPhone", phoneText(row.GuardianPhone));
   put("guardianEmail", emailText(row.GuardianEmail));
   if (values.guardianFirstName || values.guardianLastName || values.guardianPhone || values.guardianEmail) sections.add("guardian");
@@ -246,10 +280,10 @@ function entryFrom(
   // Emergency contacts for the Health tab (not roster contacts). A contact with no data at all is skipped.
   const contacts = contactRows
     .map((contact) => ({
-      firstName: clean(contact.Name_First, 80),
-      lastName: clean(contact.Name_Last, 80),
+      firstName: clean(contact.Name_First),
+      lastName: clean(contact.Name_Last),
       phone: phoneText(contact.Phone),
-      relationship: clean(contact.RelationshipToMinor, 80),
+      relationship: clean(contact.RelationshipToMinor),
     }))
     .filter((contact) => contact.firstName || contact.lastName || contact.phone || contact.relationship);
   if (contacts.length > 0) {
@@ -257,23 +291,9 @@ function entryFrom(
     sections.add("contacts");
   }
 
-  // The signature is a typed name when Cognito exported one. A link to a stored image is never kept or fetched.
-  const signatureCell = clean(row.Signature, 160);
+  // Consent and the signature are NOT imported (pending a human decision, #878). The three consents stay unset so a
+  // parent gives them through the private link, and the signature column is never read.
   const submittedAt = importDate(row.Entry_DateSubmitted) ?? "";
-  if (signatureCell) {
-    const signedOn = importDate(row.Date) ?? (submittedAt || null);
-    const isLink = /^(https?:|\/\/|www\.)/i.test(signatureCell);
-    values.consent = {
-      version: COGNITO_CONSENT_VERSION,
-      emergencyTreatment: true,
-      activities: true,
-      photocopy: true,
-      agreedOn: signedOn ?? "",
-      importedFromOnlineForm: true,
-    };
-    values.signature = { typedName: isLink ? "" : signatureCell, signedOn: signedOn ?? "" };
-    sections.add("consent");
-  }
 
   const guardianEmail = clean(row.GuardianEmail, 160).toLowerCase();
   const status = clean(row.Entry_Status, 40).toLowerCase();
@@ -288,7 +308,7 @@ function entryFrom(
     incomplete: status === "incomplete",
     values,
     sections: (Object.keys(IMPORT_SECTION_LABELS) as ImportSection[]).filter((section) => sections.has(section)),
-    needsCorrection: healthFieldsNeedingCorrection(values),
+    needsCorrection: [...new Set([...healthFieldsNeedingCorrection(values), ...overLimitFields(values)])],
     contactsOmitted: Math.max(0, contacts.length - MAX_EMERGENCY_CONTACTS),
   };
 }

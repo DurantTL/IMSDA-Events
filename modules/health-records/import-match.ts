@@ -10,7 +10,7 @@ import type { ParsedHealthEntry } from "@/modules/health-records/import-parser";
  * The rule: the club (the church and club name the parent typed, matched to a
  * club or its sponsoring church), then first and last name, and then ONE
  * confirmation: the same birth date, or the parent's email on the roster
- * member's guardian contacts. A name alone is never enough, because two
+ * member's guardian contacts (two birth dates that differ always rule a member out). A name alone is never enough, because two
  * children can share a name. When more than one member fits, or the name fits
  * but nothing confirms it, the row is NEEDS CHECK and is not imported.
  */
@@ -102,11 +102,15 @@ export function matchEntry(entry: ParsedHealthEntry, clubs: MatchClub[], members
   const named = (membersByClub.get(club.organizationId) ?? []).filter((member) => nameKey(member.firstName) === first && nameKey(member.lastName) === last);
   if (named.length === 0) return unresolved(entry, "UNMATCHED", "MEMBER_NOT_FOUND", club);
 
-  const confirmations = named.map((member) => ({
-    member,
-    byBirthDate: entry.birthDate !== null && member.birthDate !== null && entry.birthDate === member.birthDate,
-    byEmail: entry.guardianEmail !== "" && member.guardianEmails.includes(entry.guardianEmail),
-  }));
+  // Two birth dates that differ rule the member out, even when the parent's email agrees: it can be a sibling's form.
+  const confirmations = named.map((member) => {
+    const datesDiffer = entry.birthDate !== null && member.birthDate !== null && entry.birthDate !== member.birthDate;
+    return {
+      member,
+      byBirthDate: entry.birthDate !== null && member.birthDate !== null && entry.birthDate === member.birthDate,
+      byEmail: !datesDiffer && entry.guardianEmail !== "" && member.guardianEmails.includes(entry.guardianEmail),
+    };
+  });
   const confirmed = confirmations.filter((item) => item.byBirthDate || item.byEmail);
   if (confirmed.length === 1) {
     const item = confirmed[0]!;

@@ -99,7 +99,9 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
       </section>
       <section className="public-manage-card">
         <h3>Consent</h3>
-        <p>Signed by {signature.typedName ?? "—"} on {signature.signedOn ?? "—"}.</p>
+        {values.consent
+          ? <p>Signed by {signature.typedName ?? "—"} on {signature.signedOn ?? "—"}.</p>
+          : <p>No consent has been given in the new system yet. The parent can give it through the private link.</p>}
       </section>
     </div>
   );

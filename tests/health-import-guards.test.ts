@@ -59,14 +59,19 @@ describe("the Cognito health import keeps health data in memory and out of every
     for (const path of guarded) expect(read(path), path).not.toMatch(/health-records\/import/);
   });
 
-  it("asks every route for a system administrator before it reads the upload", () => {
+  it("asks every route for a system administrator, in this order, before it reads the upload", () => {
     for (const path of importRoutes) {
       const source = read(path);
-      expect(source.indexOf("requireStaffHealthViewer()"), path).toBeGreaterThan(0);
-      expect(source.indexOf("requireStaffHealthViewer()"), path).toBeLessThan(source.indexOf("readHealthImportUpload("));
-      expect(source.indexOf("healthDisabledResponse()"), path).toBeLessThan(source.indexOf("requireStaffHealthViewer()"));
-      expect(source, path).toMatch(/rejectCrossOriginRequest/);
+      const order = ["healthDisabledResponse()", "rejectCrossOriginRequest(request)", "requireHealthImporter(await requireStaffHealthViewer())", "readHealthImportUpload("].map((needle) => source.indexOf(needle));
+      expect(order.every((index) => index > 0), path).toBe(true);
+      expect([...order].sort((x, y) => x - y), path).toEqual(order);
     }
+  });
+
+  it("decides who may import in one place: a system administrator, not acting as someone else", () => {
+    const access = read("modules/health-records/import-access.ts");
+    expect(access).toMatch(/viewer\.kind !== "SYSTEM_ADMIN" \|\| viewer\.actAsId/);
+    expect(read("modules/health-records/import-repository.ts")).not.toMatch(/function requireImporter/);
   });
 
   it("adds only a plain timestamp column in its migration", () => {

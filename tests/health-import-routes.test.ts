@@ -72,13 +72,47 @@ describe("the health import routes", () => {
     expect(new TextDecoder().decode(files[0].bytes)).toContain("PathfinderHealthRecord_Id");
   });
 
-  it("apply passes the chosen entry ids, or everything when asked", async () => {
-    await applyRoute.POST(upload({ include: ["1001", "1003"] }));
-    expect(state.apply.mock.calls[0]![2]).toEqual({ include: ["1001", "1003"] });
+  it("apply passes the chosen sourceId:memberId pairs, and nothing is selected by default", async () => {
+    await applyRoute.POST(upload({ include: ["1001:member-1", "1003:member-3", "broken", ":x", "y:"] }));
+    expect(state.apply.mock.calls[0]![2]).toEqual({ include: [{ sourceId: "1001", memberId: "member-1" }, { sourceId: "1003", memberId: "member-3" }] });
     await applyRoute.POST(upload({ includeAll: "true" }));
-    expect(state.apply.mock.calls[1]![2]).toEqual({ include: null });
+    expect(state.apply.mock.calls[1]![2]).toEqual({ include: [] });
     await applyRoute.POST(upload());
     expect(state.apply.mock.calls[2]![2]).toEqual({ include: [] });
+  });
+
+  it.each(routes)("%s refuses staff who are not system administrators before reading the upload", async (_name, handler) => {
+    for (const viewer of [
+      { kind: "HEALTH_ROLE", userId: "staff-1", eventIds: ["event-1"] },
+      { kind: "SYSTEM_ADMIN", userId: "admin-1", actAsId: "director-1" },
+      { kind: "CLUB_LEADER", organizationId: "club-a", accountId: "a" },
+    ]) {
+      state.staffViewer.mockResolvedValue(viewer);
+      // A request whose body would throw if anything tried to read it.
+      const request = new Request("https://events.test/x", { method: "POST", body: "x", headers: { "content-type": "multipart/form-data; boundary=zzz" } });
+      const formData = vi.spyOn(request, "formData");
+      const response = await handler(request);
+      expect(response.status).toBe(403);
+      expect(formData).not.toHaveBeenCalled();
+    }
+    expect(state.preview).not.toHaveBeenCalled();
+    expect(state.apply).not.toHaveBeenCalled();
+  });
+
+  it.each(routes)("%s passes a missing privacy acknowledgment through as a refusal", async (_name, handler) => {
+    const refusal = new HealthRecordError("ACKNOWLEDGMENT_REQUIRED", "Read and confirm the health information privacy notice before you continue.");
+    state.preview.mockRejectedValue(refusal);
+    state.apply.mockRejectedValue(refusal);
+    const response = await handler(upload());
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: "ACKNOWLEDGMENT_REQUIRED" });
+  });
+
+  it.each(routes)("%s answers an unauthenticated request as refused, reading nothing", async (_name, handler) => {
+    state.staffViewer.mockRejectedValue(Object.assign(new Error("Authentication is required."), { name: "AccessDeniedError" }));
+    const response = await handler(upload());
+    expect([401, 403, 500]).toContain(response.status);
+    expect(state.preview).not.toHaveBeenCalled();
   });
 
   it.each(routes)("%s says so when no file is sent, without echoing anything", async (_name, handler) => {

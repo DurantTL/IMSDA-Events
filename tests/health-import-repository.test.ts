@@ -86,6 +86,19 @@ function files(rows: Array<Record<string, string>>, contacts: Array<Record<strin
   return [{ bytes: csvBytes(MAIN_HEADERS, rows) }, { bytes: csvBytes(CONTACT_HEADERS, contacts) }];
 }
 
+/** The rows an administrator would tick in the preview: the `sourceId:memberId` pairs, optionally only some entries. */
+async function pairs(upload: ReturnType<typeof files>, only?: string[]) {
+  const preview = await previewHealthImport(admin, upload, now);
+  state.audit = [];
+  return preview.rows
+    .filter((row) => (row.outcome === "MATCHED" || row.outcome === "ALREADY_HAS_RECORD") && row.memberId && (!only || only.includes(row.sourceId)))
+    .map((row) => ({ sourceId: row.sourceId, memberId: row.memberId! }));
+}
+
+async function applySelected(upload: ReturnType<typeof files>, only?: string[]) {
+  return applyHealthImport(admin, upload, { include: await pairs(upload, only) }, now);
+}
+
 function openAll(recordId: string) {
   return Object.fromEntries(state.fields.filter((field) => field.recordId === recordId).map((field) => [field.fieldKey, openHealthField(recordId, field.fieldKey, field.sealedValue)]));
 }
@@ -184,7 +197,7 @@ describe("who may import", () => {
 
 describe("applying the import", () => {
   it("writes a sealed record flagged for director review, which reads as Needs update", async () => {
-    const result = await applyHealthImport(admin, files([mainRow()], [contactRow("1001", "e1", "Alex", "Sample", "515-555-0180", "Aunt")]), {}, now);
+    const result = await applySelected(files([mainRow()], [contactRow("1001", "e1", "Alex", "Sample", "515-555-0180", "Aunt")]));
     expect(result.imported).toBe(1);
     expect(result.rows[0]).toMatchObject({ outcome: "IMPORTED" });
     expect(state.records).toHaveLength(1);
@@ -204,7 +217,7 @@ describe("applying the import", () => {
   });
 
   it("keeps every audit row to ids and counts", async () => {
-    await applyHealthImport(admin, files([mainRow(), mainRow({ PathfinderHealthRecord_Id: "1002", Name_First: "Nobody", Name_Last: "Listed" })]), {}, now);
+    await applySelected(files([mainRow(), mainRow({ PathfinderHealthRecord_Id: "1002", Name_First: "Nobody", Name_Last: "Listed" })]));
     expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_IMPORTED", "HEALTH_IMPORT_CLUB_APPLIED", "HEALTH_IMPORT_APPLIED"]);
     const dump = JSON.stringify(state.audit);
     for (const marker of importMarkers) expect(dump).not.toContain(marker);
@@ -221,9 +234,10 @@ describe("applying the import", () => {
 
   it("is idempotent: the same file again imports nothing and changes nothing", async () => {
     const upload = () => files([mainRow(), mainRow({ PathfinderHealthRecord_Id: "1002", Name_First: "Jordan" })]);
-    expect((await applyHealthImport(admin, upload(), {}, now)).imported).toBe(2);
+    const selection = await pairs(upload());
+    expect((await applyHealthImport(admin, upload(), { include: selection }, now)).imported).toBe(2);
     const before = JSON.stringify({ records: state.records, fields: state.fields });
-    const again = await applyHealthImport(admin, upload(), {}, now);
+    const again = await applyHealthImport(admin, upload(), { include: selection }, now);
     expect(again.imported).toBe(0);
     expect(again.counts.ALREADY_HAS_RECORD).toBe(2);
     expect(JSON.stringify({ records: state.records, fields: state.fields })).toBe(before);
@@ -232,7 +246,7 @@ describe("applying the import", () => {
   it("never overwrites an existing record, including one that is a director's own", async () => {
     state.records = [{ id: "existing", organizationId: "club-a", rosterMemberId: "m1", importedAt: null, hasHealthNote: false }];
     state.fields = [{ recordId: "existing", fieldKey: "hasAllergies", sealedValue: "untouched" }];
-    const result = await applyHealthImport(admin, files([mainRow()]), {}, now);
+    const result = await applySelected(files([mainRow()]));
     expect(result.imported).toBe(0);
     expect(result.rows[0]!.outcome).toBe("ALREADY_HAS_RECORD");
     expect(state.records).toEqual([{ id: "existing", organizationId: "club-a", rosterMemberId: "m1", importedAt: null, hasHealthNote: false }]);
@@ -247,15 +261,52 @@ describe("applying the import", () => {
       mainRow({ PathfinderHealthRecord_Id: "1003", Name_First: "Casey" }),
       mainRow({ PathfinderHealthRecord_Id: "1004", Name_First: "Nobody" }),
     ];
-    const result = await applyHealthImport(admin, files(rows), { include: ["1001", "1003", "1004"] }, now);
+    const result = await applySelected(files(rows), ["1001", "1003", "1004"]);
     expect(result.rows.map((row) => row.outcome)).toEqual(["IMPORTED", "NOT_SELECTED", "NEEDS_CHECK", "UNMATCHED"]);
     expect(state.records.map((record) => record.rosterMemberId)).toEqual(["m1"]);
   });
 
+  it("writes no consent and no signature, so a parent gives consent through the private link", async () => {
+    await applySelected(files([mainRow({ Signature: "Pat Sample" })]));
+    const keys = state.fields.map((field) => field.fieldKey);
+    expect(keys).not.toContain("consent");
+    expect(keys).not.toContain("signature");
+    expect(Object.keys(openAll(state.records[0]!.id))).not.toContain("consent");
+    expect(JSON.stringify(openAll(state.records[0]!.id))).not.toMatch(/Pat Sample/);
+  });
+
+  it("imports only what was previewed: a row whose match has changed is reported, not written", async () => {
+    const upload = files([mainRow(), mainRow({ PathfinderHealthRecord_Id: "1002", Name_First: "Jordan" })]);
+    const selection = await pairs(upload);
+    expect(selection).toHaveLength(2);
+    // Between preview and apply: Riley's roster row is replaced by a different member, and Jordan is removed.
+    state.members = [member("m-other", "Riley")];
+    const result = await applyHealthImport(admin, upload, { include: selection }, now);
+    expect(result.rows.map((row) => row.outcome)).toEqual(["CHANGED", "CHANGED"]);
+    expect(result.imported).toBe(0);
+    expect(state.records).toEqual([]);
+    // A pair naming a member the file does not match is refused as well, and nothing is selected by default.
+    state.members = [member("m1", "Riley")];
+    const forged = await applyHealthImport(admin, files([mainRow()]), { include: [{ sourceId: "1001", memberId: "m2" }] }, now);
+    expect(forged.rows[0]!.outcome).toBe("CHANGED");
+    const none = await applyHealthImport(admin, files([mainRow()]), {}, now);
+    expect(none.rows[0]!.outcome).toBe("NOT_SELECTED");
+    expect(state.records).toEqual([]);
+  });
+
+  it("keeps long text whole and counts the field as needing correction", async () => {
+    const long = "Synthetic note ".repeat(160);
+    const upload = () => files([mainRow({ ListOfMedicationsOrPertinentHealthincludingMentalHealthInformation: long })]);
+    await applySelected(upload());
+    expect(openAll(state.records[0]!.id).medications).toBe(long.trim());
+    const preview = await previewHealthImport(admin, upload(), now);
+    expect(preview.rows[0]!.needsCorrectionCount).toBe(1);
+  });
+
   it("lists unmatched rows by name only", async () => {
-    const result = await applyHealthImport(admin, files([mainRow({ Name_First: "Nobody", Name_Last: "Listed" })]), {}, now);
+    const result = await applySelected(files([mainRow({ Name_First: "Nobody", Name_Last: "Listed" })]));
     expect(result.rows[0]).toMatchObject({ name: "Nobody Listed", outcome: "UNMATCHED" });
-    expect(Object.keys(result.rows[0]!).sort()).toEqual(["clubName", "clubText", "contactsOmitted", "name", "needsCorrectionCount", "outcome", "reason", "sections", "sourceId"]);
+    expect(Object.keys(result.rows[0]!).sort()).toEqual(["clubName", "clubText", "contactsOmitted", "memberId", "name", "needsCorrectionCount", "outcome", "reason", "sections", "sourceId"]);
   });
 
   it("rolls a club back when a write fails, reports it without the cause, and carries on with other clubs", async () => {
@@ -266,7 +317,7 @@ describe("applying the import", () => {
       mainRow({ PathfinderHealthRecord_Id: "1002", Name_First: "Jordan" }),
       mainRow({ PathfinderHealthRecord_Id: "1009", Name_First: "Sam", ChurchAndClubName_First: "Other", ChurchAndClubName_Last: "Pathfinders" }),
     ];
-    const result = await applyHealthImport(admin, files(rows), {}, now);
+    const result = await applySelected(files(rows));
     expect(result.rows.map((row) => row.outcome)).toEqual(["FAILED", "FAILED", "IMPORTED"]);
     expect(state.records.map((record) => record.rosterMemberId)).toEqual(["m9"]);
     // The log carries the error code only, not the database's message.
@@ -276,16 +327,16 @@ describe("applying the import", () => {
   });
 
   it("uses the later of two entries for one member", async () => {
-    const result = await applyHealthImport(admin, files([
+    const result = await applySelected(files([
       mainRow({ PathfinderHealthRecord_Id: "old", Entry_DateSubmitted: "2026-08-01", Phone: "515-555-0101" }),
       mainRow({ PathfinderHealthRecord_Id: "new", Entry_DateSubmitted: "2026-09-01", Phone: "515-555-0102" }),
-    ]), {}, now);
+    ]));
     expect(result.rows.map((row) => row.outcome)).toEqual(["SUPERSEDED", "IMPORTED"]);
     expect(openAll(state.records[0]!.id).phone).toBe("(515) 555-0102");
   });
 
   it("does not import an incomplete form", async () => {
-    const result = await applyHealthImport(admin, files([mainRow({ Entry_Status: "Incomplete" })]), {}, now);
+    const result = await applySelected(files([mainRow({ Entry_Status: "Incomplete" })]));
     expect(result.rows[0]!.outcome).toBe("INCOMPLETE");
     expect(state.records).toEqual([]);
   });

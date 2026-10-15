@@ -53,6 +53,46 @@ describe("reading the uploaded files", () => {
     expect(() => readHealthImportFiles([{ bytes: bomb }])).toThrow(HealthImportFileError);
   });
 
+  it("finishes quickly on a pathological sheet of tens of thousands of unclosed cells, or refuses it", () => {
+    const hostile = `<worksheet><sheetData><row r="1">${"<c r=\"A1\" t=\"inlineStr\"><is><t>".repeat(60_000)}</row><row>${"<c ".repeat(60_000)}`;
+    const bytes = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: hostile }]);
+    const started = Date.now();
+    let sheets: unknown[] = [];
+    try {
+      sheets = readHealthImportFiles([{ bytes }]);
+    } catch (error) {
+      expect(error).toBeInstanceOf(HealthImportFileError);
+    }
+    // Refused, or read as a sheet with no usable data; and in linear time either way.
+    expect(sheets).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("refuses a row with more than 300 cells, and a sheet inflating past 15 MB", () => {
+    const cells = Array.from({ length: 301 }, (_, index) => `<c r="A${index}" t="inlineStr"><is><t>x</t></is></c>`).join("");
+    const wide = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: `<sheetData><row>${cells}</row></sheetData>` }]);
+    expect(() => readHealthImportFiles([{ bytes: wide }])).toThrow(/too many columns/);
+    const big = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: " ".repeat(15_000_001) }]);
+    expect(() => readHealthImportFiles([{ bytes: big }])).toThrow(/too large/);
+  });
+
+  it("refuses a workbook over the entry-count limit, a file too short to be a ZIP, and malformed XML", () => {
+    const many = zipBytes(Array.from({ length: 201 }, (_, index) => ({ name: `xl/extra${index}.xml`, data: "<x/>" })));
+    expect(() => readHealthImportFiles([{ bytes: many }])).toThrow(/could not be read/);
+    expect(() => readHealthImportFiles([{ bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6]) }])).toThrow(HealthImportFileError);
+    for (const data of ["<worksheet><sheetData><row><c r=\"A1\"", "not xml at all <<<>>>", "<row><c r=\"A1\" t=\"s\"><v>99</v></c></row>"]) {
+      const bytes = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data }]);
+      let outcome: unknown = null;
+      try {
+        outcome = readHealthImportFiles([{ bytes }]);
+      } catch (error) {
+        outcome = error;
+      }
+      // Either a clean refusal or sheets with no data: never a crash of another kind.
+      expect(outcome instanceof HealthImportFileError || Array.isArray(outcome)).toBe(true);
+    }
+  });
+
   it("never puts cell content in an error message", () => {
     const bad = csvBytes(["Not_This_Export", "Another"], [{ Not_This_Export: "Synthetic peanut reaction", Another: "x" }]);
     let message = "";
@@ -107,10 +147,10 @@ describe("mapping the Cognito columns to Health tab fields", () => {
         { firstName: "Alex", lastName: "Sample", phone: "(515) 555-0180", relationship: "Aunt" },
         { firstName: "Sam", lastName: "Sample", phone: "(515) 555-0181", relationship: "Grandparent" },
       ],
-      signature: { typedName: "Pat Sample", signedOn: "2026-09-20" },
-      consent: { emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-09-20", importedFromOnlineForm: true },
     });
-    expect(entry.sections).toEqual(["tetanus", "allergies", "medications", "restrictions", "insurance", "guardian", "contacts", "consent"]);
+    expect(entry.values).not.toHaveProperty("consent");
+    expect(entry.values).not.toHaveProperty("signature");
+    expect(entry.sections).toEqual(["tetanus", "allergies", "medications", "restrictions", "insurance", "guardian", "contacts"]);
     expect(entry.needsCorrection).toEqual([]);
   });
 
@@ -137,29 +177,65 @@ describe("mapping the Cognito columns to Health tab fields", () => {
     expect(entry.guardianEmail).toBe("");
   });
 
-  it("treats 'No' allergies, empty answers and 'none' notes as not provided, but never drops a note", () => {
+  it("keeps free text in the allergy answer column, as allergy text", () => {
     const { entries } = parse([
-      mainRow({ PathfinderHealthRecord_Id: "1", Allergies: "No", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "", ListOfMedicationsOrPertinentHealthincludingMentalHealthInformation: "None", ListOfMedicalRestrictions: "N/A", IsTheParticipantCoveredByMedicalInsurance: "No", InsuranceCompany: "" }),
-      mainRow({ PathfinderHealthRecord_Id: "2", Allergies: "No", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "Synthetic bee sting, carries injector" }),
-      mainRow({ PathfinderHealthRecord_Id: "3", IsTheParticipantCoveredByMedicalInsurance: "", InsuranceCompany: "Synthetic Cover Co" }),
+      mainRow({ PathfinderHealthRecord_Id: "1", Allergies: "Penicillin", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "" }),
+      mainRow({ PathfinderHealthRecord_Id: "2", Allergies: "Penicillin", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "Synthetic rash, mild" }),
     ]);
-    expect(entries[0]!.values).toMatchObject({ hasAllergies: "NO", hasInsurance: "NO" });
-    expect(entries[0]!.values).not.toHaveProperty("medications");
-    expect(entries[0]!.values).not.toHaveProperty("medicalRestrictions");
-    expect(entries[0]!.values).not.toHaveProperty("insuranceCompany");
-    expect(entries[1]!.values).toMatchObject({ hasAllergies: "YES", allergyDetails: "Synthetic bee sting, carries injector" });
-    expect(entries[2]!.values.hasInsurance).toBe("YES");
+    expect(entries[0]!.values).toMatchObject({ hasAllergies: "YES", allergyDetails: "Penicillin" });
+    expect(entries[1]!.values).toMatchObject({ hasAllergies: "YES", allergyDetails: "Penicillin\nSynthetic rash, mild" });
+    expect(entries[0]!.sections).toContain("allergies");
   });
 
-  it("does not claim a consent when there is no signature, and never keeps a signature link", () => {
+  it("stores nothing for a blank allergy or insurance answer, never a default No", () => {
+    const { entries } = parse([mainRow({
+      Allergies: "", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "", IsTheParticipantCoveredByMedicalInsurance: "",
+      InsuranceCompany: "", InsuranceGroupAndPolicyNumbers: "", InsurancePhoneNumber: "",
+    })]);
+    expect(entries[0]!.values).not.toHaveProperty("hasAllergies");
+    expect(entries[0]!.values).not.toHaveProperty("hasInsurance");
+    expect(entries[0]!.sections).not.toContain("allergies");
+    expect(entries[0]!.sections).not.toContain("insurance");
+  });
+
+  it("reads Yes with details, No with details (details win), and No with nothing", () => {
     const { entries } = parse([
-      mainRow({ PathfinderHealthRecord_Id: "1", Signature: "" }),
+      mainRow({ PathfinderHealthRecord_Id: "1", Allergies: "Yes", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "Synthetic bee sting" }),
+      mainRow({ PathfinderHealthRecord_Id: "2", Allergies: "No", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "Synthetic bee sting, carries injector" }),
+      mainRow({ PathfinderHealthRecord_Id: "3", Allergies: "No", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "", IsTheParticipantCoveredByMedicalInsurance: "No", InsuranceCompany: "", InsuranceGroupAndPolicyNumbers: "" }),
+      mainRow({ PathfinderHealthRecord_Id: "4", Allergies: "", ListAllergiesReactionsSeverityAndNormalRemedyUsed: "Synthetic dust", IsTheParticipantCoveredByMedicalInsurance: "", InsuranceCompany: "Synthetic Cover Co" }),
+      mainRow({ PathfinderHealthRecord_Id: "5", ListOfMedicationsOrPertinentHealthincludingMentalHealthInformation: "None", ListOfMedicalRestrictions: "N/A" }),
+    ]);
+    expect(entries[0]!.values).toMatchObject({ hasAllergies: "YES", allergyDetails: "Synthetic bee sting" });
+    expect(entries[1]!.values).toMatchObject({ hasAllergies: "YES", allergyDetails: "Synthetic bee sting, carries injector" });
+    expect(entries[2]!.values).toMatchObject({ hasAllergies: "NO", hasInsurance: "NO" });
+    expect(entries[2]!.values).not.toHaveProperty("insuranceCompany");
+    expect(entries[3]!.values).toMatchObject({ hasAllergies: "YES", hasInsurance: "YES" });
+    expect(entries[4]!.values).not.toHaveProperty("medications");
+    expect(entries[4]!.values).not.toHaveProperty("medicalRestrictions");
+  });
+
+  it("imports no consent and never reads the signature, whatever the form holds", () => {
+    const { entries } = parse([
+      mainRow({ PathfinderHealthRecord_Id: "1", Signature: "Pat Sample" }),
       mainRow({ PathfinderHealthRecord_Id: "2", Signature: "https://storage.example.test/signature.png" }),
     ]);
-    expect(entries[0]!.values).not.toHaveProperty("consent");
-    expect(entries[0]!.values).not.toHaveProperty("signature");
-    expect(entries[1]!.values.signature).toEqual({ typedName: "", signedOn: "2026-09-20" });
-    expect(JSON.stringify(entries[1])).not.toMatch(/signature\.png/);
+    for (const entry of entries) {
+      expect(entry.values).not.toHaveProperty("consent");
+      expect(entry.values).not.toHaveProperty("signature");
+      expect(entry.sections).not.toContain("consent");
+    }
+    expect(JSON.stringify(entries)).not.toMatch(/Pat Sample|signature\.png/);
+  });
+
+  it("keeps text longer than the Health tab form's limit whole and flags it instead of cutting it", () => {
+    const long = "Synthetic note ".repeat(160);
+    const { entries } = parse([mainRow({ ListOfMedicationsOrPertinentHealthincludingMentalHealthInformation: long, Address_Line1: "x".repeat(130), InsuranceCompany: "Synthetic Cover Co" })]);
+    expect(long.length).toBeGreaterThan(2000);
+    expect(entries[0]!.values.medications).toBe(long.trim());
+    expect((entries[0]!.values.addressLine1 as string).length).toBe(130);
+    expect(entries[0]!.needsCorrection).toEqual(expect.arrayContaining(["medications", "addressLine1"]));
+    expect(entries[0]!.needsCorrection).not.toContain("insuranceCompany");
   });
 
   it("limits emergency contacts to the Health tab's maximum and says how many were left out", () => {
@@ -190,6 +266,10 @@ describe("mapping the Cognito columns to Health tab fields", () => {
     expect(importDate("2012-04-09T00:00:00")).toBe("2012-04-09");
     expect(importDate("2012-02-30")).toBeNull();
     expect(importDate("soon")).toBeNull();
+    // A four-digit year is not a serial number: it is not a date, so the booster text is kept as typed.
+    expect(importDate("2019")).toBeNull();
+    expect(importDate("9999")).toBeNull();
+    expect(importDate("5000000")).toBeNull();
     expect(importDate("")).toBeNull();
     const bytes = xlsxBytes([{ name: "PathfinderHealthRecord", headers: MAIN_HEADERS, rows: [mainRow({ DateOfBirth: "41008" })] }], { numericColumns: ["DateOfBirth"] });
     const { entries } = parseCognitoHealthExport(readHealthImportFiles([{ bytes }]));
@@ -201,6 +281,11 @@ describe("mapping the Cognito columns to Health tab fields", () => {
     expect(["No", "false", "None", "N/A"].map(yesNoAnswer)).toEqual(["NO", "NO", "NO", "NO"]);
     expect(yesNoAnswer("maybe")).toBeNull();
     expect(yesNoAnswer(undefined)).toBeNull();
+  });
+
+  it("keeps a four-digit year typed as the tetanus booster exactly as typed", () => {
+    const { entries } = parse([mainRow({ DateOfLastTetanusBooster: "2019" })]);
+    expect(entries[0]!.values.lastTetanusBooster).toBe("2019");
   });
 
   it("works from the entries sheet alone, and from a workbook with all three sheets in one file", () => {

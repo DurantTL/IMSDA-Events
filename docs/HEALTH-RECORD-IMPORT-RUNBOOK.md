@@ -25,7 +25,8 @@ tooling with synthetic files only and never runs it on real data.
 
 The import never needs anyone to open a club's Health tab, so it stays inside the
 break-glass-only rule for system administrators (ADR 0005 Addendum B). It writes
-sealed records and never opens a stored value.
+sealed records and never opens a stored health value (roster birth dates are
+decrypted in memory for matching only).
 
 ## 1. Export from Cognito Forms
 
@@ -56,7 +57,7 @@ example "allergies ✓, insurance ✓"). **It never shows a medical value.**
 
 | Result | Meaning | What happens on Apply |
 | --- | --- | --- |
-| Matched | Exactly one member of the club's current roster has this first and last name **and** either the same birth date or the parent's email on their guardian contacts | Imported |
+| Matched | Exactly one member of the club's current roster has this first and last name **and** either the same birth date or the parent's email on their guardian contacts. If both birth dates are present and differ, it is never a match, even when the parent's email agrees (it can be a sibling's form) | Imported |
 | Needs check | More than one club or member fits, or the name fits but neither birth date nor parent email confirms it, or the birth date differs | Not imported. Fix the roster (birth date, guardian email) and run again, or let the parent refill |
 | Not matched | No club matches the church and club name on the form, or nobody with that name is on the roster | Not imported. The director can match them from the club's side, or the parent refills through the private link |
 | Already has a record | The member already has a health record in the new system (this year, or an earlier year's for the same person in this club) | Skipped. The newer entry wins and nothing is overwritten |
@@ -65,6 +66,7 @@ example "allergies ✓, insurance ✓"). **It never shows a medical value.**
 
 A name alone never matches, because two children can share a name. A parent email
 shared with a sibling doesn't match the sibling, because the name must match too.
+Two birth dates that differ rule a member out, so that row is *Needs check*.
 
 The club is matched from the church and club name on the form (the two Cognito
 name parts joined back together) against the club's name, or its sponsoring
@@ -79,8 +81,11 @@ limit of six are not imported and the preview says how many.
 ## 3. Apply
 
 Untick anyone you don't want, then press **Import**. The browser sends the same
-file again; the server matches it again and writes one sealed record per matched
-member who has none. Each club is its own transaction, so one failure never blocks
+file again, with the rows you ticked as entry-and-member pairs from the preview. The
+server matches the file again and writes a sealed record only where the new match
+gives the **same member** and is still *Matched*; any other ticked row is reported
+as **Changed since the preview** and nothing is written for it. Nothing is ticked
+by default on the server side. Each club is its own transaction, so one failure never blocks
 the others (the failed rows say **Could not import**; run again after checking).
 
 Imported records:
@@ -90,9 +95,10 @@ Imported records:
 - count as **needing confirmation** under the yearly re-confirmation rule: they
   read "Needs update" until the director saves or confirms them (either clears the
   mark);
-- carry the consent and signature date from the form when the form has a typed
-  signature, labelled as imported. A stored link to a signature image is never
-  kept;
+- carry **no consent and no signature**. Consent is not imported (see "Pending
+  decision" below), so the three consents stay unset and the parent gives them
+  through the private link. A director's Confirm does not create consent either;
+  the Health tab says "No consent has been given in the new system yet";
 - keep the combined "insurance group and policy numbers" answer whole in the
   **Group number** field (it can't be split reliably) and leave **Policy number**
   for the director.
@@ -141,12 +147,23 @@ otherwise:
 
 - Only entries whose `Entry_Status` is **Incomplete** are skipped. Any other status
   (Submitted, Reviewed, and so on) is imported.
-- The `Allergies`, `IsTheParticipantCoveredByMedicalInsurance` answers are read as
-  Yes/No. Allergy details always win over a "No", so a note is never lost.
-- `Signature` is read as a typed name; a web link is treated as an image and
-  dropped. Consent is recorded only when the form has a signature.
-- A parent's answers to the three consent statements are taken from the signature
-  on the 2026 form; the director re-confirms on review.
+- The `Allergies` column is read as Yes/No when it is one; any other text in it
+  (for example "Penicillin") is kept as allergy text and counts as Yes. Allergy
+  details win over a "No", so a note is never lost. A **blank answer stores
+  nothing**: it is never turned into "No". The insurance answer works the same way.
+- Text longer than the Health tab form's limit (for example 2,000 characters for
+  allergy details) is kept whole, never cut, and the row is counted as needing
+  correction. The director shortens it on the next save.
+- A four-digit number in a date column (a year such as 2019) is kept as typed. Only a
+  five-digit Excel date serial (10000 to 60000) is read as a date.
+
+## Pending decision: consent
+
+Whether the signed 2026 online form can stand in for the new consent statements is
+a decision for Caleb (a human). Until it is made, the importer imports **no consent
+and never reads the `Signature` column**. If it is later approved, the mapping is a
+change to `import-parser.ts` with a new consent version, reviewed like any
+medical-data change.
 
 ## Checks
 

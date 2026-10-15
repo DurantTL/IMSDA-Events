@@ -11,7 +11,7 @@ import { requireHealthPrivacyAcknowledgment } from "@/modules/health-records/ack
 import { sealHealthFieldRows } from "@/modules/health-records/crypto";
 import { hasHealthNoteFor, healthAuditActor, type HealthViewer } from "@/modules/health-records/domain";
 import { HealthRecordError } from "@/modules/health-records/errors";
-import { requireHealthRecordsEnabled } from "@/modules/health-records/flag";
+import { requireHealthImporter } from "@/modules/health-records/import-access";
 import { HealthImportFileError, readHealthImportFiles } from "@/modules/health-records/import-files";
 import {
   MATCH_REASON_LABELS,
@@ -47,14 +47,6 @@ import {
  */
 
 const IMPORT_TRANSACTION_MS = 60_000;
-
-function requireImporter(viewer: HealthViewer) {
-  requireHealthRecordsEnabled();
-  if (viewer.kind !== "SYSTEM_ADMIN" || viewer.actAsId) {
-    throw new HealthRecordError("FORBIDDEN", "Only a system administrator can import health records.");
-  }
-  return viewer;
-}
 
 function readExport(files: Array<{ bytes: Uint8Array }>) {
   try {
@@ -142,6 +134,8 @@ async function parseAndMatch(files: Array<{ bytes: Uint8Array }>, now: Date): Pr
 
 export type ImportPreviewRow = {
   sourceId: string;
+  /** The roster member a MATCHED or already-recorded row points at (an id). Sent back with Apply so it imports what was previewed. */
+  memberId: string | null;
   name: string;
   /** The church and club as typed on the form, then the club it matched, if any. */
   clubText: string;
@@ -169,6 +163,7 @@ function previewRows({ entries, matches }: Matched): ImportPreviewRow[] {
     const match = matches[index]!;
     return {
       sourceId: entry.sourceId,
+      memberId: match.memberId,
       name: `${entry.firstName} ${entry.lastName}`.trim(),
       clubText: entry.clubText,
       clubName: match.clubName,
@@ -186,7 +181,7 @@ function previewRows({ entries, matches }: Matched): ImportPreviewRow[] {
  * nothing but one audit row (counts only).
  */
 export async function previewHealthImport(viewer: HealthViewer, files: Array<{ bytes: Uint8Array }>, now = new Date()): Promise<ImportPreview> {
-  const admin = requireImporter(viewer);
+  const admin = requireHealthImporter(viewer);
   await requireHealthPrivacyAcknowledgment(admin);
   const matched = await parseAndMatch(files, now);
   const counts = countOutcomes(matched.matches);
@@ -201,7 +196,7 @@ export async function previewHealthImport(viewer: HealthViewer, files: Array<{ b
   return { rows: previewRows(matched), counts, total: matched.entries.length, unreadableRows: matched.unreadableRows, duplicateIds: matched.duplicateIds };
 }
 
-export type ImportApplyOutcome = ImportOutcome | "IMPORTED" | "NOT_SELECTED" | "FAILED";
+export type ImportApplyOutcome = ImportOutcome | "IMPORTED" | "NOT_SELECTED" | "CHANGED" | "FAILED";
 
 export type ImportApplyRow = Omit<ImportPreviewRow, "outcome"> & { outcome: ImportApplyOutcome };
 
@@ -213,28 +208,29 @@ export type ImportApplyResult = {
 };
 
 function emptyApplyCounts(): Record<ImportApplyOutcome, number> {
-  return { MATCHED: 0, NEEDS_CHECK: 0, UNMATCHED: 0, ALREADY_HAS_RECORD: 0, SUPERSEDED: 0, INCOMPLETE: 0, IMPORTED: 0, NOT_SELECTED: 0, FAILED: 0 };
+  return { MATCHED: 0, NEEDS_CHECK: 0, UNMATCHED: 0, ALREADY_HAS_RECORD: 0, SUPERSEDED: 0, INCOMPLETE: 0, IMPORTED: 0, NOT_SELECTED: 0, CHANGED: 0, FAILED: 0 };
 }
 
 /**
  * Step two: read the same file again, match it again, and write a sealed record
- * for each MATCHED row (all of them, or only the `include`d entry ids). Each club
+ * for each row the administrator selected, as `sourceId` and `memberId` pairs from the preview, and only when the
+ * new match gives the same member and is still MATCHED; anything else is reported CHANGED. Each club
  * is its own transaction, so one failure never blocks the others. The records are
  * marked as imported for a director to review and count as needing confirmation.
  */
 export async function applyHealthImport(
   viewer: HealthViewer,
   files: Array<{ bytes: Uint8Array }>,
-  options: { include?: readonly string[] | null } = {},
+  options: { include?: ReadonlyArray<{ sourceId: string; memberId: string }> } = {},
   now = new Date(),
 ): Promise<ImportApplyResult> {
-  const admin = requireImporter(viewer);
+  const admin = requireHealthImporter(viewer);
   await requireHealthPrivacyAcknowledgment(admin);
   if (!isSecretEncryptionConfigured()) {
     throw new HealthRecordError("ENCRYPTION_NOT_CONFIGURED", "Health records can't be saved right now. Please try again later.");
   }
   const matched = await parseAndMatch(files, now);
-  const include = options.include ? new Set(options.include) : null;
+  const include = new Map((options.include ?? []).map((pair) => [pair.sourceId, pair.memberId]));
   const runId = randomUUID();
   const who = healthAuditActor(admin);
   const prisma = getPrisma();
@@ -242,10 +238,16 @@ export async function applyHealthImport(
   const importable = new Map<string, Array<{ entry: ParsedHealthEntry; match: EntryMatch }>>();
   matched.entries.forEach((entry, index) => {
     const match = matched.matches[index]!;
-    if (match.outcome !== "MATCHED" || !match.organizationId || !match.memberId) {
-      outcomes.set(entry.sourceId, match.outcome);
-    } else if (include && !include.has(entry.sourceId)) {
-      outcomes.set(entry.sourceId, "NOT_SELECTED");
+    const selected = include.get(entry.sourceId);
+    if (selected === undefined) {
+      outcomes.set(entry.sourceId, match.outcome === "MATCHED" ? "NOT_SELECTED" : match.outcome);
+    } else if (match.memberId !== selected) {
+      // Not the member the preview showed: the roster or the file changed in between.
+      outcomes.set(entry.sourceId, "CHANGED");
+    } else if (match.outcome === "ALREADY_HAS_RECORD") {
+      outcomes.set(entry.sourceId, "ALREADY_HAS_RECORD");
+    } else if (match.outcome !== "MATCHED" || !match.organizationId) {
+      outcomes.set(entry.sourceId, "CHANGED");
     } else {
       importable.set(match.organizationId, [...(importable.get(match.organizationId) ?? []), { entry, match }]);
     }

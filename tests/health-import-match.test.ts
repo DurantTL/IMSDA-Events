@@ -40,11 +40,17 @@ describe("matching an entry to a roster member", () => {
     expect(only([entry()], [member()])[0]).toMatchObject({ outcome: "MATCHED", via: "BIRTH_DATE", organizationId: "club-a", memberId: "m1", clubName: "Example Pathfinders" });
   });
 
-  it("matches on club, name and the parent's email when the birth date is missing or different", () => {
+  it("matches on club, name and the parent's email when one birth date is missing", () => {
     const parent = member({ birthDate: null, guardianEmails: ["parent@example.test"] });
     expect(only([entry()], [parent])[0]).toMatchObject({ outcome: "MATCHED", via: "PARENT_EMAIL" });
+    const noDate = member({ birthDate: null, guardianEmails: ["parent@example.test"] });
+    expect(only([entry({ birthDate: "2012-04-09" })], [noDate])[0]).toMatchObject({ outcome: "MATCHED", via: "PARENT_EMAIL" });
+    expect(only([entry({ birthDate: null })], [member({ birthDate: "2012-04-09", guardianEmails: ["parent@example.test"] })])[0]).toMatchObject({ outcome: "MATCHED", via: "PARENT_EMAIL" });
+  });
+
+  it("needs a check when both birth dates are present and differ, even if the parent's email matches", () => {
     const different = member({ birthDate: "2011-01-01", guardianEmails: ["parent@example.test"] });
-    expect(only([entry()], [different])[0]).toMatchObject({ outcome: "MATCHED", via: "PARENT_EMAIL" });
+    expect(only([entry()], [different])[0]).toMatchObject({ outcome: "NEEDS_CHECK", reason: "BIRTH_DATE_DIFFERS", memberId: null });
   });
 
   it("is case, spacing and accent insensitive on names", () => {

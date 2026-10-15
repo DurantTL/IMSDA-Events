@@ -144,6 +144,8 @@ async function main() {
   // 3. The preview shows no health value and stores nothing ---------------
   const auditBefore = await prisma.auditLog.count({ where: { actorUserId: adminUserId } });
   const preview = await importer.previewHealthImport(admin, upload(), now);
+  // What an administrator ticks in the preview: sourceId:memberId pairs, exactly as the preview showed them.
+  const pick = (ids: string[]) => preview.rows.filter((row) => ids.includes(row.sourceId) && row.memberId).map((row) => ({ sourceId: row.sourceId, memberId: row.memberId! }));
   const outcomeOf = (id: string) => preview.rows.find((row) => row.sourceId === id)?.outcome;
   assert(outcomeOf("9001") === "MATCHED" && outcomeOf("9002") === "MATCHED" && outcomeOf("9003") === "MATCHED", "name and birth date, and name and parent email, match");
   assert(outcomeOf("9004") === "UNMATCHED", "an unknown person is not matched");
@@ -157,7 +159,7 @@ async function main() {
   assert(previewAudit.length === 1 && (await prisma.auditLog.count({ where: { actorUserId: adminUserId } })) === auditBefore + 1, "the preview writes one audit row");
 
   // 4. Apply: sealed, flagged, one record per matched member -------------
-  const result = await importer.applyHealthImport(admin, upload(), { include: ["9001", "9002", "9004", "9005"] }, now);
+  const result = await importer.applyHealthImport(admin, upload(), { include: pick(["9001", "9002", "9004", "9005"]) }, now);
   assert(result.imported === 3 && result.counts.NOT_SELECTED === 1 && result.counts.UNMATCHED === 1, "three selected rows are imported; the unselected and unmatched are not");
   const stored = await prisma.healthRecord.findMany({ where: { organizationId: { in: Object.values(clubs) } }, include: { fields: true } });
   assert(stored.length === 3, "one record per imported member");
@@ -166,6 +168,7 @@ async function main() {
     assert(record.fields.length >= 10 && new Set(record.fields.map((field) => field.sealedValue)).size === record.fields.length, "each field is its own ciphertext");
   }
   assert(!stored.some((record) => record.rosterMemberId === casey.id), "an unselected member has no record");
+  assert(!stored.some((record) => record.fields.some((field) => field.fieldKey === "consent" || field.fieldKey === "signature")), "no consent and no signature is imported");
   const dump = JSON.stringify(stored) + JSON.stringify(await prisma.auditLog.findMany({ where: { actorUserId: adminUserId } }));
   for (const marker of importMarkers) assert(!dump.includes(marker), `"${marker}" is in no stored column or audit row`);
   assert(!/Riley|Morgan|Nobody|Verify Import/.test(JSON.stringify(await prisma.auditLog.findMany({ where: { actorUserId: adminUserId } }))), "no name is in any audit row");
@@ -186,10 +189,13 @@ async function main() {
   const morganFields = (await prisma.healthRecord.findUniqueOrThrow({ where: { rosterMemberId: morgan.id }, include: { fields: true } })).fields.map((field) => field.fieldKey);
   assert(morganFields.includes("phone") && morganFields.includes("emergencyContacts"), "a phone that fails the check is kept as entered, not dropped");
 
+  const forged = await importer.applyHealthImport(admin, upload(), { include: [{ sourceId: "9003", memberId: riley.id }] }, now);
+  assert(forged.imported === 0 && forged.counts.CHANGED === 1, "a pair that is not what the preview showed is refused as changed");
+
   // 6. Re-running changes nothing, and a record is never overwritten ------
   const snapshot = async () => JSON.stringify(await prisma.healthRecord.findMany({ where: { organizationId: { in: Object.values(clubs) } }, include: { fields: { orderBy: { fieldKey: "asc" } } }, orderBy: { id: "asc" } }));
   const before = await snapshot();
-  const again = await importer.applyHealthImport(admin, upload(), { include: ["9001", "9002", "9004", "9005"] }, now);
+  const again = await importer.applyHealthImport(admin, upload(), { include: pick(["9001", "9002", "9004", "9005"]) }, now);
   assert(again.imported === 0 && again.counts.ALREADY_HAS_RECORD === 3, "running the same file again imports nothing");
   assert((await snapshot()) === before, "running the same file again changes nothing");
 
@@ -199,9 +205,9 @@ async function main() {
     { name: "EmergencyContactsAndAuthorizedP", headers: CONTACT_HEADERS, rows: contacts },
     { name: "CopyOfInsuranceCard", headers: CARD_HEADERS, rows: [cardRow("9001")] },
   ]);
-  const viaExcel = await importer.applyHealthImport(admin, [{ bytes: workbook }], { include: ["9001", "9002", "9005"] }, now);
+  const viaExcel = await importer.applyHealthImport(admin, [{ bytes: workbook }], { include: pick(["9001", "9002", "9005"]) }, now);
   assert(viaExcel.imported === 0 && viaExcel.counts.ALREADY_HAS_RECORD === 3, "an Excel upload of the same entries is recognised as already imported");
-  const races = await Promise.allSettled(Array.from({ length: 4 }, () => importer.applyHealthImport(admin, [{ bytes: workbook }], { include: ["9003"] }, now)));
+  const races = await Promise.allSettled(Array.from({ length: 4 }, () => importer.applyHealthImport(admin, [{ bytes: workbook }], { include: pick(["9003"]) }, now)));
   assert(races.every((race) => race.status === "fulfilled"), "racing applies all finish");
   assert((await prisma.healthRecord.count({ where: { rosterMemberId: casey.id } })) === 1, "four racing applies for one member write exactly one record");
   const raced = races.flatMap((race) => (race.status === "fulfilled" ? [race.value.imported] : []));
@@ -210,7 +216,7 @@ async function main() {
   // 8. A director's own record is never replaced -------------------------
   await prisma.healthRecord.deleteMany({ where: { rosterMemberId: drew.id } });
   const own = await prisma.healthRecord.create({ data: { organizationId: clubs.b, rosterMemberId: drew.id, confirmedClubYear: clubYear, hasHealthNote: false, lastEnteredVia: "DIRECTOR", lastConfirmedAt: now } });
-  const skipped = await importer.applyHealthImport(admin, upload(), { include: ["9005"] }, now);
+  const skipped = await importer.applyHealthImport(admin, upload(), { include: pick(["9005"]) }, now);
   const after = await prisma.healthRecord.findUniqueOrThrow({ where: { id: own.id }, include: { fields: true } });
   assert(skipped.imported === 0 && after.importedAt === null && after.fields.length === 0 && after.lastEnteredVia === "DIRECTOR", "an existing record is left exactly as it was");
 

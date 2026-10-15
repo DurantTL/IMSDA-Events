@@ -987,6 +987,17 @@ describe("a record imported from the 2026 online form (#878)", () => {
     expect(after).toMatchObject({ status: "CURRENT", importedForReview: false });
   });
 
+  it("holds no consent after the import and none after the director confirms", async () => {
+    state.fields = [];
+    const before = JSON.stringify(state.fields);
+    const view = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(view.values).not.toHaveProperty("consent");
+    expect(view.values).not.toHaveProperty("signature");
+    await confirmHealthRecord(leader, "club-a", "member-1", now);
+    expect(JSON.stringify(state.fields)).toBe(before);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values).not.toHaveProperty("consent");
+  });
+
   it("is reviewed by a director's save as well, which clears the marker", async () => {
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
     expect(state.records[0]).toMatchObject({ importedAt: null, confirmedClubYear: "2026-27" });

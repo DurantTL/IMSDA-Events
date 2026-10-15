@@ -1,6 +1,7 @@
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
+import { requireHealthImporter } from "@/modules/health-records/import-access";
 import { healthApiError, healthDisabledResponse, healthJson } from "@/modules/health-records/api";
 import { previewHealthImport } from "@/modules/health-records/import-repository";
 import { readHealthImportUpload } from "@/modules/health-records/import-upload";
@@ -16,7 +17,8 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const viewer = await requireStaffHealthViewer();
+    // Who may import is decided before the upload is read, so a refused request never has its file parsed.
+    const viewer = requireHealthImporter(await requireStaffHealthViewer());
     const { files } = await readHealthImportUpload(request);
     return healthJson({ preview: await previewHealthImport(viewer, files) });
   } catch (error) {

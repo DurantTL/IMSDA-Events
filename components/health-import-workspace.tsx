@@ -16,6 +16,7 @@ const outcomeLabels = {
   INCOMPLETE: "Incomplete form",
   IMPORTED: "Imported",
   NOT_SELECTED: "Not selected",
+  CHANGED: "Changed since the preview",
   FAILED: "Could not import",
 } as const;
 
@@ -23,7 +24,7 @@ type Outcome = keyof typeof outcomeLabels;
 
 function chipClass(outcome: Outcome) {
   if (outcome === "MATCHED" || outcome === "IMPORTED") return "status-chip green";
-  if (outcome === "NEEDS_CHECK" || outcome === "FAILED") return "status-chip gold";
+  if (outcome === "NEEDS_CHECK" || outcome === "FAILED" || outcome === "CHANGED") return "status-chip gold";
   return "status-chip";
 }
 
@@ -74,7 +75,7 @@ export function HealthImportWorkspace() {
     setBusy(true);
     setError("");
     try {
-      const { result: next } = await send("/api/staff/health-import/apply", files, { include: [...selected] }) as { result: ImportApplyResult };
+      const { result: next } = await send("/api/staff/health-import/apply", files, { include: preview.rows.filter((row) => selected.has(row.sourceId) && row.memberId).map((row) => `${row.sourceId}:${row.memberId}`) }) as { result: ImportApplyResult };
       setResult(next);
       setPreview(null);
     } catch (caught) {
@@ -199,7 +200,7 @@ export function HealthImportWorkspace() {
           <div className="section-heading"><div><p className="eyebrow">Done</p><h2>Import results</h2></div></div>
           <p>
             {result.counts.IMPORTED === 0 ? <CircleAlert aria-hidden="true" size={16} /> : <CheckCircle2 aria-hidden="true" size={16} />}
-            {" "}{result.counts.IMPORTED} imported, {result.counts.ALREADY_HAS_RECORD} already had a record, {result.counts.FAILED} could not be imported,
+            {" "}{result.counts.IMPORTED} imported, {result.counts.ALREADY_HAS_RECORD} already had a record, {result.counts.FAILED} could not be imported, {result.counts.CHANGED} changed since the preview and were skipped,
             {" "}{result.counts.NEEDS_CHECK + result.counts.UNMATCHED} not matched. The run is recorded with counts only.
           </p>
         </section>

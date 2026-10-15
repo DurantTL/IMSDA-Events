@@ -16,7 +16,8 @@ export const MAX_HEALTH_IMPORT_FILE_BYTES = 8_000_000;
 export const MAX_HEALTH_IMPORT_FILES = 4;
 export const MAX_HEALTH_IMPORT_ROWS = 3_000;
 const MAX_ZIP_ENTRIES = 200;
-const MAX_ENTRY_BYTES = 40_000_000;
+const MAX_ENTRY_BYTES = 15_000_000;
+const MAX_CELLS_PER_ROW = 300;
 const MAX_TOTAL_INFLATED_BYTES = 80_000_000;
 
 export class HealthImportFileError extends Error {
@@ -132,16 +133,63 @@ function safeCodePoint(code: number, fallback: string) {
   return Number.isInteger(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : fallback;
 }
 
+type Tag = { start: number; openEnd: number; selfClosing: boolean };
+
+/**
+ * The next `<name ...>` element start at or after `from`, found with indexOf only so a hostile sheet cannot make the
+ * scan quadratic. `openEnd` is the index just past the start tag's `>`. Null when there is none (or it is cut off).
+ */
+function nextTag(xml: string, name: string, from: number): Tag | null {
+  let at = from;
+  for (;;) {
+    const start = xml.indexOf(`<${name}`, at);
+    if (start < 0) return null;
+    const after = xml.charCodeAt(start + name.length + 1);
+    // Whitespace, ">" or "/" ends the name: "<c" is not "<cols", "<t" is not "<tr".
+    if (after === 32 || after === 9 || after === 10 || after === 13 || after === 62 || after === 47) {
+      const close = xml.indexOf(">", start);
+      if (close < 0) return null;
+      return { start, openEnd: close + 1, selfClosing: xml.charCodeAt(close - 1) === 47 };
+    }
+    at = start + 1;
+  }
+}
+
+/** Each element's inner text, in order, linear in the input. A cut-off element ends the scan. */
+function* elements(xml: string, name: string): Generator<{ inner: string; attributes: string }> {
+  let cursor = 0;
+  const closer = `</${name}>`;
+  for (;;) {
+    const tag = nextTag(xml, name, cursor);
+    if (!tag) return;
+    const attributes = xml.slice(tag.start + name.length + 1, tag.openEnd - 1);
+    if (tag.selfClosing) {
+      yield { inner: "", attributes };
+      cursor = tag.openEnd;
+      continue;
+    }
+    const end = xml.indexOf(closer, tag.openEnd);
+    if (end < 0) return;
+    yield { inner: xml.slice(tag.openEnd, end), attributes };
+    cursor = end + closer.length;
+  }
+}
+
 /** Concatenated text of every `<t>` in a fragment (a shared string or inline string; rich-text runs join). */
 function textOf(fragment: string) {
   let out = "";
-  for (const match of fragment.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)) out += decodeXml(match[1] ?? "");
+  for (const part of elements(fragment, "t")) out += decodeXml(part.inner);
   return out;
 }
 
 function sharedStringsOf(xml: string | null): string[] {
   if (!xml) return [];
-  return [...xml.matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g)].map((match) => textOf(match[1] ?? ""));
+  const strings: string[] = [];
+  for (const item of elements(xml, "si")) {
+    strings.push(textOf(item.inner));
+    if (strings.length > 200_000) throw new HealthImportFileError("That Excel file is too large to read.");
+  }
+  return strings;
 }
 
 function columnIndex(reference: string) {
@@ -151,27 +199,37 @@ function columnIndex(reference: string) {
   return index - 1;
 }
 
+function attribute(attributes: string, name: string) {
+  const marker = ` ${name}="`;
+  const at = attributes.indexOf(marker);
+  if (at < 0) return undefined;
+  const start = at + marker.length;
+  const end = attributes.indexOf('"', start);
+  return end < 0 ? undefined : attributes.slice(start, end);
+}
+
 function matrixFromSheetXml(xml: string, shared: string[]): string[][] {
   const matrix: string[][] = [];
-  for (const rowMatch of xml.matchAll(/<row(?:\s[^>]*[^/>])?>([\s\S]*?)<\/row>/g)) {
+  for (const rowElement of elements(xml, "row")) {
     if (matrix.length > MAX_HEALTH_IMPORT_ROWS + 1) throw new HealthImportFileError(`A sheet has more than ${MAX_HEALTH_IMPORT_ROWS.toLocaleString("en-US")} rows. Export fewer entries at a time.`);
     const row: string[] = [];
     let next = 0;
-    for (const cellMatch of (rowMatch[1] ?? "").matchAll(/<c((?:\s[^>]*?)?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-      const attributes = cellMatch[1] ?? "";
-      const body = cellMatch[2] ?? "";
-      const reference = /\sr="([A-Za-z]+\d+)"/.exec(attributes)?.[1];
+    let cells = 0;
+    for (const cell of elements(rowElement.inner, "c")) {
+      cells += 1;
+      if (cells > MAX_CELLS_PER_ROW) throw new HealthImportFileError("A sheet has too many columns to read.");
+      const reference = attribute(cell.attributes, "r");
       const index = reference ? columnIndex(reference) : next;
-      if (index < 0 || index > 300) continue;
-      const type = /\st="([^"]*)"/.exec(attributes)?.[1] ?? "n";
+      if (index < 0 || index >= MAX_CELLS_PER_ROW) continue;
+      const type = attribute(cell.attributes, "t") ?? "n";
       let value = "";
-      if (type === "inlineStr") value = textOf(body);
+      if (type === "inlineStr") value = textOf(cell.inner);
       else {
-        const v = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1];
-        if (v !== undefined) {
-          if (type === "s") value = shared[Number(v)] ?? "";
-          else if (type === "b") value = v.trim() === "1" ? "TRUE" : "FALSE";
-          else value = decodeXml(v);
+        const v = elements(cell.inner, "v").next().value;
+        if (v) {
+          if (type === "s") value = shared[Number(v.inner)] ?? "";
+          else if (type === "b") value = v.inner.trim() === "1" ? "TRUE" : "FALSE";
+          else value = decodeXml(v.inner);
         }
       }
       while (row.length < index) row.push("");
