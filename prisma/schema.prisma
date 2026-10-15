@@ -793,6 +793,7 @@ model User {
   createdMerchandiseOrders       MerchandiseOrder[]               @relation("MerchandiseOrderCreatedBy")
   merchandiseOrderStatusChanges  MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
+  audienceSnapshots              EventAudienceSnapshot[]          @relation("EventAudienceSnapshotCreatedBy")
   authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
   appliedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagAppliedBy")
   removedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagRemovedBy")
@@ -1705,6 +1706,7 @@ model Event {
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
   lodgingWaitlistHistory              EventLodgingWaitlistHistory[]
   notes                               StaffNote[]
+  audienceSnapshots                   EventAudienceSnapshot[]
   registrationTagAssignments          RegistrationTagAssignment[]
   attendeeTagAssignments              AttendeeTagAssignment[]
   templateApplication                 EventTemplateApplication?
@@ -2011,6 +2013,30 @@ model StaffNoteRevision {
 
   @@unique([noteId, sequence])
   @@index([noteId, createdAt])
+}
+
+/// A reviewed, preview-only record of who an event message would reach (#176). It stores the audit facts a later
+/// scheduler (#177) needs to refuse a changed audience: the normalized query, its version, the audience fingerprint and
+/// the counts. It never stores a recipient, an address, a name or a note, and creating one sends or schedules nothing.
+/// `id` is the client-generated UUID, so a lost-response retry with the same fingerprint returns the same row.
+model EventAudienceSnapshot {
+  id                 String   @id
+  eventId            String
+  createdByUserId    String
+  sourceQueryVersion String
+  queryHash          String
+  query              Json
+  fingerprint        String
+  recipientCount     Int
+  exclusionCount     Int
+  registrationCount  Int
+  createdAt          DateTime @default(now())
+
+  event     Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("EventAudienceSnapshotCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, createdAt])
+  @@index([eventId, fingerprint])
 }
 
 model EventMembership {

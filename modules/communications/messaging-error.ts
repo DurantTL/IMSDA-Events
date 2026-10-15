@@ -13,7 +13,8 @@ export class MessagingError extends Error {
       | "EVENT_NOT_ELIGIBLE"
       | "INVALID_TEMPLATE"
       | "TEMPLATE_NOT_PUBLISHED"
-      | "ATTACHMENTS_INVALID",
+      | "ATTACHMENTS_INVALID"
+      | "AUDIENCE_TOO_BROAD",
     message: string,
     public readonly details?: Record<string, unknown>,
   ) {
