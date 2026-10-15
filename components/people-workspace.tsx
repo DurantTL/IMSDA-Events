@@ -502,9 +502,17 @@ export function PeopleWorkspace({
         waitlist: "Registration moved to the waitlist and its reserved capacity was released.",
         promote: "Registration promoted and its capacity is now reserved.",
       }[lifecycleAction];
-      setNotice(promoted
+      // Honors Weekend class picks that could not come back because the class filled up meanwhile (#880).
+      const notRestored = [
+        ...((result.classPicksNotRestored ?? []) as string[]),
+        ...((result.autoPromotedClassPicksNotRestored ?? []) as string[]),
+      ];
+      const picksNotice = notRestored.length > 0
+        ? ` Class picks not restored (the director was emailed): ${notRestored.join(" ")}`
+        : "";
+      setNotice((promoted
         ? `${actionNotice} ${promoted.accountHolder.firstName} ${promoted.accountHolder.lastName} was automatically promoted from the waitlist.`
-        : actionNotice);
+        : actionNotice) + picksNotice);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to update this registration.");
     } finally {

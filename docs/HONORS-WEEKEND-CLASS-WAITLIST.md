@@ -89,6 +89,30 @@ Expiry is **enforced on read and write, and applied by the existing outbox sweep
 
 No new scheduler was added.
 
+## Bringing a registration back (#880)
+
+A cancelled or waitlisted registration keeps its class picks but holds no seats, because seats are
+counted by registration status. Flipping the status back used to re-occupy every old seat, so a seat
+given away in between (to a direct pick or an accepted waitlist offer) left the class over capacity.
+
+Decision (owner, 2026-10-15): the registration comes back **without the picks that no longer fit**.
+
+- Every flip back to SUBMITTED/CONFIRMED does it: a staff reactivation, a staff promotion from the
+  registration waitlist, and the automatic promotion after a cancellation or freed seats
+  (`modules/honors/restore-seats.ts`, called from `lifecycle-repository.ts` before the status update).
+- It runs in the same serializable transaction, takes the same `FOR UPDATE` class locks as a pick
+  save, gives a class's waitlist its free seats first (a restored pick never jumps the line, and a
+  seat held for a live offer is not available), then keeps each pick that still fits the class
+  capacity and the per-club limit. Staff, adults and underage children take no seat and always come back.
+- A dropped pick is removed and audited as `HONOR_CLASS_PICK_NOT_RESTORED` (ids only: class, youth,
+  enrollment, reason `CLASS_FULL` or `CLUB_LIMIT_REACHED`, and what triggered it). The reactivation or
+  promotion's own audit entry counts them.
+- The director gets one email through the outbox (`HONOR_CLASS_PICKS_NOT_RESTORED`, delivered after the
+  commit with the other pending messages) listing the classes, so they can pick again or join the waitlist.
+- Staff see the same lines in the response of the lifecycle action and in the people workspace notice.
+- Other paths that give seats back already check capacity (a club transfer re-checks the class).
+- Proof against a real database: `npm run test:honor-reinstate-seats`.
+
 ## Not done
 
 Group registrations have no waitlist. The staff catalog table shows seats only. Event

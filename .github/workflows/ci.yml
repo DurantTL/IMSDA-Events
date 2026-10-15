@@ -274,6 +274,11 @@ jobs:
       # at once with sweeps and direct picks racing: never overfilled, never offered out of order.
       - run: npm run test:honor-class-waitlist
 
+      # Real-database check that reinstating or promoting a registration never overfills an Honors Weekend class (#880):
+      # a seat given away in between drops that pick (audited, reported to staff, director emailed), for class capacity and
+      # the per-club limit, by staff or automatic promotion; a restored pick never jumps the class waitlist; races never overfill.
+      - run: npm run test:honor-reinstate-seats
+
       # Real-database check of deleting an event at any stage: a rich event
       # (registrations, payments, honors, forms, messages, locations, club forms,
       # amendment ledgers) is removed in one transaction with no leftover rows

@@ -9,7 +9,12 @@ const dependencies = vi.hoisted(() => ({
   enqueueWaitlistPromotedMessage: vi.fn(),
   enqueueWaitlistRemovedMessage: vi.fn(),
   logWarn: vi.fn(),
+  restoreClassSeats: vi.fn(),
 }));
+
+// Re-taking Honors Weekend class seats is proved against a real database (scripts/verify-honor-reinstate-seats.ts);
+// here only that the lifecycle calls it before the status flips, and passes its report and messages on (#880).
+vi.mock("@/modules/honors/restore-seats", () => ({ restoreClassSeatsInTransaction: dependencies.restoreClassSeats }));
 
 vi.mock("@/lib/logger", async () => {
   const actual = await vi.importActual<typeof import("@/lib/logger")>("@/lib/logger");
@@ -109,6 +114,7 @@ function transactionFixture() {
 beforeEach(() => {
   vi.clearAllMocks();
   lodgingMocks.noteLodgingOnAdmission.mockResolvedValue({ hasRequest: false });
+  dependencies.restoreClassSeats.mockResolvedValue({ dropped: { report: [], items: [] }, pendingMessageIds: [] });
   const queued = {
     messageIds: ["message-1"],
     pendingMessageIds: ["message-1"],
@@ -419,6 +425,97 @@ describe("registration lifecycle repository", () => {
         metadata: expect.objectContaining({ restoredStatus: "SUBMITTED" }),
       }),
     );
+  });
+
+  describe("class seats come back under the class locks, before the status flips (#880)", () => {
+    const dropped = {
+      dropped: { report: ["Test Youth: Knot Tying was not restored because the class filled up while the registration was not active."], items: [{}] },
+      pendingMessageIds: ["notice-1"],
+    };
+
+    it("re-takes class seats before a reactivation and reports what was not restored", async () => {
+      const { prisma, tx } = transactionFixture();
+      const cancelled = registration({ status: "CANCELLED" });
+      tx.registration.findFirst.mockResolvedValue(cancelled);
+      dependencies.restoreClassSeats.mockImplementation(async () => {
+        expect(tx.registration.update).not.toHaveBeenCalled();
+        return dropped;
+      });
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      const result = await reactivateRegistration(event.id, cancelled.id, "user-1", "Entered in error.");
+
+      expect(dependencies.restoreClassSeats).toHaveBeenCalledWith(tx, expect.objectContaining({
+        eventId: event.id,
+        registrationId: cancelled.id,
+        actorUserId: "user-1",
+        trigger: "REGISTRATION_REACTIVATED",
+      }));
+      expect(result.classPicksNotRestored).toEqual(dropped.dropped.report);
+      expect(result.pendingMessageIds).toEqual(["message-1", "notice-1"]);
+      expect(tx.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "REGISTRATION_REACTIVATED",
+          metadata: expect.objectContaining({ classPicksNotRestored: 1 }),
+        }),
+      });
+    });
+
+    it("reports nothing and adds no message when every pick fit", async () => {
+      const { prisma, tx } = transactionFixture();
+      const cancelled = registration({ status: "CANCELLED" });
+      tx.registration.findFirst.mockResolvedValue(cancelled);
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      const result = await reactivateRegistration(event.id, cancelled.id, "user-1", "");
+
+      expect(result.classPicksNotRestored).toEqual([]);
+      expect(result.pendingMessageIds).toEqual(["message-1"]);
+    });
+
+    it("applies the same rule to a promotion from the waitlist", async () => {
+      const { prisma, tx } = transactionFixture();
+      const waitlisted = registration({
+        status: "WAITLISTED",
+        waitlistEntry: { id: "entry-1", status: "WAITING", position: 1 },
+      });
+      tx.registration.findFirst.mockResolvedValue(waitlisted);
+      dependencies.restoreClassSeats.mockImplementation(async () => {
+        expect(tx.registration.update).not.toHaveBeenCalled();
+        return dropped;
+      });
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      const result = await promoteRegistrationFromWaitlist(event.id, waitlisted.id, "user-1", "A place opened.");
+
+      expect(dependencies.restoreClassSeats).toHaveBeenCalledWith(tx, expect.objectContaining({ trigger: "REGISTRATION_PROMOTED_FROM_WAITLIST" }));
+      expect(result.classPicksNotRestored).toEqual(dropped.dropped.report);
+      expect(result.pendingMessageIds).toEqual(["message-1", "notice-1"]);
+    });
+
+    it("applies it to an automatic promotion after a cancellation and reports it with the cancellation", async () => {
+      const { prisma, tx } = transactionFixture();
+      const cancelled = registration({ id: "cancelled-registration", confirmationCode: "REG-CANCEL" });
+      const fitting = registration({
+        id: "waitlist-fit",
+        confirmationCode: "REG-FIT",
+        status: "WAITLISTED",
+        waitlistEntry: { id: "entry-fit", status: "WAITING", position: 1 },
+      });
+      tx.registration.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) => (where.id === cancelled.id ? cancelled : fitting));
+      tx.registrationWaitlistEntry.findMany.mockResolvedValue([{ id: "entry-fit", registrationId: fitting.id, position: 1 }]);
+      dependencies.restoreClassSeats.mockResolvedValue(dropped);
+      dependencies.getPrisma.mockReturnValue(prisma);
+
+      const result = await cancelRegistration(event.id, cancelled.id, "user-1", "Requested.");
+
+      expect(dependencies.restoreClassSeats).toHaveBeenCalledWith(tx, expect.objectContaining({
+        registrationId: fitting.id,
+        trigger: "REGISTRATION_AUTO_PROMOTED_FROM_WAITLIST",
+      }));
+      expect(result.autoPromotedClassPicksNotRestored).toEqual(dropped.dropped.report);
+      expect(result.pendingMessageIds).toContain("notice-1");
+    });
   });
 
   it("blocks manual promotion when an immutable option selection no longer fits", async () => {

@@ -104,7 +104,7 @@ function actorMetadata(actor: WaitlistActor) {
 // The offer email: one transactional message to one director, never a bulk send.
 // ---------------------------------------------------------------------------
 
-function contactOf(registration: {
+export function contactOf(registration: {
   contactSnapshot: unknown;
   accountHolderPerson: { firstName: string; lastName: string; normalizedEmail: string | null };
 }) {

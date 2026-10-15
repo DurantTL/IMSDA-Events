@@ -249,7 +249,7 @@ export function liveWaitlistOffer(now: Date) {
   return { status: "OFFERED", offerExpiresAt: { gt: now }, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } satisfies Prisma.HonorClassWaitlistEntryWhereInput;
 }
 
-async function seatCounts(client: Prisma.TransactionClient, eventId: string, owner: SeatOwner | null, now: Date) {
+export async function seatCounts(client: Prisma.TransactionClient, eventId: string, owner: SeatOwner | null, now: Date) {
   const [all, club, offers, clubOffers] = await Promise.all([
     client.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...seatHoldingEnrollment }, _count: { _all: true } }),
     client.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...ownerSeats(owner), ...seatHoldingEnrollment }, _count: { _all: true } }),
