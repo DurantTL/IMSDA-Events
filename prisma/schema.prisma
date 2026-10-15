@@ -492,6 +492,32 @@ enum RegistrationFormStatus {
   ARCHIVED
 }
 
+/// What a policy version's acceptance represents. Consent, waiver,
+/// acknowledgment, and staff discretionary approval are never interchangeable:
+/// each kind carries its own evidence semantics in the slice that consumes
+/// these versions, and the kind is fixed for the life of the policy.
+enum PolicyKind {
+  CONSENT
+  WAIVER
+  ACKNOWLEDGMENT
+  APPROVAL_REQUIRED
+}
+
+/// Event-scoped policies belong to exactly one event (eventId set);
+/// organization-scoped policies have no eventId and any event may configure
+/// them. A policy applies to an event only through its applicability rows.
+enum PolicyScope {
+  EVENT
+  ORGANIZATION
+}
+
+/// Versions are never archived: a published version stays PUBLISHED forever so
+/// date-based selection and evidence references can always reach it.
+enum ConsentPolicyVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
 enum MfaMethod {
   TOTP
 }
@@ -788,6 +814,7 @@ model User {
   staffActAs                         StaffActAs[]                 @relation("StaffActAsUser")
   createdClubRosterMembers           ClubRosterMember[]           @relation("ClubRosterMemberCreatedByUser")
   createdRosterExportFormats         ClubRosterExportFormat[]     @relation("ClubRosterExportFormatCreatedByUser")
+  confirmedRosterCarryForwards       ClubRosterCarryForward[]     @relation("ClubRosterCarryForwardByUser")
 
   recordedMemberHonorEntries         MemberHonorEntry[]           @relation("MemberHonorEntryRecordedByUser")
   honorEnrollmentOverrides           HonorEnrollment[]            @relation("HonorEnrollmentRequirementOverriddenBy")
@@ -801,6 +828,8 @@ model User {
   updatedClubMeetingNotes            ClubMeetingNote[]             @relation("ClubMeetingNoteUpdatedByUser")
   submittedClubEventRegistrations    ClubEventRegistration[]      @relation("ClubEventRegistrationSubmittedByUser")
   resolvedGeneralLinkSubmissions     GeneralLinkSubmission[]      @relation("GeneralLinkSubmissionResolvedBy")
+  createdStaffInvitations            StaffInvitation[]            @relation("StaffInvitationCreatedBy")
+  decidedStaffInvitations            StaffInvitation[]            @relation("StaffInvitationDecidedBy")
   updatedClubRegistrationDrafts      ClubRegistrationDraft[]      @relation("ClubRegistrationDraftUpdatedByUser")
   updatedClubSupplyStock             ClubSupplyStock[]            @relation("ClubSupplyStockUpdatedByUser")
   createdClubOrderBatches            ClubSupplyOrderBatch[]       @relation("ClubSupplyOrderBatchCreatedByUser")
@@ -831,6 +860,10 @@ model User {
   sentInvoiceDeliveries        InvoiceDelivery[]                         @relation("InvoiceDeliverySentBy")
   recordedInvoiceArPostings    InvoiceArPosting[]                        @relation("InvoiceArPostingRecordedBy")
   recordedInvoicePayments      InvoicePayment[]                          @relation("InvoicePaymentRecordedBy")
+
+  createdConsentPolicies         ConsentPolicy[]        @relation("ConsentPolicyCreatedBy")
+  createdConsentPolicyVersions   ConsentPolicyVersion[] @relation("ConsentPolicyVersionCreatedBy")
+  publishedConsentPolicyVersions ConsentPolicyVersion[] @relation("ConsentPolicyVersionPublishedBy")
 
   @@index([accountStatus])
 }
@@ -1066,6 +1099,7 @@ model AttendeeAccount {
   revokedClubRoles                  ClubDirectorGrant[]              @relation("ClubDirectorGrantRevokedByAccount")
   createdClubRosterMembers          ClubRosterMember[]          @relation("ClubRosterMemberCreatedBy")
   createdRosterExportFormats        ClubRosterExportFormat[]    @relation("ClubRosterExportFormatCreatedBy")
+  confirmedRosterCarryForwards      ClubRosterCarryForward[]    @relation("ClubRosterCarryForwardByAccount")
 
   recordedMemberHonorEntries        MemberHonorEntry[]          @relation("MemberHonorEntryRecordedBy")
   voidedMemberHonorEntries          MemberHonorEntryVoid[]      @relation("MemberHonorEntryVoidedBy")
@@ -1601,6 +1635,7 @@ model Event {
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
   generalLinkSubmissions              GeneralLinkSubmission[]
+  staffInvitations                    StaffInvitation[]
   groupRegistrations                  GroupEventRegistration[]
   billingResponsibilities             RegistrationBillingResponsibility[]
   billingResponsibilityChanges        RegistrationBillingResponsibilityChange[]
@@ -1679,6 +1714,9 @@ model Event {
   locationWaitlistChanges             LocationWaitlistChange[]
   modules                             EventModule[]
   moduleRequests                      ModuleRequest[]
+
+  consentPolicies              ConsentPolicy[]
+  consentPolicyApplicabilities EventConsentPolicyApplicability[]
 
   @@index([badgeBackgroundAssetId])
 }
@@ -1828,6 +1866,7 @@ model EventAttendeeType {
   event     Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   attendees RegistrationAttendee[]
   mealPrices EventMealPrice[]
+  consentPolicyApplicabilities EventConsentPolicyApplicability[]
 
   @@unique([eventId, code])
   @@index([eventId, isActive, sortOrder, label])
@@ -2257,6 +2296,7 @@ model Organization {
   directorGrants     ClubDirectorGrant[]
   rosterMembers      ClubRosterMember[]
   rosterExportFormats ClubRosterExportFormat[]
+  rosterCarryForwards ClubRosterCarryForward[]
   eventRegistrations ClubEventRegistration[]
   generalLinkSubmissionsAsClub GeneralLinkSubmission[] @relation("GeneralLinkSubmissionClub")
   generalLinkSubmissionsSuggested GeneralLinkSubmission[] @relation("GeneralLinkSubmissionSuggestedClub")
@@ -2731,6 +2771,7 @@ model Registration {
   tagAssignments          RegistrationTagAssignment[]
   clubRegistration        ClubEventRegistration?
   generalLinkSubmission   GeneralLinkSubmission?
+  staffInvitation         StaffInvitation?
   groupRegistration       GroupEventRegistration?
   billingResponsibility        RegistrationBillingResponsibility?
   billingResponsibilityChanges RegistrationBillingResponsibilityChange[]
@@ -4049,6 +4090,98 @@ model MessageTemplateVersion {
   @@index([templateId, status, versionNumber])
 }
 
+/// A named consent, waiver, acknowledgment, or approval-required policy.
+/// `kind` and `scope` are fixed at creation. Organization-scoped policies have
+/// `eventId` null and may be configured by any event; event-scoped policies belong
+/// to exactly one event. Policy text itself is staff-entered data — no legal
+/// text belongs in this repository.
+model ConsentPolicy {
+  id               String      @id @default(cuid())
+  eventId          String?
+  kind             PolicyKind
+  scope            PolicyScope
+  slug             String
+  name             String
+  /// The most recently published version. Informational only — the version
+  /// presented to a person is selected by effective date, never by this.
+  currentVersionId String?     @unique
+  createdByUserId  String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  event           Event?                            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy       User                              @relation("ConsentPolicyCreatedBy", fields: [createdByUserId], references: [id])
+  currentVersion  ConsentPolicyVersion?             @relation("ConsentPolicyCurrentVersion", fields: [currentVersionId], references: [id])
+  versions        ConsentPolicyVersion[]            @relation("ConsentPolicyVersions")
+  applicabilities EventConsentPolicyApplicability[]
+
+  @@unique([eventId, slug])
+  @@index([scope, updatedAt])
+}
+
+/// An immutable published (or in-progress draft) version of a policy's text.
+/// Once `publishedAt` is set, no field of this row is ever updated again — a
+/// correction is a new version with the next `versionNumber`. The repository
+/// guards this and a database trigger rejects any UPDATE of a published row.
+/// `isMaterialChange` is a human judgment the publisher records, not something
+/// inferred by diffing text; it is the input to re-consent in a later slice.
+model ConsentPolicyVersion {
+  id                String                     @id @default(cuid())
+  policyId          String
+  createdByUserId   String
+  publishedByUserId String?
+  versionNumber     Int
+  status            ConsentPolicyVersionStatus @default(DRAFT)
+  title             String
+  bodyText          String
+  contentHash       String?
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+  isMaterialChange  Boolean?
+  publishedAt       DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  policy          ConsentPolicy  @relation("ConsentPolicyVersions", fields: [policyId], references: [id], onDelete: Cascade)
+  currentOfPolicy ConsentPolicy? @relation("ConsentPolicyCurrentVersion")
+  createdBy       User           @relation("ConsentPolicyVersionCreatedBy", fields: [createdByUserId], references: [id])
+  publishedBy     User?          @relation("ConsentPolicyVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([policyId, versionNumber])
+  @@index([policyId, status, versionNumber])
+  @@index([policyId, effectiveFrom, effectiveTo])
+}
+
+/// Per-event configuration of which policies apply, to whom, and whether
+/// agreement is required to proceed. `attendeeTypeDefinition` and the age band
+/// mirror `EventAttendeeType`; a null condition matches every attendee for
+/// that dimension. `role` is free-form staff-entered text — no attendee-role
+/// vocabulary exists elsewhere in this schema yet. The policy must be
+/// organization-scoped or belong to the same event; the migration enforces it.
+/// Rows are deactivated rather than deleted, and an attendee type referenced
+/// here cannot be deleted out from under a required policy.
+model EventConsentPolicyApplicability {
+  id                       String   @id @default(cuid())
+  eventId                  String
+  policyId                 String
+  attendeeTypeDefinitionId String?
+  role                     String?
+  minimumAge               Int?
+  maximumAge               Int?
+  isRequired               Boolean  @default(true)
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  event                  Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  policy                 ConsentPolicy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  attendeeTypeDefinition EventAttendeeType? @relation(fields: [attendeeTypeDefinitionId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, isActive])
+  @@index([policyId])
+  @@index([attendeeTypeDefinitionId])
+}
+
 model MessageOutbox {
   id                     String                         @id @default(cuid())
   // Null for account email — activation and password reset belong to a person,
@@ -4112,6 +4245,7 @@ model MessageOutbox {
   providerEvents  MessageProviderEvent[]
   invoiceRecipients InvoiceDeliveryRecipient[]
   files             MessageOutboxFile[]
+  staffInvitations  StaffInvitation[]
 
   @@index([status, availableAt, createdAt])
   @@index([eventId, createdAt])
@@ -4840,6 +4974,33 @@ model ClubRosterExportFormat {
   createdByUser User?            @relation("ClubRosterExportFormatCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, name])
+}
+
+/// A director confirming that a club started its next club year's roster by
+/// carrying last year's people forward (#414). One row per club and target
+/// year (the unique key makes a repeat refuse cleanly), recording counts only:
+/// never a person, a name or a birth date. The carried people are ordinary
+/// `ClubRosterMember` rows for the new year.
+model ClubRosterCarryForward {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  fromClubYear         String
+  toClubYear           String
+  carriedCount         Int
+  /// Last year's active people the director left unticked.
+  leftBehindCount      Int
+  /// Carried people whose type changed (a Pathfinder becoming staff, say).
+  typeChangedCount     Int
+  confirmedByAccountId String?
+  /// Set instead of `confirmedByAccountId` for a staff "act as" director (#442).
+  confirmedByUserId    String?
+  createdAt            DateTime @default(now())
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  confirmedBy     AttendeeAccount? @relation("ClubRosterCarryForwardByAccount", fields: [confirmedByAccountId], references: [id], onDelete: SetNull)
+  confirmedByUser User?            @relation("ClubRosterCarryForwardByUser", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, toClubYear])
 }
 
 /// The pre-#527 one-row-per-person background-check table, kept read-only
@@ -8897,4 +9058,65 @@ model ScholarshipAward {
 
   @@index([fundId, sponsorKey])
   @@index([registrationId])
+}
+
+/// Which group a personal staff invitation puts its registration in (#804). Shown beside the registration wherever staff look at it.
+enum StaffInvitationGroup {
+  STAFF
+  PASTOR
+  VOLUNTEER
+}
+
+/// The office's decision on a registration made through a personal staff invitation (#804). The registration itself is a
+/// DRAFT (not a confirmed one) until it is APPROVED, so a waiting one is in no count, report or room list.
+enum StaffInvitationApproval {
+  WAITING
+  APPROVED
+  DECLINED
+}
+
+/// A personal registration link for one person at one event (#804), made in bulk from a CSV of email addresses. One link per
+/// email: it allows exactly one registration (the person plus their eligible family), always for $0, and it waits for the
+/// office to approve it. The link is never stored. It is derived from this row's id and `linkVersion` (HMAC with the
+/// private-link secret), so the office can copy it again, and reissuing bumps `linkVersion` and makes every earlier copy
+/// useless. Invitations are only ever emailed by a person pressing Send; `lastMessageId` is the latest message queued.
+model StaffInvitation {
+  id              String                   @id @default(cuid())
+  eventId         String
+  /// The invited address, normalized (trimmed, lowercase). One invitation per address per event.
+  email           String
+  firstName       String                   @default("")
+  lastName        String                   @default("")
+  group           StaffInvitationGroup
+  linkVersion     Int                      @default(1)
+  /// Which import created it (one id per confirmed CSV), so the office can find a file's rows together.
+  importBatchId   String?
+  createdByUserId String?
+  /// The latest time a person queued this invitation's email, how many times, and the message (its delivery status is the invitation's).
+  sentAt          DateTime?
+  sendCount       Int                      @default(0)
+  lastMessageId   String?
+  revokedAt       DateTime?
+  /// The registration made through the link; set exactly once, in the same transaction that creates it.
+  registrationId  String?                  @unique
+  registeredAt    DateTime?
+  approval        StaffInvitationApproval?
+  decidedAt       DateTime?
+  decidedByUserId String?
+  /// What the invited person said about housing when registering: whether they need on-site housing, and a short note.
+  needsHousing    Boolean?
+  housingNote     String                   @default("")
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  event        Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration Registration?  @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  lastMessage  MessageOutbox? @relation(fields: [lastMessageId], references: [id], onDelete: SetNull)
+  createdBy    User?          @relation("StaffInvitationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  decidedBy    User?          @relation("StaffInvitationDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, email])
+  @@index([eventId, group])
+  @@index([eventId, approval])
+  @@index([lastMessageId])
 }

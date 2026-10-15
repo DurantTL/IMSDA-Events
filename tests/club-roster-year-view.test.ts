@@ -25,6 +25,8 @@ vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceS
 vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: mocks.listRoster }));
 vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: mocks.listClubHonorsPage }));
 vi.mock("@/modules/club-transfers/repository", () => ({ listTransferClubOptions: mocks.listTransferClubOptions }));
+// The next-year offer (#414) has its own tests; this one is about the ?year= view.
+vi.mock("@/modules/club-rosters/carry-forward", () => ({ getCarryForwardOffer: async () => ({ state: "NOTHING_TO_CARRY" }) }));
 
 import ClubRosterPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/roster/page";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";

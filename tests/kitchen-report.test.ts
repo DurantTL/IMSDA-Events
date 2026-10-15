@@ -44,6 +44,18 @@ describe("kitchen report (#787)", () => {
     expect(report.totalPeople).toBe(6);
   });
 
+  it("counts, by group, the people whose meals the conference covers, with no names (#804)", () => {
+    const staff = (id: string, group: string, count: number) => ({
+      ...registration(id, "CONFIRMED", Array.from({ length: count }, () => ({}))),
+      staffInvitation: { group, approval: "APPROVED" },
+    }) as unknown as RegistrationRecord;
+    const covered = buildKitchenReport([...sample, staff("P", "PASTOR", 3), staff("V", "VOLUNTEER", 2), staff("W", "PASTOR", 1)]);
+    expect(covered.conferenceCovered).toEqual([{ group: "Pastor", count: 4 }, { group: "Volunteer", count: 2 }]);
+    expect(report.conferenceCovered).toEqual([]);
+    expect(kitchenReportCsv(covered)).toContain('"Meals covered by the conference","Count"');
+    expect(kitchenReportCsv(report)).not.toContain("Meals covered by the conference");
+  });
+
   it("groups answers ignoring case and spacing, most common first, showing the most common wording", () => {
     expect(report.needs).toEqual([
       { answer: "Peanut allergy", count: 3 },
@@ -72,7 +84,7 @@ describe("kitchen report (#787)", () => {
     for (const text of [JSON.stringify(report), csv]) {
       expect(text).not.toMatch(/SYNTH-|Surname|Family|holder-|example\.test|5550100|Holder|Guest|at-/);
     }
-    expect(Object.keys(report).sort()).toEqual(["meals", "needs", "peopleWithNeeds", "totalPeople"]);
+    expect(Object.keys(report).sort()).toEqual(["conferenceCovered", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
     for (const need of report.needs) expect(Object.keys(need).sort()).toEqual(["answer", "count"]);
   });
 

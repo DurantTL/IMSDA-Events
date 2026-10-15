@@ -405,6 +405,14 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   await tx.memberTransferRegistrationMove.deleteMany({ where: inEvent });
   await tx.registration.deleteMany({ where: inEvent });
 
+  // 10b. Consent policies of this event (#129). Applicability rows RESTRICT the attendee types they name, so they go
+  //      first, then the versions and the policies. A published version's delete trigger accepts this transaction's
+  //      deletes (`imsda.event_deletion`) and refuses every other delete. Organization-scoped policies have no event
+  //      and stay; only this event's applicability rows to them are removed.
+  await tx.eventConsentPolicyApplicability.deleteMany({ where: inEvent });
+  await tx.consentPolicyVersion.deleteMany({ where: { policy: { eventId } } });
+  await tx.consentPolicy.deleteMany({ where: inEvent });
+
   // 11. Configuration that registrations pointed at.
   await tx.registrationForm.deleteMany({ where: inEvent });
   await tx.eventLocation.deleteMany({ where: inEvent });

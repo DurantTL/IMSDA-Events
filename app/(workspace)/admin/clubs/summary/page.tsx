@@ -4,6 +4,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsTable, AreaPointsChart } from "@/components/area-clubs-views";
+import { ClubNewYearStatus } from "@/components/club-new-year-status";
+import { listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
+import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { parseLeaderboardSort } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
@@ -19,7 +22,13 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
-  const [clubs, events] = await Promise.all([getAreaClubsSummary(clubYear), listAreaClubEvents(clubYear)]);
+  const now = new Date();
+  const [clubs, events, newYearStatus] = await Promise.all([
+    getAreaClubsSummary(clubYear),
+    listAreaClubEvents(clubYear),
+    // Which clubs haven't started next year's roster (#414): counts only, August through October.
+    carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
+  ]);
   const links = {
     clubHref: (id: string) => `/admin/organizations/${id}/club`,
     reportHref: (id: string, month: string) => `/admin/clubs/reports/${id}/${month}`,
@@ -44,6 +53,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       </div>
       <h3>Overview</h3>
       <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
+      <ClubNewYearStatus clubHref={links.clubHref} status={newYearStatus} />
       <h3>Monthly Records</h3>
       <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} />
       <h3>Points</h3>

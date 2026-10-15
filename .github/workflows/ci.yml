@@ -190,6 +190,9 @@ jobs:
       # Real-database check of roster guardian contacts: slot constraints, replace-on-edit, prior-year writes refused, deletion on removal, reader scoping, and no guardian value in any audit row (#510).
       - run: npm run test:club-roster-guardians
 
+      # Real-database check of carrying a club roster forward to the next club year: the offer lists only last year's active people with no birth date, one confirmation carries the ticked people with the same Person and the same sealed birth date, a Pathfinder becoming staff changes type and role, last year's roster stays readable, a repeat (and eight racing confirmations) leaves one winner and no duplicate rows, another club's person is refused as not found, removal erases every year's row, the oversight list of clubs that have not started, and no birth date or name in any audit row or record (#414).
+      - run: npm run test:club-roster-carry-forward
+
       # Real-database check of billing responsibility and organization billing contacts: the resolver is idempotent and race-safe, staff decisions survive re-resolution, one active contact per organization even under parallel replacement with history kept, the constraints and append-only history hold, and no audit row holds contact details (#165).
       - run: npm run test:billing-responsibility
 
@@ -198,6 +201,9 @@ jobs:
 
       # Real-database check of declared guardian authority: the registrant's choice is the only source of a responsible adult (household, canManage, surname, email and account holder create none), one ACTIVE declaration per minor even under parallel writes, append-only rows with supersede and revoke, the trigger refusing an adult who is not on the registration, minor status at the event start date, two adults claiming one minor becoming a review item, staff changes scoped to the event, and no audit row holding a reason or name (#131).
       - run: npm run test:guardian-authority
+
+      # Real-database check of consent policies (#129): kind and scope fixed at creation, one draft per policy, publishing freezing a version (repository and trigger both refuse any change), required publisher, hash and human material-change flag, version-effective-at-date and version-referenced-by-evidence as separate queries (overlap, open-ended), the current-version pointer, per-event applicability by type, role and age band, ids-only audit rows, and cascade on event deletion.
+      - run: npm run test:consent-policies
 
       # Real-database check of deferred-organization invoices: drafts only from a current approved reconciliation, numbers assigned exactly once under parallel and retried finalization (per event, code and year), immutable finalized versions with one receivable each, contact-only and amount revisions with the Finalize invoices rule, and no audit row holding a contact name or email (#167).
       - run: npm run test:invoices
@@ -295,6 +301,15 @@ jobs:
       # public route refuses a club form; honeypot, rate limit and idempotency; the optional
       # roster link; the table constraints.
       - run: npm run test:general-link-registration
+
+      # Real-database check of personal staff, pastor and volunteer invitations (#804): a CSV
+      # preview creates nothing and confirming creates only what was previewed; one derived
+      # personal link per email (copy, reissue, revoke); sending is a previewed, explicit action
+      # that only queues in the outbox; a registration through a link is the person, a spouse and
+      # children up to 18 for $0, waiting for the office as a draft (also under racing clicks);
+      # batch approval confirms it and covers every meal under the conference-paid plan, a
+      # decline cancels it; the table constraints and event deletion.
+      - run: npm run test:staff-invitations
 
       # Check-in desk concurrency (#825): 4 devices checking in the same attendee,
       # the same retry key re-sent, and different attendees of one registration at
