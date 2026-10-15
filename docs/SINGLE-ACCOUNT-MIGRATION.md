@@ -1,14 +1,35 @@
 # Single account per person: migration plan (#554)
 
-Companion to [ADR 0013](decisions/0013-one-account-per-person.md). Status: plan only. This
-PR changes no schema, session, sign-in or behaviour. It adds the plan, a read-only dry run
-(`npm run accounts:dry-run`) and tests.
+Companion to [ADR 0013](decisions/0013-one-account-per-person.md), which Caleb accepted on
+Oct 15 2026 (build slice by slice, each its own PR, the new sign-in behind a switch that is
+off by default). The plan and the read-only dry run (`npm run accounts:dry-run`) shipped
+first. **Slice (a)** adds the link column and the switch with **no behaviour change**: no
+sign-in, session, permission or email changes, and no existing account is linked, created or
+merged. Slices (b) to (e) follow, each its own PR.
 
-Model in one line: **two tables stay; a unique nullable `User.attendeeAccountId` links a
-staff `User` to the same person's `AttendeeAccount`.** Nothing is copied or moved between
-tables, which is why every rollback below is small. If the project later chooses a physical
-merge instead (ADR open question 2), the same inventory applies and the "Physical merge"
-column of each group says what would have to be repointed.
+Model in one line: **two tables stay (link, don't merge); a unique nullable
+`User.attendeeAccountId` links a staff `User` to the same person's `AttendeeAccount`.**
+Nothing is copied or moved between tables, which is why every rollback below is small. The
+"Physical merge" column of each group says what a later physical merge would have to
+repoint; it is not planned.
+
+**What slice (a) added.** Migration `20261102100000_user_attendee_account_link`:
+
+- `User.attendeeAccountId TEXT NULL`, with a unique index (`User_attendeeAccountId_key`: one
+  account, one user) and a foreign key to `AttendeeAccount(id)`, **`ON DELETE SET NULL`,
+  `ON UPDATE CASCADE`**.
+- Why `SET NULL`: the link is a pointer, not ownership. Deleting an attendee account must
+  not delete a staff user (that would take their credentials, memberships and permissions
+  with it), so it only unlinks; and `RESTRICT` would block deleting an account for a reason
+  the account's owner cannot see. Deleting a `User` never touches the attendee account,
+  because the foreign key sits on the `User` side. An unlinked staff user is simply a staff
+  user whose attendee side is missing, which later slices create again at activation.
+- `PlatformSettings.unifiedSignInEnabled BOOLEAN NOT NULL DEFAULT false`: the one-sign-in
+  switch, off by default. Nothing reads it to change behaviour yet, and there is no settings
+  screen for it yet.
+- `modules/account-merge/account-link.ts`: read-only helpers (the link by user or by
+  attendee account, ids only, and the switch). Nothing in a user-facing path calls them.
+- `npm run test:user-attendee-link` (real database, also run in CI) proves the constraints.
 
 **Human gates (AGENTS.md).** Linking identities, production migrations and production data
 steps are human-approved. Nothing here runs from CI against production, and no step
@@ -243,7 +264,7 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 
 | Slice | Writes |
 | --- | --- |
-| (a) | One additive column `User.attendeeAccountId` (all `NULL`) and its unique index. |
+| (a) | One additive column `User.attendeeAccountId` (all `NULL`) with its unique index and `ON DELETE SET NULL` foreign key, and `PlatformSettings.unifiedSignInEnabled` (default `false`). No backfill. |
 | (b) | A verified `AttendeeAccount` for each *new* staff user at activation; for an existing attendee given a staff role, the new `User` is linked to their account. |
 | (c) | Nothing in the data model. Sessions are issued by the new page into the existing session tables. |
 | (d) | Per approved person: set `User.attendeeAccountId`; set `AttendeeCredential.disabledAt` when the person holds a staff role; one `AuditLog` row (`account.linked`, ids only). |
@@ -283,7 +304,7 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 
 | Item | What happens | Why |
 | --- | --- | --- |
-| **Passkeys** | Both tables stay. `UserPasskey` signs in with staff grade; `AttendeePasskey` signs in with attendee grade (attendee session only). WebAuthn credential ids are unique per registration, so the two sets cannot collide. Passkeys are **moved or merged for nobody**. | A passkey is bound to a relying party and key; copying one is not possible. Whether an attendee passkey may count as a staff second factor is a separate decision (open). |
+| **Passkeys** | Both tables stay. `UserPasskey` signs in with staff grade; `AttendeePasskey` signs in with attendee grade (attendee session only). WebAuthn credential ids are unique per registration, so the two sets cannot collide. Passkeys are **moved or merged for nobody**. | A passkey is bound to a relying party and key; copying one is not possible. Decision 5 (Oct 15): an attendee-side passkey **may** count as the staff second factor (after the staff password), but only when verified with `userVerification: required`; an attendee passkey never opens a staff session on its own, and attendee passwords, Google and email links never yield a staff session. That is built in a later slice, not slice (a). |
 | **MFA secrets** | Never copied or merged. Staff sign-in uses `UserMfaEnrollment`. `AttendeeMfaEnrollment` stays for attendee-grade sign-in and is retired in (e). If only the attendee side is enrolled, the person enrols on the staff side before staff access (required). | Two secrets cannot be reconciled, and the staff one is the one the staff rules protect. |
 | **Recovery codes** | Stay with their enrollment. Staff codes are the ones that count. Attendee codes are deleted only when the attendee enrollment is retired in (e). | They are hashed and enrollment-bound. |
 | **Passwords** | Both hashes are salted and cannot be compared, so "different passwords" is assumed. A staff session requires, as today, the `AuthCredential` password followed by an ACTIVE `UserMfaEnrollment` code (or recovery code), or a user-verified `UserPasskey` on its own, and nothing else; an attendee password, attendee passkey or Google only ever yields the attendee session, whatever second factor follows. The attendee credential is **disabled, not deleted** (`disabledAt`), so it can be re-enabled. | Reversible, and one password per person from the person's view. |
@@ -359,7 +380,7 @@ the dry run itself changes nothing, using the same count, `updatedAt` and checks
 
 | Slice | Rollback | Data lost |
 | --- | --- | --- |
-| (a) | Migrations are roll-forward here, so rollback is a **new** migration `ALTER TABLE "User" DROP COLUMN "attendeeAccountId"`. Safe because nothing reads the column. Revert the PR if it has not been deployed. | None. |
+| (a) | Migrations are roll-forward here, so rollback is a **new** migration `ALTER TABLE "User" DROP COLUMN "attendeeAccountId"` (and `ALTER TABLE "PlatformSettings" DROP COLUMN "unifiedSignInEnabled"`). Safe because nothing reads either column. Revert the PR if it has not been deployed. | None. |
 | (b) | Turn the switch off. Links remain but nothing reads them. Attendee accounts created for new staff are ordinary verified accounts; list those with no registrations and no roles before deciding to delete any. | None. |
 | (c) | Turn the switch off: `/login` and `/account/sign-in` serve their own pages again. Sessions issued by the new page are normal rows and stay valid. | None. |
 | (d) | Per person: set `User.attendeeAccountId = NULL` and `AttendeeCredential.disabledAt = NULL`, in one audited transaction (the preview tool prints the exact statements). Because no row moved, this fully restores the pre-link state. Restore from the step-2 backup only if something unexpected was written. | None expected. |
@@ -378,7 +399,7 @@ nothing to decide.
 | **Different MFA**: both sides enrolled | `MFA_BOTH_ENROLLED` | review | Staff secret survives; the attendee secret and recovery codes are retired in (e). |
 | **Different MFA**: only the attendee side enrolled | `MFA_ATTENDEE_ONLY` | review | The person enrols on the staff side before staff access (required). |
 | Authenticator lockout in force on either side | `MFA_LOCKED` | review | Wait for the lockout to clear, or reset it deliberately. |
-| Staff role (global role or active membership) but **no confirmed authenticator and no passkey** | `STAFF_NO_SECOND_FACTOR` | blocking | Staff access requires a second factor; the person enrols before any link. |
+| Staff role (global role or active membership) but **no confirmed authenticator and no passkey** | `STAFF_NO_SECOND_FACTOR` | blocking | Staff access requires a second factor; the person enrols before any link. (The dry run still counts only staff-side factors, which is the conservative reading; decision 5 lets a user-verified attendee passkey count as a second factor in a later slice.) |
 | **Different names** (ignoring case, spacing, accents) | `NAME_MISMATCH` | review | A person picks the surviving display name. Nobody is renamed automatically. |
 | **Disabled** attendee account | `ATTENDEE_DISABLED` | blocking | Find out whether it was deliberate (abuse, request). Do not link a person someone shut out. |
 | **Disabled** staff password sign-in | `STAFF_CREDENTIAL_DISABLED` | blocking | Same question; re-enable only by a human. |

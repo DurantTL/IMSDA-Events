@@ -759,6 +759,12 @@ model User {
   activatedAt   DateTime?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
+  /// The person's attendee side (#554, ADR 0013): one staff `User` links 1:1 to one
+  /// `AttendeeAccount`. Nullable and unique; every row starts NULL and nothing reads or
+  /// writes it yet. ON DELETE SET NULL: deleting an attendee account only unlinks, it
+  /// never deletes the staff user (and deleting a user never touches the account).
+  attendeeAccountId String? @unique
+  attendeeAccount   AttendeeAccount? @relation("UserAttendeeLink", fields: [attendeeAccountId], references: [id], onDelete: SetNull)
 
   memberships               EventMembership[]
   credential                AuthCredential?
@@ -1038,6 +1044,8 @@ model AttendeeAccount {
   id                 String                @id @default(cuid())
   healthPrivacyAcknowledgments HealthPrivacyAcknowledgment[]
   teamPermissionDecisions ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedByAccount")
+  /// The staff `User` linked to this account (#554), if any. See `User.attendeeAccountId`.
+  linkedUser         User?                 @relation("UserAttendeeLink")
   email              String                @unique
   displayName        String
   firstName          String?
@@ -1494,6 +1502,9 @@ model PlatformSettings {
   invoiceHeaderPhone        String?
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
+  /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.
+  /// Later slices put the unified sign-in and role-aware landing behind it.
+  unifiedSignInEnabled      Boolean            @default(false)
   updatedAt                 DateTime           @updatedAt
   updatedByUserId           String?
 
