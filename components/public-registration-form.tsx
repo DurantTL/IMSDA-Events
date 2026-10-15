@@ -58,6 +58,7 @@ import {
   type RosterPerson,
 } from "@/modules/guardian-authority/domain";
 import { selectUsesRadioCards } from "@/modules/forms/choice-controls";
+import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
 import { TranslateHint } from "@/components/translate-hint";
 import { planAttendeeRemoval, withoutAttendee } from "@/modules/forms/attendee-removal";
 import { confirmationEmailHeadline } from "@/modules/forms/confirmation-email-status";
@@ -187,6 +188,8 @@ type PublicForm = {
   versionId: string;
   versionNumber: number;
   definition: RegistrationFormDefinition;
+  /** The wording of each policy-version acknowledgment, by field id (#150). Text acknowledgments carry theirs in the definition. */
+  acknowledgmentContent?: Record<string, AcknowledgmentDisplay>;
 };
 
 type Confirmation = {
@@ -1965,6 +1968,41 @@ export function PublicRegistrationForm({
       );
     }
 
+    if (field.type === "ACKNOWLEDGMENT") {
+      // The wording is shown in full, then ticked (#150). What is recorded is exactly this wording, or the published policy
+      // version it comes from; a person acknowledging for a minor is checked on the server against the declared adult.
+      const display: AcknowledgmentDisplay | null = field.acknowledgment?.source === "TEXT"
+        ? { source: "TEXT", title: null, text: field.acknowledgment.text, versionNumber: null }
+        : form.acknowledgmentContent?.[field.id] ?? null;
+      const wordingId = `${id}_wording`;
+      return (
+        <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused} aria-describedby={[wordingId, description].filter(Boolean).join(" ")}>
+          <legend>{fieldLabel(field, context)}</legend>
+          {display ? (
+            <div className="public-registration-acknowledgment-text" id={wordingId} tabIndex={0} role="region" aria-label={`Wording for ${field.label}`}>
+              {display.title && <strong>{display.title}</strong>}
+              <p>{display.text}</p>
+            </div>
+          ) : (
+            <p className="public-registration-acknowledgment-text" id={wordingId} role="alert">This acknowledgment is unavailable right now. Contact the event team.</p>
+          )}
+          <label className="public-registration-check">
+            <input
+              id={id}
+              type="checkbox"
+              required={field.required && !excused}
+              aria-required={field.required && !excused}
+              disabled={!display}
+              checked={context.values[field.key] === true}
+              onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.checked)}
+            />
+            <span>I acknowledge this.</span>
+          </label>
+          {fieldSupport(field, context)}
+        </fieldset>
+      );
+    }
+
     if (field.type === "CHECKBOX") {
       return (
         <fieldset className={wrapperClass} key={field.id} aria-invalid={Boolean(issue)} aria-required={field.required && !excused} aria-describedby={description}>
@@ -2516,6 +2554,7 @@ export function PublicRegistrationForm({
         (scope && field.scope !== scope)
         || field.type === "CALCULATED"
         || field.type === "CHECKBOX"
+        || field.type === "ACKNOWLEDGMENT"
         || !isFieldVisible(field, { ...shared, ...values })
       ) {
         return [];
@@ -2552,7 +2591,7 @@ export function PublicRegistrationForm({
       )
       : null;
     const acknowledgements = allFields.flatMap((field) => {
-      if (field.type !== "CHECKBOX") return [];
+      if (field.type !== "CHECKBOX" && field.type !== "ACKNOWLEDGMENT") return [];
       if (!rosterEnabled) {
         if (!isFieldVisible(field, responses)) return [];
         return [{

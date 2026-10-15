@@ -67,6 +67,9 @@ import {
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
+import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
+import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
+import { hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
 import { lodgingTransactionTimeoutMs } from "@/modules/lodging/service";
 import { getPublicLodgingOffer, planRegistrationLodging, recordRegistrationLodging, type LodgingPlan, type PublicLodgingOffer } from "@/modules/lodging/registration-form";
@@ -310,6 +313,8 @@ export type PublicRegistrationExperience = {
     versionId: string;
     versionNumber: number;
     definition: RegistrationFormDefinition;
+    /** The wording of each policy-version acknowledgment, by field id (#150). Wording only, never evidence. */
+    acknowledgmentContent: Record<string, AcknowledgmentDisplay>;
   };
   choiceUsage: ChoiceUsage;
   pricingDate: string;
@@ -633,7 +638,14 @@ export async function getPublicRegistrationExperience(eventSlug: string, formSlu
       ageOfMajority: form.event.ageOfMajority,
       refundPolicy: form.event.refundPolicy,
     },
-    form: { slug: form.slug, versionId: version.id, versionNumber: version.versionNumber, definition },
+    form: {
+      slug: form.slug,
+      versionId: version.id,
+      versionNumber: version.versionNumber,
+      definition,
+      // The wording of each policy-version acknowledgment (#150), read by exact version id: only what the form shows.
+      acknowledgmentContent: await loadAcknowledgmentDisplayContent(form.eventId, definition),
+    },
     choiceUsage: usageFromReservations(definition, reservations),
     pricingDate,
     lodging,
@@ -703,6 +715,9 @@ async function findExistingConfirmation(
   };
 }
 
+/** What the server knows about the request itself, for acknowledgment evidence (#150). Only approved metadata is ever stored. */
+export type SubmissionRequestContext = { userAgent?: string | null };
+
 async function createPublicRegistrationTransaction(
   tx: Prisma.TransactionClient,
   eventSlug: string,
@@ -710,6 +725,7 @@ async function createPublicRegistrationTransaction(
   submittedInput: PublicRegistrationInput,
   now: Date,
   bulk?: BulkSubmissionContext,
+  requestContext?: SubmissionRequestContext,
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -1255,6 +1271,56 @@ async function createPublicRegistrationTransaction(
       })),
     });
   }
+  // Acknowledgment evidence (#150): what each ticked acknowledgment showed, recorded with the registration or not at all.
+  // A minor's acknowledgment needs their declared responsible adult, recorded just above; nothing else counts.
+  try {
+    await recordSubmissionAcknowledgments(tx, {
+      eventId: form.eventId,
+      registrationId: registration.id,
+      formVersionId: version.id,
+      definition,
+      registrationResponses: prepared.registrationResponses,
+      attendees: createdAttendees.map((attendee) => ({
+        clientId: attendee.clientId,
+        attendeeId: attendee.attendeeId,
+        personId: attendee.personId,
+        responses: attendee.responses,
+      })),
+      actedByPersonId: accountHolder.id,
+      // Staff submitting for a director acted for them; everyone else acknowledged for themselves online.
+      channel: club?.submittedByUserId ? "STAFF_ENTERED" : "ONLINE",
+      recordedByUserId: club?.submittedByUserId ?? null,
+      submissionKey: input.idempotencyKey,
+      acknowledgedAt: now,
+      requestMetadata: {
+        userAgentHash: hashUserAgent(requestContext?.userAgent ?? null),
+        formVersionId: version.id,
+        submissionKey: input.idempotencyKey,
+      },
+      event: { startsAt: form.event.startsAt, timezone: form.event.timezone, ageOfMajority: form.event.ageOfMajority },
+    });
+  } catch (error) {
+    if (!(error instanceof AcknowledgmentError) || error.refusals.length === 0) throw error;
+    const indexByClientId = new Map(prepared.attendees.map((attendee, position) => [attendee.clientId, position]));
+    throw new PublicRegistrationError(
+      "INVALID_SUBMISSION",
+      error.refusals.some((refusal) => refusal.code === "POLICY_VERSION_UNAVAILABLE")
+        ? "An acknowledgment on this form is unavailable right now. Contact the event team."
+        : "An acknowledgment can only be given by the person it is about, or for a minor by their declared responsible adult.",
+      error.refusals.map((refusal) => {
+        const attendeeIndex = refusal.attendeeClientId === null ? null : indexByClientId.get(refusal.attendeeClientId) ?? null;
+        return {
+          kind: refusal.code === "POLICY_VERSION_UNAVAILABLE" ? "configuration" as const : "validation" as const,
+          code: refusal.code === "POLICY_VERSION_UNAVAILABLE" ? "ACKNOWLEDGMENT_UNAVAILABLE" as const : "ACKNOWLEDGMENT_NOT_AUTHORIZED" as const,
+          fieldId: refusal.fieldId,
+          key: refusal.key,
+          path: attendeeIndex === null ? refusal.key : `attendees.${attendeeIndex}.responses.${refusal.key}`,
+          attendeeIndex,
+          message: refusal.message,
+        };
+      }),
+    );
+  }
   if (input.lodging && lodgingPlan) {
     try {
       await recordRegistrationLodging(tx, {
@@ -1606,12 +1672,13 @@ export async function submitPublicRegistration(
   input: PublicRegistrationInput,
   now = new Date(),
   bulk?: BulkSubmissionContext,
+  requestContext?: SubmissionRequestContext,
 ) {
   const prisma = getPrisma();
   for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
     try {
       const result = await prisma.$transaction(
-        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk),
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext),
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the

@@ -136,6 +136,28 @@ async function isLiveRecord(client: Client, row: { registrationId: string; minor
 }
 
 /**
+ * The declared responsible adult who may act for a minor right now (#150): the one ACTIVE declaration for this minor at
+ * this event, naming an adult, whose registration is still active with both the minor and that adult still on it. Nothing
+ * else counts: not household, surname, email, `canManage` or being the account holder. Null when nobody is declared, the
+ * minor chose "None of us", the declaration was revoked or superseded, or it went stale. Read-only.
+ */
+export async function findActiveDeclaredAuthority(
+  client: Client,
+  eventId: string,
+  minorPersonId: string,
+): Promise<{ id: string; adultPersonId: string } | null> {
+  const row = await client.guardianAuthority.findFirst({
+    where: { eventId, minorPersonId, state: "ACTIVE" },
+    orderBy: [{ declaredAt: "desc" }, { id: "desc" }],
+    select: { id: true, registrationId: true, adultPersonId: true },
+  });
+  if (!row || !row.adultPersonId) return null;
+  if (!(await isLiveRecord(client, { registrationId: row.registrationId, minorPersonId }))) return null;
+  if (!(await isLiveRecord(client, { registrationId: row.registrationId, minorPersonId: row.adultPersonId }))) return null;
+  return { id: row.id, adultPersonId: row.adultPersonId };
+}
+
+/**
  * Everyone on the event's individual registrations with their minor status at the event's start date, the
  * ACTIVE declarations and the open conflicts. Club and group registrations are left out: their rosters
  * come from the club or the group contact, with their own adults and youth, not from this form.

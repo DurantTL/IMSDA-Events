@@ -852,6 +852,7 @@ model User {
   approvedAttendanceVersions   AttendanceReconciliationVersion[]         @relation("AttendanceVersionApprovedBy")
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]     @relation("AttendanceReviewAckActor")
   guardianAuthoritiesDeclared  GuardianAuthority[]                       @relation("GuardianAuthorityActorUser")
+  acknowledgmentEvidenceRecorded AcknowledgmentEvidence[]                 @relation("AcknowledgmentEvidenceRecordedBy")
   guardianAuthoritiesRevoked   GuardianAuthority[]                       @relation("GuardianAuthorityRevokedBy")
   guardianConflictsResolved    GuardianAuthorityConflict[]               @relation("GuardianConflictResolvedBy")
 
@@ -1643,6 +1644,7 @@ model Event {
   attendanceReconciliationVersions    AttendanceReconciliationVersion[]
   attendanceReviewAcknowledgements    AttendanceReviewAcknowledgement[]
   guardianAuthorities                 GuardianAuthority[]
+  acknowledgmentEvidence              AcknowledgmentEvidence[]
   guardianAuthorityConflicts          GuardianAuthorityConflict[]
 
   invoices                            Invoice[]
@@ -2069,6 +2071,8 @@ model Person {
   guardianAuthoritiesAsMinor GuardianAuthority[] @relation("GuardianAuthorityMinor")
   guardianAuthoritiesAsAdult GuardianAuthority[] @relation("GuardianAuthorityAdult")
   guardianAuthoritiesDeclared GuardianAuthority[] @relation("GuardianAuthorityActorPerson")
+  acknowledgmentEvidenceAsSubject AcknowledgmentEvidence[] @relation("AcknowledgmentEvidenceSubject")
+  acknowledgmentEvidenceActed AcknowledgmentEvidence[] @relation("AcknowledgmentEvidenceActedBy")
   guardianConflictsAsMinor   GuardianAuthorityConflict[] @relation("GuardianConflictMinor")
   guardianConflictsAsAdult   GuardianAuthorityConflict[] @relation("GuardianConflictAdult")
   lodgingRoommateAsker       EventLodgingRoommateRequest[] @relation("LodgingRoommateFromPerson")
@@ -2778,6 +2782,7 @@ model Registration {
   attendanceCorrections        AttendanceCorrection[]
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]
   guardianAuthorities     GuardianAuthority[]
+  acknowledgmentEvidence  AcknowledgmentEvidence[]
   guardianAuthorityConflicts GuardianAuthorityConflict[]
   lodgingRequests         EventLodgingRequest[]
   lodgingChangeRequests   EventLodgingChangeRequest[]
@@ -3872,6 +3877,7 @@ model RegistrationFormVersion {
   publicSubmissions     PublicRegistrationSubmission[]
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
+  acknowledgmentEvidence AcknowledgmentEvidence[]
 
   @@unique([formId, versionNumber])
   @@index([formId, status, versionNumber])
@@ -4153,6 +4159,7 @@ model ConsentPolicyVersion {
   currentOfPolicy ConsentPolicy? @relation("ConsentPolicyCurrentVersion")
   createdBy       User           @relation("ConsentPolicyVersionCreatedBy", fields: [createdByUserId], references: [id])
   publishedBy     User?          @relation("ConsentPolicyVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  acknowledgmentEvidence AcknowledgmentEvidence[]
 
   @@unique([policyId, versionNumber])
   @@index([policyId, status, versionNumber])
@@ -6781,6 +6788,81 @@ model GuardianAuthority {
   @@index([eventId, minorPersonId, declaredAt])
   @@index([registrationId])
   @@index([adultPersonId])
+}
+
+/// How an acknowledgment was given (#150): the registrant online, staff typing it in for the person, or a paper
+/// form staff recorded.
+enum AcknowledgmentChannel {
+  ONLINE
+  STAFF_ENTERED
+  PAPER
+}
+
+/// What an acknowledgment pointed at: the exact text on the form version, or a published #129 policy version.
+enum AcknowledgmentSource {
+  TEXT
+  POLICY_VERSION
+}
+
+/// Evidence that someone acknowledged exactly what a form showed (#150). Append-only: a trigger refuses every UPDATE
+/// and DELETE (event deletion included; the deletion service refuses an event that holds evidence), so what a person
+/// saw can never be rewritten or silently lost. No typed signature: the submission audit already says who and when.
+/// Every reference is RESTRICT, including the one to the policy version, so evidence can never be orphaned.
+/// `registrationAttendeeId` is a plain id on purpose: an attendee removed later leaves the evidence behind, still
+/// naming the person (`subjectPersonId`). Two partial unique indexes, one per subject kind, stop a retry or a second
+/// entry of the same content from creating a conflicting duplicate. Never read by exports, logs, analytics or messages.
+model AcknowledgmentEvidence {
+  id                     String                @id @default(cuid())
+  eventId                String
+  registrationId         String
+  /// Null when the subject is the registration itself.
+  registrationAttendeeId String?
+  /// The attendee the acknowledgment is about; null for a registration-level one.
+  subjectPersonId        String?
+  /// The person who acknowledged (the registrant, or whoever signed the paper): the subject, or a declared guardian.
+  actedByPersonId        String
+  /// Staff who typed it in or recorded the paper; null online.
+  recordedByUserId       String?
+  channel                AcknowledgmentChannel
+  formVersionId          String
+  fieldId                String
+  fieldKey               String
+  /// The checkbox statement the person ticked, as shown.
+  fieldLabel             String
+  source                 AcknowledgmentSource
+  /// The exact text shown when `source` is TEXT; null for a policy version (the version row holds it).
+  shownText              String?
+  policyVersionId        String?
+  /// SHA-256 of the text, or the policy version's own content hash.
+  contentHash            String
+  /// Identifies what was acknowledged, for the natural-key unique indexes: `text:<hash>` or `policy:<versionId>`.
+  contentRef             String
+  /// MINOR, ADULT or UNKNOWN on the event's start date when it was given.
+  subjectMinorStatus     String
+  /// The #131 declaration that let the person act for a minor (plain id: declarations are never deleted).
+  guardianAuthorityId    String?
+  acknowledgedAt         DateTime
+  recordedAt             DateTime              @default(now())
+  /// Only keys on the approved list (`approvedRequestMetadata`); a check constraint enforces the same list.
+  requestMetadata        Json                  @default("{}")
+  idempotencyKey         String
+  requestHash            String
+
+  event         Event                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration  Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  subjectPerson Person?                 @relation("AcknowledgmentEvidenceSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
+  actedBy       Person                  @relation("AcknowledgmentEvidenceActedBy", fields: [actedByPersonId], references: [id], onDelete: Restrict)
+  recordedBy    User?                   @relation("AcknowledgmentEvidenceRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  formVersion   RegistrationFormVersion @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  policyVersion ConsentPolicyVersion?   @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+
+  /// Migration-level partial unique indexes: one row per (registration, field, content) for a registration subject
+  /// and per (attendee, field, content) for an attendee subject.
+  @@unique([eventId, idempotencyKey])
+  @@index([registrationId, fieldKey, acknowledgedAt])
+  @@index([registrationAttendeeId, fieldKey, acknowledgedAt])
+  @@index([policyVersionId])
+  @@index([subjectPersonId])
 }
 
 /// A second adult claiming a minor who already has an ACTIVE declaration from a different registration

@@ -138,6 +138,16 @@ function AmendmentField({
   const attributes = valueType ? inputAttributesFor(valueType) : null;
   const id = `amendment_${field.id}_${locked ? "locked" : "editable"}`;
 
+  // An acknowledgment is given only through its evidence path (#150), never edited in an amendment.
+  if (field.type === "ACKNOWLEDGMENT") {
+    return (
+      <div className="amendment-locked-field">
+        <small>{field.label}</small>
+        <strong>{value === true ? "Acknowledged" : "Not acknowledged yet"}</strong>
+      </div>
+    );
+  }
+
   if (locked) {
     return (
       <div className="amendment-locked-field">

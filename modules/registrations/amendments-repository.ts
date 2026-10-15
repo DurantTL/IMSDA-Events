@@ -47,6 +47,7 @@ import { registrationOperationFingerprint } from "@/modules/registrations/operat
 import { getRegistrationByIdWithClient } from "@/modules/registrations/repository";
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
+import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
 
 /**
@@ -1024,6 +1025,17 @@ async function prepareAmendment(
       responses: { ...input.responses, ...owned },
     };
   }
+  // Acknowledgments (#150) are given only through their evidence path: an amendment keeps each answer as stored and
+  // gives a new attendee none, so a stored `true` always has its evidence beside it.
+  const held = holdAcknowledgmentAnswers(definition, input, {
+    registration: currentRegistrationResponses,
+    attendee: (attendeeId) => {
+      const row = registration.attendees.find((candidate) => candidate.id === attendeeId);
+      return row ? recordFromJson(row.formResponses) : null;
+    },
+  });
+  input = held.input;
+  const acknowledgmentKeys = held.keys;
   assertAmendmentAttendeeTypeSelections(
     definition,
     input.attendees,
@@ -1138,7 +1150,7 @@ async function prepareAmendment(
     usage: choiceUsageFromReservations(definition, otherReservations),
     // A staff seminar override (with its reason) may clear someone's picks,
     // e.g. a Teen in the Teen program (WR26), even though the question is required.
-    optionalFieldKeys: seminarPreferencesChanged ? seminarKeys : [],
+    optionalFieldKeys: [...(seminarPreferencesChanged ? seminarKeys : []), ...acknowledgmentKeys],
   };
   const validated = preparePublicRegistration(definition, publicInput, prepareOptions);
   // The same check on the stored answers, so only issues the registration
