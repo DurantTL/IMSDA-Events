@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { sidebarActiveHref } from "@/components/staff-navigation";
 import {
+  dismissalAfterNavigation,
   getSidebarGroupsServerSnapshot,
   getSidebarGroupsSnapshot,
   readSidebarGroups,
@@ -92,6 +94,30 @@ describe("parent pages reach the items that left the sidebar (#964)", () => {
   it("Payments links Promo codes on a page that already requires MANAGE_FINANCE", () => {
     expect(read("components/finance-workspace.tsx")).toContain("/more/promo-codes?event=${eventId}");
     expect(read("app/(workspace)/finance/page.tsx")).toContain('permissions.includes("MANAGE_FINANCE")');
+  });
+});
+
+describe("closing a group lasts for one page", () => {
+  const dismissed = { section: "setup", pathname: "/more/tags" };
+
+  it("keeps it on the same page and forgets it on any navigation, including coming back", () => {
+    expect(dismissalAfterNavigation(dismissed, "/more/tags", "/more/tags")).toBe(dismissed);
+    let state: typeof dismissed | null = dismissed;
+    state = dismissalAfterNavigation(state, "/more/tags", "/more/event-settings");
+    expect(state).toBeNull();
+    state = dismissalAfterNavigation(state, "/more/event-settings", "/more/tags");
+    expect(state).toBeNull();
+    // With nothing dismissed, the group opens for the page again.
+    expect(resolveSidebarGroupOpen({ saved: undefined, containsCurrentPage: true, dismissedOnThisPage: false })).toBe(true);
+  });
+});
+
+describe("which item a page lights", () => {
+  it("lights the page's own item, its visible parent, or More when the parent is hidden", () => {
+    const imports = { href: "/imports", sidebarParent: "/people" };
+    expect(sidebarActiveHref({ href: "/finance" }, new Set(["/finance"]))).toBe("/finance");
+    expect(sidebarActiveHref(imports, new Set(["/people", "/more"]))).toBe("/people");
+    expect(sidebarActiveHref(imports, new Set(["/more"]))).toBe("/more");
   });
 });
 

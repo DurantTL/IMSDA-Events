@@ -65,6 +65,15 @@ export function resolveSidebarGroupOpen({
   return containsCurrentPage || saved === true;
 }
 
+/**
+ * A group the viewer closed stays closed only on the page they closed it on:
+ * any navigation forgets it, so coming back to a page inside the group opens it
+ * again.
+ */
+export function dismissalAfterNavigation<T>(dismissed: T | null, previousPathname: string, pathname: string): T | null {
+  return previousPathname === pathname ? dismissed : null;
+}
+
 // A small external store so the saved choices are read after hydration (the
 // server always renders with nothing saved) and still work without storage.
 let choices: SidebarGroupChoices | null = null;

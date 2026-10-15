@@ -309,6 +309,19 @@ export function orderedSidebarItems(
 }
 
 /**
+ * The sidebar item a page lights (#964): the page's own item, or for a page that
+ * is no sidebar item its parent, or More when the viewer can't see that parent
+ * (Imports without Registrations access).
+ */
+export function sidebarActiveHref(
+  current: Pick<NavigationItem, "href" | "sidebarParent">,
+  visibleHrefs: ReadonlySet<string>,
+): string {
+  if (!current.sidebarParent) return current.href;
+  return visibleHrefs.has(current.sidebarParent) ? current.sidebarParent : "/more";
+}
+
+/**
  * The phone tabs, in `mobileNavigationOrder`, for the items visible to this
  * viewer. "People" is the Registrations page (`/people`): on a phone it is the
  * attendee list staff look people up in, while Team stays a desktop task reached

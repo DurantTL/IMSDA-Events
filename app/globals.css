@@ -670,18 +670,6 @@ select:focus-visible {
   scrollbar-width: thin;
 }
 
-/* Groups the sidebar's destinations (#428): Events, People, Finance, Communications. */
-.nav-group-label {
-  margin: 10px 0 -2px;
-  padding: 0 13px;
-  color: #7d97a2;
-  font-size: max(var(--type-floor, 0px), 0.62rem);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.nav-group-label:first-child { margin-top: 2px; }
-
 .nav-item {
   display: flex;
   align-items: center;
@@ -9305,7 +9293,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
 
   /* Headings and the sidebar event picker need room; the header picker replaces it. */
-  html[data-sidebar="collapsed"] .nav-group-label,
   html[data-sidebar="collapsed"] .system-navigation-label,
   html[data-sidebar="collapsed"] .event-workspace-label,
   html[data-sidebar="collapsed"] .event-picker-wrap { display: none; }
@@ -9677,8 +9664,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .public-registration-field textarea { font-size: var(--type-public-body); }
   /* Section titles 20-24px (the step heading was up to 28.8px on desktop). */
   .public-registration-step-heading h2 { font-size: clamp(1.25rem, 3vw, var(--type-public-title)); }
-  /* Sidebar group labels: #7d97a2 on the navy gradient was 3.83:1 at the top; #93abb6 is 4.91:1 there. */
-  .nav-group-label { color: #93abb6; }
 }
 
 /* --- Buttons: one filled primary per screen -------------------------------- */
@@ -10097,31 +10082,15 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .module-request-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* #741 slice 4: fixed staff navigation order.
-   The sidebar now lists up to six groups and fifteen items, so the rhythm is
-   tighter (the nav still scrolls inside the sidebar, #468) and the icons-only
-   sidebar (#446) keeps a thin rule where each hidden group heading was.
+   The rhythm is tight (the nav still scrolls inside the sidebar, #468); the
+   group headings and the icons-only rule between groups are in the #964 block.
    Self-contained block; nothing above this comment is changed by it.
    (plain comment, not a banner: the #743 block test counts banners) */
 .primary-nav { gap: 1px; }
 .primary-nav .nav-item { padding-block: 6px; }
-.primary-nav .nav-group-label { margin: 7px 0 0; }
 .system-navigation { margin-bottom: 12px; }
 .event-workspace-label { margin-bottom: 4px; }
 .event-picker-wrap { margin-bottom: 8px; }
-.primary-nav .nav-group-label:first-child { margin-top: 2px; }
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] .primary-nav .nav-group-label {
-    display: block;
-    height: 1px;
-    margin: 7px 8px 4px;
-    padding: 0;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.16);
-    color: transparent;
-    font-size: 0;
-  }
-  html[data-sidebar="collapsed"] .primary-nav .nav-group-label:first-child { display: none; }
-}
 
 /* Staff sidebar: More stays pinned at the bottom of the nav. When every item is
    visible (a system admin) the nav scrolls, and More, the last item, sticks to
@@ -10153,7 +10122,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 
 /* #964: shorter, grouped staff sidebar. The daily items sit directly in the
    nav; Set up and Reports are collapsible groups whose heading is a button.
-   Same heading look as .nav-group-label. Icon-only mode (#446) hides the
+   Icon-only mode (#446) hides the
    buttons, keeps every group's links showing (a closed group would otherwise
    hide destinations with no way to open it) and draws the thin rule between
    groups. Self-contained block; nothing above this comment is changed by it.
@@ -10170,7 +10139,8 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #7d97a2;
+  /* #93abb6 on the navy gradient is 4.91:1 (#7d97a2 was 3.83:1 at the top). */
+  color: #93abb6;
   padding: 4px 13px;
   font: inherit;
   font-size: max(var(--type-floor, 0px), 0.62rem);
@@ -10186,11 +10156,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .nav-group-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) {
   .nav-group-toggle, .nav-group-toggle svg { transition: none; }
-}
-@media screen {
-  /* #93abb6 clears 4.5:1 on the navy gradient (see the group-label rule above). */
-  .nav-group-toggle { color: #93abb6; }
-  .nav-group-toggle:hover { color: white; }
 }
 @media (min-width: 801px) {
   html[data-sidebar="collapsed"] .nav-group-toggle { display: none; }

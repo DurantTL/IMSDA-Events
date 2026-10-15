@@ -375,6 +375,15 @@ describe("Operational health and desktop highlight (#741 slice 4)", () => {
     expect(activeItems("/more/promo-codes")).toEqual(["Payments"]);
     expect(activeItems("/staff")).toEqual(["More"]);
   });
+
+  it("lights More for Imports when the viewer cannot see Registrations (#964)", () => {
+    const active = (permissions: readonly EventPermission[]) => {
+      const nav = navMarkup({ permissions, pathname: "/imports" });
+      return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    };
+    expect(active(["MANAGE_IMPORTS"])).toEqual(["More"]);
+    expect(active(["MANAGE_IMPORTS", "VIEW_SENSITIVE_DATA"])).toEqual(["Registrations"]);
+  });
 });
 
 describe("club portal and coordinator menus are unchanged (#741 slice 4)", () => {

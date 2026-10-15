@@ -22,6 +22,7 @@ import {
   subscribeSidebarCollapsed,
 } from "@/components/sidebar-collapse";
 import {
+  dismissalAfterNavigation,
   getSidebarGroupsServerSnapshot,
   getSidebarGroupsSnapshot,
   resolveSidebarGroupOpen,
@@ -44,6 +45,7 @@ import {
   navigation,
   orderedMobileTabs,
   orderedSidebarItems,
+  sidebarActiveHref,
   sidebarSections,
   staffSubpageTitle,
   systemNavigation,
@@ -124,6 +126,13 @@ export function AppShell({
   // always renders with nothing saved, and the pages inside a group open it.
   const savedGroups = useSyncExternalStore(subscribeSidebarGroups, getSidebarGroupsSnapshot, getSidebarGroupsServerSnapshot);
   const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarSection; pathname: string } | null>(null);
+  // Closing a group lasts for that page only: any navigation forgets it. Reset
+  // while rendering, not in an effect, so the very render after navigating is right.
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    setDismissedGroup(dismissalAfterNavigation(dismissedGroup, lastPathname, pathname));
+  }
   const searchParams = useSearchParams();
   // The staff-only profile page (#623) lives inside the shell but is no nav item.
   const isProfileRoute = pathname === "/profile" || pathname.startsWith("/profile/");
@@ -138,8 +147,6 @@ export function AppShell({
   // page that isn't a nav item names itself instead of reading "More".
   // The Event features page (#965) is a Set up item, not More, whatever `current` says.
   const onEventFeatures = isEventFeaturesPath(pathname);
-  // A page that is no sidebar item lights its parent (Attendee list lights Registrations, #964).
-  const activeHref = onEventFeatures ? null : current.sidebarParent ?? current.href;
   const pageTitle = isProfileRoute ? "Your account" : staffSubpageTitle(pathname) ?? current.label;
   const requestedEventId = searchParams.get("event");
   const defaultEvent = defaultEventId
@@ -214,6 +221,9 @@ export function AppShell({
     : orderedSidebarItems(selectedPermissions, showMore);
   const visibleSections = eventlessProfile ? [] : sidebarSections(selectedPermissions);
   const moreItemVisible = visibleNavigation.find((item) => item.href === "/more");
+  // A page that is no sidebar item lights its parent, or More when the viewer can't see it (#964).
+  const visibleHrefs = new Set([...visibleSections.flatMap((view) => view.items.map((item) => item.href)), ...visibleNavigation.map((item) => item.href)]);
+  const activeHref = onEventFeatures ? null : sidebarActiveHref(current, visibleHrefs);
   const isItemActive = (item: NavigationItem) => {
     if (isProfileRoute) return false;
     // Event features has a placeholder href until its page exists (#965): match its route instead.
