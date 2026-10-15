@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { BirthDateField } from "@/components/birth-date-field";
 import { RosterTypeDefinitions } from "@/components/roster-type-definitions";
@@ -233,7 +234,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         </fieldset>
 
         <div className="intro-actions">
-          <button className="primary-button" disabled={saving} type="submit">Add to roster</button>
+          <SubmitButton className="primary-button" label="Add to roster" submitting={saving} submittingLabel="Adding…" />
           <a className="text-button" href={formHref}>Cancel</a>
         </div>
       </form>

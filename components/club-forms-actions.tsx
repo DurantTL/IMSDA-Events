@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Printer, Send } from "lucide-react";
@@ -101,7 +103,7 @@ export function SendClubFormLink({
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div className="intro-actions">
-        <button className="primary-button" disabled={saving} type="submit">Send link</button>
+        <SubmitButton className="primary-button" label="Send link" submitting={saving} submittingLabel="Sending…" />
         <button className="text-button" disabled={saving} onClick={() => setOpen(false)} type="button">Close</button>
       </div>
     </form>
@@ -115,7 +117,12 @@ export function RevokeClubFormLinkButton({ organizationId, linkId }: { organizat
   const [error, setError] = useState("");
 
   async function revoke() {
-    if (!window.confirm("Withdraw this link? It will stop working right away.")) return;
+    if (!(await askConfirm({
+      title: "Withdraw this club form link",
+      body: <p>It will stop working right away. Anyone who has it can no longer open the form.</p>,
+      confirmLabel: "Withdraw link",
+      destructive: true,
+    }))) return;
     setSaving(true);
     setError("");
     try {
@@ -133,8 +140,10 @@ export function RevokeClubFormLinkButton({ organizationId, linkId }: { organizat
     }
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <>
+      {confirmDialog}
       <button className="text-button" disabled={saving} onClick={revoke} type="button">Withdraw</button>
       {error && <small className="club-report-problem">{error}</small>}
     </>
@@ -149,9 +158,14 @@ export function ClubFormTemplateToggle({ templateKey, enabled, name, needsSync =
 
   async function toggle() {
     const next = !enabled;
-    if (!window.confirm(next
-      ? `Turn on "${name}"? Every club's director and deputy will be able to use it.`
-      : `Turn off "${name}"? Clubs will no longer see it or its forms. Nothing is deleted.`)) return;
+    if (!(await askConfirm({
+      title: next ? `Turn on "${name}"` : `Turn off "${name}"`,
+      body: <p>{next
+        ? "Every club's director and deputy will be able to use it."
+        : "Clubs will no longer see it or its forms. Nothing is deleted."}</p>,
+      confirmLabel: next ? `Turn on "${name}"` : `Turn off "${name}"`,
+      destructive: !next,
+    }))) return;
     setSaving(true);
     setError("");
     try {
@@ -173,8 +187,10 @@ export function ClubFormTemplateToggle({ templateKey, enabled, name, needsSync =
     }
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <>
+      {confirmDialog}
       <button className={enabled ? "secondary-button" : "primary-button"} disabled={saving || (needsSync && !enabled)} onClick={toggle} type="button">
         {enabled ? "Turn off" : "Turn on"}
       </button>

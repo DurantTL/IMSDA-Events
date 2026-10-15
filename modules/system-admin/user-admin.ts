@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { revokeAllUserSessions } from "@/modules/access/session-store";
 import { revokeAllAttendeeSessions } from "@/modules/attendee-accounts/session-store";
+import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { sendAccountRecoveryEmail } from "@/modules/communications/account-email-dispatch";
 import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-sort";
@@ -26,6 +27,62 @@ export class UserAdminError extends Error {
 export const changeEmailSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.")),
 }).strict();
+
+/**
+ * A linked person (#554, ADR 0013, decision 3) has ONE email on both sides, so an
+ * email change is applied to the staff `User` and the linked `AttendeeAccount`
+ * in one transaction, or refused when either address is taken by someone else.
+ * "The usual verification" is the one this tool has always had: a system
+ * administrator makes the change, it is audited, and the person is signed out.
+ * Nothing here runs unless the one-sign-in switch is on and the two are linked.
+ */
+async function changeLinkedEmailTogether(
+  link: { userId: string; attendeeAccountId: string },
+  email: string,
+  actorUserId: string,
+) {
+  await getPrisma().$transaction(async (tx) => {
+    const [takenUser, takenAccount] = await Promise.all([
+      tx.user.findFirst({ where: { email, id: { not: link.userId } }, select: { id: true } }),
+      tx.attendeeAccount.findFirst({ where: { email, id: { not: link.attendeeAccountId } }, select: { id: true } }),
+    ]);
+    if (takenUser || takenAccount) throw new UserAdminError("EMAIL_IN_USE", "Another account already uses that email.");
+    await tx.user.update({ where: { id: link.userId }, data: { email } });
+    await tx.attendeeAccount.update({ where: { id: link.attendeeAccountId }, data: { email } });
+    await writeAuditLog({
+      actorUserId,
+      action: "STAFF_EMAIL_CHANGED",
+      entityType: "User",
+      entityId: link.userId,
+      summary: "A system administrator changed a linked person's email on both their staff and attendee sides.",
+      metadata: { attendeeAccountId: link.attendeeAccountId, linked: true },
+    }, tx);
+    await writeAuditLog({
+      actorUserId,
+      action: "ATTENDEE_EMAIL_CHANGED",
+      entityType: "AttendeeAccount",
+      entityId: link.attendeeAccountId,
+      summary: "A system administrator changed a linked person's email on both their staff and attendee sides.",
+      metadata: { userId: link.userId, linked: true },
+    }, tx);
+  });
+  if (link.userId !== actorUserId) await revokeAllUserSessions(link.userId);
+  await revokeAllAttendeeSessions(link.attendeeAccountId);
+}
+
+/** The link for this staff user, only while the one-sign-in switch is on. */
+async function activeLinkForUser(userId: string) {
+  if (!(await isUnifiedSignInEnabled())) return null;
+  const row = await getPrisma().user.findUnique({ where: { id: userId }, select: { id: true, attendeeAccountId: true } });
+  return row?.attendeeAccountId ? { userId: row.id, attendeeAccountId: row.attendeeAccountId } : null;
+}
+
+/** The link for this attendee account, only while the one-sign-in switch is on. */
+async function activeLinkForAccount(accountId: string) {
+  if (!(await isUnifiedSignInEnabled())) return null;
+  const row = await getPrisma().user.findUnique({ where: { attendeeAccountId: accountId }, select: { id: true, attendeeAccountId: true } });
+  return row?.attendeeAccountId ? { userId: row.id, attendeeAccountId: row.attendeeAccountId } : null;
+}
 
 // ---- Staff sign-ins -------------------------------------------------------
 
@@ -63,6 +120,8 @@ export async function resetStaffTwoStep(userId: string, actorUserId: string, now
 
 export async function changeStaffEmail(userId: string, email: string, actorUserId: string) {
   await requireStaffUser(userId);
+  const link = await activeLinkForUser(userId);
+  if (link) return changeLinkedEmailTogether(link, email, actorUserId);
   const taken = await getPrisma().user.findFirst({ where: { email, id: { not: userId } }, select: { id: true } });
   if (taken) throw new UserAdminError("EMAIL_IN_USE", "Another team account already uses that email.");
   await getPrisma().user.update({ where: { id: userId }, data: { email } });
@@ -195,6 +254,8 @@ export async function signOutAttendeeEverywhere(accountId: string, actorUserId: 
  */
 export async function changeAttendeeEmail(accountId: string, email: string, actorUserId: string) {
   await requireAttendee(accountId);
+  const link = await activeLinkForAccount(accountId);
+  if (link) return changeLinkedEmailTogether(link, email, actorUserId);
   const taken = await getPrisma().attendeeAccount.findFirst({ where: { email, id: { not: accountId } }, select: { id: true } });
   if (taken) throw new UserAdminError("EMAIL_IN_USE", "Another account already uses that email.");
   await getPrisma().attendeeAccount.update({ where: { id: accountId }, data: { email } });

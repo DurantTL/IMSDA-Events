@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, EyeOff, LockKeyhole, Plus, Save, Send, Trash2 } from "lucide-react";
 import {
@@ -159,7 +160,11 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
       setError("Fix the problems shown before publishing.");
       return;
     }
-    if (!window.confirm(`Publish version ${props.version + 1}? New fills will use it right away. Forms already filled in keep the version they were filled in on.`)) return;
+    if (!(await askConfirm({
+      title: `Publish version ${props.version + 1}`,
+      body: <p>New fills will use it right away. Forms already filled in keep the version they were filled in on.</p>,
+      confirmLabel: `Publish version ${props.version + 1}`,
+    }))) return;
     const result = await call(`${base}/publish`, { method: "POST", body: JSON.stringify({ baseVersion: props.version }) });
     if (!result) return;
     allowNavigation();
@@ -167,7 +172,12 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
   }
 
   async function discard() {
-    if (!window.confirm("Throw away this draft? The published version is not changed.")) return;
+    if (!(await askConfirm({
+      title: "Discard this draft",
+      body: <p>Every unpublished change in this draft is lost. The published version (version {props.version}) is not changed.</p>,
+      confirmLabel: "Discard draft",
+      destructive: true,
+    }))) return;
     const result = await call(`${base}/draft`, { method: "DELETE" });
     if (!result) return;
     allowNavigation();
@@ -181,8 +191,10 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
     return spec.hiddenFieldKeys.includes(key);
   };
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <div className="club-form-builder form-stack">
+      {confirmDialog}
       <section className="panel form-stack">
         <div className="intro-actions">
           <button className="primary-button" disabled={busy || !dirty} onClick={() => void saveDraft()} type="button">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, MapPin, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import type { ActiveAreaCoordinator, EventLocationRecord } from "@/modules/event-locations/repository";
@@ -128,8 +129,10 @@ export function EventLocationsPanel({
   const editedLocation = editingId ? locations.find((row) => row.id === editingId) : undefined;
   const inactiveCoordinator = editedLocation?.coordinator && !editedLocation.coordinatorActive ? editedLocation.coordinator : null;
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section aria-labelledby="event-locations-title" className="panel form-stack event-settings-panel" id="event-locations">
+      {confirmDialog}
       <div className="section-heading">
         <div>
           <p className="eyebrow">Sites</p>
@@ -191,9 +194,14 @@ export function EventLocationsPanel({
                   className="secondary-button"
                   disabled={busy || location.registrations > 0}
                   onClick={() => {
-                    if (window.confirm(`Delete ${location.name}? This can't be undone.`)) {
-                      void call(`${base}/${encodeURIComponent(location.id)}`, "DELETE", undefined, "Location deleted.");
-                    }
+                    void askConfirm({
+                      title: `Delete ${location.name}`,
+                      body: <p>The location is removed from this event. This can&apos;t be undone.</p>,
+                      confirmLabel: `Delete ${location.name}`,
+                      destructive: true,
+                    }).then((confirmed) => {
+                      if (confirmed) void call(`${base}/${encodeURIComponent(location.id)}`, "DELETE", undefined, "Location deleted.");
+                    });
                   }}
                   title={location.registrations > 0 ? "Registrations use this location. Deactivate it instead." : undefined}
                   type="button"

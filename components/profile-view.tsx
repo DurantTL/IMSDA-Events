@@ -39,6 +39,12 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
               <dt>Email</dt>
               <dd>{staff.email}</dd>
             </div>
+            {data.linkedAttendee && (
+              <div>
+                <dt>Registration account</dt>
+                <dd>Linked to {data.linkedAttendee.verifiedEmail}</dd>
+              </div>
+            )}
           </dl>
           <p className="field-help profile-readonly-note">Your name and email are managed by a system administrator, so they cannot be edited here.</p>
         </section>

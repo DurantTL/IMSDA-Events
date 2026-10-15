@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useMemo, useState } from "react";
 import { clubFormIsDirty, dropStaleRankedChoices, clubFormUnsavedMessage, rankLabel, rankedMaximum, toggleRankedChoice, withAutoDateAnswers } from "@/components/club-form-state";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -249,7 +250,7 @@ export function ClubFormFillIn(props: Props) {
         {props.mode === "club" && (
           <button className="secondary-button" disabled={saving} onClick={() => void send(false)} type="button">Save draft</button>
         )}
-        <button className="primary-button" disabled={saving} type="submit">Submit form</button>
+        <SubmitButton className="primary-button" label="Submit form" submitting={saving} submittingLabel="Submitting…" />
       </div>
     </form>
   );

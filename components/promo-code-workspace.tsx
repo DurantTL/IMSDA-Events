@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { EmptyState } from "@/components/empty-state";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useMemo, useState } from "react";
@@ -102,6 +103,7 @@ export function PromoCodeWorkspace({
   const [notice, setNotice] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
   const editedPromo = editing === "new" ? null : editing;
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const editorDialogRef = useAccessibleDialog<HTMLElement>(
     Boolean(editing),
     closeEditor,
@@ -136,9 +138,15 @@ export function PromoCodeWorkspace({
     setNotice("");
   }
 
-  function closeEditor() {
+  async function closeEditor() {
     if (saving) return;
-    if (editorDirty && !window.confirm(discardEditorMessage)) return;
+    if (editorDirty && !(await askConfirm({
+      title: editing === "new" ? "Discard the new promo code" : `Discard changes to ${editedPromo?.code ?? "this promo code"}`,
+      body: <p>{discardEditorMessage}</p>,
+      confirmLabel: "Discard changes",
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return;
     setEditorDirty(false);
     setEditing(null);
     setError("");
@@ -230,9 +238,12 @@ export function PromoCodeWorkspace({
   }
 
   async function deactivatePromo(promo: PromoCodeRecord) {
-    if (!window.confirm(
-      `Deactivate ${promo.code}? Existing registrations keep their discount, but new registrations cannot use it.`,
-    )) return;
+    if (!(await askConfirm({
+      title: `Deactivate promo code ${promo.code}`,
+      body: <p>Existing registrations keep their discount, but new registrations cannot use it.</p>,
+      confirmLabel: `Deactivate ${promo.code}`,
+      destructive: true,
+    }))) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -284,6 +295,7 @@ export function PromoCodeWorkspace({
 
   return (
     <section className="page-stack promo-code-workspace">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Registration pricing</p>

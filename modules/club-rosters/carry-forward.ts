@@ -126,6 +126,33 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
   return { state: "AVAILABLE", fromClubYear, toClubYear, candidates };
 }
 
+/**
+ * Copies each carried member's emergency contacts (#942, stored as
+ * `ClubRosterGuardian` since #510) onto the new year's row, whatever the member's type or age. The values
+ * are copied exactly as stored (the source is plain text by director decision,
+ * so nothing is sealed or opened here) and last year's rows are only read.
+ * Returns the number of contacts copied; no value leaves this function.
+ */
+async function copyGuardians(tx: Db, organizationId: string, toClubYear: string, sourceByPerson: Map<string, string>) {
+  const created = await tx.clubRosterMember.findMany({
+    where: { organizationId, clubYear: toClubYear, personId: { in: [...sourceByPerson.keys()] } },
+    select: { id: true, personId: true },
+  });
+  const targetBySource = new Map(created.flatMap((row) => {
+    const sourceId = row.personId ? sourceByPerson.get(row.personId) : undefined;
+    return sourceId ? [[sourceId, row.id] as const] : [];
+  }));
+  const contacts = await tx.clubRosterGuardian.findMany({
+    where: { rosterMemberId: { in: [...targetBySource.keys()] } },
+    select: { rosterMemberId: true, position: true, name: true, relationship: true, email: true, phone: true },
+  });
+  if (contacts.length === 0) return 0;
+  const result = await tx.clubRosterGuardian.createMany({
+    data: contacts.map((contact) => ({ ...contact, rosterMemberId: targetBySource.get(contact.rosterMemberId)! })),
+  });
+  return result.count;
+}
+
 export type CarryForwardResult = {
   fromClubYear: string;
   toClubYear: string;
@@ -134,6 +161,8 @@ export type CarryForwardResult = {
   typeChanged: number;
   /** Ticked people who were already on the new year's roster, so nothing was added for them. */
   alreadyThere: number;
+  /** Emergency contacts copied onto the new year's rows (a count only, never a value). */
+  guardiansCopied: number;
   personIds: string[];
 };
 
@@ -171,11 +200,14 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     const present = await personsAlreadyOnTarget(tx, organizationId, toClubYear, sources.flatMap((source) => (source.personId ? [source.personId] : [])));
     const choices = new Map(input.people.map((person) => [person.memberId, person]));
     const rows: Prisma.ClubRosterMemberCreateManyInput[] = [];
+    // New row's person -> the source member whose contacts it inherits.
+    const sourceByPerson = new Map<string, string>();
     let typeChanged = 0;
     for (const source of sources) {
       if (!source.personId || present.has(source.personId)) continue;
       const choice = choices.get(source.id)!;
       if (choice.attendeeType !== source.attendeeType) typeChanged += 1;
+      sourceByPerson.set(source.personId, source.id);
       rows.push({
         organizationId,
         clubYear: toClubYear,
@@ -199,6 +231,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     // People already on the new roster count as handled, not as left behind.
     const leftBehind = totalActive - sources.length;
     if (carried > 0) await tx.clubRosterMember.createMany({ data: rows });
+    const guardiansCopied = carried > 0 ? await copyGuardians(tx, organizationId, toClubYear, sourceByPerson) : 0;
     const record = await tx.clubRosterCarryForward.create({
       data: {
         organizationId,
@@ -227,6 +260,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         leftBehind,
         typeChanged,
         alreadyThere,
+        guardiansCopied,
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId ?? null }),
       },
     }, tx);
@@ -237,6 +271,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
       leftBehind,
       typeChanged,
       alreadyThere,
+      guardiansCopied,
       personIds: rows.flatMap((row) => (row.personId ? [row.personId] : [])),
     };
   });

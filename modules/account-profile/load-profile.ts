@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { resolvePersonFrom } from "@/modules/account-merge/person";
 import { getMfaStatus } from "@/modules/access/mfa-service";
 import { getPasskeySettings } from "@/modules/access/passkeys";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -28,7 +29,14 @@ export async function resolveProfileSessions() {
   // Only this browser's own attendee session counts as a registration
   // account; a staff session that merely matches an attendee email does not.
   const attendeeAccount = via === "attendee" ? account : null;
-  return { staff, attendeeAccount, sessionId };
+  // One account per person (#554, ADR 0013): with the one-sign-in switch on, a staff
+  // user's linked registration account (found by the link, never by email) is shown
+  // on the staff card. Switch off, or no link: null, and nothing changes.
+  const person = await resolvePersonFrom({ staff, attendee: { account, via, sessionId } });
+  const linkedAttendee = person.staff && person.link && person.attendee?.id === person.link.attendeeAccountId
+    ? { verifiedEmail: person.attendee.verifiedEmail }
+    : null;
+  return { staff, attendeeAccount, sessionId, linkedAttendee };
 }
 
 export type ProfileSessions = Awaited<ReturnType<typeof resolveProfileSessions>>;
@@ -57,7 +65,7 @@ export function profileHomeFor(
 }
 
 export async function loadProfileData(sessions: ProfileSessions, twoStep: string | string[] | undefined) {
-  const { staff, attendeeAccount, sessionId } = sessions;
+  const { staff, attendeeAccount, sessionId, linkedAttendee } = sessions;
   // A club role that hasn't passed its second step sees nothing of its
   // registration account yet.
   const secondStepPending = attendeeAccount ? await attendeeSecondStepPending() : false;
@@ -80,7 +88,7 @@ export async function loadProfileData(sessions: ProfileSessions, twoStep: string
   const bannerAnnouncements = attendeeAccount && !secondStepPending
     ? await listAccountBannerAnnouncements(attendeeAccount, clubs)
     : [];
-  return { staff, attendeeAccount, sessionId, staffSessions, sessionIdleTimeoutSeconds: SESSION_IDLE_TIMEOUT_SECONDS, secondStepPending, mfaStatus, passkeySettings, showTwoStepOn, clubs, bannerAnnouncements };
+  return { staff, attendeeAccount, sessionId, linkedAttendee, staffSessions, sessionIdleTimeoutSeconds: SESSION_IDLE_TIMEOUT_SECONDS, secondStepPending, mfaStatus, passkeySettings, showTwoStepOn, clubs, bannerAnnouncements };
 }
 
 export type ProfileData = Awaited<ReturnType<typeof loadProfileData>>;

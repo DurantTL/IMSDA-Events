@@ -25,6 +25,8 @@ const client = {
   userPasskey: { updateMany: mocks.userPasskeyUpdateMany },
   attendeeAccount: { findUnique: mocks.accountFindUnique, findFirst: mocks.accountFindFirst, update: mocks.accountUpdate },
   attendeeMfaEnrollment: { deleteMany: mocks.attendeeMfaDeleteMany },
+  // The one-sign-in switch (#554): no settings row means off.
+  platformSettings: { findUnique: async () => null },
   attendeePasskey: { updateMany: mocks.passkeyUpdateMany },
   $transaction: async (work: unknown[]) => Promise.all(work),
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
 import { INSTRUCTOR_EDIT_GRACE_DAYS } from "@/modules/honors/instructor-domain";
@@ -86,8 +87,10 @@ export function HonorsInstructorsWorkspace({
 
   const current = (instructor: Instructor) => edits[instructor.id] ?? instructor.offeringIds;
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Honors Weekend</p>
@@ -171,7 +174,14 @@ export function HonorsInstructorsWorkspace({
                     className="secondary-button"
                     disabled={busy}
                     onClick={() => {
-                      if (window.confirm(`Remove ${instructor.name}? They will no longer see any class roster.`)) void call(`${base}/${encodeURIComponent(instructor.id)}`, "DELETE", undefined, () => "Instructor removed.");
+                      void askConfirm({
+                        title: `Remove instructor ${instructor.name}`,
+                        body: <p>They will no longer see any class roster.</p>,
+                        confirmLabel: `Remove ${instructor.name}`,
+                        destructive: true,
+                      }).then((confirmed) => {
+                        if (confirmed) void call(`${base}/${encodeURIComponent(instructor.id)}`, "DELETE", undefined, () => "Instructor removed.");
+                      });
                     }}
                     type="button"
                   >
