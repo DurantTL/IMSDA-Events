@@ -26,6 +26,7 @@ const emptyCounts: EventDeletionCounts = {
   communityPosts: 0,
   announcements: 0,
   realPayments: 0,
+  scholarshipContributions: 0,
   healthSnapshots: 0,
   heldHealthSnapshots: 0,
 };
@@ -48,6 +49,7 @@ describe("event deletion rules (#620)", () => {
     ["attendees", { attendees: 2 }],
     ["payments", { payments: 1 }],
     ["invoices", { invoices: 1 }],
+    ["scholarship fund contributions", { scholarshipContributions: 1 }],
     ["honors enrollments", { honorEnrollments: 1 }],
     ["form submissions", { formSubmissions: 1 }],
     ["imports", { imports: 1 }],
@@ -61,6 +63,11 @@ describe("event deletion rules (#620)", () => {
     expect(decision.allowed).toBe(false);
     expect(decision.allowed === false && decision.reason).toMatch(/cannot be deleted because it has/);
     expect(decision.allowed === false && decision.reason).toMatch(/Unpublish it instead/);
+  });
+
+  it("names scholarship fund contributions in the refusal, worded like payments and invoices (#398)", () => {
+    const decision = decideEventDeletion(admin, facts({ counts: { payments: 1, scholarshipContributions: 3 } }));
+    expect(decision.allowed === false && decision.reason).toContain("1 payment, 3 scholarship fund contributions");
   });
 
   it("names every kind of attached record in the refusal", () => {
