@@ -33,6 +33,8 @@ function prismaFixture(overrides: {
     userSession: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     userPasskey: { updateMany: vi.fn().mockResolvedValue({ count: overrides.activePasskeys ?? 0 }) },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    // The one-sign-in switch (#554): no settings row means off.
+    platformSettings: { findUnique: vi.fn().mockResolvedValue(null) },
   };
   const prisma = {
     user: {

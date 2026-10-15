@@ -89,6 +89,7 @@ describe("staff attendee-account switch route", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(mocks.findSwitchableAttendeeAccountForStaff).toHaveBeenCalledWith(
       "same@example.test",
+      "staff-1",
     );
     expect(mocks.revokeAttendeeSession).toHaveBeenCalledWith("prior-attendee-token");
     expect(mocks.createAttendeeSession).toHaveBeenCalledWith(
@@ -133,6 +134,7 @@ describe("staff attendee-account switch route", () => {
     expect(response.status).toBe(303);
     expect(mocks.findSwitchableAttendeeAccountForStaff).toHaveBeenCalledWith(
       "same@example.test",
+      "staff-1",
     );
     expect(mocks.createAttendeeSession).toHaveBeenCalledWith(
       "attendee-account-1",

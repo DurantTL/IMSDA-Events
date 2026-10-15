@@ -6,7 +6,7 @@ PR, the new sign-in behind a switch that is off by default). One question from t
 comment (staff linking different emails by hand) is still open for him. The plan and the read-only dry run (`npm run accounts:dry-run`) shipped
 first. **Slice (a)** adds the link column and the switch with **no behaviour change**: no
 sign-in, session, permission or email changes, and no existing account is linked, created or
-merged. Slices (b) to (e) follow, each its own PR.
+merged. **Slice (b)** (the resolver, linking at activation, linked email changes, the staff-elevation rule) is built behind the switch, off by default; see "What slice (b) added" below. Slices (c) to (e) follow, each its own PR.
 
 Model in one line: **two tables stay (link, don't merge); a unique nullable
 `User.attendeeAccountId` links a staff `User` to the same person's `AttendeeAccount`.**
@@ -259,6 +259,23 @@ resolver helper in slice (b) should expose so no page reads the two columns sepa
 | EventLodgingAssignmentNotice | `sentByUserId` | User | plain string, no FK, optional | Un |
 | EventLodgingWaitlistHistory | `actorUserId` | User | plain string, no FK, optional | Un |
 
+**What slice (b) added** (code only: no migration, no new column, no backfill; every behaviour
+below runs only when `PlatformSettings.unifiedSignInEnabled` is true):
+
+- `resolvePerson()` (`modules/account-merge/person.ts`) is the one helper for "who is this and which
+  sides do they hold". It reports a staff user only from a real staff session.
+- At **activation** of a `PENDING_ACTIVATION` staff user a verified attendee account is created and
+  linked, or an existing one is reused only when verified, active, not disabled, unlinked and with the
+  same normalised email. Otherwise nothing is linked and an audit entry flags the person for review.
+- **Granting a staff role** links nothing; the link happens only at first activation, after inbox proof. A user who was active before (any session, authenticator or passkey row) or whose activation link `create-admin` printed is never linked at activation: needs review, linked only by slice (d).
+- **Attendee mode** uses the link for a linked user; **act as** refuses the linked account's email; the
+  staff **profile** card shows the linked registration account.
+- A **system-administrator email change** on a linked pair updates both sides in one transaction.
+- `modules/account-merge/staff-elevation.ts` states which methods may open a staff session; the
+  sign-in wiring that uses it, including the attendee-passkey second factor, is slice (c).
+- Already ACTIVE staff stay unlinked: linking existing people is slice (d) and a human gate. Sections
+  4 and 6 describe it. Verification: `npm run test:staff-attendee-activation`.
+
 ## 2. What moves where
 
 Under the link model, **no row moves** in any slice. The only data written, in order:
@@ -266,7 +283,7 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 | Slice | Writes |
 | --- | --- |
 | (a) | One additive column `User.attendeeAccountId` (all `NULL`) with its unique index and `ON DELETE SET NULL` foreign key, and `PlatformSettings.unifiedSignInEnabled` (default `false`). No backfill. |
-| (b) | A verified `AttendeeAccount` for each *new* staff user at activation; for an existing attendee given a staff role, the new `User` is linked to their account. |
+| (b) | A verified `AttendeeAccount` for each *new* staff user at activation; an existing verified, unlinked account with the same email is reused instead. Only at first activation; never at grant time and never for a previously active user. |
 | (c) | Nothing in the data model. Sessions are issued by the new page into the existing session tables. |
 | (d) | Per approved person: set `User.attendeeAccountId`; set `AttendeeCredential.disabledAt` when the person holds a staff role; one `AuditLog` row (`account.linked`, ids only). |
 | (e) | Drop the code paths, then (separately, optional) the retired attendee credentials of linked people. |

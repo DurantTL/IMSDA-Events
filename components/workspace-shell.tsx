@@ -59,7 +59,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
       && (isSystemAdmin || rolesByEvent.get(event.id) === "EVENT_ADMIN"),
   }));
   const attendeeAccountAvailable = Boolean(
-    await findSwitchableAttendeeAccountForStaff(user.email),
+    await findSwitchableAttendeeAccountForStaff(user.email, user.id),
   );
   const acting = await currentStaffActingContext();
 

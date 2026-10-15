@@ -1,6 +1,6 @@
 # ADR 0013: One account and one sign-in per person
 
-Status: Accepted: the open questions were answered by Caleb on Oct 15, 2026 (#554), except one raised by the Oct 8 comment (staff linking different emails by hand), which is still open for him. The direction was set by the Communication Director on 2026-09-30 (see "Decisions on record"). It is built slice by slice, each slice its own PR, and the new sign-in stays behind a switch that is off by default. Slice (a) (the link column and the switch, no behaviour change) is the first; slices (b) to (e) follow. The implementation plan and slices are at the end; table-by-table detail is in [docs/SINGLE-ACCOUNT-MIGRATION.md](../SINGLE-ACCOUNT-MIGRATION.md).
+Status: Accepted: the open questions were answered by Caleb on Oct 15, 2026 (#554), except one raised by the Oct 8 comment (staff linking different emails by hand), which is still open for him. The direction was set by the Communication Director on 2026-09-30 (see "Decisions on record"). It is built slice by slice, each slice its own PR, and the new sign-in stays behind a switch that is off by default. Slice (a) (the link column and the switch, no behaviour change) is the first; slice (b) (the resolver, activation linking and the elevation rule, behind the switch) is built; slices (c) to (e) follow. The implementation plan and slices are at the end; table-by-table detail is in [docs/SINGLE-ACCOUNT-MIGRATION.md](../SINGLE-ACCOUNT-MIGRATION.md).
 Date: 2026-09-30 (accepted 2026-10-15)
 Supersedes: the "staff can switch to attendee mode" part of [ADR 0003](0003-attendee-accounts.md), and the "two separate accounts per person" outcome of its "attendee accounts live in their own table" part. Under the link model below the two tables are kept (one `User`, one `AttendeeAccount`, linked 1:1), so ADR 0003's table separation itself is not undone. Everything else in ADR 0003 stands, except the staff second-factor rule it set, which decision 5 of Oct 15 widens in one way (an attendee-side passkey counts as a second factor only when its assertion is verified with user verification required).
 
@@ -318,13 +318,69 @@ human-gated and never run from CI.
   "attendeeAccountId" IS NOT NULL` is 0 after deploy; dropping the column is tested on a copy.
 - Slices (b) to (e) follow, each its own PR.
 
-**(b) One resolver and authorization.**
-- `resolvePerson()`; new staff users get a verified linked attendee account at activation;
-  granting a staff role to an existing attendee creates the `User` linked to their account;
-  attendee mode, act-as and the profile page use the link.
-- Acceptance: a staff user without an attendee account gets one at activation; no path issues
-  a staff session from an attendee-grade method (a test per method); the existing permission
-  suite is green; act-as and club second-step tests are green; behind a switch, off by default.
+**(b) One resolver and authorization.** Built, behind the switch (off by default).
+- `resolvePerson()` / `resolvePersonFrom()` (`modules/account-merge/person.ts`): from the staff
+  and attendee sessions it returns the staff user (only from a real staff session, never from an
+  attendee session), the attendee side (the session's account, or via the link for a staff
+  session), the link and a `consistent` flag. The linked user's id is reported as a display hint
+  (`linkedUserId`) and never as authority.
+- **Activation** (`linkAttendeeSideAtActivation`, called from `resetPassword` when a
+  `PENDING_ACTIVATION` user becomes ACTIVE): the new staff user gets a verified, ACTIVE attendee
+  account linked to them (decision 4). An existing account with the same normalised email is
+  reused only when it is verified, active, not disabled and linked to nobody. When an account
+  holds the email but may not be reused (unverified, disabled, linked elsewhere) nothing is linked
+  and no one else's account is verified for them; an audit entry
+  `STAFF_ATTENDEE_LINK_NEEDS_REVIEW` (ids only) marks the person and activation still succeeds.
+  A password reset of an already ACTIVE user is not an activation and links nothing.
+- **Granting a staff role to an existing attendee** links NOTHING at grant time: an event admin
+  can reach `addStaffMembership`, and the invitee has not yet proved they control the inbox. The
+  new pending `User` is linked at first activation, which reuses the existing verified, unlinked
+  account with the same email, so the end state is the same and the link follows inbox proof.
+  Linking happens only at first activation.
+- **Never linked at activation (needs review, `STAFF_ATTENDEE_LINK_NEEDS_REVIEW`):**
+  - `PREVIOUSLY_ACTIVE`: the user was active before, meaning any `UserSession`, `UserMfaEnrollment`
+    or `UserPasskey` row exists. A re-invite, or `scripts/create-admin.ts --promote-existing`, resets
+    the user to `PENDING_ACTIVATION` and clears `activatedAt`, so that field cannot be used. This
+    reason wins when more than one applies.
+  - `TOKEN_NOT_EMAILED`: "a link was printed for this user at some point". `scripts/create-admin.ts`
+    printed an activation URL for the operator (its audit row has `passwordSetDirectly: false`), or no
+    account email is configured, so the link is handed over by hand (the memberships route returns
+    `setupUrl`; outside production the password-reset route returns `resetUrl`). It fails safe: it
+    still applies if a later activation was in fact emailed.
+  - Those people are linked only by slice (d).
+  - `LINK_CONFLICT` is a defensive fallback. The account row is locked (`FOR UPDATE`) and re-read, so a
+    concurrent link is normally reported as `EXISTING_ACCOUNT_NOT_REUSABLE`; if the unique index still
+    rejects the link write, a savepoint rolls it back and the activation records review instead of failing.
+- **Attendee mode and the profile page:** `findSwitchableAttendeeAccountForStaff(email, userId)`
+  returns the LINKED account for a linked user (no email fallback, null if it is disabled or
+  unverified); an unlinked user keeps today's email rule, except that an account already linked to
+  a different staff user is refused. The staff card on `/profile` shows the
+  linked registration account. **Act as** keeps working inside the staff session as today; the one
+  change is that `isActingAdminsOwnEmail` also refuses the linked account's email, so an act-as
+  never grants a club role to the acting person's own attendee side.
+- **Email changes (decision 3):** the existing system-administrator email change, from either side
+  of a linked pair, now updates the `User` and the `AttendeeAccount` in one transaction, refuses
+  if either new address is taken, signs both sides out, and writes both audit entries. "The usual
+  verification" is that tool's existing one (an administrator's audited act). No self-service
+  email change exists in the product yet; one would have to use the same both-sides function.
+- **Staff sessions:** no code path in this slice can issue a staff session from an attendee-grade
+  method: only `authenticateWithPassword`, `completeMfaChallenge` and the staff passkey sign-in
+  create a `UserSession`, none takes attendee input, and the resolver never elevates. The rule is
+  also written as a pure decision (`modules/account-merge/staff-elevation.ts`):
+  `staffSessionAllowedFor` (one test per method: attendee password, Google, email link,
+  attendee passkey alone) and `attendeePasskeyCountsAsStaffSecondFactor` (decision 5: needs the
+  switch, the staff password first, a passkey of the linked account, and an assertion verified
+  with user verification). **Not wired into any sign-in yet:** the sign-in flow that calls them is
+  slice (c).
+- **Not built here:** the sign-in page and the attendee-passkey second factor in the staff
+  sign-in flow (c); backfilling, linking or merging any existing pair (d); removing old paths
+  (e); anything for the open question (hand-linking different emails). Existing staff who are
+  already ACTIVE stay unlinked until slice (d).
+- Acceptance: a staff user without an attendee account gets one at activation (switch on, proved
+  by `npm run test:staff-attendee-activation` against PostgreSQL); the same script proves the
+  switch-off case, that attendee password, Google and email-code sign-in yield no staff session,
+  and that unverified or already-linked accounts are never taken; the existing permission, act-as
+  and club second-step suites are green; everything new is behind the switch, off by default.
 
 **(c) The single sign-in page.**
 - `/sign-in`, with `/login` and `/account/sign-in` redirecting when the switch is on.
@@ -373,6 +429,19 @@ human-gated and never run from CI.
    Oct 8 comment says they stay separate "unless staff link them by hand". Oct 15 does not
    settle which applies. Until answered, no hand-link tool is planned, and the dry run only
    lists such pairs.
+
+2. **Admin email change vs. verification (found in the slice (b) security review).** The reuse
+   rule trusts `AttendeeAccount.emailVerifiedAt`, but a system-administrator email change keeps
+   it, so an account can be "verified" for an address nobody has verified. Options: clear the
+   verification on an administrator email change, or require a verification newer than the last
+   email change. Nothing is built for it.
+3. **Attendee passkey as a staff second factor needs an enrolment condition (security review).**
+   As decision 5 is written, someone who controls only the inbox could sign in to the attendee
+   side with an emailed code, enrol a passkey, reset the staff password by email, and then pass
+   "staff password plus attendee passkey". Before slice (c) wires it, the passkey needs a condition,
+   for example enrolled from a session that passed staff MFA, or before the last staff password
+   reset, with attendee passkeys revoked on a staff reset. A TODO on
+   `attendeePasskeyCountsAsStaffSecondFactor` points here. Nothing is built for it.
 
 **Resolved (answered by Caleb on Oct 15, 2026)**
 
