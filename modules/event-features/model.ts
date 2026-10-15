@@ -122,7 +122,7 @@ const columnCopy = {
     off: "The Pay on Square button is removed from the payment page. The card form stays.",
   },
   checksAdultBackgrounds: {
-    title: "Adult background checks",
+    title: "Sterling Volunteers check for adults",
     description: "Every adult registered is flagged until their Sterling Volunteers is current. Never blocks registration.",
     off: "Adults are no longer flagged for Sterling Volunteers. Registration and check-in are never blocked either way.",
   },

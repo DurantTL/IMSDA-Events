@@ -16,7 +16,7 @@ request each switch sends, `creation.ts` is the creation step), the page
 | --- | --- | --- |
 | Honors, Event patches, Club assignments, Seminar assignments, Merchandise, Attendee community | `PUT` / `DELETE /api/events/{id}/modules/{key}` | System administrators only. Club modules do not apply to a general event. Merchandise and Seminar assignments stay on while the event has products or a ranked field (refused, with the reason). |
 | Public content | none | Always on. |
-| Waitlist, Automatic promotion, Shirt sizes, Pay on Square, Adult background checks | `PATCH /api/events/{id}` (the settings update, with `expectedStartsOn` / `expectedEndsOn`, #445) | Event settings access (`CONFIGURE_EVENT`). Automatic promotion needs the waitlist. |
+| Waitlist, Automatic promotion, Shirt sizes, Pay on Square, Sterling Volunteers check for adults | `PATCH /api/events/{id}` (the settings update, with `expectedStartsOn` / `expectedEndsOn`, #445) | Event settings access (`CONFIGURE_EVENT`). Automatic promotion needs the waitlist. |
 | General registration link (club events) | `PUT /api/events/{id}/general-link` | `CONFIGURE_EVENT`. On only for club events billed to the church. |
 | Several teams per club (club events) | `PUT /api/events/{id}/team-settings` (every other rule sent back as stored) | `CONFIGURE_EVENT`. Refused by the server where teams are in use. |
 | Published | `POST /api/events/{id}/publish` or `/unpublish` | `CONFIGURE_EVENT`. Readiness is checked by the server. |
