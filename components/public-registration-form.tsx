@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -525,6 +526,7 @@ export function PublicRegistrationForm({
     () => getPrimaryAttendeeNameSync(definition),
     [definition],
   );
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [responses, setResponses] = useState<FormResponses>(initialResponses);
   const [registrationResponses, setRegistrationResponses] = useState<FormResponses>(initialResponses);
   function buildInitialAttendees(): RosterAttendee[] {
@@ -1482,9 +1484,12 @@ export function PublicRegistrationForm({
       );
       if (
         attendees.some((attendee) => hasResponses(attendee.responses))
-        && !window.confirm(
-          `Replace the ${attendees.length} attendee${attendees.length === 1 ? "" : "s"} currently entered with the ${importedResponses.length} in this CSV?`,
-        )
+        && !(await askConfirm({
+          title: "Replace the attendees entered so far",
+          body: <p>{`Replace the ${attendees.length} attendee${attendees.length === 1 ? "" : "s"} currently entered with the ${importedResponses.length} in this CSV? The answers already entered for them are lost.`}</p>,
+          confirmLabel: `Replace with ${importedResponses.length} from CSV`,
+          destructive: true,
+        }))
       ) return;
       setAttendees(importedResponses.map((responses) => ({
         clientId: crypto.randomUUID(),
@@ -3182,6 +3187,7 @@ export function PublicRegistrationForm({
   const Shell = club ? "div" : "main";
   return (
     <Shell className={club ? "public-registration-page club-registration-form" : "public-registration-page"}>
+      {confirmDialog}
       {!club && (<>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">

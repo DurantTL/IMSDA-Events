@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
@@ -223,6 +224,11 @@ function TermsEditor({ legend, value, onChange }: { legend: string; value: Terms
   );
 }
 
+/** The clock, read when Save is pressed rather than while rendering. */
+function currentTimeMs() {
+  return Date.now();
+}
+
 function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone: string; versions: PolicyVersionView[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -230,6 +236,7 @@ function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
 
   if (!draft) {
     return (
@@ -263,9 +270,13 @@ function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone
     const request = draftToRequest(draft, timezone);
     // A higher version replaces every lower one, so saving one that takes effect before a pending future-dated version
     // means that pending version never takes effect. Say so before saving.
-    const effective = "effectiveFrom" in request ? new Date(request.effectiveFrom as string).getTime() : Date.now();
-    const pending = versions.filter((version) => new Date(version.effectiveFrom).getTime() > Date.now() && new Date(version.effectiveFrom).getTime() > effective);
-    if (pending.length > 0 && !window.confirm(`Version ${pending.map((version) => version.version).join(", ")} is saved but has not taken effect yet. A newer version replaces every older one, so it will never take effect if you save this. Save anyway?`)) return;
+    const effective = "effectiveFrom" in request ? new Date(request.effectiveFrom as string).getTime() : currentTimeMs();
+    const pending = versions.filter((version) => new Date(version.effectiveFrom).getTime() > currentTimeMs() && new Date(version.effectiveFrom).getTime() > effective);
+    if (pending.length > 0 && !(await askConfirm({
+      title: "Save a version that replaces a scheduled one",
+      body: <p>{`Version ${pending.map((version) => version.version).join(", ")} is saved but has not taken effect yet. A newer version replaces every older one, so it will never take effect if you save this.`}</p>,
+      confirmLabel: "Save anyway",
+    }))) return;
     setBusy(true);
     setError("");
     const response = await postJson(`/api/events/${encodeURIComponent(eventId)}/cancellation-policy`, request, "The rules could not be saved.");
@@ -281,6 +292,7 @@ function NewVersion({ eventId, timezone, versions }: { eventId: string; timezone
 
   return (
     <section className="panel" aria-labelledby="cancel-policy-new">
+      {confirmDialog}
       <div className="section-heading"><h3 id="cancel-policy-new">New version</h3></div>
       {notice && <p role="status">{notice}</p>}
       <form className="form-stack" onSubmit={(event) => { event.preventDefault(); void save(); }}>

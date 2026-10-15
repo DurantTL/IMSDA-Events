@@ -58,7 +58,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop confirm-backdrop"
       onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}
       role="presentation"
     >

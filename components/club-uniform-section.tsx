@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useMemo, useState } from "react";
 import { CheckCircle2, Plus, Shirt, Trash2, X } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
@@ -97,8 +98,11 @@ export function ClubUniformSection({
   const canRecord = !busy && chosen.length > 0 && memberIds.size > 0 && !tooMany;
   const openCount = data.needs.length;
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+
   return (
     <section aria-labelledby="club-uniforms" className={styles.block}>
+      {confirmDialog}
       <h3 id="club-uniforms"><Shirt aria-hidden="true" size={14} /> Uniforms</h3>
       <p className="field-help">
         {readOnly
@@ -232,7 +236,24 @@ export function ClubUniformSection({
             <button
               className="secondary-button"
               disabled={busy || pickedNeeded.length === 0}
-              onClick={async () => { if (await onRemove(pickedNeeded)) setPicked(new Set()); }}
+              onClick={async () => {
+                const removing = data.needs.filter((need) => pickedNeeded.includes(need.needId));
+                const shown = removing.slice(0, 5).map((need) => `${need.firstName} ${need.lastName}, ${need.itemName}${need.size ? ` ${need.size}` : ""}`);
+                const noun = `uniform need${pickedNeeded.length === 1 ? "" : "s"}`;
+                if (!(await askConfirm({
+                  title: `Remove ${pickedNeeded.length} ${noun}`,
+                  body: (
+                    <>
+                      <p>{`These ${noun} are deleted from this order list. Nothing has been handed out, and stock isn't changed.`}</p>
+                      <ul>{shown.map((line) => <li key={line} translate="no">{line}</li>)}</ul>
+                      {removing.length > shown.length && <p>{`and ${removing.length - shown.length} more`}</p>}
+                    </>
+                  ),
+                  confirmLabel: `Remove ${pickedNeeded.length} ${noun}`,
+                  destructive: true,
+                }))) return;
+                if (await onRemove(pickedNeeded)) setPicked(new Set());
+              }}
               type="button"
             >
               <Trash2 aria-hidden="true" size={14} /> Remove{pickedNeeded.length > 0 ? ` (${pickedNeeded.length})` : ""}

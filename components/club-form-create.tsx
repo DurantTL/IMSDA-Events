@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -54,7 +55,7 @@ export function ClubFormCreate({ templates }: { templates: Array<{ key: string; 
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div>
-        <button className="primary-button" disabled={saving || name.trim().length < 2} type="submit">Create form</button>
+        <SubmitButton className="primary-button" disabled={name.trim().length < 2} label="Create form" submitting={saving} submittingLabel="Creating…" />
       </div>
     </form>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -179,7 +180,12 @@ export function HonorsSetupWorkspace({
    * when the number still matches.
    */
   async function confirmedDelete(url: string, label: string, success: string) {
-    if (!window.confirm(`Delete ${label}? This can't be undone.`)) return;
+    if (!(await askConfirm({
+      title: `Delete ${label}`,
+      body: <p>It is removed from the schedule. This can&apos;t be undone.</p>,
+      confirmLabel: `Delete ${label}`,
+      destructive: true,
+    }))) return;
     const pending: { picks: number | null } = { picks: null };
     const needsConfirmation = (result: ApiResult) => {
       if (result.error !== "PICKS_NEED_CONFIRMATION" || typeof result.picks !== "number") return false;
@@ -205,7 +211,12 @@ export function HonorsSetupWorkspace({
         return null;
       }
       const picks: number = pending.picks;
-      if (!window.confirm(`${picks} class pick${picks === 1 ? "" : "s"} by clubs will be removed from their registrations. Delete ${label} anyway?`)) return null;
+      if (!(await askConfirm({
+        title: `Delete ${label} and ${picks} class pick${picks === 1 ? "" : "s"}`,
+        body: <p>{`${picks} class pick${picks === 1 ? "" : "s"} by clubs will be removed from their registrations.`}</p>,
+        confirmLabel: `Delete ${label} and ${picks} pick${picks === 1 ? "" : "s"}`,
+        destructive: true,
+      }))) return null;
       confirmed = picks;
     }
   }
@@ -284,11 +295,15 @@ export function HonorsSetupWorkspace({
   async function saveEditedOffering(offering: Offering, details: Record<string, unknown>) {
     const url = `${base}/offerings/${encodeURIComponent(offering.id)}`;
     const names = editHonorIds.map((id) => honorOptions(offering).find((honor) => honor.id === id)?.name ?? id);
-    const ask = (enrolled: number) => window.confirm(`${honorsNeedConfirmationMessage(enrolled, names)} Save this change?`);
+    const ask = (enrolled: number) => askConfirm({
+      title: `Change the honors for ${offering.honorName}`,
+      body: <p>{honorsNeedConfirmationMessage(enrolled, names)}</p>,
+      confirmLabel: `Save honors for ${enrolled} enrolled`,
+    });
     const changed = honorSetChange(offering.honorIds, editHonorIds).changed;
     let confirmed: number | undefined;
     if (changed && offering.enrolled > 0) {
-      if (!ask(offering.enrolled)) return null;
+      if (!(await ask(offering.enrolled))) return null;
       confirmed = offering.enrolled;
     }
     const pending: { enrolled: number | null } = { enrolled: null };
@@ -301,7 +316,7 @@ export function HonorsSetupWorkspace({
       pending.enrolled = null;
       const result = await call(url, "PATCH", { ...details, ...(confirmed === undefined ? {} : { confirmEnrolled: confirmed }) }, "Class updated.", needsConfirmation);
       if (result || pending.enrolled === null) return result;
-      if (!ask(pending.enrolled)) return null;
+      if (!(await ask(pending.enrolled))) return null;
       confirmed = pending.enrolled;
     }
     setError("The number of enrolled people kept changing, so nothing was saved. Try again.");
@@ -347,8 +362,10 @@ export function HonorsSetupWorkspace({
     }
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Honors Weekend</p>

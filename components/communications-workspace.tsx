@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -488,16 +489,22 @@ export function CommunicationsWorkspace({
     setRetryRequestId("");
   }
 
-  function confirmDiscardEditorChanges() {
+  async function confirmDiscardEditorChanges() {
     if (!hasUnsavedChanges) return true;
-    if (!window.confirm("Discard the unpublished communication changes?")) return false;
+    if (!(await askConfirm({
+      title: "Discard the unpublished communication changes",
+      body: <p>Edits to the announcement, template or message you have open are lost.</p>,
+      confirmLabel: "Discard changes",
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return false;
     resetEditorDrafts();
     return true;
   }
 
-  function changeView(nextView: CommunicationsView) {
+  async function changeView(nextView: CommunicationsView) {
     if (nextView === view) return;
-    if (!confirmDiscardEditorChanges()) return;
+    if (!(await confirmDiscardEditorChanges())) return;
     setError("");
     setNotice("");
     setView(nextView);
@@ -1258,9 +1265,9 @@ export function CommunicationsWorkspace({
     }
   }
 
-  function selectTemplate(id: string) {
+  async function selectTemplate(id: string) {
     if (id === selectedTemplate?.id) return;
-    if (!confirmDiscardEditorChanges()) return;
+    if (!(await confirmDiscardEditorChanges())) return;
     const template = messaging?.templates.find((candidate) => candidate.id === id);
     setSelectedTemplateId(id);
     setTemplateSubject(template?.activeVersion?.subjectTemplate ?? "");
@@ -1270,9 +1277,9 @@ export function CommunicationsWorkspace({
     setQuery("templates", { template: id });
   }
 
-  function selectMessage(id: string) {
+  async function selectMessage(id: string) {
     if (id === selectedMessage?.id) return;
-    if (!confirmDiscardEditorChanges()) return;
+    if (!(await confirmDiscardEditorChanges())) return;
     setSelectedMessageId(id);
     setResendRecipientEmail("");
     setResendConfirmed(false);
@@ -1281,9 +1288,9 @@ export function CommunicationsWorkspace({
     setQuery("deliveries", { message: id, status: deliveryFilter });
   }
 
-  function chooseDeliveryFilter(filter: "ALL" | MessageOutboxStatusValue) {
+  async function chooseDeliveryFilter(filter: "ALL" | MessageOutboxStatusValue) {
     if (filter === deliveryFilter) return;
-    if (!confirmDiscardEditorChanges()) return;
+    if (!(await confirmDiscardEditorChanges())) return;
     setDeliveryFilter(filter);
     setDeliveryPage(1);
     setQuery("deliveries", { message: selectedMessageId, status: filter });
@@ -1302,8 +1309,10 @@ export function CommunicationsWorkspace({
     ? { loading: broadcastReviewLoading, error: broadcastReviewError, preview: broadcastReview.preview }
     : null);
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack communications-workspace">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Event communications</p>

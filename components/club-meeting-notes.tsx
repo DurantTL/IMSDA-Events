@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Download, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -242,7 +244,12 @@ export function ClubMeetingNotes({
   }
 
   async function remove(note: ClubMeetingNoteRecord) {
-    if (!window.confirm(`Delete the meeting note for ${formatMeetingDate(note.meetingDate)}? This can't be undone.`)) return;
+    if (!(await askConfirm({
+      title: `Delete meeting note from ${formatMeetingDate(note.meetingDate)}`,
+      body: <p>The note is deleted and its attendance no longer counts toward the monthly report. This can&apos;t be undone.</p>,
+      confirmLabel: `Delete note from ${formatMeetingDate(note.meetingDate)}`,
+      destructive: true,
+    }))) return;
     setSaving(true);
     setError("");
     try {
@@ -263,8 +270,10 @@ export function ClubMeetingNotes({
 
   const formOpen = adding || editingId !== null;
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <div className="club-roster-stack" data-month={month}>
+      {confirmDialog}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && !formOpen && <div className="inline-notice error" role="alert">{error}</div>}
 
@@ -414,7 +423,7 @@ export function ClubMeetingNotes({
           </label>
 
           <div className="intro-actions">
-            <button className="primary-button" disabled={saving} type="submit">{editingId ? "Save changes" : "Add meeting note"}</button>
+            <SubmitButton className="primary-button" label={editingId ? "Save changes" : "Add meeting note"} submitting={saving} submittingLabel="Saving…" />
             <button className="secondary-button" disabled={saving} onClick={requestClose} type="button">{justSaved && !dirty ? "Close" : "Cancel"}</button>
           </div>
         </form>

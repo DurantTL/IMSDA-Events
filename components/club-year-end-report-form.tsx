@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useMemo, useState } from "react";
 import { RotateCcw, Save, Send } from "lucide-react";
 import {
@@ -254,12 +255,8 @@ export function ClubYearEndReportForm({
 
       {!locked && (
         <div className="intro-actions">
-          <button className="secondary-button" disabled={saving} formNoValidate name="intent" type="submit" value="draft">
-            <Save aria-hidden="true" size={16} /> Save draft
-          </button>
-          <button className="primary-button" disabled={saving} name="intent" type="submit" value="submit">
-            <Send aria-hidden="true" size={16} /> Submit report
-          </button>
+          <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} label="Save draft" submitting={saving} submittingLabel="Saving…" />
+          <SubmitButton className="primary-button" name="intent" value="submit" icon={<Send aria-hidden="true" size={16} />} label="Submit report" submitting={saving} submittingLabel="Submitting…" />
         </div>
       )}
     </form>

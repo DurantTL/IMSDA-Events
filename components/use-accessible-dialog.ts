@@ -11,6 +11,12 @@ const focusableSelector = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+/**
+ * Open dialogs, outermost first. A confirmation opened over an editor dialog
+ * (#743) must own Escape and Tab while it is up, so only the top one reacts.
+ */
+const openDialogs: symbol[] = [];
+
 export function useAccessibleDialog<T extends HTMLElement>(
   open: boolean,
   onClose: () => void,
@@ -30,6 +36,8 @@ export function useAccessibleDialog<T extends HTMLElement>(
     const dialog = dialogRef.current;
     if (!dialog) return;
     const dialogElement = dialog;
+    const token = Symbol("dialog");
+    openDialogs.push(token);
 
     const focusableElements = () => Array.from(
       dialogElement.querySelectorAll<HTMLElement>(focusableSelector),
@@ -42,6 +50,7 @@ export function useAccessibleDialog<T extends HTMLElement>(
     });
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (openDialogs.at(-1) !== token) return;
       if (event.key === "Escape") {
         event.preventDefault();
         closeRef.current();
@@ -74,6 +83,8 @@ export function useAccessibleDialog<T extends HTMLElement>(
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      const at = openDialogs.indexOf(token);
+      if (at !== -1) openDialogs.splice(at, 1);
       previouslyFocused?.focus({ preventScroll: true });
     };
   }, [open]);

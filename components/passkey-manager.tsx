@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Fingerprint, Plus, ShieldCheck, Trash2 } from "lucide-react";
@@ -57,7 +58,12 @@ export function PasskeyManager({
   }
 
   async function remove(passkey: PasskeySummary) {
-    if (!window.confirm(`Remove "${passkey.name}"? It will stop working on this account.`)) return;
+    if (!(await askConfirm({
+      title: `Remove passkey "${passkey.name}"`,
+      body: <p>It will stop working on this account. You can add it again later.</p>,
+      confirmLabel: `Remove "${passkey.name}"`,
+      destructive: true,
+    }))) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -74,8 +80,10 @@ export function PasskeyManager({
     }
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="public-manage-card passkey-manager" aria-labelledby="passkeys-heading">
+      {confirmDialog}
       <div className="public-manage-card-heading">
         <p className="public-registration-eyebrow">Sign-in and second step</p>
         <h2 id="passkeys-heading"><Fingerprint size={20} aria-hidden="true" /> Passkeys</h2>
