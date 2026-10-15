@@ -61,8 +61,12 @@ being the account holder never count.
   this minor at this event. The minor's own tick, "None of us", a revoked or stale declaration and an undeclared
   parent all fail. A database check makes a `MINOR` row without `guardianAuthorityId` impossible.
 - **Staff acting as a director cannot acknowledge for them.** Evidence names the person who acknowledged and has no staff-user
-  actor, so an act-as submission carrying any acknowledgment is refused with a clear message (never recorded under the director,
-  never as STAFF_ENTERED on their behalf). The director acknowledges, or staff record paper evidence afterward.
+  actor. An act-as submission is therefore made without acknowledgments: the acknowledgment fields are optional for it, a ticked
+  answer is dropped (not stored, not recorded), and no evidence is written. The registration is created and the acknowledgment
+  stays "not acknowledged" until the director gives it themselves or staff record it through the paper or staff route.
+- **Submit-time check.** A form published before its event became a club, church-billed or general-link event may still hold a
+  per-attendee acknowledgment; a submission to it is refused with a clear message (nothing is recorded). Switching an event to
+  those modes while such a form is published is not blocked; the form is simply unusable until it is fixed.
 - A refusal on the public form is a 422 `INVALID_SUBMISSION` marking each field (`ACKNOWLEDGMENT_NOT_AUTHORIZED`) and rolls
   the whole registration back: no registration, declaration or evidence is left behind. Staff routes answer 403.
 
@@ -90,9 +94,9 @@ declared responsible adult, and staff cannot stand in. A field whose condition h
 
 ## Reading it back
 
-- **The stored answer is the submission-time answer only.** Staff-entered and paper evidence never rewrites it. Where standing
-  matters (the amendment editor) it is read from the evidence status; reports and emails that use the stored answer reflect only
-  what was ticked at submission.
+- **The stored answer is the submission-time answer only.** Staff-entered and paper evidence never rewrites it. Reports, CSV
+  exports and emails show the answer as ticked at submission; evidence status (including voids and paper or staff-entered
+  records) is the source of truth for where a person stands. The amendment editor reads the evidence status.
 - `GET .../acknowledgments?at=<iso>` (MANAGE_REGISTRATION) gives each subject's status as of a moment, with every evidence
   row as a summary: **no wording and no request metadata**.
 - `GET .../acknowledgments/{evidenceId}` (VIEW_SENSITIVE_DATA, never cached) is the only read of the payload: the exact text,
@@ -105,7 +109,7 @@ declared responsible adult, and staff cannot stand in. A field whose condition h
 
 ## Corrections: voiding
 
-Staff with VIEW_SENSITIVE_DATA void evidence with a reason (`POST .../acknowledgments/{evidenceId}/void`). The void is a separate
+Staff with both MANAGE_REGISTRATION and VIEW_SENSITIVE_DATA void evidence with a reason (`POST .../acknowledgments/{evidenceId}/void`). The void is a separate
 append-only `AcknowledgmentVoid` row (one per evidence row, so voiding twice is the same void); the evidence row is never touched.
 A voided row stops counting from its void moment on (`statusAt` filters by `voidedAt <= at`, so the past is unchanged), and the
 same content can be recorded again as the next `generation` (the insert trigger requires generation = number of voided rows

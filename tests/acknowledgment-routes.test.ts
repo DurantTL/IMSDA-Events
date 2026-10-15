@@ -213,6 +213,7 @@ describe("voiding an acknowledgment (#150)", () => {
     const response = await voidPost({ reason: "  Recorded against the wrong person.  " });
     expect(response.status).toBe(201);
     expect(dependencies.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "VIEW_SENSITIVE_DATA", dependencies.findActiveMembership);
+    expect(dependencies.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_REGISTRATION", dependencies.findActiveMembership);
     expect(dependencies.voidAcknowledgmentEvidence).toHaveBeenCalledWith({
       eventId: "event-1", registrationId: "reg-1", evidenceId: "ev-1", reason: "Recorded against the wrong person.", actorUserId: "user-1",
     });
@@ -224,6 +225,15 @@ describe("voiding an acknowledgment (#150)", () => {
     const response = await voidPost({ reason: "Again." });
     expect(response.status).toBe(200);
     expect((await response.json()).created).toBe(false);
+  });
+
+  it("refuses a caller who has the sensitive-data permission but cannot manage registrations", async () => {
+    dependencies.requirePermission.mockImplementation(async (_session: unknown, _event: string, permission: string) => {
+      if (permission === "MANAGE_REGISTRATION") throw new dependencies.MockAccessDeniedError("No access.", "FORBIDDEN", 403);
+      return { user: { id: "user-1" } };
+    });
+    expect((await voidPost({ reason: "x" })).status).toBe(403);
+    expect(dependencies.voidAcknowledgmentEvidence).not.toHaveBeenCalled();
   });
 
   it("refuses a caller without the sensitive-data permission before touching anything, and a cross-origin request", async () => {

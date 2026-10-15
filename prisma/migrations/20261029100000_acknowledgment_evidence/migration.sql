@@ -160,8 +160,9 @@ BEGIN
   IF NEW."guardianAuthorityId" IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM "GuardianAuthority" g
     WHERE g."id" = NEW."guardianAuthorityId" AND g."minorPersonId" = NEW."subjectPersonId" AND g."eventId" = NEW."eventId"
+      AND g."registrationId" = NEW."registrationId" AND g."adultPersonId" = NEW."actedByPersonId"
   ) THEN
-    RAISE EXCEPTION 'That guardian authority is not a declaration for this minor at this event.' USING ERRCODE = 'AE001';
+    RAISE EXCEPTION 'That guardian authority is not a declaration for this minor, on this registration, naming the person who acknowledged.' USING ERRCODE = 'AE001';
   END IF;
   IF NEW."policyVersionId" IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM "ConsentPolicyVersion" v JOIN "ConsentPolicy" p ON p."id" = v."policyId"

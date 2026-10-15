@@ -68,7 +68,7 @@ import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
 import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
-import { planAcknowledgments } from "@/modules/acknowledgments/domain";
+import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
 import { hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
@@ -906,6 +906,17 @@ async function createPublicRegistrationTransaction(
     }
   }
   assertRegistrationOpen(lifecycle);
+  // The event may have become a club, church-billed or general-link event after this form was published, and club rosters have no
+  // responsible-adult declarations, so a per-attendee recorded acknowledgment could never be recorded: refuse it up front.
+  if (acknowledgmentFields(definition).some((field) => field.scope === "ATTENDEE")) {
+    const eventModes = await tx.event.findUnique({ where: { id: form.eventId }, select: { audience: true, billingMode: true, generalRegistrationLinkEnabled: true } });
+    if (eventModes && (eventModes.audience === "CLUB" || eventModes.billingMode === "DEFERRED_ORGANIZATION_INVOICE" || eventModes.generalRegistrationLinkEnabled)) {
+      throw new PublicRegistrationError(
+        "INVALID_SUBMISSION",
+        "This form asks each attendee for a recorded acknowledgment, which club and group events cannot take. Contact the event team.",
+      );
+    }
+  }
 
   const roster = getAttendeeRosterConfig(definition);
   const requestedAttendees = roster.enabled ? input.attendees?.length ?? 0 : 1;
@@ -938,16 +949,23 @@ async function createPublicRegistrationTransaction(
   const deferredPaymentFieldKey = isWaitlisted && definition.payment?.enabled
     ? definition.payment.paymentMethodFieldKey
     : null;
-  const canonicalInput = deferredPaymentFieldKey
-    ? {
-        ...input,
-        responses: Object.fromEntries(
-          Object.entries(input.responses).filter(
-            ([key]) => key !== deferredPaymentFieldKey,
-          ),
-        ),
-      }
+  const dropKeys = (answers: Record<string, unknown>, keys: ReadonlySet<string>) => (
+    keys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !keys.has(key)))
+  );
+  const withoutDeferredPayment = deferredPaymentFieldKey
+    ? { ...input, responses: dropKeys(input.responses, new Set([deferredPaymentFieldKey])) }
     : input;
+  // Staff acting as a director cannot acknowledge for them (evidence names the person who acknowledged), so an act-as submission
+  // is made without acknowledgments: any ticked answer is dropped, a required one is not asked for, and no evidence is recorded.
+  // The acknowledgment stays "not acknowledged" until the director gives it, or staff record it on paper afterward.
+  const actAsAcknowledgmentKeys = club?.submittedByUserId ? new Set(acknowledgmentFields(definition).map((field) => field.key)) : new Set<string>();
+  const canonicalInput = actAsAcknowledgmentKeys.size > 0
+    ? {
+        ...withoutDeferredPayment,
+        responses: dropKeys(withoutDeferredPayment.responses, actAsAcknowledgmentKeys),
+        attendees: withoutDeferredPayment.attendees?.map((attendee) => ({ ...attendee, responses: dropKeys(attendee.responses, actAsAcknowledgmentKeys) })),
+      }
+    : withoutDeferredPayment;
   const prepared = preparePublicRegistration(definition, canonicalInput, {
     timeZone: form.event.timezone,
     now,
@@ -956,6 +974,7 @@ async function createPublicRegistrationTransaction(
     ignoredFieldKeys: deferredPaymentFieldKey
       ? [deferredPaymentFieldKey]
       : undefined,
+    optionalFieldKeys: actAsAcknowledgmentKeys.size > 0 ? [...actAsAcknowledgmentKeys] : undefined,
   });
   if (!prepared.isValid || !prepared.identity) {
     const capacityIssue = prepared.issues.some((issue) => issue.message.includes("reached its limit"));
@@ -1275,16 +1294,8 @@ async function createPublicRegistrationTransaction(
   // Acknowledgment evidence (#150): what each ticked acknowledgment showed, recorded with the registration or not at all.
   // A minor's acknowledgment needs their declared responsible adult, recorded just above; nothing else counts.
   // Staff acting as a director cannot acknowledge for them: evidence names a person who acknowledged, never a staff stand-in,
-  // and recording it under the director would claim they said something they did not.
-  if (club?.submittedByUserId && planAcknowledgments(definition, {
-    registrationResponses: prepared.registrationResponses,
-    attendees: createdAttendees.map((attendee) => ({ clientId: attendee.clientId, responses: attendee.responses })),
-  }).length > 0) {
-    throw new PublicRegistrationError(
-      "INVALID_SUBMISSION",
-      "Staff cannot give an acknowledgment for a director. Leave the acknowledgments unticked and ask the director to acknowledge, or have staff record it on paper afterward.",
-    );
-  }
+  // and recording it under the director would claim they said something they did not. Their answers were dropped above, so
+  // an act-as registration records no evidence at all.
   try {
     await recordSubmissionAcknowledgments(tx, {
       eventId: form.eventId,

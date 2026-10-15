@@ -8,7 +8,7 @@ import { findActiveMembership } from "@/modules/events/repository";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
- * Void one acknowledgment (#150), the correction path. VIEW_SENSITIVE_DATA on top of the event membership, same-origin only,
+ * Void one acknowledgment (#150), the correction path. MANAGE_REGISTRATION and VIEW_SENSITIVE_DATA, same-origin only,
  * the staff user from the session. Appends a void record with the reason; the evidence itself is never modified. Voiding twice
  * answers 200 with the first void. The registration in the URL must own the evidence.
  */
@@ -17,7 +17,10 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
   if (originError) return originError;
   try {
     const { eventId, registrationId, evidenceId } = await context.params;
-    const { user } = await requirePermission(await getCurrentSession(), eventId, "VIEW_SENSITIVE_DATA", findActiveMembership);
+    const session = await getCurrentSession();
+    // Both: seeing the evidence is sensitive, and changing what counts on a registration is registration management.
+    await requirePermission(session, eventId, "MANAGE_REGISTRATION", findActiveMembership);
+    const { user } = await requirePermission(session, eventId, "VIEW_SENSITIVE_DATA", findActiveMembership);
     const body = voidAcknowledgmentSchema.parse(await request.json());
     const outcome = await voidAcknowledgmentEvidence({ eventId, registrationId, evidenceId, reason: body.reason, actorUserId: user.id });
     return Response.json({ void: outcome.void, created: outcome.created }, { status: outcome.created ? 201 : 200, headers: { "Cache-Control": "no-store" } });

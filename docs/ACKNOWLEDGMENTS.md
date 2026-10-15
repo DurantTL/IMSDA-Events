@@ -12,8 +12,12 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
 3. **Nobody acknowledges for another adult.** #131 only records authority over minors. A household with several adults needs a
    registration-level acknowledgment, or paper acknowledgments recorded by staff for each adult.
 4. **A minor's own tick never counts**, even for a teen registering alone: a declared responsible adult must acknowledge.
-5. **Staff acting as a director cannot acknowledge for them.** Evidence has no staff-user actor, so an act-as submission with an
-   acknowledgment is refused. Giving staff that power would need a schema change and a decision about what it claims.
+5. **Staff acting as a director cannot acknowledge for them.** Evidence has no staff-user actor, so an act-as submission is made
+   without acknowledgments: they are not required, a ticked one is dropped, and no evidence is recorded. The acknowledgment stays
+   "not acknowledged" until the director gives it or staff record paper evidence through the staff route. Giving staff that
+   power would need a schema change and a decision about what it claims.
+5b. **Where people stand.** Reports, CSV exports and emails show the answer as ticked at submission. Evidence status (voids, paper
+   and staff-entered records included) is the source of truth.
 6. **Policy references are by version id.** To change wording for new registrants, publish a new policy version (or a new form
    version for typed text) and point the field at it. People who acknowledged the earlier version stay acknowledged of it;
    whether they must acknowledge again is the human "material change" flag set when the policy version was published.
@@ -25,13 +29,14 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
   to the church and events with the general registration link; only per-attendee ones are refused (at form save and publish),
   because club rosters have no responsible-adult declarations. A director's tick covers the club's roster; nothing is recorded
   per youth.
-- **Corrections: staff void an acknowledgment, with a reason.** Needs VIEW_SENSITIVE_DATA. See "Voiding" below. Evidence is
+- **Corrections: staff void an acknowledgment, with a reason.** Needs VIEW_SENSITIVE_DATA, and (the safer default, to confirm with the
+  owner) MANAGE_REGISTRATION as well. See "Voiding" below. Evidence is
   never edited or deleted.
 
 ## Voiding an acknowledgment
 
 `POST /api/events/{eventId}/registrations/{registrationId}/acknowledgments/{evidenceId}/void` with `{ "reason": "..." }`
-(1 to 1,000 characters; VIEW_SENSITIVE_DATA; same-origin).
+(1 to 1,000 characters; MANAGE_REGISTRATION and VIEW_SENSITIVE_DATA; same-origin).
 
 - A void is a new row in its own append-only table (`AcknowledgmentVoid`). The evidence row is never modified or deleted, and the
   database still refuses every UPDATE, DELETE and TRUNCATE on both tables.

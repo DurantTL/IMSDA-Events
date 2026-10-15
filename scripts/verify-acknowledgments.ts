@@ -501,6 +501,8 @@ async function main() {
   // ---- More database guards: the declared authority must be this minor's at this event, and TRUNCATE is refused ----
   assert(await rejects(raw({ subjectMinorStatus: "MINOR", guardianAuthorityId: samAuthority.id }), /not a declaration for this minor/), "an authority declared for a different minor is refused by the database");
   assert(await rejects(raw({ subjectMinorStatus: "MINOR", guardianAuthorityId: "no-such-authority" }), /not a declaration for this minor/), "an authority that does not exist is refused by the database");
+  assert(await rejects(raw({ registrationAttendeeId: sam.id, subjectPersonId: sam.personId, subjectMinorStatus: "MINOR", guardianAuthorityId: samAuthority.id, actedByPersonId: ulf.personId }), /naming the person who acknowledged/), "an authority that names a different adult than the one who acknowledged is refused by the database");
+  assert(await rejects(raw({ eventId: ids.eventA, registrationId: (await load(hidden.confirmationCode)).registration.id, registrationAttendeeId: sam.id, subjectPersonId: sam.personId, subjectMinorStatus: "MINOR", guardianAuthorityId: samAuthority.id, actedByPersonId: dan.personId }), /another event|not the subject person|on this registration/), "nor can an authority from another registration be used");
   assert(await rejects(prisma.$executeRawUnsafe('TRUNCATE TABLE "AcknowledgmentEvidence"'), /append-only|referenced in a foreign key/), "TRUNCATE is refused too");
   assert(await prisma.acknowledgmentEvidence.count({ where: { eventId: ids.eventA } }) > 0, "and nothing was removed");
 
@@ -553,6 +555,17 @@ async function main() {
     subjectMinorStatus: "ADULT", acknowledgedAt: new Date(), idempotencyKey: `${P}-skip`, requestHash: "r", generation: 5,
   } }), /generation must equal/), "a generation that skips ahead is refused by the database");
   assert(await rejects(prisma.$executeRawUnsafe(`DELETE FROM "AcknowledgmentEvidence" WHERE "id" = '${typed.evidence.id}'`), /append-only/), "the voided evidence row itself still cannot be deleted");
+
+  // ---- The event may have become a club or group event after the form was published: refused at submit time ----
+  const evidenceBeforeSubmitCheck = await prisma.acknowledgmentEvidence.count({ where: { eventId: ids.eventA } });
+  await prisma.event.update({ where: { id: ids.eventA }, data: { generalRegistrationLinkEnabled: true } });
+  let lateRefusal: unknown = null;
+  try {
+    await submit(submission({ first: "Zed" }, { reg_ack: true }, [{ clientId: "a-z", first: "Zed", age: 30 }]));
+  } catch (caught) { lateRefusal = caught; }
+  await prisma.event.update({ where: { id: ids.eventA }, data: { generalRegistrationLinkEnabled: false } });
+  assert(lateRefusal instanceof PublicRegistrationError && /recorded acknowledgment, which club and group events cannot take/.test(lateRefusal.message), "a per-attendee acknowledgment on an event that became a group event is refused at submit time with a clear message");
+  assert(await prisma.acknowledgmentEvidence.count({ where: { eventId: ids.eventA } }) === evidenceBeforeSubmitCheck, "and records nothing");
 
   // ---- Per-attendee acknowledgments are refused on club and group events at save and at publish (#150) ----
   const clubDraftDefinition = (scope: "ATTENDEE" | "REGISTRATION") => registrationFormDefinitionSchema.parse({

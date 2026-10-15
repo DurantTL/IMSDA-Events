@@ -802,6 +802,46 @@ async function main() {
   const evidence = await prisma.acknowledgmentEvidence.findMany({ where: { eventId } });
   assert(confirmedSame.status === "CONFIRMED" && evidence.length === 1, `one evidence row for the version the director saw, got ${evidence.length}`);
   assert(evidence[0]!.registrationId === confirmedSame.registrationId && evidence[0]!.formVersionId === v2.id && evidence[0]!.shownText === ACK_WORDING && evidence[0]!.channel === "ONLINE" && evidence[0]!.recordedByUserId === null, "it records that version's wording as the director's own online acknowledgment");
+  // 17b. Staff acting as a director cannot acknowledge for them, but can still register the club: the required acknowledgment is
+  // not asked for, a ticked one is dropped, no evidence exists, and it is recorded later (paper) by staff.
+  const { recordStaffAcknowledgment } = await import("../modules/acknowledgments/repository");
+  const newRosterMembers = async (tag: string) => {
+    const made: string[] = [];
+    for (const index of [1, 2]) {
+      const person = await prisma.person.create({ data: { id: `${P}_actas_${tag}${index}`, firstName: `GlActAs${tag}${index}`, lastName: "Member" } });
+      made.push((await prisma.clubRosterMember.create({ data: { organizationId: clubOf("g"), clubYear: "2026-27", personId: person.id, attendeeType: "YOUTH", role: "Pathfinder", sealedBirthDate: born, source: "DIRECTOR" } })).id);
+    }
+    return made;
+  };
+  const actAsMembers = await newRosterMembers("a");
+  const tickedMembers = await newRosterMembers("b");
+  const actAs = { userId: staffUserId, actAsId: `${P}_actas` };
+  const actAsInput = (extra: Record<string, unknown>, members = actAsMembers) => ({
+    ...portalInput(members),
+    versionId: v2.id,
+    responses: { ...portalInput(members).responses, ...extra },
+  });
+  const evidenceBefore = await prisma.acknowledgmentEvidence.count({ where: { eventId } });
+  // The acknowledgment is required on this form version, yet the act-as submission leaves it out and succeeds.
+  await club.submitClubRegistration(clubOf("g"), eventId, actAs, actAsInput({}), now, { locationId: missouri!.id, teamName: "Act As Ack", draftKey: randomUUID().replaceAll("-", "") });
+  const actAsTeam = await teamRow("g", "Act As Ack");
+  assert(actAsTeam.registration.status === "SUBMITTED", "staff acting as a director can register the club on a form with a required acknowledgment");
+  assert(await prisma.acknowledgmentEvidence.count({ where: { eventId, registrationId: actAsTeam.registrationId } }) === 0 && await prisma.acknowledgmentEvidence.count({ where: { eventId } }) === evidenceBefore, "and no evidence is recorded");
+  // A ticked answer is dropped, not recorded under the director and not stored.
+  await club.submitClubRegistration(clubOf("g"), eventId, actAs, actAsInput({ ack_release: true }, tickedMembers), now, { locationId: missouri!.id, teamName: "Act As Ticked", draftKey: randomUUID().replaceAll("-", "") });
+  const ticked = await prisma.clubEventRegistration.findFirst({ where: { eventId, organizationId: clubOf("g"), teamName: "Act As Ticked" }, include: { registration: { include: { publicFormSubmission: true } } } });
+  assert(ticked, "the act-as submission with a tick registered the club");
+  {
+    assert(await prisma.acknowledgmentEvidence.count({ where: { eventId, registrationId: ticked.registrationId } }) === 0, "a tick sent with an act-as submission records nothing");
+    assert((ticked.registration.publicFormSubmission?.responses as Record<string, unknown> | null)?.ack_release === undefined, "and is not stored as the director's answer");
+  }
+  // Later, staff record it on paper for the director (the account holder), and the evidence names that.
+  const actAsRecord = await recordStaffAcknowledgment({ eventId, registrationId: actAsTeam.registrationId, fieldKey: "ack_release", channel: "PAPER", actorUserId: staffUserId, clientRequestId: randomUUID() });
+  assert(actAsRecord.created && actAsRecord.evidence.channel === "PAPER" && actAsRecord.evidence.registrationId === actAsTeam.registrationId, "a paper record by staff afterward works");
+  const paperRow = await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: actAsRecord.evidence.id } });
+  assert(paperRow.recordedByUserId === staffUserId && paperRow.actedByPersonId === actAsTeam.registration.accountHolderPersonId && paperRow.shownText === ACK_WORDING, "naming the staff recorder and the registrant, with the form's own wording");
+  console.log("ok  acknowledgments: staff acting as a director register the club without evidence; paper evidence follows");
+
   console.log("ok  acknowledgments: a form changed since a team was received never gives it evidence for new wording");
 
   console.log("ok  all general registration link checks passed");

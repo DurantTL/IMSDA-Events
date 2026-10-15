@@ -50,11 +50,10 @@ describe("where evidence is written", () => {
     expect(publicRepository).toContain('channel: "ONLINE"');
     expect(publicRepository).toContain("recordedByUserId: null");
     expect(publicRepository).not.toContain("recordedByUserId: club");
-    const refusal = publicRepository.indexOf("Staff cannot give an acknowledgment for a director");
-    const recording = publicRepository.indexOf("await recordSubmissionAcknowledgments(tx");
-    expect(refusal).toBeGreaterThan(0);
-    expect(refusal).toBeLessThan(recording);
-    expect(publicRepository).toContain("club?.submittedByUserId && planAcknowledgments(");
+    // Act-as answers are dropped and not required, so the registration is made with no evidence.
+    expect(publicRepository).toContain("const actAsAcknowledgmentKeys = club?.submittedByUserId");
+    expect(publicRepository).toContain("optionalFieldKeys: actAsAcknowledgmentKeys.size > 0");
+    expect(publicRepository).toContain("This form asks each attendee for a recorded acknowledgment, which club and group events cannot take.");
   });
 
   it("refuses a submission with an unauthorized acknowledgment as an invalid submission that marks the field", () => {
