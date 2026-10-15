@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { getServerEnv } from "@/lib/env";
+import { pauseBeforeRetry } from "@/lib/prisma-errors";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { HonorConfigurationError } from "@/modules/honors/repository";
@@ -12,6 +13,7 @@ import {
   ClassSelectionError,
   eventPrerequisiteHonorIds,
   getClassSelectionWorkspace,
+  isRetryableSeatConflict,
   liveWaitlistOffer,
   loadMemberRequirements,
   loadOfferings,
@@ -222,7 +224,15 @@ const waitingEntrySelect = {
  * caller already holds them). Free seats are capacity less seats taken and less live
  * offers, so it can never offer a seat that is taken or already offered.
  */
-export async function promoteClassWaitlists(tx: Tx, eventId: string, offeringIds: readonly string[], now: Date, silentEntryIds: ReadonlySet<string> = new Set()): Promise<PromotionResult> {
+export async function promoteClassWaitlists(
+  tx: Tx,
+  eventId: string,
+  offeringIds: readonly string[],
+  now: Date,
+  silentEntryIds: ReadonlySet<string> = new Set(),
+  /** Registrations being brought back to life by this very transaction (#880): their places are not cleaned off as "cancelled". */
+  exemptRegistrationIds: ReadonlySet<string> = new Set(),
+): Promise<PromotionResult> {
   const ids = [...new Set(offeringIds)].sort();
   const result: PromotionResult = { messageIds: [], offered: 0, lapsed: 0 };
   if (ids.length === 0) return result;
@@ -234,7 +244,7 @@ export async function promoteClassWaitlists(tx: Tx, eventId: string, offeringIds
   for (const offeringId of ids) {
     const offering = offeringsById.get(offeringId);
     if (!offering) continue;
-    const one = await promoteOne(tx, event, offering, offeringsById, prerequisiteHonorIds, now, silentEntryIds);
+    const one = await promoteOne(tx, event, offering, offeringsById, prerequisiteHonorIds, now, silentEntryIds, exemptRegistrationIds);
     result.messageIds.push(...one.messageIds);
     result.offered += one.offered;
     result.lapsed += one.lapsed;
@@ -251,6 +261,7 @@ async function promoteOne(
   now: Date,
   /** Entries the caller is about to settle itself (a direct pick of the class they wait on): they keep their turn but are not offered, so no email goes out for a seat they take at once. */
   silentEntryIds: ReadonlySet<string>,
+  exemptRegistrationIds: ReadonlySet<string> = new Set(),
 ) {
   const out: PromotionResult = { messageIds: [], offered: 0, lapsed: 0 };
   const eventId = event.id;
@@ -258,10 +269,10 @@ async function promoteOne(
   // 1. Offers that ran out, that the class-change deadline cut off, or whose registration was cancelled give their seat back.
   const holding = await tx.honorClassWaitlistEntry.findMany({
     where: { offeringId: offering.id, status: "OFFERED" },
-    select: { id: true, offerExpiresAt: true, registrationAttendeeId: true, registration: { select: { status: true, location: { select: locationDates } } } },
+    select: { id: true, offerExpiresAt: true, registrationId: true, registrationAttendeeId: true, registration: { select: { status: true, location: { select: locationDates } } } },
   });
   for (const entry of holding) {
-    const cancelled = !activeStatuses.includes(entry.registration.status as ActiveStatus);
+    const cancelled = !activeStatuses.includes(entry.registration.status as ActiveStatus) && !exemptRegistrationIds.has(entry.registrationId);
     const ranOut = entry.offerExpiresAt === null || entry.offerExpiresAt.getTime() <= now.getTime();
     const closed = !classChangesOpen(event, entry.registration.location, now);
     const inactive = !offering.isActive;
@@ -282,7 +293,7 @@ async function promoteOne(
   }
   // Places of cancelled registrations are cleaned off the list.
   await tx.honorClassWaitlistEntry.updateMany({
-    where: { offeringId: offering.id, status: "WAITING", registration: { status: { notIn: activeStatuses } } },
+    where: { offeringId: offering.id, status: "WAITING", registration: { status: { notIn: activeStatuses } }, registrationId: { notIn: [...exemptRegistrationIds] } },
     data: { status: "REMOVED", resolvedAt: now, resolution: "Registration cancelled" },
   });
 
@@ -480,9 +491,9 @@ async function runSerializable<T>(work: (tx: Tx) => Promise<T>) {
     try {
       return await prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
-      const retryable = error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2034" || error.code === "P2002");
-      if (!retryable) throw error;
+      if (!isRetryableSeatConflict(error)) throw error;
       if (attempt === 3) throw new ClassSelectionError("SELECTION_CONFLICT", "Several people were choosing classes at once. Please try again.");
+      await pauseBeforeRetry(attempt);
     }
   }
 }

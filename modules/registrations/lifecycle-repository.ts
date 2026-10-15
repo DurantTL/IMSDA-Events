@@ -31,6 +31,7 @@ import {
   remainingEventCapacity,
 } from "@/modules/events/lifecycle";
 import { getRegistrationById, type RegistrationRecord } from "@/modules/registrations/repository";
+import type { RestoredClassSeats } from "@/modules/honors/restore-seats";
 
 export type RegistrationLifecycleErrorCode =
   | "REGISTRATION_NOT_FOUND"
@@ -469,10 +470,7 @@ async function auditTransition(
   });
 }
 
-type ClassSeatsRestored = {
-  dropped: { report: string[]; items: unknown[] };
-  pendingMessageIds: string[];
-};
+type ClassSeatsRestored = RestoredClassSeats;
 
 /** Re-takes a registration's Honors Weekend class seats before it becomes active again (#880). */
 async function restoreClassSeats(
@@ -496,8 +494,11 @@ async function restoreClassSeats(
   });
 }
 
-function classSeatsAuditMetadata(dropped: ClassSeatsRestored["dropped"]) {
-  return dropped.items.length > 0 ? { classPicksNotRestored: dropped.items.length } : {};
+function classSeatsAuditMetadata(restored: ClassSeatsRestored) {
+  return {
+    ...(restored.droppedCount > 0 ? { classPicksNotRestored: restored.droppedCount } : {}),
+    ...(restored.keptOverCount > 0 ? { classPicksKeptOverCapacity: restored.keptOverCount } : {}),
+  };
 }
 
 async function promoteWithinTransaction(
@@ -562,7 +563,7 @@ async function promoteWithinTransaction(
       totalAmountPreserved: true,
       paymentHistoryPreserved: true,
       lodgingRequestHeld: lodging.hasRequest,
-      ...classSeatsAuditMetadata(classSeats.dropped),
+      ...classSeatsAuditMetadata(classSeats),
     },
   });
   await recordLocationWaitlistChange(tx, {
@@ -720,9 +721,11 @@ export async function promoteWaitlistAfterSeatsFreed(
 ) {
   const promotedRegistrationIds: string[] = [];
   const pendingMessageIds: string[] = [];
+  // Class picks the promoted registrations could not take back (#880), one line each, for the caller to show staff.
+  const classPicksNotRestored: string[] = [];
   const event = await loadEvent(tx, input.eventId);
   if (!event.waitlistEnabled || !event.autoPromoteWaitlist) {
-    return { promotedRegistrationIds, pendingMessageIds };
+    return { promotedRegistrationIds, pendingMessageIds, classPicksNotRestored };
   }
   const now = input.now ?? new Date();
   const correlationId = input.correlationId ?? crypto.randomUUID();
@@ -733,12 +736,13 @@ export async function promoteWaitlistAfterSeatsFreed(
     if (!promoted) break;
     promotedRegistrationIds.push(promoted.registrationId);
     pendingMessageIds.push(...promoted.pendingMessageIds);
+    classPicksNotRestored.push(...promoted.classPicksNotRestored);
     if (!input.repeat) break;
     if (round === maximumPromotionRounds - 1) {
       logWarn("Waitlist promotion stopped at its round limit with clubs possibly still waiting.", { eventId: input.eventId, rounds: maximumPromotionRounds });
     }
   }
-  return { promotedRegistrationIds, pendingMessageIds };
+  return { promotedRegistrationIds, pendingMessageIds, classPicksNotRestored };
 }
 
 function retryableTransactionError(error: unknown) {
@@ -1134,7 +1138,7 @@ export async function reactivateRegistration(
         restoredStatus: targetStatus,
         totalAmountPreserved: true,
         paymentHistoryPreserved: true,
-        ...classSeatsAuditMetadata(classSeats.dropped),
+        ...classSeatsAuditMetadata(classSeats),
       },
     });
     const queued = await enqueueRegistrationReactivatedMessage(tx, {

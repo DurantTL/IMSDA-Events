@@ -17,11 +17,13 @@
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import { ClassSelectionError, setClassSelections } from "../modules/honors/enrollment-repository";
-import { createHonorOffering } from "../modules/honors/repository";
+import { createHonorOffering, HonorConfigurationError, updateHonorOffering } from "../modules/honors/repository";
 import { joinClassWaitlist } from "../modules/honors/waitlist-repository";
+import { isSerializationFailure, pauseBeforeRetry } from "../lib/prisma-errors";
 import {
   cancelRegistration,
   moveRegistrationToWaitlist,
+  promoteWaitlistAfterSeatsFreed,
   promoteRegistrationFromWaitlist,
   reactivateRegistration,
 } from "../modules/registrations/lifecycle-repository";
@@ -32,7 +34,7 @@ const prisma = new PrismaClient();
 const P = "hrs";
 const adminId = `${P}_admin`;
 const eventId = `${P}_event`;
-const clubKeys = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"] as const;
+const clubKeys = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "m1", "m2", "k1", "k2", "e1", "e2", "d1", "d2", "d3", "q1", "q2"] as const;
 type ClubKey = (typeof clubKeys)[number];
 const now = new Date("2026-10-15T15:00:00Z");
 const hours = (base: Date, count: number) => new Date(base.getTime() + count * 60 * 60 * 1000);
@@ -49,6 +51,7 @@ async function cleanup() {
   await prisma.messageOutbox.deleteMany({ where: { eventId } });
   await prisma.honorClassWaitlistEntry.deleteMany({ where: { eventId } });
   await prisma.honorEnrollment.deleteMany({ where: { eventId } });
+  await prisma.memberHonorEntry.deleteMany({ where: { organizationId: { startsWith: `${P}_org_` } } });
   await prisma.registrationWaitlistEntry.deleteMany({ where: { eventId } });
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId }, { actorUserId: adminId }] } });
   await prisma.clubEventRegistration.deleteMany({ where: { eventId } });
@@ -99,9 +102,13 @@ async function expectCode(work: Promise<unknown>, code: ClassSelectionError["cod
 }
 
 /** Whatever happened, no class holds more than its capacity in seats plus live offers, or more than its per-club limit for a club. */
+/** Classes where a pick is deliberately kept over capacity (marks, or class changes closed): checked by their own scenarios. */
+const overCapacityByDesign = new Set<string>();
+
 async function assertNoOverfill(when: string, at = now) {
   const offerings = await prisma.honorOffering.findMany({ where: { eventId }, select: { id: true, capacity: true, perClubLimit: true } });
   for (const offering of offerings) {
+    if (overCapacityByDesign.has(offering.id)) continue;
     const rows = await prisma.honorEnrollment.findMany({
       where: { offeringId: offering.id, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
       select: { organizationId: true },
@@ -320,7 +327,140 @@ async function main() {
   await assertNoOverfill("after the races");
   console.log("ok  reinstatements racing each other or a direct pick never overfill a class");
 
-  // ---- 8. The audit trail names no one
+  // ---- 8. Picks with attendance or completion marks are never dropped (they would take those records with them)
+  const classM = await makeClass(s1.id, 2);
+  overCapacityByDesign.add(classM);
+  await addPerson("m1", "mm1");
+  await addPerson("m2", "mm2");
+  await addPerson("k1", "kk1");
+  await addPerson("k2", "kk2");
+  await pick("mm1", [classM]);
+  await pick("mm2", [classM]);
+  const markedPick = await prisma.honorEnrollment.findFirstOrThrow({ where: { registrationAttendeeId: attendeeOf("mm1"), offeringId: classM } });
+  await prisma.honorEnrollmentMark.create({ data: { enrollmentId: markedPick.id, attended: true, completed: false } });
+  const linkedPick = await prisma.honorEnrollment.findFirstOrThrow({ where: { registrationAttendeeId: attendeeOf("mm2"), offeringId: classM } });
+  const linkedPerson = (await prisma.registrationAttendee.findUniqueOrThrow({ where: { id: attendeeOf("mm2") }, select: { personId: true } })).personId!;
+  const linkedHonor = (await prisma.honorOfferingHonor.findFirstOrThrow({ where: { offeringId: classM }, select: { honorId: true } })).honorId;
+  const entry = await prisma.memberHonorEntry.create({ data: { personId: linkedPerson, honorId: linkedHonor, status: "COMPLETED", completionDate: "2026-10-01", organizationId: orgOf("m2") } });
+  await prisma.honorWeekendCompletionLink.create({ data: { enrollmentId: linkedPick.id, honorId: linkedHonor, memberHonorEntryId: entry.id } });
+  await cancel("m1");
+  await cancel("m2");
+  await pick("kk1", [classM]);
+  await pick("kk2", [classM]);
+  assert((await seats(classM)) === 2, "the class was filled while both were cancelled");
+  const markedBack = await reactivate("m1");
+  const linkedBack = await reactivate("m2");
+  assert((await holds("mm1", classM)) && (await holds("mm2", classM)), "picks with an attendance mark or a written-back completion are kept");
+  assert(await prisma.honorEnrollmentMark.count({ where: { enrollmentId: markedPick.id } }) === 1 && await prisma.honorWeekendCompletionLink.count({ where: { enrollmentId: linkedPick.id } }) === 1, "and so are the records that hang on them");
+  assert(markedBack.classPicksNotRestored.length === 1 && /kept over capacity: already has attendance or completion marks/.test(markedBack.classPicksNotRestored[0]!), "staff are told it was kept over capacity because of its marks");
+  assert(linkedBack.classPicksNotRestored.length === 1 && /kept over capacity: already has attendance or completion marks/.test(linkedBack.classPicksNotRestored[0]!), "the same for a completion link");
+  assert((await notRestoredAudit("m1")).length === 0, "nothing was dropped");
+  const keptAudit = await prisma.auditLog.findMany({ where: { entityId: { in: [regOf("m1"), regOf("m2")] }, action: "HONOR_CLASS_PICK_KEPT_OVER_CAPACITY" } });
+  assert(keptAudit.length === 2 && keptAudit.every((row) => (row.metadata as Record<string, unknown>).keptBecause === "HAS_MARKS" && !/Test|Director|@example/.test(JSON.stringify(row.metadata) + row.summary)), "each kept pick is audited by id with the reason");
+  const keptMail = await notRestoredMail("m1");
+  assert(keptMail.length === 1 && /Staff will follow up/.test(keptMail[0]!.bodyTextSnapshot) && !/choose another class|waitlist/.test(keptMail[0]!.bodyTextSnapshot), "the director is told staff will follow up, and promised no re-pick");
+  console.log("ok  a pick with attendance or completion marks is kept over capacity, flagged to staff, audited by id, and never deleted");
+
+  // ---- 9. After class changes have closed nothing is dropped
+  const classK = await makeClass(s2.id, 1);
+  overCapacityByDesign.add(classK);
+  await addPerson("e1", "ee1");
+  await addPerson("e2", "ee2");
+  await pick("ee1", [classK]);
+  await cancel("e1");
+  await pick("ee2", [classK]);
+  const afterClose = new Date("2026-12-01T15:00:00Z"); // the event's class-change deadline is 2026-11-30
+  const closed = await reactivate("e1", afterClose);
+  assert(await holds("ee1", classK), "after class changes closed the pick stays although the class is full");
+  assert((await seats(classK)) === 2, "the class is over capacity, by decision");
+  assert(closed.classPicksNotRestored.length === 1 && /kept over capacity after class changes closed/.test(closed.classPicksNotRestored[0]!), "staff are told");
+  assert((await notRestoredAudit("e1")).length === 0, "nothing was dropped");
+  const closedAudit = await prisma.auditLog.findMany({ where: { entityId: regOf("e1"), action: "HONOR_CLASS_PICK_KEPT_OVER_CAPACITY" } });
+  assert(closedAudit.length === 1 && (closedAudit[0]!.metadata as Record<string, unknown>).keptBecause === "CLASS_CHANGES_CLOSED", "audited by id with the reason");
+  const closedMail = await notRestoredMail("e1");
+  assert(closedMail.length === 1 && /Staff will follow up/.test(closedMail[0]!.bodyTextSnapshot) && !/choose another class|join the class waitlist/.test(closedMail[0]!.bodyTextSnapshot), "the director is told staff will follow up, not to pick again");
+  console.log("ok  after class changes closed nothing is dropped; staff are told and the director is told staff will follow up");
+
+  // ---- 10. The restore leaves the club's own class waitlist places alone
+  const classHeld = await makeClass(s1.id, 1);
+  const classRoomy = await makeClass(s3.id, 5);
+  await addPerson("c4", "own1"); // holds the only seat
+  await addPerson("c6", "own2"); // waits for it, and holds a pick elsewhere so the restore has work to do
+  await pick("own1", [classHeld]);
+  await pick("own2", [classRoomy]);
+  await joinClassWaitlist(orgOf("c6"), eventId, director("c6"), { attendeeId: attendeeOf("own2"), offeringId: classHeld }, now);
+  await moveRegistrationToWaitlist(eventId, regOf("c6"), adminId, "synthetic", now);
+  await promoteRegistrationFromWaitlist(eventId, regOf("c6"), adminId, "synthetic", now);
+  const ownPlace = await prisma.honorClassWaitlistEntry.findFirstOrThrow({ where: { registrationAttendeeId: attendeeOf("own2"), offeringId: classHeld } });
+  assert(ownPlace.status === "WAITING", `the club's own waitlist place survives its own restore, got ${ownPlace.status}`);
+  assert(await holds("own2", classRoomy), "and its pick came back");
+  console.log("ok  the restore does not remove the club's own waitlist places");
+
+  // ---- 11. A pick save racing a multi-round promotion: deadlocks and serialization failures are retried, not surfaced
+  const classQ1 = await makeClass(s1.id, 10);
+  const classQ3 = await makeClass(s3.id, 10);
+  const classQ4 = await makeClass(s2.id, 1);
+  await addPerson("d1", "dd1");
+  await addPerson("d2", "dd2");
+  await addPerson("d3", "dd3");
+  await addPerson("q1", "qq1");
+  await addPerson("q1", "qq1b");
+  await addPerson("q2", "qq2");
+  await pick("dd1", [classQ3]);
+  await pick("dd2", [classQ1]);
+  await pick("dd3", [classQ4]);
+  for (const club of ["d1", "d2", "d3"] as const) await moveRegistrationToWaitlist(eventId, regOf(club), adminId, "synthetic", now);
+  await pick("qq2", [classQ4]); // takes the only seat dd3 wanted
+  await prisma.event.update({ where: { id: eventId }, data: { autoPromoteWaitlist: true } });
+  const promoteAll = async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await prisma.$transaction(
+          (tx) => promoteWaitlistAfterSeatsFreed(tx, { eventId, actorUserId: adminId, trigger: { locationId: null, reason: "synthetic" }, now, repeat: true }),
+          { isolationLevel: "Serializable", timeout: 30_000 },
+        );
+      } catch (error) {
+        if (!isSerializationFailure(error) || attempt === 8) throw error;
+        await pauseBeforeRetry(attempt);
+      }
+    }
+  };
+  const saves = (async () => {
+    // Saves that lock the same classes in sorted order while the promotion walks them in queue order.
+    for (let round = 0; round < 6; round += 1) {
+      const on = round % 2 === 0;
+      await setClassSelections(orgOf("q1"), eventId, director("q1"), { [attendeeOf("qq1")]: on ? [classQ1] : [], [attendeeOf("qq1b")]: on ? [classQ3] : [] }, now).catch((error) => {
+        if (!(error instanceof ClassSelectionError)) throw error;
+      });
+    }
+  })();
+  const [promotion] = await Promise.all([promoteAll(), saves]);
+  assert(promotion.promotedRegistrationIds.length === 3, `every waiting registration was promoted, got ${promotion.promotedRegistrationIds.length}`);
+  assert((await statusOfReg("d1")) === "SUBMITTED" && (await statusOfReg("d2")) === "SUBMITTED" && (await statusOfReg("d3")) === "SUBMITTED", "all three are active");
+  assert(promotion.classPicksNotRestored.length === 1 && /Test dd3: .* was not restored because the class filled up/.test(promotion.classPicksNotRestored[0]!), "the promotion returns the pick that could not come back, for the caller to show staff");
+  assert((await holds("dd1", classQ3)) && (await holds("dd2", classQ1)) && !(await holds("dd3", classQ4)), "the picks that fit came back and the full one did not");
+  await prisma.event.update({ where: { id: eventId }, data: { autoPromoteWaitlist: false } });
+  await assertNoOverfill("after the racing promotion");
+  console.log("ok  a pick save racing a multi-round promotion finishes; the promotion reports what it could not restore");
+
+  // ---- 12. A class's seat limit can't go below the seats it holds
+  const classCap = await makeClass(s1.id, 3);
+  await addPerson("c7", "cap1");
+  await addPerson("c8", "cap2");
+  await pick("cap1", [classCap]);
+  await pick("cap2", [classCap]);
+  const refusal = await updateHonorOffering(eventId, classCap, { capacity: 1 }, adminId).then(() => null, (error: unknown) => error);
+  assert(refusal instanceof HonorConfigurationError && refusal.code === "CAPACITY_BELOW_SEATS_TAKEN" && /already has 2 seats taken/.test(refusal.message), `lowering below the seats taken is refused with the count, got ${String(refusal)}`);
+  assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 3, "the limit is unchanged");
+  await updateHonorOffering(eventId, classCap, { capacity: 2 }, adminId);
+  assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 2, "lowering to exactly the seats taken is allowed");
+  // Cancelled registrations hold no seats, so they don't count.
+  await cancel("c8");
+  await updateHonorOffering(eventId, classCap, { capacity: 1 }, adminId);
+  assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 1, "seats of a cancelled registration don't hold the limit up");
+  console.log("ok  a seat limit can't be set below the seats taken, and the refusal says how many");
+
+  // ---- 13. The audit trail names no one
   const entries = await prisma.auditLog.findMany({ where: { eventId, action: "HONOR_CLASS_PICK_NOT_RESTORED" }, select: { summary: true, metadata: true } });
   assert(entries.length >= 6 && entries.every((entry) => !/Test|Director/.test(entry.summary) && !/firstName|lastName|@example/.test(JSON.stringify(entry.metadata))), "every audit entry names no one");
   console.log("ok  every dropped pick is audited with ids and no names");

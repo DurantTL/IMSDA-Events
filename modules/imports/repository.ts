@@ -11,6 +11,20 @@ const SOURCE_SYSTEM = "WR26_CSV_STAGING";
 const WR26_BUNDLE_SOURCE_SYSTEM = "WR26_GOOGLE_SHEETS_BUNDLE";
 type DatabaseClient = PrismaClient | Prisma.TransactionClient;
 
+/**
+ * An import may not bring a cancelled or waitlisted registration back to submitted or confirmed (#880). Seats are counted by
+ * registration status, so that would re-occupy every Honors Weekend class seat it held without the capacity check a staff
+ * reactivation or promotion makes. Staff reactivate or promote it from the registration, which also reports any class picks
+ * that no longer fit.
+ */
+export function importWouldReinstate(currentStatus: string, nextStatus: string) {
+  return (currentStatus === "CANCELLED" || currentStatus === "WAITLISTED") && (nextStatus === "SUBMITTED" || nextStatus === "CONFIRMED");
+}
+
+export function importReinstateRefusal(confirmationCode: string, currentStatus: string) {
+  return `Registration ${confirmationCode} is ${currentStatus.toLowerCase()}, and an import does not bring it back. Reactivate or promote it from the registration so its class seats are checked, then import again.`;
+}
+
 export class ImportOperationError extends Error {
   constructor(
     public readonly code: "IMPORT_NOT_FOUND" | "IMPORT_HAS_ERRORS" | "IMPORT_NOT_READY" | "IMPORT_CONFLICT",
@@ -246,6 +260,8 @@ async function previewImportRows(input: {
         // A registration made through a personal staff, pastor or volunteer link (#804) is $0 and moves only through the
         // office's approval, so a legacy file may not change its status, amount or people. The row is flagged and skipped.
         errors.push("This confirmation code belongs to a staff, pastor or volunteer registration made through a personal invitation link. The import does not change those; the office manages them from Staff invitations.");
+      } else if (registration && importWouldReinstate(registration.status, row.data.status)) {
+        errors.push(importReinstateRefusal(row.data.confirmationCode, registration.status));
       } else if (registration) {
         differences = differencesFor(row.data, registration);
         if (row.data.attendees) {
@@ -736,6 +752,8 @@ export async function commitImportRun(eventId: string, importRunId: string, acto
         const registration = await tx.registration.findFirst({ where: { id: record.matchedRegistrationId, eventId }, include: { attendees: { orderBy: { createdAt: "asc" }, take: 1 }, staffInvitation: { select: { id: true } } } });
         if (!registration) throw new ImportOperationError("IMPORT_CONFLICT", `Registration ${data.confirmationCode} changed after preview.`);
         if (registration.staffInvitation) throw new ImportOperationError("IMPORT_CONFLICT", `Registration ${data.confirmationCode} is a staff invitation registration, which an import does not change.`);
+        // The preview refuses this too; checked again because the registration may have changed since (#880).
+        if (importWouldReinstate(registration.status, data.status)) throw new ImportOperationError("IMPORT_CONFLICT", importReinstateRefusal(data.confirmationCode, registration.status));
         await tx.person.update({ where: { id: registration.accountHolderPersonId }, data: { firstName: data.firstName, lastName: data.lastName, normalizedEmail: data.email || null, phone: data.phone || null } });
         await tx.registration.update({ where: { id: registration.id }, data: { status: data.status, totalAmount: data.totalAmountCents / 100, submittedAt: data.submittedAt ? new Date(data.submittedAt) : null } });
         if (!data.attendees && registration.attendees[0]) {

@@ -6,7 +6,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import type { HonorImportStep } from "@/modules/honors/catalog-csv";
 import { isRoomBookedIndex, isRoomCapacityRefusal } from "@/modules/honors/room-errors";
 import { eventHasActiveLocations, offeringSiteId } from "@/modules/honors/locations";
-import { countEnrolledYouthNotMeeting } from "@/modules/honors/enrollment-repository";
+import { countEnrolledYouthNotMeeting, seatHoldingEnrollment } from "@/modules/honors/enrollment-repository";
 import { clubClassLevels } from "@/modules/club-rosters/domain";
 import {
   classSlotConflict,
@@ -54,6 +54,7 @@ export type HonorErrorCode =
   | "ROOM_NOT_FOUND"
   | "ROOM_NAME_CONFLICT"
   | "ROOM_TOO_SMALL"
+  | "CAPACITY_BELOW_SEATS_TAKEN"
   | "ROOM_IN_USE"
   | "ROOM_BOOKED"
   | "ROOM_WRONG_SITE"
@@ -896,6 +897,21 @@ export async function updateHonorOffering(
               enrolled,
             );
           }
+        }
+      }
+
+      // The seat limit can't be set below the seats the class holds (#880): the picks stay, so the class would be over its limit.
+      // Locked like a pick save locks it, so a pick saved at the same moment is counted. Re-saving an unchanged limit is fine.
+      if (details.capacity !== undefined && details.capacity !== existing.capacity) {
+        await tx.$queryRaw`SELECT id FROM "HonorOffering" WHERE id = ${offeringId} FOR UPDATE`;
+        const taken = await tx.honorEnrollment.count({ where: { offeringId, ...seatHoldingEnrollment } });
+        if (details.capacity < taken) {
+          throw new HonorConfigurationError(
+            "CAPACITY_BELOW_SEATS_TAKEN",
+            `This class already has ${taken} seat${taken === 1 ? "" : "s"} taken, so its limit can't be lowered to ${details.capacity}. Remove picks first, or keep the limit at ${taken} or more.`,
+            undefined,
+            { seatsTaken: taken, requestedCapacity: details.capacity },
+          );
         }
       }
 

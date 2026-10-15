@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   chooseLocationFirstMessage,
@@ -328,8 +329,12 @@ async function getOwnerClassSelectionWorkspace(owner: SeatOwner, eventId: string
 
 export type ClassSelectionWorkspace = Awaited<ReturnType<typeof getClassSelectionWorkspace>>;
 
-function isSerializationFailure(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2034" || error.code === "P2002");
+/**
+ * A lost conflict a retry resolves: a serialization failure or deadlock (the shared check also covers 40P01 and the raw-query
+ * P2010 wrapping, #880), or the unique-index race of two saves creating the same seat (P2002).
+ */
+export function isRetryableSeatConflict(error: unknown) {
+  return isSerializationFailure(error) || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002");
 }
 
 /**
@@ -599,10 +604,11 @@ async function setOwnerClassSelections(
       if (waitlistMessageIds.length > 0) await (await import("@/modules/honors/waitlist-repository")).deliverWaitlistOfferMessages(waitlistMessageIds);
       return getOwnerClassSelectionWorkspace(owner, eventId, now);
     } catch (error) {
-      if (!isSerializationFailure(error)) throw error;
+      if (!isRetryableSeatConflict(error)) throw error;
       if (attempt === 3) {
         throw new ClassSelectionError("SELECTION_CONFLICT", "Several people were choosing classes at once. Please save again.");
       }
+      await pauseBeforeRetry(attempt);
     }
   }
 }

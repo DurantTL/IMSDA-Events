@@ -95,7 +95,8 @@ A cancelled or waitlisted registration keeps its class picks but holds no seats,
 counted by registration status. Flipping the status back used to re-occupy every old seat, so a seat
 given away in between (to a direct pick or an accepted waitlist offer) left the class over capacity.
 
-Decision (owner, 2026-10-15): the registration comes back **without the picks that no longer fit**.
+Decisions (owner, 2026-10-15): before the class-change deadline the registration comes back **without
+the picks that no longer fit**; after class changes have closed for its site **nothing is dropped**.
 
 - Every flip back to SUBMITTED/CONFIRMED does it: a staff reactivation, a staff promotion from the
   registration waitlist, and the automatic promotion after a cancellation or freed seats
@@ -104,13 +105,30 @@ Decision (owner, 2026-10-15): the registration comes back **without the picks th
   save, gives a class's waitlist its free seats first (a restored pick never jumps the line, and a
   seat held for a live offer is not available), then keeps each pick that still fits the class
   capacity and the per-club limit. Staff, adults and underage children take no seat and always come back.
-- A dropped pick is removed and audited as `HONOR_CLASS_PICK_NOT_RESTORED` (ids only: class, youth,
-  enrollment, reason `CLASS_FULL` or `CLUB_LIMIT_REACHED`, and what triggered it). The reactivation or
-  promotion's own audit entry counts them.
+  The registration's own waitlist places are left as they are.
+- Before the deadline a pick that doesn't fit is removed and audited as `HONOR_CLASS_PICK_NOT_RESTORED`
+  (ids only: class, youth, enrollment, reason `CLASS_FULL` or `CLUB_LIMIT_REACHED`, and what triggered it).
+- A pick that doesn't fit is **kept over capacity** and audited as `HONOR_CLASS_PICK_KEPT_OVER_CAPACITY`
+  (`keptBecause`: `CLASS_CHANGES_CLOSED` after the deadline, or `HAS_MARKS` when it already has an
+  instructor attendance mark or a written-back completion, which deleting it would delete). Staff see
+  "kept over capacity" lines for these.
+- The reactivation or promotion's own audit entry counts both kinds.
 - The director gets one email through the outbox (`HONOR_CLASS_PICKS_NOT_RESTORED`, delivered after the
-  commit with the other pending messages) listing the classes, so they can pick again or join the waitlist.
-- Staff see the same lines in the response of the lifecycle action and in the people workspace notice.
-- Other paths that give seats back already check capacity (a club transfer re-checks the class).
+  commit with the other pending messages). Its wording follows what is possible: choosing another class
+  only while class changes are open, joining the waitlist only for a club (a group has none, and its link is
+  the private registration link), and for kept picks only that staff will follow up.
+- Staff see the lines in the response of the reactivate, promote and cancel (automatic promotion) actions
+  and in the people workspace notice. `promoteWaitlistAfterSeatsFreed` returns them as
+  `classPicksNotRestored` too, but the amendment, club transfer and location-capacity screens do not show
+  them yet: for those the picks are audited and the director is emailed, and staff find them in the audit log.
+- A club transfer already re-checks class capacity. An import may not bring a cancelled or waitlisted
+  registration back to submitted or confirmed (the preview reports it as an error, and the commit refuses
+  it again), so staff reactivate or promote it from the registration instead.
+- A class's seat limit can't be lowered below the seats it holds (seats of active registrations); the
+  refusal says how many are taken.
+- Pick saves and the waitlist transactions retry serialization failures and deadlocks (the shared
+  `isSerializationFailure`, which also covers 40P01 and raw-query wrapping). A multi-round promotion
+  takes class locks in queue order rather than one sorted order, so a rare deadlock is possible; the loser retries.
 - Proof against a real database: `npm run test:honor-reinstate-seats`.
 
 ## Not done

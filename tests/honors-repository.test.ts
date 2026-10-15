@@ -97,6 +97,8 @@ function fakeDatabase() {
       },
     },
     $executeRaw: async () => 1,
+    // The class lock a seat-limit edit takes (#880).
+    $queryRaw: async () => [],
     honorWeekendCompletionLink: {
       groupBy: async ({ where }: { where: { honorId: { in: string[] }; enrollment: { offeringId: string } } }) => db.writtenBackHonors
         .filter((row) => row.offeringId === where.enrollment.offeringId && where.honorId.in.includes(row.honorId))
@@ -324,6 +326,30 @@ describe("honor offerings", () => {
       .rejects.toMatchObject({ code: "OFFERING_NOT_FOUND" });
     await updateHonorOffering("site-a", offeringId, { capacity: 12, isActive: false }, "staff-1");
     expect(fake.db.offerings[0]).toMatchObject({ capacity: 12, isActive: false });
+  });
+
+  it("refuses a seat limit below the seats the class holds, saying how many are taken (#880)", async () => {
+    await createHonorOffering("site-a", offeringInput({ capacity: 5 }), "staff-1");
+    const offeringId = fake.db.offerings[0].id;
+    fake.db.pickedOfferingIds.push(offeringId, offeringId, offeringId);
+    await expect(updateHonorOffering("site-a", offeringId, { capacity: 2 }, "staff-1")).rejects.toMatchObject({
+      code: "CAPACITY_BELOW_SEATS_TAKEN",
+      message: expect.stringMatching(/already has 3 seats taken.*lowered to 2/),
+      details: { seatsTaken: 3, requestedCapacity: 2 },
+    });
+    expect(fake.db.offerings[0].capacity).toBe(5);
+    await updateHonorOffering("site-a", offeringId, { capacity: 3 }, "staff-1");
+    expect(fake.db.offerings[0].capacity).toBe(3);
+    await updateHonorOffering("site-a", offeringId, { capacity: 10 }, "staff-1");
+    expect(fake.db.offerings[0].capacity).toBe(10);
+  });
+
+  it("lets an edit that leaves the seat limit as it is through, even when the class is already over it", async () => {
+    await createHonorOffering("site-a", offeringInput({ capacity: 1 }), "staff-1");
+    const offeringId = fake.db.offerings[0].id;
+    fake.db.pickedOfferingIds.push(offeringId, offeringId);
+    await updateHonorOffering("site-a", offeringId, { capacity: 1, teacherName: "A. Teacher" }, "staff-1");
+    expect(fake.db.offerings[0]).toMatchObject({ capacity: 1, teacherName: "A. Teacher" });
   });
 
   it("removes an empty session, and a session with unpicked classes together with them (#615)", async () => {

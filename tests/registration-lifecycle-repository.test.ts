@@ -114,7 +114,7 @@ function transactionFixture() {
 beforeEach(() => {
   vi.clearAllMocks();
   lodgingMocks.noteLodgingOnAdmission.mockResolvedValue({ hasRequest: false });
-  dependencies.restoreClassSeats.mockResolvedValue({ dropped: { report: [], items: [] }, pendingMessageIds: [] });
+  dependencies.restoreClassSeats.mockResolvedValue({ dropped: { report: [], items: [] }, droppedCount: 0, keptOverCount: 0, pendingMessageIds: [] });
   const queued = {
     messageIds: ["message-1"],
     pendingMessageIds: ["message-1"],
@@ -430,6 +430,8 @@ describe("registration lifecycle repository", () => {
   describe("class seats come back under the class locks, before the status flips (#880)", () => {
     const dropped = {
       dropped: { report: ["Test Youth: Knot Tying was not restored because the class filled up while the registration was not active."], items: [{}] },
+      droppedCount: 1,
+      keptOverCount: 0,
       pendingMessageIds: ["notice-1"],
     };
 
@@ -918,7 +920,7 @@ describe("location waitlists (#599)", () => {
         const tx = locationFixture([]);
         tx.event.findUnique.mockResolvedValue({ ...event, ...flags });
         const result = await promoteWaitlistAfterSeatsFreed(tx as never, { eventId: event.id, actorUserId: "user-1", trigger, now: when });
-        expect(result).toEqual({ promotedRegistrationIds: [], pendingMessageIds: [] });
+        expect(result).toEqual({ promotedRegistrationIds: [], pendingMessageIds: [], classPicksNotRestored: [] });
         expect(tx.registrationWaitlistEntry.findMany).not.toHaveBeenCalled();
       }
     });
@@ -942,6 +944,20 @@ describe("location waitlists (#599)", () => {
       const all = await promoteWaitlistAfterSeatsFreed(many as never, { eventId: event.id, actorUserId: "user-1", trigger, now: when, repeat: true });
       expect(all.promotedRegistrationIds).toEqual(["a", "b"]);
       expect(all.pendingMessageIds).toEqual(["message-1", "message-1"]);
+    });
+
+    it("returns the class picks each promoted club could not take back, for the caller to show staff (#880)", async () => {
+      const queue = [{ id: "entry-a", registrationId: "a", position: 1, locationId: "loc-1" }];
+      const tx = locationFixture([waiting("a", "loc-1", 1)], queue);
+      dependencies.restoreClassSeats.mockResolvedValue({
+        dropped: { report: ["Test Youth: Birds was not restored because the class filled up while the registration was not active."], items: [{}] },
+        droppedCount: 1,
+        keptOverCount: 0,
+        pendingMessageIds: ["notice-1"],
+      });
+      const result = await promoteWaitlistAfterSeatsFreed(tx as never, { eventId: event.id, actorUserId: "user-1", trigger, now: when });
+      expect(result.classPicksNotRestored).toEqual(["Test Youth: Birds was not restored because the class filled up while the registration was not active."]);
+      expect(result.pendingMessageIds).toContain("notice-1");
     });
 
     it("waits on a busy location once, not again in every round of a repeating pass", async () => {
