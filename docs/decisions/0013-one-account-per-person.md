@@ -1,8 +1,8 @@
 # ADR 0013: One account and one sign-in per person
 
-Status: Proposed. The direction was decided by the Communication Director on 2026-09-30 (#554); this design awaits approval. The implementation plan and slices are at the end; table-by-table detail is in [docs/SINGLE-ACCOUNT-MIGRATION.md](../SINGLE-ACCOUNT-MIGRATION.md).
-Date: 2026-09-30
-Supersedes: the "staff can switch to attendee mode" part of [ADR 0003](0003-attendee-accounts.md), and the "two separate accounts per person" outcome of its "attendee accounts live in their own table" part. **Proposed, pending Caleb's answer to Open question 2:** under the link model below the two tables are kept (one `User`, one `AttendeeAccount`, linked 1:1), so ADR 0003's table separation itself is not undone; if the answer is a physical single table, this ADR is revised. Everything else in ADR 0003 stands.
+Status: Accepted: the open questions were answered by Caleb on Oct 15, 2026 (#554), except one raised by the Oct 8 comment (staff linking different emails by hand), which is still open for him. The direction was set by the Communication Director on 2026-09-30 (see "Decisions on record"). It is built slice by slice, each slice its own PR, and the new sign-in stays behind a switch that is off by default. Slice (a) (the link column and the switch, no behaviour change) is the first; slices (b) to (e) follow. The implementation plan and slices are at the end; table-by-table detail is in [docs/SINGLE-ACCOUNT-MIGRATION.md](../SINGLE-ACCOUNT-MIGRATION.md).
+Date: 2026-09-30 (accepted 2026-10-15)
+Supersedes: the "staff can switch to attendee mode" part of [ADR 0003](0003-attendee-accounts.md), and the "two separate accounts per person" outcome of its "attendee accounts live in their own table" part. Under the link model below the two tables are kept (one `User`, one `AttendeeAccount`, linked 1:1), so ADR 0003's table separation itself is not undone. Everything else in ADR 0003 stands, except the staff second-factor rule it set, which decision 5 of Oct 15 widens in one way (an attendee-side passkey counts as a second factor only when its assertion is verified with user verification required).
 
 ## Context
 
@@ -139,13 +139,14 @@ existing attendee accounts, which keep working.
 
 # Implementation plan
 
-This part turns the decision above into reviewable slices. It adds no product decision
-except where it says **Open question**, and these new proposed rules, which **need sign-off**
-before they are built:
+This part turns the decision above into reviewable slices. The Oct 15 decisions (below)
+settled the earlier open questions: the link model, email changes while linked, the attendee
+passkey as a staff second factor, and an attendee account for every staff member at
+activation. These rules in the plan were proposed with it and are **not** separately
+decided; each slice's review confirms them before it is built:
 
 - suspending a person's attendee side ends both sessions;
 - slice (d) disables the attendee password (`disabledAt`) for people with staff access;
-- an attendee account is auto-created for staff at activation;
 - a pair whose staff side has a role but no active second factor and no passkey
   (`STAFF_NO_SECOND_FACTOR`) is blocked from linking until the person enrols, which is stricter
   than today's enrol-at-next-sign-in gate.
@@ -168,10 +169,20 @@ The read-only dry run is `npm run accounts:dry-run`.
 | Sept 30 | Communication Director | Cutover after the Women's Retreat (Oct 9-11). Merging existing accounts in production runs only after a dry-run preview and the director's approval. |
 | Oct 1 | Director | The work is **on hold and lowest priority**; the director says when to start. |
 | Oct 6 | Director | Approved writing the plan and the read-only dry run. The cutover still waits for his go-ahead. |
+| Oct 8 | Caleb | The Oct 1 hold was lifted. |
+| Oct 8 | Caleb | The build and cutover window is November, before Honors Weekend registration opens in December. |
+| Oct 8 | Caleb | Two-step stays optional for people with no staff role. |
+| Oct 8 | Caleb | People with different staff and personal emails **stay separate unless staff link them by hand.** This conflicts with the Sept 28 row ("no linking tool is built") and with "no manual link tool" under Target model; Oct 15 does not settle it. See Open question 1. |
+| Oct 15 | Caleb | **1. Build now, slice by slice, each slice its own PR.** The new sign-in stays behind a switch that is off by default. This settles the timing conflict between the Sept 29, Sept 30 and Oct 1 comments. |
+| Oct 15 | Caleb | **2. Link, don't merge.** Keep `User` and `AttendeeAccount`, linked 1:1 (resolves Open question 2). |
+| Oct 15 | Caleb | **3. A linked person changes the email on both sides together,** after the usual verification (resolves Open question 3). |
+| Oct 15 | Caleb | **4. Every staff member gets a verified attendee side automatically when activated** (resolves Open question 5). |
+| Oct 15 | Caleb | **5. An attendee-side passkey can count as the staff second factor, but only with `userVerification: required`.** Attendee passwords, Google sign-in and email links never yield a staff session (resolves Open question 4, reversing its "no" default). |
 
-Where the comments disagree on timing, the later one should win: the Sept 29 note ("slices b
-to e wait until after Camp Meeting 2027") is older than the Sept 30 cutover date and the Oct 1
-hold. See **Open questions**.
+The later comment wins where they disagree on timing: Oct 15 (build now, slice by slice, behind
+a switch that is off by default) replaces the Sept 29 note ("slices b to e wait until after
+Camp Meeting 2027") and the Oct 1 hold (lifted Oct 8). Turning the switch on, linking existing people in
+production, and every deployment remain human steps.
 
 ## Target model
 
@@ -184,10 +195,13 @@ Two rules make the link safe:
 
 1. **Same verified email.** A link is only created between a `User` and an `AttendeeAccount`
    whose normalised emails are equal and whose attendee email is verified. Different-email
-   people stay separate (Sept 28), so there is no manual "link these two" tool.
+   people stay separate (Sept 28), so no manual "link these two" tool is planned. (The
+   Oct 8 comment says they stay separate "unless staff link them by hand"; that is unresolved,
+   see Open question 1.)
 2. **Emails stay in step.** While linked, the two emails must be equal. An email change on
-   either side is one transaction that changes both and re-verifies, or is refused. (Open
-   question: whether to allow it at all while linked.)
+   either side is one transaction that changes both and re-verifies, or is refused.
+   Decision 3 (Oct 15): a linked person may change it, on both sides together, after the
+   usual verification.
 
 ## Sessions and authorization
 
@@ -198,15 +212,21 @@ Two rules make the link safe:
   whichever sessions the browser carries. New code uses it instead of reading both cookies.
 - Staff authorization is unchanged: `getCurrentSession()`, event memberships, system admin,
   MFA, step-up.
-- **What a staff session requires, exactly** (unchanged from today): either (a) the
-  `AuthCredential` password followed by an ACTIVE `UserMfaEnrollment` code or recovery code,
-  or (b) a user-verified `UserPasskey` assertion on its own (`modules/access/passkeys.ts`).
-  Nothing else, and never an attendee credential. No extra prompt is added after a staff
-  passkey, and no password-plus-passkey path is created.
-- **An `AttendeeCredential` password, an attendee passkey or Google can only ever yield the
-  attendee session**, whatever second factor follows. An attendee password followed by a staff
-  authenticator code is still not a staff sign-in. A person holding a staff role who signs in
-  that way sees their attendee side and a prompt to finish staff verification.
+- **What a staff session requires, exactly:** either (a) the `AuthCredential` password
+  followed by a second factor, or (b) a user-verified `UserPasskey` assertion on its own
+  (`modules/access/passkeys.ts`). Today the second factor in (a) is an ACTIVE
+  `UserMfaEnrollment` code or recovery code. **Decision 5 (Oct 15) adds one more second
+  factor, in a later slice, not slice (a):** a passkey on the person's linked attendee side
+  (`AttendeePasskey`) counts, but only when the assertion was made with
+  `userVerification: required` and is verified as user-verified; an attendee passkey that
+  was not user-verified never counts. It is a second factor after the staff password only.
+  It never opens a staff session by itself, and no extra prompt is added after a staff passkey.
+- **An `AttendeeCredential` password, Google sign-in or an email link never yields a staff
+  session**, whatever follows. An attendee password followed by a staff authenticator code is
+  still not a staff sign-in. A person holding a staff role who signs in that way sees their
+  attendee side and a prompt to finish staff verification. An attendee passkey on its own
+  signs in the attendee side only; it reaches staff access only as the second factor above,
+  after the staff password.
 - **When an email has both rows,** the single form checks the staff credential for staff
   access and the attendee credential for attendee access, **independently**: the same typed
   password may satisfy one, both or neither, and each outcome is decided on its own.
@@ -280,12 +300,23 @@ Each slice is its own PR with its own review. Production data steps (backfill an
 human-gated and never run from CI.
 
 **(a) Link column, plan and read-only tooling. No behaviour change.**
-- The plan, the dry run, its tests and `docs/SINGLE-ACCOUNT-MIGRATION.md` ship first (this PR).
-- Then an additive migration: `User.attendeeAccountId`, nullable, unique, `ON DELETE SET NULL`.
-  No backfill in the migration; every row starts `NULL`. No code reads or writes it yet.
+- The plan, the dry run, its tests and `docs/SINGLE-ACCOUNT-MIGRATION.md` shipped first.
+- Then an additive migration (`20261102100000_user_attendee_account_link`):
+  `User.attendeeAccountId`, nullable, unique, `ON DELETE SET NULL`. Deleting an attendee
+  account only unlinks the staff user and never deletes it; deleting a user never touches the
+  account. No backfill in the migration; every row starts `NULL`. Nothing links, creates or
+  merges any existing account, which stays a human gate (a later slice, after the director
+  reviews the dry-run preview).
+- A small read-only module, `modules/account-merge/account-link.ts`, reads the link (by user
+  or by attendee account, ids only) and the switch. Nothing in a user-facing path calls it.
+- The switch: `PlatformSettings.unifiedSignInEnabled`, `NOT NULL DEFAULT false`. It is read
+  nowhere that changes behaviour in this slice, and has no settings screen yet.
 - Acceptance: CI migrates and seeds a clean database; the schema-drift check is clean; all
-  existing tests pass unchanged; `SELECT count(*) FROM "User" WHERE "attendeeAccountId" IS NOT NULL`
-  is 0 after deploy; dropping the column is tested on a copy.
+  existing tests pass unchanged; `npm run test:user-attendee-link` proves the link is nullable
+  and unlinked by default, unique, needs both sides to exist, and follows the `ON DELETE SET
+  NULL` rule, and that the switch defaults off; `SELECT count(*) FROM "User" WHERE
+  "attendeeAccountId" IS NOT NULL` is 0 after deploy; dropping the column is tested on a copy.
+- Slices (b) to (e) follow, each its own PR.
 
 **(b) One resolver and authorization.**
 - `resolvePerson()`; new staff users get a verified linked attendee account at activation;
@@ -301,7 +332,10 @@ human-gated and never run from CI.
   and disabled cases (tests, including a timing-equalisation check); staff MFA, passkey and
   rate-limit tests unchanged; a staff person gets both sessions, an attendee-only person
   gets one; **attendee password plus a valid staff TOTP code yields no staff session**
-  (likewise attendee passkey and Google); with both rows present, the staff and attendee
+  (likewise Google and an email link, and an attendee passkey on its own); an attendee
+  passkey counts as the staff second factor only after the staff password and only when
+  verified with `userVerification: required` (a passkey that was not user-verified is
+  refused; a test for each); with both rows present, the staff and attendee
   credentials are checked independently; password reset, attendee sign-up for an existing
   email, the post-registration "create an account" offer and the Google callback for a staff
   email each respond identically for existing, unknown and staff addresses (tests);
@@ -323,21 +357,32 @@ human-gated and never run from CI.
 
 ## Timing and gates
 
-- No sign-in change on the live site between Oct 6 and the end of the Women's Retreat
-  (Oct 9-11).
-- The cutover is slices (b) and (c) turned on after the retreat, and only when the director
-  says to start (Oct 1 hold).
-- **Production linking runs only after a dry-run preview and the director's approval.**
+- Build now, slice by slice (Oct 15). The new sign-in stays behind a switch that is off by
+  default; it stays off until Caleb turns it on. The target window is November, before
+  Honors Weekend registration opens in December (Oct 8).
+- Cutover is slices (b) and (c) turned on, which is a human step.
+- **Production linking waits for Caleb's review of the dry-run preview and his approval.**
   Merging, deployment and production migrations stay human-only (AGENTS.md).
 
 ## Open questions
 
-1. **Timing.** The Sept 29 comment waits for Camp Meeting 2027; the Sept 30 comment cuts over
-   right after the retreat; the Oct 1 comment puts everything on hold. Which governs?
-2. **Link or merge.** This ADR keeps two tables. The issue text says "a single account model;
-   `User` is the likely base". Confirm the link model is the intent.
-3. **Email changes while linked** (rule 2): change both together, or forbid?
-4. **Attendee passkey as a staff factor (D2).** Can an attendee passkey count as a staff
-   second factor? **Default: no.** It stays attendee-grade; only `UserPasskey` counts for staff.
-5. **Staff at activation:** create a verified attendee account automatically (this ADR), or
-   only when they first use an attendee feature?
+**Open for Caleb**
+
+1. **Different emails, linked by hand?** The Sept 28 decision says people with a staff and a
+   personal account under different emails stay separate and no linking tool is built. The
+   Oct 8 comment says they stay separate "unless staff link them by hand". Oct 15 does not
+   settle which applies. Until answered, no hand-link tool is planned, and the dry run only
+   lists such pairs.
+
+**Resolved (answered by Caleb on Oct 15, 2026)**
+
+- **Timing:** build now, slice by slice, behind a switch that is off by default
+  (Oct 15 decision 1; also see the Oct 8 rows). Resolved.
+- **Link or merge:** link, not merge (Oct 15 decision 2). Resolved.
+- **Email changes while linked:** change both sides together after the usual verification
+  (Oct 15 decision 3). Resolved.
+- **Attendee passkey as a staff factor:** yes, as a second factor only, with user
+  verification required at assertion time (Oct 15 decision 5). Resolved; this reverses the
+  earlier "default: no".
+- **Staff at activation:** a verified attendee side is created automatically (Oct 15
+  decision 4). Resolved.
