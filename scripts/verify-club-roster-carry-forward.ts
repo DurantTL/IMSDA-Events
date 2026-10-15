@@ -16,7 +16,10 @@
  *   is never carried, and a removal queued after a carry finishes with no deadlock (both orders, made deterministic by
  *   holding the club lock and waiting in pg_stat_activity until both are queued);
  * - the oversight list shows clubs that haven't started, counts only;
- * - no audit row, and no carry-forward record, holds a birth date or a name.
+ * - emergency/guardian contacts (#942) are copied for every carried member whatever the type (a Pathfinder who becomes
+ *   staff included), never for an unticked one, exactly as stored; last year's contact rows are unchanged; a repeat or a
+ *   race never duplicates them; the audit holds a count only;
+ * - no audit row, and no carry-forward record, holds a birth date, a name or a contact value.
  *
  * Uses fictitious rows it creates and removes itself.
  *
@@ -44,6 +47,7 @@ const august = new Date("2027-08-15T15:00:00Z");
 const september = new Date("2027-09-20T15:00:00Z");
 const actor = { accountId: `${P}_acct` };
 const names = ["Cfalpha", "Cfbravo", "Cfcharlie", "Cfdelta", "Cfecho", "Cffoxtrot"];
+const contactValues = ["Cgalpha Contact", "cgalpha@contact.example.test", "555-0142", "Cgbravo Contact", "cgbravo@contact.example.test", "555-0143", "Cgcharlie Contact", "Cgdelta Contact"];
 const birthDates = ["2012-03-04", "2013-05-06", "2008-07-08", "2014-09-10", "2011-11-12", "2010-01-02"];
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -58,6 +62,7 @@ async function cleanup() {
   await prisma.auditLog.deleteMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
   await prisma.memberTransfer.deleteMany({ where: { fromOrganizationId: { in: Object.values(clubs) } } });
   await prisma.clubRosterCarryForward.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
+  await prisma.clubRosterGuardian.deleteMany({ where: { rosterMember: { organizationId: { in: Object.values(clubs) } } } });
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { in: Object.values(clubs) } } });
   await prisma.person.deleteMany({ where: { lastName: "Carryfwd" } });
   await prisma.organization.deleteMany({ where: { id: { in: Object.values(clubs) } } });
@@ -84,6 +89,15 @@ async function main() {
   await removeRosterMember(clubs.a, a[4]!.memberId, actor);
   // Club B has its own person, and nothing else.
   const b = await addPerson(clubs.b, 5);
+
+  // Emergency contacts (#942): youth 0 (becomes staff) has two, youth 1 has none, youth 2 (leaves) has one.
+  await prisma.clubRosterGuardian.createMany({ data: [
+    { rosterMemberId: a[0]!.memberId, position: 1, name: contactValues[0]!, relationship: "Parent", email: contactValues[1]!, phone: contactValues[2]! },
+    { rosterMemberId: a[0]!.memberId, position: 2, name: contactValues[3]!, relationship: "Aunt", email: contactValues[4]!, phone: contactValues[5]! },
+    { rosterMemberId: a[2]!.memberId, position: 1, name: contactValues[6]!, relationship: "Parent", email: "", phone: "" },
+  ] });
+  const lastYearContacts = async () => JSON.stringify(await prisma.clubRosterGuardian.findMany({ where: { rosterMember: { organizationId: clubs.a, clubYear: from } }, orderBy: { id: "asc" } }));
+  const lastYearContactsBefore = await lastYearContacts();
 
   // The offer: active people only, with no birth date anywhere in it.
   const offer = await getCarryForwardOffer(clubs.a, august);
@@ -131,6 +145,18 @@ async function main() {
   assert((await prisma.person.count({ where: { id: a[2]!.personId } })) === 1, "the person who left still has their record until the club removes them");
   assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.a, clubYear: to, personId: a[3]!.personId } })) === 0, "an inactive person is not carried");
 
+  // Contacts: carried for the member who became staff, none for the one without, none for the unticked one.
+  assert(result.guardiansCopied === 2, "two contacts were copied");
+  const newContacts = await prisma.clubRosterGuardian.findMany({ where: { rosterMember: { organizationId: clubs.a, clubYear: to } }, orderBy: { position: "asc" } });
+  assert(newContacts.length === 2 && newContacts.every((contact) => contact.rosterMemberId === toStaff.id), "both contacts are on the new row of the member who became staff");
+  assert(newContacts[0]!.name === contactValues[0] && newContacts[0]!.relationship === "Parent" && newContacts[0]!.email === contactValues[1] && newContacts[0]!.phone === contactValues[2] && newContacts[1]!.position === 2, "contacts are copied as stored, same slots");
+  assert((await prisma.clubRosterGuardian.count({ where: { rosterMemberId: stayed.id } })) === 0, "a member with no contacts gets none");
+  assert(!newContacts.some((contact) => contact.name === contactValues[6]), "the unticked person's contact is not copied");
+  assert((await lastYearContacts()) === lastYearContactsBefore, "last year's contacts are unchanged");
+  // The director can still edit the copy without touching last year's.
+  await prisma.clubRosterGuardian.update({ where: { id: newContacts[0]!.id }, data: { phone: "555-0199" } });
+  assert((await lastYearContacts()) === lastYearContactsBefore, "editing the copy leaves last year's contacts alone");
+
   // Last year's roster is untouched and readable.
   const history = await listRoster(clubs.a, from, august);
   assert(history.length === 4 && history.filter((member) => member.status === "ACTIVE").length === 3, "last year's roster is unchanged and readable");
@@ -150,6 +176,7 @@ async function main() {
 
   // Racing confirmations: exactly one wins, no duplicate rows (club D).
   const d = [await addPerson(clubs.d, 0), await addPerson(clubs.d, 1)];
+  await prisma.clubRosterGuardian.create({ data: { rosterMemberId: d[0]!.memberId, position: 1, name: contactValues[7]!, relationship: "Parent" } });
   const race = await Promise.all(Array.from({ length: 8 }, () => codeOf(carryRosterForward(clubs.d, {
     confirm: true, people: d.map((member) => ({ memberId: member.memberId, attendeeType: "YOUTH" as const })),
   }, actor, august))));
@@ -157,14 +184,17 @@ async function main() {
   assert(race.filter((code) => code === "CARRY_FORWARD_DONE").length === 7, "the other seven are refused as already done");
   assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.d, clubYear: to } })) === 2, "the race left two rows, not sixteen");
   assert((await prisma.clubRosterCarryForward.count({ where: { organizationId: clubs.d } })) === 1, "one confirmation record");
+  assert((await prisma.clubRosterGuardian.count({ where: { rosterMember: { organizationId: clubs.d, clubYear: to } } })) === 1, "the race copied the contact once, not eight times");
 
   // A person already on the new roster (added by hand) is skipped, not duplicated, and a late carry works for B.
   const bHand = await prisma.clubRosterMember.create({
     data: { organizationId: clubs.b, clubYear: to, personId: b.personId, attendeeType: "YOUTH", role: "Pathfinder", source: "DIRECTOR" },
   });
+  await prisma.clubRosterGuardian.create({ data: { rosterMemberId: b.memberId, position: 1, name: contactValues[3]!, relationship: "Parent" } });
   const skip = await carryRosterForward(clubs.b, { confirm: true, people: [{ memberId: b.memberId, attendeeType: "YOUTH" }] }, actor, september);
   assert(skip.carried === 0 && skip.alreadyThere === 1, "someone already on the new roster is skipped");
   assert((await prisma.clubRosterMember.count({ where: { organizationId: clubs.b, clubYear: to } })) === 1 && bHand.id, "no duplicate row for them");
+  assert(skip.guardiansCopied === 0 && (await prisma.clubRosterGuardian.count({ where: { rosterMemberId: bHand.id } })) === 0, "someone already on the new roster gets no copied contacts");
 
   // Removal is unchanged (ADR 0005 Addendum A section 6): it erases the row it is run on, and last year's row stays as it was.
   const carriedStayed = stayed.id;
@@ -263,8 +293,9 @@ async function main() {
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
   const records = await prisma.clubRosterCarryForward.findMany({ where: { organizationId: { in: Object.values(clubs) } } });
   const text = JSON.stringify({ audits, records });
-  for (const secret of [...birthDates, ...names, "Carryfwd"]) assert(!text.includes(secret), `no audit row or record contains "${secret}"`);
+  for (const secret of [...birthDates, ...names, "Carryfwd", ...contactValues]) assert(!text.includes(secret), `no audit row or record contains "${secret}"`);
   assert(audits.some((row) => row.action === "CLUB_ROSTER_CARRIED_FORWARD"), "the carry-forward is audited");
+  assert(audits.some((row) => (row.metadata as { guardiansCopied?: number } | null)?.guardiansCopied === 2), "the audit holds the contact count");
 
   console.log("Club roster carry-forward (#414): all checks passed.");
 }

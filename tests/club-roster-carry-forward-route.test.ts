@@ -33,7 +33,7 @@ beforeEach(() => {
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.requireRosterAccess.mockResolvedValue({ state: "OPEN", actor: { kind: "ATTENDEE", accountId: "director-1", sessionId: "s1" } });
   mocks.carryRosterForward.mockResolvedValue({
-    fromClubYear: "2026-27", toClubYear: "2027-28", carried: 1, leftBehind: 2, typeChanged: 1, alreadyThere: 0, personIds: ["person-1"],
+    fromClubYear: "2026-27", toClubYear: "2027-28", carried: 1, leftBehind: 2, typeChanged: 1, alreadyThere: 0, guardiansCopied: 2, personIds: ["person-1"],
   });
   mocks.refreshBackgroundCheckMatchesSafely.mockResolvedValue(undefined);
 });
