@@ -45,6 +45,7 @@
     "test:club-roster-carry-forward": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-roster-carry-forward.ts",
     "test:billing-responsibility": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-billing-responsibility.ts",
     "test:attendance-reconciliation": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-attendance-reconciliation.ts",
+    "test:consent-policies": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-consent-policies.ts",
     "test:guardian-authority": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-guardian-authority.ts",
     "test:square-hosted-link": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-square-hosted-link.ts",
     "test:cancellation-policy": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-cancellation-policy.ts",
