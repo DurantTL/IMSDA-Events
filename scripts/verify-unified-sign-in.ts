@@ -329,15 +329,15 @@ async function main() {
   const shape = (value: object) => Object.keys(value).sort().join(",");
   const staffUsersBefore = await prisma.user.count();
   const staffSessionsBefore = await prisma.userSession.count();
-  const signUps = [];
+  const signUps: Awaited<ReturnType<typeof beginAttendeeSignUp>>[] = [];
   for (const key of ["enum-existing", "enum-unknown", "enum-staff"]) {
     signUps.push(await beginAttendeeSignUp({ email: email(key), displayName: "Synthetic Person", password: PASSWORD }));
   }
   assert(signUps.every((result) => shape(result) === shape(signUps[0]) && typeof result.pendingToken === "string"), "sign-up: one shape for existing, unknown and staff addresses");
-  const resets = [];
+  const resets: Awaited<ReturnType<typeof beginAttendeePasswordReset>>[] = [];
   for (const key of ["enum-existing", "enum-unknown", "enum-staff"]) resets.push(await beginAttendeePasswordReset({ email: email(key) }));
   assert(resets.every((result) => shape(result) === shape(resets[0]) && typeof result.pendingToken === "string"), "password reset: one shape for existing, unknown and staff addresses");
-  const googleResults = [];
+  const googleResults: Awaited<ReturnType<typeof signInWithGoogle>>[] = [];
   for (const key of ["enum-existing", "enum-unknown2", "enum-staff"]) {
     googleResults.push(await signInWithGoogle({ subject: `${P}-g-${key}`, email: email(key), emailVerified: true, name: "Synthetic Person" }, null));
   }

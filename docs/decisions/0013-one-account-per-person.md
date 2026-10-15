@@ -1,8 +1,8 @@
 # ADR 0013: One account and one sign-in per person
 
-Status: Accepted: the open questions were answered by Caleb on Oct 15, 2026 (#554), except one raised by the Oct 8 comment (staff linking different emails by hand), which is still open for him. The direction was set by the Communication Director on 2026-09-30 (see "Decisions on record"). It is built slice by slice, each slice its own PR, and the new sign-in stays behind a switch that is off by default. Slice (a) (the link column and the switch, no behaviour change) is the first; slice (b) (the resolver, activation linking and the elevation rule, behind the switch) is built; slices (c) to (e) follow. The implementation plan and slices are at the end; table-by-table detail is in [docs/SINGLE-ACCOUNT-MIGRATION.md](../SINGLE-ACCOUNT-MIGRATION.md).
+Status: Accepted: every open question was answered by Caleb on Oct 15, 2026 (#554), including the three that were open after slice (b) (see "Oct 15 decisions, latest" below). The direction was set by the Communication Director on 2026-09-30 (see "Decisions on record"). It is built slice by slice, each slice its own PR, and the new sign-in stays behind a switch that is off by default and that only Caleb turns on. Slices (a) (the link column and the switch), (b) (the resolver, activation linking and the elevation rule) and (c) (the single sign-in page, the hand-link tool and the admin email-change fix) are built; **(d) link tooling and (e) cleanup follow.** The implementation plan and slices are at the end; table-by-table detail is in [docs/SINGLE-ACCOUNT-MIGRATION.md](../SINGLE-ACCOUNT-MIGRATION.md).
 Date: 2026-09-30 (accepted 2026-10-15)
-Supersedes: the "staff can switch to attendee mode" part of [ADR 0003](0003-attendee-accounts.md), and the "two separate accounts per person" outcome of its "attendee accounts live in their own table" part. Under the link model below the two tables are kept (one `User`, one `AttendeeAccount`, linked 1:1), so ADR 0003's table separation itself is not undone. Everything else in ADR 0003 stands, except the staff second-factor rule it set, which decision 5 of Oct 15 widens in one way (an attendee-side passkey counts as a second factor only when its assertion is verified with user verification required).
+Supersedes: the "staff can switch to attendee mode" part of [ADR 0003](0003-attendee-accounts.md), and the "two separate accounts per person" outcome of its "attendee accounts live in their own table" part. Under the link model below the two tables are kept (one `User`, one `AttendeeAccount`, linked 1:1), so ADR 0003's table separation itself is not undone. Everything else in ADR 0003 stands, including the staff second-factor rule it set: only staff-side second factors count, and an attendee passkey never does (Oct 15, latest decision; it replaces decision 5).
 
 ## Context
 
@@ -51,8 +51,9 @@ Instead:
    - **Staff access:** exactly as today, either the staff password followed by the staff
      second factor, or a user-verified staff passkey on its own. On success it issues **both**
      sessions: the staff session and the linked attendee session.
-   - **Attendee access only:** attendee password, Google or passkey, exactly as today, and it
-     issues the attendee session only.
+   - **Attendee access only:** attendee password, Google, an email code or link, or an attendee
+     passkey, exactly as today, and it issues the attendee session only. An attendee passkey is
+     never a staff second factor.
    - A sign-in method that is weaker than the staff rules (such as Google alone) **never**
      issues a staff session. The person gets their attendee side and a prompt to finish
      staff verification. **This keeps ADR 0003's core security property: staff permissions
@@ -177,7 +178,16 @@ The read-only dry run is `npm run accounts:dry-run`.
 | Oct 15 | Caleb | **2. Link, don't merge.** Keep `User` and `AttendeeAccount`, linked 1:1 (resolves Open question 2). |
 | Oct 15 | Caleb | **3. A linked person changes the email on both sides together,** after the usual verification (resolves Open question 3). |
 | Oct 15 | Caleb | **4. Every staff member gets a verified attendee side automatically when activated** (resolves Open question 5). |
-| Oct 15 | Caleb | **5. An attendee-side passkey can count as the staff second factor, but only with `userVerification: required`.** Attendee passwords, Google sign-in and email links never yield a staff session (resolves Open question 4, reversing its "no" default). |
+| Oct 15 | Caleb | **5. (Superseded by the later Oct 15 decision below.) An attendee-side passkey can count as the staff second factor, but only with `userVerification: required`.** Attendee passwords, Google sign-in and email links never yield a staff session (resolves Open question 4, reversing its "no" default). |
+
+### Oct 15 decisions, latest (these override older text above and below)
+
+| Date | Who | Decision |
+| --- | --- | --- |
+| Oct 15 | Caleb | **Staff second factor:** only the staff side counts: a staff `UserPasskey` or the existing staff TOTP and recovery codes. **An attendee passkey never counts as the staff second factor.** It still signs people in on the attendee side. This replaces decision 5. `attendeePasskeyCountsAsStaffSecondFactor` and its TODO are removed so nothing can wire it, and Open question 3 (its enrolment condition) falls away with it. |
+| Oct 15 | Caleb | **Admin email change clears verification:** when a system administrator changes an attendee account's email, that account's `emailVerifiedAt` is cleared (resolves Open question 2). The person verifies again later. For a linked pair, slice (b)'s both-sides change applies and the attendee side's verification is cleared too. It applies with the switch on or off, because it is an admin-tool safety fix. |
+| Oct 15 | Caleb | **Hand-linking different emails:** a **system administrator** can link a person's staff `User` and `AttendeeAccount` by hand when the emails differ, and can unlink them (resolves Open question 1). Server-side, system-administrator only, a reason is required, audited with ids only, refused when either side is already linked, and it never creates a staff session. |
+| Oct 15 | Caleb | **The switch stays off by default.** Everything that changes sign-in behaviour runs only when `unifiedSignInEnabled` is true. With it off everything is as today. Hand-linking and the verification clear may work with it off, because they are admin tools. |
 
 The later comment wins where they disagree on timing: Oct 15 (build now, slice by slice, behind
 a switch that is off by default) replaces the Sept 29 note ("slices b to e wait until after
@@ -195,9 +205,10 @@ Two rules make the link safe:
 
 1. **Same verified email.** A link is only created between a `User` and an `AttendeeAccount`
    whose normalised emails are equal and whose attendee email is verified. Different-email
-   people stay separate (Sept 28), so no manual "link these two" tool is planned. (The
-   Oct 8 comment says they stay separate "unless staff link them by hand"; that is unresolved,
-   see Open question 1.)
+   people stay separate (Sept 28) unless a **system administrator links them by hand**
+   (Oct 8 comment, settled on Oct 15; built in slice (c): `modules/account-merge/hand-link.ts`).
+   A hand-linked pair may have two different emails; a later email change through the admin
+   tool applies one new address to both sides.
 2. **Emails stay in step.** While linked, the two emails must be equal. An email change on
    either side is one transaction that changes both and re-verifies, or is refused.
    Decision 3 (Oct 15): a linked person may change it, on both sides together, after the
@@ -215,18 +226,16 @@ Two rules make the link safe:
 - **What a staff session requires, exactly:** either (a) the `AuthCredential` password
   followed by a second factor, or (b) a user-verified `UserPasskey` assertion on its own
   (`modules/access/passkeys.ts`). Today the second factor in (a) is an ACTIVE
-  `UserMfaEnrollment` code or recovery code. **Decision 5 (Oct 15) adds one more second
-  factor, in a later slice, not slice (a):** a passkey on the person's linked attendee side
-  (`AttendeePasskey`) counts, but only when the assertion was made with
-  `userVerification: required` and is verified as user-verified; an attendee passkey that
-  was not user-verified never counts. It is a second factor after the staff password only.
-  It never opens a staff session by itself, and no extra prompt is added after a staff passkey.
+  `UserMfaEnrollment` code or recovery code. **Only the staff
+  side's own second factors count (Oct 15, latest decision, replacing decision 5):** an ACTIVE
+  `UserMfaEnrollment` code or recovery code, or a staff `UserPasskey`. A passkey on the person's linked
+  attendee side (`AttendeePasskey`) is never a staff second factor, in any form; it signs the attendee
+  side in, nothing more. No extra prompt is added after a staff passkey.
 - **An `AttendeeCredential` password, Google sign-in or an email link never yields a staff
   session**, whatever follows. An attendee password followed by a staff authenticator code is
   still not a staff sign-in. A person holding a staff role who signs in that way sees their
-  attendee side and a prompt to finish staff verification. An attendee passkey on its own
-  signs in the attendee side only; it reaches staff access only as the second factor above,
-  after the staff password.
+  attendee side and a prompt to finish staff verification. An attendee passkey
+  signs in the attendee side only, and never reaches staff access.
 - **When an email has both rows,** the single form checks the staff credential for staff
   access and the attendee credential for attendee access, **independently**: the same typed
   password may satisfy one, both or neither, and each outcome is decided on its own.
@@ -368,12 +377,11 @@ human-gated and never run from CI.
   create a `UserSession`, none takes attendee input, and the resolver never elevates. The rule is
   also written as a pure decision (`modules/account-merge/staff-elevation.ts`):
   `staffSessionAllowedFor` (one test per method: attendee password, Google, email link,
-  attendee passkey alone) and `attendeePasskeyCountsAsStaffSecondFactor` (decision 5: needs the
-  switch, the staff password first, a passkey of the linked account, and an assertion verified
-  with user verification). **Not wired into any sign-in yet:** the sign-in flow that calls them is
-  slice (c).
-- **Not built here:** the sign-in page and the attendee-passkey second factor in the staff
-  sign-in flow (c); backfilling, linking or merging any existing pair (d); removing old paths
+  attendee passkey alone) and, in (b), `attendeePasskeyCountsAsStaffSecondFactor` (decision 5).
+  **Slice (c) wired `staffSessionAllowedFor` into the sign-in flow and removed
+  `attendeePasskeyCountsAsStaffSecondFactor`** (Oct 15, latest decision: an attendee passkey is never a
+  staff second factor).
+- **Not built here:** the sign-in page (c); backfilling, linking or merging any existing pair (d); removing old paths
   (e); anything for the open question (hand-linking different emails). Existing staff who are
   already ACTIVE stay unlinked until slice (d).
 - Acceptance: a staff user without an attendee account gets one at activation (switch on, proved
@@ -382,21 +390,66 @@ human-gated and never run from CI.
   and that unverified or already-linked accounts are never taken; the existing permission, act-as
   and club second-step suites are green; everything new is behind the switch, off by default.
 
-**(c) The single sign-in page.**
-- `/sign-in`, with `/login` and `/account/sign-in` redirecting when the switch is on.
-- Acceptance: identical status, body shape and timing for unknown, wrong-password, locked
-  and disabled cases (tests, including a timing-equalisation check); staff MFA, passkey and
-  rate-limit tests unchanged; a staff person gets both sessions, an attendee-only person
-  gets one; **attendee password plus a valid staff TOTP code yields no staff session**
-  (likewise Google and an email link, and an attendee passkey on its own); an attendee
-  passkey counts as the staff second factor only after the staff password and only when
-  verified with `userVerification: required` (a passkey that was not user-verified is
-  refused; a test for each); with both rows present, the staff and attendee
-  credentials are checked independently; password reset, attendee sign-up for an existing
-  email, the post-registration "create an account" offer and the Google callback for a staff
-  email each respond identically for existing, unknown and staff addresses (tests);
-  guest registration still works with no account; the post-registration offer to create an
-  account is shown.
+**(c) The single sign-in page.** Built, behind the switch (off by default).
+- **`/sign-in`** (`app/sign-in/page.tsx`, `app/api/sign-in/route.ts`,
+  `modules/account-merge/unified-sign-in.ts`). One form, one submit. With the switch on, `/login`
+  and `/account/sign-in` redirect to it, carrying `next` and `error`
+  (`modules/account-merge/sign-in-redirect.ts`); with it off they render as before, `/sign-in` sends
+  visitors to `/login`, and `/api/sign-in` answers 404 and checks nothing. Passkeys keep their two
+  discoverable flows (a team passkey button and an account passkey button, neither asks for an
+  email), and Google is its own button.
+- **What the submit does.** It runs the unchanged staff check (`authenticateWithPassword`: lockout,
+  pending and disabled rules, second-factor gate) and the unchanged attendee check
+  (`authenticateAttendee`) one after the other, always both. Each does exactly one password hash
+  whether the address is unknown, wrong, locked, disabled or right.
+  - Staff password right and no second step needed: the staff session **and** the linked attendee
+    session (`issueLinkedAttendeeSession`, which uses the existing switchable-account rule: the link,
+    or the same verified email for an unlinked user; none when disabled or unverified).
+  - Staff password right and a second step needed: only the challenge (or `PASSKEY_REQUIRED`, as
+    today). Once the staff second factor is passed (`/api/auth/mfa/challenge`) or a staff passkey
+    signs in, both sessions are issued together and the attendee one is marked second-step verified.
+    An attendee session the same password earned is revoked, not left behind.
+  - Only the attendee password right: the attendee session only. It never produces a staff session
+    or a staff challenge, so a valid staff authenticator code has nothing to complete.
+  - Neither: one refusal. `staffSessionAllowedFor` decides every staff session in this flow.
+- **Same response for every failure.** One 401 body for unknown, wrong, locked and disabled, with the
+  same headers; rate limits are the staff client and account limits plus the attendee sign-in limit,
+  counted the same for known and unknown addresses. A staff second step, or `PASSKEY_REQUIRED`, is
+  offered only after the staff password is right. Tests assert identical status, headers and body, and
+  that every case spends the same two password derivations; the verify script also times it.
+- **Staff checks unchanged.** The staff MFA, passkey and rate-limit tests are untouched and pass.
+- **No account enumeration.** Password reset (staff and attendee), attendee sign-up for an existing
+  email, the post-registration "create an account" offer and the Google callback each answer
+  identically for existing, unknown and staff addresses (tests; the attendee flows never read the staff
+  table). Support text never says an address has a staff account.
+- **Admin email change clears verification** (any switch state): `changeAttendeeEmail` and the
+  linked both-sides change set `emailVerifiedAt` to null on the attendee side. So the person can verify
+  again, a completed password reset code and a Google sign-in for the new address now verify an account
+  whose verification is null (they matched no row before). Without that, a cleared ACTIVE account
+  would have had no way back.
+- **Hand-linking different emails** (`modules/account-merge/hand-link.ts`, the "Link team sign-in" /
+  "Unlink team sign-in" buttons on System administration, Accounts): system administrator only
+  (checked in the route and again against the database), reason required, audited with ids and the
+  reason text (no email or name), refused when either side is already linked, the staff user must be
+  ACTIVE and the attendee account ACTIVE, not disabled and verified, and it never creates or changes a
+  staff session. Works with the switch off.
+- **Removed:** `attendeePasskeyCountsAsStaffSecondFactor` and its TODO.
+- **Not built here:** the role chooser and header switcher (#108); a single password-reset form for both
+  sides (the sign-in page links to both existing reset flows); an administrator action to mark an
+  attendee email verified again; backfilling or linking existing pairs (d); removing old paths (e).
+- **Known transitional effect until (d):** a person who has both credentials with different passwords
+  and signs in with the attendee password counts that miss against the staff lock (the independent
+  check is the one rule), which can lock the staff credential and email them after five. Slice (d)
+  disables the attendee password for people with staff access, which ends it.
+- Acceptance, each met: identical status, body shape and timing for unknown, wrong-password, locked and
+  disabled cases; staff MFA, passkey and rate-limit tests unchanged; a staff person gets both sessions,
+  an attendee-only person gets one; attendee password plus a valid staff TOTP code yields no staff
+  session, and likewise Google, an email link or code, and an attendee passkey (a test for each); with
+  both rows present the credentials are checked independently; password reset, attendee sign-up for an
+  existing email, the post-registration offer and the Google callback respond identically (tests);
+  guest registration still works with no account and the offer is shown; `staffSessionAllowedFor` is used
+  in the sign-in flow; `npm run test:unified-sign-in` proves it against PostgreSQL with the switch on and
+  off.
 
 **(d) Link tooling (preview and apply).**
 - The slice (a) dry run feeds a preview and apply tool: one person per transaction, audited,
@@ -422,26 +475,7 @@ human-gated and never run from CI.
 
 ## Open questions
 
-**Open for Caleb**
-
-1. **Different emails, linked by hand?** The Sept 28 decision says people with a staff and a
-   personal account under different emails stay separate and no linking tool is built. The
-   Oct 8 comment says they stay separate "unless staff link them by hand". Oct 15 does not
-   settle which applies. Until answered, no hand-link tool is planned, and the dry run only
-   lists such pairs.
-
-2. **Admin email change vs. verification (found in the slice (b) security review).** The reuse
-   rule trusts `AttendeeAccount.emailVerifiedAt`, but a system-administrator email change keeps
-   it, so an account can be "verified" for an address nobody has verified. Options: clear the
-   verification on an administrator email change, or require a verification newer than the last
-   email change. Nothing is built for it.
-3. **Attendee passkey as a staff second factor needs an enrolment condition (security review).**
-   As decision 5 is written, someone who controls only the inbox could sign in to the attendee
-   side with an emailed code, enrol a passkey, reset the staff password by email, and then pass
-   "staff password plus attendee passkey". Before slice (c) wires it, the passkey needs a condition,
-   for example enrolled from a session that passed staff MFA, or before the last staff password
-   reset, with attendee passkeys revoked on a staff reset. A TODO on
-   `attendeePasskeyCountsAsStaffSecondFactor` points here. Nothing is built for it.
+**Open for Caleb:** none.
 
 **Resolved (answered by Caleb on Oct 15, 2026)**
 
@@ -450,8 +484,18 @@ human-gated and never run from CI.
 - **Link or merge:** link, not merge (Oct 15 decision 2). Resolved.
 - **Email changes while linked:** change both sides together after the usual verification
   (Oct 15 decision 3). Resolved.
-- **Attendee passkey as a staff factor:** yes, as a second factor only, with user
-  verification required at assertion time (Oct 15 decision 5). Resolved; this reverses the
-  earlier "default: no".
+- **Attendee passkey as a staff factor:** decision 5 said yes (with user verification required);
+  the later Oct 15 decision replaced it with **no**: only staff-side factors count. Resolved.
 - **Staff at activation:** a verified attendee side is created automatically (Oct 15
   decision 4). Resolved.
+- **1. Different emails, linked by hand (Oct 8 comment; Oct 15 latest decision):** a system
+  administrator can link and unlink by hand, with a reason, audited, refused when either side is linked.
+  Resolved; built in slice (c).
+- **2. Admin email change vs. verification (slice (b) security review):** clear `emailVerifiedAt` on an
+  administrator's attendee email change (and on the attendee side of a linked pair). Resolved; built in
+  slice (c), with the switch on or off.
+- **3. Enrolment condition for an attendee passkey as a staff second factor (slice (b) security
+  review):** moot. An attendee passkey is never a staff second factor (Oct 15, latest decision,
+  replacing decision 5), and the helper and its TODO are removed. Resolved.
+
+Slices (d) link tooling and (e) cleanup follow. The switch is turned on, if ever, by Caleb.
