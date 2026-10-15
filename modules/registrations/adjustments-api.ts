@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { AdjustmentError } from "@/modules/registrations/adjustments";
@@ -15,6 +16,9 @@ export function adjustmentApiError(error: unknown, action: string) {
   if (error instanceof AdjustmentError) {
     const status = error.code.endsWith("_NOT_FOUND") ? 404 : error.code === "PROMO_INVALID" ? 400 : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+    return Response.json({ error: "ADJUSTMENT_BUSY", message: "Another change was being saved at the same moment. Try again." }, { status: 409 });
   }
   if (error instanceof ScholarshipFundError) return scholarshipFundErrorResponse(error);
   logError(`${action} failed`, error);

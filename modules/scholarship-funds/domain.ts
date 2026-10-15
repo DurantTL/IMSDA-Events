@@ -17,6 +17,15 @@ import { z } from "zod";
  *   is promised by a named sponsor but has not arrived, so they may exceed the
  *   balance. They are what is outstanding for that sponsor until settled.
  * - active: the award's scholarship adjustment line has not been reversed.
+ *
+ * Per-sponsor rule: a sponsor's unallocated money is what they gave (reversals
+ * included) minus the funded awards attributed to them. A funded award
+ * attributed to a sponsor, settling that sponsor's pledge, and reversing that
+ * sponsor's contribution are each refused when they would take the sponsor's
+ * unallocated money below zero, and (as for everything) the fund balance too.
+ * A funded award with no sponsor draws on the fund in general; the matching
+ * view shows it on its own "general" line, so received minus awarded per
+ * sponsor, minus general draws, always equals the fund balance.
  */
 
 export const CONTRIBUTION_METHODS = ["CASH", "CHECK", "CARD", "BANK_TRANSFER", "OTHER"] as const;
@@ -36,6 +45,7 @@ export type ScholarshipFundErrorCode =
   | "SPONSOR_REQUIRED"
   | "SPONSOR_NOT_FOUND"
   | "FUND_BALANCE_TOO_LOW"
+  | "SPONSOR_BALANCE_TOO_LOW"
   | "CONTRIBUTION_NOT_FOUND"
   | "CONTRIBUTION_NOT_REVERSIBLE"
   | "CONTRIBUTION_ALREADY_REVERSED"
@@ -44,6 +54,7 @@ export type ScholarshipFundErrorCode =
   | "AWARD_NOT_PLEDGED"
   | "AWARD_ALREADY_SETTLED"
   | "AWARD_REVERSED"
+  | "AWARD_REGISTRATION_INACTIVE"
   | "SETTLE_EXCEEDS_BALANCE";
 
 export class ScholarshipFundError extends Error {
@@ -157,7 +168,11 @@ export type FundTotals = {
   afterPledgesCents: number;
 };
 
-export type FundSummary = FundTotals & { sponsors: SponsorMatch[] };
+export type FundSummary = FundTotals & {
+  sponsors: SponsorMatch[];
+  /** Funded awards with no sponsor: drawn on the fund in general, not on one sponsor's money. */
+  generalAwardedCents: number;
+};
 
 export function isFundedAward(award: Pick<AwardLine, "active" | "pledged" | "settled">) {
   return award.active && (!award.pledged || award.settled);
@@ -193,11 +208,13 @@ export function summarizeFund(contributions: ContributionLine[], awards: AwardLi
   }
   let funded = 0;
   let pledged = 0;
+  let general = 0;
   for (const award of awards) {
     const isFunded = isFundedAward(award);
     const isPledged = isPledgedAward(award);
     if (isFunded) funded += award.amountCents;
     if (isPledged) pledged += award.amountCents;
+    if (isFunded && !award.sponsorKey) general += award.amountCents;
     if (!award.sponsorKey || !award.sponsorName || (!isFunded && !isPledged)) continue;
     const match = entry(award.sponsorKey, award.sponsorName, award.organizationId);
     if (isFunded) match.awardedCents += award.amountCents;
@@ -205,7 +222,7 @@ export function summarizeFund(contributions: ContributionLine[], awards: AwardLi
   }
   const list = [...sponsors.values()].map((match) => ({ ...match, unallocatedCents: match.receivedCents - match.awardedCents }));
   list.sort((a, b) => b.outstandingCents - a.outstandingCents || a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
-  return { ...fundTotals(received, funded, pledged), sponsors: list };
+  return { ...fundTotals(received, funded, pledged), sponsors: list, generalAwardedCents: general };
 }
 
 export type FundExportData = {
@@ -251,8 +268,9 @@ export function fundCsvRows(data: FundExportData): Array<Array<string | number>>
     [],
     ["Matching by sponsor", "Received", "Awarded", "Pledged, not yet received", "Received, not yet awarded"],
     ...summary.sponsors.map((sponsor) => [
-      sponsor.name, dollars(sponsor.receivedCents), dollars(sponsor.awardedCents), dollars(sponsor.outstandingCents), dollars(Math.max(0, sponsor.unallocatedCents)),
+      sponsor.name, dollars(sponsor.receivedCents), dollars(sponsor.awardedCents), dollars(sponsor.outstandingCents), dollars(sponsor.unallocatedCents),
     ]),
+    ["Awarded from the fund in general (no one sponsor)", "", dollars(summary.generalAwardedCents)],
     [],
     ["Contribution", "Type", "Date received", "Sponsor", "Method", "Amount", "Reverses", "Note"],
     ...data.contributions.map((line) => [

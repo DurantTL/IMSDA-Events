@@ -36,6 +36,9 @@ export function ScholarshipFundWorkspace({
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [reversing, setReversing] = useState<string | null>(null);
+  // A sponsor is a directory church or a typed name, never both: choosing one switches the other off.
+  const [pickedOrganization, setPickedOrganization] = useState("");
+  const [typedSponsor, setTypedSponsor] = useState("");
   const { summary } = fund;
   const base = `/api/events/${encodeURIComponent(eventId)}/scholarship-fund`;
 
@@ -65,7 +68,7 @@ export function ScholarshipFundWorkspace({
       method: String(form.get("method") ?? "CHECK") as ContributionMethod,
       note: String(form.get("note") ?? "").trim() || undefined,
     }, "Unable to record the contribution.", "Contribution recorded.");
-    if (ok) formElement.reset();
+    if (ok) { formElement.reset(); setPickedOrganization(""); setTypedSponsor(""); }
   }
 
   async function reverseContribution(event: React.FormEvent<HTMLFormElement>, contributionId: string) {
@@ -79,7 +82,7 @@ export function ScholarshipFundWorkspace({
     await send(`${base}/awards/${encodeURIComponent(awardId)}/settle`, {}, "Unable to mark the pledge received.", "Pledge marked received.");
   }
 
-  const pledgedAwards = fund.awards.filter((award) => award.active && award.pledged && !award.settled);
+  const pledgedAwards = fund.awards.filter((award) => award.active && award.pledged && !award.settled && !award.registrationCancelled);
   return (
     <section className="page-stack">
       <div className="page-intro">
@@ -123,6 +126,11 @@ export function ScholarshipFundWorkspace({
             <span>{sponsor.outstandingCents > 0 ? <strong>{formatCents(sponsor.outstandingCents)}</strong> : formatCents(0)}</span>
           </div>
         ))}
+        {summary.generalAwardedCents > 0 && (
+          <div className="finance-row">
+            <span><strong>Fund in general (no one sponsor)</strong></span><span /><span>{formatCents(summary.generalAwardedCents)}</span><span />
+          </div>
+        )}
         {summary.sponsors.length === 0 && <p className="quiet-copy">No contributions or sponsored awards yet.</p>}
       </section>
 
@@ -130,12 +138,15 @@ export function ScholarshipFundWorkspace({
         <h3>Record a contribution</h3>
         <form className="form-stack" onSubmit={addContribution}>
           <label>Church or club from the directory
-            <select name="organizationId" defaultValue="">
+            <select name="organizationId" value={pickedOrganization} disabled={typedSponsor.trim() !== ""} onChange={(event) => setPickedOrganization(event.target.value)}>
               <option value="">Not in the directory (type a name below)</option>
               {directory.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}{entry.place ? ` · ${entry.place}` : ""}</option>)}
             </select>
           </label>
-          <label>Or type who it is from<input name="sponsorName" maxLength={120} autoComplete="off" /></label>
+          <label>Or type who it is from
+            <input name="sponsorName" maxLength={120} autoComplete="off" value={typedSponsor} disabled={pickedOrganization !== ""} onChange={(event) => setTypedSponsor(event.target.value)} />
+            {(pickedOrganization !== "" || typedSponsor.trim() !== "") && <small className="quiet-copy">{pickedOrganization !== "" ? "A directory church is chosen, so the name box is off." : "A name is typed, so the directory choice is off."}</small>}
+          </label>
           <label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label>
           <label>Date received<input name="receivedOn" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label>
           <label>Method
@@ -154,7 +165,7 @@ export function ScholarshipFundWorkspace({
           {pledgedAwards.map((award) => (
             <div className="finance-row" key={award.id}>
               <span><strong>{award.sponsorName}</strong><small>Awarded {award.createdOn}</small></span>
-              <span>{award.confirmationCode}</span>
+              <span><a className="text-link scholarship-fund-code-link" href={`/finance?event=${encodeURIComponent(eventId)}&registration=${encodeURIComponent(award.registrationId)}`}>{award.confirmationCode}</a></span>
               <span>{formatCents(award.amountCents)}</span>
               <span>
                 <button className="secondary-button" type="button" disabled={saving || award.amountCents > summary.balanceCents} onClick={() => settle(award.id)}>Mark received</button>
@@ -199,8 +210,11 @@ export function ScholarshipFundWorkspace({
         {fund.awards.map((award) => (
           <div className="finance-row" key={award.id}>
             <span><strong>{award.sponsorName ?? "Fund (no one sponsor)"}</strong><small>{award.createdOn}</small></span>
-            <span><a href={`/finance?event=${encodeURIComponent(eventId)}&registration=${encodeURIComponent(award.registrationId)}`}>{award.confirmationCode}</a></span>
-            <span>{!award.active ? "Reversed" : award.pledged ? (award.settled ? "Pledge received" : "Pledged, not yet received") : "Funded"}</span>
+            <span><a className="text-link scholarship-fund-code-link" href={`/finance?event=${encodeURIComponent(eventId)}&registration=${encodeURIComponent(award.registrationId)}`}>{award.confirmationCode}</a></span>
+            <span>
+              {!award.active ? "Reversed" : award.pledged ? (award.settled ? "Pledge received" : "Pledged, not yet received") : "Funded"}
+              {award.registrationCancelled && <small className="form-error">Registration cancelled — reverse to return to fund</small>}
+            </span>
             <span>{formatCents(award.amountCents)}</span>
           </div>
         ))}

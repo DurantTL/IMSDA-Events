@@ -156,8 +156,13 @@ async function main() {
   const adaAttendee = await prisma.registrationAttendee.create({
     data: { eventId, registrationId: regA.id, personId: ada.personId!, attendeeType: "YOUTH", position: 0, profileSnapshot: { firstName: "Ada", lastName: "Testperson", clubRosterMemberId: ada.id } },
   });
-  await prisma.registrationAdjustment.create({
+  const scholarshipLine = await prisma.registrationAdjustment.create({
     data: { eventId, registrationId: regA.id, registrationAttendeeId: adaAttendee.id, kind: "SCHOLARSHIP", amountCents: -2500, reason: "Test scholarship", createdByNameSnapshot: "Test Staff" },
+  });
+  // The scholarship draws on the event's fund (#398): its award row must follow the line to the new registration.
+  const transferFund = await prisma.scholarshipFund.create({ data: { eventId } });
+  const fundAwardRow = await prisma.scholarshipAward.create({
+    data: { eventId, fundId: transferFund.id, registrationId: regA.id, adjustmentId: scholarshipLine.id, amountCents: 2500, createdByUserId: null },
   });
   await prisma.payment.create({ data: { eventId, registrationId: regA.id, amount: 20, status: "SUCCEEDED", method: "CASH" } });
   const session = await prisma.honorSession.create({ data: { eventId, name: "Sabbath", normalizedName: "sabbath" } });
@@ -298,6 +303,7 @@ async function main() {
   const adjustment = await prisma.registrationAdjustment.findFirstOrThrow({ where: { registrationAttendeeId: adaAttendee.id, kind: "SCHOLARSHIP" } });
   assert((await prisma.registrationAdjustment.findFirstOrThrow({ where: { kind: "MEAL", registrationAttendeeId: adaAttendee.id } })).registrationId === regA.id && moved.fromTotalCentsBefore === 7500, "a MEAL line stays on the old registration and is not counted in the move's money");
   assert(attendeeAfter.registrationId === regB.id && enrollment.registrationId === regB.id && enrollment.organizationId === clubs.b && adjustment.registrationId === regB.id, "attendee, class seat and adjustment moved together");
+  assert((await prisma.scholarshipAward.findUniqueOrThrow({ where: { id: fundAwardRow.id } })).registrationId === regB.id, "the fund award moved with its scholarship line, so the fund page and the registration agree");
   assert((attendeeAfter.profileSnapshot as { clubRosterMemberId?: string }).clubRosterMemberId === accepted.rosterMemberId, "the snapshot points at the receiving roster row");
   const bWorkspace = await getClubEventWorkspace(clubs.b, eventId, now);
   const adaOnB = bWorkspace.registration?.attendees.find((row) => row.attendeeId === adaAttendee.id);

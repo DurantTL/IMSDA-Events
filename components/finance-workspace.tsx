@@ -289,7 +289,7 @@ export function FinanceWorkspace({
                           </strong>
                           <small>{adjustment.reason} · {adjustment.createdBy} · {new Date(adjustment.createdAt).toLocaleDateString()}</small>
                         </span>
-                        {canManage && adjustment.kind !== "MEAL" && adjustment.kind !== "ASSET" && !adjustment.reversesAdjustmentId && !adjustment.reversed && activeFinancialStatuses.has(selected.status) && (
+                        {canManage && adjustment.kind !== "MEAL" && adjustment.kind !== "ASSET" && !adjustment.reversesAdjustmentId && !adjustment.reversed && (activeFinancialStatuses.has(selected.status) || (selected.status === "CANCELLED" && adjustment.kind === "SCHOLARSHIP" && Boolean(adjustment.fundAward))) && (
                           <button className="text-button" type="button" onClick={() => { setSelectedAdjustment(adjustment); setError(""); setModal("reverse"); }}>Reverse</button>
                         )}
                       </div>

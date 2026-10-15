@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { ScholarshipFundError } from "@/modules/scholarship-funds/domain";
@@ -24,6 +25,9 @@ export function scholarshipFundApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof ScholarshipFundError) return scholarshipFundErrorResponse(error);
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+    return Response.json({ error: "SCHOLARSHIP_FUND_BUSY", message: "Another change was being saved at the same moment. Try again." }, { status: 409 });
+  }
   logError(`${action} failed`, error);
   return Response.json({ error: "SCHOLARSHIP_FUND_FAILED", message: "The scholarship fund could not be updated." }, { status: 500 });
 }

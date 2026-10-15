@@ -65,6 +65,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     clubRegistrationDrafts,
     communityPosts,
     announcements,
+    scholarshipContributions,
     healthSnapshots,
     heldHealthSnapshots,
   ] = await Promise.all([
@@ -98,6 +99,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     db.clubRegistrationDraft.count({ where: inEvent }),
     db.communityPost.count({ where: inEvent }),
     db.announcement.count({ where: inEvent }),
+    db.scholarshipContribution.count({ where: inEvent }),
     // Sealed health copies (#924): counted here, never opened. A copy under a legal hold (an event hold, or a hold on
     // the person) blocks the deletion; the rest go with the event.
     db.healthRecordSnapshot.count({ where: inEvent }),
@@ -120,6 +122,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     communityPosts,
     announcements,
     realPayments: succeededPayments + openHeldCharges,
+    scholarshipContributions,
     healthSnapshots,
     heldHealthSnapshots,
   };

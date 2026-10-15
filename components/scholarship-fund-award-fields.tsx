@@ -12,6 +12,9 @@ import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-fund
 export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
   const [useFund, setUseFund] = useState(false);
   const [pledged, setPledged] = useState(false);
+  // A sponsor is a directory church or a typed name, never both: choosing one switches the other off.
+  const [pickedOrganization, setPickedOrganization] = useState("");
+  const [typedSponsor, setTypedSponsor] = useState("");
   const [info, setInfo] = useState<{ fund: FundView; directory: SponsorDirectoryEntry[] } | null>(null);
   const [loadError, setLoadError] = useState("");
 
@@ -41,11 +44,11 @@ export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
             <p className="quiet-copy">
               Fund balance {formatCents(info.fund.summary.balanceCents)}
               {info.fund.summary.pledgedCents > 0 ? ` · ${formatCents(info.fund.summary.pledgedCents)} pledged, not yet received` : ""}.
-              {" "}An award can&apos;t take the balance below $0 unless it is marked pledged.
+              {" "}An award can&apos;t take the balance below $0, or use more than its sponsor has given, unless it is marked pledged.
             </p>
           )}
           <label>Church or club from the directory
-            <select name="fundOrganizationId" defaultValue="">
+            <select name="fundOrganizationId" value={pickedOrganization} disabled={typedSponsor.trim() !== ""} onChange={(event) => setPickedOrganization(event.target.value)}>
               <option value="">{pledged ? "Not in the directory (type a name below)" : "Not tied to one sponsor"}</option>
               {(info?.directory ?? []).map((entry) => (
                 <option key={entry.id} value={entry.id}>{entry.name}{entry.place ? ` · ${entry.place}` : ""}</option>
@@ -53,7 +56,8 @@ export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
             </select>
           </label>
           <label>Or type a sponsor name
-            <input name="fundSponsorName" maxLength={120} autoComplete="off" />
+            <input name="fundSponsorName" maxLength={120} autoComplete="off" value={typedSponsor} disabled={pickedOrganization !== ""} onChange={(event) => setTypedSponsor(event.target.value)} />
+            {(pickedOrganization !== "" || typedSponsor.trim() !== "") && <small className="quiet-copy">{pickedOrganization !== "" ? "A directory church is chosen, so the name box is off." : "A name is typed, so the directory choice is off."}</small>}
           </label>
           <label className="checkbox-label">
             <input type="checkbox" name="fundPledged" checked={pledged} onChange={(event) => setPledged(event.target.checked)} />

@@ -1570,7 +1570,7 @@ model Event {
   registrationAdjustments             RegistrationAdjustment[]
   scholarshipFund                     ScholarshipFund?
   refunds                             Refund[]
-  checkIns                           CheckIn[]
+  checkIns                            CheckIn[]
   announcements                       Announcement[]
   announcementOptOuts                 EmailAnnouncementOptOut[]
   unsubscribeTokens                   EmailUnsubscribeToken[]

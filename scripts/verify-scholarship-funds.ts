@@ -17,6 +17,12 @@
  *   already drew on the money;
  * - parallel awards never overspend the fund (race-safe at SERIALIZABLE with retries), and an award racing the reversal
  *   of the contribution that covers it leaves the balance at or above zero;
+ * - per-sponsor money: a funded award attributed to a sponsor, settling that sponsor's pledge and reversing that
+ *   sponsor's contribution are refused when they would spend more than that sponsor gave, even when the fund as a whole
+ *   has the money; an award with no sponsor draws on the fund in general; and per-sponsor figures add up to the balance;
+ * - a cancelled registration: its pledge cannot be settled, its award is flagged, and only a fund-linked scholarship
+ *   line (nothing else) can be reversed on it, returning the money to the fund; a church-billed registration refuses a
+ *   fund award on the server;
  * - the database itself refuses a negative contribution that is not a reversal, a pledge without a sponsor, a settled
  *   award that was never pledged, and a line whose fund belongs to another event;
  * - the finance export is formula-safe through csvCell and audited with counts only;
@@ -75,12 +81,12 @@ async function cleanup() {
 }
 
 let eventCounter = 0;
-async function mkEvent() {
+async function mkEvent(billingMode: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE" = "ATTENDEE_PAY") {
   eventCounter += 1;
   const id = `${P}_event_${eventCounter}`;
   const day = 86_400_000;
   await prisma.event.create({
-    data: { id, slug: `${id.replace(/_/g, "-")}-slug`, name: `Scholarship Check Event ${eventCounter}`, startsAt: new Date(Date.now() + day), endsAt: new Date(Date.now() + 2 * day), isPublished: false, audience: "GENERAL" },
+    data: { id, slug: `${id.replace(/_/g, "-")}-slug`, name: `Scholarship Check Event ${eventCounter}`, startsAt: new Date(Date.now() + day), endsAt: new Date(Date.now() + 2 * day), isPublished: false, audience: "GENERAL", billingMode },
   });
   return id;
 }
@@ -260,6 +266,77 @@ async function main() {
     assert(succeeded.length <= 1, `an award and the reversal of its funding never both succeed (round ${round}: ${outcomes.map(String).join(", ")})`);
     assert((await getFundView(e)).summary.balanceCents >= 0, `the balance never goes negative (round ${round})`);
   }
+
+  // ---- Per-sponsor money: a sponsor's awards, settlements and reversals are bounded by what that sponsor gave.
+  const e6 = await mkEvent();
+  const giftA = await contribute(e6, 10_000, { sponsorName: "Sponsor A" });
+  await contribute(e6, 20_000, { sponsorName: "Sponsor C" });
+  const r6 = await mkRegistration(e6, 500);
+  const sponsorRefusal = await award(e6, r6.id, 10_001, { pledged: false, sponsorName: "Sponsor A" }).then(() => null, (caught: unknown) => caught);
+  assert(sponsorRefusal instanceof ScholarshipFundError && sponsorRefusal.code === "SPONSOR_BALANCE_TOO_LOW", `a sponsored award above the sponsor's own money is refused although the fund has it (got ${String(sponsorRefusal)})`);
+  assert(await totalCents(r6.id) === 50_000 && await awardRow(r6.id) === null, "the refused sponsored award leaves nothing behind");
+  await expectFundError(award(e6, r6.id, 1_000, { pledged: false, sponsorName: "Never Gave" }), "SPONSOR_BALANCE_TOO_LOW", "a sponsor who gave nothing");
+  await award(e6, r6.id, 8_000, { pledged: false, sponsorName: "sponsor a" });
+  let v6 = await getFundView(e6);
+  const sponsorA = v6.summary.sponsors.find((sponsor) => sponsor.key === "name:sponsor a")!;
+  assert(sponsorA.receivedCents === 10_000 && sponsorA.awardedCents === 8_000 && sponsorA.unallocatedCents === 2_000, "per-sponsor matching after a sponsored award");
+  // An award with no sponsor draws on the fund in general and shows on its own line.
+  const r6b = await mkRegistration(e6, 500);
+  await award(e6, r6b.id, 5_000, { pledged: false });
+  v6 = await getFundView(e6);
+  const unallocatedTotal = v6.summary.sponsors.reduce((total, sponsor) => total + sponsor.unallocatedCents, 0);
+  assert(v6.summary.generalAwardedCents === 5_000 && unallocatedTotal - v6.summary.generalAwardedCents === v6.summary.balanceCents, "per-sponsor figures and the general draw add up to the fund balance");
+  // Reversing a sponsor's contribution cannot leave their awards uncovered, even with a healthy fund balance.
+  assert(v6.summary.balanceCents >= 10_000, "the fund as a whole could absorb the reversal");
+  await expectFundError(reverseContribution(e6, giftA, staff, "Check bounced"), "REVERSAL_EXCEEDS_BALANCE", "reverse money that sponsor's awards drew on");
+  // Settling a pledge needs that sponsor's own money, not just money in the fund.
+  const r6c = await mkRegistration(e6, 500);
+  await award(e6, r6c.id, 5_000, { pledged: true, sponsorName: "Sponsor P" });
+  const pledgeP = (await awardRow(r6c.id))!;
+  await expectFundError(settlePledgedAward(e6, pledgeP.id, staff), "SETTLE_EXCEEDS_BALANCE", "settle with only other sponsors' money in the fund");
+  await contribute(e6, 5_000, { sponsorName: "Sponsor P" });
+  await settlePledgedAward(e6, pledgeP.id, staff);
+  assert((await getFundView(e6)).summary.sponsors.find((sponsor) => sponsor.key === "name:sponsor p")?.unallocatedCents === 0, "a settled pledge spends exactly that sponsor's money");
+
+  // ---- A cancelled registration: no settling, flagged, and only a fund-linked scholarship can be reversed to release money.
+  const r7 = await mkRegistration(e6, 500);
+  await award(e6, r7.id, 2_000, { pledged: true, sponsorName: "Sponsor P" });
+  const pledge7 = (await awardRow(r7.id))!;
+  await contribute(e6, 2_000, { sponsorName: "Sponsor P" });
+  const plainDiscount = await createRegistrationAdjustment(e6, r7.id, staff, { kind: "DISCOUNT", amountCents: 1_000, reason: "Plain discount reason" }).then(() => prisma.registrationAdjustment.findFirstOrThrow({ where: { registrationId: r7.id, kind: "DISCOUNT" } }));
+  await prisma.registration.update({ where: { id: r7.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
+  await expectFundError(settlePledgedAward(e6, pledge7.id, staff), "AWARD_REGISTRATION_INACTIVE", "settle a pledge on a cancelled registration");
+  const cancelledView = (await getFundView(e6)).awards.find((entry) => entry.id === pledge7.id)!;
+  assert(cancelledView.active && cancelledView.registrationCancelled, "an active award on a cancelled registration is flagged");
+  const pledgedBefore = (await getFundView(e6)).summary.pledgedCents;
+  const discountRefusal = await reverseRegistrationAdjustment(e6, r7.id, plainDiscount.id, staff, "Release it").then(() => null, (caught: unknown) => caught);
+  assert((discountRefusal as { code?: string } | null)?.code === "REGISTRATION_NOT_ADJUSTABLE", "a plain discount on a cancelled registration still cannot be reversed");
+  const pledgeLine = await prisma.registrationAdjustment.findFirstOrThrow({ where: { id: pledge7.adjustmentId } });
+  await reverseRegistrationAdjustment(e6, r7.id, pledgeLine.id, staff, "Registration cancelled, release the pledge");
+  const releasedView = await getFundView(e6);
+  assert(!releasedView.awards.find((entry) => entry.id === pledge7.id)!.active && !releasedView.awards.find((entry) => entry.id === pledge7.id)!.registrationCancelled, "the reversed award is released and no longer flagged");
+  assert(releasedView.summary.pledgedCents === pledgedBefore - 2_000, "the released pledge is no longer outstanding");
+  // A funded award on a cancelled registration returns its money to the fund the same way.
+  const r8 = await mkRegistration(e6, 500);
+  await award(e6, r8.id, 1_500, { pledged: false });
+  const balanceWithAward = (await getFundView(e6)).summary.balanceCents;
+  await prisma.registration.update({ where: { id: r8.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
+  await reverseRegistrationAdjustment(e6, r8.id, (await prisma.registrationAdjustment.findFirstOrThrow({ where: { registrationId: r8.id } })).id, staff, "Registration cancelled, release it");
+  assert((await getFundView(e6)).summary.balanceCents === balanceWithAward + 1_500, "reversing a cancelled registration's award returns its money to the fund");
+  // Other statuses stay closed.
+  await prisma.registration.update({ where: { id: r8.id }, data: { status: "WAITLISTED" } });
+  const waitlistedRefusal = await award(e6, r8.id, 100, { pledged: false }).then(() => null, (caught: unknown) => caught);
+  assert((waitlistedRefusal as { code?: string } | null)?.code === "REGISTRATION_NOT_ADJUSTABLE", "a waitlisted registration still cannot be adjusted");
+
+  // ---- A church-billed registration refuses a fund award on the server.
+  const eBilled = await mkEvent("DEFERRED_ORGANIZATION_INVOICE");
+  await contribute(eBilled, 10_000, { sponsorName: "Billed Sponsor" });
+  const rBilled = await mkRegistration(eBilled, 300);
+  const billedRefusal = await award(eBilled, rBilled.id, 1_000, { pledged: false }).then(() => null, (caught: unknown) => caught);
+  assert((billedRefusal as { code?: string } | null)?.code === "FUND_AWARD_NOT_ALLOWED", `a church-billed registration refuses a fund award (got ${String(billedRefusal)})`);
+  assert(await totalCents(rBilled.id) === 30_000 && await prisma.scholarshipAward.count({ where: { eventId: eBilled } }) === 0, "and records nothing");
+  await createRegistrationAdjustment(eBilled, rBilled.id, staff, { kind: "SCHOLARSHIP", amountCents: 1_000, reason: "Plain scholarship reason" });
+  assert(await totalCents(rBilled.id) === 29_000, "a plain scholarship on a church-billed registration still works");
 
   // ---- The database refuses what the application never writes.
   const fund1 = await prisma.scholarshipFund.findUniqueOrThrow({ where: { eventId: e1 }, select: { id: true } });

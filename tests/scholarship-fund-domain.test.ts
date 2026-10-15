@@ -159,3 +159,34 @@ describe("finance export", () => {
     expect(csv).toContain('"Pledged, not yet received"\r\n');
   });
 });
+
+describe("per-sponsor consistency and busy answers (#398)", () => {
+  it("received minus awarded per sponsor, minus general draws, equals the fund balance", () => {
+    const summary = summarizeFund(
+      [contribution({ amountCents: 50_000 }), contribution({ id: "c2", sponsorKey: "name:b", sponsorName: "B", organizationId: null, amountCents: 20_000 })],
+      [
+        award({ amountCents: 10_000 }),
+        award({ id: "a2", sponsorKey: null, sponsorName: null, organizationId: null, amountCents: 7_000 }),
+        award({ id: "a3", sponsorKey: "name:b", sponsorName: "B", organizationId: null, amountCents: 5_000, pledged: true }),
+        award({ id: "a4", sponsorKey: "name:b", sponsorName: "B", organizationId: null, amountCents: 3_000, pledged: true, settled: true }),
+        award({ id: "a5", amountCents: 2_000, active: false }),
+      ],
+    );
+    expect(summary.generalAwardedCents).toBe(7_000);
+    const unallocated = summary.sponsors.reduce((total, sponsor) => total + sponsor.unallocatedCents, 0);
+    expect(unallocated - summary.generalAwardedCents).toBe(summary.balanceCents);
+    expect(summary.sponsors.every((sponsor) => sponsor.unallocatedCents >= 0)).toBe(true);
+  });
+
+  it("answers a serialization failure that escaped the retries with 409, not 500", async () => {
+    const { Prisma } = await import("@prisma/client");
+    const { adjustmentApiError } = await import("@/modules/registrations/adjustments-api");
+    const { scholarshipFundApiError } = await import("@/modules/scholarship-funds/api");
+    const conflict = () => new Prisma.PrismaClientKnownRequestError("write conflict", { code: "P2034", clientVersion: "test" });
+    const adjustment = adjustmentApiError(conflict(), "Adding");
+    const fundResponse = scholarshipFundApiError(conflict(), "Recording");
+    expect([adjustment.status, fundResponse.status]).toEqual([409, 409]);
+    expect(await adjustment.json()).toMatchObject({ error: "ADJUSTMENT_BUSY" });
+    expect((await adjustmentApiError(new Error("boom"), "Adding").json()).error).toBe("ADJUSTMENT_FAILED");
+  });
+});

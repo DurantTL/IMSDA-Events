@@ -178,6 +178,54 @@ describe("registration adjustments (#396)", () => {
       .rejects.toMatchObject({ code: "REGISTRATION_NOT_ADJUSTABLE" });
   });
 
+  it("refuses a scholarship fund award on a registration billed to its church, on the server (#398)", async () => {
+    mocks.registrationFindFirst.mockResolvedValue(registration({ event: { billingMode: "DEFERRED_ORGANIZATION_INVOICE" } }));
+    await expect(createRegistrationAdjustment("event-1", "reg-1", "user-1", createAdjustmentSchema.parse({
+      kind: "SCHOLARSHIP", amountCents: 5000, reason: "Committee scholarship", fundAward: { pledged: false },
+    }))).rejects.toMatchObject({ code: "FUND_AWARD_NOT_ALLOWED" });
+    expect(mocks.adjustmentCreate).not.toHaveBeenCalled();
+    expect(mocks.registrationUpdate).not.toHaveBeenCalled();
+    // A plain scholarship on the same registration is still fine.
+    await createRegistrationAdjustment("event-1", "reg-1", "user-1", createAdjustmentSchema.parse({
+      kind: "SCHOLARSHIP", amountCents: 5000, reason: "Committee scholarship",
+    }));
+    expect(mocks.adjustmentCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("on a cancelled registration only a fund-linked scholarship can be reversed, to release its money (#398)", async () => {
+    mocks.registrationFindFirst.mockResolvedValue(registration({ status: "CANCELLED", totalAmount: 95 }));
+    const line = (overrides: Record<string, unknown>) => ({
+      id: "adj-1", kind: "SCHOLARSHIP", amountCents: -5000, promoCodeId: null, promoCodeSnapshot: null, registrationAttendeeId: null,
+      reversesAdjustmentId: null, reversedBy: null, scholarshipAward: { id: "award-1" }, ...overrides,
+    });
+    mocks.adjustmentFindFirst.mockResolvedValue(line({}));
+    await reverseRegistrationAdjustment("event-1", "reg-1", "adj-1", "user-1", "Registration cancelled");
+    expect(mocks.adjustmentCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "SCHOLARSHIP", amountCents: 5000, reversesAdjustmentId: "adj-1" }) });
+    expect(mocks.registrationUpdate).toHaveBeenCalledWith({ where: { id: "reg-1" }, data: { totalAmount: 145 } });
+
+    vi.clearAllMocks();
+    mocks.registrationFindFirst.mockResolvedValue(registration({ status: "CANCELLED", totalAmount: 95 }));
+    mocks.userFindUnique.mockResolvedValue({ displayName: "Finance Staff" });
+    for (const other of [
+      line({ scholarshipAward: null }),
+      line({ kind: "DISCOUNT", scholarshipAward: null }),
+      line({ kind: "CORRECTION", scholarshipAward: null }),
+      line({ kind: "PROMO_CODE", scholarshipAward: null }),
+    ]) {
+      mocks.adjustmentFindFirst.mockResolvedValue(other);
+      await expect(reverseRegistrationAdjustment("event-1", "reg-1", "adj-1", "user-1", "Nope"))
+        .rejects.toMatchObject({ code: "REGISTRATION_NOT_ADJUSTABLE" });
+    }
+    // Every other status stays closed, fund-linked or not.
+    mocks.adjustmentFindFirst.mockResolvedValue(line({}));
+    for (const status of ["WAITLISTED", "DRAFT"]) {
+      mocks.registrationFindFirst.mockResolvedValue(registration({ status }));
+      await expect(reverseRegistrationAdjustment("event-1", "reg-1", "adj-1", "user-1", "Nope"))
+        .rejects.toMatchObject({ code: "REGISTRATION_NOT_ADJUSTABLE" });
+    }
+    expect(mocks.adjustmentCreate).not.toHaveBeenCalled();
+  });
+
   it("prices a per-person code on that person's share, one code each (#397)", async () => {
     mocks.registrationFindFirst.mockResolvedValue(registration({ totalAmount: 270 }));
     mocks.claimPromoCode.mockResolvedValue({ promoCode: { id: "promo-1", code: "EARLY" }, evaluation: { discountAmountCents: 1250 } });

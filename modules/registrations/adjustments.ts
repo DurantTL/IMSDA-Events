@@ -69,7 +69,8 @@ export type AdjustmentErrorCode =
   | "PROMO_ALREADY_APPLIED"
   | "PROMO_INVALID"
   | "ATTENDEE_NOT_FOUND"
-  | "ATTENDEE_PRICE_UNKNOWN";
+  | "ATTENDEE_PRICE_UNKNOWN"
+  | "FUND_AWARD_NOT_ALLOWED";
 
 export class AdjustmentError extends Error {
   constructor(public readonly code: AdjustmentErrorCode, message: string) {
@@ -126,7 +127,11 @@ export async function adjustmentTotalCents(client: Client, registrationId: strin
   return result._sum.amountCents ?? 0;
 }
 
-async function loadRegistration(tx: Client, eventId: string, registrationId: string) {
+/**
+ * `allowCancelled` lets a CANCELLED registration load so the caller can decide what is still allowed on it (only
+ * returning a fund-linked scholarship to the fund, #398). Every other status is refused here, as before.
+ */
+async function loadRegistration(tx: Client, eventId: string, registrationId: string, options: { allowCancelled?: boolean } = {}) {
   const registration = await tx.registration.findFirst({
     where: { id: registrationId, eventId },
     select: {
@@ -137,6 +142,7 @@ async function loadRegistration(tx: Client, eventId: string, registrationId: str
       submittedAt: true,
       createdAt: true,
       promoCodeRedemption: { select: { id: true } },
+      event: { select: { billingMode: true } },
       attendees: {
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
         select: { id: true, profileSnapshot: true, person: { select: { firstName: true, lastName: true } } },
@@ -157,16 +163,20 @@ async function loadRegistration(tx: Client, eventId: string, registrationId: str
   if (!registration) {
     throw new AdjustmentError("REGISTRATION_NOT_FOUND", "That registration could not be found.");
   }
-  if (registration.status !== "SUBMITTED" && registration.status !== "CONFIRMED") {
-    throw new AdjustmentError(
-      "REGISTRATION_NOT_ADJUSTABLE",
-      "The amount owed can only be adjusted on submitted or confirmed registrations.",
-    );
+  if (registration.status !== "SUBMITTED" && registration.status !== "CONFIRMED" && !(options.allowCancelled && registration.status === "CANCELLED")) {
+    throw notAdjustable();
   }
   const paidCents = registration.payments.reduce((total, payment) => (
     total + cents(payment.amount) - payment.refunds.reduce((sum, refund) => sum + cents(refund.amount), 0)
   ), 0);
   return { ...registration, totalCents: cents(registration.totalAmount), paidCents };
+}
+
+function notAdjustable() {
+  return new AdjustmentError(
+    "REGISTRATION_NOT_ADJUSTABLE",
+    "The amount owed can only be adjusted on submitted or confirmed registrations.",
+  );
 }
 
 function checkNewTotal(currentTotalCents: number, changeCents: number, paidCents: number) {
@@ -192,12 +202,12 @@ async function actorName(tx: Client, actorUserId: string) {
 }
 
 async function withRetry<T>(work: (tx: Client) => Promise<T>) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       return await getPrisma().$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
-      if (!retryable || attempt === 2) throw error;
+      if (!retryable || attempt === 4) throw error;
     }
   }
   throw new Error("unreachable");
@@ -214,6 +224,13 @@ export async function createRegistrationAdjustment(
     let kind: RegistrationAdjustmentKind = input.kind;
     let changeCents: number;
     let promo: { id: string; code: string } | null = null;
+    if (input.kind === "SCHOLARSHIP" && input.fundAward && registration.event?.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
+      // A church-billed registration adjusts an estimate that is invoiced later, not an amount a fund award can cover.
+      throw new AdjustmentError(
+        "FUND_AWARD_NOT_ALLOWED",
+        "A scholarship fund award can't be added to a registration billed to its church. Use a plain scholarship adjustment.",
+      );
+    }
     const attendeeIndex = input.attendeeId
       ? registration.attendees.findIndex((attendee) => attendee.id === input.attendeeId)
       : -1;
@@ -422,13 +439,17 @@ export async function reverseRegistrationAdjustment(
   reason: string,
 ) {
   await withRetry(async (tx) => {
-    const registration = await loadRegistration(tx, eventId, registrationId);
+    const registration = await loadRegistration(tx, eventId, registrationId, { allowCancelled: true });
     const original = await tx.registrationAdjustment.findFirst({
       where: { id: adjustmentId, registrationId, eventId },
-      select: { id: true, kind: true, amountCents: true, promoCodeId: true, promoCodeSnapshot: true, registrationAttendeeId: true, reversesAdjustmentId: true, reversedBy: { select: { id: true } } },
+      select: { scholarshipAward: { select: { id: true } }, id: true, kind: true, amountCents: true, promoCodeId: true, promoCodeSnapshot: true, registrationAttendeeId: true, reversesAdjustmentId: true, reversedBy: { select: { id: true } } },
     });
     if (!original || original.reversesAdjustmentId) {
       throw new AdjustmentError("ADJUSTMENT_NOT_FOUND", "That adjustment could not be found.");
+    }
+    if (registration.status === "CANCELLED" && !(original.kind === "SCHOLARSHIP" && original.scholarshipAward)) {
+      // On a cancelled registration only a fund-linked scholarship may be reversed, so staff can release its money by hand.
+      throw notAdjustable();
     }
     if (original.kind === "MEAL") {
       throw new AdjustmentError("MEAL_ADJUSTMENT_NOT_REVERSIBLE", "A meal charge is changed by changing the meal order, not by reversing the line.");

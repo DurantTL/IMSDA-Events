@@ -103,6 +103,19 @@ async function loadTotals(tx: Client, fundId: string) {
   return fundTotals(received._sum.amountCents ?? 0, funded._sum.amountCents ?? 0, pledged._sum.amountCents ?? 0);
 }
 
+/**
+ * One sponsor's position in a fund: what they gave (reversals included) minus the funded awards attributed to
+ * them. Funded means not pledged, or pledged and settled; active means the adjustment line is unreversed.
+ */
+async function loadSponsorUnallocated(tx: Client, fundId: string, key: string) {
+  const received = await tx.scholarshipContribution.aggregate({ where: { fundId, sponsorKey: key }, _sum: { amountCents: true } });
+  const awarded = await tx.scholarshipAward.aggregate({
+    where: { fundId, sponsorKey: key, adjustment: { reversedBy: null }, OR: [{ pledged: false }, { settledAt: { not: null } }] },
+    _sum: { amountCents: true },
+  });
+  return (received._sum.amountCents ?? 0) - (awarded._sum.amountCents ?? 0);
+}
+
 /** Records money received into the event's fund. Records it only: no payment is taken or moved. */
 export async function recordContribution(eventId: string, actorUserId: string, input: CreateContributionInput) {
   return withSerializableRetry(async (tx) => {
@@ -168,6 +181,13 @@ export async function reverseContribution(eventId: string, contributionId: strin
       throw new ScholarshipFundError(
         "REVERSAL_EXCEEDS_BALANCE",
         `Awards already drawn on this money, and only ${formatCents(totals.balanceCents)} is unspent. Reverse those awards first.`,
+      );
+    }
+    const sponsorUnallocated = await loadSponsorUnallocated(tx, original.fundId, original.sponsorKey);
+    if (sponsorUnallocated - original.amountCents < 0) {
+      throw new ScholarshipFundError(
+        "REVERSAL_EXCEEDS_BALANCE",
+        `Awards already drew on this sponsor's money, and only ${formatCents(Math.max(0, sponsorUnallocated))} of what they gave is unspent. Reverse those awards first.`,
       );
     }
     const reversal = await tx.scholarshipContribution.create({
@@ -237,6 +257,16 @@ export async function recordFundAward(
         `The fund has ${formatCents(totals.balanceCents)} available, which is less than ${formatCents(input.amountCents)}. Record the contribution first, or mark the award pledged, not yet received.`,
       );
     }
+    // Attributed to a sponsor, it is that sponsor's money being spent. With no sponsor it draws on the fund in general.
+    if (sponsor) {
+      const unallocated = await loadSponsorUnallocated(tx, fundId, sponsor.key);
+      if (input.amountCents > unallocated) {
+        throw new ScholarshipFundError(
+          "SPONSOR_BALANCE_TOO_LOW",
+          `${sponsor.name} has ${formatCents(Math.max(0, unallocated))} unspent in the fund, which is less than ${formatCents(input.amountCents)}. Record their contribution first, mark the award pledged, not yet received, or leave the sponsor blank to draw on the fund in general.`,
+        );
+      }
+    }
   }
   const row = await tx.scholarshipAward.create({
     data: {
@@ -281,13 +311,32 @@ export async function settlePledgedAward(eventId: string, awardId: string, actor
   return withSerializableRetry(async (tx) => {
     const award = await tx.scholarshipAward.findFirst({
       where: { id: awardId, eventId },
-      select: { id: true, fundId: true, amountCents: true, pledged: true, settledAt: true, adjustment: { select: { reversedBy: { select: { id: true } } } } },
+      select: {
+        id: true, fundId: true, amountCents: true, pledged: true, settledAt: true, sponsorKey: true, sponsorName: true,
+        registration: { select: { status: true } },
+        adjustment: { select: { reversedBy: { select: { id: true } } } },
+      },
     });
     if (!award) throw new ScholarshipFundError("AWARD_NOT_FOUND", "That award could not be found.");
     if (!award.pledged) throw new ScholarshipFundError("AWARD_NOT_PLEDGED", "That award was not marked pledged.");
     if (award.settledAt) throw new ScholarshipFundError("AWARD_ALREADY_SETTLED", "That pledge was already marked received.");
     if (award.adjustment.reversedBy) throw new ScholarshipFundError("AWARD_REVERSED", "That award was reversed, so there is nothing to settle.");
+    if (award.registration.status !== "SUBMITTED" && award.registration.status !== "CONFIRMED") {
+      throw new ScholarshipFundError(
+        "AWARD_REGISTRATION_INACTIVE",
+        "That registration is no longer active, so its pledge can't be marked received. Reverse the scholarship to release the pledge instead.",
+      );
+    }
     const totals = await loadTotals(tx, award.fundId);
+    if (award.sponsorKey) {
+      const unallocated = await loadSponsorUnallocated(tx, award.fundId, award.sponsorKey);
+      if (award.amountCents > unallocated) {
+        throw new ScholarshipFundError(
+          "SETTLE_EXCEEDS_BALANCE",
+          `${award.sponsorName ?? "That sponsor"} has ${formatCents(Math.max(0, unallocated))} unspent in the fund. Record their contribution that covers this ${formatCents(award.amountCents)} pledge first.`,
+        );
+      }
+    }
     if (award.amountCents > totals.balanceCents) {
       throw new ScholarshipFundError(
         "SETTLE_EXCEEDS_BALANCE",
@@ -330,6 +379,8 @@ export type AwardView = {
   pledged: boolean;
   settled: boolean;
   active: boolean;
+  /** The award is active but its registration was cancelled: staff should reverse it to return the money. */
+  registrationCancelled: boolean;
   createdOn: string;
 };
 
@@ -359,7 +410,7 @@ export async function getFundView(eventId: string): Promise<FundView> {
         select: {
           id: true, registrationId: true, amountCents: true, pledged: true, settledAt: true, createdAt: true,
           sponsorName: true, sponsorKey: true, organizationId: true,
-          registration: { select: { confirmationCode: true } },
+          registration: { select: { confirmationCode: true, status: true } },
           adjustment: { select: { reversedBy: { select: { id: true } } } },
         },
       },
@@ -400,6 +451,7 @@ export async function getFundView(eventId: string): Promise<FundView> {
       pledged: award.pledged,
       settled: Boolean(award.settledAt),
       active: awardLines[index]!.active,
+      registrationCancelled: awardLines[index]!.active && award.registration.status === "CANCELLED",
       createdOn: dateOnly(award.createdAt),
     })),
   };

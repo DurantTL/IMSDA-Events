@@ -1071,6 +1071,8 @@ select:focus-visible {
   text-decoration: none;
 }
 
+.scholarship-fund-code-link { min-height: 44px; }
+
 .text-button {
   border: 0;
   background: transparent;
