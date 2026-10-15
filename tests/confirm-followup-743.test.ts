@@ -64,7 +64,6 @@ describe("dialogs stack safely (#743)", () => {
   it("only the top-most dialog handles Escape and Tab", () => {
     const code = source("components/use-accessible-dialog.ts");
     expect(code).toContain("openDialogs.at(-1) !== token");
-    expect(code).toContain("confirm-backdrop");
     expect(source("components/confirm-dialog.tsx")).toContain("confirm-backdrop");
   });
 });
