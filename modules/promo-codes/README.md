@@ -130,7 +130,9 @@ Automation may prepare a draft and must never finalize or send one.
   attendee names: a whole-registration line shows the registrant, and a per-person
   line (#397) shows the covered attendee ("used for that person"). Names are read the
   way the rest of the app reads them: the registration's `contactSnapshot` (or the
-  attendee's `profileSnapshot`) first, then the stored Person. (2) The church invoice keeps one line per sponsored registration with
+  attendee's `profileSnapshot`) first, then the stored Person. If a covered attendee
+  is later removed in an amendment, the per-person line stays billed (the adjustment
+  remains) and its name falls back to the registrant's. (2) The church invoice keeps one line per sponsored registration with
   **no names**, as built; so do the PDF, the send preview and any email to the
   church. (3) The invoice code is **not** chosen by staff on attendee-paid events;
   it stays derived from the event name. (4) Audits keep ids only.

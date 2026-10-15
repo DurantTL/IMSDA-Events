@@ -314,12 +314,18 @@ async function main() {
   let rowA = report.rows.find((row) => row.churchId === ids.churchA)!;
   assert(rowA.coveredCents === 8_734 && rowA.invoicedCents === 8_734 && rowA.paidCents === 0 && rowA.owedOnInvoiceCents === 8_734 && rowA.notInvoicedCents === 0 && rowA.state === "FINALIZED_CURRENT" && rowA.invoiceNumber === finalized.number, "report: covered, invoiced, paid and owed");
   const holderName = `${REGISTRANT.first} ${REGISTRANT.last}`;
-  const nameByCode = new Map(rowA.lines.map((line) => [line.confirmationCode, line.registrantName]));
+  const nameByCode = new Map(rowA.lines.map((line) => [line.confirmationCode, line.usedByName]));
   assert(rowA.lines.length === 4, "report: four billed lines for church A");
   assert(nameByCode.get(snapshotReg.confirmationCode) === `${SNAPSHOT_REGISTRANT.first} ${SNAPSHOT_REGISTRANT.last}`, "report: a whole-registration line names the registrant, contact snapshot first");
   assert(nameByCode.get(personReg.confirmationCode) === ATTENDEE.shown, "report: a per-person line names the covered attendee (profile snapshot first, then Person), not the account holder");
-  assert(rowA.lines.filter((line) => line.registrantName === holderName).length === 2, "report: other whole-registration lines fall back to the stored Person name");
-  assert(report.rows.every((row) => row.lines.every((line) => line.registrantName.length > 0)), "report: every line carries a name");
+  assert(rowA.lines.filter((line) => line.usedByName === holderName).length === 2, "report: other whole-registration lines fall back to the stored Person name");
+  assert(report.rows.every((row) => row.lines.every((line) => line.usedByName.length > 0)), "report: every line carries a name");
+  // A covered attendee removed in an amendment: the per-person line stays billed and falls back to the registrant's name.
+  await prisma.registrationAttendee.delete({ where: { id: coveredAttendee.id } });
+  const afterRemoval = (await getChurchCodeReport(ids.general)).rows.find((row) => row.churchId === ids.churchA)!;
+  const removedLine = afterRemoval.lines.find((line) => line.confirmationCode === personReg.confirmationCode);
+  assert(afterRemoval.lines.length === 4 && afterRemoval.coveredCents === rowA.coveredCents && removedLine?.amountCents === 1_234, "report: removing the covered attendee leaves the per-person line billed");
+  assert(removedLine?.usedByName === holderName, "report: and its name falls back to the registrant's");
   assert(rowA.codes.length === 1 && rowA.codes[0]!.code === "CHURCHA" && rowA.codes[0]!.redeemedCount >= 4, "report: the code and its uses");
   assert(rowA.contact?.email === EMAIL.tina, "report: the church's contact");
   const rowB = report.rows.find((row) => row.churchId === ids.churchB)!;

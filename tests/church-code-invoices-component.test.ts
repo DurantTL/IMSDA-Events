@@ -50,7 +50,7 @@ describe("Church promo code report", () => {
     expect(markup).not.toMatch(/finalize invoice<\/button>/i);
   });
 
-  it("says so when a registrant has no name on file, and keeps the report line otherwise", () => {
+  it("says so when a line has no name on file, and keeps the report line otherwise", () => {
     const rows = [buildChurchCodeReportRow({
       event, church, lines, invoice: null, lineNames: new Map(),
       codes: [], contact: null,
@@ -69,7 +69,7 @@ describe("Church promo code report", () => {
       event, church, lines: mixed, invoice: null, codes: [], contact: null,
       lineNames: new Map([["redemption:r1", "Quillon Fernsby"], ["adjustment:a1", "Odalys Pemberton"]]),
     })];
-    expect(rows[0]!.lines.map((line) => line.registrantName)).toEqual(["Quillon Fernsby", "Odalys Pemberton"]);
+    expect(rows[0]!.lines.map((line) => line.usedByName)).toEqual(["Quillon Fernsby", "Odalys Pemberton"]);
     const markup = render({ eventId: "event-1", eligible: true, rows, totals: summarizeChurchCodeReport(rows) });
     expect(markup).toContain("Odalys Pemberton");
     const figures = JSON.stringify(buildChurchPromoInvoiceFigures({ event, church, lines: mixed }));
@@ -83,7 +83,7 @@ describe("Church promo code report", () => {
     expect(withNames).not.toContain("Fernsby");
     expect(withNames).not.toContain("Marisol");
     // The report line is a separate type: the shared line the invoice is built from never gains a name.
-    expect(Object.keys(lines[0]!)).not.toContain("registrantName");
+    expect(Object.keys(lines[0]!)).not.toContain("usedByName");
   });
 
   it("shows invoiced, paid and owed for a finalized invoice, and links to it", () => {
