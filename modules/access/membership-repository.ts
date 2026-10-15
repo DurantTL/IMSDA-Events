@@ -3,7 +3,6 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { EventPermission, EventRole } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { attendeeAccountToLinkForNewStaff } from "@/modules/account-merge/staff-attendee-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { wouldRemoveLastActiveEventAdmin } from "@/modules/access/membership-rules";
 import { hashPassword } from "@/modules/access/passwords";
@@ -127,31 +126,15 @@ export async function addStaffMembership(eventId: string, actorUserId: string, i
     let user = await tx.user.findUnique({ where: { email }, select: { id: true, credential: { select: { id: true } } } });
     let credentialCreated = false;
     if (!user) {
-      // One account per person (#554, ADR 0013): giving a staff role to someone who
-      // already has a verified attendee account creates the User linked to THAT
-      // account. Null (so unchanged) unless the one-sign-in switch is on.
-      const attendeeAccountId = await attendeeAccountToLinkForNewStaff(tx, email);
       user = await tx.user.create({
         data: {
           email,
           displayName: input.displayName.trim(),
           accountStatus: "PENDING_ACTIVATION",
           credential: { create: { passwordHash: unusableHash } },
-          ...(attendeeAccountId ? { attendeeAccountId } : {}),
         },
         select: { id: true, credential: { select: { id: true } } },
       });
-      if (attendeeAccountId) {
-        await writeAuditLog({
-          eventId,
-          actorUserId,
-          action: "STAFF_USER_LINKED_TO_ATTENDEE_ACCOUNT",
-          entityType: "User",
-          entityId: user.id,
-          summary: "A staff role was given to an existing attendee; the new staff user was linked to their attendee account.",
-          metadata: { attendeeAccountId },
-        }, tx);
-      }
       credentialCreated = true;
     } else {
       await tx.user.update({ where: { id: user.id }, data: { displayName: input.displayName.trim() } });

@@ -94,17 +94,24 @@ export async function findSwitchableAttendeeAccountForStaff(
   staffEmail: string,
   staffUserId?: string,
 ): Promise<SwitchableAttendeeAccount | null> {
-  if (staffUserId && (await isUnifiedSignInEnabled())) {
+  const unified = Boolean(staffUserId) && (await isUnifiedSignInEnabled());
+  if (unified) {
     const linked = await getPrisma().user.findUnique({
       where: { id: staffUserId },
       select: { attendeeAccount: { select: switchableAccountSelect } },
     });
     if (linked?.attendeeAccount) return switchableFrom(linked.attendeeAccount);
   }
-  const account = await getPrisma().attendeeAccount.findUnique({
-    where: { email: staffEmail.trim().toLowerCase() },
-    select: switchableAccountSelect,
-  });
+  const account: (SwitchableRow & { linkedUser?: { id: string } | null }) | null =
+    await getPrisma().attendeeAccount.findUnique({
+      where: { email: staffEmail.trim().toLowerCase() },
+      select: unified ? { ...switchableAccountSelect, linkedUser: { select: { id: true } } } : switchableAccountSelect,
+    });
+  // With the switch on, an account already linked to a DIFFERENT staff user is
+  // someone else's attendee side, whatever its email says.
+  if (unified && account?.linkedUser && account.linkedUser.id !== staffUserId) {
+    return null;
+  }
   return switchableFrom(account);
 }
 

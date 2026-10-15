@@ -267,7 +267,7 @@ below runs only when `PlatformSettings.unifiedSignInEnabled` is true):
 - At **activation** of a `PENDING_ACTIVATION` staff user a verified attendee account is created and
   linked, or an existing one is reused only when verified, active, not disabled, unlinked and with the
   same normalised email. Otherwise nothing is linked and an audit entry flags the person for review.
-- **Granting a staff role** to an existing attendee creates the `User` linked to their account.
+- **Granting a staff role** links nothing; the link happens only at first activation, after inbox proof. A user who was active before (any session, authenticator or passkey row) or whose activation link `create-admin` printed is never linked at activation: needs review, linked only by slice (d).
 - **Attendee mode** uses the link for a linked user; **act as** refuses the linked account's email; the
   staff **profile** card shows the linked registration account.
 - A **system-administrator email change** on a linked pair updates both sides in one transaction.
@@ -283,7 +283,7 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 | Slice | Writes |
 | --- | --- |
 | (a) | One additive column `User.attendeeAccountId` (all `NULL`) with its unique index and `ON DELETE SET NULL` foreign key, and `PlatformSettings.unifiedSignInEnabled` (default `false`). No backfill. |
-| (b) | A verified `AttendeeAccount` for each *new* staff user at activation; for an existing attendee given a staff role, the new `User` is linked to their account. |
+| (b) | A verified `AttendeeAccount` for each *new* staff user at activation; an existing verified, unlinked account with the same email is reused instead. Only at first activation; never at grant time and never for a previously active user. |
 | (c) | Nothing in the data model. Sessions are issued by the new page into the existing session tables. |
 | (d) | Per approved person: set `User.attendeeAccountId`; set `AttendeeCredential.disabledAt` when the person holds a staff role; one `AuditLog` row (`account.linked`, ids only). |
 | (e) | Drop the code paths, then (separately, optional) the retired attendee credentials of linked people. |

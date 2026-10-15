@@ -71,6 +71,14 @@ export type AttendeePasskeySecondFactorDecision =
 /**
  * Whether an attendee-side passkey assertion counts as the staff second factor
  * (decision 5). Every condition must hold; the first one that fails is the reason.
+ *
+ * TODO(#554, open question for Caleb, ADR 0013 "Open questions" 3): do NOT wire this
+ * into the staff sign-in (slice c) until the passkey has an ENROLMENT condition. As
+ * written, someone who controls only the inbox could sign in to the attendee side with
+ * an emailed code, enrol a passkey, reset the staff password by email, and then pass
+ * "staff password plus attendee passkey". The condition might be: enrolled from a
+ * session that passed staff MFA, or before the last staff password reset, with
+ * attendee passkeys revoked on a staff reset.
  */
 export function attendeePasskeyCountsAsStaffSecondFactor(
   input: AttendeePasskeySecondFactorInput,

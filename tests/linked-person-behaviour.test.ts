@@ -77,6 +77,18 @@ describe("attendee mode uses the link", () => {
     expect(mocks.accountFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { email: "linked@example.test" } }));
   });
 
+  it("switch on, unlinked: refuses an email-matched account that is linked to a different user", async () => {
+    mocks.enabled = true;
+    mocks.userFindUnique.mockResolvedValue({ attendeeAccount: null });
+    mocks.accountFindUnique.mockResolvedValue({ ...verifiedAccount, linkedUser: { id: "usr_other" } });
+    await expect(findSwitchableAttendeeAccountForStaff("linked@example.test", "usr_1")).resolves.toBeNull();
+  });
+
+  it("switch off: an email-matched account linked to someone else is still returned, as today", async () => {
+    mocks.accountFindUnique.mockResolvedValue({ ...verifiedAccount, linkedUser: { id: "usr_other" } });
+    await expect(findSwitchableAttendeeAccountForStaff("linked@example.test", "usr_1")).resolves.toMatchObject({ id: "acc_linked" });
+  });
+
   it("switch off: the email rule only, the link is never read", async () => {
     mocks.userFindUnique.mockResolvedValue({ attendeeAccount: { ...verifiedAccount, id: "acc_linked" } });
     mocks.accountFindUnique.mockResolvedValue({ ...verifiedAccount, id: "acc_by_email" });

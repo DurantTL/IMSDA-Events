@@ -1,19 +1,20 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { canReuseAttendeeAccount, normalizeLinkEmail } from "@/modules/account-merge/link-rules";
 
 /**
  * Creating the staff `User` <-> `AttendeeAccount` link for NEW staff (#554,
- * ADR 0013, slice (b)). Both entry points run only when
- * `PlatformSettings.unifiedSignInEnabled` is true; with it false they return
- * "disabled" without touching a row, so behaviour is exactly as before.
+ * ADR 0013, slice (b)). It runs only when `PlatformSettings.unifiedSignInEnabled`
+ * is true; with it false it returns "disabled" without touching a row, so
+ * behaviour is exactly as before.
  *
- * Neither one backfills: they act on one person at the moment that person is
- * invited or activates. Linking people who already exist is a human-approved
- * later slice (d).
+ * It links at a person's FIRST activation only, after the activation link proved
+ * they control the inbox. It never links at grant time, never links someone who
+ * was active before, and never backfills. Linking people who already exist is a
+ * human-approved later slice (d).
  *
  * Audit entries carry ids only, never emails or names.
  */
@@ -27,6 +28,12 @@ export type ActivationLinkOutcome =
   | "created"
   | "needs_review";
 
+export type NeedsReviewReason =
+  | "EXISTING_ACCOUNT_NOT_REUSABLE"
+  | "PREVIOUSLY_ACTIVE"
+  | "TOKEN_NOT_EMAILED"
+  | "LINK_CONFLICT";
+
 const accountSelect = {
   id: true,
   email: true,
@@ -36,6 +43,23 @@ const accountSelect = {
   linkedUser: { select: { id: true } },
 } as const;
 
+async function markNeedsReview(
+  tx: Tx,
+  userId: string,
+  attendeeAccountId: string | null,
+  reason: NeedsReviewReason,
+): Promise<"needs_review"> {
+  await writeAuditLog({
+    actorUserId: userId,
+    action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW",
+    entityType: "User",
+    entityId: userId,
+    summary: "A staff member's attendee account was not linked automatically and needs review.",
+    metadata: { attendeeAccountId, reason },
+  }, tx);
+  return "needs_review";
+}
+
 /**
  * Run inside the activation transaction, right after a PENDING_ACTIVATION user
  * became ACTIVE. Gives the new staff member a verified attendee account:
@@ -44,10 +68,14 @@ const accountSelect = {
  *   verified, active, not disabled and linked to nobody;
  * - when no account holds that email, one is created, already verified: the
  *   activation link proved control of the address (decision 4);
- * - when an account holds the email but may not be reused (unverified, disabled
- *   or linked elsewhere), nothing is linked, no account is verified on its
- *   behalf, and an audit entry marks the person for review. Activation itself
- *   still succeeds.
+ * - otherwise nothing is linked, no one else's account is verified for them, and an
+ *   audit entry marks the person for review. Activation itself still succeeds.
+ *
+ * Needs review, with nothing linked, also when: the user was active before
+ * (PREVIOUSLY_ACTIVE: any session, authenticator enrolment or staff passkey row
+ * exists, since a re-invite clears `activatedAt`), or the activation link was
+ * printed by `scripts/create-admin.ts` for the operator to pass on instead of being
+ * emailed (TOKEN_NOT_EMAILED: it did not prove the inbox).
  */
 export async function linkAttendeeSideAtActivation(
   tx: Tx,
@@ -63,6 +91,22 @@ export async function linkAttendeeSideAtActivation(
   if (!user) return "disabled";
   if (user.attendeeAccountId) return "already_linked";
 
+  const [sessions, enrollments, passkeys, printedUrl] = await Promise.all([
+    tx.userSession.count({ where: { userId: user.id } }),
+    tx.userMfaEnrollment.count({ where: { userId: user.id } }),
+    tx.userPasskey.count({ where: { userId: user.id } }),
+    // create-admin without a password prints the activation URL (passwordSetDirectly is false).
+    tx.auditLog.count({
+      where: {
+        entityId: user.id,
+        action: { in: ["SYSTEM_ADMIN_BOOTSTRAPPED", "SYSTEM_ADMIN_PROMOTED"] },
+        metadata: { path: ["passwordSetDirectly"], equals: false },
+      },
+    }),
+  ]);
+  if (sessions + enrollments + passkeys > 0) return markNeedsReview(tx, user.id, null, "PREVIOUSLY_ACTIVE");
+  if (printedUrl > 0) return markNeedsReview(tx, user.id, null, "TOKEN_NOT_EMAILED");
+
   const email = normalizeLinkEmail(user.email);
   // ON CONFLICT DO NOTHING: when an account already holds this email, nothing
   // is written and the transaction is not aborted by the unique index.
@@ -70,6 +114,9 @@ export async function linkAttendeeSideAtActivation(
     data: [{ email, displayName: user.displayName, status: "ACTIVE", emailVerifiedAt: now }],
     skipDuplicates: true,
   });
+  // Lock the account row, then re-read it, so the reuse rule is checked against a
+  // state nobody can change until this transaction ends.
+  await tx.$queryRaw`SELECT "id" FROM "AttendeeAccount" WHERE "email" = ${email} FOR UPDATE`;
   const account = await tx.attendeeAccount.findUnique({ where: { email }, select: accountSelect });
   const reusable = account
     ? canReuseAttendeeAccount(
@@ -86,18 +133,21 @@ export async function linkAttendeeSideAtActivation(
     : false;
 
   if (!account || !reusable) {
-    await writeAuditLog({
-      actorUserId: user.id,
-      action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW",
-      entityType: "User",
-      entityId: user.id,
-      summary: "A new staff member's attendee account could not be linked automatically and needs review.",
-      metadata: { attendeeAccountId: account?.id ?? null, reason: "EXISTING_ACCOUNT_NOT_REUSABLE" },
-    }, tx);
-    return "needs_review";
+    return markNeedsReview(tx, user.id, account?.id ?? null, "EXISTING_ACCOUNT_NOT_REUSABLE");
   }
 
-  await tx.user.update({ where: { id: user.id }, data: { attendeeAccountId: account.id } });
+  // A savepoint, so a unique-index conflict on the link becomes "needs review"
+  // instead of failing (and rolling back) the whole activation.
+  await tx.$executeRawUnsafe("SAVEPOINT staff_attendee_link");
+  try {
+    await tx.user.update({ where: { id: user.id }, data: { attendeeAccountId: account.id } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT staff_attendee_link");
+      return markNeedsReview(tx, user.id, account.id, "LINK_CONFLICT");
+    }
+    throw error;
+  }
   const wasCreated = created.count === 1;
   await writeAuditLog({
     actorUserId: user.id,
@@ -110,29 +160,4 @@ export async function linkAttendeeSideAtActivation(
     metadata: { attendeeAccountId: account.id },
   }, tx);
   return wasCreated ? "created" : "linked_existing";
-}
-
-/**
- * Run inside `addStaffMembership` when it is about to CREATE a staff `User`.
- * Returns the attendee account to link the new user to, so that granting a
- * staff role to an existing attendee gives that person a `User` attached to
- * THEIR account instead of a second identity. Null when the switch is off or no
- * reusable account holds the email (activation then creates or reviews one).
- */
-export async function attendeeAccountToLinkForNewStaff(tx: Tx, email: string): Promise<string | null> {
-  if (!(await isUnifiedSignInEnabled(tx))) return null;
-  const normalized = normalizeLinkEmail(email);
-  const account = await tx.attendeeAccount.findUnique({ where: { email: normalized }, select: accountSelect });
-  if (!account) return null;
-  const reusable = canReuseAttendeeAccount(
-    {
-      email: account.email,
-      status: account.status,
-      emailVerifiedAt: account.emailVerifiedAt,
-      disabledAt: account.disabledAt,
-      linkedUserId: account.linkedUser?.id ?? null,
-    },
-    normalized,
-  );
-  return reusable ? account.id : null;
 }

@@ -332,12 +332,23 @@ human-gated and never run from CI.
   and no one else's account is verified for them; an audit entry
   `STAFF_ATTENDEE_LINK_NEEDS_REVIEW` (ids only) marks the person and activation still succeeds.
   A password reset of an already ACTIVE user is not an activation and links nothing.
-- **Granting a staff role to an existing attendee** (`addStaffMembership`): when it would create the
-  `User`, and a reusable account holds the email, the `User` is created linked to that account
-  (audit `STAFF_USER_LINKED_TO_ATTENDEE_ACCOUNT`).
+- **Granting a staff role to an existing attendee** links NOTHING at grant time: an event admin
+  can reach `addStaffMembership`, and the invitee has not yet proved they control the inbox. The
+  new pending `User` is linked at first activation, which reuses the existing verified, unlinked
+  account with the same email, so the end state is the same and the link follows inbox proof.
+  Linking happens only at first activation.
+- **Never linked at activation (needs review, `STAFF_ATTENDEE_LINK_NEEDS_REVIEW`):** a user who
+  was active before (`PREVIOUSLY_ACTIVE`: any `UserSession`, `UserMfaEnrollment` or `UserPasskey`
+  row exists, because a re-invite, or `scripts/create-admin.ts --promote-existing`, resets the user
+  to `PENDING_ACTIVATION` and clears `activatedAt`), and an activation link that
+  `scripts/create-admin.ts` printed for the operator instead of emailing (`TOKEN_NOT_EMAILED`).
+  Those people are linked only by slice (d). The activation also falls back to needs review
+  (`LINK_CONFLICT`) rather than failing if the account row was linked to someone else meanwhile;
+  the account row is locked (`FOR UPDATE`) while the reuse rule is re-checked.
 - **Attendee mode and the profile page:** `findSwitchableAttendeeAccountForStaff(email, userId)`
   returns the LINKED account for a linked user (no email fallback, null if it is disabled or
-  unverified); an unlinked user keeps today's email rule. The staff card on `/profile` shows the
+  unverified); an unlinked user keeps today's email rule, except that an account already linked to
+  a different staff user is refused. The staff card on `/profile` shows the
   linked registration account. **Act as** keeps working inside the staff session as today; the one
   change is that `isActingAdminsOwnEmail` also refuses the linked account's email, so an act-as
   never grants a club role to the acting person's own attendee side.
@@ -412,6 +423,19 @@ human-gated and never run from CI.
    Oct 8 comment says they stay separate "unless staff link them by hand". Oct 15 does not
    settle which applies. Until answered, no hand-link tool is planned, and the dry run only
    lists such pairs.
+
+2. **Admin email change vs. verification (found in the slice (b) security review).** The reuse
+   rule trusts `AttendeeAccount.emailVerifiedAt`, but a system-administrator email change keeps
+   it, so an account can be "verified" for an address nobody has verified. Options: clear the
+   verification on an administrator email change, or require a verification newer than the last
+   email change. Nothing is built for it.
+3. **Attendee passkey as a staff second factor needs an enrolment condition (security review).**
+   As decision 5 is written, someone who controls only the inbox could sign in to the attendee
+   side with an emailed code, enrol a passkey, reset the staff password by email, and then pass
+   "staff password plus attendee passkey". Before slice (c) wires it, the passkey needs a condition,
+   for example enrolled from a session that passed staff MFA, or before the last staff password
+   reset, with attendee passkeys revoked on a staff reset. A TODO on
+   `attendeePasskeyCountsAsStaffSecondFactor` points here. Nothing is built for it.
 
 **Resolved (answered by Caleb on Oct 15, 2026)**
 

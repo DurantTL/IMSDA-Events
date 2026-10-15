@@ -7,10 +7,8 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: vi.fn() }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 
 import { canReuseAttendeeAccount } from "@/modules/account-merge/link-rules";
-import {
-  attendeeAccountToLinkForNewStaff,
-  linkAttendeeSideAtActivation,
-} from "@/modules/account-merge/staff-attendee-link";
+import { Prisma } from "@prisma/client";
+import { linkAttendeeSideAtActivation } from "@/modules/account-merge/staff-attendee-link";
 
 /** #554 slice (b): activation linking and role-grant linking, switch both ways. Synthetic data only. */
 
@@ -24,12 +22,18 @@ const verified = {
   linkedUser: null,
 };
 
-function tx(options: { enabled: boolean; user?: unknown; account?: unknown; created?: number }) {
+function tx(options: { enabled: boolean; user?: unknown; account?: unknown; created?: number; sessions?: number; enrollments?: number; passkeys?: number; printed?: number; updateError?: unknown }) {
   return {
+    userSession: { count: vi.fn().mockResolvedValue(options.sessions ?? 0) },
+    userMfaEnrollment: { count: vi.fn().mockResolvedValue(options.enrollments ?? 0) },
+    userPasskey: { count: vi.fn().mockResolvedValue(options.passkeys ?? 0) },
+    auditLog: { count: vi.fn().mockResolvedValue(options.printed ?? 0) },
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    $executeRawUnsafe: vi.fn().mockResolvedValue(0),
     platformSettings: { findUnique: vi.fn().mockResolvedValue({ unifiedSignInEnabled: options.enabled }) },
     user: {
       findUnique: vi.fn().mockResolvedValue(options.user ?? { id: "usr_1", email: "New@Example.test", displayName: "New", attendeeAccountId: null }),
-      update: vi.fn().mockResolvedValue({}),
+      update: options.updateError ? vi.fn().mockRejectedValue(options.updateError) : vi.fn().mockResolvedValue({}),
     },
     attendeeAccount: {
       createMany: vi.fn().mockResolvedValue({ count: options.created ?? 0 }),
@@ -98,22 +102,62 @@ describe("linkAttendeeSideAtActivation", () => {
   });
 });
 
-describe("attendeeAccountToLinkForNewStaff (a staff role for an existing attendee)", () => {
-  it("switch off: null, and no lookup", async () => {
-    const t = tx({ enabled: false, account: verified });
-    await expect(attendeeAccountToLinkForNewStaff(t as never, "new@example.test")).resolves.toBeNull();
-    expect(t.attendeeAccount.findUnique).not.toHaveBeenCalled();
+describe("never links an existing person at activation (security review B1)", () => {
+  it.each([
+    ["a session row", { sessions: 1 }],
+    ["an authenticator enrolment", { enrollments: 1 }],
+    ["a staff passkey", { passkeys: 1 }],
+  ])("a previously active user with %s is flagged, not linked", async (_label, extra) => {
+    const t = tx({ enabled: true, account: verified, ...extra });
+    await expect(linkAttendeeSideAtActivation(t as never, "usr_1", now)).resolves.toBe("needs_review");
+    expect(t.attendeeAccount.createMany).not.toHaveBeenCalled();
+    expect(t.user.update).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW", metadata: { attendeeAccountId: null, reason: "PREVIOUSLY_ACTIVE" } }),
+      t,
+    );
   });
 
-  it("switch on: returns the existing verified account", async () => {
-    const t = tx({ enabled: true, account: verified });
-    await expect(attendeeAccountToLinkForNewStaff(t as never, " New@example.test")).resolves.toBe("acc_1");
-    expect(t.attendeeAccount.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { email: "new@example.test" } }));
+  it("an activation link printed by create-admin is flagged, not linked", async () => {
+    const t = tx({ enabled: true, account: verified, printed: 1 });
+    await expect(linkAttendeeSideAtActivation(t as never, "usr_1", now)).resolves.toBe("needs_review");
+    expect(t.user.update).not.toHaveBeenCalled();
+    expect(t.attendeeAccount.createMany).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { attendeeAccountId: null, reason: "TOKEN_NOT_EMAILED" } }),
+      t,
+    );
   });
 
-  it("switch on: null for no account, an unverified one, or one linked elsewhere", async () => {
-    await expect(attendeeAccountToLinkForNewStaff(tx({ enabled: true }) as never, "x@example.test")).resolves.toBeNull();
-    await expect(attendeeAccountToLinkForNewStaff(tx({ enabled: true, account: { ...verified, emailVerifiedAt: null } }) as never, "new@example.test")).resolves.toBeNull();
-    await expect(attendeeAccountToLinkForNewStaff(tx({ enabled: true, account: { ...verified, linkedUser: { id: "u" } } }) as never, "new@example.test")).resolves.toBeNull();
+  it("switch off: the history is not even read", async () => {
+    const t = tx({ enabled: false, sessions: 3 });
+    await linkAttendeeSideAtActivation(t as never, "usr_1", now);
+    expect(t.userSession.count).not.toHaveBeenCalled();
+  });
+});
+
+describe("a link conflict falls back to review instead of failing (security review N4)", () => {
+  it("locks the account row before re-checking the reuse rule", async () => {
+    const t = tx({ enabled: true, created: 0, account: verified });
+    await linkAttendeeSideAtActivation(t as never, "usr_1", now);
+    const order = [t.attendeeAccount.createMany.mock.invocationCallOrder[0], t.$queryRaw.mock.invocationCallOrder[0], t.attendeeAccount.findUnique.mock.invocationCallOrder[0]];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(t.$queryRaw).toHaveBeenCalledOnce();
+  });
+
+  it("a unique-index conflict on the link rolls back to the savepoint and records review", async () => {
+    const conflict = new Prisma.PrismaClientKnownRequestError("unique", { code: "P2002", clientVersion: "test" });
+    const t = tx({ enabled: true, created: 0, account: verified, updateError: conflict });
+    await expect(linkAttendeeSideAtActivation(t as never, "usr_1", now)).resolves.toBe("needs_review");
+    expect(t.$executeRawUnsafe).toHaveBeenCalledWith("ROLLBACK TO SAVEPOINT staff_attendee_link");
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { attendeeAccountId: "acc_1", reason: "LINK_CONFLICT" } }),
+      t,
+    );
+  });
+
+  it("any other error still propagates", async () => {
+    const t = tx({ enabled: true, created: 0, account: verified, updateError: new Error("boom") });
+    await expect(linkAttendeeSideAtActivation(t as never, "usr_1", now)).rejects.toThrow("boom");
   });
 });
