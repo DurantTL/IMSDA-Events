@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { HealthRecordForm } from "@/components/health-record-form";
 import { HealthImportWorkspace } from "@/components/health-import-workspace";
 import { HEALTH_IMPORTED_NOTICE, HealthRecordView } from "@/components/health-record-view";
 import { HEALTH_CONSENT_TEXT, HEALTH_CONSENT_VERSION } from "@/modules/health-records/domain";
@@ -40,6 +41,42 @@ describe("the Health tab for an imported record (#878)", () => {
     const html = render(health());
     expect(html).toContain("Ask the parent to upload it again here.");
     expect(html).not.toMatch(/https?:/);
+  });
+});
+
+describe("an imported record with unanswered or unusable answers (#878)", () => {
+  it("says Not answered, never No or None reported, for a blank insurance or allergy answer", () => {
+    const html = render(health({ values: { emergencyContacts: [] } }));
+    expect(html).toContain("Not answered");
+    expect(html).not.toMatch(/None reported/);
+    expect(html.match(/Not answered/g)).toHaveLength(2);
+    expect(render(health({ values: { hasAllergies: "NO", hasInsurance: "NO", emergencyContacts: [] } }))).toMatch(/None reported/);
+  });
+});
+
+describe("the form for an imported record (#878)", () => {
+  const props = { mode: { kind: "director", organizationId: "club-a", memberId: "m1" } as const, consentText: HEALTH_CONSENT_TEXT, clubName: "Example Pathfinders", memberName: "Riley Sample" };
+  const form = (initialValues: Record<string, unknown>, needsCorrection: string[]) => renderToStaticMarkup(createElement(HealthRecordForm, { ...props, initialValues, needsCorrection }));
+
+  it("names each field that needs correcting in the banner", () => {
+    const html = form({ lastTetanusBooster: "2019", medications: "x".repeat(2100), emergencyContacts: [] }, ["lastTetanusBooster", "medications", "emergencyContacts.0.phone"]);
+    expect(html).toContain("Date of last tetanus booster, Medications or other relevant health information, Emergency contact 1 phone");
+  });
+
+  it("shows a tetanus answer that is not a date as typed, with what to fix", () => {
+    const html = form({ lastTetanusBooster: "2019", emergencyContacts: [] }, ["lastTetanusBooster"]);
+    expect(html).toMatch(/<input[^>]*value="2019"/);
+    expect(html).toContain("Enter the date as year-month-day");
+  });
+
+  it("marks over-length text, and leaves unanswered questions unanswered", () => {
+    const html = form({ medications: "x".repeat(2100), emergencyContacts: [] }, ["medications"]);
+    expect(html).toContain("Keep this to 2000 characters or fewer. This saved answer needs correcting.");
+    expect(html.match(/Not answered: choose one/g)).toHaveLength(2);
+  });
+
+  it("starts a brand-new record at No, as before", () => {
+    expect(form({}, [])).not.toContain("Not answered: choose one");
   });
 });
 

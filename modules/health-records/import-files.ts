@@ -133,6 +133,8 @@ function safeCodePoint(code: number, fallback: string) {
   return Number.isInteger(code) && code >= 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : fallback;
 }
 
+const TRUNCATED = "That Excel file looks cut off or damaged. Export it again from Cognito Forms.";
+
 type Tag = { start: number; openEnd: number; selfClosing: boolean };
 
 /**
@@ -148,7 +150,7 @@ function nextTag(xml: string, name: string, from: number): Tag | null {
     // Whitespace, ">" or "/" ends the name: "<c" is not "<cols", "<t" is not "<tr".
     if (after === 32 || after === 9 || after === 10 || after === 13 || after === 62 || after === 47) {
       const close = xml.indexOf(">", start);
-      if (close < 0) return null;
+      if (close < 0) throw new HealthImportFileError(TRUNCATED);
       return { start, openEnd: close + 1, selfClosing: xml.charCodeAt(close - 1) === 47 };
     }
     at = start + 1;
@@ -169,7 +171,8 @@ function* elements(xml: string, name: string): Generator<{ inner: string; attrib
       continue;
     }
     const end = xml.indexOf(closer, tag.openEnd);
-    if (end < 0) return;
+    // A start tag with no end tag means the file is cut off. Refusing it beats importing the cells before the cut.
+    if (end < 0) throw new HealthImportFileError(TRUNCATED);
     yield { inner: xml.slice(tag.openEnd, end), attributes };
     cursor = end + closer.length;
   }
@@ -178,8 +181,27 @@ function* elements(xml: string, name: string): Generator<{ inner: string; attrib
 /** Concatenated text of every `<t>` in a fragment (a shared string or inline string; rich-text runs join). */
 function textOf(fragment: string) {
   let out = "";
-  for (const part of elements(fragment, "t")) out += decodeXml(part.inner);
+  for (const part of elements(withoutPhonetic(fragment), "t")) out += decodeXml(part.inner);
   return out;
+}
+
+/** Drops `<rPh>` runs: the phonetic guide text (furigana) is not part of the cell's value. Linear, indexOf only. */
+function withoutPhonetic(fragment: string) {
+  if (!fragment.includes("<rPh")) return fragment;
+  let out = "";
+  let cursor = 0;
+  for (;;) {
+    const tag = nextTag(fragment, "rPh", cursor);
+    if (!tag) return out + fragment.slice(cursor);
+    out += fragment.slice(cursor, tag.start);
+    if (tag.selfClosing) {
+      cursor = tag.openEnd;
+      continue;
+    }
+    const end = fragment.indexOf("</rPh>", tag.openEnd);
+    if (end < 0) throw new HealthImportFileError(TRUNCATED);
+    cursor = end + "</rPh>".length;
+  }
 }
 
 function sharedStringsOf(xml: string | null): string[] {

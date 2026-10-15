@@ -18,6 +18,7 @@ vi.mock("@/modules/health-records/import-repository", () => ({ previewHealthImpo
 
 import * as applyRoute from "@/app/api/staff/health-import/apply/route";
 import * as previewRoute from "@/app/api/staff/health-import/preview/route";
+import { AccessDeniedError } from "@/modules/access/authorization";
 import { HealthRecordError } from "@/modules/health-records/errors";
 
 function upload(extra: Record<string, string | string[]> = {}, file: Uint8Array = csvBytes(MAIN_HEADERS, [mainRow()])) {
@@ -109,9 +110,11 @@ describe("the health import routes", () => {
   });
 
   it.each(routes)("%s answers an unauthenticated request as refused, reading nothing", async (_name, handler) => {
-    state.staffViewer.mockRejectedValue(Object.assign(new Error("Authentication is required."), { name: "AccessDeniedError" }));
+    state.staffViewer.mockRejectedValue(new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED"));
     const response = await handler(upload());
-    expect([401, 403, 500]).toContain(response.status);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: "AUTHENTICATION_REQUIRED" });
+    expect(state.apply).not.toHaveBeenCalled();
     expect(state.preview).not.toHaveBeenCalled();
   });
 

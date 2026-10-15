@@ -25,6 +25,7 @@ function entry(overrides: Partial<ParsedHealthEntry> = {}): ParsedHealthEntry {
     sections: [],
     needsCorrection: [],
     contactsOmitted: 0,
+    tooLong: false,
     ...overrides,
   };
 }
@@ -89,6 +90,10 @@ describe("matching an entry to a roster member", () => {
     expect(clubsForText("Sample Valley SDA Church Pathfinder Club", clubs).map((club) => club.organizationId)).toEqual(["club-b"]);
     expect(clubsForText("example pathfinders", clubs).map((club) => club.organizationId)).toEqual(["club-a"]);
     expect(clubNameStem("Albany SDA Church Pathfinders")).toBe("albany");
+  });
+
+  it("never imports an entry with a cell over the hard length cap: it needs a check", () => {
+    expect(only([entry({ tooLong: true })], [member()])[0]).toMatchObject({ outcome: "NEEDS_CHECK", reason: "TEXT_TOO_LONG", memberId: null });
   });
 
   it("never imports an incomplete form", () => {

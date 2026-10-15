@@ -42,33 +42,6 @@ export const IMPORT_SECTION_LABELS = {
 
 export type ImportSection = keyof typeof IMPORT_SECTION_LABELS;
 
-/** The Health tab form's own limits (domain.ts `healthRecordShape`). A longer imported value is flagged, never cut. */
-export const FORM_LIMITS: Record<string, number> = {
-  addressLine1: 120, addressLine2: 120, city: 80, state: 40, zip: 20, phone: 40, email: 160,
-  allergyDetails: 2000, medications: 2000, medicalRestrictions: 2000,
-  insuranceCompany: 160, insuranceGroupNumber: 80, insurancePolicyNumber: 80, insurancePhone: 40,
-  guardianFirstName: 80, guardianLastName: 80, guardianAddress: 300, guardianPhone: 40, guardianEmail: 160,
-};
-const CONTACT_LIMITS = { firstName: 80, lastName: 80, phone: 40, relationship: 80 } as const;
-
-/** Keys of values the Health tab form would refuse as too long. Keys only. */
-export function overLimitFields(values: Record<string, unknown>): string[] {
-  const flagged: string[] = [];
-  for (const [key, limit] of Object.entries(FORM_LIMITS)) {
-    const value = values[key];
-    if (typeof value === "string" && value.length > limit) flagged.push(key);
-  }
-  if (Array.isArray(values.emergencyContacts)) {
-    values.emergencyContacts.forEach((contact, index) => {
-      for (const [field, limit] of Object.entries(CONTACT_LIMITS)) {
-        const value = (contact as Record<string, unknown>)[field];
-        if (typeof value === "string" && value.length > limit) flagged.push(`emergencyContacts.${index}.${field}`);
-      }
-    });
-  }
-  return flagged;
-}
-
 export type ParsedHealthEntry = {
   /** The Cognito entry id. Not health content; it is what the preview and the apply step name a row by. */
   sourceId: string;
@@ -89,6 +62,8 @@ export type ParsedHealthEntry = {
   sections: ImportSection[];
   /** Field keys that fail today's checks, as stored. Keys only. */
   needsCorrection: string[];
+  /** A cell longer than the hard cap (20,000 characters). It is never cut: the row is not imported (NEEDS_CHECK). */
+  tooLong: boolean;
   /** Emergency contacts beyond the Health tab's limit that were left out. A count only. */
   contactsOmitted: number;
 };
@@ -308,8 +283,9 @@ function entryFrom(
     incomplete: status === "incomplete",
     values,
     sections: (Object.keys(IMPORT_SECTION_LABELS) as ImportSection[]).filter((section) => sections.has(section)),
-    needsCorrection: [...new Set([...healthFieldsNeedingCorrection(values), ...overLimitFields(values)])],
+    needsCorrection: healthFieldsNeedingCorrection(values),
     contactsOmitted: Math.max(0, contacts.length - MAX_EMERGENCY_CONTACTS),
+    tooLong: [row, ...contactRows].some((source) => Object.values(source).some((cell) => cell.length > TEXT_CAP)),
   };
 }
 

@@ -56,7 +56,7 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
         <h3>Health</h3>
         <dl className="detail-list">
           <Row label="Last tetanus booster" value={str(values, "lastTetanusBooster")} />
-          <Row label="Allergies" value={values.hasAllergies === "YES" ? str(values, "allergyDetails") : "None reported"} />
+          <Row label="Allergies" value={values.hasAllergies === "YES" ? str(values, "allergyDetails") : values.hasAllergies === "NO" ? "None reported" : "Not answered"} />
           <Row label="Medications or other relevant health information" value={str(values, "medications")} />
           <Row label="Medical restrictions" value={str(values, "medicalRestrictions")} />
         </dl>
@@ -64,7 +64,7 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
       <section className="public-manage-card">
         <h3>Insurance</h3>
         <dl className="detail-list">
-          <Row label="Covered by medical insurance" value={values.hasInsurance === "YES" ? "Yes" : "No"} />
+          <Row label="Covered by medical insurance" value={values.hasInsurance === "YES" ? "Yes" : values.hasInsurance === "NO" ? "No" : "Not answered"} />
           {values.insuranceCardInCognito === true && (
             <Row label="Insurance card" value="Uploaded on the old online form. Ask the parent to upload it again here." />
           )}

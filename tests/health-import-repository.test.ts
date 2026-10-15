@@ -294,6 +294,27 @@ describe("applying the import", () => {
     expect(state.records).toEqual([]);
   });
 
+  it("reports a selected older entry as superseded, not changed", async () => {
+    const upload = files([
+      mainRow({ PathfinderHealthRecord_Id: "old", Entry_DateSubmitted: "2026-08-01" }),
+      mainRow({ PathfinderHealthRecord_Id: "new", Entry_DateSubmitted: "2026-09-01" }),
+    ]);
+    const preview = await previewHealthImport(admin, upload, now);
+    state.audit = [];
+    const selection = preview.rows.filter((row) => row.memberId).map((row) => ({ sourceId: row.sourceId, memberId: row.memberId! }));
+    expect(selection).toHaveLength(2);
+    const result = await applyHealthImport(admin, upload, { include: selection }, now);
+    expect(result.rows.map((row) => row.outcome)).toEqual(["SUPERSEDED", "IMPORTED"]);
+    expect(result.counts.CHANGED).toBe(0);
+  });
+
+  it("does not import an entry with a cell over the length cap", async () => {
+    const result = await applySelected(files([mainRow({ ListOfMedicalRestrictions: "x".repeat(20_001) })]));
+    expect(result.rows[0]!.outcome).toBe("NEEDS_CHECK");
+    expect(result.rows[0]!.reason).toMatch(/20,000/);
+    expect(state.records).toEqual([]);
+  });
+
   it("keeps long text whole and counts the field as needing correction", async () => {
     const long = "Synthetic note ".repeat(160);
     const upload = () => files([mainRow({ ListOfMedicationsOrPertinentHealthincludingMentalHealthInformation: long })]);

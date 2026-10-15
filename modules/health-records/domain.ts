@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isUnchangedFromStored, storedContactPhone, normalizePhoneAnswer, validateEmail, validatePhone, validateZip, type FieldCheck } from "@/lib/field-validation";
 import { clubYearFor, parseCalendarDate } from "@/modules/club-rosters/domain";
+import { overLimitFields, tetanusNeedsCorrection } from "@/modules/health-records/field-limits";
 
 /**
  * Pure rules for the Pathfinder Health Record (#611): the field list, input
@@ -214,7 +215,10 @@ export function healthFieldsNeedingCorrection(values: Record<string, unknown>): 
       if (typeof phone === "string" && phone.trim() !== "" && !validatePhone(phone).ok) flagged.push(`emergencyContacts.${index}.phone`);
     });
   }
-  return flagged;
+  // A stored date that is not year-month-day (an imported "2019"), and text longer than the form accepts (#878).
+  if (tetanusNeedsCorrection(values.lastTetanusBooster)) flagged.push("lastTetanusBooster");
+  flagged.push(...overLimitFields(values));
+  return [...new Set(flagged)];
 }
 
 /**

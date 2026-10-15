@@ -93,6 +93,31 @@ describe("reading the uploaded files", () => {
     }
   });
 
+  it("refuses a truncated workbook instead of dropping the cells after the cut", () => {
+    const cut = `<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Name_First</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Riley`;
+    const bytes = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: cut }]);
+    expect(() => readHealthImportFiles([{ bytes }])).toThrow(/cut off or damaged/);
+    const noEnd = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: `<sheetData><row><c r="A1"><v>1</v>` }]);
+    expect(() => readHealthImportFiles([{ bytes: noEnd }])).toThrow(HealthImportFileError);
+    const cutTag = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: `<sheetData><row><c r="A1" t="inl` }]);
+    expect(() => readHealthImportFiles([{ bytes: cutTag }])).toThrow(HealthImportFileError);
+  });
+
+  it("leaves phonetic guide runs out of a cell's text", () => {
+    const sheet = `<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row><row r="2"><c r="A2" t="s"><v>1</v></c></row></sheetData></worksheet>`;
+    const strings = `<sst><si><t>Name_First</t></si><si><r><t>Riley</t></r><rPh sb="0" eb="1"><t>PHONETIC-GUIDE</t></rPh><phoneticPr fontId="1"/></si></sst>`;
+    const bytes = zipBytes([{ name: "xl/workbook.xml", data: "<workbook/>" }, { name: "xl/worksheets/sheet1.xml", data: sheet }, { name: "xl/sharedStrings.xml", data: strings }]);
+    const [read] = readHealthImportFiles([{ bytes }]);
+    expect(read!.rows[0]!.Name_First).toBe("Riley");
+  });
+
+  it("flags a cell over the 20,000-character cap instead of cutting it", () => {
+    const huge = "x".repeat(20_001);
+    const { entries } = parse([mainRow({ PathfinderHealthRecord_Id: "1", ListOfMedicalRestrictions: huge }), mainRow({ PathfinderHealthRecord_Id: "2" })], [contactRow("2", "e1", "Alex", "Sample", "515-555-0180", huge)]);
+    expect(entries.map((entry) => entry.tooLong)).toEqual([true, true]);
+    expect(parse([mainRow()]).entries[0]!.tooLong).toBe(false);
+  });
+
   it("never puts cell content in an error message", () => {
     const bad = csvBytes(["Not_This_Export", "Another"], [{ Not_This_Export: "Synthetic peanut reaction", Another: "x" }]);
     let message = "";

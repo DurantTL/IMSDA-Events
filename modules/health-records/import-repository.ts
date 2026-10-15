@@ -244,8 +244,9 @@ export async function applyHealthImport(
     } else if (match.memberId !== selected) {
       // Not the member the preview showed: the roster or the file changed in between.
       outcomes.set(entry.sourceId, "CHANGED");
-    } else if (match.outcome === "ALREADY_HAS_RECORD") {
-      outcomes.set(entry.sourceId, "ALREADY_HAS_RECORD");
+    } else if (match.outcome === "ALREADY_HAS_RECORD" || match.outcome === "SUPERSEDED") {
+      // Same member as previewed, and still skipped for the reason the preview gave.
+      outcomes.set(entry.sourceId, match.outcome);
     } else if (match.outcome !== "MATCHED" || !match.organizationId) {
       outcomes.set(entry.sourceId, "CHANGED");
     } else {

@@ -153,7 +153,15 @@ otherwise:
   nothing**: it is never turned into "No". The insurance answer works the same way.
 - Text longer than the Health tab form's limit (for example 2,000 characters for
   allergy details) is kept whole, never cut, and the row is counted as needing
-  correction. The director shortens it on the next save.
+  correction. The director shortens it on the next save. A cell over 20,000
+  characters is never cut either: that entry is *Needs check* and is not imported.
+- On the Health tab and in its form, every stored answer that needs correcting is
+  named: phones, emails and ZIP codes that fail the checks, a tetanus booster that
+  isn't a year-month-day date (shown as typed, for example "2019"), and text over the
+  form's limits. A refused save names the field. An unanswered allergy or insurance
+  question reads "Not answered" and must be answered before the director can save.
+- A truncated or damaged Excel file is refused outright rather than read as far as it
+  goes. Phonetic guide text in a cell is ignored.
 - A four-digit number in a date column (a year such as 2019) is kept as typed. Only a
   five-digit Excel date serial (10000 to 60000) is read as a date.
 

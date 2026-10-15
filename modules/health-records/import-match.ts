@@ -49,6 +49,7 @@ export type MatchReason =
   | "MEMBER_NOT_FOUND"
   | "SEVERAL_MEMBERS"
   | "NOT_CONFIRMED"
+  | "TEXT_TOO_LONG"
   | "BIRTH_DATE_DIFFERS";
 
 export type EntryMatch = {
@@ -93,6 +94,8 @@ export function matchEntry(entry: ParsedHealthEntry, clubs: MatchClub[], members
   if (entry.incomplete) {
     return { sourceId: entry.sourceId, outcome: "INCOMPLETE", reason: null, via: null, organizationId: null, clubName: null, memberId: null };
   }
+  // A cell longer than the importer will hold is never cut: the entry waits for a human to look at it in Cognito.
+  if (entry.tooLong) return unresolved(entry, "NEEDS_CHECK", "TEXT_TOO_LONG");
   const candidatesClubs = clubsForText(entry.clubText, clubs);
   if (candidatesClubs.length === 0) return unresolved(entry, "UNMATCHED", "CLUB_NOT_FOUND");
   if (candidatesClubs.length > 1) return unresolved(entry, "NEEDS_CHECK", "CLUB_AMBIGUOUS");
@@ -176,4 +179,5 @@ export const MATCH_REASON_LABELS: Record<MatchReason, string> = {
   SEVERAL_MEMBERS: "More than one roster member fits this name and details.",
   NOT_CONFIRMED: "A roster member has this name, but neither the birth date nor the parent's email confirms it.",
   BIRTH_DATE_DIFFERS: "A roster member has this name but a different birth date.",
+  TEXT_TOO_LONG: "A field on the form is longer than 20,000 characters, so the entry is not imported. Check it in Cognito.",
 };
