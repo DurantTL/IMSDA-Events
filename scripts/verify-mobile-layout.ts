@@ -211,6 +211,7 @@ const pages: PageSpec[] = [
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("more-menu", "/more"),
+  staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
   staff("more-launcher-admin", "/overview", "system-admin"),
   staff("reports", "/more/reports"),

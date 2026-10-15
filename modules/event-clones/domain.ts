@@ -4,6 +4,8 @@ import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { isEventMessageTemplateKey, validateMessageTemplate } from "@/modules/communications/templates";
 import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/events/schemas";
 import { mealPriceCount, type MealDefinitions } from "@/modules/meals/clone-domain";
+import { isEventModuleKey, type EventModuleKey } from "@/modules/event-modules/catalog";
+import type { CreationFlagKey } from "@/modules/event-features/creation";
 import { privateLinkReasonLabels, privateLinkValue, stripPrivateLinks, type PrivateLinkContext, type PrivateLinkMatch } from "@/modules/event-clones/private-links";
 
 /**
@@ -608,9 +610,24 @@ export type ClonePlanDomain = {
   skipped: Array<{ label: string; reason: string }>;
 };
 
+/**
+ * What a copy would carry as feature switches (#965), shown on the copy flow's
+ * "Which features does this event use?" step. Read-only: a copy keeps the
+ * source's settings exactly as the "What to copy" choices say, and any switch
+ * is changed afterwards on the Event features page.
+ */
+export type ClonePlanFeatures = {
+  audience: "GENERAL" | "CLUB";
+  /** The source's stored module rows, carried over only when the event details are copied. Empty: the copy gets the audience's defaults. */
+  sourceModules: EventModuleKey[];
+  flags: Record<CreationFlagKey, boolean>;
+  showOnCalendar: boolean;
+};
+
 export type ClonePlan = {
   source: SourceConfiguration["event"];
   fingerprint: string;
+  features: ClonePlanFeatures;
   domains: ClonePlanDomain[];
   review: {
     latePricing: FormLatePricingItem[];
@@ -664,7 +681,13 @@ function plural(count: number, singular: string, pluralForm = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
-export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: string, appOrigins: readonly string[] = []): ClonePlan {
+export function buildClonePlan(
+  rawConfig: SourceConfiguration,
+  fingerprint: string,
+  appOrigins: readonly string[] = [],
+  /** The source event's stored module keys (#965); not part of the fingerprinted configuration. */
+  sourceModuleKeys: readonly string[] = [],
+): ClonePlan {
   // Counts and validity come from the text as it would be copied.
   const { config, findings } = sanitizeSourceForClone(rawConfig, appOrigins);
   const skippedForms: ClonePlanDomain["skipped"] = [];
@@ -774,9 +797,24 @@ export function buildClonePlan(rawConfig: SourceConfiguration, fingerprint: stri
     uploadedFiles: config.unsupported.uploadedFiles,
   };
 
+  const toggles = config.moduleToggles;
+  const features: ClonePlanFeatures = {
+    audience: config.eventDetails.audience,
+    sourceModules: sourceModuleKeys.filter(isEventModuleKey),
+    flags: {
+      waitlistEnabled: toggles.waitlistEnabled,
+      autoPromoteWaitlist: toggles.waitlistEnabled ? toggles.autoPromoteWaitlist : false,
+      collectsShirtSizes: toggles.collectsShirtSizes,
+      hostedPaymentLinkEnabled: toggles.hostedPaymentLinkEnabled ?? false,
+      checksAdultBackgrounds: toggles.checksAdultBackgrounds,
+    },
+    showOnCalendar: config.eventDetails.showOnCalendar,
+  };
+
   return {
     source: config.event,
     fingerprint,
+    features,
     domains: cloneDomainKeys.map((key) => ({
       key,
       label: cloneDomainLabels[key].label,

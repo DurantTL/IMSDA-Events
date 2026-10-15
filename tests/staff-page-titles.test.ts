@@ -56,6 +56,8 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/program-assignments/run_1")).toBe("Assignment roster");
     // /more is the Event modules page (#810): its header names it, while the tab keeps "More".
     expect(staffSubpageTitle("/more")).toBe("Event modules");
+    // The Event features page (#965) is its own page under /more.
+    expect(staffSubpageTitle("/more/features")).toBe("Event features");
     expect(staffSubpageTitle("/people")).toBeNull();
   });
 
@@ -63,7 +65,7 @@ describe("staff page names (#685)", () => {
     const pages: Record<string, string> = {
       overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", payments: "finance", registrationForm: "registration-builder",
       emails: "communications", team: "staff", imports: "imports", systemManagement: "admin", checkIn: "check-in",
-      more: "more", eventModules: "more", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
+      more: "more", eventModules: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
       attendeeSetup: "more/attendee-configuration", tags: "more/tags", eventSettings: "more/event-settings",
       clubPacket: "more/reports/clubs/packet/[organizationId]", checkInBook: "more/reports/clubs/check-in-book",
       clubReports: "more/reports/clubs", groupedPackets: "more/reports/packets", operationalReports: "more/reports",

@@ -171,6 +171,25 @@ export function defaultModuleKeys(audience: "GENERAL" | "CLUB"): EventModuleKey[
 }
 
 /**
+ * The modules a new event is created with when staff chose them on the
+ * "Which features does this event use?" step (#965). `requested` undefined is the
+ * step skipped: the audience's defaults. Otherwise the always-on modules plus the
+ * requested ones that apply to the audience (`canEnableForEvent`): a club module
+ * asked for on a general event would only leave a row nothing reads, so it is
+ * dropped rather than stored. Duplicates collapse, and the order is the catalog's.
+ */
+export function creationModuleKeys(
+  audience: "GENERAL" | "CLUB",
+  requested?: readonly EventModuleKey[],
+): EventModuleKey[] {
+  if (requested === undefined) return defaultModuleKeys(audience);
+  const wanted = new Set<EventModuleKey>(requested);
+  return eventModuleCatalog
+    .filter((entry) => entry.alwaysOn || (wanted.has(entry.key) && canEnableForEvent(entry.key, audience)))
+    .map((entry) => entry.key);
+}
+
+/**
  * Visibility reads stored rows only (#741): a module that is off is hidden even
  * where it applies, so turning it off, and its audit entry, mean what they say.
  * New events get their rows at creation (`defaults.ts`). Returns the More card

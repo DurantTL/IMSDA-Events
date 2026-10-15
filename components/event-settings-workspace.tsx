@@ -24,6 +24,10 @@ import {
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
 import { getEventPublishReadiness, getEventPublishWarnings } from "@/modules/events/readiness";
+import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
+import { CreationFeaturesStep } from "@/components/creation-features-step";
+import { defaultModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
+import { creationFlagKeys, defaultCreationFeatures, type CreationFeatures } from "@/modules/event-features/creation";
 import {
   eventTimeZones,
   type EventSettingsInput,
@@ -107,49 +111,6 @@ function slugFromName(value: string) {
     .slice(0, 80);
 }
 
-function draftFromEvent(event: EventSettingsRecord | null): EventSettingsInput {
-  return {
-    name: event?.name ?? "",
-    slug: event?.slug ?? "",
-    startsOn: event?.startsOn ?? "",
-    endsOn: event?.endsOn ?? "",
-    timezone: (event?.timezone as EventSettingsInput["timezone"] | undefined)
-      ?? "America/Chicago",
-    location: event?.location ?? null,
-    capacity: event?.capacity ?? null,
-    publicInfoUrl: event?.publicInfoUrl ?? null,
-    supportContact: event?.supportContact ?? null,
-    tagline: event?.tagline ?? null,
-    subtitle: event?.subtitle ?? null,
-    helpEmail: event?.helpEmail ?? null,
-    hubTitle: event?.hubTitle ?? null,
-    hubIntro: event?.hubIntro ?? null,
-    refundPolicy: event?.refundPolicy ?? null,
-    hotelName: event?.hotelName ?? null,
-    hotelBookingUrl: event?.hotelBookingUrl ?? null,
-    hotelPhone: event?.hotelPhone ?? null,
-    hotelGroupName: event?.hotelGroupName ?? null,
-    hotelRate: event?.hotelRate ?? null,
-    hotelInstructions: event?.hotelInstructions ?? null,
-    registrationOpensOn: event?.registrationOpensOn ?? null,
-    registrationClosesOn: event?.registrationClosesOn ?? null,
-    collectsShirtSizes: event?.collectsShirtSizes ?? false,
-    checksAdultBackgrounds: event?.checksAdultBackgrounds ?? false,
-    hostedPaymentLinkEnabled: event?.hostedPaymentLinkEnabled ?? false,
-    attendeeEditPolicy: event?.attendeeEditPolicy ?? "VERIFY_EVERY_EDIT",
-    billingMode: event?.billingMode ?? "ATTENDEE_PAY",
-    audience: event?.audience ?? "GENERAL",
-    approvedPaymentInstructions: event?.approvedPaymentInstructions ?? null,
-    seminarPreferenceClosesOn: event?.seminarPreferenceClosesOn ?? null,
-    seminarPreferenceSelfServiceLocked:
-      event?.seminarPreferenceSelfServiceLocked ?? false,
-    waitlistEnabled: event?.waitlistEnabled ?? false,
-    autoPromoteWaitlist: event?.waitlistEnabled
-      ? (event.autoPromoteWaitlist ?? false)
-      : false,
-  };
-}
-
 /** A new event set up from a calendar item (#445) starts with the item's title, dates and location. */
 function startingDraft(event: EventSettingsRecord | null, prefill: CalendarPrefill | undefined): EventSettingsInput {
   const base = draftFromEvent(event);
@@ -181,6 +142,11 @@ export function EventSettingsWorkspace({
   const [loadedDates, setLoadedDates] = useState<{ startsOn: string; endsOn: string } | null>(
     initialEvent ? { startsOn: initialEvent.startsOn, endsOn: initialEvent.endsOn } : null,
   );
+  // The "Which features does this event use?" step of creation (#965). The five flags live in `draft`, like the rest of
+  // the form; the modules and the calendar choice live here. Untouched (null) means the step was skipped: the modules
+  // follow the audience's defaults and nothing extra is sent, so the server applies the same defaults.
+  const [chosenModules, setChosenModules] = useState<EventModuleKey[] | null>(null);
+  const [showOnCalendar, setShowOnCalendar] = useState(true);
   const [setupWarnings, setSetupWarnings] = useState(initialEvent?.warnings ?? []);
   const [publishedFormCount, setPublishedFormCount] = useState(initialEvent?.publishedFormCount ?? 0);
   // Publishing and unpublishing are their own actions (#471), never a side
@@ -231,6 +197,20 @@ export function EventSettingsWorkspace({
     setEventSettingsDirty(dirty);
     return () => setEventSettingsDirty(false);
   }, [mode, dirty]);
+  // The modules the step shows and sends: the person's choice, else the live audience's defaults.
+  const effectiveModules = chosenModules ?? defaultModuleKeys(draft.audience ?? "GENERAL");
+  const creationFeatures: CreationFeatures = {
+    ...defaultCreationFeatures(draft.audience ?? "GENERAL", draft),
+    modules: effectiveModules,
+    showOnCalendar,
+  };
+  function changeCreationFeatures(next: CreationFeatures) {
+    setChosenModules(next.modules);
+    setShowOnCalendar(next.showOnCalendar);
+    for (const key of creationFlagKeys) {
+      if (next[key] !== draft[key]) update(key, next[key]);
+    }
+  }
   const publishBlockedBySave = dirty || saving;
   const canPublish = readiness.ready && !publishBlockedBySave && !publishing;
   const allowNextNavigation = useUnsavedChangesGuard(
@@ -294,21 +274,13 @@ export function EventSettingsWorkspace({
           method: mode === "create" ? "POST" : "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...draft,
+            ...eventSettingsRequestBody(draft),
             ...(mode === "create" && calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}),
             ...(mode === "edit" && loadedDates ? { expectedStartsOn: loadedDates.startsOn, expectedEndsOn: loadedDates.endsOn } : {}),
-            location: draft.location || null,
-            publicInfoUrl: draft.publicInfoUrl || null,
-            supportContact: draft.supportContact || null,
-            tagline: draft.tagline || null,
-            subtitle: draft.subtitle || null,
-            helpEmail: draft.helpEmail || null,
-            hubTitle: draft.hubTitle || null,
-            hubIntro: draft.hubIntro || null,
-            refundPolicy: draft.refundPolicy || null,
-            registrationOpensOn: draft.registrationOpensOn || null,
-            registrationClosesOn: draft.registrationClosesOn || null,
-            capacity: draft.capacity || null,
+            // Only a step the person opened sends its choices; skipped, the server applies the audience's defaults (#965).
+            ...(mode === "create" && (chosenModules !== null || !showOnCalendar)
+              ? { features: { modules: effectiveModules, showOnCalendar } }
+              : {}),
           }),
         },
       );
@@ -835,6 +807,15 @@ export function EventSettingsWorkspace({
               {fieldNote("capacity")}</label>
             </div>
           </SettingsBlock>
+
+          {mode === "create" && (
+            <CreationFeaturesStep
+              audience={draft.audience ?? "GENERAL"}
+              collapsible
+              features={creationFeatures}
+              onChange={changeCreationFeatures}
+            />
+          )}
 
           <SettingsBlock
             eyebrow="Step 2"

@@ -19,7 +19,8 @@ import { activeCoordinatorAccountIds } from "@/modules/event-locations/coordinat
 import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locations/domain";
 import { createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
-import { writeDefaultModules } from "@/modules/event-modules/defaults";
+import { writeCreationModules } from "@/modules/event-modules/defaults";
+import { creationFlagKeys, type CreationFlagKey } from "@/modules/event-features/creation";
 import { assertCalendarEntryLinkable, linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 export class EventTemplateOperationError extends Error {
   constructor(
@@ -320,6 +321,17 @@ export async function unarchiveEventTemplate(templateId: string, actorUserId: st
 
 type RequestInput = Pick<ApplyEventTemplateInput, "name" | "slug" | "startsOn" | "endsOn" | "calendarEntryId">;
 
+/** The flag overrides the features step actually set (an absent key keeps the template's value). */
+function definedFlagOverrides(features: ApplyEventTemplateInput["features"]) {
+  const overrides: Partial<Record<CreationFlagKey, boolean>> = {};
+  if (!features) return overrides;
+  for (const key of creationFlagKeys) {
+    const value = features[key];
+    if (value !== undefined) overrides[key] = value;
+  }
+  return overrides;
+}
+
 function requestInputOf(input: ApplyEventTemplateInput): RequestInput {
   // The calendar item the event was set up from (#445) is part of the request: the same key with another item is a reused key.
   return { name: input.name, slug: input.slug, startsOn: input.startsOn, endsOn: input.endsOn, ...(input.calendarEntryId ? { calendarEntryId: input.calendarEntryId } : {}) };
@@ -399,6 +411,8 @@ export async function applyEventTemplate(
       // Set up from a calendar item (#445): checked before anything is written, so an item that can't be linked
       // any more leaves no event behind.
       const fromItem = input.calendarEntryId ? await assertCalendarEntryLinkable(tx, input.calendarEntryId) : null;
+      // What the template carries, then what staff chose on the features step (#965).
+      const flags = { ...payload.moduleEnablement, ...definedFlagOverrides(input.features) };
       const event = await tx.event.create({
         data: {
           name: input.name,
@@ -407,13 +421,12 @@ export async function applyEventTemplate(
           endsAt: eventDate(input.endsOn),
           ...(fromItem?.location ? { location: fromItem.location } : {}),
           isPublished: false,
-          waitlistEnabled: payload.moduleEnablement.waitlistEnabled,
-          autoPromoteWaitlist: payload.moduleEnablement.waitlistEnabled
-            ? payload.moduleEnablement.autoPromoteWaitlist
-            : false,
-          collectsShirtSizes: payload.moduleEnablement.collectsShirtSizes,
-          checksAdultBackgrounds: payload.moduleEnablement.checksAdultBackgrounds,
-          hostedPaymentLinkEnabled: payload.moduleEnablement.hostedPaymentLinkEnabled,
+          waitlistEnabled: flags.waitlistEnabled,
+          autoPromoteWaitlist: flags.waitlistEnabled ? flags.autoPromoteWaitlist : false,
+          collectsShirtSizes: flags.collectsShirtSizes,
+          checksAdultBackgrounds: flags.checksAdultBackgrounds,
+          hostedPaymentLinkEnabled: flags.hostedPaymentLinkEnabled,
+          ...(input.features?.showOnCalendar === undefined ? {} : { showOnCalendar: input.features.showOnCalendar }),
           attendeeEditPolicy: platform.defaultAttendeeEditPolicy,
           audience: payload.audience,
           billingMode: templateBillingMode(payload),
@@ -434,7 +447,8 @@ export async function applyEventTemplate(
       await tx.eventMembership.create({
         data: { eventId: event.id, userId: actorUserId, role: "EVENT_ADMIN", status: "ACTIVE" },
       });
-      await writeDefaultModules(tx, event.id, payload.audience);
+      // The modules chosen on the features step (#965), in this same transaction; skipped means the audience's defaults.
+      await writeCreationModules(tx, event.id, payload.audience, input.features?.modules);
       if (input.calendarEntryId) {
         await linkNewEventToCalendarEntry(tx, { entryId: input.calendarEntryId, eventId: event.id, actorUserId });
       }
