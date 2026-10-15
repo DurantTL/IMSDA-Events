@@ -190,7 +190,8 @@ export async function listCalendarEntries(now = new Date()) {
       prisma.event.findMany({
         // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event is not a match
         // candidate). Whichever of #445 and #635 merges second adds it.
-        where: { endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) } },
+        // An event already linked to an item is not offered to another (also enforced by the database).
+        where: { endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) }, calendarEntryLink: null },
         select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, isPublished: true },
       }),
       prisma.calendarEventMatchDismissal.findMany({
@@ -256,9 +257,9 @@ export async function listCalendarEntries(now = new Date()) {
     sourceRemovedAt: entry.sourceRemovedAt?.toISOString() ?? null,
     locallyEditedFields: entry.locallyEditedFields,
     updatedAt: entry.updatedAt.toISOString(),
-    /** An ordinary one-off item: the only kind that can stand in for a registration event (#445). */
     /** Linked, but a refresh or an edit since made it a Deadline, closure or repeating item. Never unlinked automatically. */
     linkedIneligible: entry.linkedEventId !== null && !entryCanBeLinked({ entryType: entry.entryType, hasRepeat: entry.repeatRule !== null }),
+    /** An ordinary one-off item: the only kind that can stand in for a registration event (#445). */
     canLinkToEvent: entryCanBeLinked({ entryType: entry.entryType, hasRepeat: entry.repeatRule !== null }),
     linkedEvent,
     /** Linked, and the item's dates are not the event's: the event shows a banner asking staff to choose. */

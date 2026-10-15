@@ -161,5 +161,5 @@ export const calendarEventDateDecisionSchema = z.object({
 export type CalendarEntryEventLink = z.infer<typeof calendarEntryEventLinkSchema>;
 export type CalendarEventDateDecision = z.infer<typeof calendarEventDateDecisionSchema>;
 
-export type CalendarFeedInput =z.infer<typeof calendarFeedInputSchema>;
+export type CalendarFeedInput = z.infer<typeof calendarFeedInputSchema>;
 export type CalendarFeedUpdate = z.infer<typeof calendarFeedUpdateSchema>;

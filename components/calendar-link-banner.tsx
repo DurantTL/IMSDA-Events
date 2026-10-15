@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEventSettingsDirty } from "@/components/event-settings-dirty";
 import type { CalendarLinkNotice } from "@/modules/calendar/event-links";
 import { formatDateRange } from "@/modules/calendar/domain";
 
@@ -25,6 +26,8 @@ export function CalendarLinkBanner({ eventId, notice }: CalendarLinkBannerProps)
   const prompt = notice.datePrompt;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Answering reloads the settings form below; with unsaved changes in it, that would discard them.
+  const unsaved = useEventSettingsDirty();
 
   async function answer(decision: "update" | "keep") {
     if (!prompt) return;
@@ -80,11 +83,12 @@ export function CalendarLinkBanner({ eventId, notice }: CalendarLinkBannerProps)
           <p>{prompt.pricingNote}</p>
           {prompt.preview.blockedReason && <p className="form-error" role="alert">{prompt.preview.blockedReason}</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
+          {unsaved && <p role="status" data-testid="calendar-banner-unsaved">Save or discard your changes first. Answering reloads the settings below and would lose them.</p>}
           <div className="calendar-link-actions">
-            <button className="primary-button" disabled={busy || prompt.preview.blockedReason !== null} onClick={() => answer("update")} type="button">
+            <button className="primary-button" disabled={busy || unsaved || prompt.preview.blockedReason !== null} onClick={() => answer("update")} type="button">
               Update to {formatDateRange(prompt.itemStartsOn, prompt.itemEndsOn)}
             </button>
-            <button className="secondary-button" disabled={busy} onClick={() => answer("keep")} type="button">Keep current dates</button>
+            <button className="secondary-button" disabled={busy || unsaved} onClick={() => answer("keep")} type="button">Keep current dates</button>
           </div>
         </section>
       )}

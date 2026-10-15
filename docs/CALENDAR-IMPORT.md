@@ -162,3 +162,5 @@ and uses the same permission as event creation.
 Migration `20261030100000_calendar_event_links` is additive: five nullable columns
 on `CalendarEntry`, a unique `linkedEventId` (cleared if the event is deleted) and the
 `CalendarEventMatchDismissal` table.
+
+Deleting an event clears the item's link, but `linkedAt`, `linkedByUserId` and the baseline dates stay on the item until it is linked again; they have no effect while it is unlinked.

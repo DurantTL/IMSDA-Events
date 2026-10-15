@@ -342,8 +342,12 @@ export async function updateEventSettings(
   eventId: string,
   input: EventSettingsInput,
   actorUserId: string,
-  /** The `updatedAt` of the event the form was loaded from. When given and the event has changed since, nothing is saved. */
-  options: { expectedUpdatedAt?: string } = {},
+  /**
+   * The first and last day the form was loaded with. When given and the stored dates differ (they were updated from the
+   * calendar banner while the form was open), nothing is saved. Only the dates are guarded: other writes to the event
+   * (the general registration link, a calendar setting, and so on) never conflict with a settings save.
+   */
+  options: { expectedStartsOn?: string; expectedEndsOn?: string } = {},
 ) {
   const prisma = getPrisma();
   try {
@@ -394,7 +398,6 @@ export async function updateEventSettings(
           seminarPreferenceClosesOn: true,
           seminarPreferenceSelfServiceLocked: true,
           autoPromoteWaitlist: true,
-          updatedAt: true,
         },
       }),
       tx.eventPaymentInstructionVersion.findFirst({
@@ -406,12 +409,15 @@ export async function updateEventSettings(
     if (!current) {
       throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
     }
-    // Stale-write guard (#445): the form carries the version it was loaded from. If the event changed since (another
-    // save, or its dates updated from the calendar banner), saving would write old values over newer ones.
-    if (options.expectedUpdatedAt !== undefined && new Date(options.expectedUpdatedAt).getTime() !== current.updatedAt.getTime()) {
+    // Stale-write guard (#445): the form carries the dates it was loaded with. If they changed since (updated from the
+    // calendar banner), saving would write the old dates back over the new ones. Checked under the row lock above.
+    if (
+      (options.expectedStartsOn !== undefined && options.expectedStartsOn !== calendarDateInEventTimeZone(current.startsAt, current.timezone))
+      || (options.expectedEndsOn !== undefined && options.expectedEndsOn !== calendarDateInEventTimeZone(current.endsAt, current.timezone))
+    ) {
       throw new EventOperationError(
         "EVENT_CHANGED",
-        "This event changed after you opened it (someone saved it, or its dates were updated from the calendar). Nothing was saved. Reload the page to see the latest, then make your change again.",
+        "This event's dates changed after you opened the page (for example, they were updated from the calendar). Nothing was saved. Reload the page to see the current dates, then make your change again.",
       );
     }
     // An update without an audience keeps the stored one (#481 review), so a
@@ -504,7 +510,7 @@ export async function updateEventSettings(
         entityId: eventId,
         correlationId: crypto.randomUUID(),
         summary: `Updated event settings: ${input.name}.`,
-        metadata: { before: Object.fromEntries(Object.entries(current).filter(([key]) => key !== "updatedAt")), after: { ...input, audience } },
+        metadata: { before: current, after: { ...input, audience } },
       },
     });
   });

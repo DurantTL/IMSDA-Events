@@ -298,19 +298,21 @@ async function main() {
   assert(updated.registrationClosesOn === "2026-11-01", "Update left the registration close date exactly as staff set it");
   assert(await links.getCalendarLinkNotice(created.id) === null, "after Update the banner is gone");
   // A save from that stale form must not write the old dates back.
-  await rejectsWith(updateEventSettings(created.id, { ...staleInput, name: "Evlink Conference (stale save)" }, userId, { expectedUpdatedAt: openForm.updatedAt }), "EVENT_CHANGED", "a save from the form opened before Update is refused");
+  await rejectsWith(updateEventSettings(created.id, { ...staleInput, name: "Evlink Conference (stale save)" }, userId, { expectedStartsOn: openForm.startsOn, expectedEndsOn: openForm.endsOn }), "EVENT_CHANGED", "a save from the form opened before Update is refused");
   const afterStale = await prisma.event.findUniqueOrThrow({ where: { id: created.id } });
   assert(afterStale.name === "Evlink Conference" && afterStale.startsAt.toISOString().startsWith("2026-11-21") && afterStale.endsAt.toISOString().startsWith("2026-11-23"), "the refused save changed nothing: the new dates stand");
   // The form loaded again (what the remount does) saves fine and keeps the new dates.
   const reloaded = (await getEventSettings(created.id))!;
   assert(reloaded.startsOn === "2026-11-21" && reloaded.endsOn === "2026-11-23", "the reloaded form carries the new dates");
   const fresh = eventSettingsInputSchema.parse({ ...reloaded, approvedPaymentInstructions: reloaded.approvedPaymentInstructions ?? null });
-  await updateEventSettings(created.id, { ...fresh, location: "Hall Example Annex" }, userId, { expectedUpdatedAt: reloaded.updatedAt });
+  // Another page writes the event meanwhile (the general registration link bumps `updatedAt`): no conflict, the dates are what the form has.
+  const beforeOtherWrite = (await prisma.event.findUniqueOrThrow({ where: { id: created.id } })).updatedAt;
+  await prisma.event.update({ where: { id: created.id }, data: { generalRegistrationLinkEnabled: true } });
+  assert((await prisma.event.findUniqueOrThrow({ where: { id: created.id } })).updatedAt.getTime() !== beforeOtherWrite.getTime(), "the other write moved the event's updatedAt");
+  await updateEventSettings(created.id, { ...fresh, location: "Hall Example Annex" }, userId, { expectedStartsOn: reloaded.startsOn, expectedEndsOn: reloaded.endsOn });
   const afterFresh = await prisma.event.findUniqueOrThrow({ where: { id: created.id } });
-  assert(afterFresh.location === "Hall Example Annex" && afterFresh.startsAt.toISOString().startsWith("2026-11-21") && afterFresh.endsAt.toISOString().startsWith("2026-11-23"), "a save from the reloaded form keeps the new dates");
-  await rejectsWith(updateEventSettings(created.id, fresh, userId, { expectedUpdatedAt: reloaded.updatedAt }), "EVENT_CHANGED", "and the version it was loaded from is stale after that save");
+  assert(afterFresh.location === "Hall Example Annex" && afterFresh.startsAt.toISOString().startsWith("2026-11-21") && afterFresh.endsAt.toISOString().startsWith("2026-11-23"), "a save from the reloaded form keeps the new dates, even after another page wrote the event");
   await updateEventSettings(created.id, { ...fresh, location: "Hall Example Annex" }, userId);
-  assert(true, "a save that sends no version still works (older clients)");
   const updatedAudit = await prisma.auditLog.findMany({ where: { action: "CALENDAR_EVENT_DATES_UPDATED", entityId: created.id } });
   assert(updatedAudit.length === 1, "Update is audited, once");
   const updatedMeta = updatedAudit[0]!.metadata as { from: { startsOn: string }; to: { startsOn: string } };

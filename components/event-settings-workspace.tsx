@@ -29,6 +29,7 @@ import {
   type EventSettingsInput,
 } from "@/modules/events/schemas";
 import { buildRegistrationEmbedCode } from "@/modules/forms/embed";
+import { setEventSettingsDirty } from "@/components/event-settings-dirty";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { PublishEventDialog } from "@/components/publish-event-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
@@ -170,10 +171,12 @@ export function EventSettingsWorkspace({
 }: EventSettingsWorkspaceProps) {
   const [draft, setDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
   const [savedDraft, setSavedDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
-  // The version of the event this form was loaded from (or last saved as). A save sends it back, and the server
-  // refuses it if the event changed meanwhile (for example its dates, after Update on the calendar banner), so a
-  // stale form can never write old values over newer ones.
-  const [version, setVersion] = useState<string | null>(initialEvent?.updatedAt ?? null);
+  // The dates this form was loaded with (or last saved as). A save sends them back, and the server refuses it if the
+  // stored dates differ (they were updated from the calendar banner meanwhile), so a stale form can never write the
+  // old dates over the new ones. Only dates are guarded: other writes to the event never cause a conflict.
+  const [loadedDates, setLoadedDates] = useState<{ startsOn: string; endsOn: string } | null>(
+    initialEvent ? { startsOn: initialEvent.startsOn, endsOn: initialEvent.endsOn } : null,
+  );
   const [setupWarnings, setSetupWarnings] = useState(initialEvent?.warnings ?? []);
   const [publishedFormCount, setPublishedFormCount] = useState(initialEvent?.publishedFormCount ?? 0);
   // Publishing and unpublishing are their own actions (#471), never a side
@@ -217,6 +220,12 @@ export function EventSettingsWorkspace({
     () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
     [draft, savedDraft],
   );
+  // Tell the calendar banner beside this form whether answering it would discard unsaved changes (#445).
+  useEffect(() => {
+    if (mode !== "edit") return undefined;
+    setEventSettingsDirty(dirty);
+    return () => setEventSettingsDirty(false);
+  }, [mode, dirty]);
   const publishBlockedBySave = dirty || saving;
   const canPublish = readiness.ready && !publishBlockedBySave && !publishing;
   const allowNextNavigation = useUnsavedChangesGuard(
@@ -282,7 +291,7 @@ export function EventSettingsWorkspace({
           body: JSON.stringify({
             ...draft,
             ...(mode === "create" && calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}),
-            ...(mode === "edit" && version ? { expectedUpdatedAt: version } : {}),
+            ...(mode === "edit" && loadedDates ? { expectedStartsOn: loadedDates.startsOn, expectedEndsOn: loadedDates.endsOn } : {}),
             location: draft.location || null,
             publicInfoUrl: draft.publicInfoUrl || null,
             supportContact: draft.supportContact || null,
@@ -321,7 +330,7 @@ export function EventSettingsWorkspace({
       setSavedDraft(nextDraft);
       setPublishedFormCount(result.event.publishedFormCount);
       setPublished(result.event.isPublished);
-      setVersion(result.event.updatedAt);
+      setLoadedDates({ startsOn: result.event.startsOn, endsOn: result.event.endsOn });
       setSetupWarnings(result.event.warnings ?? []);
       const nextReadiness = getEventPublishReadiness(nextDraft, result.event.publishedFormCount);
       const nextStep = result.event.isPublished
@@ -440,7 +449,7 @@ export function EventSettingsWorkspace({
         throw new Error(result.message ?? "The event could not be published.");
       }
       setPublished(result.event.isPublished);
-      setVersion(result.event.updatedAt);
+      setLoadedDates({ startsOn: result.event.startsOn, endsOn: result.event.endsOn });
       setSetupWarnings(result.event.warnings ?? []);
       setPublishDialogOpen(false);
       const warnings = result.warnings ?? [];
@@ -477,7 +486,7 @@ export function EventSettingsWorkspace({
         throw new Error(result.message ?? "The event could not be unpublished.");
       }
       setPublished(result.event.isPublished);
-      setVersion(result.event.updatedAt);
+      setLoadedDates({ startsOn: result.event.startsOn, endsOn: result.event.endsOn });
       setSetupWarnings(result.event.warnings ?? []);
       setUnpublishDialogOpen(false);
       setNotice("Event unpublished. Every public registration form is now closed.");
