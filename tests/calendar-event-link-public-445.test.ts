@@ -86,7 +86,16 @@ describe("a linked pair shows once (#445)", () => {
     expect(items[0]).toMatchObject({ key: "entry-entry-1", kind: "ENTRY", title: "Womens Retreat", registrationOpen: false, href: null });
     expect(JSON.stringify(items)).not.toContain("event-1");
     const linkedLookup = mocks.eventFindMany.mock.calls.find(([args]) => args.where.id)?.[0];
-    expect(linkedLookup.where).toMatchObject({ isPublished: true });
+    expect(linkedLookup.where).toMatchObject({ isPublished: true, archivedAt: null });
+  });
+
+  it("an archived event is off the calendar and doesn't hide its item, which shows on its own (#635)", async () => {
+    // The public events query leaves the archived event out, and the linked-events lookup (published and not
+    // archived) finds nothing, so the item is not treated as the event's pair.
+    seed({ events: [], entries: [entry({ linkedEventId: "event-1" })], publishedLinkedIds: [] });
+    const items = await listPublicCalendarItems("2026-10-01", "2026-10-31", now);
+    expect(items.map((item) => item.key)).toEqual(["entry-entry-1"]);
+    expect(mocks.eventFindMany.mock.calls[0][0].where).toMatchObject({ isPublished: true, archivedAt: null });
   });
 
   it("asks which linked events are published only when some item is linked", async () => {

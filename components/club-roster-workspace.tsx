@@ -20,7 +20,6 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
-  isAdultRosterPerson,
   missingRosterFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
@@ -196,8 +195,6 @@ export function ClubRosterWorkspace({
   }
 
   const today = calendarDateInEventTimeZone(new Date(), "America/Chicago");
-  /** Adults (staff, adult members, and anyone 18 or over) name an emergency contact; only a minor has a guardian (#918). */
-  const adultContact = isAdultRosterPerson(formType, formBirthDate, today);
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, today)
     : null;
@@ -263,9 +260,9 @@ export function ClubRosterWorkspace({
       editing: Boolean(editing),
     });
     setFieldErrors(errors);
-    // Guardian contacts (#510): two slots, every field optional; only email and phone format are checked.
+    // Emergency contacts (#510): every member, two slots, every field optional; only email and phone format are checked.
     if (canEditGuardians && guardianState === "loading") {
-      setError("Still loading this person's guardian contacts. Try again in a moment.");
+      setError("Still loading this person's emergency contacts. Try again in a moment.");
       return;
     }
     const guardianSlots = canEditGuardians && guardianState === "ready"
@@ -658,7 +655,6 @@ export function ClubRosterWorkspace({
         </div>
         {canEditGuardians && (
           <RosterGuardianFields
-            adult={adultContact}
             errors={guardianErrors}
             guardianState={guardianState}
             key={`${editing?.id ?? "new"}-${guardianRev}`}

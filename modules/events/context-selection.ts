@@ -1,3 +1,4 @@
+import { withoutArchivedEvents } from "@/modules/events/archive";
 import {
   evaluateEventRegistrationPhase,
   type EventLifecycleSource,
@@ -54,12 +55,16 @@ export function selectEventContext<T extends EventSelectionCandidate>(input: {
   lastUsedEventId?: string | null;
   now?: Date;
 }): EventContextSelection<T> {
-  const { events, requestedEventId, lastUsedEventId, now = new Date() } = input;
+  const { events: allEvents, requestedEventId, lastUsedEventId, now = new Date() } = input;
 
+  // An explicitly requested event may be archived (#635): archived events stay
+  // readable by link and from the Archived events list. Only automatic choices
+  // (the only event, the remembered one, the nearest one) skip them.
   if (requestedEventId) {
-    const requested = events.find((event) => event.id === requestedEventId);
+    const requested = allEvents.find((event) => event.id === requestedEventId);
     return requested ? { kind: "requested", event: requested } : { kind: "unavailable" };
   }
+  const events = withoutArchivedEvents(allEvents);
 
   if (events.length === 1) {
     return { kind: "only", event: events[0] };

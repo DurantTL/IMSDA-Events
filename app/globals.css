@@ -616,6 +616,18 @@ select:focus-visible {
 /* The visible "Event workspace" label above names the picker; this one is for screen readers only. */
 .event-picker-wrap label.sr-only { margin: -1px; }
 
+/* Link to the Archived events list (#635); 44px tall for touch. */
+.event-picker-archived-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin: 2px 0 0 5px;
+  color: #d3e2e8;
+  font-size: max(var(--type-body-floor, 0px), 0.82rem);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .select-shell { position: relative; }
 
 .select-shell select {
@@ -2445,6 +2457,9 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .preview-calculated-field { border: 1px solid #ded2e9; border-radius: 8px; background: var(--imsda-purple-soft); padding: 8px; }
 .preview-check { display: flex; align-items: center; gap: 5px; font-weight: 500; }
 .preview-check input { width: auto; }
+.preview-acknowledgment-text { max-height: 220px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 10px; background: #fff; padding: 10px 12px; }
+.preview-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.acknowledgment-settings textarea { min-height: 120px; }
 .preview-choice-list { display: grid; gap: 6px; margin-top: 4px; }
 .preview-option { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfd; padding: 7px 8px; font-size: max(var(--type-body-floor, 0px), 0.61rem); font-weight: 600; }
 .preview-option input { width: auto; margin: 0; accent-color: var(--imsda-purple); }
@@ -3690,6 +3705,11 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .public-registration-check { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #d2dfe4; border-radius: 12px; background: #fbfcfd; cursor: pointer; padding: 13px; font-weight: 500; line-height: 1.5; }
 .public-registration-check:has(input:checked) { border-color: #ad92c6; background: var(--imsda-purple-soft); }
 .public-registration-check input { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--imsda-purple); }
+/* The exact wording of a recorded acknowledgment (#150): shown in full, scrollable by keyboard and thumb. */
+.public-registration-acknowledgment-text { max-height: 280px; overflow: auto; border: 1px solid #d2dfe4; border-radius: 12px; background: #fff; padding: 13px; line-height: 1.55; overscroll-behavior: contain; }
+.public-registration-acknowledgment-text:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.public-registration-acknowledgment-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.public-registration-acknowledgment-text strong { display: block; margin-bottom: 6px; }
 
 .public-registration-calculated { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid #d8c8e6; border-radius: 13px; background: var(--imsda-purple-soft); padding: 14px 16px; }
 .public-registration-calculated > span { display: grid; gap: 3px; }
@@ -7390,6 +7410,14 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .team-result-levels { display: grid; gap: 14px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
 .team-result-level { display: grid; gap: 8px; align-content: start; padding: 12px; border: 1px solid var(--line, #d9dde3); border-radius: 8px; }
 .team-result-level label { display: grid; gap: 4px; }
+/* Levels (#945): tabs for Area, Conference and Union, the team check-in tap, and one printed form per page. */
+.team-level-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.team-level-tabs a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.team-level-checkin { display: grid; gap: 8px; justify-items: start; margin: 8px 0; }
+.team-level-checkin .secondary-button, .team-notices .secondary-button, .team-notices .primary-button { min-height: 44px; }
+.team-notices { display: grid; gap: 8px; margin-top: 8px; justify-items: start; }
+.team-form-level-sheet { margin-bottom: 18px; }
+@media print { .team-form-level-sheet { break-after: page; margin: 0; } .team-form-level-sheet:last-child { break-after: auto; } }
 .club-team-name { display: grid; gap: 6px; max-width: 420px; margin-bottom: 12px; }
 
 /* The Pathfinder Bible Experience form (4-1), #809: a framed sheet on screen, one letter page in print. */
@@ -8200,7 +8228,10 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 /* Roster export builder (#490) */
 .roster-export-format-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
 .roster-export-format-list li { display: flex; align-items: center; gap: 4px; }
-.roster-export-add-column { display: grid; gap: 5px; margin: 10px 0 14px; max-width: 320px; }
+.roster-export-add-column { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; margin: 10px 0 14px; max-width: 320px; }
+/* The long "Emergency contact N ..." options must not widen the select past its column on a phone (#510). */
+.roster-export-add-column label { overflow-wrap: anywhere; }
+.roster-export-add-column select { width: 100%; min-width: 0; max-width: 100%; }
 .roster-export-column-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .roster-export-column-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .roster-export-column-order { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; background: var(--paper); font-size: max(var(--type-floor, 0px), 0.6rem); font-weight: 800; }

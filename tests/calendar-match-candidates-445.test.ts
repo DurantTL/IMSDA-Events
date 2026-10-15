@@ -30,10 +30,10 @@ beforeEach(() => {
 });
 
 describe("match candidates in the calendar admin list (#445)", () => {
-  it("asks only for events not already linked to an item", async () => {
+  it("asks only for events that are not archived and not already linked to an item", async () => {
     mocks.eventFindMany.mockResolvedValue([event("event-1")]);
     const rows = await listCalendarEntries(now);
-    expect(mocks.eventFindMany.mock.calls[0][0].where).toMatchObject({ calendarEntryLink: null });
+    expect(mocks.eventFindMany.mock.calls[0][0].where).toMatchObject({ archivedAt: null, calendarEntryLink: null });
     expect(rows[0].possibleMatch?.id).toBe("event-1");
   });
 
@@ -45,7 +45,7 @@ describe("match candidates in the calendar admin list (#445)", () => {
 
   it("an event linked to another item (the database refuses a second link) is never suggested", async () => {
     // Even if the query returned it, an event linked from another listed item is filtered out by the matcher.
-    mocks.entryFindMany.mockResolvedValue([entry, { ...entry, id: "entry-2", sourceUid: "uid-2", linkedEventId: "event-1", linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat", isPublished: false, showOnCalendar: true, startsAt: new Date("2026-10-09T17:00:00Z"), endsAt: new Date("2026-10-11T17:00:00Z"), timezone: "America/Chicago" } }]);
+    mocks.entryFindMany.mockResolvedValue([entry, { ...entry, id: "entry-2", sourceUid: "uid-2", linkedEventId: "event-1", linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat", isPublished: false, archivedAt: null, showOnCalendar: true, startsAt: new Date("2026-10-09T17:00:00Z"), endsAt: new Date("2026-10-11T17:00:00Z"), timezone: "America/Chicago" } }]);
     mocks.eventFindMany.mockResolvedValue([event("event-1")]);
     const rows = await listCalendarEntries(now);
     expect(rows.find((row) => row.id === "entry-1")?.possibleMatch).toBeNull();

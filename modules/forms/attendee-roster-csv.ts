@@ -24,7 +24,8 @@ export class AttendeeRosterCsvError extends Error {
 function attendeeFields(definition: RegistrationFormDefinition) {
   return definition.sections
     .flatMap((section) => section.fields)
-    .filter((field) => field.scope === "ATTENDEE" && field.type !== "CALCULATED");
+    // A recorded acknowledgment (#150) is never set by a file: it has its own evidence path.
+    .filter((field) => field.scope === "ATTENDEE" && field.type !== "CALCULATED" && field.type !== "ACKNOWLEDGMENT");
 }
 
 function escapeCsvCell(value: string) {

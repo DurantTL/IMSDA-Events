@@ -21,7 +21,7 @@ import {
 async function loadAutoEventInfoCards(eventSlug: string): Promise<EventInfoCards | null> {
   const prisma = getPrisma();
   const event = await prisma.event.findFirst({
-    where: { slug: eventSlug, isPublished: true, audience: "CLUB" },
+    where: { slug: eventSlug, isPublished: true, archivedAt: null, audience: "CLUB" },
     select: {
       id: true,
       name: true,

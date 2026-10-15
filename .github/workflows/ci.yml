@@ -209,6 +209,9 @@ jobs:
       # Real-database check of consent policies (#129): kind and scope fixed at creation, one draft per policy, publishing freezing a version (repository and trigger both refuse any change), required publisher, hash and human material-change flag, version-effective-at-date and version-referenced-by-evidence as separate queries (overlap, open-ended), the current-version pointer, per-event applicability by type, role and age band, ids-only audit rows, and cascade on event deletion.
       - run: npm run test:consent-policies
 
+      # Real-database check of acknowledgment evidence (#150): one append-only row per ticked acknowledgment recorded with its registration (the exact text, or a published policy version by id; who, when, which channel, approved request metadata only), hidden conditional acknowledgments recording nothing, retries and repeats creating no second row, a minor's acknowledgment needing the declared responsible adult (account holder, other adults, household members and the minor's own tick all refused, leaving no registration behind), staff-entered and paper evidence, status resolved at a past moment against policy versions, RESTRICT references, the database refusing another event's, another kind's or a draft policy version, event deletion refusing while evidence exists, and no wording in any response snapshot, audit row or message.
+      - run: npm run test:acknowledgments
+
       # Real-database check of deferred-organization invoices: drafts only from a current approved reconciliation, numbers assigned exactly once under parallel and retried finalization (per event, code and year), immutable finalized versions with one receivable each, contact-only and amount revisions with the Finalize invoices rule, and no audit row holding a contact name or email (#167).
       - run: npm run test:invoices
 
@@ -248,6 +251,9 @@ jobs:
       # Real-database check of unsubscribe and email preferences for event announcements (#838), through a local stand-in for the email provider: a one-click opt-out (RFC 8058, no login or CSRF token) and the page's choices skipping an address for this event or for all events in the review and the send with the skipped counted by kind, another event's opt-out changing nothing, an opt-out recorded after the broadcast was queued still honoured at delivery with a recorded reason and an audit row holding no address, an announcement marked essential by an event manager (audited) reaching opted-out addresses, a payment receipt never affected and carrying no unsubscribe link, List-Unsubscribe and List-Unsubscribe-Post headers and a signed link on every announcement, an altered token or a GET recording nothing, and re-subscribing clearing the opt-out.
       - run: npm run test:announcement-unsubscribe
 
+      # Real-database check of the reviewed event audience builder (#176), preview only, selecting registrations through the operations search (#180): one email in several roles and registrations is one recipient with every role, reason and each registration's own balance kept; payment, check-in, tag, attendee-type, lifecycle and form-answer filters from the search, readiness and role qualify people with a reason; opted-out, bounced, missing and invalid addresses are excluded with a reason; a restricted note, answer text, a sensitive form question, another event's tag and the staff list never appear in any preview; a filter the caller may not use (tag, payment, check-in or text without its permission), another event's tag, a stale or sensitive answer, a malformed search, a draft or a domain the event lacks is refused with one identical answer; equivalent searches have one hash and fingerprint, which are identical across batch sizes while paged previews cover 650+ registrations once each; a snapshot needs the previewed fingerprint, replays by UUID, refuses a reused id and writes an audit row with no address; and nothing is queued, sent or scheduled.
+      - run: npm run test:event-audience-builder
+
       # Real-database check of "Retry failed" after a provider quota (#860), through a local stand-in for the email provider: a 429 daily quota recorded as PROVIDER_QUOTA with a staff-readable reason and a backoff in hours, a bulk send where some guests were sent and some failed, a preview naming every skip, one new copy for each failed guest and none for anyone who was sent the email, nothing sent inside the request, a re-post and a double click adding no second copy, exactly one email per guest once the worker has run, and an audit row with ids and counts only.
       - run: npm run test:retry-failed
 
@@ -279,6 +285,11 @@ jobs:
       # at once with sweeps and direct picks racing: never overfilled, never offered out of order.
       - run: npm run test:honor-class-waitlist
 
+      # Real-database check that reinstating or promoting a registration never overfills an Honors Weekend class (#880):
+      # a seat given away in between drops that pick (audited, reported to staff, director emailed), for class capacity and
+      # the per-club limit, by staff or automatic promotion; a restored pick never jumps the class waitlist; races never overfill.
+      - run: npm run test:honor-reinstate-seats
+
       # Real-database check of deleting an event at any stage: a rich event
       # (registrations, payments, honors, forms, messages, locations, club forms,
       # amendment ledgers) is removed in one transaction with no leftover rows
@@ -286,6 +297,9 @@ jobs:
       # name are enforced, the audit row holds counts only, a mid-deletion failure
       # rolls everything back, and the ledger trigger flag never leaks (#620).
       - run: npm run test:event-deletion
+      # Real-database check of archiving an event (#635): permissions, audit rows with ids only, no other row
+      # changed, hidden from staff lists, the public page and calendar, registration closed, unarchive restores it.
+      - run: npm run test:event-archive
 
       # Real-database check of PBE registration (#809): the starter template, several
       # named teams per club, the name unique per event (also under concurrent
@@ -295,6 +309,14 @@ jobs:
       # filled and blank print form, billing/church/packet/QR/check-in views per
       # team, and an event without team rules behaving exactly as before.
       - run: npm run test:pbe-registration
+
+      # Real-database check of PBE advancement inside one event (#945): 1st and 2nd per Area advance (a tie advances
+      # both), staff overrides are audited with ids only and survive a recompute, the Conference list, results and
+      # roster CSVs and printed forms are exactly the advancing teams with no re-registration, a team that did not
+      # advance never reaches the next level, notices are queued only when staff press "Send notices" (once per team
+      # and level, with the next level's date and place), team check-in for the Conference day, a director's team
+      # changes between levels under the team rules, and old free-text placements staying readable.
+      - run: npm run test:pbe-advancement
 
       # Real-database check of the general registration link (#931): a director with no
       # account registers a PBE team through one public link; a matching director or

@@ -14,6 +14,7 @@ export class CalendarError extends Error {
       | "ENTRY_ALREADY_LINKED"
       | "EVENT_ALREADY_LINKED"
       | "NOT_LINKED"
+      | "EVENT_ARCHIVED"
       | "DATES_CHANGED"
       | "DATES_CONFLICT",
     message: string,

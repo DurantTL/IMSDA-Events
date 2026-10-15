@@ -33,6 +33,7 @@ const publicEventSelect = {
   location: true,
   calendarCategory: true,
   isPublished: true,
+  archivedAt: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
@@ -56,6 +57,7 @@ export async function listPublicCalendarItems(
     prisma.event.findMany({
       where: {
         isPublished: true,
+        archivedAt: null,
         showOnCalendar: true,
         startsAt: { lt: new Date(`${addDays(to, 2)}T00:00:00Z`) },
         endsAt: { gte: new Date(`${addDays(from, -1)}T00:00:00Z`) },
@@ -85,9 +87,8 @@ export async function listPublicCalendarItems(
   const publishedLinked = linkedEventIds.length === 0
     ? new Set<string>()
     : new Set((await prisma.event.findMany({
-      // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event must not hide its
-      // item). Whichever of #445 and #635 merges second adds it.
-      where: { id: { in: linkedEventIds }, isPublished: true },
+      // An archived event is off the public calendar (#635), so it doesn't hide its item: the item shows on its own.
+      where: { id: { in: linkedEventIds }, isPublished: true, archivedAt: null },
       select: { id: true },
     })).map((event) => event.id));
   const standalone = entries.filter((entry) => !entry.linkedEventId || !publishedLinked.has(entry.linkedEventId));
@@ -176,7 +177,7 @@ export async function listCalendarEntries(now = new Date()) {
     take: calendarEntryListLimit,
     include: {
       sourceFeed: { select: { name: true } },
-      linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
+      linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, archivedAt: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
     },
   });
 
@@ -188,10 +189,9 @@ export async function listCalendarEntries(now = new Date()) {
     ? [[], []]
     : await Promise.all([
       prisma.event.findMany({
-        // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event is not a match
-        // candidate). Whichever of #445 and #635 merges second adds it.
-        // An event already linked to an item is not offered to another (also enforced by the database).
-        where: { endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) }, calendarEntryLink: null },
+        // An archived event is not a match candidate (#635). An event already linked to an item is not offered to
+        // another (also enforced by the database).
+        where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) }, calendarEntryLink: null },
         select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, isPublished: true },
       }),
       prisma.calendarEventMatchDismissal.findMany({
@@ -230,6 +230,7 @@ export async function listCalendarEntries(now = new Date()) {
         id: entry.linkedEvent.id,
         name: entry.linkedEvent.name,
         slug: entry.linkedEvent.slug,
+        isArchived: Boolean(entry.linkedEvent.archivedAt),
         isPublished: entry.linkedEvent.isPublished,
         showOnCalendar: entry.linkedEvent.showOnCalendar,
         startsOn: calendarDateIn(entry.linkedEvent.startsAt, entry.linkedEvent.timezone),
@@ -274,9 +275,8 @@ export type CalendarAdminEvent = Awaited<ReturnType<typeof listCalendarEvents>>[
 /** Events that haven't ended (plus the last month), with whether each shows on the calendar. */
 export async function listCalendarEvents(now = new Date()) {
   const events = await getPrisma().event.findMany({
-    // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event is not offered to
-    // link to). Whichever of #445 and #635 merges second adds it.
-    where: { endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
+    // An archived event is not offered to link to (#635).
+    where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
     orderBy: { startsAt: "asc" },
     select: { ...publicEventSelect, showOnCalendar: true, calendarEntryLink: { select: { id: true, title: true } } },
   });

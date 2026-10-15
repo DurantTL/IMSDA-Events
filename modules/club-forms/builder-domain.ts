@@ -146,6 +146,7 @@ function clubFormRestrictionIssues(definition: RegistrationFormDefinition): Buil
       const key = fieldIdKey(field.id);
       const name = describeField(field);
       if (field.type === "CALCULATED") issues.push({ key, message: `${name}: calculated fields are not available on club forms.` });
+      if (field.type === "ACKNOWLEDGMENT") issues.push({ key, message: `${name}: recorded acknowledgments are not available on club forms.` });
       if (field.scope !== "REGISTRATION") issues.push({ key, message: `${name}: club forms ask each question once, not per attendee.` });
       if (
         field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined

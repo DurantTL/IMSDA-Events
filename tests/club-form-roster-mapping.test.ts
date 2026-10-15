@@ -154,9 +154,31 @@ describe("mapping validation: protected fields only, no health (#721)", () => {
     expect(problems(on(empty)).join(" ")).toMatch(/birth-date question/);
   });
 
-  it("gives a staff member no class and no guardian contacts", () => {
-    expect(problems({ ...base, fields: { ...base.fields, classLevel: "marital_status" } }).join(" ")).toMatch(/no class or guardian/);
-    expect(problems({ ...base, guardians: [{ name: "spouse_name" }] }).join(" ")).toMatch(/no class or guardian/);
+  /** The staff form plus a plain contact section (the form's own phone questions say "emergency" and so are kept off the roster). */
+  const withContact = () => {
+    const fields = allFields(staffForm.definition);
+    const name = { ...fields.find((field) => field.key === "spouse_name")!, key: "contact_name", label: "Contact name" };
+    const phone = { ...fields.find((field) => field.key === "phone_cell")!, key: "contact_phone", label: "Contact phone", helpText: "" };
+    const section = { ...staffForm.definition.sections[0]!, key: "sec_contact", title: "Contact", description: "", fields: [name, phone] };
+    return { ...specOf(staffForm), definition: { ...staffForm.definition, sections: [...staffForm.definition.sections, section] } } as ReturnType<typeof specOf>;
+  };
+
+  it("gives a staff member no class, but allows emergency contacts (#510)", () => {
+    expect(problems({ ...base, fields: { ...base.fields, classLevel: "marital_status" } }).join(" ")).toMatch(/no class/);
+    const mapping: RosterMapping = { ...base, guardians: [{ name: "contact_name", phone: "contact_phone", relationshipLabel: "Spouse" }] };
+    expect(rosterMappingProblems(mapping, withContact())).toEqual([]);
+  });
+
+  it("pre-fills a staff applicant's emergency contact on the Add to roster review (#510)", () => {
+    const mapping: RosterMapping = { ...base, guardians: [{ name: "contact_name", phone: "contact_phone", relationshipLabel: "Spouse" }] };
+    const prefill = rosterPrefillFromAnswers(mapping, {
+      full_name: "Sample, Riley", birth_date: "1988-01-02", contact_name: "Sam Sample", contact_phone: "(555) 010-0100",
+    }, withContact());
+    expect(prefill.attendeeType).toBe("STAFF");
+    expect(prefill.guardians).toEqual([
+      { name: "Sam Sample", relationship: "Spouse", email: "", phone: "(555) 010-0100" },
+      { name: "", relationship: "", email: "", phone: "" },
+    ]);
   });
 
   it("offers the builder only the questions the rules allow", () => {
@@ -258,7 +280,7 @@ describe("pre-filling a roster member from the answers (#721)", () => {
     expect(prefill.guardians[1]).toEqual({ name: "", relationship: "", email: "", phone: "" });
   });
 
-  it("reads a staff applicant as staff with no class or guardians", () => {
+  it("reads a staff applicant as staff with no class, and no contact unless one is mapped", () => {
     const prefill = rosterPrefillFromAnswers(staffForm.rosterMapping!, {
       full_name: "Sample, Riley", birth_date: "1988-01-02", health_limitation: "Yes", health_limitation_how: "Synthetic health detail", conduct_type: "Synthetic conduct",
     }, specOf(staffForm));

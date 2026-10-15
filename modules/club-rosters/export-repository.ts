@@ -170,7 +170,7 @@ export async function runRosterExport(
   }
   const needsGuardians = request.columns.some((column) => isGuardianRosterExportColumn(column.key));
   if (needsGuardians && !canSeeGuardians) {
-    throw new RosterExportError("SENSITIVE_ACCESS_DENIED", "Guardian contacts are for your club's director and deputy.");
+    throw new RosterExportError("SENSITIVE_ACCESS_DENIED", "Emergency contacts are for your club's director and deputy.");
   }
 
   const allMembers = await listRoster(organizationId, clubYear);
@@ -211,7 +211,7 @@ export async function runRosterExport(
       action: "CLUB_ROSTER_EXPORT_PREVIEWED",
       entityType: "Organization",
       entityId: organizationId,
-      summary: "Previewed a club roster export that shows birth dates or guardian contacts.",
+      summary: "Previewed a club roster export that shows birth dates or emergency contacts.",
       metadata: auditMetadata(actor, {
         organizationId,
         clubYear,

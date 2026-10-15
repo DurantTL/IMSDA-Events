@@ -367,6 +367,37 @@ async function main() {
   assert(differsKept.baselineStartsOn === "2026-12-19" && await links.getCalendarLinkNotice(differs.id) === null, "Keep records the baseline and ends the question");
   console.log("ok  baseline dates: an event edited by hand is no question; a moved item is; one that differed at linking says differs; the preview lists meals and registrations");
 
+  // Archived events (#635): not suggested, can't be linked, no banner, and Update or Keep is refused.
+  const archivable = await createEvent(settings("Evlink Archived", `${P}-archived`, "2026-12-05", "2026-12-07"), userId);
+  assert(archivable, "an event was made for the archive checks");
+  const archivedCandidate = await prisma.calendarEntry.create({ data: { title: "Evlink Archived", startsOn: "2026-12-05", endsOn: "2026-12-07", isPublished: true, sourceUid: "archived@evlink.test", createdByUserId: userId, updatedByUserId: userId } });
+  assert((await listed(archivedCandidate.id))?.possibleMatch?.id === archivable.id, "before archiving, the look-alike event is suggested");
+  assert((await listCalendarEvents(now)).some((row) => row.id === archivable.id), "and offered in the link picker");
+  await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: new Date(), archivedByUserId: userId } });
+  assert((await listed(archivedCandidate.id))?.possibleMatch === null, "an archived event is not suggested");
+  assert(!(await listCalendarEvents(now)).some((row) => row.id === archivable.id), "an archived event is not in the link picker");
+  await rejectsWith(links.linkCalendarEntryToEvent(archivedCandidate.id, archivable.id, userId), "EVENT_ARCHIVED", "an archived event can't be linked");
+  assert((await entryRow(archivedCandidate.id)).linkedEventId === null, "and nothing was linked");
+  // An event archived after it was linked: the link still shows, marked archived, with no banner and no way to answer.
+  await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: null, archivedByUserId: null } });
+  await prisma.calendarEntry.update({ where: { id: archivedCandidate.id }, data: { startsOn: "2026-12-12", endsOn: "2026-12-13" } });
+  await links.linkCalendarEntryToEvent(archivedCandidate.id, archivable.id, userId);
+  assert((await links.getCalendarLinkNotice(archivable.id))?.datePrompt?.message.includes("differs"), "unarchived, the differing item asks");
+  await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: new Date(), archivedByUserId: userId } });
+  assert(await links.getCalendarLinkNotice(archivable.id) === null, "an archived event shows no date banner");
+  assert((await listed(archivedCandidate.id))?.linkedEvent?.isArchived === true, "the calendar list still shows the link, marked archived");
+  await rejectsWith(links.resolveCalendarDateChange(archivable.id, "update", { startsOn: "2026-12-12", endsOn: "2026-12-13" }, userId), "EVENT_ARCHIVED", "Update is refused for an archived event");
+  await rejectsWith(links.resolveCalendarDateChange(archivable.id, "keep", { startsOn: "2026-12-12", endsOn: "2026-12-13" }, userId), "EVENT_ARCHIVED", "and so is Keep");
+  const archivedRow = await prisma.event.findUniqueOrThrow({ where: { id: archivable.id } });
+  assert(archivedRow.startsAt.toISOString().startsWith("2026-12-05"), "the archived event's dates did not change");
+  await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: new Date("2026-10-15T00:00:00Z"), archivedByUserId: userId } });
+  await prisma.event.update({ where: { id: archivable.id }, data: { isPublished: true } });
+  const archivedKeys = await publicKeys("2026-12-01", "2026-12-31");
+  assert(archivedKeys.includes(`entry-${archivedCandidate.id}`) && !archivedKeys.includes(`event-${archivable.id}`), "an archived published event is off the public calendar and its item shows on its own");
+  await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: null, archivedByUserId: null } });
+  assert(Boolean((await links.getCalendarLinkNotice(archivable.id))?.datePrompt), "unarchived, the banner returns");
+  console.log("ok  archived events: not suggested, not offered, can't be linked, no banner, Update and Keep refused, link still shown");
+
   // 8. Gone from Google: never deleted, the event never removed or cancelled; staff are warned. It comes back linked.
   feedBody = ics([retreat, unrelated]);
   await refresh();

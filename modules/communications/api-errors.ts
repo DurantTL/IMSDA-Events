@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { MessageFileError } from "@/modules/communications/message-files";
 import { MessagingError } from "@/modules/communications/messaging-repository";
+import { AudienceFilterNotAvailableError } from "@/modules/communications/audience-query";
 import { logError } from "@/lib/logger";
 
 export function messagingApiError(error: unknown, operation: string) {
@@ -26,6 +27,10 @@ export function messagingApiError(error: unknown, operation: string) {
       { error: error.code, message: error.message },
       { status: error.status }
     );
+  }
+  if (error instanceof AudienceFilterNotAvailableError) {
+    // Fixed body: it names no filter, value or count.
+    return Response.json({ error: error.code, message: error.message }, { status: 403 });
   }
   if (error instanceof MessageFileError) {
     return Response.json(

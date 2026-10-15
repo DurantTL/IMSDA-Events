@@ -3,7 +3,7 @@ import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
 
-export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
+export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
 export const formFieldScopes = ["REGISTRATION", "ATTENDEE"] as const;
 export const choiceFieldTypes = ["SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE"] as const;
 export const conditionOperators = ["EQUALS", "NOT_EQUALS", "INCLUDES", "NOT_EMPTY"] as const;
@@ -89,6 +89,20 @@ export function getAvailabilityMode(field: Pick<RegistrationFormField, "type" | 
   return "NONE";
 }
 
+/** The longest acknowledgment statement a form can carry as plain text (#150); longer wording belongs in a policy version. */
+export const ACKNOWLEDGMENT_TEXT_MAX = 4000;
+
+/**
+ * What an ACKNOWLEDGMENT field records (#150): the exact text shown, or a reference to a published #129 policy version
+ * of the acknowledgment kind. The reference is by version id, never "latest": the form version that carries it is
+ * immutable once published and a policy version is never edited, so what a person saw can always be reproduced.
+ */
+export const acknowledgmentConfigSchema = z.discriminatedUnion("source", [
+  z.object({ source: z.literal("TEXT"), text: z.string().trim().min(5, "Enter the acknowledgment wording.").max(ACKNOWLEDGMENT_TEXT_MAX) }),
+  z.object({ source: z.literal("POLICY_VERSION"), policyVersionId: z.string().trim().min(1).max(100) }),
+]);
+export type AcknowledgmentConfig = z.infer<typeof acknowledgmentConfigSchema>;
+
 export const formFieldSchema = z.object({
   id: z.string().trim().min(3).max(80),
   key: z.string().trim().min(2).max(60).regex(/^[a-z][a-z0-9_]*$/, "Field keys use lowercase letters, numbers, and underscores."),
@@ -164,7 +178,22 @@ export const formFieldSchema = z.object({
    * sensitive) in `modules/forms/field-flags.ts`.
    */
   sensitive: z.boolean().optional(),
+  /**
+   * What an ACKNOWLEDGMENT field records (#150). Required on that type and refused on every other. Evidence of each
+   * acknowledgment lives in its own append-only table; the stored answer is only `true`.
+   */
+  acknowledgment: acknowledgmentConfigSchema.optional(),
 }).superRefine((field, context) => {
+  if (field.type === "ACKNOWLEDGMENT") {
+    if (!field.acknowledgment) {
+      context.addIssue({ code: "custom", path: ["acknowledgment"], message: "An acknowledgment needs its wording or a policy version." });
+    }
+    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
+      context.addIssue({ code: "custom", path: ["type"], message: "An acknowledgment carries no choices, price, credit, age range or automatic date." });
+    }
+  } else if (field.acknowledgment) {
+    context.addIssue({ code: "custom", path: ["acknowledgment"], message: "Only an acknowledgment field carries acknowledgment wording." });
+  }
   if (field.autoDate && field.type !== "DATE") {
     context.addIssue({ code: "custom", path: ["autoDate"], message: "Only a date question can fill in today's date." });
   }
@@ -1838,6 +1867,8 @@ export function validateTestResponses(
       const typedProblem = typedAnswerProblem(field, value, options.previousResponses?.[field.key]);
       if (typedProblem) issues.push({ fieldId: field.id, key: field.key, message: typedProblem });
       if (field.type === "CHECKBOX" && typeof value !== "boolean") issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be checked or unchecked.` });
+      // An acknowledgment is only ever given (`true`); `hasValue` already treats an unticked box as no answer (#150).
+      if (field.type === "ACKNOWLEDGMENT" && value !== true) issues.push({ fieldId: field.id, key: field.key, message: `${fieldDisplayLabel(field)} must be acknowledged.` });
       if (field.type === "ADDRESS") {
         for (const message of validateAddressValue(fieldDisplayLabel(field), value)) {
           issues.push({ fieldId: field.id, key: field.key, message });

@@ -110,6 +110,7 @@ const eventSelect = {
   endsAt: true,
   timezone: true,
   isPublished: true,
+  archivedAt: true,
   audience: true,
   supportContact: true,
 } satisfies Prisma.EventSelect;
@@ -617,8 +618,8 @@ async function loadByToken(client: Tx | ReturnType<typeof getPrisma>, token: str
 }
 
 /** Whether the event takes registrations through a personal link now: published, a general event, and not over. */
-export function eventAcceptsInvitationRegistration(event: Pick<InviteEvent, "isPublished" | "audience" | "timezone" | "endsAt">, now = new Date()) {
-  return event.audience === "GENERAL" && event.isPublished && !hasEventEnded({ timezone: event.timezone, endsAt: event.endsAt }, now);
+export function eventAcceptsInvitationRegistration(event: Pick<InviteEvent, "isPublished" | "archivedAt" | "audience" | "timezone" | "endsAt">, now = new Date()) {
+  return event.audience === "GENERAL" && event.isPublished && !event.archivedAt && !hasEventEnded({ timezone: event.timezone, endsAt: event.endsAt }, now);
 }
 
 export type InvitationExperience =

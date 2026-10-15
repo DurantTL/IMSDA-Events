@@ -51,10 +51,10 @@ async function linkInTransaction(tx: Tx, entryId: string, eventId: string, actor
   if (problem) throw new CalendarError("NOT_LINKABLE", problem);
   if (entry.linkedEventId === eventId) return entry;
   if (entry.linkedEventId) throw new CalendarError("ENTRY_ALREADY_LINKED", "That calendar item is already linked to a registration event. Unlink it first.");
-  // TODO(#635): when `Event.archivedAt` lands, an archived event is not linkable here; add `archivedAt: null` to this
-  // lookup (whichever of #445 and #635 merges second adds it).
-  const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true, startsAt: true, endsAt: true, timezone: true } });
+  const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true, startsAt: true, endsAt: true, timezone: true, archivedAt: true } });
   if (!event) throw new CalendarError("EVENT_NOT_FOUND", "That event could not be found.");
+  // An archived event can't be linked to (#635): unarchive it first. Checked inside the same transaction as the link.
+  if (event.archivedAt) throw new CalendarError("EVENT_ARCHIVED", "That event is archived. Unarchive it before linking a calendar item to it.");
   const other = await tx.calendarEntry.findUnique({ where: { linkedEventId: eventId }, select: { id: true } });
   if (other) throw new CalendarError("EVENT_ALREADY_LINKED", "That event is already linked to another calendar item. Unlink it first.");
   // The baseline is the item's dates when they agree with the event's. If they already differ, there is no baseline:
@@ -235,7 +235,7 @@ async function previewInputs(db: Tx | ReturnType<typeof getPrisma>, eventId: str
   const [event, locations, lodging, meals, policy, registrationCount] = await Promise.all([
     db.event.findUnique({
       where: { id: eventId },
-      select: { startsAt: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, seminarPreferenceClosesOn: true },
+      select: { startsAt: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, seminarPreferenceClosesOn: true, archivedAt: true },
     }),
     db.eventLocation.findMany({ where: { eventId }, orderBy: { sortOrder: "asc" }, select: { name: true, firstDay: true, lastDay: true, registrationClosesOn: true } }),
     db.eventLodging.findUnique({ where: { eventId }, select: { firstNight: true, lastNight: true, preferencesDeadline: true } }),
@@ -248,6 +248,7 @@ async function previewInputs(db: Tx | ReturnType<typeof getPrisma>, eventId: str
     mealServiceDates: meals.map((meal) => meal.serviceDate),
     cancellationWindows: cancellationWindowsOf(policy?.rules),
     registrationCount,
+    isArchived: event.archivedAt !== null,
     startsOn: calendarDateIn(event.startsAt, event.timezone),
     endsOn: calendarDateIn(event.endsAt, event.timezone),
     registrationOpensOn: event.registrationOpensOn,
@@ -268,7 +269,8 @@ export async function getCalendarLinkNotice(eventId: string): Promise<CalendarLi
   const entry = await prisma.calendarEntry.findUnique({ where: { linkedEventId: eventId } });
   if (!entry) return null;
   const event = await previewInputs(prisma, eventId);
-  if (!event) return null;
+  // An archived event (#635) is read-only history: no banner and no warning, so nothing invites a change to it.
+  if (!event || event.isArchived) return null;
   const sourceRemoved = entry.sourceRemovedAt !== null;
   const needsDecision = datesNeedDecision({
     itemStartsOn: entry.startsOn,
@@ -326,6 +328,8 @@ export async function resolveCalendarDateChange(
     }
     const event = await previewInputs(tx, eventId);
     if (!event) throw new CalendarError("EVENT_NOT_FOUND", "That event could not be found.");
+    // Neither answer applies to an archived event (#635), read under the same lock as the dates.
+    if (event.isArchived) throw new CalendarError("EVENT_ARCHIVED", "That event is archived, so its dates can't be changed. Unarchive it first.");
     if (decision === "keep") {
       await tx.calendarEntry.update({ where: { id: entry.id }, data: { baselineStartsOn: entry.startsOn, baselineEndsOn: entry.endsOn } });
       await writeAuditLog({

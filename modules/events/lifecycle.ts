@@ -16,6 +16,12 @@ export type EventLifecycleSource = {
   registrationClosesOn: string | null;
   waitlistEnabled: boolean;
   /**
+   * When the event was archived (#635), or null. Required (not optional) so a
+   * query that forgets to select it fails to type-check instead of quietly
+   * leaving registration open on an archived event.
+   */
+  archivedAt: Date | null;
+  /**
    * The event's last instant. When present, public registration also closes
    * once the event's last calendar day (in its own time zone) has passed (#575),
    * regardless of the registration-window settings.
@@ -59,7 +65,10 @@ export function evaluateEventRegistrationPhase(
   event: EventLifecycleSource,
   now = new Date(),
 ): EventRegistrationPhase {
+  // An unpublished event reads as a draft even when archived; an archived published event takes no
+  // registrations (#635), whatever its dates say. Either way registration is not open.
   if (!event.isPublished) return "DRAFT";
+  if (event.archivedAt) return "CLOSED";
   if (hasEventEnded(event, now)) return "CLOSED";
   const today = calendarDateInEventTimeZone(now, event.timezone);
   if (event.registrationOpensOn && today < event.registrationOpensOn) return "UPCOMING";

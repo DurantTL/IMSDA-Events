@@ -115,12 +115,20 @@ function typedFieldProblem(field: RegistrationFormField, value: unknown, stored:
   return inlineFieldProblem(field.label, type, value, stored, shown, rules);
 }
 
+const ACKNOWLEDGMENT_STATUS_LABEL: Record<string, string> = {
+  ACKNOWLEDGED: "Acknowledged",
+  ACKNOWLEDGED_EARLIER_VERSION: "Acknowledged (an earlier version)",
+  REACKNOWLEDGMENT_REQUIRED: "Needs to be acknowledged again",
+  NOT_ACKNOWLEDGED: "Not acknowledged yet",
+};
+
 function AmendmentField({
   field,
   values,
   stored,
   attempted,
   locked,
+  acknowledgmentStatus,
   onChange,
 }: {
   field: RegistrationFormField;
@@ -129,6 +137,8 @@ function AmendmentField({
   stored?: unknown;
   attempted?: boolean;
   locked: boolean;
+  /** An acknowledgment's standing from its evidence (#150): the evidence, not the stored answer, is what counts. */
+  acknowledgmentStatus?: string;
   onChange: (value: unknown) => void;
 }) {
   const [touched, setTouched] = useState(false);
@@ -137,6 +147,16 @@ function AmendmentField({
   const valueType = valueTypeForFieldType(field.type);
   const attributes = valueType ? inputAttributesFor(valueType) : null;
   const id = `amendment_${field.id}_${locked ? "locked" : "editable"}`;
+
+  // An acknowledgment is given only through its evidence path (#150), never edited in an amendment.
+  if (field.type === "ACKNOWLEDGMENT") {
+    return (
+      <div className="amendment-locked-field">
+        <small>{field.label}</small>
+        <strong>{(acknowledgmentStatus && ACKNOWLEDGMENT_STATUS_LABEL[acknowledgmentStatus]) ?? (value === true ? "Acknowledged" : "Not acknowledged yet")}</strong>
+      </div>
+    );
+  }
 
   if (locked) {
     return (
@@ -338,6 +358,21 @@ export function RegistrationAmendmentEditor({
       },
     })),
   );
+  // Acknowledgment standing comes from the evidence (#150), read once; staff-recorded evidence never changes the stored answer.
+  const [acknowledgmentStatuses, setAcknowledgmentStatuses] = useState<Record<string, string>>({});
+  const hasAcknowledgments = allFields.some((field) => field.type === "ACKNOWLEDGMENT");
+  useEffect(() => {
+    if (!hasAcknowledgments) return;
+    let live = true;
+    fetch(`/api/events/${eventId}/registrations/${registration.id}/acknowledgments`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { acknowledgments?: Array<{ fieldKey: string; status: string; subject: { kind: string; attendeeId?: string } }> } | null) => {
+        if (!live || !body?.acknowledgments) return;
+        setAcknowledgmentStatuses(Object.fromEntries(body.acknowledgments.map((view) => [`${view.fieldKey}|${view.subject.attendeeId ?? ""}`, view.status])));
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [eventId, registration.id, hasAcknowledgments]);
   const [reason, setReason] = useState("");
   const [clientRequestId] = useState(() => crypto.randomUUID());
   const [preview, setPreview] = useState<AmendmentPreview | null>(null);
@@ -597,6 +632,7 @@ export function RegistrationAmendmentEditor({
               stored={registration.publicSubmission?.responses?.[field.key]}
               attempted={attempted}
               locked={lockedRegistrationKeys.has(field.key)}
+              acknowledgmentStatus={acknowledgmentStatuses[`${field.key}|`]}
               key={field.id}
               onChange={(value) => setRegistrationValue(field.key, value)}
             />
@@ -655,6 +691,7 @@ export function RegistrationAmendmentEditor({
                     stored={registration.attendees.find((candidate) => candidate.id === attendee.attendeeId)?.responses?.[field.key]}
                     attempted={attempted}
                     locked={Boolean(attendee.attendeeId && attendeeIdentityKeys.has(field.key))}
+                    acknowledgmentStatus={acknowledgmentStatuses[`${field.key}|${attendee.attendeeId ?? ""}`]}
                     key={field.id}
                     onChange={(value) => setAttendeeValue(attendeeIndex, field.key, value)}
                   />

@@ -80,7 +80,7 @@ describe("public event landing repository announcements", () => {
 
     expect(prismaMocks.eventFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { slug: "public-retreat", isPublished: true },
+        where: { slug: "public-retreat", isPublished: true, archivedAt: null },
         select: expect.objectContaining({
           announcements: {
             where: {

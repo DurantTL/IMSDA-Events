@@ -139,8 +139,8 @@ export function ageOn(birthDate: string, onDate: string) {
 
 /**
  * Whether a roster person is an adult (#918): registered staff and adults are, and so is anyone whose
- * birth date makes them 18 or over on `today`. Used to word the contact section "Emergency contact"
- * for adults and "Guardian" only for a minor.
+ * birth date makes them 18 or over on `today`. (#918 used it to word the contact section; since #510
+ * every member's contact reads "Emergency contact", so nothing in the roster contact code depends on it.)
  */
 export function isAdultRosterPerson(attendeeType: string | null | undefined, birthDate?: string | null, today?: string) {
   if (attendeeType === "STAFF" || attendeeType === "ADULT") return true;

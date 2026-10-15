@@ -15,6 +15,7 @@ const calendarErrorStatus: Record<CalendarError["code"], number> = {
   ENTRY_ALREADY_LINKED: 409,
   EVENT_ALREADY_LINKED: 409,
   NOT_LINKED: 409,
+  EVENT_ARCHIVED: 409,
   DATES_CHANGED: 409,
   DATES_CONFLICT: 409,
   FEED_FETCH_FAILED: 502,

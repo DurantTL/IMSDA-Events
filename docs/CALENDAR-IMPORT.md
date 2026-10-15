@@ -164,3 +164,5 @@ on `CalendarEntry`, a unique `linkedEventId` (cleared if the event is deleted) a
 `CalendarEventMatchDismissal` table.
 
 Deleting an event clears the item's link, but `linkedAt`, `linkedByUserId` and the baseline dates stay on the item until it is linked again; they have no effect while it is unlinked.
+
+**Archived events (#635).** An archived event is not suggested as a match, not offered in the link picker and can't be linked (it must be unarchived first). If a linked event is archived, the item still shows its link, marked archived; the event stops hiding its item on the public calendar (the archived event is off it), so the item shows on its own; and the event's page shows no date banner, and Update or Keep is refused until it is unarchived.

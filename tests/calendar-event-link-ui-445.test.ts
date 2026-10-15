@@ -75,7 +75,7 @@ describe("calendar item registration actions (#445)", () => {
   });
 
   it("warns, without unlinking, when a linked item has become a deadline, closure or repeating item", () => {
-    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" };
+    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" };
     const html = render({ linkedEvent, linkedIneligible: true, canLinkToEvent: false, entryType: "DEADLINE" });
     expect(html).toContain("calendar-linked-ineligible");
     expect(html).toContain("stays linked until you unlink it");
@@ -83,9 +83,21 @@ describe("calendar item registration actions (#445)", () => {
     expect(render({ linkedEvent })).not.toContain("calendar-linked-ineligible");
   });
 
+  it("still shows the link to an archived event, marked archived, with Unlink", () => {
+    const html = render({
+      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: true, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" },
+      datesDifferFromEvent: true,
+    });
+    expect(html).toContain("archived, ");
+    expect(html).toContain("The event is archived and off the calendar, so this item shows on its own.");
+    expect(html).not.toContain("shows this pair once");
+    expect(html).not.toContain("update or keep them");
+    expect(html).toContain("Unlink event");
+  });
+
   it("shows a linked item with its event and Unlink, and says the pair shows once", () => {
     const html = render({
-      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" },
+      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" },
       datesDifferFromEvent: true,
       sourceRemovedAt: "2026-10-10T00:00:00.000Z",
     });

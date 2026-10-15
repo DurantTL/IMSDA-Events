@@ -9,7 +9,9 @@ Build 6 stores each form as an event-scoped `RegistrationForm` with ordered `Reg
 - Publishing archives the previously published version and writes an audit event in the same transaction.
 - `MANAGE_FORMS` is granted to event administrators and registration managers; every API also requires an active event membership.
 - Supported controls include short text, long answers, email, phone, searchable
-  dropdowns, single choice, multiple choice, ranked choice, acknowledgments,
+  dropdowns, single choice, multiple choice, ranked choice, checkboxes, recorded
+  acknowledgments (#150: the exact wording or a published policy version is kept
+  as append-only evidence; see `modules/acknowledgments/README.md`),
   dates, numbers, and automatic fees. Dropdowns use the same keyboard-accessible
   search control on public registration, builder preview, and attendee
   self-service editing. Choice fields support reusable presets, up to 200

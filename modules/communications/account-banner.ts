@@ -37,6 +37,7 @@ export async function listAccountBannerAnnouncements(
       placement: "HOME_BANNER",
       publishedAt: { lte: now },
       event: {
+        archivedAt: null,
         OR: [
           ...(registrationIds.length > 0 ? [{ registrations: { some: ownRegistration } }] : []),
           ...(clubIds.length > 0 ? [{ clubRegistrations: { some: clubRegistration } }] : []),

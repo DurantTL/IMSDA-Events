@@ -100,6 +100,6 @@ describe("staff retreat-hub preview", () => {
       "womens-retreat",
     );
 
-    expect(mocks.listEventsForUser).toHaveBeenCalledWith("admin-1", true);
+    expect(mocks.listEventsForUser).toHaveBeenCalledWith("admin-1", true, { archived: "include" });
   });
 });

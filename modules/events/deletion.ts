@@ -32,6 +32,8 @@ export type EventDeletionCounts = {
   healthSnapshots: number;
   /** Of those, copies a legal hold covers (an event hold, or a hold on the person). Any one blocks the deletion. */
   heldHealthSnapshots: number;
+  /** Append-only acknowledgment evidence rows (#150). Counts only; any one blocks the deletion. */
+  acknowledgmentEvidence: number;
 };
 
 export type EventDeletionFacts = {
@@ -70,6 +72,9 @@ export function eventDeletionBlockers(counts: EventDeletionCounts) {
   if (counts.communityPosts > 0) blockers.push(plural(counts.communityPosts, "community post"));
   if (counts.announcements > 0) blockers.push(plural(counts.announcements, "announcement"));
   if (counts.messages > 0) blockers.push(plural(counts.messages, "message"));
+  // Acknowledgment evidence (#150) is append-only and its retention is a human decision, so an event that holds any is
+  // never deleted: the safe default until someone decides how long it must be kept.
+  if (counts.acknowledgmentEvidence > 0) blockers.push(plural(counts.acknowledgmentEvidence, "acknowledgment record"));
   // A legal hold is never bypassed by deleting the event (#924): lift the hold first.
   if (counts.heldHealthSnapshots > 0) blockers.push(`${plural(counts.heldHealthSnapshots, "sealed health copy", "sealed health copies")} under a legal hold`);
   return blockers;

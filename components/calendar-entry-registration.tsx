@@ -30,9 +30,11 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
       <div className="calendar-entry-link" data-testid="calendar-entry-linked">
         <p>
           Registration event: <strong>{event.name}</strong>
-          {" "}({event.isPublished ? "published" : "draft"}, {formatDateRange(event.startsOn, event.endsOn)}).
-          {" "}The calendar shows this pair once{event.isPublished ? ", as the event with Register" : " (this item stands in until the event is published)"}.
-          {entry.datesDifferFromEvent ? " This item's dates differ from the event's; the event's page asks staff to update or keep them." : ""}
+          {" "}({event.isArchived ? "archived" : event.isPublished ? "published" : "draft"}, {formatDateRange(event.startsOn, event.endsOn)}).
+          {event.isArchived
+            ? " The event is archived and off the calendar, so this item shows on its own. Unarchive the event to put the pair back."
+            : <>{" "}The calendar shows this pair once{event.isPublished ? ", as the event with Register" : " (this item stands in until the event is published)"}.</>}
+          {entry.datesDifferFromEvent && !event.isArchived ?" This item's dates differ from the event's; the event's page asks staff to update or keep them." : ""}
           {entry.sourceRemovedAt ? " Google no longer lists this item. The event was not changed." : ""}
         </p>
         {entry.linkedIneligible && (

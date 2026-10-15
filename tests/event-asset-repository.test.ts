@@ -304,7 +304,7 @@ describe("findPublishedEventAsset", () => {
     await findPublishedEventAsset("synthetic-retreat", "asset_1");
 
     const query = findFirst.mock.calls[0][0] as { where: { event: { slug: string; isPublished: boolean }; OR: Array<Record<string, unknown>> } };
-    expect(query.where.event).toEqual({ slug: "synthetic-retreat", isPublished: true });
+    expect(query.where.event).toEqual({ slug: "synthetic-retreat", isPublished: true, archivedAt: null });
     const merchandiseBranch = query.where.OR.find((clause) => "merchandiseArtworkProducts" in clause) as {
       merchandiseArtworkProducts: { some: { isEnabled: boolean; isArchived: boolean; event: { merchandiseCatalog: { isEnabled: boolean; status: string } } } };
     };
@@ -329,7 +329,7 @@ describe("findPublishedEventAsset", () => {
     const query = findFirst.mock.calls[0][0] as {
       where: { event: unknown; OR: Array<Record<string, { some: Record<string, unknown> }>> };
     };
-    expect(query.where.event).toEqual({ slug: "event-a", isPublished: true });
+    expect(query.where.event).toEqual({ slug: "event-a", isPublished: true, archivedAt: null });
     const sectionBranch = query.where.OR.find((clause) => "links" in clause)!;
     expect(sectionBranch.links.some).toEqual({
       section: { isPublished: true, event: { slug: "event-a" } },

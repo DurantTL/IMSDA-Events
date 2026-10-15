@@ -481,7 +481,7 @@ function publicFormQuery(eventSlug: string, formSlug: string) {
   return {
     where: {
       slug: formSlug,
-      event: { slug: eventSlug, isPublished: true },
+      event: { slug: eventSlug, isPublished: true, archivedAt: null },
     },
     select: {
       eventId: true,
@@ -490,6 +490,7 @@ function publicFormQuery(eventSlug: string, formSlug: string) {
           timezone: true,
           endsAt: true,
           isPublished: true,
+          archivedAt: true,
           registrationOpensOn: true,
           registrationClosesOn: true,
           waitlistEnabled: true,

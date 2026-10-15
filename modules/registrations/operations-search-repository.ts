@@ -8,6 +8,8 @@ import {
   availableOperationsFilters,
   buildRegistrationWhere,
   emptySearchCatalog,
+  MAX_PAGE,
+  MAX_PAGE_SIZE,
   normalizeSearchText,
   parseOperationsSearchParams,
   registrationOrderBy,
@@ -423,6 +425,73 @@ export async function searchOperationsRegistrations(
     };
   } catch (error) {
     if (isTooBroad(error)) return rejectedResult(query, [TOO_BROAD]);
+    throw error;
+  }
+}
+
+/** The most registrations one enumeration returns: every page the search offers, so it never reaches further than paging could. */
+export const MAX_ENUMERATED_REGISTRATIONS = MAX_PAGE * MAX_PAGE_SIZE;
+
+export type OperationsIdEnumeration = {
+  /** False when something asked for was not run (see `issues`), or the match is larger than the bound. No ids are returned then. */
+  ok: boolean;
+  issues: SearchIssue[];
+  query: OperationsSearchQuery;
+  queryString: string;
+  total: number;
+  /** In canonical order, one snapshot. */
+  registrationIds: string[];
+};
+
+/**
+ * Every registration id the search matches, for a caller that needs the whole
+ * set (the audience builder, #176) rather than one page. It is the same
+ * predicate as `searchOperationsRegistrations` (`prepare` then `readWhere`), so
+ * the same permission checks, domain gates and sensitive-data rules apply and a
+ * filter the viewer may not use is refused before any read. It returns ids only,
+ * in one repeatable-read transaction under the same statement timeout, so the
+ * set is one consistent moment.
+ *
+ * Bounded: at most MAX_ENUMERATED_REGISTRATIONS ids (MAX_PAGE pages of
+ * MAX_PAGE_SIZE). A larger match is refused as too broad and returns no ids,
+ * never a truncated set that would look complete.
+ */
+export async function enumerateOperationsRegistrationIds(
+  viewer: SearchViewer,
+  input: SearchParamsInput | OperationsSearchQuery,
+  catalog?: SearchCatalog,
+  carriedIssues: readonly SearchIssue[] = [],
+): Promise<OperationsIdEnumeration> {
+  const parsed = isQuery(input) ? { query: input, issues: [] as SearchIssue[] } : parseOperationsSearchParams(input);
+  const query = parsed.query;
+  const prepared = await prepare(viewer, query, [...parsed.issues, ...carriedIssues], catalog);
+  const rejected = (issues: SearchIssue[]): OperationsIdEnumeration => ({
+    ok: false,
+    issues,
+    query,
+    queryString: serializeOperationsSearchQuery(query),
+    total: 0,
+    registrationIds: [],
+  });
+  if (!prepared.ok) return rejected(prepared.result.issues);
+  try {
+    const rows = await readTransaction(async (tx) => tx.registration.findMany({
+      where: await readWhere(tx, prepared),
+      orderBy: registrationOrderBy(query),
+      take: MAX_ENUMERATED_REGISTRATIONS + 1,
+      select: { id: true },
+    }));
+    if (rows.length > MAX_ENUMERATED_REGISTRATIONS) return rejected([TOO_BROAD]);
+    return {
+      ok: true,
+      issues: [],
+      query,
+      queryString: serializeOperationsSearchQuery(query),
+      total: rows.length,
+      registrationIds: rows.map((row) => row.id),
+    };
+  } catch (error) {
+    if (isTooBroad(error)) return rejected([TOO_BROAD]);
     throw error;
   }
 }

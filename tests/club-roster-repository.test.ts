@@ -207,6 +207,26 @@ describe("club roster storage", () => {
       expect(onFile(memberId)).toEqual([]);
     });
 
+    it("keeps emergency contacts for every member, adult or minor, on add and on edit (#510)", async () => {
+      const adult = { ...youth, attendeeType: "ADULT" as const, role: "", birthDate: "1985-03-04" };
+      const staff = { ...adult, attendeeType: "STAFF" as const, firstName: "Staffer" };
+      const grown = { ...youth, birthDate: "2008-10-01", firstName: "Grown" };
+      const added = [];
+      for (const input of [adult, staff, grown, youth]) {
+        added.push(await addRosterMember("club-1", "2026-27", { ...input, firstName: `${input.firstName}X`, guardians: [first, second] }, actor, { now }));
+      }
+      for (const { memberId } of added) expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }, { position: 2, name: second.name }]);
+      // An adult's contact can be edited and cleared like anyone's.
+      const adultId = added[0]!.memberId;
+      await updateRosterMember("club-1", adultId, { guardians: [{ ...first, name: "Renamed Adult Contact" }, blank] }, actor, now);
+      expect(onFile(adultId)).toEqual([{ position: 1, name: "Renamed Adult Contact" }]);
+      // Changing the type or the birth date never drops a stored contact.
+      await updateRosterMember("club-1", adultId, { attendeeType: "STAFF", birthDate: "1990-01-01" }, actor, now);
+      expect(onFile(adultId)).toEqual([{ position: 1, name: "Renamed Adult Contact" }]);
+      await updateRosterMember("club-1", adultId, { guardians: [] }, actor, now);
+      expect(onFile(adultId)).toEqual([]);
+    });
+
     it("lets a saved guardian phone through unchanged, but not a new bad one, per slot (#855)", async () => {
       const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first, second] }, actor, { now });
       // Both slots resent as stored (invalid by today's rules): the edit goes through.

@@ -136,6 +136,7 @@ describe("listAccountBannerAnnouncements", () => {
         status: "PUBLISHED",
         placement: "HOME_BANNER",
         event: {
+          archivedAt: null,
           OR: [{ registrations: { some: { id: { in: ["reg-1"] }, status: { in: ["SUBMITTED", "CONFIRMED"] } } } }],
         },
       }),
@@ -149,6 +150,7 @@ describe("listAccountBannerAnnouncements", () => {
     expect(mocks.announcementFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         event: {
+          archivedAt: null,
           OR: [{
             clubRegistrations: {
               some: {
