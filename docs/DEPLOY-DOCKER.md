@@ -246,12 +246,19 @@ on the server shrinks back to about 250 bytes, xCloud has regenerated it: copy
 it in again (as `root`, `install -m 644 -o u_events -g u_events
 deploy/xcloud/docker-compose.yml /home/u_events/239298/docker-compose.yml`).
 
-**Nothing builds on the server.** `.github/workflows/docker-image.yml` publishes
+**The site never runs an image built on the server.** `.github/workflows/docker-image.yml` publishes
 `ghcr.io/duranttl/imsda-events:<sha>` about 10 minutes after each merge to
 `main` (see "Prebuilt images from GitHub"). Its public build values
 (`APP_BASE_URL`, `EMBED_ALLOWED_ORIGINS`, `SQUARE_ENVIRONMENT`,
 `SQUARE_ENABLE_PRODUCTION`) come from repository variables and must match the
 server `.env`.
+
+xCloud's own deploy still builds the Dockerfile on the server
+(`xcloud-site-239298-app:latest`), and xCloud has no setting to stop it. The
+site never uses that image, but each build leaves gigabytes of build cache: by
+Oct 15, 2026 old release images and 80 GB of cache had filled the 123 GB disk
+to 99% (#943). `imsda-cleanup` (below) removes them after every deploy and
+once a day.
 
 **How a new version goes live.** xCloud does not run the Git page's Deploy
 Script on this site: its deploy pulls `main` into `/var/www/events.imsda.org`
@@ -268,6 +275,13 @@ already tagged `imsda-events:live`. A systemd timer finishes the job:
   `imsda-autodeploy.timer`. When the checked-out commit differs from the live
   image's `org.opencontainers.image.revision` label and that commit's image is
   published, it runs `imsda-deploy`.
+- [`deploy/xcloud/cleanup.sh`](../deploy/xcloud/cleanup.sh), installed as
+  `/usr/local/bin/imsda-cleanup`, runs after each successful `imsda-deploy` and
+  daily from `imsda-cleanup.timer`. It removes old release tags, unused build
+  cache, untagged images and xCloud's unused `xcloud-site-*-app` images. It
+  never touches containers or volumes and never forces a removal, so
+  `imsda-events:live`, `imsda-events:previous` and anything a container uses
+  stay. A failed cleanup never fails a deploy.
 
 So after a merge: xCloud pulls the commit within a minute (and restarts the old
 version briefly), GitHub publishes the image about 10 minutes later, and the
@@ -280,6 +294,7 @@ Install or update (as `root`, from a checkout of `main`):
 ```bash
 install -m 755 deploy/xcloud/deploy.sh /usr/local/bin/imsda-deploy
 install -m 755 deploy/xcloud/autodeploy.sh /usr/local/bin/imsda-autodeploy
+install -m 755 deploy/xcloud/cleanup.sh /usr/local/bin/imsda-cleanup
 cat > /etc/systemd/system/imsda-autodeploy.service <<'UNIT'
 [Unit]
 Description=Deploy the GitHub-built IMSDA Events image for the checked-out commit
@@ -296,8 +311,28 @@ OnUnitActiveSec=2min
 [Install]
 WantedBy=timers.target
 UNIT
-systemctl daemon-reload && systemctl enable --now imsda-autodeploy.timer
+cat > /etc/systemd/system/imsda-cleanup.service <<'UNIT'
+[Unit]
+Description=Remove old IMSDA Events images and Docker build cache
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/imsda-cleanup
+UNIT
+cat > /etc/systemd/system/imsda-cleanup.timer <<'UNIT'
+[Unit]
+Description=Daily Docker cleanup for IMSDA Events
+[Timer]
+OnCalendar=*-*-* 09:30:00
+RandomizedDelaySec=15min
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload && systemctl enable --now imsda-autodeploy.timer imsda-cleanup.timer
 ```
+
+Run `imsda-cleanup` by hand to free space now, and check it with
+`journalctl -u imsda-cleanup.service` and `df -h /`.
 
 By hand, as `root`:
 
@@ -319,9 +354,9 @@ docker compose -f /home/u_events/239298/docker-compose.yml up -d app
 
 Migrations only move forward; rolling back the image does not undo them.
 
-Old images pile up (about 1.9 GB each). Remove ones no longer needed with
-`docker image ls ghcr.io/duranttl/imsda-events` and `docker image rm <tag>`;
-Docker refuses to remove the one in use.
+Old images (about 1.9 GB each) and build cache are removed by `imsda-cleanup`
+(above). Never run `docker system prune -a --volumes` or `docker volume prune`:
+the database, uploads and backups live in volumes.
 
 To change a secret, edit it in the xCloud dashboard, then run the `up -d` line:
 a restart alone keeps the old values.

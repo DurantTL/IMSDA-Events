@@ -35,3 +35,9 @@ docker image inspect imsda-events:live >/dev/null 2>&1 \
 docker tag "$IMAGE" imsda-events:live
 docker compose -f "$COMPOSE" up -d app
 echo "[deploy] Started $SHA (previous version tagged imsda-events:previous)"
+
+# Old release images and xCloud's build cache filled the disk once (#943).
+CLEANUP="${IMSDA_CLEANUP:-/usr/local/bin/imsda-cleanup}"
+if [ -x "$CLEANUP" ]; then
+  "$CLEANUP" || echo "[deploy] Cleanup failed; the new version is still live." >&2
+fi
