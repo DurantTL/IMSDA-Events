@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logError } from "@/lib/logger";
+import { CalendarError } from "@/modules/calendar/errors";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { calendarEntryListLimit, planBulkAction, type BulkAction, type BulkChange, type BulkSkip } from "@/modules/calendar/admin-list";
@@ -11,6 +12,7 @@ import {
   sortCalendarItems,
   type CalendarItem,
 } from "@/modules/calendar/domain";
+import { dismissalKey, entryCanBeLinked, findPossibleMatches } from "@/modules/calendar/event-match";
 import { entryTypeEditMark } from "@/modules/calendar/deadlines";
 import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminders";
 import { feedLockKey } from "@/modules/calendar/feed-plan";
@@ -19,23 +21,7 @@ import { expandOccurrences, parseRepeatRule, repeatStartProblem, serializeRepeat
 import type { CalendarBulkRequest, CalendarEntryInput, CalendarEntryUpdate, CalendarEventSettings, CalendarRepeatInput } from "@/modules/calendar/schemas";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
 
-export class CalendarError extends Error {
-  constructor(
-    public readonly code:
-      | "ENTRY_NOT_FOUND"
-      | "EVENT_NOT_FOUND"
-      | "INVALID_REPEAT"
-      | "FEED_NOT_FOUND"
-      | "INVALID_FEED"
-      | "FEED_FETCH_FAILED"
-      | "FEED_SECRET_MISSING"
-      | "NOT_IMPORTED",
-    message: string,
-  ) {
-    super(message);
-    this.name = "CalendarError";
-  }
-}
+export { CalendarError };
 
 const publicEventSelect = {
   id: true,
@@ -93,6 +79,20 @@ export async function listPublicCalendarItems(
     }),
   ]);
 
+  // A linked pair shows once (#445): the event's own entry, with Register. The item stands in for its event only while
+  // the event is not published (a draft set up from it, or unpublished), and says nothing about the event then. A
+  // published event that staff hid from the calendar stays off it, and so does its item. A deleted event unlinks the
+  // item (the link is cleared with it), which then shows on its own.
+  const linkedEventIds = [...new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : [])))];
+  const publishedLinked = linkedEventIds.length === 0
+    ? new Set<string>()
+    : new Set((await prisma.event.findMany({
+      // An archived event is off the public calendar (#635), so it doesn't hide its item: the item shows on its own.
+      where: { id: { in: linkedEventIds }, isPublished: true, archivedAt: null },
+      select: { id: true },
+    })).map((event) => event.id));
+  const standalone = entries.filter((entry) => !entry.linkedEventId || !publishedLinked.has(entry.linkedEventId));
+
   const items: CalendarItem[] = [
     ...events.map((event) => ({
       key: `event-${event.id}`,
@@ -109,7 +109,7 @@ export async function listPublicCalendarItems(
       registrationOpen: evaluateEventRegistrationPhase(event, now) === "OPEN",
     })),
     // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.
-    ...entries.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),
+    ...standalone.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),
   ];
   return sortCalendarItems(items.filter((item) => item.recurrence || (item.startsOn <= to && item.endsOn >= from)));
 }
@@ -170,13 +170,74 @@ function entryItems(entry: PublicEntryRow, from: string, to: string, expandRepea
 
 export type CalendarAdminEntry = Awaited<ReturnType<typeof listCalendarEntries>>[number];
 
-export async function listCalendarEntries() {
-  const entries = await getPrisma().calendarEntry.findMany({
+export async function listCalendarEntries(now = new Date()) {
+  const prisma = getPrisma();
+  const entries = await prisma.calendarEntry.findMany({
     orderBy: [{ startsOn: "desc" }, { title: "asc" }],
     take: calendarEntryListLimit,
-    include: { sourceFeed: { select: { name: true } } },
+    include: {
+      sourceFeed: { select: { name: true } },
+      linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, archivedAt: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
+    },
   });
-  return entries.map((entry) => ({
+
+  // Possible matches (#445): imported items not yet linked, against events from the last month on, minus the pairs
+  // staff said are not the same. Staff see drafts here, so a draft event can be matched too.
+  const since = calendarDateIn(new Date(now.getTime() - 31 * 86_400_000));
+  const candidates = entries.filter((entry) => !entry.linkedEventId && Boolean(entry.sourceUid) && entry.endsOn >= since);
+  const [matchEvents, dismissals] = candidates.length === 0
+    ? [[], []]
+    : await Promise.all([
+      prisma.event.findMany({
+        // An archived event is not a match candidate (#635). An event already linked to an item is not offered to
+        // another (also enforced by the database).
+        where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) }, calendarEntryLink: null },
+        select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, isPublished: true },
+      }),
+      prisma.calendarEventMatchDismissal.findMany({
+        where: { calendarEntryId: { in: candidates.map((entry) => entry.id) } },
+        select: { calendarEntryId: true, eventId: true },
+      }),
+    ]);
+  const eventsById = new Map(matchEvents.map((event) => [event.id, {
+    id: event.id,
+    name: event.name,
+    startsOn: calendarDateIn(event.startsAt, event.timezone),
+    endsOn: calendarDateIn(event.endsAt, event.timezone),
+    isPublished: event.isPublished,
+  }]));
+  const matches = new Map(findPossibleMatches(
+    candidates.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      startsOn: entry.startsOn,
+      endsOn: entry.endsOn,
+      entryType: entry.entryType,
+      hasRepeat: entry.repeatRule !== null,
+      isImported: entry.sourceUid !== null,
+      linkedEventId: entry.linkedEventId,
+      isHiddenLocally: entry.isHiddenLocally,
+      sourceRemoved: entry.sourceRemovedAt !== null,
+    })),
+    [...eventsById.values()],
+    new Set(dismissals.map((row) => dismissalKey(row.calendarEntryId, row.eventId))),
+    new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : []))),
+  ).map((match) => [match.entryId, match.eventId]));
+
+  return entries.map((entry) => {
+    const linkedEvent = entry.linkedEvent
+      ? {
+        id: entry.linkedEvent.id,
+        name: entry.linkedEvent.name,
+        slug: entry.linkedEvent.slug,
+        isArchived: Boolean(entry.linkedEvent.archivedAt),
+        isPublished: entry.linkedEvent.isPublished,
+        showOnCalendar: entry.linkedEvent.showOnCalendar,
+        startsOn: calendarDateIn(entry.linkedEvent.startsAt, entry.linkedEvent.timezone),
+        endsOn: calendarDateIn(entry.linkedEvent.endsAt, entry.linkedEvent.timezone),
+      }
+      : null;
+    return {
     id: entry.id,
     title: entry.title,
     description: entry.description,
@@ -197,7 +258,16 @@ export async function listCalendarEntries() {
     sourceRemovedAt: entry.sourceRemovedAt?.toISOString() ?? null,
     locallyEditedFields: entry.locallyEditedFields,
     updatedAt: entry.updatedAt.toISOString(),
-  }));
+    /** Linked, but a refresh or an edit since made it a Deadline, closure or repeating item. Never unlinked automatically. */
+    linkedIneligible: entry.linkedEventId !== null && !entryCanBeLinked({ entryType: entry.entryType, hasRepeat: entry.repeatRule !== null }),
+    /** An ordinary one-off item: the only kind that can stand in for a registration event (#445). */
+    canLinkToEvent: entryCanBeLinked({ entryType: entry.entryType, hasRepeat: entry.repeatRule !== null }),
+    linkedEvent,
+    /** Linked, and the item's dates are not the event's: the event shows a banner asking staff to choose. */
+    datesDifferFromEvent: linkedEvent !== null && (linkedEvent.startsOn !== entry.startsOn || linkedEvent.endsOn !== entry.endsOn),
+    possibleMatch: eventsById.get(matches.get(entry.id) ?? "") ?? null,
+    };
+  });
 }
 
 export type CalendarAdminEvent = Awaited<ReturnType<typeof listCalendarEvents>>[number];
@@ -205,9 +275,10 @@ export type CalendarAdminEvent = Awaited<ReturnType<typeof listCalendarEvents>>[
 /** Events that haven't ended (plus the last month), with whether each shows on the calendar. */
 export async function listCalendarEvents(now = new Date()) {
   const events = await getPrisma().event.findMany({
+    // An archived event is not offered to link to (#635).
     where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
     orderBy: { startsAt: "asc" },
-    select: { ...publicEventSelect, showOnCalendar: true },
+    select: { ...publicEventSelect, showOnCalendar: true, calendarEntryLink: { select: { id: true, title: true } } },
   });
   return events.map((event) => ({
     id: event.id,
@@ -217,6 +288,9 @@ export async function listCalendarEvents(now = new Date()) {
     isPublished: event.isPublished,
     showOnCalendar: event.showOnCalendar,
     calendarCategory: event.calendarCategory ?? "",
+    /** The calendar item linked to this event (#445), when there is one. */
+    linkedEntryId: event.calendarEntryLink?.id ?? null,
+    linkedEntryTitle: event.calendarEntryLink?.title ?? null,
   }));
 }
 

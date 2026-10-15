@@ -13,6 +13,8 @@ import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 
 type StartFromTemplateProps = {
   templates: EventTemplateRecord[];
+  /** Opened from a calendar item (#445): the form starts with its title and dates, and the item is linked on create. */
+  calendarPrefill?: { entryId: string; title: string; startsOn: string; endsOn: string };
 };
 
 function slugFromName(value: string) {
@@ -26,17 +28,17 @@ function slugFromName(value: string) {
     .slice(0, 80);
 }
 
-export function StartFromTemplate({ templates }: StartFromTemplateProps) {
+export function StartFromTemplate({ templates, calendarPrefill }: StartFromTemplateProps) {
   const router = useRouter();
   // Archived templates never appear. A template with no published version is listed
   // but cannot be chosen yet (#617): starters are added as drafts and need publishing.
   const applicable = templates.filter((template) => template.canApply);
   const [templateId, setTemplateId] = useState(applicable[0]?.id ?? "");
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
+  const [name, setName] = useState(calendarPrefill?.title ?? "");
+  const [slug, setSlug] = useState(calendarPrefill ? slugFromName(calendarPrefill.title) : "");
   const [slugEdited, setSlugEdited] = useState(false);
-  const [startsOn, setStartsOn] = useState("");
-  const [endsOn, setEndsOn] = useState("");
+  const [startsOn, setStartsOn] = useState(calendarPrefill?.startsOn ?? "");
+  const [endsOn, setEndsOn] = useState(calendarPrefill?.endsOn ?? "");
   const [requestKey] = useState(() => crypto.randomUUID());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -92,7 +94,7 @@ export function StartFromTemplate({ templates }: StartFromTemplateProps) {
       const response = await fetch(`/api/event-templates/${templateId}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug, startsOn, endsOn, requestKey }),
+        body: JSON.stringify({ name, slug, startsOn, endsOn, requestKey, ...(calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}) }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "The event could not be created from this template.");

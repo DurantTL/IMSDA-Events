@@ -1618,6 +1618,9 @@ model Event {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
+  /// The calendar item this event was set up from or linked to (#445).
+  calendarEntryLink                   CalendarEntry?     @relation("CalendarEntryLinkedEvent")
+  calendarMatchDismissals             CalendarEventMatchDismissal[] @relation("CalendarMatchDismissalEvent")
   archivedBy                          User?              @relation("EventArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
 
   badgeBackground                     EventAsset?        @relation("EventBadgeBackground", fields: [badgeBackgroundAssetId], references: [id], onDelete: Restrict)
@@ -5873,17 +5876,45 @@ model CalendarEntry {
   locallyEditedFields       String[]            @default([])
   /// Hidden by staff here only; a refresh never unhides it.
   isHiddenLocally           Boolean             @default(false)
+  /// The registration event this item is the placeholder for (#445). A linked pair shows once, as the event's own
+  /// entry with Register. Never touched by a feed refresh, so the link survives every import. An event links to at most
+  /// one item; deleting the event restores the item on its own.
+  linkedEventId             String?             @unique
+  linkedAt                  DateTime?
+  linkedByUserId            String?
+  /// The item's dates when staff last acknowledged them (#445): set when the item is linked, if they matched the
+  /// event's then, and at every Update or Keep. The event's date banner appears only when the item's dates move away
+  /// from these. Null while the item and event have differed since linking ("differs", not "moved").
+  baselineStartsOn          String?
+  baselineEndsOn            String?
   createdByUserId String
   updatedByUserId String
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
   sourceFeed CalendarFeed? @relation(fields: [sourceFeedId], references: [id], onDelete: SetNull)
+  linkedEvent Event? @relation("CalendarEntryLinkedEvent", fields: [linkedEventId], references: [id], onDelete: SetNull)
+  matchDismissals CalendarEventMatchDismissal[]
 
   deadlineReminderBatches DeadlineReminderBatch[]
 
   @@unique([sourceFeedId, sourceUid, sourceRecurrenceId])
   @@index([isPublished, startsOn])
+}
+
+/// "Not the same" (#445): staff said this calendar item and this registration event are different things, so the
+/// calendar admin never suggests that pair again. Permanent; ids only.
+model CalendarEventMatchDismissal {
+  calendarEntryId   String
+  eventId           String
+  dismissedByUserId String
+  createdAt         DateTime @default(now())
+
+  calendarEntry CalendarEntry @relation(fields: [calendarEntryId], references: [id], onDelete: Cascade)
+  event         Event         @relation("CalendarMatchDismissalEvent", fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([calendarEntryId, eventId])
+  @@index([eventId])
 }
 
 /// One reminder for one deadline at one reminder point, 14 or 2 days before it is

@@ -290,6 +290,8 @@ export const applyEventTemplateInputSchema = z.object({
    * attempt created instead of creating a second one, and reusing a key with
    * different details is refused (#152). */
   requestKey: z.string().trim().min(8).max(200),
+  /** Set when the event is set up from a calendar item (#445): the item is linked, and its location and description carried over. */
+  calendarEntryId: z.string().trim().min(1).max(100).optional(),
 }).superRefine((value, context) => {
   if (value.endsOn < value.startsOn) {
     context.addIssue({ code: "custom", path: ["endsOn"], message: "The event cannot end before it starts." });

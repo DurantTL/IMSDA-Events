@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logger";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
 import { AccessDeniedError } from "@/modules/access/authorization";
+import { CalendarError } from "@/modules/calendar/errors";
 import { EventTemplateReferenceError } from "@/modules/event-templates/domain";
 import { EventTemplateOperationError } from "@/modules/event-templates/repository";
 
@@ -44,6 +45,9 @@ export function eventTemplateApiError(
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
   if (error instanceof EventTemplateReferenceError) {
     return Response.json({ error: "TEMPLATE_REFERENCES_INVALID", message: error.message, issues: error.issues }, { status: options.referenceStatus ?? 400 });
+  }
+  if (error instanceof CalendarError) {
+    return Response.json({ error: error.code, message: error.message }, { status: error.code === "ENTRY_NOT_FOUND" ? 404 : 409 });
   }
   if (error instanceof EventTemplateOperationError) {
     return Response.json({ error: error.code, message: error.message }, { status: operationStatus[error.code] });

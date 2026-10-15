@@ -10,3 +10,4 @@ Archiving hides a real past event without deleting it. Deleting (#620) is for te
 - **Offer clocks:** class waitlist offer clocks keep running while an event is archived (the sweep and every other promotion skip archived events, so nothing lapses). An offer whose time ran out during the archive lapses on the first sweep after unarchive.
 - **Audit:** `EVENT_ARCHIVED` and `EVENT_UNARCHIVED`, metadata is `{ eventId }` only. A repeated request writes no second row.
 - **Checks:** `tests/event-archive.test.ts` (pure rules) and `npm run test:event-archive` (real database).
+- **Calendar items (#445):** an archived event is not a calendar match candidate or link target, shows no date-change banner (Update and Keep are refused), and no longer hides the calendar item it is linked to, which then shows on its own. Unarchiving restores all of it.

@@ -139,5 +139,27 @@ export type CalendarBulkRequest = z.infer<typeof calendarBulkSchema>;
 
 export const calendarEntrySourceActionSchema = z.object({ action: z.enum(["hide", "show", "reset"]) }).strict();
 
+const identifier = z.string().trim().min(1).max(100);
+
+/** Link a calendar item to a registration event, unlink it, or say a suggested pair is not the same (#445). */
+export const calendarEntryEventLinkSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("link"), eventId: identifier }).strict(),
+  z.object({ action: z.literal("unlink") }).strict(),
+  z.object({ action: z.literal("notSame"), eventId: identifier }).strict(),
+]);
+
+/**
+ * Staff's answer to an event's date-change banner (#445). The item's dates they saw travel with it, so an answer
+ * about dates Google has since moved again is refused instead of applied.
+ */
+export const calendarEventDateDecisionSchema = z.object({
+  decision: z.enum(["update", "keep"]),
+  startsOn: calendarDate("calendar item's start date"),
+  endsOn: calendarDate("calendar item's end date"),
+}).strict();
+
+export type CalendarEntryEventLink = z.infer<typeof calendarEntryEventLinkSchema>;
+export type CalendarEventDateDecision = z.infer<typeof calendarEventDateDecisionSchema>;
+
 export type CalendarFeedInput = z.infer<typeof calendarFeedInputSchema>;
 export type CalendarFeedUpdate = z.infer<typeof calendarFeedUpdateSchema>;

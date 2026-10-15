@@ -29,6 +29,11 @@ const entry: CalendarAdminEntry = {
   sourceRemovedAt: null,
   locallyEditedFields: [],
   updatedAt: "2026-01-01T00:00:00.000Z",
+  canLinkToEvent: true,
+  linkedEvent: null,
+  datesDifferFromEvent: false,
+  linkedIneligible: false,
+  possibleMatch: null,
 };
 
 describe("calendar admin entries list and edit dialog (#869)", () => {

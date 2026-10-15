@@ -10,7 +10,7 @@ import {
   getEventSettings,
   updateEventSettings,
 } from "@/modules/events/repository";
-import { eventSettingsInputSchema } from "@/modules/events/schemas";
+import { calendarDateSchema, eventSettingsInputSchema } from "@/modules/events/schemas";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -84,8 +84,13 @@ async function patchHandler(
   try {
     const { eventId } = await context.params;
     const access = await authorize(eventId);
-    const input = eventSettingsInputSchema.parse(await request.json());
-    const event = await updateEventSettings(eventId, input, access.user.id);
+    const body = await request.json();
+    const input = eventSettingsInputSchema.parse(body);
+    // The dates the form was loaded with (#445): a save over dates updated from the calendar meanwhile is refused.
+    const expected = z.object({ expectedStartsOn: calendarDateSchema.optional(), expectedEndsOn: calendarDateSchema.optional() }).parse(body ?? {});
+    const event = expected.expectedStartsOn === undefined && expected.expectedEndsOn === undefined
+      ? await updateEventSettings(eventId, input, access.user.id)
+      : await updateEventSettings(eventId, input, access.user.id, expected);
     return Response.json({ event });
   } catch (error) { return eventApiError(error); }
 }

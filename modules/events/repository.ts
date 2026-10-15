@@ -14,10 +14,11 @@ import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeDefaultModules } from "@/modules/event-modules/defaults";
+import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export class EventOperationError extends Error {
   constructor(
-    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY",
+    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY" | "EVENT_CHANGED",
     message: string,
   ) {
     super(message);
@@ -253,6 +254,8 @@ export type EventSettingsRecord = NonNullable<Awaited<ReturnType<typeof getEvent
 export async function createEvent(
   input: EventSettingsInput,
   actorUserId: string,
+  /** Set when the event is set up from a calendar item (#445): the item is linked and its description carried over. */
+  options: { calendarEntryId?: string } = {},
 ) {
   const audience = input.audience ?? "GENERAL";
   const eventId = await getPrisma().$transaction(async (tx) => {
@@ -307,6 +310,10 @@ export async function createEvent(
       },
     });
     await writeDefaultModules(tx, event.id, audience);
+    // In the same transaction: an item that can't be linked any more fails the whole creation, leaving no event behind.
+    if (options.calendarEntryId) {
+      await linkNewEventToCalendarEntry(tx, { entryId: options.calendarEntryId, eventId: event.id, actorUserId });
+    }
     if (input.approvedPaymentInstructions) {
       await tx.eventPaymentInstructionVersion.create({
         data: {
@@ -328,7 +335,7 @@ export async function createEvent(
         summary: `Created event draft: ${event.name}.`,
         // The initial audience (#481) is recorded, since it decides whether
         // the event gets club features at all.
-        metadata: { slug: event.slug, audience: event.audience },
+        metadata: { slug: event.slug, audience: event.audience, ...(options.calendarEntryId ? { calendarEntryId: options.calendarEntryId } : {}) },
       },
     });
     return event.id;
@@ -348,6 +355,12 @@ export async function updateEventSettings(
   eventId: string,
   input: EventSettingsInput,
   actorUserId: string,
+  /**
+   * The first and last day the form was loaded with. When given and the stored dates differ (they were updated from the
+   * calendar banner while the form was open), nothing is saved. Only the dates are guarded: other writes to the event
+   * (the general registration link, a calendar setting, and so on) never conflict with a settings save.
+   */
+  options: { expectedStartsOn?: string; expectedEndsOn?: string } = {},
 ) {
   const prisma = getPrisma();
   try {
@@ -408,6 +421,17 @@ export async function updateEventSettings(
     ]);
     if (!current) {
       throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
+    }
+    // Stale-write guard (#445): the form carries the dates it was loaded with. If they changed since (updated from the
+    // calendar banner), saving would write the old dates back over the new ones. Checked under the row lock above.
+    if (
+      (options.expectedStartsOn !== undefined && options.expectedStartsOn !== calendarDateInEventTimeZone(current.startsAt, current.timezone))
+      || (options.expectedEndsOn !== undefined && options.expectedEndsOn !== calendarDateInEventTimeZone(current.endsAt, current.timezone))
+    ) {
+      throw new EventOperationError(
+        "EVENT_CHANGED",
+        "This event's dates changed after you opened the page (for example, they were updated from the calendar). Nothing was saved. Reload the page to see the current dates, then make your change again.",
+      );
     }
     // An update without an audience keeps the stored one (#481 review), so a
     // stale client can't silently reset a CLUB event to GENERAL.

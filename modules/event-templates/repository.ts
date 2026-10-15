@@ -20,6 +20,7 @@ import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locati
 import { createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeDefaultModules } from "@/modules/event-modules/defaults";
+import { assertCalendarEntryLinkable, linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 export class EventTemplateOperationError extends Error {
   constructor(
     public readonly code:
@@ -317,10 +318,11 @@ export async function unarchiveEventTemplate(templateId: string, actorUserId: st
   return getEventTemplate(templateId);
 }
 
-type RequestInput = Pick<ApplyEventTemplateInput, "name" | "slug" | "startsOn" | "endsOn">;
+type RequestInput = Pick<ApplyEventTemplateInput, "name" | "slug" | "startsOn" | "endsOn" | "calendarEntryId">;
 
 function requestInputOf(input: ApplyEventTemplateInput): RequestInput {
-  return { name: input.name, slug: input.slug, startsOn: input.startsOn, endsOn: input.endsOn };
+  // The calendar item the event was set up from (#445) is part of the request: the same key with another item is a reused key.
+  return { name: input.name, slug: input.slug, startsOn: input.startsOn, endsOn: input.endsOn, ...(input.calendarEntryId ? { calendarEntryId: input.calendarEntryId } : {}) };
 }
 
 /**
@@ -340,7 +342,8 @@ async function resolveExistingApplication(actorUserId: string, templateId: strin
     && stored.name === requested.name
     && stored.slug === requested.slug
     && stored.startsOn === requested.startsOn
-    && stored.endsOn === requested.endsOn;
+    && stored.endsOn === requested.endsOn
+    && (stored.calendarEntryId ?? undefined) === requested.calendarEntryId;
   if (!sameRequest) {
     throw new EventTemplateOperationError("REQUEST_KEY_REUSED", "This request was already used to create a different event. Reload the page and try again.");
   }
@@ -393,12 +396,16 @@ export async function applyEventTemplate(
         create: { id: "platform" },
         select: { defaultAttendeeEditPolicy: true },
       });
+      // Set up from a calendar item (#445): checked before anything is written, so an item that can't be linked
+      // any more leaves no event behind.
+      const fromItem = input.calendarEntryId ? await assertCalendarEntryLinkable(tx, input.calendarEntryId) : null;
       const event = await tx.event.create({
         data: {
           name: input.name,
           slug: input.slug,
           startsAt: eventDate(input.startsOn),
           endsAt: eventDate(input.endsOn),
+          ...(fromItem?.location ? { location: fromItem.location } : {}),
           isPublished: false,
           waitlistEnabled: payload.moduleEnablement.waitlistEnabled,
           autoPromoteWaitlist: payload.moduleEnablement.waitlistEnabled
@@ -428,6 +435,9 @@ export async function applyEventTemplate(
         data: { eventId: event.id, userId: actorUserId, role: "EVENT_ADMIN", status: "ACTIVE" },
       });
       await writeDefaultModules(tx, event.id, payload.audience);
+      if (input.calendarEntryId) {
+        await linkNewEventToCalendarEntry(tx, { entryId: input.calendarEntryId, eventId: event.id, actorUserId });
+      }
 
       if (payload.attendeeTypes.length > 0) {
         await tx.eventAttendeeType.createMany({
