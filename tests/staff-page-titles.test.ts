@@ -22,6 +22,22 @@ describe("staff page names (#685)", () => {
     expect(labelByHref["/registration-builder"]).toBe("Registration forms");
   });
 
+  it("keeps the moved pages' names equal to their page titles, and lists the sidebar's own items (#964)", () => {
+    const titles = staffPageTitles as Record<string, string>;
+    const byHref = Object.fromEntries(navigation.map((item) => [item.href, item.label]));
+    // Pages that left the sidebar still name themselves in the header and <title>.
+    expect(byHref["/people/attendees"]).toBe(titles.attendeeList);
+    expect(byHref["/imports"]).toBe(titles.imports);
+    expect(byHref["/staff"]).toBe(titles.team);
+    expect(byHref["/more/promo-codes"]).toBe(titles.promoCodes);
+    // The sidebar's own items, as the target names them.
+    expect(navigation.filter((item) => item.sidebar).map((item) => item.label)).toEqual([
+      "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
+      "Event settings", "Registration forms", "Attendee setup", "Tags",
+      "Operational reports", "Operational health",
+    ]);
+  });
+
   it("keeps five phone tabs with short labels while the sidebar keeps full labels (#711)", () => {
     expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
     expect(mobileNavigationOrder.map((href) => mobileNavigationLabels[href])).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);

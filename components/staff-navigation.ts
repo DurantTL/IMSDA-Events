@@ -22,6 +22,7 @@ import {
   Tags,
   Tent,
   TicketPercent,
+  ToggleRight,
   Trophy,
   UserCog,
   UsersRound,
@@ -39,36 +40,44 @@ import { canManageProgramAssignments } from "@/modules/program-assignments/acces
  * this list, so which pages a role can open can't drift between desktop and
  * phone (#475).
  *
- * The sidebar order is fixed (#741 slice 4): System management and the event
- * picker sit above it, then the groups in `navigationGroupOrder`, each listing
- * its items in the order they appear in `navigation`, then More last (the one
- * item with no group). A group with no visible item is left out. System
- * management is not a nav item: the shell draws it once above the picker. Club
- * features (the club directory, This event's clubs) are More launcher cards,
- * not sidebar items (#741 slice 1).
+ * The sidebar (#964) is short and grouped. System management and the event
+ * picker sit above it, then the daily items (Dashboard, Check-in, Registrations,
+ * Payments, Emails) always visible, then the collapsible "Set up" and "Reports"
+ * groups, then More last (the one item with no section). A group with no
+ * visible item is left out. System management is not a nav item: the shell draws
+ * it once above the picker. Attendee list, Imports, Team and Promo codes are not
+ * sidebar items: More cards (and their parent pages) reach them. Club features
+ * (the club directory, This event's clubs) are More launcher cards too (#741
+ * slice 1).
  */
-export type NavigationGroup = "main" | "run" | "setup" | "people" | "money" | "reports";
+export type SidebarSection = "daily" | "setup" | "reports";
 
-/** The sidebar's groups, in the fixed order they render (#741 slice 4). */
-export const navigationGroupOrder: readonly NavigationGroup[] = ["main", "run", "setup", "people", "money", "reports"];
+/** The sidebar's sections, in the fixed order they render (#964). */
+export const sidebarSectionOrder: readonly SidebarSection[] = ["daily", "setup", "reports"];
 
-export const navigationGroupLabels: Record<NavigationGroup, string> = {
-  main: "Main",
-  run: "Run the event",
-  setup: "Set up the event",
-  people: "People",
-  money: "Money",
+/** `null` for the daily items: no heading, never collapsible. */
+export const sidebarSectionLabels: Record<SidebarSection, string | null> = {
+  daily: null,
+  setup: "Set up",
   reports: "Reports",
 };
+
+/** The sections whose heading is a button that collapses and expands them (#964). */
+export const collapsibleSidebarSections: readonly SidebarSection[] = ["setup", "reports"];
 
 export type NavigationItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  desktopOnly?: boolean;
   requiredPermission?: EventPermission;
   requiredAnyPermissions?: readonly EventPermission[];
-  group?: NavigationGroup;
+  /** The sidebar section the item is listed in; an item without one is not a sidebar item (#964). */
+  sidebar?: SidebarSection;
+  /**
+   * For a page that is not a sidebar item: the sidebar item to highlight while
+   * the page is open (#964), so Attendee list lights Registrations.
+   */
+  sidebarParent?: string;
 };
 
 /**
@@ -202,21 +211,22 @@ export const systemNavigation: NavigationItem = {
 };
 
 export const navigation: readonly NavigationItem[] = [
-  { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, group: "main" },
-  { href: "/check-in", label: staffPageTitles.checkIn, icon: CheckCircle2, requiredPermission: "MANAGE_CHECK_IN", group: "run" },
-  { href: "/people", label: staffPageTitles.registrations, icon: UsersRound, requiredPermission: "VIEW_SENSITIVE_DATA", group: "run" },
-  { href: "/people/attendees", label: staffPageTitles.attendeeList, icon: ListChecks, desktopOnly: true, requiredPermission: "VIEW_SENSITIVE_DATA", group: "run" },
-  { href: "/imports", label: staffPageTitles.imports, icon: FileUp, desktopOnly: true, requiredPermission: "MANAGE_IMPORTS", group: "run" },
-  { href: "/more/event-settings", label: staffPageTitles.eventSettings, icon: Settings2, desktopOnly: true, requiredPermission: "CONFIGURE_EVENT", group: "setup" },
-  { href: "/registration-builder", label: staffPageTitles.registrationForm, icon: PanelsTopLeft, desktopOnly: true, requiredPermission: "MANAGE_FORMS", group: "setup" },
-  { href: "/more/attendee-configuration", label: staffPageTitles.attendeeSetup, icon: Tags, desktopOnly: true, requiredPermission: "CONFIGURE_EVENT", group: "setup" },
-  { href: "/more/tags", label: staffPageTitles.tags, icon: Tag, desktopOnly: true, requiredPermission: "CONFIGURE_EVENT", group: "setup" },
-  { href: "/staff", label: staffPageTitles.team, icon: UserCog, desktopOnly: true, requiredPermission: "MANAGE_STAFF", group: "people" },
-  { href: "/communications", label: staffPageTitles.emails, icon: Megaphone, requiredPermission: "MANAGE_COMMUNICATIONS", group: "people" },
-  { href: "/finance", label: staffPageTitles.payments, icon: WalletCards, requiredPermission: "MANAGE_FINANCE", group: "money" },
-  { href: "/more/promo-codes", label: staffPageTitles.promoCodes, icon: TicketPercent, requiredPermission: "MANAGE_FINANCE", group: "money" },
-  { href: "/more/reports", label: staffPageTitles.operationalReports, icon: ChartNoAxesCombined, desktopOnly: true, requiredPermission: "VIEW_REPORTS", group: "reports" },
-  { href: "/more/health", label: staffPageTitles.operationalHealth, icon: HeartPulse, desktopOnly: true, requiredAnyPermissions: operationalHealthEntryPermissions, group: "reports" },
+  { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, sidebar: "daily" },
+  { href: "/check-in", label: staffPageTitles.checkIn, icon: CheckCircle2, requiredPermission: "MANAGE_CHECK_IN", sidebar: "daily" },
+  { href: "/people", label: staffPageTitles.registrations, icon: UsersRound, requiredPermission: "VIEW_SENSITIVE_DATA", sidebar: "daily" },
+  { href: "/finance", label: staffPageTitles.payments, icon: WalletCards, requiredPermission: "MANAGE_FINANCE", sidebar: "daily" },
+  { href: "/communications", label: staffPageTitles.emails, icon: Megaphone, requiredPermission: "MANAGE_COMMUNICATIONS", sidebar: "daily" },
+  { href: "/more/event-settings", label: staffPageTitles.eventSettings, icon: Settings2, requiredPermission: "CONFIGURE_EVENT", sidebar: "setup" },
+  { href: "/registration-builder", label: staffPageTitles.registrationForm, icon: PanelsTopLeft, requiredPermission: "MANAGE_FORMS", sidebar: "setup" },
+  { href: "/more/attendee-configuration", label: staffPageTitles.attendeeSetup, icon: Tags, requiredPermission: "CONFIGURE_EVENT", sidebar: "setup" },
+  { href: "/more/tags", label: staffPageTitles.tags, icon: Tag, requiredPermission: "CONFIGURE_EVENT", sidebar: "setup" },
+  { href: "/more/reports", label: staffPageTitles.operationalReports, icon: ChartNoAxesCombined, requiredPermission: "VIEW_REPORTS", sidebar: "reports" },
+  { href: "/more/health", label: staffPageTitles.operationalHealth, icon: HeartPulse, requiredAnyPermissions: operationalHealthEntryPermissions, sidebar: "reports" },
+  // Not sidebar items (#964): More cards and parent-page links reach them, and the parent lights up while one is open.
+  { href: "/people/attendees", label: staffPageTitles.attendeeList, icon: ListChecks, requiredPermission: "VIEW_SENSITIVE_DATA", sidebarParent: "/people" },
+  { href: "/imports", label: staffPageTitles.imports, icon: FileUp, requiredPermission: "MANAGE_IMPORTS", sidebarParent: "/people" },
+  { href: "/staff", label: staffPageTitles.team, icon: UserCog, requiredPermission: "MANAGE_STAFF", sidebarParent: "/more" },
+  { href: "/more/promo-codes", label: staffPageTitles.promoCodes, icon: TicketPercent, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
   {
     href: "/more",
     label: staffPageTitles.more,
@@ -231,20 +241,86 @@ export const navigation: readonly NavigationItem[] = [
 ];
 
 /**
- * The sidebar's visible items in their fixed order: grouped items by group,
- * then by their order in `navigation`, with More last. `showMore` is the
- * launcher rule (`canShowMoreLauncher`), which can admit More when no single
- * permission does.
+ * The "Event features" page (#965) is a Set up item, shown for CONFIGURE_EVENT.
+ * TODO(#965): the page does not exist yet, so the item points at `/more`. Change
+ * this one constant to `eventFeaturesRoute` when the page lands.
+ */
+export const eventFeaturesRoute = "/more/features";
+export const eventFeaturesHref = "/more";
+
+export const eventFeaturesItem: NavigationItem = {
+  href: eventFeaturesHref,
+  label: "Event features",
+  icon: ToggleRight,
+  requiredPermission: "CONFIGURE_EVENT",
+  sidebar: "setup",
+};
+
+/** Whether the page is the Event features page or below it, which lights that item (and not More). */
+export function isEventFeaturesPath(pathname: string): boolean {
+  return pathname === eventFeaturesRoute || pathname.startsWith(`${eventFeaturesRoute}/`);
+}
+
+/** Sidebar-only items that are not in `navigation` (its hrefs are page lookups), placed after the item with this href. */
+const sidebarInserts: readonly { after: string; item: NavigationItem }[] = [
+  { after: "/more/event-settings", item: eventFeaturesItem },
+];
+
+export type SidebarSectionView = {
+  section: SidebarSection;
+  label: string | null;
+  collapsible: boolean;
+  items: NavigationItem[];
+};
+
+/**
+ * The sidebar as sections, each with the items this viewer may see (#964); a
+ * section with none is left out. More is not here: it is always last, drawn
+ * after the sections (see `orderedSidebarItems`).
+ */
+export function sidebarSections(selectedPermissions: ReadonlySet<EventPermission>): SidebarSectionView[] {
+  return sidebarSectionOrder
+    .map((section) => ({
+      section,
+      label: sidebarSectionLabels[section],
+      collapsible: collapsibleSidebarSections.includes(section),
+      items: navigation
+        .flatMap((item) => [item, ...sidebarInserts.filter((insert) => insert.after === item.href).map((insert) => insert.item)])
+        .filter((item) => item.sidebar === section && matchesVisibility(item, selectedPermissions)),
+    }))
+    .filter((view) => view.items.length > 0);
+}
+
+/**
+ * The sidebar's visible items in their fixed order, as a flat list: the sections'
+ * items, then More last. (The shell draws from `sidebarSections`; the phone tabs
+ * read this list.) `showMore` is the launcher rule (`canShowMoreLauncher`), which
+ * can admit More when no single permission does.
  */
 export function orderedSidebarItems(
   selectedPermissions: ReadonlySet<EventPermission>,
   showMore: boolean,
 ): NavigationItem[] {
-  const visible = navigation.filter((item) => (item.href === "/more" ? showMore : matchesVisibility(item, selectedPermissions)));
+  const more = navigation.filter((item) => item.href === "/more" && showMore);
+  // Without the sidebar-only inserts: Event features shares More's placeholder href (#965) and is no phone tab.
+  const inserted = new Set(sidebarInserts.map((insert) => insert.item));
   return [
-    ...navigationGroupOrder.flatMap((group) => visible.filter((item) => item.group === group)),
-    ...visible.filter((item) => item.href === "/more"),
+    ...sidebarSections(selectedPermissions).flatMap((view) => view.items.filter((item) => !inserted.has(item))),
+    ...more,
   ];
+}
+
+/**
+ * The sidebar item a page lights (#964): the page's own item, or for a page that
+ * is no sidebar item its parent, or More when the viewer can't see that parent
+ * (Imports without Registrations access).
+ */
+export function sidebarActiveHref(
+  current: Pick<NavigationItem, "href" | "sidebarParent">,
+  visibleHrefs: ReadonlySet<string>,
+): string {
+  if (!current.sidebarParent) return current.href;
+  return visibleHrefs.has(current.sidebarParent) ? current.sidebarParent : "/more";
 }
 
 /**

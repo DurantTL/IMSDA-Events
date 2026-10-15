@@ -7,6 +7,8 @@ const dependencies = vi.hoisted(() => ({
   listEventsForUser: vi.fn(),
   findActiveMembership: vi.fn(),
   listChurchAmountsOwed: vi.fn(),
+  getChurchCodeReport: vi.fn(),
+  listChurchSponsoredPromoLines: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +26,13 @@ vi.mock("@/modules/events/repository", () => ({
 }));
 vi.mock("@/modules/club-registrations/repository", () => ({
   listChurchAmountsOwed: dependencies.listChurchAmountsOwed,
+}));
+
+vi.mock("@/modules/promo-codes/church-invoice-repository", () => ({
+  getChurchCodeReport: dependencies.getChurchCodeReport,
+}));
+vi.mock("@/modules/promo-codes/church-sponsored-repository", () => ({
+  listChurchSponsoredPromoLines: dependencies.listChurchSponsoredPromoLines,
 }));
 
 import ChurchOwedPage from "@/app/(workspace)/finance/church-owed/page";
@@ -70,6 +79,10 @@ describe("owed-by-churches page access (#409, #465)", () => {
     );
 
     expect(markup).toContain("Finance is restricted");
+    // The report with attendee names (#960) is never read for staff without Manage finance.
+    expect(dependencies.getChurchCodeReport).not.toHaveBeenCalled();
+    expect(dependencies.listChurchSponsoredPromoLines).not.toHaveBeenCalled();
+    expect(markup).not.toContain("Used by");
     expect(dependencies.listChurchAmountsOwed).not.toHaveBeenCalled();
   });
 });

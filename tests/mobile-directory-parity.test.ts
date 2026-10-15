@@ -8,7 +8,9 @@ import {
   matchesVisibility,
   mobileNavigationOrder,
   navigation,
+  orderedSidebarItems,
   resolveClubsAndChurchesEntry,
+  sidebarSections,
 } from "@/components/staff-navigation";
 import { eventPermissions, eventRoles, rolePermissions, type EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
@@ -197,6 +199,15 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   // The sidebar links a system admin to the directory instead, so for them
   // this event view is reached only from "More".
   "/more/clubs": (scenario) => scenario.clubOversight,
+  // Left the sidebar (#964); each page keeps the permission its sidebar item had.
+  // app/(workspace)/people/attendees/page.tsx
+  "/people/attendees": (scenario) => has(scenario, "VIEW_SENSITIVE_DATA"),
+  // app/(workspace)/imports/page.tsx
+  "/imports": (scenario) => has(scenario, "MANAGE_IMPORTS"),
+  // app/(workspace)/staff/page.tsx
+  "/staff": (scenario) => has(scenario, "MANAGE_STAFF"),
+  // app/(workspace)/more/promo-codes/page.tsx
+  "/more/promo-codes": (scenario) => has(scenario, "MANAGE_FINANCE"),
 };
 
 const moreItem = navigation.find((item) => item.href === "/more");
@@ -228,16 +239,20 @@ function allowedMoreCardHrefs(scenario: Scenario): string[] {
 }
 
 /**
- * Destinations the desktop sidebar links to for this scenario: every
- * sidebar-visible nav item (Dashboard, the grouped items, and the "/more"
- * gateway) and "Clubs and churches" when it applies. The More page's cards
- * are deliberately not included, so they are checked independently below.
+ * Destinations the desktop sidebar links to for this scenario (#964): the
+ * daily items, the Set up and Reports groups (open or closed, they are links),
+ * and the "/more" gateway, plus "Clubs and churches" when it applies. Attendee
+ * list, Imports, Team and Promo codes are no longer here: they are More-only
+ * pages below. The More page's cards are deliberately not included, so they are
+ * checked independently.
  */
 function sidebarDestinations(scenario: Scenario): Set<string> {
   const granted = new Set(scenario.permissions);
-  const hrefs = navigation
-    .filter((item) => matchesVisibility(item, granted))
-    .map((item) => item.href);
+  const hrefs = [
+    ...sidebarSections(granted).flatMap((view) => view.items.map((item) => item.href)),
+    // The More link follows its own permission rule here, as before #964.
+    ...orderedSidebarItems(granted, matchesVisibility(moreItem!, granted)).filter((item) => item.href === "/more").map((item) => item.href),
+  ];
   const clubsAndChurches = resolveClubsAndChurchesEntry(scenario);
   if (clubsAndChurches.visible) hrefs.push(clubsAndChurches.href);
   return new Set(hrefs);
@@ -383,6 +398,26 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
     const labels = [...mobileNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]);
     expect(labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
     expect(mobileNav).not.toContain("promo-codes");
+  });
+
+  it("keeps every item that left the sidebar out of it, and reachable from a More card (#964)", () => {
+    const removed = ["/people/attendees", "/imports", "/staff", "/more/promo-codes"];
+    const fullAccess: Scenario = { name: "full", permissions: eventPermissions, isSystemAdmin: true, clubOversight: true, clubEvent: true, clubFormsAccess: true };
+    const sidebar = sidebarDestinations(fullAccess);
+    const cards = allowedMoreCardHrefs(fullAccess);
+    for (const href of removed) {
+      expect(navigation.find((item) => item.href === href)?.sidebar, `${href} is not a sidebar item`).toBeUndefined();
+      expect(sidebar.has(href), `${href} not in the sidebar`).toBe(false);
+      expect(cards, `${href} has a More card`).toContain(href);
+      expect(phoneDestinations(fullAccess).has(href), `${href} on phone`).toBe(true);
+    }
+    // The permission each needed in the sidebar still gates it.
+    for (const href of removed) {
+      const permission = navigation.find((item) => item.href === href)?.requiredPermission;
+      expect(permission, href).toBeTruthy();
+      const without = { ...fullAccess, permissions: eventPermissions.filter((entry) => entry !== permission) };
+      expect(allowedMoreCardHrefs(without), `${href} without ${permission}`).not.toContain(href);
+    }
   });
 
   it("has no Payments card in More (it is a phone tab, #890); Promo codes stay behind MANAGE_FINANCE", () => {

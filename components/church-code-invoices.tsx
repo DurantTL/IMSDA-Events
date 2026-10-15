@@ -12,8 +12,8 @@ function money(cents: number) {
 }
 
 /**
- * The church promo code report and invoices (#399). For each church that sponsors a code: who used it (by confirmation
- * code, never a name), what it covered, what its invoice bills, what was paid and what is still owed. Staff prepare or
+ * The church promo code report and invoices (#399). For each church that sponsors a code: who used it (the registrant,
+ * or the covered attendee on a per-person line, with the confirmation code; staff only, #960), what it covered, what its invoice bills, what was paid and what is still owed. Staff prepare or
  * refresh a DRAFT invoice here; the office finalizes and sends it from the invoice, which stays a named human action
  * (the Finalize invoices permission), and recording a payment is the invoice's own action. Nothing on this screen
  * finalizes, sends or emails anything.
@@ -111,7 +111,7 @@ function ChurchRow({ eventId, row, canFinalize }: { eventId: string; row: Church
         ? <div className="finance-row"><span><small>No active registration has used this church&apos;s codes yet.</small></span><span /><span /><span /></div>
         : row.lines.map((line) => (
           <div className="finance-row" key={line.lineId}>
-            <span><small>Used by registration {line.confirmationCode} · code {line.promoCode} · {line.status.toLowerCase()}</small></span>
+            <span><small>Used by {line.usedByName || "a person with no name on file"}, registration {line.confirmationCode} · code {line.promoCode} · {line.status.toLowerCase()}</small></span>
             <span>{money(line.amountCents)}</span>
             <span />
             <span />

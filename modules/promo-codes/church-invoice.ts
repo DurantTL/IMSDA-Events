@@ -120,13 +120,20 @@ export type ChurchInvoiceFacts = {
   paidCents: number;
 };
 
+/**
+ * A report line: the billed line plus who used the code (Caleb, Oct 15, 2026, #960): the registrant on a
+ * whole-registration line, the covered attendee on a per-person line. The name is for the staff report only; it is added here, never to `ChurchSponsoredPromoLine`, so the invoice builder, its snapshot, the PDF,
+ * the send preview and any email to the church cannot pick it up.
+ */
+export type ChurchCodeReportLine = ChurchSponsoredPromoLine & { usedByName: string };
+
 export type ChurchCodeReportRow = {
   churchId: string;
   churchName: string;
   /** The codes this church sponsors on the event, with how many times each has been used. */
   codes: Array<{ id: string; code: string; isActive: boolean; redeemedCount: number; maximumUses: number | null }>;
-  /** Who used the code: one line per billed redemption, by confirmation code (never a name). */
-  lines: ChurchSponsoredPromoLine[];
+  /** Who used the code: one line per billed redemption, by name (registrant, or covered attendee on a per-person line) and confirmation code (staff report only). */
+  lines: ChurchCodeReportLine[];
   /** What the codes covered: the billed lines added up. */
   coveredCents: number;
   /** What the live finalized invoice bills; 0 until one is finalized. */
@@ -180,6 +187,8 @@ export function buildChurchCodeReportRow(input: {
   church: { id: string; name: string };
   codes: ChurchCodeReportRow["codes"];
   lines: readonly ChurchSponsoredPromoLine[];
+  /** The name each line shows, by line id: the registrant, or the covered attendee for a per-person line; no entry shows an empty name. */
+  lineNames?: ReadonlyMap<string, string>;
   invoice: ChurchInvoiceFacts | null;
   contact: ChurchCodeReportRow["contact"];
 }): ChurchCodeReportRow {
@@ -190,7 +199,10 @@ export function buildChurchCodeReportRow(input: {
     churchId: input.church.id,
     churchName: input.church.name,
     codes: input.codes,
-    lines: churchInvoiceLines(input.lines, input.church.id),
+    lines: churchInvoiceLines(input.lines, input.church.id).map((line) => ({
+      ...line,
+      usedByName: input.lineNames?.get(line.lineId) ?? "",
+    })),
     coveredCents: figures.amountDueCents,
     invoicedCents,
     paidCents,

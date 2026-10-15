@@ -258,8 +258,74 @@ describe("club roster storage", () => {
       await expect(updateRosterMember("club-1", memberId, { guardians: [] }, actor, now))
         .rejects.toMatchObject({ code: "GUARDIANS_PRIOR_YEAR" });
       expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
-      // Other edits to that row still work.
-      await expect(updateRosterMember("club-1", memberId, { role: "TLT" }, actor, now)).resolves.toBeDefined();
+      // A past year is history: no other edit works either (#959).
+      await expect(updateRosterMember("club-1", memberId, { role: "TLT" }, actor, now)).rejects.toMatchObject({ code: "ROSTER_YEAR_READ_ONLY" });
+      await expect(updateRosterMember("club-1", memberId, { status: "INACTIVE" }, actor, now)).rejects.toMatchObject({ code: "ROSTER_YEAR_READ_ONLY" });
+    });
+
+    it("lets a director add, edit and clear contacts on next year's row in August (#959)", async () => {
+      const august = new Date("2026-08-15T15:00:00Z");
+      // In August the current year is 2025-26, so 2026-27 is next year's roster.
+      const secondOk = { ...second, phone: "515-555-0202" };
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first] }, actor, { now: august });
+      await updateRosterMember("club-1", memberId, { guardians: [{ ...first, name: "Corrected Contact", phone: "515-555-0134" }, secondOk] }, actor, august);
+      expect(onFile(memberId)).toEqual([{ position: 1, name: "Corrected Contact" }, { position: 2, name: second.name }]);
+      await updateRosterMember("club-1", memberId, { guardians: [blank, blank] }, actor, august);
+      expect(onFile(memberId)).toEqual([]);
+      await updateRosterMember("club-1", memberId, { guardians: [{ ...first, phone: "(515) 555-0101" }] }, actor, august);
+      expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
+      // A contacts-only edit needs no gender on file: it doesn't touch the person's details.
+      db.members.find((row) => row.id === memberId)!.gender = null;
+      await expect(updateRosterMember("club-1", memberId, { guardians: [secondOk] }, actor, august, { requireGender: true })).resolves.toBeDefined();
+      // Audits carry field names and counts, never a contact value.
+      const entries = mocks.writeAuditLog.mock.calls.map(([entry]) => entry);
+      const text = JSON.stringify(entries);
+      for (const value of [first.name, second.name, "Corrected Contact", first.phone, "515-555-0134"]) expect(text).not.toContain(value);
+      expect(entries.filter((entry) => entry.action === "CLUB_ROSTER_MEMBER_UPDATED").at(-1)?.metadata)
+        .toMatchObject({ fields: ["guardians"], guardiansStored: 1 });
+    });
+
+    it("refuses contacts mixed with other fields on a next-year row, and status alone, writing nothing (#959)", async () => {
+      const august = new Date("2026-08-15T15:00:00Z");
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first] }, actor, { now: august });
+      const before = JSON.stringify(db.members.find((row) => row.id === memberId));
+      const auditsBefore = mocks.writeAuditLog.mock.calls.length;
+      for (const input of [
+        { guardians: [{ ...first, phone: "515-555-0134" }], firstName: "Changed" },
+        { guardians: [blank, blank], birthDate: "2010-01-02", attendeeType: "ADULT" as const, status: "INACTIVE" as const },
+        { status: "INACTIVE" as const },
+        { birthDate: "2010-01-02" },
+      ]) {
+        await expect(updateRosterMember("club-1", memberId, input, actor, august)).rejects.toMatchObject({ code: "ROSTER_YEAR_READ_ONLY" });
+      }
+      expect(JSON.stringify(db.members.find((row) => row.id === memberId))).toBe(before);
+      expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
+      expect(mocks.writeAuditLog.mock.calls.length).toBe(auditsBefore);
+    });
+
+    it("still requires a gender when contacts come with a details edit on the current year (#959)", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first] }, actor, { now });
+      db.members.find((row) => row.id === memberId)!.gender = null;
+      await expect(updateRosterMember("club-1", memberId, { guardians: [{ ...first, phone: "515-555-0134" }], firstName: "Changed" }, actor, now, { requireGender: true }))
+        .rejects.toMatchObject({ code: "GENDER_REQUIRED" });
+      expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
+    });
+
+    it("still refuses contact edits on a past year's row in August, and on a year beyond next (#959)", async () => {
+      const august = new Date("2026-08-15T15:00:00Z");
+      const { memberId } = await addRosterMember("club-1", "2025-26", { ...youth, guardians: [first] }, actor, { now: august });
+      db.members.find((row) => row.id === memberId)!.clubYear = "2024-25";
+      await expect(updateRosterMember("club-1", memberId, { guardians: [second] }, actor, august)).rejects.toMatchObject({ code: "GUARDIANS_PRIOR_YEAR" });
+      db.members.find((row) => row.id === memberId)!.clubYear = "2027-28";
+      await expect(updateRosterMember("club-1", memberId, { guardians: [] }, actor, august)).rejects.toMatchObject({ code: "GUARDIANS_PRIOR_YEAR" });
+      expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
+    });
+
+    it("refuses another club's director on a next-year row: the row is not found, and nothing changes (#959)", async () => {
+      const august = new Date("2026-08-15T15:00:00Z");
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first] }, actor, { now: august });
+      await expect(updateRosterMember("club-2", memberId, { guardians: [second] }, actor, august)).rejects.toMatchObject({ code: "MEMBER_NOT_FOUND" });
+      expect(onFile(memberId)).toEqual([{ position: 1, name: first.name }]);
     });
 
     it("keeps guardian values out of every audit entry: field names and counts only", async () => {

@@ -358,9 +358,14 @@ Database triggers (not only application code) enforce, and `npm run test:invoice
   staff action from the church report (idempotent, SERIALIZABLE), finalized only by someone with the Finalize invoices
   permission, then sent, posted and paid like any other. These invoices are left out of a deferred event's invoice list and
   draft run. See `modules/promo-codes/README.md`.
-  - **Invoice code (open owner decision).** On an attendee-paid event there is no screen for the invoice code, so the first
+  - **Invoice code (decided, Caleb, Oct 15, 2026).** On an attendee-paid event there is no screen for the invoice code, so the first
     church invoice finalized takes the code derived from the event name (and freezes it on the event, as for any event).
-    Staff cannot choose it yet; whether they should is an owner decision.
+    Staff do not choose it on attendee-paid events.
+  - **Names (decided, Caleb, Oct 15, 2026, #960).** The staff church report on `/finance/church-owed` (`getChurchCodeReport`,
+    Manage finance, checked on the server) shows a name next to each confirmation code: the registrant on a whole-registration line, the covered attendee on a per-person line (#397), read from the contact or profile snapshot first, then the stored Person. The church
+    invoice (one line per sponsored registration), its snapshot and PDF, the send preview and any email to the church show **no
+    names**. Audits keep ids only. `npm run test:church-code-invoices` asserts the name is on the report and absent from the PDF
+    text, the snapshot, the send preview and the audit rows.
 - The code of two events in the same year must differ; the screen explains the refusal.
 
 ## Checks
