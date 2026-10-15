@@ -20,6 +20,7 @@ import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locati
 import { createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeDefaultModules } from "@/modules/event-modules/defaults";
+import { assertCalendarEntryLinkable, linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 export class EventTemplateOperationError extends Error {
   constructor(
     public readonly code:
@@ -393,12 +394,16 @@ export async function applyEventTemplate(
         create: { id: "platform" },
         select: { defaultAttendeeEditPolicy: true },
       });
+      // Set up from a calendar item (#445): checked before anything is written, so an item that can't be linked
+      // any more leaves no event behind.
+      const fromItem = input.calendarEntryId ? await assertCalendarEntryLinkable(tx, input.calendarEntryId) : null;
       const event = await tx.event.create({
         data: {
           name: input.name,
           slug: input.slug,
           startsAt: eventDate(input.startsOn),
           endsAt: eventDate(input.endsOn),
+          ...(fromItem?.location ? { location: fromItem.location } : {}),
           isPublished: false,
           waitlistEnabled: payload.moduleEnablement.waitlistEnabled,
           autoPromoteWaitlist: payload.moduleEnablement.waitlistEnabled
@@ -428,6 +433,9 @@ export async function applyEventTemplate(
         data: { eventId: event.id, userId: actorUserId, role: "EVENT_ADMIN", status: "ACTIVE" },
       });
       await writeDefaultModules(tx, event.id, payload.audience);
+      if (input.calendarEntryId) {
+        await linkNewEventToCalendarEntry(tx, { entryId: input.calendarEntryId, eventId: event.id, actorUserId });
+      }
 
       if (payload.attendeeTypes.length > 0) {
         await tx.eventAttendeeType.createMany({

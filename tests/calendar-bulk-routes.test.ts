@@ -24,6 +24,9 @@ vi.mock("@/modules/calendar/deadline-reminders", () => ({ reconcileDeadlineRemin
 vi.mock("@/lib/prisma", () => {
   const tx = {
     $executeRaw: async () => { state.locks += 1; },
+    // Possible matches (#445) read events and dismissals after a change; there are none here.
+    event: { findMany: async () => [] },
+    calendarEventMatchDismissal: { findMany: async () => [] },
     calendarEntry: {
       findMany: async (args: { where?: { id?: { in: string[] } } } = {}) => {
         const ids = args.where?.id?.in;

@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from "react";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
 import { DeadlineRemindersPanel } from "@/components/deadline-reminders-panel";
 import { ConfirmDialog, cancelUnlessBusy } from "@/components/confirm-dialog";
@@ -412,6 +413,8 @@ export function CalendarAdminWorkspace({
                         {entry.sourceFeedName && <span className="status-chip">Imported from {entry.sourceFeedName}</span>}
                         {entry.sourceRemovedAt && <span className="status-chip coral">No longer in the source</span>}
                         {entry.isHiddenLocally && <span className="status-chip gold">Hidden here</span>}
+                        {entry.linkedEvent && <span className="status-chip green">Linked to an event</span>}
+                        {entry.possibleMatch && <span className="status-chip gold">Possible match</span>}
                         {entry.locallyEditedFields.length > 0 && <span className="status-chip">Edited here</span>}
                       </span>
                     </div>
@@ -466,6 +469,7 @@ export function CalendarAdminWorkspace({
                         </button>
                       )}
                     </div>
+                    <CalendarEntryRegistration entry={entry} events={events} saving={saving} send={(url, body, success) => call(url, "POST", body, success)} />
                   </li>
                 ))}
               </ul>
@@ -507,6 +511,7 @@ export function CalendarAdminWorkspace({
                         <span className={`status-chip ${visible ? "green" : "gold"}`}>
                           {!event.isPublished ? "Not published" : event.showOnCalendar ? "On calendar" : "Hidden"}
                         </span>
+                        {event.linkedEntryTitle && <span className="status-chip">Linked to calendar item &ldquo;{event.linkedEntryTitle}&rdquo;</span>}
                       </span>
                     </div>
                     <form

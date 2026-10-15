@@ -82,7 +82,8 @@ vi.mock("@/lib/prisma", () => {
       for (const entry of state.entries.filter((candidate) => candidate.sourceFeedId === where.id)) entry.sourceFeedId = null;
     },
   };
-  const client = { calendarEntry: entryApi, calendarFeed: feedApi, $executeRaw: async () => 1, $transaction: async (run: (tx: unknown) => unknown) => run(client) };
+  // Possible matches (#445) read events and dismissals after a change; there are none here.
+  const client = { calendarEntry: entryApi, calendarFeed: feedApi, event: { findMany: async () => [] }, calendarEventMatchDismissal: { findMany: async () => [] }, $executeRaw: async () => 1, $transaction: async (run: (tx: unknown) => unknown) => run(client) };
   return { getPrisma: () => client };
 });
 

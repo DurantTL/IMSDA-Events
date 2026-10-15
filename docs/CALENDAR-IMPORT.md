@@ -123,3 +123,42 @@ reports `calendarFeeds: { due, refreshed, failed }`.
 Run `npm run db:deploy` (migration `20261003180000_calendar_feed_import`: a
 `CalendarFeed` table and additive columns on `CalendarEntry`). Existing entries are
 untouched. No import runs until staff add a feed and press Import.
+
+## Calendar items and registration events (#445)
+
+A calendar item and a registration event can be one thing. System administrators
+do all of this in **Conference calendar**, **Entries**; every check is server-side
+and uses the same permission as event creation.
+
+- **Add registration** (any ordinary one-time item, imported or made by staff) opens
+  the normal Create event flow, blank or from a template, starting with the item's
+  title, dates and location. Its description becomes a draft "About this event"
+  section. The event is linked to the item in the same transaction that creates it.
+- **Link to existing event** picks a registration event; **Unlink event** puts the
+  item back on its own. One item per event.
+- **One entry, never two.** A linked pair shows once on the calendar page, the home
+  page "Coming up" list and the `.ics` feed: the event's entry, with Register. While
+  the event is only a draft or unpublished, the item shows alone and says nothing
+  about the event. Deleting the event unlinks the item, which shows on its own again.
+- **Possible matches.** An imported item whose dates overlap an event and whose title
+  is similar (ignoring case, punctuation, years, and words like "the") is flagged
+  with **Link**, **Not the same** and **Add registration**. Nothing links by itself.
+  **Not the same** is permanent for that pair.
+- **The link survives every refresh.** Imported items keep their identity and are
+  never deleted; a refresh never writes the link.
+- **Dates never change by themselves.** When Google moves a linked item, the item
+  updates as before and the event's settings page shows "Google Calendar moved this
+  event to ... Update the registration dates?" with a preview. **Update** changes the
+  event's first and last day only; registration dates, location days, lodging dates
+  and every price stay as staff set them, and the preview lists them with a flag when
+  they no longer fit. **Keep current dates** remembers exactly those item dates, so
+  the banner returns only if the item moves again. Both are audited.
+- **Deleted in Google.** The registration event is never removed or cancelled. The
+  event's page shows a warning and staff decide.
+- Registration events reach the public calendar when they are published and not hidden
+  there, as before; unpublishing or deleting one takes it off.
+
+`npm run test:calendar-event-links` proves this against a real local PostgreSQL.
+Migration `20261030100000_calendar_event_links` is additive: five nullable columns
+on `CalendarEntry`, a unique `linkedEventId` (cleared if the event is deleted) and the
+`CalendarEventMatchDismissal` table.

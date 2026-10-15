@@ -1,0 +1,24 @@
+export class CalendarError extends Error {
+  constructor(
+    public readonly code:
+      | "ENTRY_NOT_FOUND"
+      | "EVENT_NOT_FOUND"
+      | "INVALID_REPEAT"
+      | "FEED_NOT_FOUND"
+      | "INVALID_FEED"
+      | "FEED_FETCH_FAILED"
+      | "FEED_SECRET_MISSING"
+      | "NOT_IMPORTED"
+      // Calendar items and registration events (#445)
+      | "NOT_LINKABLE"
+      | "ENTRY_ALREADY_LINKED"
+      | "EVENT_ALREADY_LINKED"
+      | "NOT_LINKED"
+      | "DATES_CHANGED"
+      | "DATES_CONFLICT",
+    message: string,
+  ) {
+    super(message);
+    this.name = "CalendarError";
+  }
+}

@@ -14,6 +14,7 @@ import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeDefaultModules } from "@/modules/event-modules/defaults";
+import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export class EventOperationError extends Error {
   constructor(
@@ -240,6 +241,8 @@ export type EventSettingsRecord = NonNullable<Awaited<ReturnType<typeof getEvent
 export async function createEvent(
   input: EventSettingsInput,
   actorUserId: string,
+  /** Set when the event is set up from a calendar item (#445): the item is linked and its description carried over. */
+  options: { calendarEntryId?: string } = {},
 ) {
   const audience = input.audience ?? "GENERAL";
   const eventId = await getPrisma().$transaction(async (tx) => {
@@ -294,6 +297,10 @@ export async function createEvent(
       },
     });
     await writeDefaultModules(tx, event.id, audience);
+    // In the same transaction: an item that can't be linked any more fails the whole creation, leaving no event behind.
+    if (options.calendarEntryId) {
+      await linkNewEventToCalendarEntry(tx, { entryId: options.calendarEntryId, eventId: event.id, actorUserId });
+    }
     if (input.approvedPaymentInstructions) {
       await tx.eventPaymentInstructionVersion.create({
         data: {
@@ -315,7 +322,7 @@ export async function createEvent(
         summary: `Created event draft: ${event.name}.`,
         // The initial audience (#481) is recorded, since it decides whether
         // the event gets club features at all.
-        metadata: { slug: event.slug, audience: event.audience },
+        metadata: { slug: event.slug, audience: event.audience, ...(options.calendarEntryId ? { calendarEntryId: options.calendarEntryId } : {}) },
       },
     });
     return event.id;

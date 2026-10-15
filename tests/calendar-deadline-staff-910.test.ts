@@ -19,6 +19,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => {
   const client = {
     event: { findMany: mocks.eventFindMany },
+    calendarEventMatchDismissal: { findMany: async () => [] },
     calendarEntry: { findMany: mocks.entryFindMany, findUnique: mocks.entryFindUnique, update: mocks.entryUpdate, updateMany: mocks.entryUpdateMany },
     $executeRaw: mocks.executeRaw,
     $transaction: async (run: (tx: unknown) => unknown) => run(client),

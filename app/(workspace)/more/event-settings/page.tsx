@@ -10,6 +10,7 @@ import { EventGeneralLinkPanel } from "@/components/event-general-link-panel";
 import { generalLinkUrl } from "@/modules/general-link-registrations/domain";
 import { getGeneralLinkSettings } from "@/modules/general-link-registrations/repository";
 import { getServerEnv } from "@/lib/env";
+import { getCalendarLinkNotice } from "@/modules/calendar/event-links";
 import { getEventSettings } from "@/modules/events/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -27,11 +28,11 @@ export default async function EventSettingsPage({
     return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." />;
   }
   const { user } = await getCurrentSession();
-  const [settings, locations, coordinators, teamSettings, generalLink] = await Promise.all([getEventSettings(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id)]);
+  const [settings, locations, coordinators, teamSettings, generalLink, linkNotice] = await Promise.all([getEventSettings(event.id), listEventLocations(event.id), listActiveAreaCoordinators(), getTeamSettings(event.id), getGeneralLinkSettings(event.id), getCalendarLinkNotice(event.id)]);
   if (!settings) notFound();
   return (
     <>
-      <EventSettingsWorkspace key={event.id} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} />
+      <EventSettingsWorkspace key={event.id} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} linkNotice={linkNotice} canAnswerCalendarDates={user?.globalRole === "SYSTEM_ADMIN"} />
       {settings.audience === "CLUB" && <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />}
       {settings.audience === "CLUB" && generalLink && (
         <EventGeneralLinkPanel

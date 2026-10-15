@@ -39,6 +39,7 @@
     "test:multi-honor-classes": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-multi-honor-classes.ts",
     "test:event-locations": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-locations.ts",
     "test:calendar-bulk": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-calendar-bulk.ts",
+    "test:calendar-event-links": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-calendar-event-links.ts",
     "test:deadline-reminders": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-deadline-reminders.ts",
     "test:club-form-roster-add": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-form-roster-add.ts",
     "test:club-roster-guardians": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-roster-guardians.ts",

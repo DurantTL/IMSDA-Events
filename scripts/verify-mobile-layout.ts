@@ -538,6 +538,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.honor.deleteMany({ where: { id: { in: multiHonorIds } } }),
     prisma.deadlineReminderBatch.deleteMany({ where: { title: { startsWith: "Mobilecheck" } } }),
     prisma.calendarEntry.deleteMany({ where: { id: { startsWith: `${P}_deadline_` } } }),
+    prisma.calendarEntry.deleteMany({ where: { id: { startsWith: `${P}_calpair_` } } }),
+    prisma.event.deleteMany({ where: { id: { startsWith: `${P}_calpair_` } } }),
     prisma.announcement.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.messageOutbox.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.eventMessageTemplate.deleteMany({ where: { eventId: blocksEventId } }),
@@ -776,6 +778,39 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedLauncherModule(prisma);
   await seedIssuedAssets(prisma);
   await seedDeadlines(prisma);
+  await seedCalendarEventPairs(prisma);
+}
+
+/**
+ * Calendar items and registration events (#445), for the calendar admin's Entries list: an imported item flagged as a
+ * possible match for a draft event (Link, Not the same, Add registration), an unmatched item (Add registration, Link to
+ * existing event), and a linked item whose dates differ from its event's (Open event, Unlink event). Dates are relative
+ * to today so the rows stay in the list's "upcoming" window. Idempotent.
+ */
+async function seedCalendarEventPairs(prisma: PrismaClient) {
+  const { calendarDateIn, addDays } = await import("../modules/calendar/domain");
+  const today = calendarDateIn(new Date());
+  const actor = "usr_system_admin";
+  const events = [
+    { key: "match", name: "Mobilecheck Women's Retreat 2026 with a Long Registration Event Name", start: 20, end: 22 },
+    { key: "linked", name: "Mobilecheck Spring Conference Registration", start: 40, end: 42 },
+  ];
+  for (const row of events) {
+    const data = { name: row.name, slug: `${P}-calpair-${row.key}`, startsAt: new Date(`${addDays(today, row.start)}T12:00:00Z`), endsAt: new Date(`${addDays(today, row.end)}T12:00:00Z`), isPublished: false };
+    await prisma.event.upsert({ where: { id: `${P}_calpair_event_${row.key}` }, update: data, create: { id: `${P}_calpair_event_${row.key}`, ...data } });
+  }
+  const entries = [
+    { key: "match", title: "Mobilecheck Womens Retreat", start: 20, end: 22, uid: "mobilecheck-uid-match", linked: null },
+    { key: "open", title: "Mobilecheck Youth Rally with a Long Imported Title the Calendar Might Bring In", start: 25, end: 25, uid: "mobilecheck-uid-open", linked: null },
+    { key: "linked", title: "Mobilecheck Spring Conference", start: 47, end: 49, uid: "mobilecheck-uid-linked", linked: `${P}_calpair_event_linked` },
+  ];
+  for (const row of entries) {
+    const data = {
+      title: row.title, startsOn: addDays(today, row.start), endsOn: addDays(today, row.end), entryType: "STANDARD" as const, isPublished: true, isHiddenLocally: false,
+      status: "SCHEDULED" as const, repeatRule: null, sourceUid: row.uid, sourceRecurrenceId: "", linkedEventId: row.linked, linkedAt: row.linked ? new Date() : null, linkedByUserId: row.linked ? actor : null,
+    };
+    await prisma.calendarEntry.upsert({ where: { id: `${P}_calpair_${row.key}` }, update: data, create: { id: `${P}_calpair_${row.key}`, ...data, createdByUserId: actor, updatedByUserId: actor } });
+  }
 }
 
 /**

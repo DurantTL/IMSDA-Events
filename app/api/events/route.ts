@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AccessDeniedError, requireAuthenticatedUser } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
+import { CalendarError } from "@/modules/calendar/errors";
 import { requireEventCreationPermission } from "@/modules/events/authorization";
 import {
   createEvent,
@@ -23,6 +24,9 @@ function eventApiError(error: unknown) {
   }
   if (error instanceof AccessDeniedError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
+  }
+  if (error instanceof CalendarError) {
+    return Response.json({ error: error.code, message: error.message }, { status: error.code === "ENTRY_NOT_FOUND" ? 404 : 409 });
   }
   if (error instanceof EventOperationError) {
     return Response.json(
@@ -56,8 +60,11 @@ async function postHandler(request: Request) {
   if (originError) return originError;
   try {
     const user = requireEventCreationPermission(await getCurrentSession());
-    const input = eventSettingsInputSchema.parse(await request.json());
-    const event = await createEvent(input, user.id);
+    const body = await request.json();
+    const input = eventSettingsInputSchema.parse(body);
+    // Set when the event is set up from a calendar item (#445); the item decides the rest, never the request.
+    const calendarEntryId = z.object({ calendarEntryId: z.string().trim().min(1).max(100).optional() }).parse(body ?? {}).calendarEntryId;
+    const event = await calendarEntryId ? await createEvent(input, user.id, { calendarEntryId }) : await createEvent(input, user.id);
     return Response.json({ event }, { status: 201 });
   } catch (error) { return eventApiError(error); }
 }
