@@ -54,3 +54,18 @@ export function attendeeSummaryLabel(
   const remaining = names.length - Math.min(names.length, limit);
   return remaining > 0 ? `${shown} +${remaining} more` : shown;
 }
+
+/**
+ * The record a `?registration=` link opens: a row of the list, else the
+ * separately loaded off-page record (#180: a link to a registration that is not
+ * on this page of search results). That record only opens the detail; it is
+ * never added to the list, its count, or Select all.
+ */
+export function findRegistrationToOpen(
+  rows: readonly RegistrationRecord[],
+  openOnly: RegistrationRecord | null,
+  id: string | undefined,
+): RegistrationRecord | null {
+  if (!id) return null;
+  return rows.find((registration) => registration.id === id) ?? (openOnly?.id === id ? openOnly : null);
+}

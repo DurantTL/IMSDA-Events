@@ -85,6 +85,7 @@
     "test:single-account-dry-run": "tsx scripts/verify-single-account-dry-run.ts",
     "test:honor-instructors-http": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-honor-instructors-http.ts",
     "test:lodging-assignment-http": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-assignment-http.ts",
+    "test:operations-search": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-operations-search.ts",
     "test:check-in-concurrency": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-check-in-concurrency.ts",
     "test:check-in-multi-device-http": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-check-in-multi-device-http.ts",
     "imports:build": "tsx scripts/build-import-files.ts",
