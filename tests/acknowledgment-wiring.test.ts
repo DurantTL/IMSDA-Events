@@ -10,7 +10,7 @@ import { eventDeletionBlockers, decideEventDeletion, type EventDeletionCounts } 
 
 const emptyCounts: EventDeletionCounts = {
   registrations: 0, attendees: 0, payments: 0, invoices: 0, honorEnrollments: 0, locations: 0, forms: 0, messages: 0, queuedMessages: 0,
-  formSubmissions: 0, imports: 0, merchandiseOrders: 0, clubRegistrationDrafts: 0, communityPosts: 0, announcements: 0, realPayments: 0,
+  formSubmissions: 0, imports: 0, merchandiseOrders: 0, clubRegistrationDrafts: 0, communityPosts: 0, announcements: 0, realPayments: 0, scholarshipContributions: 0,
   healthSnapshots: 0, heldHealthSnapshots: 0, acknowledgmentEvidence: 0,
 };
 
