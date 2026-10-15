@@ -127,8 +127,8 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
 }
 
 /**
- * Copies each carried member's emergency/guardian contacts (#942, the model of
- * #510) onto the new year's row, whatever the member's type or age. The values
+ * Copies each carried member's emergency contacts (#942, stored as
+ * `ClubRosterGuardian` since #510) onto the new year's row, whatever the member's type or age. The values
  * are copied exactly as stored (the source is plain text by director decision,
  * so nothing is sealed or opened here) and last year's rows are only read.
  * Returns the number of contacts copied; no value leaves this function.
@@ -149,7 +149,6 @@ async function copyGuardians(tx: Db, organizationId: string, toClubYear: string,
   if (contacts.length === 0) return 0;
   const result = await tx.clubRosterGuardian.createMany({
     data: contacts.map((contact) => ({ ...contact, rosterMemberId: targetBySource.get(contact.rosterMemberId)! })),
-    skipDuplicates: true,
   });
   return result.count;
 }
@@ -162,7 +161,7 @@ export type CarryForwardResult = {
   typeChanged: number;
   /** Ticked people who were already on the new year's roster, so nothing was added for them. */
   alreadyThere: number;
-  /** Guardian contacts copied onto the new year's rows (a count only, never a value). */
+  /** Emergency contacts copied onto the new year's rows (a count only, never a value). */
   guardiansCopied: number;
   personIds: string[];
 };

@@ -153,9 +153,9 @@ async function main() {
   assert((await prisma.clubRosterGuardian.count({ where: { rosterMemberId: stayed.id } })) === 0, "a member with no contacts gets none");
   assert(!newContacts.some((contact) => contact.name === contactValues[6]), "the unticked person's contact is not copied");
   assert((await lastYearContacts()) === lastYearContactsBefore, "last year's contacts are unchanged");
-  // The director can still edit the copy without touching last year's.
+  // Storage independence: the copy is its own row, so changing it leaves last year's row unchanged.
   await prisma.clubRosterGuardian.update({ where: { id: newContacts[0]!.id }, data: { phone: "555-0199" } });
-  assert((await lastYearContacts()) === lastYearContactsBefore, "editing the copy leaves last year's contacts alone");
+  assert((await lastYearContacts()) === lastYearContactsBefore, "changing the copy leaves last year's emergency contact rows unchanged");
 
   // Last year's roster is untouched and readable.
   const history = await listRoster(clubs.a, from, august);
@@ -297,7 +297,7 @@ async function main() {
   assert(audits.some((row) => row.action === "CLUB_ROSTER_CARRIED_FORWARD"), "the carry-forward is audited");
   assert(audits.some((row) => (row.metadata as { guardiansCopied?: number } | null)?.guardiansCopied === 2), "the audit holds the contact count");
 
-  console.log("Club roster carry-forward (#414): all checks passed.");
+  console.log("Club roster carry-forward (#414, #942): all checks passed.");
 }
 
 main()
