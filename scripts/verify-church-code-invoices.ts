@@ -54,6 +54,7 @@ const ids = {
   staff: `${P}_staff`,
   treasurer: `${P}_treasurer`,
   holder: `${P}_holder`,
+  attendeePerson: `${P}_attendee_person`,
   churchA: `${P}_church_a`,
   churchB: `${P}_church_b`,
   churchC: `${P}_church_c`,
@@ -64,6 +65,10 @@ const ids = {
 };
 /** The registrant's stored name (synthetic, and distinctive so a leak is found): on the staff report, nowhere on the church invoice. */
 const REGISTRANT = { first: "Quillon", last: "Fernsby" };
+/** A registration whose contact snapshot overrides the stored Person, and an attendee a per-person code covers (profile snapshot overrides the last name). */
+const SNAPSHOT_REGISTRANT = { first: "Wilhelmina", last: "Oakhurst" };
+const ATTENDEE = { first: "Odalys", last: "Pemberton", snapshotLast: "Pemberton-Hale", shown: "Odalys Pemberton-Hale" };
+const NAME_PARTS = [REGISTRANT.first, REGISTRANT.last, SNAPSHOT_REGISTRANT.first, SNAPSHOT_REGISTRANT.last, ATTENDEE.first, ATTENDEE.last, ATTENDEE.snapshotLast];
 const events = [ids.general, ids.other, ids.club];
 const EMAIL = { tina: `${P}.tina@contact.test`, sam: `${P}.sam@contact.test` };
 const NAMES = { churchA: `Church Code Check A ${P}`, churchB: `Church Code Check B ${P}`, churchC: `Church Code Check C ${P}` };
@@ -88,7 +93,7 @@ async function cleanup() {
     prisma.$executeRawUnsafe('ALTER TABLE "OrganizationBillingContact" ENABLE TRIGGER "OrganizationBillingContact_no_delete"'),
   ]);
   await prisma.organization.deleteMany({ where: { id: { in: [ids.churchA, ids.churchB, ids.churchC, ids.churchNoCode] } } });
-  await prisma.person.deleteMany({ where: { id: ids.holder } });
+  await prisma.person.deleteMany({ where: { id: { in: [ids.holder, ids.attendeePerson] } } });
   await prisma.user.deleteMany({ where: { id: { in: [ids.staff, ids.treasurer] } } });
 }
 
@@ -176,6 +181,7 @@ async function main() {
     ],
   });
   await prisma.person.create({ data: { id: ids.holder, firstName: REGISTRANT.first, lastName: REGISTRANT.last } });
+  await prisma.person.create({ data: { id: ids.attendeePerson, firstName: ATTENDEE.first, lastName: ATTENDEE.last } });
   await prisma.organization.createMany({
     data: [
       { id: ids.churchA, type: "CHURCH", name: NAMES.churchA, normalizedName: NAMES.churchA.toLowerCase() },
@@ -212,7 +218,9 @@ async function main() {
   assert(code(await failure(prepare(ids.churchA, ids.club))) === "CHURCH_CODE_NOT_ELIGIBLE", "a club event bills no church promo code");
 
   // ---- The draft is the church's billed lines, in cents.
-  await redeem(ids.general, "CHURCHA", "CONFIRMED");
+  const snapshotReg = await redeem(ids.general, "CHURCHA", "CONFIRMED");
+  // The registration's own contact snapshot wins over the stored Person, as everywhere else in the app.
+  await prisma.registration.update({ where: { id: snapshotReg.id }, data: { contactSnapshot: { firstName: SNAPSHOT_REGISTRANT.first, lastName: SNAPSHOT_REGISTRANT.last } } });
   await redeem(ids.general, "CHURCHA", "SUBMITTED");
   await redeem(ids.general, "CHURCHA", "WAITLISTED");
   await redeem(ids.general, "CHURCHA", "DRAFT");
@@ -221,8 +229,12 @@ async function main() {
   // A per-person (adjustment) line on its own registration, counted once, at its own amount.
   const personReg = await redeem(ids.general, "PLAINCODE", "CONFIRMED");
   const churchACode = await prisma.promoCode.findFirstOrThrow({ where: { eventId: ids.general, normalizedCode: "CHURCHA" } });
+  // ...covering one attendee (#397): the report names that attendee (profile snapshot first, then Person), not the account holder.
+  const coveredAttendee = await prisma.registrationAttendee.create({
+    data: { eventId: ids.general, registrationId: personReg.id, personId: ids.attendeePerson, attendeeType: "ADULT", profileSnapshot: { lastName: ATTENDEE.snapshotLast } },
+  });
   await prisma.registrationAdjustment.create({
-    data: { eventId: ids.general, registrationId: personReg.id, kind: "PROMO_CODE", amountCents: -1_234, reason: "Synthetic per-person line.", promoCodeId: churchACode.id, promoCodeSnapshot: "CHURCHA", createdByNameSnapshot: "Check" },
+    data: { eventId: ids.general, registrationId: personReg.id, registrationAttendeeId: coveredAttendee.id, kind: "PROMO_CODE", amountCents: -1_234, reason: "Synthetic per-person line.", promoCodeId: churchACode.id, promoCodeSnapshot: "CHURCHA", createdByNameSnapshot: "Check" },
   });
   const lines = (await listChurchSponsoredPromoLines(ids.general)).filter((line) => line.churchId === ids.churchA);
   assert(lines.length === 3 && lines.reduce((total, line) => total + line.amountCents, 0) === 2_500 + 2_500 + 1_234, "the church has three billed lines");
@@ -301,8 +313,13 @@ async function main() {
   let report = await getChurchCodeReport(ids.general);
   let rowA = report.rows.find((row) => row.churchId === ids.churchA)!;
   assert(rowA.coveredCents === 8_734 && rowA.invoicedCents === 8_734 && rowA.paidCents === 0 && rowA.owedOnInvoiceCents === 8_734 && rowA.notInvoicedCents === 0 && rowA.state === "FINALIZED_CURRENT" && rowA.invoiceNumber === finalized.number, "report: covered, invoiced, paid and owed");
-  assert(rowA.lines.length === 4 && rowA.lines.every((line) => line.registrantName === `${REGISTRANT.first} ${REGISTRANT.last}` && line.confirmationCode.length > 0), "report: who used the code, by registrant name as stored and registration (staff report only)");
-  assert(report.rows.every((row) => row.lines.every((line) => line.registrantName === `${REGISTRANT.first} ${REGISTRANT.last}`)), "report: every church's lines carry the registrant name");
+  const holderName = `${REGISTRANT.first} ${REGISTRANT.last}`;
+  const nameByCode = new Map(rowA.lines.map((line) => [line.confirmationCode, line.registrantName]));
+  assert(rowA.lines.length === 4, "report: four billed lines for church A");
+  assert(nameByCode.get(snapshotReg.confirmationCode) === `${SNAPSHOT_REGISTRANT.first} ${SNAPSHOT_REGISTRANT.last}`, "report: a whole-registration line names the registrant, contact snapshot first");
+  assert(nameByCode.get(personReg.confirmationCode) === ATTENDEE.shown, "report: a per-person line names the covered attendee (profile snapshot first, then Person), not the account holder");
+  assert(rowA.lines.filter((line) => line.registrantName === holderName).length === 2, "report: other whole-registration lines fall back to the stored Person name");
+  assert(report.rows.every((row) => row.lines.every((line) => line.registrantName.length > 0)), "report: every line carries a name");
   assert(rowA.codes.length === 1 && rowA.codes[0]!.code === "CHURCHA" && rowA.codes[0]!.redeemedCount >= 4, "report: the code and its uses");
   assert(rowA.contact?.email === EMAIL.tina, "report: the church's contact");
   const rowB = report.rows.find((row) => row.churchId === ids.churchB)!;
@@ -318,7 +335,7 @@ async function main() {
   const attachment = await prisma.messageAttachment.findUniqueOrThrow({ where: { id: pdf.attachmentId }, select: { content: true } });
   const pdfText = await extractPdfText(new Uint8Array(attachment.content));
   assert(pdfText.includes("Total"), "the PDF text was read back");
-  for (const forbidden of [REGISTRANT.first, REGISTRANT.last]) {
+  for (const forbidden of NAME_PARTS) {
     assert(!pdfText.includes(forbidden), `the invoice PDF never shows ${forbidden}`);
     assert(!JSON.stringify(draft.snapshot).includes(forbidden), `the invoice snapshot never holds ${forbidden}`);
     assert(!JSON.stringify(preview).includes(forbidden), `the send preview and its email text never show ${forbidden}`);
@@ -368,7 +385,7 @@ async function main() {
     const metadata = entry.metadata as Record<string, unknown>;
     assert(Object.keys(metadata).sort().join() === "amountDueCents,churchId,eventId,invoiceId,lineCount,outcome,previousAmountDueCents,revision,versionId", "audit metadata keys are ids, counts and amounts");
     const text = JSON.stringify(entry);
-    for (const forbidden of [EMAIL.tina, EMAIL.sam, "Tina", "Sam Clerk", "Sue", "CHURCHA", "CHURCHB", NAMES.churchA, NAMES.churchB, "Treasurer", REGISTRANT.first, REGISTRANT.last]) {
+    for (const forbidden of [EMAIL.tina, EMAIL.sam, "Tina", "Sam Clerk", "Sue", "CHURCHA", "CHURCHB", NAMES.churchA, NAMES.churchB, "Treasurer", ...NAME_PARTS]) {
       assert(!text.includes(forbidden), `an audit row never holds ${forbidden}`);
     }
   }

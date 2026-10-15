@@ -18,6 +18,7 @@ import {
   type ChurchInvoiceFacts,
 } from "@/modules/promo-codes/church-invoice";
 import { loadChurchBillingContact, loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
+import { publicAttendeeName } from "@/modules/public-access/domain";
 import { listChurchSponsoredPromoLines } from "@/modules/promo-codes/church-sponsored-repository";
 
 /**
@@ -215,17 +216,31 @@ export type ChurchCodeReport = {
   totals: ReturnType<typeof summarizeChurchCodeReport>;
 };
 
-/** The registrant's name as stored (the account holder's first and last name), by confirmation code, for the staff report only. */
-async function loadRegistrantNames(client: PrismaClient, eventId: string, confirmationCodes: string[]) {
+/**
+ * The name each report line shows, by line id, for the staff report only (Caleb, Oct 15, 2026, #960). A whole-registration
+ * line shows the registrant (the account holder); a per-person line (#397) shows the covered attendee, "used for that
+ * person". Both read the registration's or attendee's contact/profile snapshot first and fall back to the Person, the
+ * same precedence as the rest of the app (`publicAttendeeName`).
+ */
+async function loadReportLineNames(client: PrismaClient, eventId: string, lines: ReadonlyArray<{ lineId: string; confirmationCode: string }>) {
   const names = new Map<string, string>();
-  const unique = [...new Set(confirmationCodes)];
-  if (unique.length === 0) return names;
+  if (lines.length === 0) return names;
   const registrations = await client.registration.findMany({
-    where: { eventId, confirmationCode: { in: unique } },
-    select: { confirmationCode: true, accountHolderPerson: { select: { firstName: true, lastName: true } } },
+    where: { eventId, confirmationCode: { in: [...new Set(lines.map((line) => line.confirmationCode))] } },
+    select: { confirmationCode: true, contactSnapshot: true, accountHolderPerson: { select: { firstName: true, lastName: true } } },
   });
-  for (const registration of registrations) {
-    names.set(registration.confirmationCode, `${registration.accountHolderPerson.firstName} ${registration.accountHolderPerson.lastName}`.trim());
+  const registrantByCode = new Map(registrations.map((registration) => [registration.confirmationCode, publicAttendeeName(registration.contactSnapshot, registration.accountHolderPerson)]));
+  const adjustmentIds = lines.filter((line) => line.lineId.startsWith("adjustment:")).map((line) => line.lineId.slice("adjustment:".length));
+  const adjustments = adjustmentIds.length === 0 ? [] : await client.registrationAdjustment.findMany({
+    where: { id: { in: adjustmentIds }, eventId, registrationAttendeeId: { not: null } },
+    select: { id: true, attendee: { select: { profileSnapshot: true, person: { select: { firstName: true, lastName: true } } } } },
+  });
+  const attendeeByLine = new Map<string, string>();
+  for (const adjustment of adjustments) {
+    if (adjustment.attendee) attendeeByLine.set(`adjustment:${adjustment.id}`, publicAttendeeName(adjustment.attendee.profileSnapshot, adjustment.attendee.person));
+  }
+  for (const line of lines) {
+    names.set(line.lineId, attendeeByLine.get(line.lineId) ?? registrantByCode.get(line.confirmationCode) ?? "");
   }
   return names;
 }
@@ -257,7 +272,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
     }),
     loadEventLedger(eventId, {}, client),
   ]);
-  const registrantNames = await loadRegistrantNames(client, eventId, lines.map((line) => line.confirmationCode));
+  const lineNames = await loadReportLineNames(client, eventId, lines);
   const paidByInvoice = new Map(ledger.map((entry) => [entry.invoiceId, entry.figures.paidCents]));
   const invoiceByChurch = new Map<string, ChurchInvoiceFacts>();
   for (const invoice of invoices) {
@@ -290,7 +305,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
       church,
       codes: church.codes,
       lines,
-      registrantNames,
+      lineNames,
       invoice: invoiceByChurch.get(church.id) ?? null,
       contact: contact ? { name: contact.name, email: contact.email, verified: contact.verified } : null,
     }));

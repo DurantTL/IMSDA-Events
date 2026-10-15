@@ -187,8 +187,8 @@ export function buildChurchCodeReportRow(input: {
   church: { id: string; name: string };
   codes: ChurchCodeReportRow["codes"];
   lines: readonly ChurchSponsoredPromoLine[];
-  /** The registrant's name as stored, by confirmation code; a code with no entry shows an empty name. */
-  registrantNames?: ReadonlyMap<string, string>;
+  /** The name each line shows, by line id: the registrant, or the covered attendee for a per-person line; no entry shows an empty name. */
+  lineNames?: ReadonlyMap<string, string>;
   invoice: ChurchInvoiceFacts | null;
   contact: ChurchCodeReportRow["contact"];
 }): ChurchCodeReportRow {
@@ -201,7 +201,7 @@ export function buildChurchCodeReportRow(input: {
     codes: input.codes,
     lines: churchInvoiceLines(input.lines, input.church.id).map((line) => ({
       ...line,
-      registrantName: input.registrantNames?.get(line.confirmationCode) ?? "",
+      registrantName: input.lineNames?.get(line.lineId) ?? "",
     })),
     coveredCents: figures.amountDueCents,
     invoicedCents,

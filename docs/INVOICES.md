@@ -362,7 +362,7 @@ Database triggers (not only application code) enforce, and `npm run test:invoice
     church invoice finalized takes the code derived from the event name (and freezes it on the event, as for any event).
     Staff do not choose it on attendee-paid events.
   - **Names (decided, Caleb, Oct 15, 2026, #960).** The staff church report on `/finance/church-owed` (`getChurchCodeReport`,
-    Manage finance, checked on the server) shows the registrant's name as stored next to each confirmation code. The church
+    Manage finance, checked on the server) shows a name next to each confirmation code: the registrant on a whole-registration line, the covered attendee on a per-person line (#397), read from the contact or profile snapshot first, then the stored Person. The church
     invoice (one line per sponsored registration), its snapshot and PDF, the send preview and any email to the church show **no
     names**. Audits keep ids only. `npm run test:church-code-invoices` asserts the name is on the report and absent from the PDF
     text, the snapshot, the send preview and the audit rows.

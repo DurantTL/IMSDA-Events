@@ -119,7 +119,7 @@ Automation may prepare a draft and must never finalize or send one.
   a confirmation code or an attendee name; the invoice goes to the church's own
   active billing contact.
 - **The church report** (same page) shows, per church that sponsors a code on the
-  event: who used the code (the registrant's name as stored, with the confirmation
+  event: who used the code (the registrant's name, or the covered attendee's on a per-person line, with the confirmation
   code and the code; #960), covered, invoiced (the live finalized invoice), paid and
   still owed (both from the invoice ledger), and what is not yet invoiced (or
   invoiced beyond current use). The names are read on the server by
@@ -127,8 +127,10 @@ Automation may prepare a draft and must never finalize or send one.
   to the report's own line type, never to the sponsored line the invoice is built
   from.
 - **Decisions (Caleb, Oct 15, 2026, #960).** (1) The staff church report shows
-  attendee names, the registrant's name as stored (the account holder's first and
-  last name). (2) The church invoice keeps one line per sponsored registration with
+  attendee names: a whole-registration line shows the registrant, and a per-person
+  line (#397) shows the covered attendee ("used for that person"). Names are read the
+  way the rest of the app reads them: the registration's `contactSnapshot` (or the
+  attendee's `profileSnapshot`) first, then the stored Person. (2) The church invoice keeps one line per sponsored registration with
   **no names**, as built; so do the PDF, the send preview and any email to the
   church. (3) The invoice code is **not** chosen by staff on attendee-paid events;
   it stays derived from the event name. (4) Audits keep ids only.
