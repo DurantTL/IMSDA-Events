@@ -19,6 +19,11 @@ export const staffAcknowledgmentSchema = z.object({
 
 export type StaffAcknowledgmentRequest = z.infer<typeof staffAcknowledgmentSchema>;
 
+/** Staff void an acknowledgment with a reason (#150). The evidence id is in the URL; the reason is kept on the void row only. */
+export const voidAcknowledgmentSchema = z.object({
+  reason: z.string().trim().min(1, "Enter a reason for voiding this acknowledgment.").max(1000),
+}).strict();
+
 export const acknowledgmentStatusQuerySchema = z.object({
   at: z.iso.datetime().optional(),
 });

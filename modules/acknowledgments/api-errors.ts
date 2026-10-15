@@ -15,7 +15,7 @@ function isAcknowledgmentTriggerError(error: unknown) {
 }
 
 const notFound = new Set<AcknowledgmentErrorCode>(["REGISTRATION_NOT_FOUND", "FIELD_NOT_FOUND", "ATTENDEE_NOT_FOUND", "EVIDENCE_NOT_FOUND", "ACTOR_NOT_FOUND"]);
-const badRequest = new Set<AcknowledgmentErrorCode>(["ATTENDEE_REQUIRED", "ATTENDEE_NOT_ALLOWED", "ACKNOWLEDGED_AT_INVALID"]);
+const badRequest = new Set<AcknowledgmentErrorCode>(["ATTENDEE_REQUIRED", "ATTENDEE_NOT_ALLOWED", "ACKNOWLEDGED_AT_INVALID", "REASON_REQUIRED"]);
 const forbidden = new Set<AcknowledgmentErrorCode>(["ACTING_FOR_MINOR_NOT_AUTHORIZED", "ACTING_FOR_ANOTHER_NOT_AUTHORIZED"]);
 
 export function acknowledgmentApiError(error: unknown) {

@@ -68,6 +68,13 @@ let templateIdsBefore = new Set<string>();
 async function cleanup() {
   const events = await prisma.event.findMany({ where: { OR: [{ id: { startsWith: `${P}_` } }, { slug: { startsWith: `${S}-` } }] }, select: { id: true } });
   const eventIds = [...new Set([...events.map((event) => event.id), generalEventId])];
+  // Acknowledgment evidence (#150) is append-only and RESTRICTs its event; this script's own synthetic rows are removed with
+  // triggers bypassed for that one transaction (a superuser, local databases only).
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SET LOCAL session_replication_role = replica`;
+    await tx.$executeRaw`DELETE FROM "AcknowledgmentVoid" WHERE "eventId" = ANY(${eventIds})`;
+    await tx.$executeRaw`DELETE FROM "AcknowledgmentEvidence" WHERE "eventId" = ANY(${eventIds})`;
+  });
   const registrationIds = (await prisma.registration.findMany({ where: { eventId: { in: eventIds } }, select: { id: true } })).map((row) => row.id);
   await prisma.messageOutbox.deleteMany({ where: { OR: [{ registrationId: { in: registrationIds } }, { eventId: { in: eventIds } }] } });
   // Amendment records are immutable by trigger; this script's own synthetic rows are removed with the trigger off for that
@@ -758,6 +765,44 @@ async function main() {
   }));
   assert(sameName && /pending_team_name|Unique constraint/.test(dbError(sameName)), `two waiting teams cannot share a name key, got ${dbError(sameName)}`);
   console.log("ok  the table constraints: answers exist only while waiting, a waiting name is unique in the event");
+
+  // 17. Acknowledgment evidence (#150) and a form that changed after a team was received. Staff confirm against the current form,
+  // so a director's acknowledgment answers are only kept when they were given on that very form version; otherwise the evidence
+  // would claim they saw wording they never saw.
+  const ACK_WORDING = "Synthetic general link acknowledgment wording.";
+  const v1 = await prisma.registrationFormVersion.findUniqueOrThrow({ where: { id: versionId } });
+  const v2Definition = JSON.parse(JSON.stringify(v1.definition)) as { sections: Array<{ fields: Array<Record<string, unknown>> }> };
+  v2Definition.sections[0]!.fields.push({
+    id: `${P}_ack_field`, key: "ack_release", label: "Release acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION", required: true, options: [],
+    acknowledgment: { source: "TEXT", text: ACK_WORDING },
+  });
+  const driftSubmit = (teamName: string, extra: Record<string, unknown> = {}, id = versionId) =>
+    link.submitGeneralLinkRegistration(eventSlug, { ...request(youth(teamName.replace(/\W/g, "").slice(0, 6)), { club_name: clubName("c"), email: emailOf("regc"), ...extra }), versionId: id }, { locationId: missouri!.id, teamName }, now);
+  await driftSubmit("Ack Drift Old");
+  const driftRow = await submissionOf("Ack Drift Old");
+  assert(driftRow.status === "PENDING", "a team from an unmatched email waits for staff");
+  await prisma.registrationFormVersion.update({ where: { id: versionId }, data: { status: RegistrationFormStatus.ARCHIVED } });
+  const v2 = await prisma.registrationFormVersion.create({
+    data: { id: `${P}_form_v2`, formId: form.id, createdByUserId: staffUserId, versionNumber: v1.versionNumber + 1, status: RegistrationFormStatus.PUBLISHED, publishedAt: new Date(), definition: v2Definition as never },
+  });
+  const refusedDrift = await caught(link.resolvePendingTeam(eventId, driftRow.id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") }));
+  assert(refusedDrift instanceof Error && (refusedDrift as { code?: string }).code === "FORM_CHANGED" && /acknowledgment/.test(refusedDrift.message), `confirming against a form that now needs an acknowledgment is refused clearly, got ${String(refusedDrift)}`);
+  assert((await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { id: driftRow.id } })).status === "PENDING", "the team stays waiting");
+  assert(await prisma.acknowledgmentEvidence.count({ where: { eventId } }) === 0, "and no evidence exists for wording the director never saw");
+  // Even if the stored answers carry a tick (a hand-edited payload), it is dropped, not recorded, when the version differs.
+  const tampered = driftRow.payload as { responses: Record<string, unknown> };
+  await prisma.generalLinkSubmission.update({ where: { id: driftRow.id }, data: { payload: { ...(driftRow.payload as object), responses: { ...tampered.responses, ack_release: true } } as never } });
+  const stillRefused = await caught(link.resolvePendingTeam(eventId, driftRow.id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") }));
+  assert((stillRefused as { code?: string })?.code === "FORM_CHANGED" && await prisma.acknowledgmentEvidence.count({ where: { eventId } }) === 0, "a tick carried over from another form version is never recorded");
+  // A team that acknowledged on the current version keeps its acknowledgment through staff confirmation.
+  await driftSubmit("Ack Same Version", { ack_release: true }, v2.id);
+  const sameRow = await submissionOf("Ack Same Version");
+  assert(sameRow.status === "PENDING", "the team on the current version waits too");
+  const confirmedSame = await link.resolvePendingTeam(eventId, sameRow.id, staffUserId, { action: "CONFIRM", organizationId: clubOf("c") });
+  const evidence = await prisma.acknowledgmentEvidence.findMany({ where: { eventId } });
+  assert(confirmedSame.status === "CONFIRMED" && evidence.length === 1, `one evidence row for the version the director saw, got ${evidence.length}`);
+  assert(evidence[0]!.registrationId === confirmedSame.registrationId && evidence[0]!.formVersionId === v2.id && evidence[0]!.shownText === ACK_WORDING && evidence[0]!.channel === "ONLINE" && evidence[0]!.recordedByUserId === null, "it records that version's wording as the director's own online acknowledgment");
+  console.log("ok  acknowledgments: a form changed since a team was received never gives it evidence for new wording");
 
   console.log("ok  all general registration link checks passed");
 }

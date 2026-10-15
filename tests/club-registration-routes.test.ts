@@ -37,6 +37,7 @@ vi.mock("@/lib/prisma", () => ({
       findUniqueOrThrow: mocks.draftFind,
     },
     eventLocation: { findFirst: mocks.locationFindFirst },
+    registrationForm: { findFirst: async () => null },
     };
     return client;
   },

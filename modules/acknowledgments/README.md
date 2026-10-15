@@ -24,7 +24,11 @@ drawn signature** here (decision of Sept 28, 2026, confirmed Oct 14). Human deci
   the experience) and the box says "I acknowledge this." If a policy version cannot be read the box is disabled and says so.
 - Drafts: an acknowledgment, and any answer that depends on one, is never saved in a browser draft. Previews and test
   submissions validate the field but record no evidence (they are fictitious).
-- Attendee self-service, the attendee roster file and club forms never carry the field. An amendment keeps each
+- Per-attendee acknowledgments are refused, at save and again at publish, on club events, events billed to the church and events
+  with the general registration link on: club rosters have no #131 declarations, so they could never be recorded. The builder
+  says so and suggests a registration-level one, which stays allowed.
+- Attendee self-service, the attendee roster file and club forms never carry the field. Club server drafts drop it, as browser
+  drafts do. An amendment keeps each
   acknowledgment answer as stored and gives a new attendee none (`holdAcknowledgmentAnswers`), so a stored `true` always has
   its evidence beside it.
 
@@ -51,9 +55,14 @@ being the account holder never count.
 - An adult (or a person of unknown age) acknowledges for themselves. Nobody acknowledges for another adult: nothing records
   that authority. On the public form the registrant can therefore tick an attendee-level acknowledgment for themselves and for
   the minors they were declared responsible for, and no one else.
-- A minor's acknowledgment needs the minor's ACTIVE, live declaration to name the person who acknowledged
-  (`findActiveDeclaredAuthority`). The minor's own tick, "None of us", a revoked or stale declaration and an undeclared
+- A minor's acknowledgment needs the minor's ACTIVE, live declaration, made **on this registration**, to name the person who
+  acknowledged (`findActiveDeclaredAuthority(client, eventId, minorPersonId, registrationId)`; a declaration on another
+  registration of a split family is not authority here). The insert trigger also checks the authority id is a declaration for
+  this minor at this event. The minor's own tick, "None of us", a revoked or stale declaration and an undeclared
   parent all fail. A database check makes a `MINOR` row without `guardianAuthorityId` impossible.
+- **Staff acting as a director cannot acknowledge for them.** Evidence names the person who acknowledged and has no staff-user
+  actor, so an act-as submission carrying any acknowledgment is refused with a clear message (never recorded under the director,
+  never as STAFF_ENTERED on their behalf). The director acknowledges, or staff record paper evidence afterward.
 - A refusal on the public form is a 422 `INVALID_SUBMISSION` marking each field (`ACKNOWLEDGMENT_NOT_AUTHORIZED`) and rolls
   the whole registration back: no registration, declaration or evidence is left behind. Staff routes answer 403.
 
@@ -75,11 +84,15 @@ being the account holder never count.
 `POST /api/events/{eventId}/registrations/{registrationId}/acknowledgments` (MANAGE_REGISTRATION, same-origin) takes
 `{ fieldKey, attendeeId?, actedByPersonId?, channel: STAFF_ENTERED | PAPER, acknowledgedAt?, clientRequestId }`. The wording
 is never in the request: it comes from the registration's own form version, so staff cannot record text the person was not
-shown. `actedByPersonId` defaults to the registrant (registration level) or the attendee; for a minor staff must name the
+shown. `actedByPersonId` defaults to the registrant (registration level) or the attendee and, if given, must be the registrant or a
+person on this registration: anyone else, existing or not, gets the same 404 (no oracle). For a minor staff must name the
 declared responsible adult, and staff cannot stand in. A field whose condition hides it for that person is refused.
 
 ## Reading it back
 
+- **The stored answer is the submission-time answer only.** Staff-entered and paper evidence never rewrites it. Where standing
+  matters (the amendment editor) it is read from the evidence status; reports and emails that use the stored answer reflect only
+  what was ticked at submission.
 - `GET .../acknowledgments?at=<iso>` (MANAGE_REGISTRATION) gives each subject's status as of a moment, with every evidence
   row as a summary: **no wording and no request metadata**.
 - `GET .../acknowledgments/{evidenceId}` (VIEW_SENSITIVE_DATA, never cached) is the only read of the payload: the exact text,
@@ -89,6 +102,15 @@ declared responsible adult, and staff cannot stand in. A field whose condition h
   `REACKNOWLEDGMENT_REQUIRED` (one is). Materiality is the publisher's recorded judgment (#129), never inferred. Evidence is
   judged against the version in force at the moment asked about (`getPolicyVersionEffectiveAt`), so the answer about the past
   does not change when a later version is published.
+
+## Corrections: voiding
+
+Staff with VIEW_SENSITIVE_DATA void evidence with a reason (`POST .../acknowledgments/{evidenceId}/void`). The void is a separate
+append-only `AcknowledgmentVoid` row (one per evidence row, so voiding twice is the same void); the evidence row is never touched.
+A voided row stops counting from its void moment on (`statusAt` filters by `voidedAt <= at`, so the past is unchanged), and the
+same content can be recorded again as the next `generation` (the insert trigger requires generation = number of voided rows
+for that subject, field and content, and the unique indexes include it). The reason is on the void row and in the payload read
+only; the audit entry carries ids.
 
 ## Kept out of the general flow
 
@@ -112,10 +134,15 @@ and a policy version someone acknowledged must not vanish. An event with evidenc
   acknowledgment entered by staff on paper. A per-adult link is a later slice.
 - **Registrants cannot yet add an acknowledgment after the fact.** An attendee added by amendment gets no acknowledgment until
   staff record it. There is no screen for the staff route yet; it is an API.
-- **Club and group submissions**: a club director acting for roster members is refused for attendee-level acknowledgments,
-  because #131 declarations do not exist for club rosters. Registration-level ones work.
+- **Club and group events**: attendee-level acknowledgments cannot be configured (refused at save and publish) because #131
+  declarations do not exist for club rosters. Registration-level ones work.
+- **General-link teams**: staff confirmation resubmits against the current form. If the form changed since the team was received,
+  its acknowledgment answers are dropped, and a now-required acknowledgment makes the confirmation refuse (`FORM_CHANGED`) rather
+  than record wording the director never saw.
 - **Paper wording** is whatever the registration's form version shows. A paper form carrying different published wording needs
   its own form version.
+- Decided (Caleb, Oct 15): a club director's ONE registration-level acknowledgment covers the whole club (Fall Camporee), and
+  staff correct evidence by voiding it with a reason (see below and `docs/ACKNOWLEDGMENTS.md`).
 - The policy picker previews a policy version by title and number only: the slim read has no body text by design.
 
 Policy text and acknowledgment wording are staff-entered data. No legal text belongs in this repository; tests use obviously

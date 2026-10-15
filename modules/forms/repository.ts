@@ -56,6 +56,19 @@ const emptyDirectory: OrganizationDirectory = { clubs: [], churches: [], schools
  * picker) can be saved only once it is fixed, and can never be published pointing at something the event cannot use.
  */
 async function assertAcknowledgmentPolicies(eventId: string, definition: RegistrationFormDefinition) {
+  // Club and group events take registrations from directors, and club rosters have no responsible-adult declarations (#131),
+  // so an attendee-level acknowledgment could never be recorded for them. Registration-level ones are fine.
+  const attendeeLevel = definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.type === "ACKNOWLEDGMENT" && field.scope === "ATTENDEE");
+  if (attendeeLevel.length > 0) {
+    const event = await getPrisma().event.findUnique({ where: { id: eventId }, select: { audience: true, billingMode: true, generalRegistrationLinkEnabled: true } });
+    if (event && (event.audience === "CLUB" || event.billingMode === "DEFERRED_ORGANIZATION_INVOICE" || event.generalRegistrationLinkEnabled)) {
+      throw new FormOperationError(
+        "ACKNOWLEDGMENT_POLICY_UNAVAILABLE",
+        `${attendeeLevel.map((field) => field.label).join(", ")}: a per-attendee recorded acknowledgment is not available on club or group events, because club rosters have no responsible-adult declarations. Make it a registration-level acknowledgment.`,
+      );
+    }
+  }
   try {
     await assertAcknowledgmentPoliciesAvailable(eventId, definition);
   } catch (error) {

@@ -59,6 +59,7 @@ export type AcknowledgmentErrorCode =
   | "ACTING_FOR_ANOTHER_NOT_AUTHORIZED"
   | "ACKNOWLEDGMENT_REFUSED"
   | "IDEMPOTENCY_CONFLICT"
+  | "REASON_REQUIRED"
   | "EVIDENCE_NOT_FOUND";
 
 export type AcknowledgmentRefusal = {
@@ -112,6 +113,8 @@ export type EvidenceSummary = {
   guardianAuthorityId: string | null;
   acknowledgedAt: string;
   recordedAt: string;
+  /** When staff voided it (a correction, #150); null while it stands. The reason is only in the payload read. */
+  voidedAt: string | null;
 };
 
 const summarySelect = {
@@ -130,6 +133,7 @@ const summarySelect = {
   guardianAuthorityId: true,
   acknowledgedAt: true,
   recordedAt: true,
+  void: { select: { voidedAt: true } },
 } as const;
 
 type SummaryRow = Prisma.AcknowledgmentEvidenceGetPayload<{ select: typeof summarySelect }>;
@@ -149,6 +153,7 @@ function summarize(row: SummaryRow): EvidenceSummary {
     contentHash: row.contentHash,
     subjectMinorStatus: row.subjectMinorStatus,
     guardianAuthorityId: row.guardianAuthorityId,
+    voidedAt: row.void?.voidedAt ? row.void.voidedAt.toISOString() : null,
     acknowledgedAt: row.acknowledgedAt.toISOString(),
     recordedAt: row.recordedAt.toISOString(),
   };
@@ -248,6 +253,7 @@ export type RecordOutcome = {
   replayed: boolean;
 };
 
+/** The latest row (highest generation) for this subject, field and content: the one that is live unless it was voided. */
 async function findByNaturalKey(client: Client, request: RecordRequest, contentRef: string) {
   return client.acknowledgmentEvidence.findFirst({
     where: {
@@ -256,7 +262,8 @@ async function findByNaturalKey(client: Client, request: RecordRequest, contentR
       fieldKey: request.field.key,
       contentRef,
     },
-    select: summarySelect,
+    orderBy: { generation: "desc" },
+    select: { ...summarySelect, generation: true },
   });
 }
 
@@ -296,7 +303,7 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
   }
 
   const authority = request.attendee && request.attendee.status === "MINOR"
-    ? await findActiveDeclaredAuthority(tx, request.eventId, request.attendee.personId)
+    ? await findActiveDeclaredAuthority(tx, request.eventId, request.attendee.personId, request.registrationId)
     : null;
   const decision: ActingDecision = decideActing({
     subject: { personId: request.attendee?.personId ?? null, status: request.attendee?.status ?? "ADULT" },
@@ -306,7 +313,9 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
   if (!decision.allowed) throw new AcknowledgmentError(decision.code, decision.message);
 
   const existing = await findByNaturalKey(tx, request, content.contentRef);
-  if (existing) return { evidence: summarize(existing), created: false, replayed: false };
+  if (existing && !existing.void) return { evidence: summarize(existing), created: false, replayed: false };
+  // A voided acknowledgment can be recorded again: the next generation (all earlier ones are voided, so this is their count).
+  const generation = existing ? existing.generation + 1 : 0;
 
   const id = randomUUID();
   const inserted = await tx.acknowledgmentEvidence.createMany({
@@ -335,6 +344,7 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
       requestMetadata: approvedRequestMetadata(request.requestMetadata) as Prisma.InputJsonValue,
       idempotencyKey: request.idempotencyKey,
       requestHash,
+      generation,
     }],
   });
   if (inserted.count === 0) {
@@ -525,8 +535,12 @@ export async function recordStaffAcknowledgment(input: StaffAcknowledgmentInput,
       throw new AcknowledgmentError("FIELD_NOT_APPLICABLE", "That acknowledgment does not apply to this person.");
     }
     const actedByPersonId = input.actedByPersonId ?? (attendee ? attendee.personId : registration.accountHolderPersonId);
-    if (!(await tx.person.findUnique({ where: { id: actedByPersonId }, select: { id: true } }))) {
-      throw new AcknowledgmentError("ACTOR_NOT_FOUND", "The person who acknowledged was not found.");
+    // Only the registrant or someone on this registration can have acknowledged on it. Anyone else, whether they exist or not,
+    // gets the same answer, so this route cannot be used to find out which people exist.
+    const onRegistration = actedByPersonId === registration.accountHolderPersonId
+      || registration.attendees.some((candidate) => candidate.personId === actedByPersonId);
+    if (!onRegistration) {
+      throw new AcknowledgmentError("ACTOR_NOT_FOUND", "The person who acknowledged is not on this registration.");
     }
     return recordAcknowledgmentEvidence(tx, {
       eventId: input.eventId,
@@ -563,10 +577,14 @@ export type SubjectAcknowledgmentView = {
 async function statusAt(
   client: Client,
   eventId: string,
-  rows: ReadonlyArray<{ source: "TEXT" | "POLICY_VERSION"; policyVersionId: string | null; acknowledgedAt: string }>,
+  rows: ReadonlyArray<{ source: "TEXT" | "POLICY_VERSION"; policyVersionId: string | null; acknowledgedAt: string; voidedAt?: string | null }>,
   at: Date,
 ): Promise<AcknowledgmentStatusCode> {
-  const given = rows.filter((row) => new Date(row.acknowledgedAt).getTime() <= at.getTime());
+  // Standing at a moment: given by then, and not yet voided by then. A void changes the answer only from its own moment on.
+  const given = rows.filter((row) => (
+    new Date(row.acknowledgedAt).getTime() <= at.getTime()
+    && !(row.voidedAt && new Date(row.voidedAt).getTime() <= at.getTime())
+  ));
   const latest = given[given.length - 1] ?? null;
   if (!latest) return resolveAcknowledgmentStatus({ evidence: null });
   if (latest.source === "TEXT" || !latest.policyVersionId) return resolveAcknowledgmentStatus({ evidence: latest });
@@ -671,6 +689,7 @@ export async function getAcknowledgmentEvidencePayload(eventId: string, registra
     select: { ...summarySelect, shownText: true, requestMetadata: true, formVersionId: true },
   });
   if (!row) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
+  const voidRow = await getPrisma().acknowledgmentVoid.findUnique({ where: { evidenceId: row.id }, select: { voidedAt: true, voidedByUserId: true, reason: true } });
   let policy: { id: string; versionNumber: number; title: string; bodyText: string; contentHash: string | null } | null = null;
   if (row.policyVersionId) {
     // By exact version id: what this person saw, never what applies now.
@@ -679,11 +698,62 @@ export async function getAcknowledgmentEvidencePayload(eventId: string, registra
   }
   return {
     evidence: summarize(row),
+    // The void's reason is sensitive and lives only here, behind the sensitive-data permission.
+    voided: voidRow ? { voidedAt: voidRow.voidedAt.toISOString(), voidedByUserId: voidRow.voidedByUserId, reason: voidRow.reason } : null,
     formVersionId: row.formVersionId,
     shownText: row.shownText,
     policyVersion: policy,
     requestMetadata: record(row.requestMetadata),
   };
+}
+
+export type VoidOutcome = { void: { id: string; evidenceId: string; voidedAt: string }; created: boolean };
+
+/**
+ * A correction (#150): staff void an acknowledgment with a reason. The evidence row is never changed; a separate append-only
+ * void row says it no longer counts, from the moment of the void on. Voiding twice is the same void (the first reason stands).
+ * A new acknowledgment of the same content can be recorded afterward. The audit entry holds ids only; the reason does not
+ * leave the void row (and the payload read behind VIEW_SENSITIVE_DATA).
+ */
+export async function voidAcknowledgmentEvidence(input: {
+  eventId: string;
+  registrationId: string;
+  evidenceId: string;
+  reason: string;
+  actorUserId: string;
+}): Promise<VoidOutcome> {
+  const reason = input.reason.trim();
+  if (reason.length === 0 || reason.length > 1000) {
+    throw new AcknowledgmentError("REASON_REQUIRED", "Enter a reason of 1 to 1,000 characters for voiding this acknowledgment.");
+  }
+  return getPrisma().$transaction(async (tx) => {
+    const evidence = await tx.acknowledgmentEvidence.findFirst({
+      where: { id: input.evidenceId, eventId: input.eventId, registrationId: input.registrationId },
+      select: { id: true, fieldKey: true, registrationAttendeeId: true },
+    });
+    if (!evidence) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
+    const existing = await tx.acknowledgmentVoid.findUnique({ where: { evidenceId: evidence.id }, select: { id: true, evidenceId: true, voidedAt: true } });
+    if (existing) return { void: { id: existing.id, evidenceId: existing.evidenceId, voidedAt: existing.voidedAt.toISOString() }, created: false };
+    const id = randomUUID();
+    const inserted = await tx.acknowledgmentVoid.createMany({
+      skipDuplicates: true,
+      data: [{ id, eventId: input.eventId, registrationId: input.registrationId, evidenceId: evidence.id, voidedByUserId: input.actorUserId, reason }],
+    });
+    const row = await tx.acknowledgmentVoid.findUniqueOrThrow({ where: { evidenceId: evidence.id }, select: { id: true, evidenceId: true, voidedAt: true } });
+    if (inserted.count === 1) {
+      await writeAuditLog({
+        eventId: input.eventId,
+        actorUserId: input.actorUserId,
+        action: "ACKNOWLEDGMENT_VOIDED",
+        entityType: "AcknowledgmentVoid",
+        entityId: row.id,
+        summary: "Voided an acknowledgment.",
+        // Ids only: the reason stays on the void row.
+        metadata: { eventId: input.eventId, registrationId: input.registrationId, evidenceId: evidence.id, registrationAttendeeId: evidence.registrationAttendeeId, fieldKey: evidence.fieldKey },
+      }, tx);
+    }
+    return { void: { id: row.id, evidenceId: row.evidenceId, voidedAt: row.voidedAt.toISOString() }, created: inserted.count === 1 };
+  });
 }
 
 /** How many evidence rows an event holds (counts only), for the event deletion guard. */

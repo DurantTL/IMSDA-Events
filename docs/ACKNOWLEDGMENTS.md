@@ -12,9 +12,37 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
 3. **Nobody acknowledges for another adult.** #131 only records authority over minors. A household with several adults needs a
    registration-level acknowledgment, or paper acknowledgments recorded by staff for each adult.
 4. **A minor's own tick never counts**, even for a teen registering alone: a declared responsible adult must acknowledge.
-5. **Policy references are by version id.** To change wording for new registrants, publish a new policy version (or a new form
+5. **Staff acting as a director cannot acknowledge for them.** Evidence has no staff-user actor, so an act-as submission with an
+   acknowledgment is refused. Giving staff that power would need a schema change and a decision about what it claims.
+6. **Policy references are by version id.** To change wording for new registrants, publish a new policy version (or a new form
    version for typed text) and point the field at it. People who acknowledged the earlier version stay acknowledged of it;
    whether they must acknowledge again is the human "material change" flag set when the policy version was published.
+
+## Decided by the owner (Caleb, Oct 15, 2026)
+
+- **Club events (Fall Camporee).** The club director ticking ONE registration-level acknowledgment for the whole club is enough.
+  That is the decided approach for club events. Registration-level acknowledgments stay allowed on club events, events billed
+  to the church and events with the general registration link; only per-attendee ones are refused (at form save and publish),
+  because club rosters have no responsible-adult declarations. A director's tick covers the club's roster; nothing is recorded
+  per youth.
+- **Corrections: staff void an acknowledgment, with a reason.** Needs VIEW_SENSITIVE_DATA. See "Voiding" below. Evidence is
+  never edited or deleted.
+
+## Voiding an acknowledgment
+
+`POST /api/events/{eventId}/registrations/{registrationId}/acknowledgments/{evidenceId}/void` with `{ "reason": "..." }`
+(1 to 1,000 characters; VIEW_SENSITIVE_DATA; same-origin).
+
+- A void is a new row in its own append-only table (`AcknowledgmentVoid`). The evidence row is never modified or deleted, and the
+  database still refuses every UPDATE, DELETE and TRUNCATE on both tables.
+- From the moment of the void on, the acknowledgment no longer counts: its status is NOT_ACKNOWLEDGED (unless a later one was
+  recorded). Asked about a moment before the void, it still counted: the history does not change.
+- Voiding twice is the same void: the second call returns the first (200, the first reason stands).
+- A new acknowledgment of the same content can then be recorded, as the next generation of that subject, field and content. A
+  database trigger makes the generation exactly the number of voided earlier rows, so there is never a second live row.
+- The reason lives only on the void row and in the sensitive payload read (`GET .../acknowledgments/{evidenceId}`). The audit entry
+  (`ACKNOWLEDGMENT_VOIDED`) holds ids only, and the status read shows only the time of the void.
+- There is no screen for it yet; it is an API.
 
 ## Staff recording an acknowledgment (API)
 

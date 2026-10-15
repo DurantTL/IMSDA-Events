@@ -46,9 +46,15 @@ describe("where evidence is written", () => {
     expect(publicRepository).not.toMatch(/actedByPersonId: input\./);
   });
 
-  it("labels a form submitted by staff for a director as staff-entered and the registrant's own as online", () => {
-    expect(publicRepository).toContain('channel: club?.submittedByUserId ? "STAFF_ENTERED" : "ONLINE"');
-    expect(publicRepository).toContain("recordedByUserId: club?.submittedByUserId ?? null");
+  it("never records a director's acknowledgment given by staff acting as them", () => {
+    expect(publicRepository).toContain('channel: "ONLINE"');
+    expect(publicRepository).toContain("recordedByUserId: null");
+    expect(publicRepository).not.toContain("recordedByUserId: club");
+    const refusal = publicRepository.indexOf("Staff cannot give an acknowledgment for a director");
+    const recording = publicRepository.indexOf("await recordSubmissionAcknowledgments(tx");
+    expect(refusal).toBeGreaterThan(0);
+    expect(refusal).toBeLessThan(recording);
+    expect(publicRepository).toContain("club?.submittedByUserId && planAcknowledgments(");
   });
 
   it("refuses a submission with an unauthorized acknowledgment as an invalid submission that marks the field", () => {
@@ -64,6 +70,47 @@ describe("where evidence is written", () => {
 
   it("reads a policy version's wording into the public experience by exact version id", () => {
     expect(publicRepository).toContain("acknowledgmentContent: await loadAcknowledgmentDisplayContent(form.eventId, definition)");
+  });
+});
+
+describe("other places an acknowledgment must not leak or be mis-attributed (#150)", () => {
+  const clubRegistrations = readFileSync("modules/club-registrations/repository.ts", "utf8");
+  const clubRosters = readFileSync("modules/club-rosters/repository.ts", "utf8");
+  const generalLink = readFileSync("modules/general-link-registrations/repository.ts", "utf8");
+  const editor = readFileSync("components/registration-amendment-editor.tsx", "utf8");
+  const acknowledgmentsRepository = readFileSync("modules/acknowledgments/repository.ts", "utf8");
+
+  it("drops acknowledgment answers from a club's saved server draft, as the browser draft does", () => {
+    expect(clubRegistrations).toContain("acknowledgmentFields(draftForm.definition)");
+    expect(clubRegistrations).toContain("responses: withoutAcknowledgments(input.responses)");
+    expect(clubRegistrations).toContain(".map(([key, answers]) => [key, withoutAcknowledgments(answers)])");
+  });
+
+  it("counts both evidence relations before removing a club roster person, so removal keeps the Person instead of failing", () => {
+    expect(clubRosters).toContain("acknowledgmentEvidenceAsSubject: true");
+    expect(clubRosters).toContain("acknowledgmentEvidenceActed: true");
+  });
+
+  it("confirms a general-link team only with acknowledgment answers from the form version the director saw", () => {
+    expect(generalLink).toContain("storedVersionId !== experience.form.versionId");
+    expect(generalLink).toContain('"FORM_CHANGED"');
+    expect(generalLink).toContain("withoutAcknowledgments(stored.responses ?? {})");
+  });
+
+  it("shows an acknowledgment's standing from its evidence in the amendment editor, since staff evidence never rewrites the stored answer", () => {
+    expect(editor).toContain("/acknowledgments`");
+    expect(editor).toContain("acknowledgmentStatus={acknowledgmentStatuses[");
+    expect(acknowledgmentsRepository).not.toMatch(/formResponses:\s*\{[^}]*ack/);
+    expect(acknowledgmentsRepository).not.toContain("registration.update");
+  });
+
+  it("limits who staff can name as having acknowledged to the registrant or someone on the registration, with one answer for everyone else", () => {
+    expect(acknowledgmentsRepository).toContain("registration.attendees.some((candidate) => candidate.personId === actedByPersonId)");
+    expect(acknowledgmentsRepository).not.toContain("tx.person.findUnique");
+  });
+
+  it("reads declared authority for the registration the evidence belongs to", () => {
+    expect(acknowledgmentsRepository).toContain("request.attendee.personId, request.registrationId");
   });
 });
 
@@ -102,6 +149,17 @@ describe("where evidence is checked and never exposed", () => {
     const guard = migration.slice(migration.indexOf('CREATE FUNCTION "AcknowledgmentEvidence_append_only"'), migration.indexOf('CREATE TRIGGER "AcknowledgmentEvidence_append_only"'));
     expect(guard).toContain("RAISE EXCEPTION");
     expect(guard).not.toContain("imsda.event_deletion");
+  });
+
+  it("corrects evidence only by appending a void: its own append-only table, restricted references, an insert guard, no truncate", () => {
+    expect(migration).toContain('CREATE TABLE "AcknowledgmentVoid"');
+    expect(migration).toContain('CREATE UNIQUE INDEX "AcknowledgmentVoid_evidenceId_key"');
+    expect(migration).toContain('BEFORE UPDATE OR DELETE ON "AcknowledgmentVoid"');
+    expect(migration).toContain('BEFORE TRUNCATE ON "AcknowledgmentVoid"');
+    const voidKeys = migration.split("\n").filter((line) => line.includes('ADD CONSTRAINT "AcknowledgmentVoid_') && line.includes("FOREIGN KEY"));
+    expect(voidKeys).toHaveLength(4);
+    for (const line of voidKeys) expect(line).toContain("ON DELETE RESTRICT");
+    expect(migration).toContain('BEFORE TRUNCATE ON "AcknowledgmentEvidence"');
   });
 
   it("is an additive migration later than every other migration", () => {

@@ -29,6 +29,7 @@ const state = vi.hoisted(() => ({
   /** The declared responsible adult per minor person id (what the guardian module's read returns). */
   authority: new Map<string, { id: string; adultPersonId: string }>(),
   authorityLookups: [] as string[],
+  authorityRegistrations: [] as string[],
   registration: null as Row | null,
   persons: new Set<string>(["p-dan", "p-sam", "p-ulf", "p-mum", "p-stranger"]),
 }));
@@ -48,8 +49,9 @@ vi.mock("@/modules/audit/audit-service", () => ({
   writeAuditLog: vi.fn(async (entry: Row) => { state.audits.push(entry); }),
 }));
 vi.mock("@/modules/guardian-authority/repository", () => ({
-  findActiveDeclaredAuthority: vi.fn(async (_client: unknown, _eventId: string, minorPersonId: string) => {
+  findActiveDeclaredAuthority: vi.fn(async (_client: unknown, _eventId: string, minorPersonId: string, registrationId: string) => {
     state.authorityLookups.push(minorPersonId);
+    state.authorityRegistrations.push(registrationId);
     return state.authority.get(minorPersonId) ?? null;
   }),
 }));
@@ -105,6 +107,7 @@ vi.mock("@/lib/prisma", () => ({
       findMany: async () => [...state.evidence].sort((a, b) => (a.acknowledgedAt as Date).getTime() - (b.acknowledgedAt as Date).getTime()),
       findFirst: async ({ where }: { where: Row }) => state.evidence.find((row) => row.id === where.id && row.eventId === where.eventId && row.registrationId === where.registrationId) ?? null,
     },
+    acknowledgmentVoid: { findUnique: async () => null },
     consentPolicyVersion: {
       findUnique: async ({ where }: { where: { id: string } }) => state.versions.get(where.id) ?? null,
       count: async ({ where }: { where: { policyId: string; versionNumber: { gt: number; lte: number }; effectiveFrom: { lte: Date } } }) => (
@@ -181,6 +184,7 @@ beforeEach(() => {
   state.versions.clear();
   state.authority.clear();
   state.authorityLookups.length = 0;
+  state.authorityRegistrations.length = 0;
   prismaStand.tx = fakeTx();
   addVersion({ id: "version-1", versionNumber: 1, effectiveFrom: new Date("2026-01-01T00:00:00Z") });
   consent.getPolicyVersionForEvidence.mockReset();
@@ -335,6 +339,7 @@ describe("acting for a minor needs declared authority (#131)", () => {
     const outcome = await run((tx) => recordAcknowledgmentEvidence(asTx(tx), minorRequest()));
     expect(outcome.evidence).toMatchObject({ subjectPersonId: "p-sam", actedByPersonId: "p-dan", subjectMinorStatus: "MINOR", guardianAuthorityId: "auth-1" });
     expect(state.authorityLookups).toEqual(["p-sam"]);
+    expect(state.authorityRegistrations).toEqual(["reg-1"]);
   });
 
   it.each([
@@ -477,9 +482,15 @@ describe("staff-entered and paper evidence (#150)", () => {
 
   it("refuses a minor unless the person who signed is the declared responsible adult", async () => {
     state.authority.set("p-sam", { id: "auth-1", adultPersonId: "p-dan" });
-    for (const actor of [null, "p-ulf", "p-mum", "p-stranger"]) {
+    for (const actor of [null, "p-ulf"]) {
       const error = await failure(staff({ attendeeId: "att-sam", actedByPersonId: actor, clientRequestId: `req-${actor}` }));
       expect((error as AcknowledgmentError).code).toBe("ACTING_FOR_MINOR_NOT_AUTHORIZED");
+    }
+    // Anyone not on the registration, existing or not, gets the same answer: the route is no oracle for who exists.
+    for (const actor of ["p-mum", "p-stranger", "p-nobody"]) {
+      const error = await failure(staff({ attendeeId: "att-sam", actedByPersonId: actor, clientRequestId: `req-${actor}` }));
+      expect((error as AcknowledgmentError).code).toBe("ACTOR_NOT_FOUND");
+      expect((error as AcknowledgmentError).message).toBe("The person who acknowledged is not on this registration.");
     }
     expect(state.evidence).toHaveLength(0);
     const allowed = await staff({ attendeeId: "att-sam", actedByPersonId: "p-dan", clientRequestId: "req-dad" });
@@ -499,6 +510,7 @@ describe("staff-entered and paper evidence (#150)", () => {
     ["an attendee who is not on the registration", { attendeeId: "att-elsewhere" }, "ATTENDEE_NOT_FOUND"],
     ["a date in the future", { acknowledgedAt: new Date("2027-02-01T00:00:00Z") }, "ACKNOWLEDGED_AT_INVALID"],
     ["a person who does not exist", { actedByPersonId: "p-nobody" }, "ACTOR_NOT_FOUND"],
+    ["a real person who is not on the registration", { actedByPersonId: "p-stranger" }, "ACTOR_NOT_FOUND"],
     ["an attendee conditional that does not apply to the person", { fieldKey: "att_cond_ack", attendeeId: "att-ulf" }, "FIELD_NOT_APPLICABLE"],
     ["a registration conditional that does not apply", { fieldKey: "program_ack", attendeeId: null }, "FIELD_NOT_APPLICABLE"],
   ])("refuses %s", async (_label, overrides, code) => {
@@ -578,6 +590,29 @@ describe("historical status resolution (#150)", () => {
     evidenceRow({ policyVersionId: "version-2", contentHash: "hash-version-2", acknowledgedAt: day(35) });
     expect(await statusAt(day(32))).toBe("REACKNOWLEDGMENT_REQUIRED");
     expect(await statusAt(day(36))).toBe("ACKNOWLEDGED");
+  });
+
+  it("stops counting from the moment of a void, and only from then", async () => {
+    evidenceRow({ voidedAt: undefined, void: { voidedAt: day(15) } });
+    expect(await statusAt(day(12))).toBe("ACKNOWLEDGED");
+    expect(await statusAt(day(14))).toBe("ACKNOWLEDGED");
+    expect(await statusAt(day(16))).toBe("NOT_ACKNOWLEDGED");
+    expect(await statusAt(day(500))).toBe("NOT_ACKNOWLEDGED");
+  });
+
+  it("counts a new acknowledgment recorded after a void, judged from its own moment", async () => {
+    evidenceRow({ void: { voidedAt: day(15) } });
+    evidenceRow({ acknowledgedAt: day(20), recordedAt: day(20) });
+    expect(await statusAt(day(17))).toBe("NOT_ACKNOWLEDGED");
+    expect(await statusAt(day(21))).toBe("ACKNOWLEDGED");
+  });
+
+  it("reports the void time in the summary and never its reason", async () => {
+    evidenceRow({ void: { voidedAt: day(15) } });
+    const views = (await listRegistrationAcknowledgments("event-1", "reg-1", day(20)))!;
+    const row = views.find((view) => view.fieldKey === "att_ack")!.evidence[0]!;
+    expect(row.voidedAt).toBe(day(15).toISOString());
+    expect(JSON.stringify(views)).not.toContain("reason");
   });
 
   it("stands for a text acknowledgment whatever happens to any policy", async () => {

@@ -37,6 +37,7 @@ import {
   AcknowledgmentError,
   assertAcknowledgmentPoliciesAvailable,
   getAcknowledgmentEvidencePayload,
+  voidAcknowledgmentEvidence,
   listRegistrationAcknowledgments,
   recordAcknowledgmentEvidence,
   recordStaffAcknowledgment,
@@ -44,6 +45,7 @@ import {
 import { contentHashFor } from "../modules/consent/domain";
 import { createConsentPolicy, createNextDraftVersion, publishPolicyVersion } from "../modules/consent/repository";
 import { EventDeletionError, deleteEvent, getEventDeletionPreview } from "../modules/events/deletion-repository";
+import { FormOperationError, publishRegistrationForm, updateRegistrationForm } from "../modules/forms/repository";
 
 loadEnvConfig(process.cwd());
 // Local-only, before any Prisma client or connection exists.
@@ -58,6 +60,7 @@ const ids = {
   staff: `${P}_staff`,
   eventA: `${P}_ev_a`,
   eventB: `${P}_ev_b`,
+  eventC: `${P}_ev_c`,
   form: `${P}_form`,
   formVersion: `${P}_form_v1`,
   polHist: `${P}_pol_hist`,
@@ -90,10 +93,11 @@ async function expectCode(promise: Promise<unknown>, code: string, message: stri
 }
 
 async function cleanup() {
-  const eventIds = [ids.eventA, ids.eventB];
+  const eventIds = [ids.eventA, ids.eventB, ids.eventC];
   // The product can never delete evidence or a published policy version; the superuser bypass lets this check clear its own rows.
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SET LOCAL session_replication_role = replica`;
+    await tx.$executeRaw`DELETE FROM "AcknowledgmentVoid" WHERE "eventId" IN (${Prisma.join(eventIds)})`;
     await tx.$executeRaw`DELETE FROM "AcknowledgmentEvidence" WHERE "eventId" IN (${Prisma.join(eventIds)})`;
     await tx.$executeRaw`DELETE FROM "ConsentPolicyVersion" WHERE "policyId" IN (SELECT "id" FROM "ConsentPolicy" WHERE "eventId" IN (${Prisma.join(eventIds)}))`;
     await tx.$executeRaw`DELETE FROM "ConsentPolicy" WHERE "eventId" IN (${Prisma.join(eventIds)})`;
@@ -138,8 +142,8 @@ async function main() {
   const year = new Date().getUTCFullYear() + 1;
   const startsAt = new Date(Date.UTC(year, 2, 5, 15, 0, 0));
   const endsAt = new Date(Date.UTC(year, 2, 7, 15, 0, 0));
-  for (const id of [ids.eventA, ids.eventB]) {
-    await prisma.event.create({ data: { id, slug: slugOf(id), name: `Acknowledgment Check ${id}`, startsAt, endsAt, timezone: "America/Chicago", isPublished: true, audience: "GENERAL", billingMode: "ATTENDEE_PAY" } });
+  for (const id of [ids.eventA, ids.eventB, ids.eventC]) {
+    await prisma.event.create({ data: { id, slug: slugOf(id), name: `Acknowledgment Check ${id}`, startsAt, endsAt, timezone: "America/Chicago", isPublished: true, audience: id === ids.eventC ? "CLUB" : "GENERAL", billingMode: "ATTENDEE_PAY" } });
   }
 
   // ---- Policies, through the real #129 functions where time does not matter ----
@@ -379,7 +383,7 @@ async function main() {
   });
   await expectCode(minorRequest(null), "ACTING_FOR_MINOR_NOT_AUTHORIZED", "the minor's own tick is not authority");
   await expectCode(minorRequest(ulf.personId), "ACTING_FOR_MINOR_NOT_AUTHORIZED", "an adult on the registration who was not declared is refused");
-  await expectCode(minorRequest(stranger.id), "ACTING_FOR_MINOR_NOT_AUTHORIZED", "a household member who can manage the child is refused");
+  await expectCode(minorRequest(stranger.id), "ACTOR_NOT_FOUND", "a household member who can manage the child but is not on the registration gets the same answer as a person who does not exist");
   const declared = await minorRequest(dan.personId);
   assert(declared.created && declared.evidence.guardianAuthorityId === samAuthority.id && declared.evidence.actedByPersonId === dan.personId, "the declared responsible adult can sign for the minor");
   await expectCode(recordStaffAcknowledgment({
@@ -493,6 +497,94 @@ async function main() {
   assert(await rejects(raw({ registrationAttendeeId: null }), /subject_check|check constraint/i), "an attendee subject without a person pairing is refused");
   assert(await rejects(raw({}), /unique/i), "the same content for the same subject and field cannot be recorded twice, whatever the request id");
   assert(await rejects(raw({ registrationAttendeeId: null, subjectPersonId: null, fieldKey: "reg_ack", contentRef: regAck.contentRef, source: "TEXT", shownText: TEXT_WORDING, policyVersionId: null, contentHash: regAck.contentHash }), /unique/i), "and the same holds for a registration-level subject");
+
+  // ---- More database guards: the declared authority must be this minor's at this event, and TRUNCATE is refused ----
+  assert(await rejects(raw({ subjectMinorStatus: "MINOR", guardianAuthorityId: samAuthority.id }), /not a declaration for this minor/), "an authority declared for a different minor is refused by the database");
+  assert(await rejects(raw({ subjectMinorStatus: "MINOR", guardianAuthorityId: "no-such-authority" }), /not a declaration for this minor/), "an authority that does not exist is refused by the database");
+  assert(await rejects(prisma.$executeRawUnsafe('TRUNCATE TABLE "AcknowledgmentEvidence"'), /append-only|referenced in a foreign key/), "TRUNCATE is refused too");
+  assert(await prisma.acknowledgmentEvidence.count({ where: { eventId: ids.eventA } }) > 0, "and nothing was removed");
+
+  // ---- Corrections: staff void an acknowledgment with a reason; the evidence itself is never touched (#150) ----
+  const REASON = "Synthetic reason: recorded against the wrong person.";
+  const typedBefore = await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: typed.evidence.id } });
+  assert(typed.evidence.voidedAt === null && statusOf(await view(), "hist_soft_ack", dan.id) === "ACKNOWLEDGED_EARLIER_VERSION", "before the void it counts");
+  await expectCode(voidAcknowledgmentEvidence({ eventId: ids.eventA, registrationId: regId, evidenceId: typed.evidence.id, reason: "   ", actorUserId: ids.staff }), "REASON_REQUIRED", "a void needs a reason");
+  await expectCode(voidAcknowledgmentEvidence({ eventId: ids.eventB, registrationId: regId, evidenceId: typed.evidence.id, reason: REASON, actorUserId: ids.staff }), "EVIDENCE_NOT_FOUND", "another event cannot void it");
+  await expectCode(voidAcknowledgmentEvidence({ eventId: ids.eventA, registrationId: "another-registration", evidenceId: typed.evidence.id, reason: REASON, actorUserId: ids.staff }), "EVIDENCE_NOT_FOUND", "nor another registration");
+  const beforeVoid = new Date();
+  const voided = await voidAcknowledgmentEvidence({ eventId: ids.eventA, registrationId: regId, evidenceId: typed.evidence.id, reason: REASON, actorUserId: ids.staff });
+  const afterVoid = new Date();
+  assert(voided.created && voided.void.evidenceId === typed.evidence.id, "staff void it");
+  const voidAgain = await voidAcknowledgmentEvidence({ eventId: ids.eventA, registrationId: regId, evidenceId: typed.evidence.id, reason: "A different reason that must not replace the first", actorUserId: ids.staff });
+  assert(!voidAgain.created && voidAgain.void.id === voided.void.id && voidAgain.void.voidedAt === voided.void.voidedAt, "voiding twice is the same void");
+  assert(await prisma.acknowledgmentVoid.count({ where: { evidenceId: typed.evidence.id } }) === 1 && (await prisma.acknowledgmentVoid.findUniqueOrThrow({ where: { evidenceId: typed.evidence.id } })).reason === REASON, "one void row, with the first reason");
+  assert(JSON.stringify(await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: typed.evidence.id } })) === JSON.stringify(typedBefore), "the evidence row is exactly as it was");
+  assert(statusOf(await view(), "hist_soft_ack", dan.id) === "NOT_ACKNOWLEDGED", "a voided acknowledgment no longer counts");
+  assert(statusOf(await view(new Date(beforeVoid.getTime() - 1000)), "hist_soft_ack", dan.id) === "ACKNOWLEDGED_EARLIER_VERSION", "judged at a moment before the void it still counted");
+  assert(statusOf(await view(new Date(afterVoid.getTime() + 1000)), "hist_soft_ack", dan.id) === "NOT_ACKNOWLEDGED", "and after the void it does not");
+  const voidedView = (await view()).find((candidate) => candidate.fieldKey === "hist_soft_ack" && candidate.subject.kind === "ATTENDEE" && candidate.subject.attendeeId === dan.id)!;
+  assert(voidedView.evidence.length === 1 && voidedView.evidence[0]!.voidedAt !== null && !JSON.stringify(voidedView).includes(REASON), "the status read shows the void's time and never its reason");
+  const voidedPayload = await getAcknowledgmentEvidencePayload(ids.eventA, regId, typed.evidence.id);
+  assert(voidedPayload.voided?.reason === REASON && voidedPayload.voided.voidedByUserId === ids.staff, "the reason is in the payload read only");
+  const voidAudit = await prisma.auditLog.findMany({ where: { eventId: ids.eventA, action: "ACKNOWLEDGMENT_VOIDED" } });
+  assert(voidAudit.length === 1 && !JSON.stringify(voidAudit[0]).includes("Synthetic reason") && (voidAudit[0]!.metadata as Record<string, unknown>).evidenceId === typed.evidence.id, "audited once, with ids only and no reason");
+  const reRecorded = await recordStaffAcknowledgment({
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER",
+    acknowledgedAt: daysAgo(1), actorUserId: ids.staff, clientRequestId: randomUUID(),
+  });
+  assert(reRecorded.created && reRecorded.evidence.id !== typed.evidence.id && reRecorded.evidence.voidedAt === null, "a new acknowledgment can then be recorded");
+  assert((await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: reRecorded.evidence.id } })).generation === 1, "as the next generation");
+  assert(statusOf(await view(), "hist_soft_ack", dan.id) === "ACKNOWLEDGED_EARLIER_VERSION", "and it counts again");
+  const reAgain = await recordStaffAcknowledgment({
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER",
+    acknowledgedAt: daysAgo(1), actorUserId: ids.staff, clientRequestId: randomUUID(),
+  });
+  assert(!reAgain.created && reAgain.evidence.id === reRecorded.evidence.id, "recording it a third time while the new one stands returns that row");
+  assert(await prisma.acknowledgmentEvidence.count({ where: { registrationId: regId, registrationAttendeeId: dan.id, fieldKey: "hist_soft_ack" } }) === 2, "both rows are kept");
+  // The database: voids are append-only, generation cannot skip, and a void must match its evidence.
+  assert(await rejects(prisma.acknowledgmentVoid.update({ where: { evidenceId: typed.evidence.id }, data: { reason: "Rewritten" } }), /append-only/), "a void is not edited");
+  assert(await rejects(prisma.acknowledgmentVoid.delete({ where: { evidenceId: typed.evidence.id } }), /append-only/), "a void is not deleted (so a voided row cannot be revived)");
+  assert(await rejects(prisma.$executeRawUnsafe('TRUNCATE TABLE "AcknowledgmentVoid"'), /append-only/), "and TRUNCATE is refused");
+  assert(await rejects(prisma.acknowledgmentVoid.create({ data: { eventId: ids.eventA, registrationId: regId, evidenceId: reRecorded.evidence.id, voidedByUserId: ids.staff, reason: "   " } }), /reason_check|check constraint/i), "a blank reason is refused by the database");
+  assert(await rejects(prisma.acknowledgmentVoid.create({ data: { eventId: ids.eventB, registrationId: regId, evidenceId: reRecorded.evidence.id, voidedByUserId: ids.staff, reason: "x" } }), /same event and registration/), "a void of another event's evidence is refused by the database");
+  assert(await rejects(prisma.acknowledgmentEvidence.create({ data: {
+    eventId: ids.eventA, registrationId: regId, registrationAttendeeId: dan.id, subjectPersonId: dan.personId, actedByPersonId: dan.personId, channel: "ONLINE", formVersionId: ids.formVersion,
+    fieldId: `${P}_a_soft_ack`, fieldKey: "hist_soft_ack", fieldLabel: "x", source: "POLICY_VERSION", policyVersionId: softV1, contentHash: "hash", contentRef: `policy:${softV1}`,
+    subjectMinorStatus: "ADULT", acknowledgedAt: new Date(), idempotencyKey: `${P}-skip`, requestHash: "r", generation: 5,
+  } }), /generation must equal/), "a generation that skips ahead is refused by the database");
+  assert(await rejects(prisma.$executeRawUnsafe(`DELETE FROM "AcknowledgmentEvidence" WHERE "id" = '${typed.evidence.id}'`), /append-only/), "the voided evidence row itself still cannot be deleted");
+
+  // ---- Per-attendee acknowledgments are refused on club and group events at save and at publish (#150) ----
+  const clubDraftDefinition = (scope: "ATTENDEE" | "REGISTRATION") => registrationFormDefinitionSchema.parse({
+    title: "Club acknowledgment check", description: "", confirmationMessage: "Received.",
+    sections: [{ id: `${P}_c_sec`, title: "All", description: "", fields: [
+      { id: `${P}_c_name`, key: "full_name", label: "Full name", helpText: "", type: "TEXT", scope: "REGISTRATION", required: true, options: [] },
+      { id: `${P}_c_ack`, key: "club_ack", label: "Club acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope, required: false, options: [], acknowledgment: { source: "TEXT", text: "Synthetic club wording." } },
+    ] }],
+  });
+  const clubDraft = await prisma.registrationForm.create({
+    data: {
+      id: `${ids.form}_c`, eventId: ids.eventC, createdByUserId: ids.staff, name: "Club ack", slug: `${formSlug}-c`, status: RegistrationFormStatus.DRAFT,
+      versions: { create: { id: `${ids.formVersion}_c`, createdByUserId: ids.staff, versionNumber: 1, status: RegistrationFormStatus.DRAFT, definition: clubDraftDefinition("ATTENDEE") } },
+    },
+    include: { versions: true },
+  });
+  const formError = async (promise: Promise<unknown>) => {
+    const error = await promise.then(() => null, (caught: unknown) => caught);
+    return error instanceof FormOperationError ? error : null;
+  };
+  const expectedAt = () => prisma.registrationFormVersion.findUniqueOrThrow({ where: { id: `${ids.formVersion}_c` } }).then((version) => version.updatedAt.toISOString());
+  const savedRefusal = await formError(updateRegistrationForm(ids.eventC, clubDraft.id, ids.staff, { definition: clubDraftDefinition("ATTENDEE"), expectedUpdatedAt: await expectedAt() }));
+  assert(savedRefusal?.code === "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" && /per-attendee recorded acknowledgment is not available on club or group events/.test(savedRefusal.message), "saving an attendee-level acknowledgment on a club event is refused with a builder message");
+  const publishRefusal = await formError(publishRegistrationForm(ids.eventC, clubDraft.id, ids.staff));
+  assert(publishRefusal?.code === "ACKNOWLEDGMENT_POLICY_UNAVAILABLE", `publishing a draft that already holds one is refused (before any test is asked for), got ${publishRefusal?.code}`);
+  assert(await formError(updateRegistrationForm(ids.eventC, clubDraft.id, ids.staff, { definition: clubDraftDefinition("REGISTRATION"), expectedUpdatedAt: await expectedAt() })) === null, "a registration-level acknowledgment stays allowed on a club event");
+  await prisma.event.update({ where: { id: ids.eventC }, data: { audience: "GENERAL", billingMode: "DEFERRED_ORGANIZATION_INVOICE" } });
+  assert((await formError(updateRegistrationForm(ids.eventC, clubDraft.id, ids.staff, { definition: clubDraftDefinition("ATTENDEE"), expectedUpdatedAt: await expectedAt() })))?.code === "ACKNOWLEDGMENT_POLICY_UNAVAILABLE", "so is an event billed to the church");
+  await prisma.event.update({ where: { id: ids.eventC }, data: { billingMode: "ATTENDEE_PAY", generalRegistrationLinkEnabled: true } });
+  assert((await formError(updateRegistrationForm(ids.eventC, clubDraft.id, ids.staff, { definition: clubDraftDefinition("ATTENDEE"), expectedUpdatedAt: await expectedAt() })))?.code === "ACKNOWLEDGMENT_POLICY_UNAVAILABLE", "and an event with the general registration link on");
+  await prisma.event.update({ where: { id: ids.eventC }, data: { generalRegistrationLinkEnabled: false } });
+  assert(await formError(updateRegistrationForm(ids.eventC, clubDraft.id, ids.staff, { definition: clubDraftDefinition("ATTENDEE"), expectedUpdatedAt: await expectedAt() })) === null, "an ordinary individual-registration event accepts it");
 
   // ---- Event deletion refuses while evidence exists ----
   const actor = { userId: ids.staff, globalRole: "SYSTEM_ADMIN" as const };

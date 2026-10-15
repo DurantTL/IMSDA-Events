@@ -136,8 +136,9 @@ async function isLiveRecord(client: Client, row: { registrationId: string; minor
 }
 
 /**
- * The declared responsible adult who may act for a minor right now (#150): the one ACTIVE declaration for this minor at
- * this event, naming an adult, whose registration is still active with both the minor and that adult still on it. Nothing
+ * The declared responsible adult who may act for a minor on one registration right now (#150): the one ACTIVE declaration for
+ * this minor at this event, made on THIS registration, naming an adult, with the registration still active and both the minor
+ * and that adult still on it. A declaration made on another registration (a split family) is not authority here. Nothing
  * else counts: not household, surname, email, `canManage` or being the account holder. Null when nobody is declared, the
  * minor chose "None of us", the declaration was revoked or superseded, or it went stale. Read-only.
  */
@@ -145,9 +146,10 @@ export async function findActiveDeclaredAuthority(
   client: Client,
   eventId: string,
   minorPersonId: string,
+  registrationId: string,
 ): Promise<{ id: string; adultPersonId: string } | null> {
   const row = await client.guardianAuthority.findFirst({
-    where: { eventId, minorPersonId, state: "ACTIVE" },
+    where: { eventId, registrationId, minorPersonId, state: "ACTIVE" },
     orderBy: [{ declaredAt: "desc" }, { id: "desc" }],
     select: { id: true, registrationId: true, adultPersonId: true },
   });

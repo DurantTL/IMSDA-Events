@@ -853,6 +853,7 @@ model User {
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]     @relation("AttendanceReviewAckActor")
   guardianAuthoritiesDeclared  GuardianAuthority[]                       @relation("GuardianAuthorityActorUser")
   acknowledgmentEvidenceRecorded AcknowledgmentEvidence[]                 @relation("AcknowledgmentEvidenceRecordedBy")
+  acknowledgmentVoids AcknowledgmentVoid[] @relation("AcknowledgmentVoidedBy")
   guardianAuthoritiesRevoked   GuardianAuthority[]                       @relation("GuardianAuthorityRevokedBy")
   guardianConflictsResolved    GuardianAuthorityConflict[]               @relation("GuardianConflictResolvedBy")
 
@@ -1645,6 +1646,7 @@ model Event {
   attendanceReviewAcknowledgements    AttendanceReviewAcknowledgement[]
   guardianAuthorities                 GuardianAuthority[]
   acknowledgmentEvidence              AcknowledgmentEvidence[]
+  acknowledgmentVoids AcknowledgmentVoid[]
   guardianAuthorityConflicts          GuardianAuthorityConflict[]
 
   invoices                            Invoice[]
@@ -2783,6 +2785,7 @@ model Registration {
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]
   guardianAuthorities     GuardianAuthority[]
   acknowledgmentEvidence  AcknowledgmentEvidence[]
+  acknowledgmentVoids AcknowledgmentVoid[]
   guardianAuthorityConflicts GuardianAuthorityConflict[]
   lodgingRequests         EventLodgingRequest[]
   lodgingChangeRequests   EventLodgingChangeRequest[]
@@ -6847,7 +6850,11 @@ model AcknowledgmentEvidence {
   requestMetadata        Json                  @default("{}")
   idempotencyKey         String
   requestHash            String
+  /// How many earlier rows for this same subject, field and content were voided (#150). A voided acknowledgment can be
+  /// recorded again as the next generation; a trigger makes this exactly that count, so there is never a second live row.
+  generation             Int                   @default(0)
 
+  void          AcknowledgmentVoid?
   event         Event                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
   registration  Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
   subjectPerson Person?                 @relation("AcknowledgmentEvidenceSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
@@ -6863,6 +6870,27 @@ model AcknowledgmentEvidence {
   @@index([registrationAttendeeId, fieldKey, acknowledgedAt])
   @@index([policyVersionId])
   @@index([subjectPersonId])
+}
+
+/// A correction to acknowledgment evidence (#150): staff with VIEW_SENSITIVE_DATA void a row with a reason. The evidence row is
+/// never modified or deleted; this separate append-only row says it no longer counts. One void per evidence row, so voiding
+/// twice is the same void. The reason is kept here and never in the audit log.
+model AcknowledgmentVoid {
+  id               String   @id @default(cuid())
+  eventId          String
+  registrationId   String
+  evidenceId       String   @unique
+  voidedByUserId   String
+  reason           String
+  voidedAt         DateTime @default(now())
+
+  event        Event                @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration Registration         @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  evidence     AcknowledgmentEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  voidedBy     User                 @relation("AcknowledgmentVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([registrationId])
+  @@index([eventId])
 }
 
 /// A second adult claiming a minor who already has an ACTIVE declaration from a different registration

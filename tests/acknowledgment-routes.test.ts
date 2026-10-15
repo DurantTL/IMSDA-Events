@@ -21,6 +21,7 @@ const dependencies = vi.hoisted(() => {
     listRegistrationAcknowledgments: vi.fn(),
     recordStaffAcknowledgment: vi.fn(),
     getAcknowledgmentEvidencePayload: vi.fn(),
+    voidAcknowledgmentEvidence: vi.fn(),
     logError: vi.fn(),
   };
 });
@@ -38,9 +39,11 @@ vi.mock("@/modules/acknowledgments/repository", () => ({
   listRegistrationAcknowledgments: dependencies.listRegistrationAcknowledgments,
   recordStaffAcknowledgment: dependencies.recordStaffAcknowledgment,
   getAcknowledgmentEvidencePayload: dependencies.getAcknowledgmentEvidencePayload,
+  voidAcknowledgmentEvidence: dependencies.voidAcknowledgmentEvidence,
 }));
 
 import { GET as listAcknowledgments, POST as recordAcknowledgment } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/route";
+import { POST as voidEvidence } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/[evidenceId]/void/route";
 import { GET as readEvidence } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/[evidenceId]/route";
 
 const params = Promise.resolve({ eventId: "event-1", registrationId: "reg-1" });
@@ -199,5 +202,53 @@ describe("reading the payload behind one acknowledgment (#150)", () => {
   it("answers 404 for evidence that is not this registration's", async () => {
     dependencies.getAcknowledgmentEvidencePayload.mockRejectedValue(new dependencies.MockAcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found."));
     expect((await readEvidence(new Request("http://localhost/api"), { params: evidenceParams })).status).toBe(404);
+  });
+});
+
+describe("voiding an acknowledgment (#150)", () => {
+  const voidPost = (body: unknown) => voidEvidence(post(body), { params: evidenceParams });
+
+  it("needs VIEW_SENSITIVE_DATA, takes the staff user from the session, and answers 201 for a new void", async () => {
+    dependencies.voidAcknowledgmentEvidence.mockResolvedValue({ void: { id: "void-1", evidenceId: "ev-1", voidedAt: "2027-01-01T00:00:00.000Z" }, created: true });
+    const response = await voidPost({ reason: "  Recorded against the wrong person.  " });
+    expect(response.status).toBe(201);
+    expect(dependencies.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "VIEW_SENSITIVE_DATA", dependencies.findActiveMembership);
+    expect(dependencies.voidAcknowledgmentEvidence).toHaveBeenCalledWith({
+      eventId: "event-1", registrationId: "reg-1", evidenceId: "ev-1", reason: "Recorded against the wrong person.", actorUserId: "user-1",
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("answers 200 when it was already voided (idempotent)", async () => {
+    dependencies.voidAcknowledgmentEvidence.mockResolvedValue({ void: { id: "void-1", evidenceId: "ev-1", voidedAt: "2027-01-01T00:00:00.000Z" }, created: false });
+    const response = await voidPost({ reason: "Again." });
+    expect(response.status).toBe(200);
+    expect((await response.json()).created).toBe(false);
+  });
+
+  it("refuses a caller without the sensitive-data permission before touching anything, and a cross-origin request", async () => {
+    dependencies.requirePermission.mockRejectedValue(new dependencies.MockAccessDeniedError("No access.", "FORBIDDEN", 403));
+    expect((await voidPost({ reason: "x" })).status).toBe(403);
+    expect(dependencies.voidAcknowledgmentEvidence).not.toHaveBeenCalled();
+    dependencies.requirePermission.mockResolvedValue({ user: { id: "user-1" } });
+    dependencies.rejectCrossOriginRequest.mockReturnValue(new Response(null, { status: 403 }));
+    expect((await voidPost({ reason: "x" })).status).toBe(403);
+    expect(dependencies.voidAcknowledgmentEvidence).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["no reason", {}],
+    ["a blank reason", { reason: "   " }],
+    ["a reason that is too long", { reason: "x".repeat(1001) }],
+    ["an extra field", { reason: "x", evidenceId: "ev-2" }],
+  ])("refuses %s", async (_label, body) => {
+    const response = await voidPost(body);
+    expect(response.status).toBe(400);
+    expect(dependencies.voidAcknowledgmentEvidence).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for evidence that is not this registration's", async () => {
+    dependencies.voidAcknowledgmentEvidence.mockRejectedValue(new dependencies.MockAcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found."));
+    expect((await voidPost({ reason: "x" })).status).toBe(404);
   });
 });

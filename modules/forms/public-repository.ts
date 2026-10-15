@@ -68,6 +68,7 @@ import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
 import { AcknowledgmentError, loadAcknowledgmentDisplayContent, recordSubmissionAcknowledgments } from "@/modules/acknowledgments/repository";
+import { planAcknowledgments } from "@/modules/acknowledgments/domain";
 import type { AcknowledgmentDisplay } from "@/modules/acknowledgments/domain";
 import { hashUserAgent } from "@/modules/access/tokens";
 import { LodgingError } from "@/modules/lodging/errors";
@@ -1273,6 +1274,17 @@ async function createPublicRegistrationTransaction(
   }
   // Acknowledgment evidence (#150): what each ticked acknowledgment showed, recorded with the registration or not at all.
   // A minor's acknowledgment needs their declared responsible adult, recorded just above; nothing else counts.
+  // Staff acting as a director cannot acknowledge for them: evidence names a person who acknowledged, never a staff stand-in,
+  // and recording it under the director would claim they said something they did not.
+  if (club?.submittedByUserId && planAcknowledgments(definition, {
+    registrationResponses: prepared.registrationResponses,
+    attendees: createdAttendees.map((attendee) => ({ clientId: attendee.clientId, responses: attendee.responses })),
+  }).length > 0) {
+    throw new PublicRegistrationError(
+      "INVALID_SUBMISSION",
+      "Staff cannot give an acknowledgment for a director. Leave the acknowledgments unticked and ask the director to acknowledge, or have staff record it on paper afterward.",
+    );
+  }
   try {
     await recordSubmissionAcknowledgments(tx, {
       eventId: form.eventId,
@@ -1287,9 +1299,9 @@ async function createPublicRegistrationTransaction(
         responses: attendee.responses,
       })),
       actedByPersonId: accountHolder.id,
-      // Staff submitting for a director acted for them; everyone else acknowledged for themselves online.
-      channel: club?.submittedByUserId ? "STAFF_ENTERED" : "ONLINE",
-      recordedByUserId: club?.submittedByUserId ?? null,
+      // Only the registrant's own online acknowledgment is recorded here; staff recording uses its own route.
+      channel: "ONLINE",
+      recordedByUserId: null,
       submissionKey: input.idempotencyKey,
       acknowledgedAt: now,
       requestMetadata: {
