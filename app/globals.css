@@ -10946,6 +10946,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* Event features page and the creation features step (#965). */
 .event-features-page { display: grid; gap: 14px; }
 .event-features-notice { min-height: 1.4em; margin: 0; }
+.event-features-page .page-intro .secondary-button { max-width: 100%; text-align: center; }
 .event-features-table th[scope="row"] { min-width: 220px; }
 .event-feature-description { display: block; margin-top: 2px; font-weight: 400; }
 .feature-switch {

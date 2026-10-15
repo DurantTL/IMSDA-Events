@@ -89,7 +89,8 @@ export default async function EventFeaturesPage({ searchParams }: { searchParams
             {!isSystemAdmin && " A system administrator turns modules and the public calendar on or off."}
             {!canConfigure && " You can see each feature's state but not change it."}
           </p>
-          <p className="quiet-copy"><Link href={`/more${eventQuery}`}>Event modules, requests and recent activity</Link></p>
+          {/* A button-styled link, which the phone audit measures at 44px (a bare link in a paragraph is 19px tall). */}
+          <p><Link className="secondary-button" href={`/more${eventQuery}`}>Event modules, requests and recent activity</Link></p>
         </div>
       </div>
       <section className="panel" aria-label="Event features">
