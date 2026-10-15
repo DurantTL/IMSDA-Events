@@ -71,7 +71,7 @@ steps.
 
 - **Mapping:** the admin picks the roster type (youth member or staff) and which
   question fills each roster field (name, birth date, gender, class, role, up to
-  two guardian contacts). The seeded Membership Application and Staff/Volunteer
+  two emergency contacts, for youth and staff alike). The seeded Membership Application and Staff/Volunteer
   templates ship with a mapping pre-filled from their field keys, **off**; it
   applies until the template has its own stored mapping.
 - **Protection rules** (checked in the builder, at publish, and again before the

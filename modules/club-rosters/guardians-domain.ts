@@ -13,7 +13,7 @@ const GUARDIAN_PHONE_MESSAGE = "Enter a phone number like (515) 555-0134.";
  * the roster export. Staff-facing wording is "Emergency contact" everywhere.
  *
  * Director decision (Oct 1 and Oct 3, 2026): up to two contacts per member,
- * each with a name, relationship, email and cell phone, every field optional,
+ * each with a name, relationship, email and phone, every field optional,
  * stored as plain text (not encrypted). Readable by the club's director and
  * deputy (who also edit), by every Area Coordinator, and by conference staff
  * holding VIEW_SENSITIVE_DATA. Nobody else.
@@ -28,7 +28,7 @@ export const guardianFieldLabels: Record<GuardianField, string> = {
   name: "Name",
   relationship: "Relationship",
   email: "Email",
-  phone: "Cell phone",
+  phone: "Phone",
 };
 
 /**

@@ -22,7 +22,7 @@ import { GUARDIAN_SLOTS } from "@/modules/club-rosters/guardians-domain";
 
 type Mutator = (spec: ClubFormDraftSpec) => ClubFormDraftSpec;
 
-const partLabels: Record<GuardianMappingPart, string> = { name: "Name", relationship: "Relationship", email: "Email", phone: "Cell phone" };
+const partLabels: Record<GuardianMappingPart, string> = { name: "Name", relationship: "Relationship", email: "Email", phone: "Phone" };
 
 export function ClubFormRosterMapping({ spec, edit, issues }: { spec: ClubFormDraftSpec; edit: (change: Mutator) => void; issues: BuilderIssue[] }) {
   const mapping = spec.rosterMapping;
@@ -93,7 +93,7 @@ export function ClubFormRosterMapping({ spec, edit, issues }: { spec: ClubFormDr
               .filter((target) => !(mapping.rosterType === "STAFF" && target === "classLevel"))
               .map((target) => select(rosterTargetLabels[target], mapping.fields[target], rosterMappingCandidates(target, spec), (key) => setField(target, key)))}
           </div>
-          {mapping.rosterType === "YOUTH" && Array.from({ length: GUARDIAN_SLOTS }, (_, index) => (
+          {Array.from({ length: GUARDIAN_SLOTS }, (_, index) => (
             <fieldset className="form-stack" key={index}>
               <legend>Emergency contact {index + 1} (optional)</legend>
               <div className="form-grid two-column">
@@ -113,7 +113,7 @@ export function ClubFormRosterMapping({ spec, edit, issues }: { spec: ClubFormDr
                   <input
                     maxLength={60}
                     onChange={(event) => setGuardian(index, "relationshipLabel", event.target.value)}
-                    placeholder="e.g. Mother or guardian"
+                    placeholder="e.g. Spouse or parent"
                     value={mapping.guardians[index]?.relationshipLabel ?? ""}
                   />
                 </label>

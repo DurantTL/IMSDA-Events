@@ -216,7 +216,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
                       <input autoComplete="off" defaultValue={value.name} maxLength={120} name={`g${slot}Name`} />
                     </label>
                     <label>{guardianFieldLabels.relationship}
-                      <input autoComplete="off" defaultValue={value.relationship} maxLength={60} name={`g${slot}Relationship`} placeholder="e.g. Mother" />
+                      <input autoComplete="off" defaultValue={value.relationship} maxLength={60} name={`g${slot}Relationship`} placeholder="e.g. Spouse or parent" />
                     </label>
                     <label>{guardianFieldLabels.email}
                       <input aria-invalid={guardianErrors[`g${slot}Email`] ? true : undefined} autoComplete="off" defaultValue={value.email} inputMode="email" maxLength={254} name={`g${slot}Email`} type="text" />

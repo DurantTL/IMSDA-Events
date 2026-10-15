@@ -36,7 +36,7 @@ export const rosterMappingSchema = z.object({
     classLevel: fieldKey.optional(),
     role: fieldKey.optional(),
   }).strict(),
-  /** Up to two guardian contacts. A slot may name a fixed relationship instead of a form field. */
+  /** Up to two emergency contacts, for any roster type. A slot may name a fixed relationship instead of a form field. */
   guardians: z.array(z.object({
     name: fieldKey.optional(),
     relationship: fieldKey.optional(),
@@ -210,12 +210,12 @@ export function rosterMappingProblems(mapping: RosterMapping, spec: RosterMappin
   if (mapped.fullName && (mapped.firstName || mapped.lastName)) {
     problems.push("Roster mapping: use either a full-name question or separate first and last name questions, not both.");
   }
-  if (mapping.rosterType === "STAFF" && (mapped.classLevel || mapping.guardians.some((guardian) => guardianMappingParts.some((part) => guardian[part])))) {
-    problems.push("Roster mapping: a staff roster member has no class or guardian contacts.");
+  if (mapping.rosterType === "STAFF" && mapped.classLevel) {
+    problems.push("Roster mapping: a staff roster member has no class.");
   }
   for (const [index, guardian] of mapping.guardians.entries()) {
     if (guardian.relationship && guardian.relationshipLabel) {
-      problems.push(`Roster mapping: guardian ${index + 1} has both a relationship question and a fixed relationship. Choose one.`);
+      problems.push(`Roster mapping: emergency contact ${index + 1} has both a relationship question and a fixed relationship. Choose one.`);
     }
   }
   if (mapping.enabled) {
@@ -347,7 +347,7 @@ export function rosterPrefillFromAnswers(
   const gender = genderFrom(text(answers, plain(fields.gender), 20));
   const classLevel = mapping.rosterType === "YOUTH" ? classLevelFrom(text(answers, plain(fields.classLevel), 40)) : null;
   const guardians: GuardianValues[] = Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
-    const slot = mapping.rosterType === "YOUTH" ? mapping.guardians[index] : undefined;
+    const slot = mapping.guardians[index];
     if (!slot) return { name: "", relationship: "", email: "", phone: "" };
     const name = text(answers, plain(slot.name), 120);
     const email = text(answers, plain(slot.email), 254);

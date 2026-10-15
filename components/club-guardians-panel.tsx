@@ -4,7 +4,7 @@ import { GuardianAccessError, listGuardianContactsForClub, type ClubGuardianCont
 import { GUARDIAN_SLOTS, EMERGENCY_CONTACT_TERM, type GuardianRecord, type GuardianViewer } from "@/modules/club-rosters/guardians-domain";
 
 /**
- * A club's emergency contacts (minors only), read only (#510), for the pages Area
+ * A club's emergency contacts, read only (#510), for the pages Area
  * Coordinators and conference staff use to look at a club. The caller passes
  * the viewer it resolved from the session (`guardians-access.ts`); the
  * repository checks it again and audits a coordinator's or staff member's
