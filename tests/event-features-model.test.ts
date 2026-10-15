@@ -1,8 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildFeatureRows, type FeatureRow, type FeatureRowsInput } from "@/modules/event-features/model";
-import { featureRequest } from "@/modules/event-features/requests";
-import { eventColumnBase } from "@/modules/events/settings-draft";
-import type { EventSettingsRecord } from "@/modules/events/repository";
+import { featureRequest, performFeatureChange } from "@/modules/event-features/requests";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
 import { eventPermissions } from "@/modules/access/permissions";
 
@@ -185,60 +184,136 @@ describe("data-forced and dependent switches (#965)", () => {
 });
 
 describe("each switch sends an existing request (#965)", () => {
-  const settings = {
+  const stored = {
     id: "event_1", name: "Synthetic Camporee", slug: "synthetic-camporee", startsOn: "2027-05-01", endsOn: "2027-05-03", timezone: "America/Chicago",
-    location: "", capacity: null, publicInfoUrl: null, supportContact: "help@imsda-events.test", tagline: null, subtitle: null, helpEmail: null, hubTitle: null, hubIntro: null,
+    location: "", capacity: 100, publicInfoUrl: null, supportContact: "help@imsda-events.test", tagline: null, subtitle: null, helpEmail: null, hubTitle: null, hubIntro: null,
     refundPolicy: null, hotelName: null, hotelBookingUrl: null, hotelPhone: null, hotelGroupName: null, hotelRate: null, hotelInstructions: null,
     approvedPaymentInstructions: "Pay at the door.", isPublished: false, archivedAt: null, registrationOpensOn: null, registrationClosesOn: null,
     waitlistEnabled: true, collectsShirtSizes: false, checksAdultBackgrounds: false, hostedPaymentLinkEnabled: false, attendeeEditPolicy: "VERIFY_EVERY_EDIT",
     billingMode: "ATTENDEE_PAY", audience: "GENERAL", seminarPreferenceClosesOn: null, seminarPreferenceSelfServiceLocked: false, autoPromoteWaitlist: true,
     publishedFormCount: 0, publishedForms: [], createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z",
-  } as unknown as EventSettingsRecord;
-  const context = { eventId: "event_1", columnBase: eventColumnBase(settings), teamSettings: null };
+  };
+  const teamRules = { allowMultipleTeams: true, minTeamMembers: 4, maxTeamMembers: 8, maxAlternates: 1, ageAsOf: "2027-01-01", maxMemberAge: 21, booksLine: "Synthetic book", levelInfo: [{ level: "CONFERENCE" as const, date: "2027-03-01", place: "Synthetic Hall" }] };
 
-  it("sends modules to the module API: PUT to turn on, DELETE to turn off", () => {
-    expect(featureRequest({ type: "module", moduleKey: "merchandise" }, true, context)).toEqual({ url: "/api/events/event_1/modules/merchandise", method: "PUT" });
-    expect(featureRequest({ type: "module", moduleKey: "merchandise" }, false, context)).toEqual({ url: "/api/events/event_1/modules/merchandise", method: "DELETE" });
+  /** A fetchJson that answers the two existing GETs from what the server holds now, and records what was read. */
+  function server(overrides: { event?: Record<string, unknown>; teamSettings?: unknown } = {}) {
+    const reads: string[] = [];
+    const fetchJson = async (url: string) => {
+      reads.push(url);
+      if (url.endsWith("/team-settings")) return { teamSettings: "teamSettings" in overrides ? overrides.teamSettings : teamRules };
+      return { event: { ...stored, ...overrides.event } };
+    };
+    return { reads, context: { eventId: "event_1", fetchJson } };
+  }
+
+  it("sends modules to the module API: PUT to turn on, DELETE to turn off, with nothing read first", async () => {
+    const { reads, context } = server();
+    expect(await featureRequest({ type: "module", moduleKey: "merchandise" }, true, context)).toEqual({ url: "/api/events/event_1/modules/merchandise", method: "PUT" });
+    expect(await featureRequest({ type: "module", moduleKey: "merchandise" }, false, context)).toEqual({ url: "/api/events/event_1/modules/merchandise", method: "DELETE" });
+    expect(reads).toEqual([]);
   });
 
-  it("sends an event column through the settings update with the dates it was loaded with", () => {
-    const request = featureRequest({ type: "event-column", field: "collectsShirtSizes" }, true, context);
+  it("builds an event column change from the event as the server holds it now, with its dates for the stale-write guard", async () => {
+    const { reads, context } = server();
+    const request = await featureRequest({ type: "event-column", field: "collectsShirtSizes" }, true, context);
+    expect(reads).toEqual(["/api/events/event_1"]);
     expect(request).toMatchObject({ url: "/api/events/event_1", method: "PATCH" });
     expect(request.body).toMatchObject({
       collectsShirtSizes: true,
       // Everything else is sent back as stored, so the save changes nothing but the one switch.
-      name: "Synthetic Camporee", slug: "synthetic-camporee", waitlistEnabled: true, autoPromoteWaitlist: true,
+      name: "Synthetic Camporee", slug: "synthetic-camporee", waitlistEnabled: true, autoPromoteWaitlist: true, capacity: 100,
       approvedPaymentInstructions: "Pay at the door.", location: null,
-      // The stale-write guard (#445).
       expectedStartsOn: "2027-05-01", expectedEndsOn: "2027-05-03",
     });
   });
 
-  it("turns automatic promotion off with the waitlist, as the settings form does", () => {
-    const request = featureRequest({ type: "event-column", field: "waitlistEnabled" }, false, context);
+  it("keeps what another admin changed after the page loaded (capacity, dates) instead of putting the old values back", async () => {
+    // The page rendered with capacity 100 and the first weekend of May; the server now holds 250 and the second weekend.
+    const { context } = server({ event: { capacity: 250, startsOn: "2027-05-08", endsOn: "2027-05-10", supportContact: "new@imsda-events.test" } });
+    const request = await featureRequest({ type: "event-column", field: "hostedPaymentLinkEnabled" }, true, context);
+    expect(request.body).toMatchObject({
+      hostedPaymentLinkEnabled: true, capacity: 250, supportContact: "new@imsda-events.test",
+      // The guard uses the freshly read dates, so this save is not refused for a change it already includes.
+      expectedStartsOn: "2027-05-08", expectedEndsOn: "2027-05-10", startsOn: "2027-05-08", endsOn: "2027-05-10",
+    });
+  });
+
+  it("turns automatic promotion off with the waitlist, as the settings form does", async () => {
+    const request = await featureRequest({ type: "event-column", field: "waitlistEnabled" }, false, server().context);
     expect(request.body).toMatchObject({ waitlistEnabled: false, autoPromoteWaitlist: false });
   });
 
-  it("never sends an event column change for a viewer with no settings access", () => {
-    expect(() => featureRequest({ type: "event-column", field: "waitlistEnabled" }, false, { ...context, columnBase: null })).toThrow("Event settings access is needed");
+  it("sends the general link, publish and calendar to the APIs that already own them", async () => {
+    const { context } = server();
+    expect(await featureRequest({ type: "general-link" }, true, context)).toEqual({ url: "/api/events/event_1/general-link", method: "PUT", body: { enabled: true } });
+    expect(await featureRequest({ type: "publish" }, true, context)).toEqual({ url: "/api/events/event_1/publish", method: "POST" });
+    expect(await featureRequest({ type: "publish" }, false, context)).toEqual({ url: "/api/events/event_1/unpublish", method: "POST" });
+    expect(await featureRequest({ type: "calendar" }, false, context)).toEqual({ url: "/api/admin/calendar/events/event_1", method: "PATCH", body: { showOnCalendar: false } });
   });
 
-  it("sends the general link, teams, publish and calendar to the APIs that already own them", () => {
-    expect(featureRequest({ type: "general-link" }, true, context)).toEqual({ url: "/api/events/event_1/general-link", method: "PUT", body: { enabled: true } });
-    expect(featureRequest({ type: "publish" }, true, context)).toEqual({ url: "/api/events/event_1/publish", method: "POST" });
-    expect(featureRequest({ type: "publish" }, false, context)).toEqual({ url: "/api/events/event_1/unpublish", method: "POST" });
-    expect(featureRequest({ type: "calendar" }, false, context)).toEqual({ url: "/api/admin/calendar/events/event_1", method: "PATCH", body: { showOnCalendar: false } });
-  });
-
-  it("sends teams with every other team rule as it is stored", () => {
-    const teamSettings = { allowMultipleTeams: true, minTeamMembers: 4, maxTeamMembers: 8, maxAlternates: 1, ageAsOf: "2027-01-01", maxMemberAge: 21, booksLine: "Synthetic book", levelInfo: [{ level: "CONFERENCE" as const, date: "2027-03-01", place: "Synthetic Hall" }] };
-    expect(featureRequest({ type: "teams" }, false, { ...context, teamSettings })).toEqual({
-      url: "/api/events/event_1/team-settings", method: "PUT", body: { ...teamSettings, allowMultipleTeams: false },
+  it("sends teams with every other team rule as the server holds it now", async () => {
+    const { reads, context } = server();
+    expect(await featureRequest({ type: "teams" }, false, context)).toEqual({
+      url: "/api/events/event_1/team-settings", method: "PUT", body: { ...teamRules, allowMultipleTeams: false },
     });
-    expect(featureRequest({ type: "teams" }, true, context).body).toMatchObject({ allowMultipleTeams: true, maxAlternates: 0, levelInfo: [] });
+    expect(reads).toEqual(["/api/events/event_1/team-settings"]);
+    // A rule changed on the server after the page loaded is kept.
+    const changed = server({ teamSettings: { ...teamRules, maxTeamMembers: 12, booksLine: "Newer book" } });
+    expect((await featureRequest({ type: "teams" }, false, changed.context)).body).toMatchObject({ maxTeamMembers: 12, booksLine: "Newer book", allowMultipleTeams: false });
+    // An event with no team rules yet starts from the form's defaults.
+    expect((await featureRequest({ type: "teams" }, true, server({ teamSettings: null }).context)).body).toMatchObject({ allowMultipleTeams: true, maxAlternates: 0, levelInfo: [] });
   });
 
-  it("encodes the event and module in the URL", () => {
-    expect(featureRequest({ type: "module", moduleKey: "honors" }, true, { ...context, eventId: "a/b" }).url).toBe("/api/events/a%2Fb/modules/honors");
+  it("encodes the event and module in the URL", async () => {
+    expect((await featureRequest({ type: "module", moduleKey: "honors" }, true, { ...server().context, eventId: "a/b" })).url).toBe("/api/events/a%2Fb/modules/honors");
+  });
+});
+
+describe("a refused change shows the server's own message (#965)", () => {
+  const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+  function fetchWith(answers: Record<string, Response>) {
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method ?? "GET" });
+      return answers[`${init?.method ?? "GET"} ${url}`] ?? json(500, {});
+    }) as unknown as typeof fetch;
+    return { calls, fetchImpl };
+  }
+
+  it("throws the 409 TEAMS_IN_USE message of the team API", async () => {
+    const message = "Teams have already registered for this event, so several teams per club cannot be turned off.";
+    const { calls, fetchImpl } = fetchWith({
+      "GET /api/events/event_1/team-settings": json(200, { teamSettings: null }),
+      "PUT /api/events/event_1/team-settings": json(409, { error: "TEAMS_IN_USE", message }),
+    });
+    await expect(performFeatureChange({ type: "teams" }, false, { eventId: "event_1", fetchImpl })).rejects.toThrow(message);
+    expect(calls.map((call) => call.method)).toEqual(["GET", "PUT"]);
+  });
+
+  it("throws the module API's refusal for a module the event's data keeps on", async () => {
+    const message = "Merchandise stays on while this event has the data it works on.";
+    const { fetchImpl } = fetchWith({ "DELETE /api/events/event_1/modules/merchandise": json(409, { error: "DATA_KEEPS_ON", message }) });
+    await expect(performFeatureChange({ type: "module", moduleKey: "merchandise" }, false, { eventId: "event_1", fetchImpl })).rejects.toThrow(message);
+  });
+
+  it("throws the permission refusal when the fresh read is refused, and sends no change", async () => {
+    const { calls, fetchImpl } = fetchWith({ "GET /api/events/event_1": json(403, { error: "PERMISSION_DENIED", message: "You do not have permission to do that." }) });
+    await expect(performFeatureChange({ type: "event-column", field: "collectsShirtSizes" }, true, { eventId: "event_1", fetchImpl })).rejects.toThrow("You do not have permission to do that.");
+    expect(calls).toEqual([{ url: "/api/events/event_1", method: "GET" }]);
+  });
+
+  it("falls back to a plain message when the server sends no JSON, and resolves on success", async () => {
+    const plain = (async () => new Response("oops", { status: 500 })) as unknown as typeof fetch;
+    await expect(performFeatureChange({ type: "publish" }, true, { eventId: "event_1", fetchImpl: plain })).rejects.toThrow("The change could not be saved. Nothing was changed.");
+    const ok = (async () => json(200, {})) as unknown as typeof fetch;
+    await expect(performFeatureChange({ type: "publish" }, true, { eventId: "event_1", fetchImpl: ok })).resolves.toBeUndefined();
+  });
+
+  it("is shown in the table beside the switch, or in the confirm dialog", () => {
+    const source = readFileSync(new URL("../components/event-features-table.tsx", import.meta.url), "utf8");
+    expect(source).toContain("setDialogError(message)");
+    expect(source).toContain('<p className="form-error" role="alert">{error}</p>');
+    expect(source).toContain("error={dialogError}");
   });
 });

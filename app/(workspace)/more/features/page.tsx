@@ -11,7 +11,6 @@ import { loadEventFeatureFacts } from "@/modules/event-features/repository";
 import { buildFeatureRows } from "@/modules/event-features/model";
 import { moduleState } from "@/modules/event-modules/service";
 import { getEventSettings } from "@/modules/events/repository";
-import { eventColumnBase } from "@/modules/events/settings-draft";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getGeneralLinkSettings } from "@/modules/general-link-registrations/repository";
 
@@ -94,12 +93,7 @@ export default async function EventFeaturesPage({ searchParams }: { searchParams
         </div>
       </div>
       <section className="panel" aria-label="Event features">
-        <EventFeaturesTable
-          columnBase={canConfigure ? eventColumnBase(settings) : null}
-          eventId={event.id}
-          rows={rows}
-          teamSettings={teamSettings}
-        />
+        <EventFeaturesTable eventId={event.id} rows={rows} />
       </section>
     </section>
   );

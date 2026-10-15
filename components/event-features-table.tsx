@@ -5,31 +5,17 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cardCell } from "@/components/table-card-labels";
-import type { TeamSettings } from "@/modules/club-teams/domain";
-import type { EventColumnBase } from "@/modules/events/settings-draft";
-import { featureRequest, type FeatureRequest } from "@/modules/event-features/requests";
+import { featureFallbackMessage as fallbackMessage, performFeatureChange } from "@/modules/event-features/requests";
 import type { FeatureRow } from "@/modules/event-features/model";
 
 type Pending = { row: FeatureRow; next: boolean };
 
-const fallbackMessage = "The change could not be saved. Nothing was changed.";
-
-async function send({ url, method, body }: FeatureRequest) {
-  const response = await fetch(url, {
-    method,
-    ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
-  });
-  if (!response.ok) {
-    const result = await response.json().catch(() => ({})) as { message?: string };
-    throw new Error(result.message ?? fallbackMessage);
-  }
-}
-
 /**
  * The Event features table (#965). It renders the rows the server built and sends
  * each change to the request that already owns that switch: the module API, the
- * event settings update (with the dates the page was loaded with, the stale-write
- * guard of #445), the general link and team APIs, publish and unpublish, and the
+ * event settings update (built from the event as the server holds it at the moment
+ * of the click, with its dates for the stale-write guard of #445), the general link
+ * and team APIs (team rules likewise read fresh), publish and unpublish, and the
  * calendar API. Hiding a switch is never the protection: the server checks the
  * permission again on every request, and a refused change shows its message here.
  * Turning a feature off asks first.
@@ -37,14 +23,9 @@ async function send({ url, method, body }: FeatureRequest) {
 export function EventFeaturesTable({
   eventId,
   rows,
-  columnBase,
-  teamSettings,
 }: {
   eventId: string;
   rows: FeatureRow[];
-  /** The stored event as a settings draft, for staff who may change event columns; null for everyone else. */
-  columnBase: EventColumnBase | null;
-  teamSettings: TeamSettings | null;
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
@@ -56,7 +37,9 @@ export function EventFeaturesTable({
 
   async function apply(row: FeatureRow, next: boolean) {
     if (!row.action) return;
-    await send(featureRequest(row.action, next, { eventId, columnBase, teamSettings }));
+    // Event columns and teams are read fresh from the server first, so a field changed elsewhere since this page
+    // loaded is never written back over.
+    await performFeatureChange(row.action, next, { eventId, fetchImpl: fetch });
   }
 
   async function run(row: FeatureRow, next: boolean) {

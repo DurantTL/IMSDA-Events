@@ -26,8 +26,14 @@ import {
 import { getEventPublishReadiness, getEventPublishWarnings } from "@/modules/events/readiness";
 import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
-import { defaultModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
-import { creationFlagKeys, defaultCreationFeatures, type CreationFeatures } from "@/modules/event-features/creation";
+import type { EventModuleKey } from "@/modules/event-modules/catalog";
+import {
+  chosenModulesAfter,
+  creationFeaturesFor,
+  creationFlagKeys,
+  defaultCreationFeatures,
+  type CreationFeatures,
+} from "@/modules/event-features/creation";
 import {
   eventTimeZones,
   type EventSettingsInput,
@@ -198,14 +204,15 @@ export function EventSettingsWorkspace({
     return () => setEventSettingsDirty(false);
   }, [mode, dirty]);
   // The modules the step shows and sends: the person's choice, else the live audience's defaults.
-  const effectiveModules = chosenModules ?? defaultModuleKeys(draft.audience ?? "GENERAL");
-  const creationFeatures: CreationFeatures = {
-    ...defaultCreationFeatures(draft.audience ?? "GENERAL", draft),
-    modules: effectiveModules,
-    showOnCalendar,
-  };
+  const creationFeatures: CreationFeatures = creationFeaturesFor(
+    draft.audience ?? "GENERAL",
+    chosenModules,
+    { ...defaultCreationFeatures(draft.audience ?? "GENERAL", draft), showOnCalendar },
+  );
+  const effectiveModules = creationFeatures.modules;
   function changeCreationFeatures(next: CreationFeatures) {
-    setChosenModules(next.modules);
+    // Only a module checkbox pins the modules; a flag or the calendar choice leaves them following the audience.
+    setChosenModules(chosenModulesAfter(chosenModules, creationFeatures, next));
     setShowOnCalendar(next.showOnCalendar);
     for (const key of creationFlagKeys) {
       if (next[key] !== draft[key]) update(key, next[key]);
@@ -853,7 +860,12 @@ export function EventSettingsWorkspace({
               name="audience"
               {...fieldAria("audience")}
               value={draft.audience ?? "GENERAL"}
-              onChange={(value) => update("audience", value as EventSettingsInput["audience"])}
+              onChange={(value) => {
+                update("audience", value as EventSettingsInput["audience"]);
+                // The modules follow the audience's defaults again (a club event gets the club modules); a choice made for
+                // the other audience would otherwise carry over.
+                if (mode === "create") setChosenModules(null);
+              }}
               options={[
                 { value: "GENERAL", label: "General event" },
                 { value: "CLUB", label: "Club or church event" },

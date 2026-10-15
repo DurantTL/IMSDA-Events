@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   rejectCrossOriginRequest: vi.fn(),
   getCurrentSession: vi.fn(),
   createEvent: vi.fn(),
+  applyEventTemplate: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -26,15 +28,23 @@ vi.mock("@/modules/events/repository", async () => {
   return { ...actual, createEvent: mocks.createEvent, listEventsForUser: vi.fn() };
 });
 
+vi.mock("@/modules/event-templates/repository", async () => {
+  const actual = await vi.importActual<typeof import("@/modules/event-templates/repository")>("@/modules/event-templates/repository");
+  return { ...actual, applyEventTemplate: mocks.applyEventTemplate };
+});
+
 import { POST as CREATE } from "@/app/api/events/route";
+import { POST as APPLY } from "@/app/api/event-templates/[templateId]/apply/route";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import { StartFromTemplate } from "@/components/start-from-template";
 import { applyEventTemplateInputSchema } from "@/modules/event-templates/domain";
 import { templateFeatureDefaults } from "@/modules/event-templates/feature-defaults";
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 import {
+  chosenModulesAfter,
   cloneCreationFeatures,
   creationFeatureItems,
+  creationFeaturesFor,
   creationFeaturesSchema,
   defaultCreationFeatures,
   featuresForAudience,
@@ -72,6 +82,7 @@ beforeEach(() => {
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.getCurrentSession.mockResolvedValue(admin);
   mocks.createEvent.mockResolvedValue({ id: "event-1" });
+  mocks.applyEventTemplate.mockResolvedValue({ event: { id: "event-1" }, alreadyApplied: false });
 });
 
 describe("defaults come from the audience and the template", () => {
@@ -227,6 +238,74 @@ describe("the template apply accepts the step's choices", () => {
     expect(parsed.features).toEqual({ modules: ["merchandise"], showOnCalendar: false, waitlistEnabled: true });
     expect(applyEventTemplateInputSchema.safeParse({ ...body, features: { modules: ["nope"] } }).success).toBe(false);
     expect(applyEventTemplateInputSchema.safeParse({ ...body, features: { isPublished: true } }).success).toBe(false);
+  });
+});
+
+describe("the blank form's module choice", () => {
+  const readSource = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+
+  /** The form's state: what the person chose (null = follows the audience) and the flags in the draft. */
+  function form(audience: "GENERAL" | "CLUB", chosen: ReturnType<typeof defaultCreationFeatures>["modules"] | null, carried = {}) {
+    return creationFeaturesFor(audience, chosen, defaultCreationFeatures(audience, carried));
+  }
+
+  it("shows the audience's defaults with the step open and nothing touched", () => {
+    expect(form("GENERAL", null).modules).toEqual(["public-content"]);
+    expect(form("CLUB", null).modules).toEqual(defaultModuleKeys("CLUB"));
+  });
+
+  it("a flag change does not pin the modules, so the club defaults still follow a later switch to CLUB", () => {
+    const general = form("GENERAL", null);
+    const afterFlag = withFlag(general, "collectsShirtSizes", true);
+    // Opening the step and ticking a flag leaves the choice unset ...
+    let chosen = chosenModulesAfter(null, general, afterFlag);
+    expect(chosen).toBeNull();
+    // ... and so does the calendar choice.
+    chosen = chosenModulesAfter(chosen, afterFlag, { ...afterFlag, showOnCalendar: false });
+    expect(chosen).toBeNull();
+    // Switching the audience to CLUB: the club defaults are present, and the flag the person set stays.
+    const club = form("CLUB", chosen, { collectsShirtSizes: true });
+    expect(club.modules).toEqual(defaultModuleKeys("CLUB"));
+    expect(club.modules).toEqual(expect.arrayContaining(["honors", "event-patches", "club-assignments"]));
+    expect(club.collectsShirtSizes).toBe(true);
+  });
+
+  it("a module checkbox pins the choice, and a switch of audience puts the new audience's defaults back", () => {
+    const general = form("GENERAL", null);
+    const withMerch = withModule(general, "merchandise", true);
+    const chosen = chosenModulesAfter(null, general, withMerch);
+    expect(chosen).toEqual(["merchandise", "public-content"]);
+    expect(form("GENERAL", chosen).modules).toEqual(["merchandise", "public-content"]);
+    // The form resets the choice when the audience changes, so the club defaults follow (featuresForAudience).
+    expect(form("CLUB", null).modules).toEqual(defaultModuleKeys("CLUB"));
+    expect(featuresForAudience(withMerch, "CLUB").modules).toEqual(defaultModuleKeys("CLUB"));
+  });
+
+  it("is wired into the form: choices only from a module checkbox, audience change resets", () => {
+    const source = readSource("components/event-settings-workspace.tsx");
+    expect(source).toContain("chosenModulesAfter(chosenModules, creationFeatures, next)");
+    expect(source).toContain("creationFeaturesFor(");
+    expect(source).toMatch(/update\("audience", value as EventSettingsInput\["audience"\]\);[\s\S]{0,260}setChosenModules\(null\)/);
+  });
+});
+
+describe("a template applied with features by someone who is not a system administrator", () => {
+  const body = { name: "Synthetic Retreat", slug: "synthetic-retreat", startsOn: "2027-10-09", endsOn: "2027-10-11", requestKey: "request-key-0001", features: { modules: ["merchandise"], showOnCalendar: false } };
+  const apply = (session: unknown) => {
+    mocks.getCurrentSession.mockResolvedValue(session);
+    return APPLY(post(body), { params: Promise.resolve({ templateId: "template-1" }) });
+  };
+
+  it("gets 403 and nothing is applied", async () => {
+    expect((await apply({ user: { id: "staff-1", globalRole: null } })).status).toBe(403);
+    expect((await apply({ user: { id: "staff-2", globalRole: "STAFF" } })).status).toBe(403);
+    expect((await apply({ user: null })).status).toBeGreaterThanOrEqual(401);
+    expect(mocks.applyEventTemplate).not.toHaveBeenCalled();
+  });
+
+  it("is applied for a system administrator, with the features passed through", async () => {
+    expect((await apply(admin)).status).toBe(201);
+    expect(mocks.applyEventTemplate).toHaveBeenCalledWith("template-1", "admin-1", expect.objectContaining({ features: { modules: ["merchandise"], showOnCalendar: false } }));
   });
 });
 

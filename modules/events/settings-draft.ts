@@ -70,30 +70,25 @@ export function eventSettingsRequestBody(draft: EventSettingsInput) {
   };
 }
 
-/** What the Event features page keeps of the stored event: its settings draft and the dates it was loaded with. */
-export type EventColumnBase = { draft: EventSettingsInput; startsOn: string; endsOn: string };
-
-export function eventColumnBase(event: EventSettingsRecord): EventColumnBase {
-  return { draft: draftFromEvent(event), startsOn: event.startsOn, endsOn: event.endsOn };
-}
-
 /**
  * The body that changes one event column from outside the settings form (the
- * Event features page): the stored event as a full settings body, the flag
- * changed, and the dates the page was loaded with so the server refuses the save
- * if they changed meanwhile (#445). Turning the waitlist off turns automatic
- * promotion off with it, as the form does, because the schema refuses the other
- * mix.
+ * Event features page). `event` must be the event as the server holds it right
+ * now (the page fetches it with `GET /api/events/{id}` on every toggle), so the
+ * save sends back every other field as it is stored and changes only the one
+ * flag; a field another admin changed after the page loaded is never put back.
+ * The dates come from the same fetch for the stale-write guard (#445). Turning
+ * the waitlist off turns automatic promotion off with it, as the form does,
+ * because the schema refuses the other mix.
  */
 export function eventColumnChangeBody(
-  base: EventColumnBase,
+  event: EventSettingsRecord,
   change: Partial<Pick<EventSettingsInput, "waitlistEnabled" | "autoPromoteWaitlist" | "collectsShirtSizes" | "hostedPaymentLinkEnabled" | "checksAdultBackgrounds">>,
 ) {
-  const draft = { ...base.draft, ...change };
+  const draft = { ...draftFromEvent(event), ...change };
   if (change.waitlistEnabled === false) draft.autoPromoteWaitlist = false;
   return {
     ...eventSettingsRequestBody(draft),
-    expectedStartsOn: base.startsOn,
-    expectedEndsOn: base.endsOn,
+    expectedStartsOn: event.startsOn,
+    expectedEndsOn: event.endsOn,
   };
 }

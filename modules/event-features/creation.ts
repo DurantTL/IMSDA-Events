@@ -179,6 +179,29 @@ export function cloneCreationFeatures(
   };
 }
 
+/**
+ * The blank form's module choice after the step changed. A module is "chosen" only when a module checkbox actually
+ * changed the list; touching a flag or the calendar choice leaves the choice as it was (null still follows the audience),
+ * so opening the step never pins the modules before the audience is picked.
+ */
+export function chosenModulesAfter(
+  previous: EventModuleKey[] | null,
+  current: CreationFeatures,
+  next: CreationFeatures,
+): EventModuleKey[] | null {
+  const same = current.modules.length === next.modules.length && current.modules.every((key, index) => key === next.modules[index]);
+  return same ? previous : next.modules;
+}
+
+/** The modules the form shows and sends: the person's choice, else the audience's defaults (`featuresForAudience`). */
+export function creationFeaturesFor(
+  audience: CreationAudience,
+  chosen: EventModuleKey[] | null,
+  base: CreationFeatures,
+): CreationFeatures {
+  return chosen === null ? featuresForAudience(base, audience) : { ...base, modules: chosen };
+}
+
 /** The club-only features that need the event to exist first, so the step only names them. */
 export const clubFeaturesAfterCreation = [
   { key: "general-link", title: "General registration link", description: "Needs a published registration form, so turn it on from the Event features page once the event exists." },

@@ -14,7 +14,7 @@ import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
 import { writeCreationModules, writeDefaultModules } from "@/modules/event-modules/defaults";
-import type { EventModuleKey } from "@/modules/event-modules/catalog";
+import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export class EventOperationError extends Error {
@@ -348,8 +348,10 @@ export async function createEvent(
           slug: event.slug,
           audience: event.audience,
           ...(options.calendarEntryId ? { calendarEntryId: options.calendarEntryId } : {}),
-          // Whether the features step chose the starting switches (#965). The chosen modules are the event's EventModule rows.
-          ...(options.modules !== undefined ? { featuresChosen: true } : {}),
+          // The features the event started with (#965): module keys and the calendar choice, no personal data.
+          featuresChosen: options.modules !== undefined,
+          modules: creationModuleKeys(audience, options.modules),
+          showOnCalendar: event.showOnCalendar,
         },
       },
     });

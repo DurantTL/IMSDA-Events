@@ -20,6 +20,7 @@ import { normalizeLocationName, shiftCalendarDate } from "@/modules/event-locati
 import { createRegistrationFormFromTemplateInTransaction } from "@/modules/forms/repository";
 import { getEventSettings } from "@/modules/events/repository";
 import { writeCreationModules } from "@/modules/event-modules/defaults";
+import { creationModuleKeys } from "@/modules/event-modules/catalog";
 import { creationFlagKeys, type CreationFlagKey } from "@/modules/event-features/creation";
 import { assertCalendarEntryLinkable, linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 export class EventTemplateOperationError extends Error {
@@ -545,6 +546,10 @@ export async function applyEventTemplate(
             slug: event.slug,
             audience: event.audience,
             billingMode: event.billingMode,
+            // The features the event started with (#965): module keys and the calendar choice, no personal data.
+            featuresChosen: input.features !== undefined,
+            modules: creationModuleKeys(payload.audience, input.features?.modules),
+            showOnCalendar: event.showOnCalendar,
             formTemplateCount: payload.formTemplateKeys.length,
             attendeeTypeCount: payload.attendeeTypes.length,
             locationCount: templateLocations.length,

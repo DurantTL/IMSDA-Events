@@ -99,7 +99,10 @@ async function run() {
   const chosenRow = await prisma.event.findUniqueOrThrow({ where: { id: chosen.id }, select: { showOnCalendar: true, waitlistEnabled: true, autoPromoteWaitlist: true, collectsShirtSizes: true, isPublished: true } });
   assert(!chosenRow.showOnCalendar && chosenRow.waitlistEnabled && chosenRow.autoPromoteWaitlist && chosenRow.collectsShirtSizes && !chosenRow.isPublished, "the flags and the calendar choice were saved, and the event is a draft");
   const audit = await prisma.auditLog.findFirstOrThrow({ where: { eventId: chosen.id, action: "EVENT_CREATED" } });
-  assert((audit.metadata as { featuresChosen?: boolean }).featuresChosen === true, "the creation audit records that the features were chosen");
+  const auditMeta = audit.metadata as { featuresChosen?: boolean; modules?: string[]; showOnCalendar?: boolean };
+  assert(auditMeta.featuresChosen === true, "the creation audit records that the features were chosen");
+  assert((auditMeta.modules ?? []).slice().sort().join() === "attendee-community,merchandise,public-content", "the creation audit records the module keys");
+  assert(auditMeta.showOnCalendar === false, "the creation audit records the calendar choice");
   console.log("ok  the chosen modules, flags and calendar choice are saved with the event");
 
   // 2. A skipped step gets the audience's defaults; a club module on a general event is not stored.
@@ -146,6 +149,9 @@ async function run() {
   assert(!changed.event.collectsShirtSizes && changed.event.checksAdultBackgrounds, "the step's flag overrides replace the template's");
   assert(JSON.stringify(await moduleKeys(changed.event.id)) === JSON.stringify(["merchandise", "public-content"]), "the step's modules replace the defaults");
   assert(!(await prisma.event.findUniqueOrThrow({ where: { id: changed.event.id }, select: { showOnCalendar: true } })).showOnCalendar, "the step's calendar choice was saved");
+  const applyAudit = await prisma.auditLog.findFirstOrThrow({ where: { eventId: changed.event.id, action: "EVENT_TEMPLATE_APPLIED" } });
+  const applyMeta = applyAudit.metadata as { featuresChosen?: boolean; modules?: string[]; showOnCalendar?: boolean };
+  assert(applyMeta.featuresChosen === true && (applyMeta.modules ?? []).slice().sort().join() === "merchandise,public-content" && applyMeta.showOnCalendar === false, "the template apply audit records the module keys and the calendar choice");
   const retried = await applyEventTemplate(template.id, adminId, { name: "Evtfeat Changed", slug: `${P}-tpl-changed`, startsOn: "2027-06-01", endsOn: "2027-06-02", requestKey: `${P}-key-changed`, features: { modules: ["attendee-community"], waitlistEnabled: true } });
   assert(retried.alreadyApplied && retried.event.id === changed.event.id, "a retry with the same key returns the event the first attempt created");
   assert(JSON.stringify(await moduleKeys(changed.event.id)) === JSON.stringify(["merchandise", "public-content"]) && !(await getEventSettings(changed.event.id))!.waitlistEnabled, "the retry did not rewrite the event's features");
