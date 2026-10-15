@@ -18,6 +18,7 @@ import {
   type ChurchInvoiceFacts,
 } from "@/modules/promo-codes/church-invoice";
 import { loadChurchBillingContact, loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
+import { publicAttendeeName } from "@/modules/public-access/domain";
 import { listChurchSponsoredPromoLines } from "@/modules/promo-codes/church-sponsored-repository";
 
 /**
@@ -216,9 +217,39 @@ export type ChurchCodeReport = {
 };
 
 /**
+ * The name each report line shows, by line id, for the staff report only (Caleb, Oct 15, 2026, #960). A whole-registration
+ * line shows the registrant (the account holder); a per-person line (#397) shows the covered attendee, "used for that
+ * person". Both read the registration's or attendee's contact/profile snapshot first and fall back to the Person, the
+ * same precedence as the rest of the app (`publicAttendeeName`).
+ */
+async function loadReportLineNames(client: PrismaClient, eventId: string, lines: ReadonlyArray<{ lineId: string; confirmationCode: string }>) {
+  const names = new Map<string, string>();
+  if (lines.length === 0) return names;
+  const registrations = await client.registration.findMany({
+    where: { eventId, confirmationCode: { in: [...new Set(lines.map((line) => line.confirmationCode))] } },
+    select: { confirmationCode: true, contactSnapshot: true, accountHolderPerson: { select: { firstName: true, lastName: true } } },
+  });
+  const registrantByCode = new Map(registrations.map((registration) => [registration.confirmationCode, publicAttendeeName(registration.contactSnapshot, registration.accountHolderPerson)]));
+  const adjustmentIds = lines.filter((line) => line.lineId.startsWith("adjustment:")).map((line) => line.lineId.slice("adjustment:".length));
+  const adjustments = adjustmentIds.length === 0 ? [] : await client.registrationAdjustment.findMany({
+    where: { id: { in: adjustmentIds }, eventId, registrationAttendeeId: { not: null } },
+    select: { id: true, attendee: { select: { profileSnapshot: true, person: { select: { firstName: true, lastName: true } } } } },
+  });
+  const attendeeByLine = new Map<string, string>();
+  for (const adjustment of adjustments) {
+    if (adjustment.attendee) attendeeByLine.set(`adjustment:${adjustment.id}`, publicAttendeeName(adjustment.attendee.profileSnapshot, adjustment.attendee.person));
+  }
+  for (const line of lines) {
+    names.set(line.lineId, attendeeByLine.get(line.lineId) ?? registrantByCode.get(line.confirmationCode) ?? "");
+  }
+  return names;
+}
+
+/**
  * For each church that sponsors a code on the event: who used the code (billed redemptions, by confirmation code), what
  * it covered, what its invoice bills, what has been paid and what is still owed. Staff finance only (the page checks
- * MANAGE_FINANCE). Names, emails and amounts only for the church's billing contact; no attendee name or answer.
+ * MANAGE_FINANCE on the server). Each line carries the registrant's name as stored (Caleb, Oct 15, 2026, #960); no
+ * answer, email or phone. The church invoice, its PDF, the send preview and any email to the church never carry a name.
  */
 export async function getChurchCodeReport(eventId: string, client: PrismaClient = getPrisma()): Promise<ChurchCodeReport> {
   const event = await client.event.findUnique({ where: { id: eventId }, select: { id: true, name: true } });
@@ -241,6 +272,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
     }),
     loadEventLedger(eventId, {}, client),
   ]);
+  const lineNames = await loadReportLineNames(client, eventId, lines);
   const paidByInvoice = new Map(ledger.map((entry) => [entry.invoiceId, entry.figures.paidCents]));
   const invoiceByChurch = new Map<string, ChurchInvoiceFacts>();
   for (const invoice of invoices) {
@@ -273,6 +305,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
       church,
       codes: church.codes,
       lines,
+      lineNames,
       invoice: invoiceByChurch.get(church.id) ?? null,
       contact: contact ? { name: contact.name, email: contact.email, verified: contact.verified } : null,
     }));

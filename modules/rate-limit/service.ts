@@ -981,3 +981,25 @@ export async function checkNewClubApplicationLinkRateLimit(request: Request, tok
     },
   ], configuration);
 }
+
+/** An administrator's "Send verification email": a few per account per hour, and a ceiling per administrator. */
+export async function checkAdminVerificationEmailRateLimit(actorUserId: string, accountId: string) {
+  const configuration = getRateLimitConfiguration();
+  const actor = hashRateLimitIdentifier("admin-verification-actor", actorUserId, configuration);
+  const account = hashRateLimitIdentifier("admin-verification-account", accountId, configuration);
+  return evaluate([
+    { policy: "admin.verification-email.actor", limit: 30, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "admin.verification-email.account", limit: 3, windowSeconds: oneHour, identifierHashes: [account] },
+  ], configuration);
+}
+
+/** Verifying an address with the emailed code and no pending cookie: per source and per address. */
+export async function checkAttendeeVerifyByAddressRateLimit(request: Request, email: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const account = hashRateLimitIdentifier("attendee-email", email.trim().toLowerCase(), configuration);
+  return evaluate([
+    { policy: "attendee.verify-by-address.account", limit: 10, windowSeconds: fifteenMinutes, identifierHashes: [account] },
+    { policy: "attendee.verify-by-address.client-account", limit: 5, windowSeconds: fifteenMinutes, identifierHashes: [client, account] },
+  ], configuration);
+}

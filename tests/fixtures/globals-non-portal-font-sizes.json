@@ -487,7 +487,7 @@
 ".module-library-filters label | 0.51rem",
 ".module-library-head strong | 0.68rem",
 ".money-input > b | 0.62rem",
-".nav-group-label | 0.62rem",
+".nav-group-toggle | 0.62rem",
 ".nav-item | 0.86rem",
 ".operation-review-card small | 0.56rem",
 ".operation-review-card span | 0.62rem",

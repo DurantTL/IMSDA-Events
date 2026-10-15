@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   accountFindUnique: vi.fn(),
   accountFindFirst: vi.fn(),
   accountUpdate: vi.fn(),
+  tokenUpdateMany: vi.fn(),
+  resetTokenUpdateMany: vi.fn(),
   revokeAllUserSessions: vi.fn(),
   revokeAllAttendeeSessions: vi.fn(),
   writeAuditLog: vi.fn(),
@@ -16,6 +18,8 @@ const mocks = vi.hoisted(() => ({
 const client = {
   user: { findUnique: mocks.userFindUnique, findFirst: mocks.userFindFirst, update: mocks.userUpdate },
   attendeeAccount: { findUnique: mocks.accountFindUnique, findFirst: mocks.accountFindFirst, update: mocks.accountUpdate },
+  attendeeAccountToken: { updateMany: mocks.tokenUpdateMany },
+  passwordResetToken: { updateMany: mocks.resetTokenUpdateMany },
   platformSettings: { findUnique: async () => ({ unifiedSignInEnabled: mocks.enabled }) },
   $transaction: async (work: unknown) => (typeof work === "function" ? (work as (c: unknown) => unknown)(client) : Promise.all(work as unknown[])),
 };
@@ -121,7 +125,9 @@ describe("a linked person's email changes on both sides together (decision 3)", 
       .mockResolvedValueOnce({ id: "usr_1", attendeeAccountId: "acc_1" }); // link
     await changeStaffEmail("usr_1", "new@example.test", "admin-1");
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "usr_1" }, data: { email: "new@example.test" } });
-    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test" } });
+    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test", emailVerifiedAt: null } });
+    // Every unused attendee token is spent in the same transaction (B1).
+    expect(mocks.tokenUpdateMany).toHaveBeenCalledWith({ where: { accountId: "acc_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
     expect(mocks.revokeAllUserSessions).toHaveBeenCalledWith("usr_1");
     expect(mocks.revokeAllAttendeeSessions).toHaveBeenCalledWith("acc_1");
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(2);
@@ -132,8 +138,9 @@ describe("a linked person's email changes on both sides together (decision 3)", 
     mocks.accountFindUnique.mockResolvedValue({ id: "acc_1" });
     mocks.userFindUnique.mockResolvedValue({ id: "usr_1", attendeeAccountId: "acc_1" });
     await changeAttendeeEmail("acc_1", "new@example.test", "admin-1");
+    expect(mocks.tokenUpdateMany).toHaveBeenCalledWith({ where: { accountId: "acc_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "usr_1" }, data: { email: "new@example.test" } });
-    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test" } });
+    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test", emailVerifiedAt: null } });
   });
 
   it("refuses, writing nothing, when either side's new address is taken", async () => {
@@ -153,5 +160,44 @@ describe("a linked person's email changes on both sides together (decision 3)", 
     expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "usr_1" }, data: { email: "new@example.test" } });
     expect(mocks.accountUpdate).not.toHaveBeenCalled();
     expect(mocks.revokeAllAttendeeSessions).not.toHaveBeenCalled();
+    // The staff reset links emailed to the old address are spent with the change, even unlinked.
+    expect(mocks.resetTokenUpdateMany).toHaveBeenCalledWith({ where: { userId: "usr_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
+  });
+
+  it("switch on, linked: the staff reset links are spent in the same transaction as both email writes", async () => {
+    mocks.enabled = true;
+    mocks.userFindUnique
+      .mockResolvedValueOnce({ id: "usr_1", email: "old@example.test" })
+      .mockResolvedValueOnce({ id: "usr_1", attendeeAccountId: "acc_1" });
+    const order: string[] = [];
+    mocks.userUpdate.mockImplementation(() => { order.push("user"); return Promise.resolve({}); });
+    mocks.accountUpdate.mockImplementation(() => { order.push("account"); return Promise.resolve({}); });
+    mocks.resetTokenUpdateMany.mockImplementation(() => { order.push("staff-links"); return Promise.resolve({ count: 1 }); });
+    await changeStaffEmail("usr_1", "new@example.test", "admin-1");
+    expect(order).toEqual(["user", "account", "staff-links"]);
+    expect(mocks.resetTokenUpdateMany).toHaveBeenCalledWith({ where: { userId: "usr_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
+  });
+});
+
+describe("an administrator's email change and outstanding codes (B1)", () => {
+  it("switch off, plain account: the update and the token spend are one transaction", async () => {
+    mocks.accountFindUnique.mockResolvedValue({ id: "acc_1", email: "old@example.test" });
+    const order: string[] = [];
+    mocks.accountUpdate.mockImplementation(() => { order.push("update"); return Promise.resolve({}); });
+    mocks.tokenUpdateMany.mockImplementation(() => { order.push("spend"); return Promise.resolve({ count: 2 }); });
+    await changeAttendeeEmail("acc_1", "new@example.test", "admin-1");
+    expect(order).toEqual(["update", "spend"]);
+    expect(mocks.accountUpdate).toHaveBeenCalledWith({ where: { id: "acc_1" }, data: { email: "new@example.test", emailVerifiedAt: null } });
+    expect(mocks.tokenUpdateMany).toHaveBeenCalledWith({ where: { accountId: "acc_1", usedAt: null }, data: { usedAt: expect.any(Date) } });
+  });
+
+  it("refuses a change to the address it already has, writing nothing", async () => {
+    mocks.accountFindUnique.mockResolvedValue({ id: "acc_1", email: "same@example.test" });
+    await expect(changeAttendeeEmail("acc_1", "same@example.test", "admin-1")).rejects.toMatchObject({ code: "EMAIL_UNCHANGED" });
+    mocks.userFindUnique.mockResolvedValueOnce({ id: "usr_1", email: "same@example.test" });
+    await expect(changeStaffEmail("usr_1", "same@example.test", "admin-1")).rejects.toMatchObject({ code: "EMAIL_UNCHANGED" });
+    expect(mocks.accountUpdate).not.toHaveBeenCalled();
+    expect(mocks.userUpdate).not.toHaveBeenCalled();
+    expect(mocks.tokenUpdateMany).not.toHaveBeenCalled();
   });
 });

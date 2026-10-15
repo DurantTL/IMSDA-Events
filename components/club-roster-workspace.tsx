@@ -75,6 +75,7 @@ export function ClubRosterWorkspace({
   healthEntryOnly,
   healthRecordFlags,
   guardians: initialGuardians,
+  guardiansOnly = false,
 }: {
   /** Directors and deputies only; a registrar enters birth dates but sees ages (#375). */
   canSeeBirthDates: boolean;
@@ -129,6 +130,12 @@ export function ClubRosterWorkspace({
    * about guardians is rendered or sent.
    */
   guardians?: Record<string, GuardianRecord[]>;
+  /**
+   * Next year's roster (#959): the rest of the page is read-only, but a
+   * director or deputy can edit each person's emergency contacts. The pop-up
+   * then holds only the contact fields, and nothing else about the person is sent.
+   */
+  guardiansOnly?: boolean;
 }) {
   const [members, setMembers] = useState(initialMembers);
   const showHonors = Boolean(honorsPopup || honorsHref);
@@ -147,12 +154,15 @@ export function ClubRosterWorkspace({
   const [fieldErrors, setFieldErrors] = useState<RosterFormErrors>({});
   const [guardianMap, setGuardianMap] = useState(initialGuardians);
   const [guardianErrors, setGuardianErrors] = useState<GuardianFormErrors>({});
-  const canEditGuardians = initialGuardians !== undefined && !readOnly;
+  const canEditGuardians = initialGuardians !== undefined && (!readOnly || guardiansOnly);
+  const contactsOnlyDialog = guardiansOnly && readOnly;
   /** Whether the dialog has this member's current guardians (#510): "failed" leaves guardians untouched on save. */
   const [guardianState, setGuardianState] = useState<"ready" | "loading" | "failed">("ready");
   const [guardianRev, setGuardianRev] = useState(0);
   const guardianLoadToken = useRef(0);
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/roster`;
+  /** Reads and contact saves name the year on next year's roster, so the server answers for that year (#959). */
+  const yearQuery = contactsOnlyDialog ? `?year=${encodeURIComponent(clubYear)}` : "";
   const closeDialog = useCallback(() => {
     setDialogOpen(false);
     setEditing(null);
@@ -176,7 +186,7 @@ export function ClubRosterWorkspace({
     const token = ++guardianLoadToken.current;
     if (canEditGuardians && member) {
       setGuardianState("loading");
-      fetch(base)
+      fetch(`${base}${yearQuery}`)
         .then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) as RosterResponse }))
         .then(({ ok, body }) => {
           if (token !== guardianLoadToken.current) return;
@@ -218,7 +228,7 @@ export function ClubRosterWorkspace({
     { key: "MEMBERS", title: "Members", empty: "No Pathfinders on the roster yet.", people: sortByName(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS"), nameDirection) },
   ] as const;
   /** Name, Age, Type, Current class, Role, Gender, Flags — plus every optional column, for the section-title row's colSpan. */
-  const rosterColumnCount = 7 + (birthDates ? 1 : 0) + (complianceStatuses ? 1 : 0) + (showHonors ? 1 : 0) + (readOnly ? 0 : 1);
+  const rosterColumnCount = 7 + (birthDates ? 1 : 0) + (complianceStatuses ? 1 : 0) + (showHonors ? 1 : 0) + (!readOnly || canEditGuardians ? 1 : 0);
 
   async function call(url: string, method: string, body: unknown, success: string) {
     setSaving(true);
@@ -250,6 +260,10 @@ export function ClubRosterWorkspace({
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    if (contactsOnlyDialog) {
+      await saveContactsOnly(formElement, form);
+      return;
+    }
     const birthDate = String(form.get("birthDate") ?? "");
     const attendeeType = String(form.get("attendeeType") ?? "YOUTH");
     // Inline, per-field errors (#571 F-26) instead of only the browser tooltip.
@@ -308,6 +322,32 @@ export function ClubRosterWorkspace({
       formElement.reset();
       closeDialog();
     }
+  }
+
+  /** Next year's row (#959): only the emergency contacts are validated and sent. */
+  async function saveContactsOnly(formElement: HTMLFormElement, form: FormData) {
+    if (!editing) return;
+    if (guardianState !== "ready") {
+      setError(guardianState === "loading"
+        ? "Still loading this person's emergency contacts. Try again in a moment."
+        : "This person's emergency contacts could not be loaded, so nothing was saved. Close this and try again.");
+      return;
+    }
+    const slots = Array.from({ length: GUARDIAN_SLOTS }, (_, index) => ({
+      name: String(form.get(`g${index + 1}Name`) ?? "").trim(),
+      relationship: String(form.get(`g${index + 1}Relationship`) ?? "").trim(),
+      email: String(form.get(`g${index + 1}Email`) ?? "").trim(),
+      phone: String(form.get(`g${index + 1}Phone`) ?? "").trim(),
+    }));
+    const problems = validateGuardianForm(slots, guardianMap?.[editing.id] ?? []);
+    setGuardianErrors(problems);
+    const firstProblem = Object.keys(problems)[0];
+    if (firstProblem) {
+      (formElement.elements.namedItem(firstProblem) as HTMLElement | null)?.focus();
+      return;
+    }
+    const result = await call(`${base}/${encodeURIComponent(editing.id)}${yearQuery}`, "PATCH", { guardians: slots }, "Saved.");
+    if (result) closeDialog();
   }
 
   async function setStatus(member: RosterMemberRecord, status: "ACTIVE" | "INACTIVE") {
@@ -456,7 +496,7 @@ export function ClubRosterWorkspace({
                   <th>Flags</th>
                   {complianceStatuses && <th>Sterling Volunteers</th>}
                   {showHonors && <th>Honors</th>}
-                  {!readOnly && <th><span className="sr-only">Actions</span></th>}
+                  {(!readOnly || canEditGuardians) && <th><span className="sr-only">Actions</span></th>}
                 </tr>
               </thead>
               {/* One row group per section, so each section heading covers only its own rows. */}
@@ -549,6 +589,13 @@ export function ClubRosterWorkspace({
                                 )}
                               </td>
                             )}
+                            {readOnly && canEditGuardians && <td className="roster-card-actions" data-label="Actions">
+                              <div className="honor-row-actions">
+                                <button aria-label={`Emergency contacts for ${member.firstName} ${member.lastName}`} className="secondary-button" disabled={saving} onClick={() => openDialog(member)} type="button">
+                                  <Pencil aria-hidden="true" size={13} /> Emergency contacts
+                                </button>
+                              </div>
+                            </td>}
                             {!readOnly && <td className="roster-card-actions" data-label="Actions">
                               <div className="honor-row-actions">
                               {healthRecordFlags?.[member.id] && (
@@ -609,6 +656,9 @@ export function ClubRosterWorkspace({
           </button>
         </div>
         {error && <div className="inline-notice error" role="alert">{error}</div>}
+        {contactsOnlyDialog ? (
+          <p className="field-help">Next year&apos;s roster. Only emergency contacts can be changed here; the rest of this person&apos;s details are edited once the club year starts.</p>
+        ) : (
         <div className="form-grid two-column">
           <label>
             First name
@@ -665,6 +715,7 @@ export function ClubRosterWorkspace({
             {fieldErrors.gender && <span className="roster-field-error" id="roster-gender-error" role="alert">{fieldErrors.gender}</span>}
           </label>
         </div>
+        )}
         {canEditGuardians && (
           <RosterGuardianFields
             errors={guardianErrors}
@@ -673,12 +724,12 @@ export function ClubRosterWorkspace({
             records={editing ? guardianMap?.[editing.id] : undefined}
           />
         )}
-        <p className="field-help">
+        {!contactsOnlyDialog && <p className="field-help">
           Birth dates are encrypted and shown only to your club&apos;s director and deputy. Registrars and event
           staff see age only. Don&apos;t enter medical or insurance information here.
-        </p>
+        </p>}
         <div className="form-actions">
-          {editing && (
+          {editing && !contactsOnlyDialog && (
             <button
               className="secondary-button roster-dialog-status-action"
               disabled={saving}
@@ -689,7 +740,7 @@ export function ClubRosterWorkspace({
             </button>
           )}
           <button className="secondary-button" disabled={saving} onClick={closeDialog} type="button">Cancel</button>
-          <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? "Save" : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
+          <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? (contactsOnlyDialog ? "Save contacts" : "Save") : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
         </div>
       </form>
       </section>

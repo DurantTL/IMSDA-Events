@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import * as elevation from "@/modules/account-merge/staff-elevation";
 import {
   ATTENDEE_GRADE_METHODS,
-  attendeePasskeyCountsAsStaffSecondFactor,
   staffSessionAllowedFor,
 } from "@/modules/account-merge/staff-elevation";
 
@@ -28,35 +28,13 @@ describe("staff session by sign-in method", () => {
   });
 });
 
-describe("attendee passkey as a staff second factor (decision 5)", () => {
-  const base = {
-    switchEnabled: true,
-    staffPasswordVerified: true,
-    passkeyAccountId: "acct-1",
-    linkedAttendeeAccountId: "acct-1",
-    assertionUserVerified: true,
-  };
-
-  it("counts when every condition holds", () => {
-    expect(attendeePasskeyCountsAsStaffSecondFactor(base)).toEqual({ counts: true });
+describe("attendee passkey is never a staff second factor (Caleb, Oct 15, 2026)", () => {
+  it("retires the decision-5 helper so nothing can wire it", () => {
+    expect(Object.keys(elevation).sort()).toEqual(["ATTENDEE_GRADE_METHODS", "staffSessionAllowedFor"]);
+    expect("attendeePasskeyCountsAsStaffSecondFactor" in elevation).toBe(false);
   });
 
-  it("is refused when the assertion was not user-verified", () => {
-    expect(attendeePasskeyCountsAsStaffSecondFactor({ ...base, assertionUserVerified: false }))
-      .toEqual({ counts: false, reason: "USER_VERIFICATION_REQUIRED" });
-  });
-
-  it("is never a first factor: the staff password must come first", () => {
-    expect(attendeePasskeyCountsAsStaffSecondFactor({ ...base, staffPasswordVerified: false }))
-      .toEqual({ counts: false, reason: "STAFF_PASSWORD_REQUIRED_FIRST" });
-  });
-
-  it("is refused with the switch off, unlinked, or for another account's passkey", () => {
-    expect(attendeePasskeyCountsAsStaffSecondFactor({ ...base, switchEnabled: false }))
-      .toEqual({ counts: false, reason: "SWITCH_OFF" });
-    expect(attendeePasskeyCountsAsStaffSecondFactor({ ...base, linkedAttendeeAccountId: null }))
-      .toEqual({ counts: false, reason: "NOT_LINKED" });
-    expect(attendeePasskeyCountsAsStaffSecondFactor({ ...base, passkeyAccountId: "acct-2" }))
-      .toEqual({ counts: false, reason: "PASSKEY_OF_ANOTHER_ACCOUNT" });
+  it("has no staff-grade method that names an attendee passkey", () => {
+    expect(elevation.staffSessionAllowedFor("ATTENDEE_PASSKEY").allowed).toBe(false);
   });
 });
