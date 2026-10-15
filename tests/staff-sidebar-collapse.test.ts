@@ -62,16 +62,26 @@ describe("sidebar collapse toggle", () => {
     for (const [, inner] of links) expect(inner.replace(/<svg.*?<\/svg>/g, "").replace(/<[^>]+>/g, "").trim()).not.toBe("");
   });
 
-  it("shows the same links as before for each role: visibility is unchanged", () => {
+  it("shows the same permission-gated links for each role: visibility is unchanged (#964: the moved items are not in the sidebar)", () => {
     for (const role of ["EVENT_ADMIN", "CHECK_IN_STAFF", "READ_ONLY_STAFF"] as const) {
       const permissions = new Set<string>(rolePermissions[role]);
       const markup = sidebar(render(rolePermissions[role]));
       for (const item of navigation) {
         const visible = matchesVisibility(item, permissions as never);
         if (item.href === "/more") continue;
-        expect(markup.includes(`href="${item.href}?event=event_1"`), `${role} ${item.href}`).toBe(visible);
+        // Only items with a sidebar section are listed; Attendee list, Imports, Team and Promo codes are not.
+        expect(markup.includes(`href="${item.href}?event=event_1"`), `${role} ${item.href}`).toBe(Boolean(item.sidebar) && visible);
       }
     }
+  });
+
+  it("keeps the icon-only sidebar usable with groups: the group buttons hide and every link shows (#446, #964)", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.nav-group-toggle \{ display: none; \}/);
+    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.nav-group-items\[hidden\] \{ display: grid; \}/);
+    // The text label is still clipped, not removed, in a link inside a group.
+    const markup = sidebar(render(rolePermissions.EVENT_ADMIN));
+    expect(markup).toMatch(/<div class="nav-group-items"[^>]*>.*?<a class="nav-item"[^>]*>.*?<span>Event settings<\/span>/);
   });
 });
 

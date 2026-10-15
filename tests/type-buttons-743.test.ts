@@ -69,7 +69,7 @@ describe("type scale tokens (#743)", () => {
     for (const background of ["#ffffff", "#f4f7f8", "#e6f0f4", "#f1eaf7", "#fff5d7", "#e5f3ed", "#f8fafb", "#f9fbfb", "#fbfcfd", "#dce6ea", "#eee6f5", "#fff1ef"]) {
       expect(contrast(muted, background), `${muted} on ${background}`).toBeGreaterThanOrEqual(4.5);
     }
-    const label = block.match(/\.nav-group-label \{ color: (#[0-9a-f]{6}); \}/i)?.[1] ?? "";
+    const label = css.match(/\.nav-group-toggle \{[^}]*?\bcolor: (#[0-9a-f]{6});/i)?.[1] ?? "";
     expect(contrast(label, "#003b5c")).toBeGreaterThanOrEqual(4.5);
     expect(contrast(label, "#002c45")).toBeGreaterThanOrEqual(4.5);
   });
