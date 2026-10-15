@@ -259,7 +259,7 @@ export function ClubYearEndReportForm({
       {!locked && (
         <div className="intro-actions">
           <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
-          <SubmitButton className="primary-button" disabled={saving} name="intent" value="submit" icon={<Send aria-hidden="true" size={16} />} label="Submit report" submitting={saving && savingIntent !== "draft"} submittingLabel="Submitting…" />
+          <SubmitButton className="primary-button" disabled={saving} name="intent" value="submit" icon={<Send aria-hidden="true" size={16} />} label="Submit report" submitting={saving && savingIntent === "submit"} submittingLabel="Submitting…" />
         </div>
       )}
     </form>

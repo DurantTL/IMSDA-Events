@@ -92,8 +92,9 @@ export function DiscardControl({ eventId, invoiceId, isRevision }: { eventId: st
   const { busy, error, run } = useAction(eventId);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
+    <>
+    {confirmDialog}
     <span className="billing-inline-action">
-      {confirmDialog}
       <button
         className="secondary-button"
         disabled={busy}
@@ -114,6 +115,7 @@ export function DiscardControl({ eventId, invoiceId, isRevision }: { eventId: st
       </button>
       {error && <small className="form-error" role="alert">{error}</small>}
     </span>
+    </>
   );
 }
 

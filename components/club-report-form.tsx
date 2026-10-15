@@ -185,6 +185,7 @@ export function ClubReportForm({
       body: <p>It goes back to a draft. You must resubmit it by {dueLabel}. After that date you can&apos;t submit changes.</p>,
       confirmLabel: `Reopen ${monthLabel} report`,
     }))) return;
+    setSavingIntent(null);
     setSaving(true);
     setError("");
     setNotice("");
@@ -383,7 +384,7 @@ export function ClubReportForm({
             {allowDraft && (!report || isDraft) && (
               <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
             )}
-            <SubmitButton className="primary-button" disabled={saving || problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving && savingIntent !== "draft"} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
+            <SubmitButton className="primary-button" disabled={saving || problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving && savingIntent === "submit"} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
           </div>
         )}
       </fieldset>

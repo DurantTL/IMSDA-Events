@@ -78,3 +78,13 @@ describe("club-side save buttons show Submitting/Saving (#743)", () => {
     expect(source(file)).toContain("<SubmitButton");
   });
 });
+
+describe("report buttons and reopen (#743)", () => {
+  it("reopen clears the pressed-button state and only Submit shows its busy label for a submit", () => {
+    const monthly = source("components/club-report-form.tsx");
+    const reopen = monthly.slice(monthly.indexOf("async function reopen()"), monthly.indexOf("async function refreshFromNotes()"));
+    expect(reopen).toContain("setSavingIntent(null)");
+    expect(monthly).toContain('submitting={saving && savingIntent === "submit"}');
+    expect(source("components/club-year-end-report-form.tsx")).toContain('submitting={saving && savingIntent === "submit"}');
+  });
+});

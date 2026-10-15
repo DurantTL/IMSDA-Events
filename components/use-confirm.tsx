@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -51,7 +51,7 @@ export function createConfirmController(onChange: (pending: PendingConfirm | nul
  */
 export function useConfirm() {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
-  const controller = useMemo(() => createConfirmController(setPending), []);
+  const [controller] = useState(() => createConfirmController(setPending));
   const confirm = controller.request;
   const settle = controller.settle;
 

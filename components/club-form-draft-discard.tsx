@@ -34,11 +34,13 @@ export function ClubFormDraftDiscard({ templateKey, message }: { templateKey: st
 
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
+    <>
+    {confirmDialog}
     <div className="inline-notice error" role="alert">
-      {confirmDialog}
       <p>{message ?? "The saved draft of this form can't be read, so it can't be edited or published. The published version is not affected."}</p>
       <button className="secondary-button" disabled={busy} onClick={() => void discard()} type="button">Discard draft</button>
       {error && <small className="club-report-problem">{error}</small>}
     </div>
+    </>
   );
 }
