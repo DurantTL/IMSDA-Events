@@ -1017,6 +1017,32 @@ describe("a record imported from the 2026 online form (#878)", () => {
     expect((await viewHealthRecord(leader, "club-a", "member-1", now)).importedForReview).toBe(false);
   });
 
+  it("replaces the imported consent with the standard one when a director saves over the record", async () => {
+    const { sealHealthField, openHealthField } = await import("@/modules/health-records/crypto");
+    state.fields = [{ recordId: "imported-1", fieldKey: "consent", sealedValue: sealHealthField("imported-1", "consent", { version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "", importedFromOnlineForm: true }) }];
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    const stored = state.fields.find((field) => field.fieldKey === "consent")!;
+    const consent = openHealthField("imported-1", "consent", stored.sealedValue) as Record<string, unknown>;
+    expect(consent.version).toBe("pathfinder-health-record-2026");
+    expect(consent).not.toHaveProperty("importedFromOnlineForm");
+    expect(consent).toMatchObject({ emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-10-05" });
+  });
+
+  it("replaces the imported consent with the standard one when the parent submits through the private link", async () => {
+    const { sealHealthField, openHealthField } = await import("@/modules/health-records/crypto");
+    state.fields = [{ recordId: "imported-1", fieldKey: "consent", sealedValue: sealHealthField("imported-1", "consent", { version: "cognito-pathfinder-health-record-2026", importedFromOnlineForm: true }) }];
+    const created = await createHealthRecordLink(leader, { organizationId: "club-a", rosterMemberId: "member-1", recipientEmail: "parent@example.test" }, now);
+    const delivered = await prepareHealthRecordLinkBodyForDelivery({ messageId: created.messageId, bodyText: state.outbox[0]!.bodyTextSnapshot as string, now });
+    const token = decodeURIComponent(delivered.bodyText.match(/https:\/\/\S+/)![0].split("/health-records/")[1]!);
+    await submitHealthRecordViaLink(token, syntheticRecord, now);
+    const stored = state.fields.filter((field) => field.recordId === "imported-1" && field.fieldKey === "consent");
+    expect(stored).toHaveLength(1);
+    const consent = openHealthField("imported-1", "consent", stored[0]!.sealedValue) as Record<string, unknown>;
+    expect(consent.version).toBe("pathfinder-health-record-2026");
+    expect(consent).not.toHaveProperty("importedFromOnlineForm");
+    expect(state.records[0]!.importedAt).toBeNull();
+  });
+
   it("is not marked for a record that was never imported", async () => {
     state.records = [];
     await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);

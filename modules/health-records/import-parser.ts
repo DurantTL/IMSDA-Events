@@ -125,6 +125,18 @@ function calendar(year: number, month: number, day: number) {
   return parseCalendarDate(text) ? text : null;
 }
 
+/**
+ * True only for a cell that reads as a person's typed name: letters (any script), marks, spaces and ' . , -, with no ":"
+ * or "/" and no file extension. A web link, data URI, blob or file path, "signature.png", or "Signed: https://..." is
+ * not a name: it counts as signed but is never stored.
+ */
+export function looksLikeTypedName(cell: string) {
+  const text = cell.trim();
+  if (text === "" || text.length > 160) return false;
+  if (!/^[\p{L}\p{M}][\p{L}\p{M}' .,-]*$/u.test(text)) return false;
+  return !/\.[A-Za-z0-9]{2,5}$/.test(text);
+}
+
 function phoneText(value: string | undefined) {
   const text = clean(value);
   return text ? (normalizePhoneAnswer(text) as string) : "";
@@ -275,10 +287,10 @@ function entryFrom(
   // A typed name is kept as the signature; an image link is never kept or fetched (the typed name stays blank). The
   // date is the form's `Date` column when it parses, otherwise blank.
   const submittedAt = importDate(row.Entry_DateSubmitted) ?? "";
-  const signatureCell = clean(row.Signature, 160);
+  const signatureCell = clean(row.Signature);
   if (signatureCell) {
     const signedOn = importDate(row.Date) ?? "";
-    const isLink = /^(https?:|\/\/|www\.)/i.test(signatureCell);
+    const typedName = looksLikeTypedName(signatureCell) ? signatureCell : "";
     values.consent = {
       version: COGNITO_CONSENT_VERSION,
       emergencyTreatment: true,
@@ -287,7 +299,7 @@ function entryFrom(
       agreedOn: signedOn,
       importedFromOnlineForm: true,
     };
-    values.signature = { typedName: isLink ? "" : signatureCell, signedOn };
+    values.signature = { typedName, signedOn };
     sections.add("consent");
   }
 
@@ -306,7 +318,8 @@ function entryFrom(
     sections: (Object.keys(IMPORT_SECTION_LABELS) as ImportSection[]).filter((section) => sections.has(section)),
     needsCorrection: healthFieldsNeedingCorrection(values),
     contactsOmitted: Math.max(0, contacts.length - MAX_EMERGENCY_CONTACTS),
-    tooLong: [row, ...contactRows].some((source) => Object.values(source).some((cell) => cell.length > TEXT_CAP)),
+    // The Signature cell is left out: a large image data URI there is only ever counted as "signed", never kept.
+    tooLong: [row, ...contactRows].some((source) => Object.entries(source).some(([column, cell]) => column !== "Signature" && cell.length > TEXT_CAP)),
   };
 }
 

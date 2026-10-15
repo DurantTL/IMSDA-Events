@@ -131,7 +131,8 @@ export async function sealHealthSnapshot(
           consentVersion = (value as { version: string }).version;
         }
         if (field.fieldKey === "signature" && value && typeof value === "object" && typeof (value as { signedOn?: unknown }).signedOn === "string") {
-          signedOn = (value as { signedOn: string }).signedOn;
+          // An imported consent can have no date; that is stored as no date, not as an empty string.
+          signedOn = (value as { signedOn: string }).signedOn || null;
         }
         rows.push({ fieldKey: field.fieldKey, sealedValue: sealSnapshotField(snapshotId, field.fieldKey, value) });
       }

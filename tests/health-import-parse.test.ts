@@ -255,13 +255,38 @@ describe("mapping the Cognito columns to Health tab fields", () => {
     }
   });
 
-  it("counts an image link as signed but never keeps it: the typed name stays blank", () => {
-    const { entries } = parse([mainRow({ Signature: "https://storage.example.test/signature.png" }), mainRow({ PathfinderHealthRecord_Id: "2", Signature: "www.example.test/sig.png" })]);
-    for (const entry of entries) {
-      expect(entry.values.consent).toMatchObject({ emergencyTreatment: true, importedFromOnlineForm: true });
-      expect(entry.values.signature).toEqual({ typedName: "", signedOn: "2026-09-20" });
-    }
-    expect(JSON.stringify(entries)).not.toMatch(/signature\.png|sig\.png|storage\.example/);
+  it.each([
+    "https://storage.example.test/signature.png",
+    "www.example.test/sig.png",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+    "DATA:IMAGE/PNG;BASE64,AAAA",
+    "ftp://files.example.test/sig.png",
+    "blob:https://example.test/0000-1111",
+    "file:///C:/sig.png",
+    "signature.png",
+    "Signed: https://storage.example.test/sig.png",
+    "<https://storage.example.test/sig.png>",
+  ])("counts %s as signed but never keeps it: the typed name stays blank", (cell) => {
+    const { entries } = parse([mainRow({ Signature: cell })]);
+    expect(entries[0]!.values.consent).toMatchObject({ emergencyTreatment: true, activities: true, photocopy: true, importedFromOnlineForm: true });
+    expect(entries[0]!.values.signature).toEqual({ typedName: "", signedOn: "2026-09-20" });
+    expect(JSON.stringify(entries[0])).not.toMatch(/storage\.example|sig\.png|signature\.png|base64|blob:|file:|ftp:|DATA:/i);
+  });
+
+  it.each(["Pat Sample", "Renée O'Neil-García", "María José Ñandú", "Dr. Pat Sample Jr.", "Zoë Müller, Sr."])("keeps %s as the typed name", (name) => {
+    const { entries } = parse([mainRow({ Signature: name })]);
+    expect(entries[0]!.values.signature).toEqual({ typedName: name, signedOn: "2026-09-20" });
+  });
+
+  it("does not let a very large signature cell make a signed form need a check", () => {
+    const huge = `data:image/png;base64,${"A".repeat(50_000)}`;
+    const { entries } = parse([mainRow({ Signature: huge })]);
+    expect(entries[0]!.tooLong).toBe(false);
+    expect(entries[0]!.values.consent).toMatchObject({ importedFromOnlineForm: true });
+    expect(entries[0]!.values.signature).toEqual({ typedName: "", signedOn: "2026-09-20" });
+    expect(JSON.stringify(entries[0])).not.toContain("AAAAAAAA");
+    // Any other column over the cap still does.
+    expect(parse([mainRow({ ListOfMedicalRestrictions: "x".repeat(20_001) })]).entries[0]!.tooLong).toBe(true);
   });
 
   it("takes the consent date from the Date column only, and leaves it blank when it does not parse", () => {

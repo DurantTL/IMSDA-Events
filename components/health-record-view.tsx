@@ -101,7 +101,7 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
         <h3>Consent</h3>
         {values.consent
           ? <p>{(values.consent as { importedFromOnlineForm?: boolean }).importedFromOnlineForm
-            ? `Signed on the 2026 online form${signature.typedName ? ` by ${signature.typedName}` : ""}${signature.signedOn ? ` on ${signature.signedOn}` : ""}. Imported from the 2026 online form.`
+            ? `Signed on the 2026 online form${signature.typedName ? ` by ${signature.typedName}` : ""}${signature.signedOn ? ` on ${signature.signedOn}` : ""} (imported).`
             : `Signed by ${signature.typedName || "—"} on ${signature.signedOn || "—"}.`}</p>
           : <p>No consent has been given in the new system yet. The parent can give it through the private link.</p>}
       </section>
