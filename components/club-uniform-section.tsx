@@ -13,6 +13,31 @@ export const emptyUniformData: ClubUniformData = { catalog: [], members: [], nee
 
 type Chosen = { itemId: string; label: string };
 
+type PreviewNeed = { needId: string; firstName: string; lastName: string; itemName: string; size?: string | null };
+
+/** The first few picked needs, in list order, each keyed by its own id (#743 bulk preview). */
+export function uniformNeedPreview(needs: readonly PreviewNeed[], pickedIds: readonly string[], limit = 5) {
+  const picked = needs.filter((need) => pickedIds.includes(need.needId));
+  return {
+    rows: picked.slice(0, limit).map((need) => ({
+      needId: need.needId,
+      line: `${need.firstName} ${need.lastName}, ${need.itemName}${need.size ? ` ${need.size}` : ""}`,
+    })),
+    more: Math.max(0, picked.length - limit),
+  };
+}
+
+function NeedPreview({ needs, pickedIds }: { needs: readonly PreviewNeed[]; pickedIds: readonly string[] }) {
+  const { rows, more } = uniformNeedPreview(needs, pickedIds);
+  return (
+    <>
+      <ul>{rows.map((row) => <li key={row.needId} translate="no">{row.line}</li>)}</ul>
+      {more > 0 && <p>{`and ${more} more`}</p>}
+    </>
+  );
+}
+
+
 /**
  * The Uniforms section of a club's Orders screen (#497). A director or
  * deputy picks an item and a size (sizes are grouped under the base item),
@@ -228,7 +253,20 @@ export function ClubUniformSection({
             <button
               className="secondary-button"
               disabled={busy || pickedNeeded.length === 0}
-              onClick={async () => { if (await onAlreadyHasOne(pickedNeeded)) setPicked(new Set()); }}
+              onClick={async () => {
+                const noun = `uniform need${pickedNeeded.length === 1 ? "" : "s"}`;
+                if (!(await askConfirm({
+                  title: `Mark ${pickedNeeded.length} ${noun} as already issued`,
+                  body: (
+                    <>
+                      <p>{`These ${noun} are marked as already issued. Stock isn't changed, and each is removed from the open list.`}</p>
+                      <NeedPreview needs={data.needs} pickedIds={pickedNeeded} />
+                    </>
+                  ),
+                  confirmLabel: `Mark ${pickedNeeded.length} as already issued`,
+                }))) return;
+                if (await onAlreadyHasOne(pickedNeeded)) setPicked(new Set());
+              }}
               type="button"
             >
               <CheckCircle2 aria-hidden="true" size={14} /> Already has one{pickedNeeded.length > 0 ? ` (${pickedNeeded.length})` : ""}
@@ -237,16 +275,13 @@ export function ClubUniformSection({
               className="secondary-button"
               disabled={busy || pickedNeeded.length === 0}
               onClick={async () => {
-                const removing = data.needs.filter((need) => pickedNeeded.includes(need.needId));
-                const shown = removing.slice(0, 5).map((need) => `${need.firstName} ${need.lastName}, ${need.itemName}${need.size ? ` ${need.size}` : ""}`);
                 const noun = `uniform need${pickedNeeded.length === 1 ? "" : "s"}`;
                 if (!(await askConfirm({
                   title: `Remove ${pickedNeeded.length} ${noun}`,
                   body: (
                     <>
                       <p>{`These ${noun} are deleted from this order list. Nothing has been handed out, and stock isn't changed.`}</p>
-                      <ul>{shown.map((line) => <li key={line} translate="no">{line}</li>)}</ul>
-                      {removing.length > shown.length && <p>{`and ${removing.length - shown.length} more`}</p>}
+                      <NeedPreview needs={data.needs} pickedIds={pickedNeeded} />
                     </>
                   ),
                   confirmLabel: `Remove ${pickedNeeded.length} ${noun}`,

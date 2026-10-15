@@ -109,6 +109,8 @@ export function ClubReportForm({
   const [openedNotes] = useState(() => JSON.stringify(notesPrefill ?? null));
   const notesChanged = JSON.stringify(notesPrefill ?? null) !== openedNotes;
   const [saving, setSaving] = useState(false);
+  // Which of the two submit buttons was pressed, so only it shows the busy label.
+  const [savingIntent, setSavingIntent] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -135,6 +137,7 @@ export function ClubReportForm({
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const status: "DRAFT" | "SUBMITTED" = submitter?.value === "draft" ? "DRAFT" : "SUBMITTED";
+    setSavingIntent(status === "DRAFT" ? "draft" : "submit");
     if (status === "SUBMITTED" && problems.length > 0) {
       setError("Fix the items marked below before submitting.");
       return;
@@ -251,7 +254,6 @@ export function ClubReportForm({
 
   const formBody = (
     <>
-      {confirmDialog}
       {renderSummary(asDialog)}
 
       {readOnly && (
@@ -379,19 +381,20 @@ export function ClubReportForm({
         {!readOnly && (
           <div className="intro-actions">
             {allowDraft && (!report || isDraft) && (
-              <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} label="Save draft" submitting={saving} submittingLabel="Saving…" />
+              <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
             )}
-            <SubmitButton className="primary-button" disabled={problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
+            <SubmitButton className="primary-button" disabled={saving || problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving && savingIntent !== "draft"} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
           </div>
         )}
       </fieldset>
     </>
   );
 
-  if (!asDialog) return <form className="club-report-form" onSubmit={save}>{formBody}</form>;
+  if (!asDialog) return <>{confirmDialog}<form className="club-report-form" onSubmit={save}>{formBody}</form></>;
 
   return (
     <>
+      {confirmDialog}
       {renderSummary(false)}
       <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setOpen(false); }} role="presentation" style={open ? undefined : { display: "none" }}>
         <section aria-labelledby="monthly-report-dialog-title" aria-modal="true" className="modal-card modal-card-wide" ref={dialogRef} role="dialog" tabIndex={-1}>

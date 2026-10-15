@@ -17,6 +17,27 @@ const focusableSelector = [
  */
 const openDialogs: symbol[] = [];
 
+/** Registers an open dialog; returns its token. */
+export function pushOpenDialog() {
+  const token = Symbol("dialog");
+  openDialogs.push(token);
+  return token;
+}
+
+export function removeOpenDialog(token: symbol) {
+  const at = openDialogs.indexOf(token);
+  if (at !== -1) openDialogs.splice(at, 1);
+}
+
+/** Only the top-most open dialog answers Escape and Tab. */
+export function isTopDialog(token: symbol) {
+  return openDialogs.at(-1) === token;
+}
+
+export function openDialogCount() {
+  return openDialogs.length;
+}
+
 export function useAccessibleDialog<T extends HTMLElement>(
   open: boolean,
   onClose: () => void,
@@ -36,8 +57,7 @@ export function useAccessibleDialog<T extends HTMLElement>(
     const dialog = dialogRef.current;
     if (!dialog) return;
     const dialogElement = dialog;
-    const token = Symbol("dialog");
-    openDialogs.push(token);
+    const token = pushOpenDialog();
 
     const focusableElements = () => Array.from(
       dialogElement.querySelectorAll<HTMLElement>(focusableSelector),
@@ -50,7 +70,7 @@ export function useAccessibleDialog<T extends HTMLElement>(
     });
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (openDialogs.at(-1) !== token) return;
+      if (!isTopDialog(token)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         closeRef.current();
@@ -83,8 +103,7 @@ export function useAccessibleDialog<T extends HTMLElement>(
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      const at = openDialogs.indexOf(token);
-      if (at !== -1) openDialogs.splice(at, 1);
+      removeOpenDialog(token);
       previouslyFocused?.focus({ preventScroll: true });
     };
   }, [open]);

@@ -86,6 +86,8 @@ export function ClubYearEndReportForm({
   const [current, setCurrent] = useState(status);
   const [isLate, setIsLate] = useState(late);
   const [saving, setSaving] = useState(false);
+  // Which of the two submit buttons was pressed, so only it shows the busy label.
+  const [savingIntent, setSavingIntent] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const locked = readOnly || current === "SUBMITTED";
@@ -103,6 +105,7 @@ export function ClubYearEndReportForm({
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const next: "DRAFT" | "SUBMITTED" = submitter?.value === "draft" ? "DRAFT" : "SUBMITTED";
+    setSavingIntent(next === "DRAFT" ? "draft" : "submit");
     setSaving(true);
     setError("");
     setNotice("");
@@ -255,8 +258,8 @@ export function ClubYearEndReportForm({
 
       {!locked && (
         <div className="intro-actions">
-          <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} label="Save draft" submitting={saving} submittingLabel="Saving…" />
-          <SubmitButton className="primary-button" name="intent" value="submit" icon={<Send aria-hidden="true" size={16} />} label="Submit report" submitting={saving} submittingLabel="Submitting…" />
+          <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
+          <SubmitButton className="primary-button" disabled={saving} name="intent" value="submit" icon={<Send aria-hidden="true" size={16} />} label="Submit report" submitting={saving && savingIntent !== "draft"} submittingLabel="Submitting…" />
         </div>
       )}
     </form>

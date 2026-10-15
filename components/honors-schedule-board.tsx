@@ -51,6 +51,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   useEffect(() => {
     if (!selected) return undefined;
     const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         setSelectedId(null);
         focusMove(selected.id);

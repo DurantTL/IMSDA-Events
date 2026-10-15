@@ -23,10 +23,8 @@ describe("confirmations use the shared dialog (#743)", () => {
 
   it("useConfirm resolves a promise and renders one ConfirmDialog", () => {
     const code = source("components/use-confirm.tsx");
-    expect(code).toContain("new Promise<boolean>");
     expect(code).toContain("<ConfirmDialog");
-    expect(code).toContain("settle(false)");
-    expect(code).toContain("settle(true)");
+    expect(code).toContain("createConfirmController");
   });
 
   it.each([
@@ -63,7 +61,7 @@ describe("confirmations use the shared dialog (#743)", () => {
 describe("dialogs stack safely (#743)", () => {
   it("only the top-most dialog handles Escape and Tab", () => {
     const code = source("components/use-accessible-dialog.ts");
-    expect(code).toContain("openDialogs.at(-1) !== token");
+    expect(code).toContain("isTopDialog(token)");
     expect(source("components/confirm-dialog.tsx")).toContain("confirm-backdrop");
   });
 });

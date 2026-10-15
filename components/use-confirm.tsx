@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -17,7 +17,31 @@ export type ConfirmRequest = {
   destructive?: boolean;
 };
 
-type Pending = ConfirmRequest & { resolve: (confirmed: boolean) => void };
+export type PendingConfirm = ConfirmRequest & { resolve: (confirmed: boolean) => void };
+
+/**
+ * The state machine behind `useConfirm`, free of React so it can be tested
+ * directly. One request is open at a time: asking again cancels the first
+ * (resolves it false); `settle` resolves the open one and clears it.
+ */
+export function createConfirmController(onChange: (pending: PendingConfirm | null) => void) {
+  let current: PendingConfirm | null = null;
+  return {
+    request(request: ConfirmRequest) {
+      return new Promise<boolean>((resolve) => {
+        current?.resolve(false);
+        current = { ...request, resolve };
+        onChange(current);
+      });
+    },
+    settle(confirmed: boolean) {
+      const open = current;
+      current = null;
+      onChange(null);
+      open?.resolve(confirmed);
+    },
+  };
+}
 
 /**
  * A promise-shaped replacement for `window.confirm()`: `if (!(await confirm({...}))) return;`
@@ -26,23 +50,10 @@ type Pending = ConfirmRequest & { resolve: (confirmed: boolean) => void };
  * fail to show on iOS Safari (#466); the in-page dialog cannot.
  */
 export function useConfirm() {
-  const [pending, setPending] = useState<Pending | null>(null);
-  const pendingRef = useRef<Pending | null>(null);
-
-  const settle = useCallback((confirmed: boolean) => {
-    const current = pendingRef.current;
-    pendingRef.current = null;
-    setPending(null);
-    current?.resolve(confirmed);
-  }, []);
-
-  const confirm = useCallback((request: ConfirmRequest) => new Promise<boolean>((resolve) => {
-    // A second request while one is open cancels the first.
-    pendingRef.current?.resolve(false);
-    const next = { ...request, resolve };
-    pendingRef.current = next;
-    setPending(next);
-  }), []);
+  const [pending, setPending] = useState<PendingConfirm | null>(null);
+  const controller = useMemo(() => createConfirmController(setPending), []);
+  const confirm = controller.request;
+  const settle = controller.settle;
 
   const confirmDialog = (
     <ConfirmDialog
