@@ -302,6 +302,14 @@ jobs:
       # team, and an event without team rules behaving exactly as before.
       - run: npm run test:pbe-registration
 
+      # Real-database check of PBE advancement inside one event (#945): 1st and 2nd per Area advance (a tie advances
+      # both), staff overrides are audited with ids only and survive a recompute, the Conference list, results and
+      # roster CSVs and printed forms are exactly the advancing teams with no re-registration, a team that did not
+      # advance never reaches the next level, notices are queued only when staff press "Send notices" (once per team
+      # and level, with the next level's date and place), team check-in for the Conference day, a director's team
+      # changes between levels under the team rules, and old free-text placements staying readable.
+      - run: npm run test:pbe-advancement
+
       # Real-database check of the general registration link (#931): a director with no
       # account registers a PBE team through one public link; a matching director or
       # deputy email attaches it to the club picked as an ordinary club registration, any

@@ -637,6 +637,8 @@ enum MessageTemplateKey {
   HONOR_CLASS_WAITLIST_OFFER
   /// A reinstated or promoted registration came back without some Honors Weekend class picks because the class was full or the club's limit was reached (#880): one email to that club's director. Not an event template.
   HONOR_CLASS_PICKS_NOT_RESTORED
+  /// A team advanced to the next level of a multi-level event (#945): one email to the team's director, queued and sent only when staff press "Send notices". Not an event template.
+  CLUB_TEAM_ADVANCEMENT_NOTICE
 }
 
 enum MessageTemplateStatus {
@@ -783,6 +785,7 @@ model User {
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
   clubAssignmentUpdates     ClubEventAssignment[]     @relation("ClubEventAssignmentUpdatedBy")
   teamResultUpdates         ClubTeamResult[]          @relation("ClubTeamResultUpdatedBy")
+  teamLevelCheckIns         ClubTeamLevelCheckIn[]    @relation("ClubTeamLevelCheckInBy")
   teamPermissionDecisions   ClubTeamMemberPermission[] @relation("ClubTeamPermissionDecidedBy")
   registrationOperations    RegistrationOperation[]   @relation("RegistrationOperationActor")
   accountMessages           MessageOutbox[]           @relation("AccountMessageRecipient")
@@ -1637,6 +1640,7 @@ model Event {
   honorInstructors                    HonorInstructor[]
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
+  teamLevelCheckIns                   ClubTeamLevelCheckIn[]
   generalLinkSubmissions              GeneralLinkSubmission[]
   staffInvitations                    StaffInvitation[]
   groupRegistrations                  GroupEventRegistration[]
@@ -5285,6 +5289,7 @@ model ClubEventRegistration {
   submittedByUser User?            @relation("ClubEventRegistrationSubmittedByUser", fields: [submittedByUserId], references: [id], onDelete: SetNull)
   assignment      ClubEventAssignment?
   teamResults     ClubTeamResult[]
+  teamLevelCheckIns ClubTeamLevelCheckIn[]
   teamPermissions ClubTeamMemberPermission[]
 
   @@unique([eventId, organizationId, teamKey])
@@ -7886,9 +7891,14 @@ model ClubTeamResult {
   id                      String          @id @default(cuid())
   clubEventRegistrationId String
   level                   TeamResultLevel
-  /// Free text, e.g. "2nd place" or "412 points".
+  /// Free text from before placement was a number (#809): kept readable and flagged for staff to re-enter (#945). New entries leave it empty.
   placement               String          @default("")
+  /// The place as a number (#945): 1 is first. Ties share a number; 1st and 2nd advance. Null until staff enter it.
+  placementRank           Int?
+  /// Whether the team advances to the next level (#945): the rule's answer (placement 1 or 2) unless `advanceOverride` says otherwise.
   qualified               Boolean         @default(false)
+  /// Staff's decision (#945): true advances the team, false keeps it from advancing, whatever its place. Null follows the rule; kept when places are recomputed.
+  advanceOverride         Boolean?
   notes                   String          @default("")
   updatedByUserId         String?
   createdAt               DateTime        @default(now())
@@ -7898,6 +7908,26 @@ model ClubTeamResult {
   updatedBy             User?                 @relation("ClubTeamResultUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([clubEventRegistrationId, level])
+}
+
+/// A team checked in for a level above Area (#945): the Conference or Union day of the same event. The team never
+/// registers again, so this is one row per team and level rather than the per-person Area check-in. Undoing keeps the row.
+model ClubTeamLevelCheckIn {
+  id                      String          @id @default(cuid())
+  eventId                 String
+  clubEventRegistrationId String
+  level                   TeamResultLevel
+  checkedInAt             DateTime        @default(now())
+  checkedInByUserId       String?
+  undoneAt                DateTime?
+  createdAt               DateTime        @default(now())
+
+  event                 Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  clubEventRegistration ClubEventRegistration @relation(fields: [clubEventRegistrationId], references: [id], onDelete: Cascade)
+  checkedInBy           User?                 @relation("ClubTeamLevelCheckInBy", fields: [checkedInByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([clubEventRegistrationId, level])
+  @@index([eventId, level])
 }
 
 enum TeamPermissionStatus {
