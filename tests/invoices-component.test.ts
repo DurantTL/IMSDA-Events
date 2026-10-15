@@ -116,7 +116,7 @@ function detail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
   const shown = overrides.shown ?? version({ amountDueCents: 4500 });
   return {
     invoice: { id: "i1", groupKey: "organization:church-1", baseNumber: "SC27-0001", invoiceGrouping: "PER_CHURCH", partyKind: "ORGANIZATION" },
-    versions: [shown], discarded: [], shown, snapshot, change: null, needsFinalizePermission: false, currentContact: contact, contactChanged: false, amountsOutOfDate: false,
+    versions: [shown], discarded: [], shown, snapshot, change: null, needsFinalizePermission: false, currentContact: contact, contactChanged: false, amountsOutOfDate: false, churchDraftStale: false,
     hasOpenDraft: shown.status === "DRAFT", liveFinalized: shown.status === "FINALIZED" ? shown : null, reconciliationFreshness: "CURRENT", approvedReconciliationVersionId: "recon-1",
     ...overrides,
   };

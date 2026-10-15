@@ -1227,6 +1227,8 @@ export type InvoiceDetail = {
   currentContact: InvoiceContact | null;
   contactChanged: boolean;
   amountsOutOfDate: boolean;
+  /** A church promo code draft (#399) whose lines no longer match the redemptions now: refresh it before finalizing. */
+  churchDraftStale: boolean;
   hasOpenDraft: boolean;
   liveFinalized: InvoiceVersionSummary | null;
   reconciliationFreshness: "CURRENT" | "FACTS_CHANGED" | "UNKNOWN" | "SUPERSEDED" | "NONE";
@@ -1271,12 +1273,14 @@ export async function getInvoiceDetail(eventId: string, invoiceId: string, optio
   let freshness: InvoiceDetail["reconciliationFreshness"] = "NONE";
   let approvedId: string | null = null;
   let amountsOutOfDate = false;
+  let churchDraftStale = false;
   const churchId = churchIdOfPromoGroupKey(invoice.groupKey);
   if (churchId) {
     // A church's promo code invoice (#399): the contact is the church's own, and it is out of date when the lines now differ.
     const inputs = await loadChurchInvoiceInputs(prisma, eventId, churchId);
     currentContact = inputs?.contact ?? null;
     if (liveFinalized && inputs) amountsOutOfDate = inputs.figures.amountsFingerprint !== liveFinalized.amountsFingerprint;
+    if (shown.status === "DRAFT") churchDraftStale = !inputs || !inputs.event.eligible || inputs.figures.amountsFingerprint !== shown.amountsFingerprint;
   } else if (event.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
     const billing = await getBillingResponsibilityView(eventId, {}, prisma);
     currentContact = contactOfGroup(billing.groups.find((candidate) => candidate.key === invoice.groupKey));
@@ -1316,6 +1320,7 @@ export async function getInvoiceDetail(eventId: string, invoiceId: string, optio
       currentContact ? { name: currentContact.name, email: currentContact.email } : null,
     )),
     amountsOutOfDate,
+    churchDraftStale,
     hasOpenDraft: latest.status === "DRAFT",
     liveFinalized,
     reconciliationFreshness: freshness,

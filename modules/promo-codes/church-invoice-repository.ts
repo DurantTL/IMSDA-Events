@@ -219,7 +219,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
         id: true,
         baseNumber: true,
         groupKey: true,
-        versions: { where: { status: { in: ["DRAFT", "FINALIZED"] } }, select: { id: true, revision: true, status: true, number: true, amountDueCents: true, amountsFingerprint: true } },
+        versions: { where: { status: { in: ["DRAFT", "FINALIZED"] } }, select: { id: true, revision: true, status: true, number: true, amountDueCents: true, amountsFingerprint: true, contactName: true, contactEmail: true } },
       },
     }),
     loadEventLedger(eventId, {}, client),
@@ -235,7 +235,7 @@ export async function getChurchCodeReport(eventId: string, client: PrismaClient 
       invoiceId: invoice.id,
       baseNumber: invoice.baseNumber,
       finalized: finalized ? { versionId: finalized.id, number: finalized.number!, amountDueCents: finalized.amountDueCents, amountsFingerprint: finalized.amountsFingerprint } : null,
-      draft: draft ? { versionId: draft.id, revision: draft.revision, amountDueCents: draft.amountDueCents, amountsFingerprint: draft.amountsFingerprint } : null,
+      draft: draft ? { versionId: draft.id, revision: draft.revision, amountDueCents: draft.amountDueCents, amountsFingerprint: draft.amountsFingerprint, contactName: draft.contactName, contactEmail: draft.contactEmail } : null,
       paidCents: paidByInvoice.get(invoice.id) ?? 0,
     });
   }

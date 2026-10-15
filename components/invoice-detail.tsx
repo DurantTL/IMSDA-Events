@@ -32,7 +32,9 @@ export function InvoiceDetailView({
   const isDraft = shown.status === "DRAFT";
   const contact = shown.contact;
   const finalizeAllowed = canFinalize || !detail.needsFinalizePermission;
-  const stale = isDraft && detail.reconciliationFreshness !== "CURRENT" && detail.needsFinalizePermission;
+  // A church's promo code invoice (#399) has no reconciliation: it is stale when its lines no longer match the redemptions.
+  const isChurchCodes = snapshot.kind === "CHURCH_PROMO_CODES";
+  const stale = isDraft && (isChurchCodes ? detail.churchDraftStale : detail.reconciliationFreshness !== "CURRENT" && detail.needsFinalizePermission);
   return (
     <section className="page-stack">
       <div className="page-intro">
@@ -45,8 +47,12 @@ export function InvoiceDetailView({
           </p>
         </div>
         <div className="page-intro-actions">
-          <a className="secondary-button" href={`/finance/invoices?event=${eventId}`}>All invoices</a>
-          <a className="secondary-button" href={`/finance/attendance-reconciliation?event=${eventId}&version=${shown.reconciliationVersionId}`}>Reconciliation version {shown.reconciliationVersionNumber}</a>
+          {isChurchCodes
+            ? <a className="secondary-button" href={`/finance/church-owed?event=${eventId}`}>Church promo code report</a>
+            : <>
+                <a className="secondary-button" href={`/finance/invoices?event=${eventId}`}>All invoices</a>
+                <a className="secondary-button" href={`/finance/attendance-reconciliation?event=${eventId}&version=${shown.reconciliationVersionId}`}>Reconciliation version {shown.reconciliationVersionNumber}</a>
+              </>}
         </div>
       </div>
 
@@ -55,18 +61,24 @@ export function InvoiceDetailView({
           <p>
             <strong>Contact changed since finalization.</strong> The finalized invoice keeps {detail.liveFinalized?.contact?.name ?? "the contact it was finalized with"}
             {detail.currentContact ? `; the billing contact is now ${detail.currentContact.name}.` : "; this group has no billing contact now."}
-            {" "}Revise the contact to bring the invoice up to date; the finalized version stays readable.
+            {isChurchCodes
+              ? " The invoice is sent to the church's current billing contact; the send screen shows the change first."
+              : " Revise the contact to bring the invoice up to date; the finalized version stays readable."}
           </p>
         </section>
       )}
       {detail.amountsOutOfDate && !isDraft && (
         <section className="panel billing-settings" role="status" aria-label="Amounts out of date">
-          <p><strong>This invoice no longer matches the approved reconciliation.</strong> Revise it to rebuild the amounts; the finalized version stays readable.</p>
+          {isChurchCodes
+            ? <p><strong>The church's promo code usage has changed since this invoice was finalized.</strong> Start a revision draft from the church report; the finalized version stays readable.</p>
+            : <p><strong>This invoice no longer matches the approved reconciliation.</strong> Revise it to rebuild the amounts; the finalized version stays readable.</p>}
         </section>
       )}
       {stale && (
         <section className="panel billing-settings" role="status" aria-label="Reconciliation not current">
-          <p><strong>This draft cannot be finalized yet.</strong> The approved reconciliation is not current (a newer one was approved, or the facts changed). Prepare and approve the reconciliation, then regenerate the draft.</p>
+          {isChurchCodes
+            ? <p><strong>This draft cannot be finalized yet.</strong> The church's promo code usage changed after it was made. Refresh the draft, then review it again.</p>
+            : <p><strong>This draft cannot be finalized yet.</strong> The approved reconciliation is not current (a newer one was approved, or the facts changed). Prepare and approve the reconciliation, then regenerate the draft.</p>}
         </section>
       )}
 
@@ -81,7 +93,7 @@ export function InvoiceDetailView({
         </p>
         <p>
           <small>
-            Event {snapshot.event.name} · built from reconciliation version {shown.reconciliationVersionNumber}
+            Event {snapshot.event.name} · {isChurchCodes ? "built from the church's promo code redemptions" : `built from reconciliation version ${shown.reconciliationVersionNumber}`}
             {shown.createdByName ? ` · prepared by ${shown.createdByName}` : ""} {invoiceWhen(shown.createdAt)}
             {shown.regenerationCount > 0 ? ` · regenerated ${shown.regenerationCount} ${shown.regenerationCount === 1 ? "time" : "times"}` : ""}
           </small>
@@ -103,8 +115,8 @@ export function InvoiceDetailView({
 
       <section className="panel finance-list invoice-detail-lines" aria-label="Invoice lines">
         <div className="section-heading"><h3>Lines</h3></div>
-        {snapshot.lines.length === 0 && <p style={{ padding: "0 17px" }}>No registrations are on this invoice.</p>}
-        {snapshot.lines.map((line) => <LineBlock key={line.registrationId} line={line} />)}
+        {snapshot.lines.length === 0 && <p style={{ padding: "0 17px" }}>{isChurchCodes ? "No sponsored registrations are on this invoice." : "No registrations are on this invoice."}</p>}
+        {snapshot.lines.map((line) => <LineBlock key={line.registrationId} line={line} isChurchCodes={isChurchCodes} />)}
         {shown.manualLines.map((line) => (
           <div className="invoice-line" key={line.id}>
             <span><strong>{line.item}</strong><small>{line.description ? `${line.description} · ` : ""}manual line · {line.quantity} × {invoiceMoney(line.rateCents)}</small></span>
@@ -114,14 +126,14 @@ export function InvoiceDetailView({
           </div>
         ))}
         <div className="invoice-line">
-          <span><strong>Total due</strong><small>{snapshot.totals.billable} billable of {snapshot.totals.registered} registered ({snapshot.totals.noShow} no-show)</small></span>
+          <span><strong>Total due</strong><small>{isChurchCodes ? `${snapshot.totals.registered} sponsored ${snapshot.totals.registered === 1 ? "registration" : "registrations"}` : `${snapshot.totals.billable} billable of ${snapshot.totals.registered} registered (${snapshot.totals.noShow} no-show)`}</small></span>
           <span />
           <span><strong>{invoiceMoney(shown.amountDueCents)}</strong></span>
           <span />
         </div>
       </section>
 
-      {(isDraft || shown.manualLines.length > 0) && (
+      {!isChurchCodes && (isDraft || shown.manualLines.length > 0) && (
         <ManualLinesPanel canEdit={isDraft && shown.basis === "RECONCILIATION" && canFinalize} isDraft={isDraft} eventId={eventId} invoiceId={detail.invoice.id} lines={shown.manualLines} money={invoiceMoney} />
       )}
 
@@ -130,7 +142,7 @@ export function InvoiceDetailView({
         {isDraft && (
           <>
             <RegenerateControl eventId={eventId} invoiceId={detail.invoice.id} />
-            <DiscardControl eventId={eventId} invoiceId={detail.invoice.id} isRevision={shown.revision > 0} />
+            <DiscardControl eventId={eventId} invoiceId={detail.invoice.id} isRevision={shown.revision > 0} isChurchCodes={isChurchCodes} />
             {finalizeAllowed ? (
               !stale && (
                 <FinalizeControl
@@ -148,7 +160,10 @@ export function InvoiceDetailView({
             {finalizeAllowed && shown.amountDueCents === 0 && <p><small>This invoice is for $0. It can be finalized so the group has a number and a record, but nothing is owed.</small></p>}
           </>
         )}
-        {!isDraft && !detail.hasOpenDraft && detail.liveFinalized && shown.id === detail.liveFinalized.id && (
+        {!isDraft && !detail.hasOpenDraft && detail.liveFinalized && shown.id === detail.liveFinalized.id && isChurchCodes && (
+          <p><small>If the church's code is used or a registration is cancelled after this invoice, start a revision draft from the <a href={`/finance/church-owed?event=${eventId}`}>church promo code report</a>.</small></p>
+        )}
+        {!isDraft && !detail.hasOpenDraft && detail.liveFinalized && shown.id === detail.liveFinalized.id && !isChurchCodes && (
           <ReviseForm amountsOutOfDate={detail.amountsOutOfDate} contactChanged={detail.contactChanged} eventId={eventId} invoiceId={detail.invoice.id} />
         )}
         {!isDraft && detail.hasOpenDraft && <p><small>A newer version is open as a draft. <a href={`/finance/invoices/${detail.invoice.id}?event=${eventId}`}>Open it</a>.</small></p>}
@@ -202,7 +217,18 @@ function VersionRow({ eventId, detailInvoiceId, version, shownId, baseNumber }: 
   );
 }
 
-function LineBlock({ line }: { line: InvoiceLine }) {
+function LineBlock({ line, isChurchCodes = false }: { line: InvoiceLine; isChurchCodes?: boolean }) {
+  if (isChurchCodes) {
+    // One redemption: a confirmation code and the amount the church covers, never an attendee name.
+    return (
+      <div className="invoice-line">
+        <span><strong>{line.label}</strong><small>{line.confirmationCode}</small></span>
+        <span />
+        <span><strong>{invoiceMoney(line.amountCents)}</strong></span>
+        <span />
+      </div>
+    );
+  }
   return (
     <div className="invoice-line">
       <span>

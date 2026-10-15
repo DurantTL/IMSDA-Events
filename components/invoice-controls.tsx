@@ -86,7 +86,7 @@ export function RegenerateControl({ eventId, invoiceId }: { eventId: string; inv
   );
 }
 
-export function DiscardControl({ eventId, invoiceId, isRevision }: { eventId: string; invoiceId: string; isRevision: boolean }) {
+export function DiscardControl({ eventId, invoiceId, isRevision, isChurchCodes = false }: { eventId: string; invoiceId: string; isRevision: boolean; isChurchCodes?: boolean }) {
   const router = useRouter();
   const { busy, error, run } = useAction(eventId);
   return (
@@ -95,8 +95,10 @@ export function DiscardControl({ eventId, invoiceId, isRevision }: { eventId: st
         className="secondary-button"
         disabled={busy}
         onClick={() => {
-          if (!window.confirm(isRevision ? "Discard this revision draft? The finalized invoice stays as it is." : "Discard this draft? You can create a fresh one from the approved reconciliation.")) return;
-          void run({ action: "discard", invoiceId }).then((ok) => { if (ok && !isRevision) router.push(`/finance/invoices?event=${encodeURIComponent(eventId)}`); });
+          const fresh = isChurchCodes ? "the church promo code report" : "the approved reconciliation";
+          if (!window.confirm(isRevision ? "Discard this revision draft? The finalized invoice stays as it is." : `Discard this draft? You can create a fresh one from ${fresh}.`)) return;
+          const back = isChurchCodes ? "/finance/church-owed" : "/finance/invoices";
+          void run({ action: "discard", invoiceId }).then((ok) => { if (ok && !isRevision) router.push(`${back}?event=${encodeURIComponent(eventId)}`); });
         }}
         type="button"
       >

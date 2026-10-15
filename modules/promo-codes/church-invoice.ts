@@ -14,7 +14,7 @@
  */
 
 import type { InvoiceFigures, InvoiceLine, InvoiceSnapshot } from "@/modules/invoices/domain";
-import { amountsFingerprintOf } from "@/modules/invoices/domain";
+import { amountsFingerprintOf, contactsMatch } from "@/modules/invoices/domain";
 import { billedSponsoredLines, type ChurchSponsoredPromoLine } from "@/modules/promo-codes/church-sponsored";
 
 /** The invoice group key of a church's promo code invoice on an event: disjoint from the Camporee group keys. */
@@ -115,7 +115,7 @@ export type ChurchInvoiceFacts = {
   invoiceId: string;
   baseNumber: string | null;
   finalized: { versionId: string; number: string; amountDueCents: number; amountsFingerprint: string } | null;
-  draft: { versionId: string; revision: number; amountDueCents: number; amountsFingerprint: string } | null;
+  draft: { versionId: string; revision: number; amountDueCents: number; amountsFingerprint: string; contactName: string | null; contactEmail: string | null } | null;
   /** Payments less reversals recorded against the invoice, in cents (never below zero in `paidCents`). */
   paidCents: number;
 };
@@ -147,10 +147,16 @@ export type ChurchCodeReportRow = {
 export function churchInvoiceState(input: {
   figures: Pick<InvoiceFigures, "amountsFingerprint" | "amountDueCents">;
   invoice: ChurchInvoiceFacts | null;
+  /** The church's billing contact now: a draft carrying another contact is out of date too (refreshing picks the current one up). */
+  contact?: { name: string; email: string } | null;
 }): ChurchInvoiceState {
   const { figures, invoice } = input;
   if (!invoice || (!invoice.draft && !invoice.finalized)) return figures.amountDueCents > 0 ? "NO_INVOICE" : "NOTHING_TO_INVOICE";
-  if (invoice.draft) return invoice.draft.amountsFingerprint === figures.amountsFingerprint ? "DRAFT_CURRENT" : "DRAFT_STALE";
+  if (invoice.draft) {
+    const sameLines = invoice.draft.amountsFingerprint === figures.amountsFingerprint;
+    const sameContact = contactsMatch(invoice.draft, input.contact ?? null);
+    return sameLines && sameContact ? "DRAFT_CURRENT" : "DRAFT_STALE";
+  }
   return invoice.finalized!.amountsFingerprint === figures.amountsFingerprint ? "FINALIZED_CURRENT" : "FINALIZED_STALE";
 }
 
@@ -176,7 +182,7 @@ export function buildChurchCodeReportRow(input: {
     owedOnInvoiceCents: Math.max(invoicedCents - paidCents, 0),
     notInvoicedCents: figures.amountDueCents - invoicedCents,
     overpaidCents: Math.max(paidCents - invoicedCents, 0),
-    state: churchInvoiceState({ figures, invoice: input.invoice }),
+    state: churchInvoiceState({ figures, invoice: input.invoice, contact: input.contact }),
     invoiceId: input.invoice?.invoiceId ?? null,
     invoiceNumber: input.invoice?.finalized?.number ?? null,
     draftAmountCents: input.invoice?.draft?.amountDueCents ?? null,
