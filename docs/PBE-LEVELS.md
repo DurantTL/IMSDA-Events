@@ -6,6 +6,11 @@ again. Area, Conference and Union are levels of that one event, and a team reach
 ## Rules
 
 - **Placement is a number** (`ClubTeamResult.placementRank`, 1 is first). Ties share a number, so two 2nd places both advance.
+  The rule is "place 1 or 2 advances", so **every team tied at 1st or 2nd advances**: entering 1, 1, 2 advances all three teams,
+  and 1, 2, 2 does too. Staff who want fewer advancing use the override. Place 3 or lower never advances on its own.
+- **Results are removed only by "Clear result"** (`clear: true`). Saving the fields empty deletes nothing, so an old free-text
+  placement, a note or an override is not lost by an empty save. Clearing an override on an old free-text row is refused until a
+  number is entered, because the override is that row's only decision.
 - **Advancing**: a team placing 1st or 2nd at a level advances to the next (Area to Conference, Conference to Union). Union is
   the last level; nothing advances from it.
 - **Override**: staff can force a team to advance or not (`advanceOverride` true or false). It beats the placement, is audited
@@ -43,8 +48,14 @@ is later marked not advancing, and is not re-sent if the date changes; staff can
 ## Directors between levels
 
 After the registration window closes, an advanced team's director can still update the team's people until the level it advanced to
-is held (its date in `levelInfo` has passed, or staff entered a result for it). The usual team rules apply (2 to 7 team members and
-one alternate, ages on the age date, one team per person). A team that did not advance follows the registration window as before.
+is held: the window closes on that level's date (`levelInfo`), as soon as the team is checked in for it, or once staff enter a
+result for it. It is checked again inside the amendment transaction, so a revoked advancement cannot race an edit.
+
+It reopens only the team's people. The Area cannot change, the only answers that may change are a person's role (team member,
+TLT or coach) and the alternate box, people can be added or removed only within the usual team rules (2 to 7 team members and
+one alternate, ages on the age date, one team per person), and nothing may change the registration's total: a change that would
+(for example adding someone on an event that prices them) is refused with "contact the event office". A team that did not advance
+follows the registration window as before.
 
 ## Migration
 

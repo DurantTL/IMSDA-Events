@@ -67,8 +67,8 @@ beforeEach(() => {
 
 describe("team result input", () => {
   it("takes the place as a number and defaults a level to nothing entered", () => {
-    expect(teamResultInputSchema.parse({ level: "AREA", placementRank: 1 })).toEqual({ level: "AREA", placementRank: 1, advanceOverride: null, notes: "" });
-    expect(teamResultInputSchema.parse({ level: "AREA", notes: "  Great  " })).toEqual({ level: "AREA", placementRank: null, advanceOverride: null, notes: "Great" });
+    expect(teamResultInputSchema.parse({ level: "AREA", placementRank: 1 })).toEqual({ level: "AREA", placementRank: 1, advanceOverride: null, notes: "", clear: false });
+    expect(teamResultInputSchema.parse({ level: "AREA", notes: "  Great  " })).toEqual({ level: "AREA", placementRank: null, advanceOverride: null, notes: "Great", clear: false });
   });
 
   it.each([
@@ -137,12 +137,24 @@ describe("PUT /api/events/[eventId]/team-results/[registrationId]", () => {
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
-  it("clears a level when it is saved blank, and audits the clearing", async () => {
+  it("clears a level only on an explicit Clear result, and audits the clearing", async () => {
     const { tx } = database({ existing: stored() });
-    const response = await PUT(put({ level: "AREA" }), ctx);
+    const response = await PUT(put({ level: "AREA", clear: true }), ctx);
     await expect(response.json()).resolves.toMatchObject({ changed: true, result: null });
     expect(tx.clubTeamResult.delete).toHaveBeenCalled();
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_RESULT_CLEARED" }), tx);
+  });
+
+  it("never deletes a result because the fields were saved empty, old free-text rows included", async () => {
+    const { tx } = database({ existing: stored({ placement: "2nd place", placementRank: null, qualified: true }) });
+    const response = await PUT(put({ level: "AREA" }), ctx);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ error: "RESULT_INVALID", message: expect.stringContaining("Clear result") });
+    expect(tx.clubTeamResult.delete).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+    // Nothing stored and nothing entered is simply nothing.
+    database();
+    await expect((await PUT(put({ level: "AREA" }), ctx)).json()).resolves.toMatchObject({ changed: false, result: null });
   });
 
   it.each(["FINANCE_MANAGER", "COMMUNICATIONS_MANAGER", "CHECK_IN_STAFF", "READ_ONLY_STAFF"])("refuses %s, who cannot manage registrations", async (role) => {

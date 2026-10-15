@@ -52,8 +52,13 @@ function LevelEditor({
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(stored));
   const label = teamLabel(row.clubName, row.teamName);
 
-  async function save(event: React.FormEvent<HTMLFormElement>) {
+  function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    return send(false);
+  }
+
+  /** `clear` is the only way to remove a result: saving the fields empty never deletes one. */
+  async function send(clear: boolean) {
     setBusy(true);
     setMessage(null);
     try {
@@ -65,6 +70,7 @@ function LevelEditor({
           placementRank: draft.placementRank.trim() === "" ? null : Number(draft.placementRank),
           advanceOverride: overrideValue(draft.advanceOverride),
           notes: draft.notes,
+          ...(clear ? { clear: true } : {}),
         }),
       });
       const result = await response.json().catch(() => ({})) as { result?: TeamResultView | null; message?: string };
@@ -119,6 +125,7 @@ function LevelEditor({
       {status}
       <div className="intro-actions">
         <button className="secondary-button" disabled={busy || !dirty} type="submit">{busy ? "Saving…" : "Save"}</button>
+        {stored && <button className="secondary-button" disabled={busy} onClick={() => void send(true)} type="button">Clear result</button>}
         {message && <span className={message.kind === "error" ? "inline-notice error" : "field-help"} role={message.kind === "error" ? "alert" : "status"}>{message.kind === "ok" && <CheckCircle2 aria-hidden="true" size={13} />} {message.text}</span>}
       </div>
     </form>

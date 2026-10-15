@@ -117,7 +117,13 @@ export async function saveTeamResult(
     const existing = await tx.clubTeamResult.findUnique({ where });
     const label = teamLabel(team.organization.name, team.teamName);
 
-    if (resultIsBlank(input)) {
+    // A result is only ever deleted by an explicit "Clear result" (`clear`). Saving the fields blank deletes nothing: an old
+    // free-text placement, a note or an override is never lost by a save that happened to leave the form empty.
+    if (resultIsBlank(input) && !input.clear) {
+      if (!existing) return { result: null, changed: false };
+      throw new ClubTeamError("RESULT_INVALID", "There is nothing to save. To remove this result, use Clear result.");
+    }
+    if (input.clear) {
       if (!existing) return { result: null, changed: false };
       await tx.clubTeamResult.delete({ where });
       await writeAuditLog({
@@ -135,6 +141,12 @@ export async function saveTeamResult(
     }
     if (input.advanceOverride !== null && nextLevel(input.level) === null) {
       throw new ClubTeamError("RESULT_INVALID", `${teamLevelLabels[input.level]} is the last level, so no team advances from it.`);
+    }
+
+    // An old free-text row's earlier decision is kept only until it is re-entered; clearing the override on it would leave
+    // nothing to decide from, so a number is entered first.
+    if (existing && placementNeedsReentry(existing) && existing.advanceOverride !== null && input.advanceOverride === null && input.placementRank === null) {
+      throw new ClubTeamError("RESULT_INVALID", "This result is an old free-text entry, so staff's decision is the only thing saying whether the team advances. Enter the place as a number before clearing it.");
     }
 
     // A structured place replaces an old free-text one; a result saved without one keeps what was there.

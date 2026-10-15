@@ -27,6 +27,8 @@ export const teamResultInputSchema = z.object({
   /** Staff's decision: true advances the team, false keeps it from advancing, null follows the placement rule. */
   advanceOverride: z.boolean().nullable().default(null),
   notes: z.string().trim().max(2000, "Keep the notes to 2,000 characters or fewer.").default(""),
+  /** Remove the level's result altogether. Only this deletes one; saving the fields empty never does. */
+  clear: z.boolean().default(false),
 }).strict();
 
 export type TeamResultInput = z.infer<typeof teamResultInputSchema>;
@@ -261,18 +263,22 @@ export function currentLevelOf(row: { results: Record<TeamLevel, { qualified: bo
 /**
  * Whether a director may still change an advanced team's people (#945) after the registration window has closed. Between
  * levels the team can be updated under the same team rules (size, alternate, ages on the age date): from the moment it
- * advances until the level it advanced to is held. That level is held when its date has passed or staff have entered a
- * result for it. A team that has not advanced has no extra window: it follows the registration window as always.
+ * advances until the level it advanced to is held. That level is held on its date (the window closes that day), once the
+ * team has been checked in for it, or once staff have entered a result for it. A team that has not advanced has no extra
+ * window: it follows the registration window as always.
  */
 export function betweenLevelsEditOpen(
   row: { results: Record<TeamLevel, { qualified: boolean } | null> },
   levelInfo: readonly TeamLevelInfo[],
   today: string,
+  /** Levels the team is checked in for (an active team check-in). */
+  checkedInLevels: ReadonlySet<TeamLevel> = new Set(),
 ): { open: true; level: TeamLevel } | { open: false } {
   const level = currentLevelOf(row);
   if (level === "AREA") return { open: false };
   if (row.results[level] !== null) return { open: false };
+  if (checkedInLevels.has(level)) return { open: false };
   const date = levelInfoFor(levelInfo, level)?.date ?? null;
-  if (date !== null && today > date) return { open: false };
+  if (date !== null && today >= date) return { open: false };
   return { open: true, level };
 }

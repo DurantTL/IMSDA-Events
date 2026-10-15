@@ -183,8 +183,13 @@ describe("the notice and the between-levels window", () => {
     const levelInfo = [{ level: "CONFERENCE" as const, date: "2027-03-20", place: "Camp Heritage" }];
     const advanced = team("a", "Aces", { AREA: view("AREA", { qualified: true }) });
     expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-01")).toEqual({ open: true, level: "CONFERENCE" });
-    expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-20")).toEqual({ open: true, level: "CONFERENCE" });
+    // The window closes on the level's own day.
+    expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-19")).toEqual({ open: true, level: "CONFERENCE" });
+    expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-20")).toEqual({ open: false });
     expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-21")).toEqual({ open: false });
+    // ...or as soon as the team is checked in for the level, before the day is over.
+    expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-01", new Set<TeamLevel>(["CONFERENCE"]))).toEqual({ open: false });
+    expect(betweenLevelsEditOpen(advanced, levelInfo, "2027-03-01", new Set<TeamLevel>(["UNION"]))).toEqual({ open: true, level: "CONFERENCE" });
     expect(betweenLevelsEditOpen(advanced, [], "2030-01-01")).toEqual({ open: true, level: "CONFERENCE" });
     // Once staff enter a Conference result the level has been held.
     const held = team("a", "Aces", { AREA: view("AREA", { qualified: true }), CONFERENCE: view("CONFERENCE", { placementRank: 4 }) });
@@ -282,6 +287,25 @@ describe("saving placements marks who advances", () => {
     await saveTeamResult("event-1", "t1", { level: "AREA", placementRank: 5 }, "staff-1");
     expect(results[0]).toMatchObject({ advanceOverride: null, qualified: false });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_ADVANCEMENT_OVERRIDE_CLEARED" }), expect.anything());
+  });
+
+  it("refuses to clear an override on an old free-text row until a number is entered, and keeps the row's decision", async () => {
+    const { results } = resultsDatabase([row({ id: "r1", clubEventRegistrationId: "t1", level: "AREA", placement: "2nd place", advanceOverride: false, qualified: false })]);
+    await expect(saveTeamResult("event-1", "t1", { level: "AREA", notes: "x" }, "staff-1")).rejects.toMatchObject({ code: "RESULT_INVALID" });
+    expect(results[0]).toMatchObject({ placement: "2nd place", advanceOverride: false, qualified: false });
+    // Keeping the override while changing the note is fine, and so is entering a number, which replaces the text.
+    await saveTeamResult("event-1", "t1", { level: "AREA", advanceOverride: false, notes: "x" }, "staff-1");
+    await saveTeamResult("event-1", "t1", { level: "AREA", placementRank: 1 }, "staff-1");
+    expect(results[0]).toMatchObject({ placement: "", placementRank: 1, advanceOverride: null, qualified: true });
+  });
+
+  it("never deletes a result on a blank save, but does on Clear result", async () => {
+    const { tx, results } = resultsDatabase([row({ id: "r1", clubEventRegistrationId: "t1", level: "AREA", placement: "2nd place", qualified: true })]);
+    await expect(saveTeamResult("event-1", "t1", { level: "AREA" }, "staff-1")).rejects.toMatchObject({ code: "RESULT_INVALID" });
+    expect(tx.clubTeamResult.delete).not.toHaveBeenCalled();
+    expect(results).toHaveLength(1);
+    await saveTeamResult("event-1", "t1", { level: "AREA", clear: true }, "staff-1");
+    expect(tx.clubTeamResult.delete).toHaveBeenCalledTimes(1);
   });
 
   it("keeps an old free-text placement and its decision when only the note changes, and replaces it once a number is entered", async () => {
@@ -397,6 +421,16 @@ describe("team check-in for a level", () => {
     const undone = await setTeamLevelCheckIn("event-1", "cer-1", "CONFERENCE", false, "staff-1");
     expect(undone).toEqual({ checkedInAt: null, changed: true });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_LEVEL_CHECK_IN_UNDONE" }), expect.anything());
+  });
+
+  it("answers 404 for a team of another event on the check-in route, and checks in nothing", async () => {
+    const tx = checkInDatabase([]);
+    tx.clubEventRegistration.findFirst.mockResolvedValue(null);
+    const response = await putCheckIn(put("/api/events/event-1/team-results/cer-other/check-in", { level: "CONFERENCE", checkedIn: true }), { params: Promise.resolve({ eventId: "event-1", registrationId: "cer-other" }) });
+    expect(response.status).toBe(404);
+    expect(tx.clubEventRegistration.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "cer-other", eventId: "event-1" } }));
+    expect(tx.clubTeamLevelCheckIn.upsert).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("refuses a team that did not advance, and the Area day, which uses the usual check-in", async () => {

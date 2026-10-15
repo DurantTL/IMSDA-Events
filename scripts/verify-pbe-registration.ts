@@ -424,7 +424,7 @@ async function main() {
   assert(otherTeamView.registration?.results.length === 0, "and none on a team that has none");
   const strangerView = await club.getClubEventWorkspace(clubOf("c"), eventId, now, { teamKey: "sword drill" });
   assert(strangerView.registration === null, "another club asking for the team sees nothing");
-  await saveTeamResult(eventId, swordRow.id, { level: "CONFERENCE" }, staffUserId);
+  await saveTeamResult(eventId, swordRow.id, { level: "CONFERENCE", clear: true }, staffUserId);
   assert((await getResultsForRegistration(swordRow.id)).CONFERENCE === null, "saving a level blank clears it");
   console.log("ok  results: entered, audited once per change, shown to the director read only, in the report and CSV");
 

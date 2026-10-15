@@ -301,7 +301,7 @@ export default async function ClubEventRegistrationPage({
                 {workspace.registration.nextLevel.whenWhere
                   ? <>{teamLevelLabels[workspace.registration.nextLevel.level]}: <strong>{workspace.registration.nextLevel.whenWhere}</strong>.</>
                   : <>The {teamLevelLabels[workspace.registration.nextLevel.level]} date and place will be announced.</>}{" "}
-                Until then you can update your team&apos;s people below, under the same team rules.
+                {workspace.event.edit.open ? "Until then you can update your team's people below, under the same team rules." : ""}
               </p>
             </div>
           )}

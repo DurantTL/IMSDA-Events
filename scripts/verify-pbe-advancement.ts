@@ -292,21 +292,52 @@ async function main() {
   });
   const acesRow = await rowOf("Aces");
   const dovesRow = await rowOf("Doves");
+  // Aces was checked in for Conference above, so its window is already closed: it closes as soon as the team is checked in.
+  const checkedInWorkspace = await club.getClubEventWorkspace(clubOf("a"), eventId, afterClose, { teamKey: "aces" });
+  assert(!checkedInWorkspace.event.edit.open, "a team checked in for its next level can no longer change its people");
+  await expectCode(club.amendClubRegistration(clubOf("a"), eventId, actor, editFor("a", ["y1", "y2", "y4", "coach1"], "aces", acesRow.registration.updatedAt), afterClose), "REGISTRATION_CLOSED", "and the amendment is refused too");
+  await setTeamLevelCheckIn(eventId, ids.Aces!, "CONFERENCE", false, staffUserId);
   const workspaceAfterClose = await club.getClubEventWorkspace(clubOf("a"), eventId, afterClose, { teamKey: "aces" });
   assert(workspaceAfterClose.event.edit.open && workspaceAfterClose.registration?.nextLevel?.level === "CONFERENCE" && workspaceAfterClose.registration.nextLevel.whenWhere.includes("Camp Synthetic"), "an advanced team's page is open for changes and says where Conference is");
-  await club.amendClubRegistration(clubOf("a"), eventId, actor, editFor("a", ["y1", "y2", "y3", "y4", "coach1"], "aces", acesRow.registration.updatedAt), afterClose);
-  assert(await prisma.registrationAttendee.count({ where: { registrationId: acesRow.registrationId } }) === 5, "the advanced team's change is saved after the registration deadline");
+
+  // The window reopens only the team's people: not the Area, not other answers, not the price.
+  await expectCode(
+    club.amendClubRegistration(clubOf("a"), eventId, actor, { ...editFor("a", ["y1", "y2", "y3", "coach1"], "aces", acesRow.registration.updatedAt), locationId: iowa.id }, afterClose),
+    "REGISTRATION_CLOSED", "a team cannot switch Area between levels",
+  );
+  const otherAnswer = editFor("a", ["y1", "y2", "y3", "coach1"], "aces", acesRow.registration.updatedAt);
+  otherAnswer.attendeeResponses[clientId("a", "y1")] = { attendee_type: "Pathfinder", dietary_notes: "Peanuts" } as never;
+  await expectCode(club.amendClubRegistration(clubOf("a"), eventId, actor, otherAnswer, afterClose), "REGISTRATION_CLOSED", "a changed non-team answer is refused between levels");
+  assert((await rowOf("Aces")).registration.locationId === missouri.id, "the Area is unchanged");
+  // A valid swap of one team member for another works, and the team rules still apply.
+  await club.amendClubRegistration(clubOf("a"), eventId, actor, editFor("a", ["y1", "y2", "y4", "coach1"], "aces", acesRow.registration.updatedAt), afterClose);
+  const swapped = await prisma.registrationAttendee.findMany({ where: { registrationId: acesRow.registrationId }, select: { personId: true } });
+  assert(swapped.length === 4 && swapped.some((entry) => entry.personId === `${P}_a_y4`) && !swapped.some((entry) => entry.personId === `${P}_a_y3`), "a member swap is saved after the registration deadline");
   const acesAfter = await rowOf("Aces");
   await expectCode(
     club.amendClubRegistration(clubOf("a"), eventId, actor, editFor("a", ["y1", "coach1"], "aces", acesAfter.registration.updatedAt), afterClose),
     "TEAM_RULES", "the team rules still apply between levels",
   );
+  // A change that would alter the total is refused: here the form starts pricing coaches, so any change re-prices the team.
+  const versionRow = await prisma.registrationFormVersion.findUniqueOrThrow({ where: { id: versionId } });
+  const definition = versionRow.definition as unknown as { sections: Array<{ fields: Array<Record<string, unknown>> }> };
+  const roleField = definition.sections.flatMap((section) => section.fields).find((field) => field.key === "attendee_type" && Array.isArray(field.options) && field.options.includes("Coach"));
+  assert(roleField, "the form has a role question with a Coach choice");
+  roleField.choicePricesCents = { Coach: 1500 };
+  await prisma.registrationFormVersion.update({ where: { id: versionId }, data: { definition: definition as never } });
+  await expectCode(
+    club.amendClubRegistration(clubOf("a"), eventId, actor, editFor("a", ["y1", "y2", "y3", "y4", "coach1"], "aces", acesAfter.registration.updatedAt), afterClose),
+    "REGISTRATION_CLOSED", "a priced change is refused between levels, with a note to contact the event office",
+  );
+  const priced = await caught(club.amendClubRegistration(clubOf("a"), eventId, actor, editFor("a", ["y1", "y2", "y3", "y4", "coach1"], "aces", acesAfter.registration.updatedAt), afterClose));
+  assert(priced instanceof Error && priced.message.includes("event office"), "the refusal tells the director to contact the event office");
+  assert(Number((await rowOf("Aces")).registration.totalAmount) === 0, "the total is unchanged");
   const closed = await club.getClubEventWorkspace(clubOf("d"), eventId, afterClose, { teamKey: "doves" });
   assert(!closed.event.edit.open && closed.registration?.nextLevel === null, "a team that did not advance stays closed");
   await expectCode(club.amendClubRegistration(clubOf("d"), eventId, actor, editFor("d", ["y1", "y2", "y3", "y4", "coach1"], "doves", dovesRow.registration.updatedAt), afterClose), "REGISTRATION_CLOSED", "and cannot change its people");
-  const afterConferenceDate = new Date("2027-02-21T15:00:00Z");
-  assert(!(await club.getClubEventWorkspace(clubOf("a"), eventId, afterConferenceDate, { teamKey: "aces" })).event.edit.open, "the window closes once Conference has been held");
-  console.log("ok  between levels a director updates an advanced team under the team rules; a team that did not advance stays closed");
+  assert(!(await club.getClubEventWorkspace(clubOf("a"), eventId, new Date("2027-02-20T15:00:00Z"), { teamKey: "aces" })).event.edit.open, "the window closes on Conference's own day");
+  assert(!(await club.getClubEventWorkspace(clubOf("a"), eventId, new Date("2027-02-21T15:00:00Z"), { teamKey: "aces" })).event.edit.open, "and stays closed after it");
+  console.log("ok  between levels a director updates an advanced team's people under the team rules only (no Area, answer or price change); a team that did not advance stays closed");
 
   // 9. Conference to Union: the same top-2 rule, with an override, and Union is the last level.
   await saveTeamResult(eventId, ids.Aces!, { level: "CONFERENCE", placementRank: 1 }, staffUserId);
