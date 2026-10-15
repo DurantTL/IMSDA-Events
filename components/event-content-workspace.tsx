@@ -66,7 +66,7 @@ function usageSummary(usage: EventAssetRecord["usage"]) {
   return parts.length > 0 ? parts.join(" · ") : "not used yet";
 }
 
-const retreatGuideStarterSections: SectionDraft[] = [
+const eventGuideStarterSections: SectionDraft[] = [
   {
     kind: "RICH_TEXT",
     title: "Weekend schedule",
@@ -84,7 +84,7 @@ const retreatGuideStarterSections: SectionDraft[] = [
   {
     kind: "RICH_TEXT",
     title: "Meals, childcare and accessibility",
-    body: "Add meal times and locations, childcare check-in details, accessibility guidance, and who to contact before or during the retreat.",
+    body: "Add meal times and locations, childcare check-in details, accessibility guidance, and who to contact before or during the event.",
     isPublished: false,
     links: [],
   },
@@ -97,7 +97,7 @@ const retreatGuideStarterSections: SectionDraft[] = [
   },
   {
     kind: "RICH_TEXT",
-    title: "Retreat resources",
+    title: "Event resources",
     body: "Add the final programme, site map, packing list, speaker notes, recordings, and other files or web links attendees may need. Change this section to “Resource links” when the first resource is ready.",
     isPublished: false,
     links: [],
@@ -361,17 +361,17 @@ export function EventContentWorkspace({
     setNotice("");
   }
 
-  function addRetreatGuideStarter() {
+  function addEventGuideStarter() {
     setSections((current) => [
       ...current,
-      ...retreatGuideStarterSections.map((section) => ({
+      ...eventGuideStarterSections.map((section) => ({
         ...section,
         cid: newDraftId(),
         links: section.links.map((link) => ({ ...link })),
       })),
     ]);
     setError("");
-    setNotice("Added five unpublished retreat-guide sections. Replace the prompts, then publish each section when it is ready.");
+    setNotice("Added five unpublished event-guide sections. Replace the prompts, then publish each section when it is ready.");
   }
 
   async function uploadAsset(file: File) {
@@ -509,8 +509,8 @@ export function EventContentWorkspace({
             Each section publishes on its own, so a half-written one can wait while the rest goes live.
           </p>
         </div>
-        <button className="secondary-button" type="button" onClick={addRetreatGuideStarter}>
-          <Sparkles size={16} aria-hidden="true" /> Add retreat guide starter
+        <button className="secondary-button" type="button" onClick={addEventGuideStarter}>
+          <Sparkles size={16} aria-hidden="true" /> Add event guide starter
         </button>
       </div>
 

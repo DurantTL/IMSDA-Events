@@ -81,11 +81,20 @@ with the decision record.
 ## Related rules
 
 - **Break-glass access** (decided 2026-10-09):
-  - only system administrators may use it;
+  - only system administrators may use it, and it is the only way they read a Pathfinder Health Record (the live record
+    and the sealed copies; #929), one person at a time. The coordinator health sheet reads registration and club form
+    data, not the Health Record, and is not behind break-glass (owner decision, 2026-10-14);
   - they must type a reason;
   - access lasts 24 hours and is logged;
   - the incident lead reviews every use each month.
 - **Retention** (decided 2026-10-09): see Addendum B. Health records are
   removed when not re-confirmed, so there is less to lose.
+- **Sealed per-event copies** (decided 2026-10-14, #924, Addendum B): an
+  encrypted, immutable copy of the record for each event attended, kept until a
+  minor's 26th birthday or 5 years after the event for an adult, and opened only
+  through break-glass. They are encrypted with the same key as the live records,
+  so a key loss or exposure covers them too; a breach assessment counts them.
+  Their audit rows (`HEALTH_SNAPSHOT_*`) hold ids, counts and typed reasons,
+  never values, and every break-glass use is reviewed monthly like the rest.
 - **Backups and the encryption key:** #875 (nightly backups to Cloudflare R2)
   and #876 (the key is kept out of the env file, with a separate tested backup).

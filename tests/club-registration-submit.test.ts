@@ -111,6 +111,8 @@ function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CL
     },
     eventTeamSettings: { findUnique: vi.fn().mockResolvedValue(null) },
     clubEventRegistration: { findUnique: vi.fn().mockResolvedValue(null), findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "cer-1" }) },
+    // A team waiting on the general link (#931) holds its name against every club submission.
+    generalLinkSubmission: { findFirst: vi.fn().mockResolvedValue(null) },
     eventLocation: { count: vi.fn().mockResolvedValue(0) },
     clubRegistrationDraft: { findUnique: vi.fn().mockResolvedValue(null), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     publicRegistrationSubmission: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "submission-1" }) },
@@ -902,6 +904,39 @@ describe("club registration of named teams (#809)", () => {
     expect(refused).toMatchObject({ code: "CLUB_TEAM_NAME_TAKEN", message: 'A team named "BIBLE BEES" is already registered for this event. Choose a different team name.' });
     expect(tx.clubEventRegistration.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event-1", teamKey: "bible bees" } }));
     expect(tx.registration.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a team name a team waiting on the general link holds, through the club portal too (#931)", async () => {
+    const tx = fixture();
+    tx.eventTeamSettings.findUnique.mockResolvedValue(teamRulesRow());
+    tx.generalLinkSubmission.findFirst.mockResolvedValue({ id: "waiting-1" });
+    const refused = await submit(baseInput, clubTeam("BIBLE BEES")).catch((error: unknown) => error);
+    expect(refused).toMatchObject({ code: "CLUB_TEAM_NAME_TAKEN", message: 'A team named "BIBLE BEES" is already registered for this event. Choose a different team name.' });
+    expect(tx.generalLinkSubmission.findFirst).toHaveBeenCalledWith({
+      where: { eventId: "event-1", teamKey: "bible bees", status: "PENDING" },
+      select: { id: true },
+    });
+    expect(tx.registration.create).not.toHaveBeenCalled();
+  });
+
+  it("exempts only the waiting submission that this very submission confirms (#931)", async () => {
+    const tx = fixture();
+    tx.eventTeamSettings.findUnique.mockResolvedValue(teamRulesRow());
+    await submit(baseInput, { ...clubTeam("Bible Bees"), confirmsPendingSubmissionId: "waiting-1" }).catch(() => undefined);
+    expect(tx.generalLinkSubmission.findFirst).toHaveBeenCalledWith({
+      where: { eventId: "event-1", teamKey: "bible bees", status: "PENDING", id: { not: "waiting-1" } },
+      select: { id: true },
+    });
+  });
+
+  it("puts the director's attached-to-club line on the one confirmation email, and only when asked (#931)", async () => {
+    fixture();
+    await submit(baseInput, { ...club(), confirmationNote: () => 'Your team "Bible Bees" is attached to Test Pathfinders.' });
+    expect(dependencies.enqueuePublicRegistrationMessages).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ registrantNote: 'Your team "Bible Bees" is attached to Test Pathfinders.' }));
+    dependencies.enqueuePublicRegistrationMessages.mockClear();
+    fixture();
+    await submit(baseInput, club());
+    expect(dependencies.enqueuePublicRegistrationMessages).toHaveBeenCalledWith(expect.anything(), expect.not.objectContaining({ registrantNote: expect.anything() }));
   });
 
   it("refuses the club's own team name again, as an already registered team", async () => {

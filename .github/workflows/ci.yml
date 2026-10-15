@@ -159,6 +159,8 @@ jobs:
       # timing out as a retryable busy, the location filters and CSV columns,
       # and cloning with shifted dates (#413).
       - run: npm run test:event-locations
+      # Real-database check of the event-scoped operations search (#180): attendee-not-payer lookup, words matching one person, duplicate names in a deterministic order, note text never searchable, refused filters that read like missing ones, stale and health form keys reported, another event unreachable, results/counts/facets/suggestions agreeing, and canonical paging over 1,500 tied rows with the index used.
+      - run: npm run test:operations-search
       # Real-database check of lodging inventory (#198): idempotent and concurrent template sync with no names or prices, night-by-night availability with partial stays, closures and unavailable units, per-event overrides, holds that keep append-only history and refuse overlapping active holds under a race, optional finance-only rates, and cascade on event deletion.
       - run: npm run test:lodging
       # Real-database check of lodging preferences, roommate requests and household rules (#199): versioned requests that keep every earlier version, a registrant deadline that staff changes can pass and are flagged for, a full type refused at selection and one winner when five registrants race for the last place, directional roommate requests that are mutual only when both ask or staff approve and never reveal who asked or any contact detail, yes/no accessibility flags with no free-text column that staff without sensitive access neither see nor set, keep-together/split/keep-apart rules that keep history and follow a household change, the review queue, the lodging step of the real public registration (first version from the form, per-night and flat-for-the-event charges as their own line, no line without a rate, rooms for a party, a full type refused at submit with one winner under a race and against a private-page save, church-billed events never charged, a waitlisted choice kept unpriced, lodging never discounted by a promo code, change requests rather than repricing after submission), and the database refusing cross-event rows and rewrites.
@@ -184,8 +186,14 @@ jobs:
       # Real-database check of the Pathfinder Health Record: switched off stores nothing (the script turns the flag on only inside its own process), every field is sealed on its own and appears in no stored or audit row, one audit row per view, a single-use private link that submits exactly once under a race, Needs update by club year, and removal erasing every year's record (#611); a Registrar who can enter and replace a record but never read one back, with refused reads audited and no value in any row, the one-time privacy acknowledgment per person and wording version (staff by user, everyone else by attendee account, asked again after a wording change, one person per row, gone with its account, referring to no event, club, roster row or person) (#923).
       - run: npm run test:health-records
 
+      # Real-database check of the sealed per-event copies of the health record (#924): a copy sealed at check-in and at the event's start, once per person per event even when attempts race, never for a person with no record or off a club registration; every field its own ciphertext under the copy's own key purpose with no plaintext in any column or audit row; the database refusing every update, every addition to a copy, every incomplete copy and every delete outside the retention job and event deletion; expiry per copy from the birth date at the event (a minor's 26th birthday, an adult's 5 years, the longer reading when there is no birth date) with no birth date stored; the live record's removal leaving the copy, and a person with a copy not deletable; the daily job deleting only expired copies, never one under a person or event hold, once a day, audited with ids and counts; holds and lifts by a system administrator with a reason; break-glass as the only way in (system administrator, privacy acknowledgment, typed reason, 24 hours, every use and refusal audited, never a value); event deletion removing an event's copies and refusing while a hold covers one; and everything off with HEALTH_RECORDS_ENABLED off.
+      - run: npm run test:health-snapshots
+
       # Real-database check of roster guardian contacts: slot constraints, replace-on-edit, prior-year writes refused, deletion on removal, reader scoping, and no guardian value in any audit row (#510).
       - run: npm run test:club-roster-guardians
+
+      # Real-database check of carrying a club roster forward to the next club year: the offer lists only last year's active people with no birth date, one confirmation carries the ticked people with the same Person and the same sealed birth date, a Pathfinder becoming staff changes type and role, last year's roster stays readable, a repeat (and eight racing confirmations) leaves one winner and no duplicate rows, another club's person is refused as not found, removal erases every year's row, the oversight list of clubs that have not started, and no birth date or name in any audit row or record (#414).
+      - run: npm run test:club-roster-carry-forward
 
       # Real-database check of billing responsibility and organization billing contacts: the resolver is idempotent and race-safe, staff decisions survive re-resolution, one active contact per organization even under parallel replacement with history kept, the constraints and append-only history hold, and no audit row holds contact details (#165).
       - run: npm run test:billing-responsibility
@@ -195,6 +203,9 @@ jobs:
 
       # Real-database check of declared guardian authority: the registrant's choice is the only source of a responsible adult (household, canManage, surname, email and account holder create none), one ACTIVE declaration per minor even under parallel writes, append-only rows with supersede and revoke, the trigger refusing an adult who is not on the registration, minor status at the event start date, two adults claiming one minor becoming a review item, staff changes scoped to the event, and no audit row holding a reason or name (#131).
       - run: npm run test:guardian-authority
+
+      # Real-database check of consent policies (#129): kind and scope fixed at creation, one draft per policy, publishing freezing a version (repository and trigger both refuse any change), required publisher, hash and human material-change flag, version-effective-at-date and version-referenced-by-evidence as separate queries (overlap, open-ended), the current-version pointer, per-event applicability by type, role and age band, ids-only audit rows, and cascade on event deletion.
+      - run: npm run test:consent-policies
 
       # Real-database check of deferred-organization invoices: drafts only from a current approved reconciliation, numbers assigned exactly once under parallel and retried finalization (per event, code and year), immutable finalized versions with one receivable each, contact-only and amount revisions with the Finalize invoices rule, and no audit row holding a contact name or email (#167).
       - run: npm run test:invoices
@@ -282,6 +293,25 @@ jobs:
       # filled and blank print form, billing/church/packet/QR/check-in views per
       # team, and an event without team rules behaving exactly as before.
       - run: npm run test:pbe-registration
+
+      # Real-database check of the general registration link (#931): a director with no
+      # account registers a PBE team through one public link; a matching director or
+      # deputy email attaches it to the club picked as an ordinary club registration, any
+      # other waits as a pending submission (in no count, invoice or check-in list) until
+      # staff confirm, reassign or reject it, all audited with ids only and safe under
+      # concurrency; the team rules and unique team name hold (also racing); the generic
+      # public route refuses a club form; honeypot, rate limit and idempotency; the optional
+      # roster link; the table constraints.
+      - run: npm run test:general-link-registration
+
+      # Real-database check of personal staff, pastor and volunteer invitations (#804): a CSV
+      # preview creates nothing and confirming creates only what was previewed; one derived
+      # personal link per email (copy, reissue, revoke); sending is a previewed, explicit action
+      # that only queues in the outbox; a registration through a link is the person, a spouse and
+      # children up to 18 for $0, waiting for the office as a draft (also under racing clicks);
+      # batch approval confirms it and covers every meal under the conference-paid plan, a
+      # decline cancels it; the table constraints and event deletion.
+      - run: npm run test:staff-invitations
 
       # Check-in desk concurrency (#825): 4 devices checking in the same attendee,
       # the same retry key re-sent, and different attendees of one registration at

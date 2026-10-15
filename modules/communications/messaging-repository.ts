@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { MessagingError } from "@/modules/communications/messaging-error";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -94,7 +95,7 @@ import {
   shirtSizeAttendeeSummary,
   type ShirtSizeCandidate,
   type ShirtSizePreviewContext,
-} from "@/modules/communications/shirt-size-audience";
+} from "@/modules/merchandise/legacy-shirt-size-audience-compat";
 import {
   computeSelectedAudiencePreview,
   type SelectedAudienceBatchInput,
@@ -107,7 +108,7 @@ import { enqueueSelectedAudienceMessage, isRegistrationConfirmation } from "@/mo
 import {
   eventCollectsShirtSizes,
   shirtSizeFromResponses,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 import type {
   BalanceReminderPreview,
   MessageOutboxRecord,
@@ -187,6 +188,12 @@ export type RegistrationMessageInput = {
    * its price and estimated total shown, never the church-billed wording.
    */
   billedToGroup?: boolean;
+  /**
+   * One plain line placed at the top of the registrant's confirmation (never the internal notice), such as the club a team
+   * was attached to (#931). Added to the rendered message as escaped text, never as template source, so a name typed by a
+   * visitor cannot become a link, an image or a token.
+   */
+  registrantNote?: string | null;
 };
 
 export type QueuedRegistrationMessages = {
@@ -3415,6 +3422,7 @@ export async function enqueuePublicRegistrationMessages(
 ): Promise<QueuedRegistrationMessages> {
   const isDeferredOrganizationBilling = input.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
   const billedToGroup = isDeferredOrganizationBilling && Boolean(input.billedToGroup);
+  const registrantNote = input.registrantNote ?? null;
   const registrantTemplateKey = selectRegistrationMessageTemplate({
     isWorker: input.registration.attendeeType === "WORKER",
     balanceCents: input.calculation.totalCents,
@@ -3609,6 +3617,8 @@ export async function enqueuePublicRegistrationMessages(
         `The ${recipient.templateKey.toLowerCase().replaceAll("_", " ")} template has unresolved tokens: ${rendered.unresolvedTokens.join(", ")}.`,
       );
     }
+    // The note is added to the rendered message as escaped text, never as template source.
+    const shown = withPlainLeadNote(rendered, recipient.kind === "REGISTRANT" ? registrantNote : null);
     const suppressed = settings.deliveryMode === "DISABLED" || !source.isEnabled;
     const message = await tx.messageOutbox.create({
       data: {
@@ -3623,8 +3633,8 @@ export async function enqueuePublicRegistrationMessages(
         senderEmailSnapshot: settings.senderEmail,
         replyToEmailSnapshot: settings.replyToEmail,
         subjectSnapshot: rendered.subject,
-        bodyTextSnapshot: rendered.body,
-        bodyHtmlSnapshot: rendered.bodyHtml,
+        bodyTextSnapshot: shown.body,
+        bodyHtmlSnapshot: shown.bodyHtml,
         metadata: {
           trigger: "PUBLIC_REGISTRATION_SUBMITTED",
           confirmationCode: input.registration.confirmationCode,

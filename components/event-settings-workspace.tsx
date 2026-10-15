@@ -114,6 +114,8 @@ function draftFromEvent(event: EventSettingsRecord | null): EventSettingsInput {
     tagline: event?.tagline ?? null,
     subtitle: event?.subtitle ?? null,
     helpEmail: event?.helpEmail ?? null,
+    hubTitle: event?.hubTitle ?? null,
+    hubIntro: event?.hubIntro ?? null,
     refundPolicy: event?.refundPolicy ?? null,
     hotelName: event?.hotelName ?? null,
     hotelBookingUrl: event?.hotelBookingUrl ?? null,
@@ -262,6 +264,8 @@ export function EventSettingsWorkspace({
             tagline: draft.tagline || null,
             subtitle: draft.subtitle || null,
             helpEmail: draft.helpEmail || null,
+            hubTitle: draft.hubTitle || null,
+            hubIntro: draft.hubIntro || null,
             refundPolicy: draft.refundPolicy || null,
             registrationOpensOn: draft.registrationOpensOn || null,
             registrationClosesOn: draft.registrationClosesOn || null,
@@ -915,6 +919,16 @@ export function EventSettingsWorkspace({
               <input id={settingsFieldDomId("helpEmail")} {...fieldAria("helpEmail")} type="email" value={draft.helpEmail ?? ""} maxLength={200} placeholder="youth@imsda.org" onChange={(event) => update("helpEmail", event.target.value || null)} />
               <small>Used by the help card on a club event&rsquo;s public page. Club events fall back to youth@imsda.org.</small>
             {fieldNote("helpEmail")}</label>
+            <label>
+              Attendee hub title (optional)
+              <input id={settingsFieldDomId("hubTitle")} {...fieldAria("hubTitle")} value={draft.hubTitle ?? ""} maxLength={80} placeholder="Event hub" onChange={(event) => update("hubTitle", event.target.value || null)} />
+              <small>The heading label and page title on the signed-in attendee hub. Plain text. Leave empty for &ldquo;Event hub&rdquo;.</small>
+            {fieldNote("hubTitle")}</label>
+            <label>
+              Attendee hub intro (optional)
+              <textarea id={settingsFieldDomId("hubIntro")} {...fieldAria("hubIntro")} value={draft.hubIntro ?? ""} rows={3} maxLength={600} placeholder="Schedule, updates, resources, passes and assigned sessions in one signed-in place." onChange={(event) => update("hubIntro", event.target.value || null)} />
+              <small>The sentence under the event name on the attendee hub. Plain text. Leave empty for the standard sentence.</small>
+            {fieldNote("hubIntro")}</label>
             <label>
               Refund policy (optional)
               <textarea id={settingsFieldDomId("refundPolicy")} {...fieldAria("refundPolicy")} value={draft.refundPolicy ?? ""} rows={5} maxLength={4000} placeholder="Refunds are available until two weeks before the event." onChange={(event) => update("refundPolicy", event.target.value || null)} />

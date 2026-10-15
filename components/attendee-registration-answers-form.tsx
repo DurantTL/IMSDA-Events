@@ -153,7 +153,7 @@ export function AttendeeRegistrationAnswersForm({
         <span className="attendee-answer-icon"><ListChecks size={20} aria-hidden="true" /></span>
         <div>
           <p className="public-registration-eyebrow">Self-service choices</p>
-          <h3>Meals, sessions and retreat details</h3>
+          <h3>Meals, sessions and event details</h3>
           <p>{description}</p>
         </div>
       </div>

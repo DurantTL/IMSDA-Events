@@ -21,11 +21,11 @@ import {
   computeShirtSizeRequestPreview,
   shirtSizeAttendeeSummary,
   type ShirtSizeCandidate,
-} from "@/modules/communications/shirt-size-audience";
+} from "@/modules/merchandise/legacy-shirt-size-audience-compat";
 import {
   eventCollectsShirtSizes,
   shirtSizeFromResponses,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 
 loadEnvConfig(process.cwd());
 

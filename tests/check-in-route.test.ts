@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
     findActiveMembership: vi.fn(),
     checkInAttendee: vi.fn(),
     undoCheckIn: vi.fn(),
+    sealHealthSnapshotAfterCheckIn: vi.fn(),
   };
 });
 
@@ -40,6 +41,7 @@ vi.mock("@/modules/access/current-session", () => ({
 vi.mock("@/modules/access/request-security", () => ({
   rejectCrossOriginRequest: mocks.rejectCrossOriginRequest,
 }));
+vi.mock("@/modules/health-records/snapshot-hooks", () => ({ sealHealthSnapshotAfterCheckIn: mocks.sealHealthSnapshotAfterCheckIn }));
 vi.mock("@/modules/events/repository", () => ({
   findActiveMembership: mocks.findActiveMembership,
 }));
@@ -114,6 +116,16 @@ describe("check-in route", () => {
       checkedIn: true,
       disposition: "CREATED",
     });
+  });
+
+  it("seals the person's health copy for the event after a successful check-in (#924), and not when the check-in fails", async () => {
+    await POST(request({ idempotencyKey }), context);
+    expect(mocks.sealHealthSnapshotAfterCheckIn).toHaveBeenCalledWith("event_123", "attendee_123");
+
+    mocks.sealHealthSnapshotAfterCheckIn.mockClear();
+    mocks.checkInAttendee.mockRejectedValue(new mocks.CheckInOperationError("REGISTRATION_NOT_ELIGIBLE", "Review and retry."));
+    await POST(request({ idempotencyKey }), context);
+    expect(mocks.sealHealthSnapshotAfterCheckIn).not.toHaveBeenCalled();
   });
 
   it.each([

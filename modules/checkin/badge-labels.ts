@@ -9,7 +9,7 @@ import { buildOperationalReport } from "@/modules/reporting/operational-reports"
 import {
   shirtSizeConfirmedAtFromResponses,
   shirtSizeFromResponses,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 
 export const badgeTemplateIds = [
   "avery-5395",

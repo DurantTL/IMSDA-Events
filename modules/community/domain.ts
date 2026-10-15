@@ -63,4 +63,4 @@ export const staffCommunityActionSchema = z.discriminatedUnion("action", [
 export type AttendeeCommunityAction = z.infer<typeof attendeeCommunityActionSchema>;
 export type StaffCommunityAction = z.infer<typeof staffCommunityActionSchema>;
 
-export const defaultCommunityConduct = "Be kind, protect privacy, and keep posts focused on the retreat. Do not share another person's personal information without permission. Event staff may hide content that is unsafe, disruptive, or unrelated to the event.";
+export const defaultCommunityConduct = "Be kind, protect privacy, and keep posts focused on the event. Do not share another person's personal information without permission. Event staff may hide content that is unsafe, disruptive, or unrelated to the event.";

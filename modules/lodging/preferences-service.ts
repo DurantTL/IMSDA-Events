@@ -518,6 +518,19 @@ export type SaveRequestResult =
  *
  * A registrant is also refused fewer nights than a rate's minimum (BELOW_MINIMUM_NIGHTS); staff may make the exception.
  */
+/**
+ * A registration made through a personal staff, pastor or volunteer invitation (#804). Its housing is assigned by the office
+ * from the rooms left over, so a registrant (through the private manage link) never requests rooms, adds extra rooms, asks to
+ * room with someone, or joins the lodging waitlist for it. Staff are not stopped.
+ */
+export async function isStaffInvitationRegistration(client: Client, registrationId: string) {
+  return (await client.staffInvitation.count({ where: { registrationId } })) > 0;
+}
+
+export function staffRegistrationLodgingRefusal() {
+  return new LodgingError("STAFF_REGISTRATION", "Housing for staff, pastor and volunteer registrations is assigned by the event office. Contact the office with any request.");
+}
+
 export async function saveLodgingRequest(
   input: { eventId: string; registrationId: string; actor: Actor; raw: unknown; sourceFormVersionId?: string | null; now?: Date },
   client: PrismaClient = getPrisma(),
@@ -544,6 +557,8 @@ async function saveLodgingRequestOnce(
 ): Promise<SaveRequestResult> {
   const { staff, parsed, reason, now } = prepared;
   return client.$transaction(async (tx) => {
+    // Both the $0 direct save and the priced change request below are refused for a staff registration's registrant (#804).
+    if (!staff && await isStaffInvitationRegistration(tx, input.registrationId)) throw staffRegistrationLodgingRefusal();
     await lockRegistrationLodging(tx, input.registrationId);
     const context = await loadContext(tx, input.eventId);
     const registration = await loadRegistration(tx, input.eventId, input.registrationId);
@@ -887,6 +902,7 @@ async function changeRegistrantRoommatesInTransaction(input: RoommateChangeInput
   const now = input.now ?? new Date();
   const action = registrantRoommateSchema.parse(input.raw);
   return client.$transaction(async (tx) => {
+    if (await isStaffInvitationRegistration(tx, input.registrationId)) throw staffRegistrationLodgingRefusal();
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`lodging-roommates:${input.eventId}`}))`;
     const context = await loadContext(tx, input.eventId);
     const own = await loadRegistration(tx, input.eventId, input.registrationId);
@@ -1512,6 +1528,8 @@ export async function getRegistrantLodgingView(input: { eventId: string; registr
   const now = input.now ?? new Date();
   const lodging = await client.eventLodging.findUnique({ where: { eventId: input.eventId }, select: { collectsPreferences: true } });
   if (!lodging || !lodging.collectsPreferences) return emptyView({});
+  // The office assigns a staff registration's housing: the registrant's lodging card is not shown (#804).
+  if (await isStaffInvitationRegistration(client, input.registrationId)) return emptyView({});
   const context = await loadContext(client, input.eventId);
   const own = await loadRegistration(client, input.eventId, input.registrationId).catch((error: unknown) => {
     if (error instanceof LodgingError && error.code === "REGISTRATION_NOT_ELIGIBLE") return null;

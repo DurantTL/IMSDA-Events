@@ -1,6 +1,6 @@
 import { DIRECTORY_NOT_LISTED_VALUE, localCalendarDate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { fullNameKeys, splitNameKeyPairs } from "@/modules/forms/public-domain";
-import { shirtSizeOptions } from "@/modules/registrations/shirt-sizes";
+import { shirtSizeOptions } from "@/modules/merchandise/legacy-shirt-size-compat";
 
 export type BuilderModuleCategory = "Common" | "People" | "Housing" | "Group event";
 

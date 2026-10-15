@@ -15,13 +15,16 @@ export function LocationFilter({
 }: {
   basePath: string;
   locations: Array<{ id: string; name: string; isActive?: boolean }>;
-  params?: Record<string, string | undefined>;
+  /** The page's other parameters. A `URLSearchParams` keeps repeated parameters (several answer filters) intact. */
+  params?: Record<string, string | undefined> | URLSearchParams;
   selectedId: string | null;
 }) {
   if (locations.length === 0) return null;
   function href(locationId: string | null) {
     const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) if (value && key !== "location") query.set(key, value);
+    const entries = params instanceof URLSearchParams ? [...params.entries()] : Object.entries(params);
+    // Another location is another result set: the old page number and location do not carry.
+    for (const [key, value] of entries) if (value && key !== "location" && key !== "page") query.append(key, value);
     if (locationId) query.set("location", locationId);
     const text = query.toString();
     return text ? `${basePath}?${text}` : basePath;

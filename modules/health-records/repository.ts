@@ -9,6 +9,7 @@ import { hashOpaqueToken } from "@/modules/access/tokens";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { requireHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";
+import { activeGrantsFor, auditBreakGlassRefusal, breakGlassRequired, recordBreakGlassUse } from "@/modules/health-records/break-glass";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { openHealthField, sealHealthField } from "@/modules/health-records/crypto";
@@ -232,7 +233,24 @@ export async function viewHealthRecord(
   if (scoped) await assertEventScope(prisma, { viewer, eventId: options.eventId, organizationId, member, now });
   const record = await findRecord(prisma, organizationId, member);
   const who = healthAuditActor(viewer);
-  await writeAuditLog({
+  // A system administrator (acting as a director or not) reads a live record only inside an unexpired break-glass
+  // grant for that person (#929, ADR 0005 Addendum B). With no record there is nothing to open, so nothing is gated.
+  let grantId: string | null = null;
+  if (viewer.kind === "SYSTEM_ADMIN" && record) {
+    grantId = member.personId ? (await activeGrantsFor(viewer, [member.personId], now)).get(member.personId) ?? null : null;
+    if (!grantId) {
+      await auditBreakGlassRefusal({
+        actor: viewer,
+        action: "HEALTH_RECORD_ACCESS_REFUSED",
+        entityType: "HealthRecord",
+        entityId: record.id,
+        summary: "A read of a member's health record was refused: break-glass is required.",
+        metadata: { organizationId: idShaped(organizationId), rosterMemberId: idShaped(memberId), personId: member.personId ? idShaped(member.personId) : null, attempted: "VIEW_RECORD" },
+      });
+      throw breakGlassRequired();
+    }
+  }
+  const viewAudit = {
     // No top-level eventId: that column feeds the event staff audit log, which must not list these views. The event is in the metadata.
     actorUserId: who.actorUserId,
     action: "HEALTH_RECORD_VIEWED",
@@ -246,8 +264,19 @@ export async function viewHealthRecord(
       recordExists: record !== null,
       // The event a coordinator or health-role viewer opened it through (null for everyone else).
       eventId: scoped ? options.eventId ?? null : null,
+      // The grant this read used (a system administrator only).
+      ...(grantId ? { grantId, personId: member.personId } : {}),
     },
-  });
+  };
+  if (grantId && member.personId && viewer.kind === "SYSTEM_ADMIN") {
+    const useInput = { grantId, userId: viewer.userId, personId: member.personId, kind: "LIVE_RECORD" as const };
+    await prisma.$transaction(async (tx) => {
+      await recordBreakGlassUse(tx, useInput);
+      await writeAuditLog(viewAudit, tx);
+    });
+  } else {
+    await writeAuditLog(viewAudit);
+  }
   const values = record ? openFields(record.id, record.fields) : {};
   return {
     member: { id: member.id, firstName: member.person?.firstName ?? "", lastName: member.person?.lastName ?? "" },
@@ -465,9 +494,18 @@ export async function healthSummariesForMembers(
     select: { rosterMemberId: true, confirmedClubYear: true, hasHealthNote: true },
   });
   const byMember = new Map(records.map((record) => [record.rosterMemberId, record]));
+  // A system administrator sees the clinical "has a health note" flag only for people with an unexpired break-glass
+  // grant (#929); the status (current or needs update) says nothing about the record's content and stays.
+  let noteVisible: (memberId: string) => boolean = () => true;
+  if (viewer.kind === "SYSTEM_ADMIN") {
+    const people = await getPrisma().clubRosterMember.findMany({ where: { id: { in: memberIds }, organizationId }, select: { id: true, personId: true } });
+    const grants = await activeGrantsFor(viewer, people.flatMap((person) => (person.personId ? [person.personId] : [])), now);
+    const granted = new Set(people.filter((person) => person.personId !== null && grants.has(person.personId)).map((person) => person.id));
+    noteVisible = (memberId) => granted.has(memberId);
+  }
   return Object.fromEntries(memberIds.map((id) => {
     const record = byMember.get(id) ?? null;
-    return [id, { status: healthRecordStatus(record, now), hasHealthNote: record?.hasHealthNote ?? false }];
+    return [id, { status: healthRecordStatus(record, now), hasHealthNote: noteVisible(id) ? record?.hasHealthNote ?? false : false }];
   }));
 }
 

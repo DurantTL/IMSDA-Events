@@ -29,7 +29,7 @@ import {
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listRegistrations } from "@/modules/registrations/repository";
-import { eventCollectsShirtSizes } from "@/modules/registrations/shirt-sizes";
+import { eventCollectsShirtSizes } from "@/modules/merchandise/legacy-shirt-size-compat";
 
 export const metadata: Metadata = {
   title: "Printable name badges",

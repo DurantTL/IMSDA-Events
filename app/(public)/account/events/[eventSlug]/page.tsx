@@ -19,15 +19,17 @@ import { AttendeeCommunityBoard } from "@/components/attendee-community-board";
 import { AttendeePassGrid } from "@/components/attendee-pass-grid";
 import { BrandMark } from "@/components/brand-mark";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
+import { attendeeSecondStepPending, requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { splitParagraphs } from "@/modules/communications/account-banner-domain";
 import {
-  getAttendeeRetreatHub,
-  getStaffRetreatHubPreview,
-  type AttendeeRetreatHub,
-} from "@/modules/attendee-accounts/retreat-hub-repository";
+  getAttendeeEventHub,
+  getEventHubTitleForViewer,
+  getStaffEventHubPreview,
+  type AttendeeEventHub,
+} from "@/modules/attendee-accounts/event-hub-repository";
+import { resolveEventHubCopy } from "@/modules/attendee-accounts/event-hub-copy";
 import {
   getAttendeeCommunity,
   getStaffCommunity,
@@ -35,11 +37,31 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Retreat hub",
-  description: "Your event schedule, updates, resources, and assigned sessions.",
-  robots: { index: false, follow: false, nocache: true },
-};
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ eventSlug: string }>;
+  searchParams: Promise<{ preview?: string }>;
+}): Promise<Metadata> {
+  const [{ eventSlug }, query] = await Promise.all([params, searchParams]);
+  // The custom title is the event's own setting (#104), shown only to a viewer the page itself would
+  // serve: staff previewing an event they can access, or an attendee registered for a published event.
+  // Anyone else, and any failed lookup, gets the default title.
+  const hubTitle = await (async () => {
+    const [attendeeSession, staffSession] = await Promise.all([getCurrentAttendee(), getCurrentSession()]);
+    if (query.preview === "staff" && staffSession.user) {
+      return getEventHubTitleForViewer({ eventSlug, staffUser: staffSession.user });
+    }
+    if (!attendeeSession.account || (await attendeeSecondStepPending())) return null;
+    return getEventHubTitleForViewer({ eventSlug, attendeeEmail: attendeeSession.account.verifiedEmail });
+  })().catch(() => null);
+  return {
+    title: resolveEventHubCopy({ hubTitle }).documentTitle,
+    description: "Your event schedule, updates, resources, and assigned sessions.",
+    robots: { index: false, follow: false, nocache: true },
+  };
+}
 
 function eventDateLabel(
   startsAt: string,
@@ -86,12 +108,12 @@ export default async function AttendeeEventHubPage({
     getCurrentSession(),
   ]);
   const staffPreview = query.preview === "staff" && Boolean(staffSession.user);
-  let hub: AttendeeRetreatHub;
+  let hub: AttendeeEventHub;
   let staffPreviewEventId: string | null = null;
   let attendeeCommunity: NonNullable<Awaited<ReturnType<typeof getAttendeeCommunity>>> | null = null;
   let staffCommunity: NonNullable<Awaited<ReturnType<typeof getStaffCommunity>>> | null = null;
   if (staffPreview && staffSession.user) {
-    const preview = await getStaffRetreatHubPreview(staffSession.user, eventSlug);
+    const preview = await getStaffEventHubPreview(staffSession.user, eventSlug);
     if (!preview) notFound();
     hub = preview.hub;
     staffPreviewEventId = preview.eventId;
@@ -100,7 +122,7 @@ export default async function AttendeeEventHubPage({
     if (!attendeeSession.account) redirect(await attendeeSignInRedirectPath());
     // Same second-step gate as the rest of the portal (#568).
     await requireAttendeeSecondStep();
-    const attendeeHub = await getAttendeeRetreatHub(
+    const attendeeHub = await getAttendeeEventHub(
       attendeeSession.account.verifiedEmail,
       eventSlug,
     );
@@ -108,6 +130,7 @@ export default async function AttendeeEventHubPage({
     hub = attendeeHub;
     attendeeCommunity = await getAttendeeCommunity(attendeeSession.account, eventSlug);
   }
+  const hubCopy = resolveEventHubCopy(hub.event);
   const textSections = hub.contentSections.filter((section) => section.kind === "RICH_TEXT");
   const resourceSections = hub.contentSections.filter((section) => section.kind === "RESOURCE_LINKS");
   const staffTimeline = staffCommunity
@@ -127,7 +150,7 @@ export default async function AttendeeEventHubPage({
     : [];
 
   return (
-    <main className="public-registration-page attendee-retreat-hub">
+    <main className="public-registration-page attendee-event-hub">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
           <Link className="public-registration-brand public-event-brand-link" href="/">
@@ -163,10 +186,10 @@ export default async function AttendeeEventHubPage({
       <section className="public-registration-hero attendee-hub-hero">
         <div>
           <p className="public-registration-eyebrow">
-            {staffPreviewEventId ? "Staff preview · Attendee experience" : "Your attendee hub"}
+            {staffPreviewEventId ? "Staff preview · Attendee experience" : hubCopy.eyebrow}
           </p>
           <h1>{hub.event.name}</h1>
-          <p>Schedule, updates, resources, passes and assigned sessions in one signed-in place.</p>
+          <p>{hubCopy.intro}</p>
         </div>
         <div className="public-registration-event-details">
           <span><CalendarDays size={17} aria-hidden="true" /> {eventDateLabel(hub.event.startsAt, hub.event.endsAt, hub.event.timezone)}</span>
@@ -328,7 +351,7 @@ export default async function AttendeeEventHubPage({
 
           <section className="public-manage-help-card">
             <span><CircleHelp size={23} aria-hidden="true" /></span>
-            <p className="public-registration-eyebrow">During the retreat</p>
+            <p className="public-registration-eyebrow">During the event</p>
             <h2>Need help?</h2>
             <p>{hub.event.supportContact ?? "Contact the event team at the registration desk."}</p>
           </section>

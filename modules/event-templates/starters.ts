@@ -34,6 +34,8 @@ export type StarterEventTemplate = {
   /** Team rules for the new event (#809), and its registration deadline: for the one-year Pathfinder Bible Experience starter. */
   teamSettings?: TeamSettingsInputValues;
   registrationClosesOn?: string;
+  /** Turns on the general registration link (#931): directors with no account register a team through one public link. */
+  generalRegistrationLink?: boolean;
   /** Replaces the generated description, for a starter whose form carries no prices and whose set-up the generic text does not describe. */
   description?: string;
 };
@@ -85,8 +87,8 @@ export const starterEventTemplates: readonly StarterEventTemplate[] = [
   {
     starterKey: "pathfinder_bible_experience", name: "Pathfinder Bible Experience", formTemplateKey: "pbe_registration", audience: "CLUB",
     billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: true,
-    locations: pbeLocations, teamSettings: pbeTeamSettings, registrationClosesOn: "2026-12-18",
-    description: "Starter set: created from the built-in \"Pathfinder Bible Experience\" form (pbe_registration) for the 2026–27 Pathfinder Bible Experience (IA-MO), a free club event where a club registers more than one named team, each with 2 to 7 team members (the 7th is the alternate), adults listed as coaches, and no team member older than 19 on January 1, 2026. It creates the Missouri and Iowa Area sites with no venue or dates, sets registration to close December 18, 2026, and carries the books line and the Conference (February 20, 2027) and Union (March 27, 2027, Lincoln, NE) dates for the printed form. Choose January 16, 2027 as the event date when you create the event. Staff create the live event from this template; nothing is created until they do. No prices or capacity are set.",
+    locations: pbeLocations, teamSettings: pbeTeamSettings, registrationClosesOn: "2026-12-18", generalRegistrationLink: true,
+    description: "Starter set: created from the built-in \"Pathfinder Bible Experience\" form (pbe_registration) for the 2026–27 Pathfinder Bible Experience (IA-MO), a free club event where a club registers more than one named team, each with 2 to 7 team members (the 7th is the alternate), adults listed as coaches, and no team member older than 19 on January 1, 2026. It creates the Missouri and Iowa Area sites with no venue or dates, sets registration to close December 18, 2026, and carries the books line and the Conference (February 20, 2027) and Union (March 27, 2027, Lincoln, NE) dates for the printed form. Choose January 16, 2027 as the event date when you create the event. It turns on the general registration link, so club directors with no account can register a team and have it matched to their club; staff copy the link from Event settings. Staff create the live event from this template; nothing is created until they do. No prices or capacity are set.",
   },
   { starterKey: "honors_weekend", name: "Honors Weekend", formTemplateKey: "honors_weekend", audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", collectsShirtSizes: false, checksAdultBackgrounds: true },
   // #606. Individuals register (GENERAL) and the church or school is billed later: the platform allows
@@ -167,5 +169,6 @@ export function starterPayload(starter: StarterEventTemplate): EventTemplatePayl
     ...(starter.locations ? { locations: starter.locations.map((location) => ({ ...location })) } : {}),
     ...(starter.teamSettings ? { teamSettings: starter.teamSettings } : {}),
     ...(starter.registrationClosesOn ? { registrationClosesOn: starter.registrationClosesOn } : {}),
+    ...(starter.generalRegistrationLink ? { generalRegistrationLink: true } : {}),
   });
 }

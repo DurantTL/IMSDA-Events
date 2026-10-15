@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getAttendeeProfile: vi.fn(),
   secondStepPending: vi.fn(),
   formProps: vi.fn(),
+  clubEventEntryRedirect: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -29,8 +30,10 @@ vi.mock("@/components/public-registration-form", () => ({
     return null;
   },
 }));
+vi.mock("@/modules/general-link-registrations/repository", () => ({ clubEventEntryRedirect: mocks.clubEventEntryRedirect }));
 vi.mock("next/navigation", () => ({ notFound: vi.fn(), redirect: vi.fn() }));
 
+import { redirect } from "next/navigation";
 import RegisterPage from "@/app/(public)/register/[eventSlug]/[formSlug]/page";
 
 const profile = {
@@ -69,6 +72,7 @@ async function prefill() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getPublicRegistrationExperience.mockResolvedValue(experience());
+  mocks.clubEventEntryRedirect.mockResolvedValue(null);
   mocks.getAttendeeProfile.mockResolvedValue(profile);
   mocks.secondStepPending.mockResolvedValue(false);
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1", verifiedEmail: "avery@example.test" }, via: "attendee" });
@@ -101,5 +105,19 @@ describe("registration page prefill of address and emergency contact", () => {
   it("prefills only the ordinary profile fields for a staff act-as session", async () => {
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1", verifiedEmail: "avery@example.test" }, via: "staff" });
     expect(await prefill()).toEqual({ phone: "555-0100" });
+  });
+});
+
+describe("the generic registration page on a club event (#931)", () => {
+  it("sends a visitor to the general link, or the event page, instead of showing the individual form", async () => {
+    mocks.clubEventEntryRedirect.mockResolvedValue("/register/synthetic-event/general");
+    await prefill();
+    expect(redirect).toHaveBeenCalledWith("/register/synthetic-event/general");
+    expect(mocks.clubEventEntryRedirect).toHaveBeenCalledWith("synthetic-event");
+  });
+
+  it("shows the form as ever for any other event", async () => {
+    await prefill();
+    expect(redirect).not.toHaveBeenCalled();
   });
 });

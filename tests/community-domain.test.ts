@@ -50,7 +50,7 @@ describe("community action validation", () => {
       isEnabled: true,
       allowNewPosts: true,
       allowReplies: true,
-      conductText: "Be kind, protect privacy, respect one another, and keep every post focused on the retreat.",
+      conductText: "Be kind, protect privacy, respect one another, and keep every post focused on the event.",
       retentionDays: 30,
     })).toMatchObject({ action: "UPDATE_SETTINGS", retentionDays: 30 });
     expect(() => staffCommunityActionSchema.parse({

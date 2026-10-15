@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, Shirt } from "lucide-react";
 import {
   shirtSizeOptions,
   type ShirtSize,
-} from "@/modules/registrations/shirt-sizes";
+} from "@/modules/merchandise/legacy-shirt-size-compat";
 
 type ShirtSizeAttendee = {
   id: string;

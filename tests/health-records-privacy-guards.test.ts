@@ -22,6 +22,10 @@ describe("health data stays out of exports, the check-in book, communications an
     const allowedOutside = new Set([
       "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx",
       "modules/communications/email-delivery.ts",
+      // The two scheduled and event-driven callers of sealed health copies (#924). Each imports only `snapshot-hooks`
+      // (checked below); the check-in module itself stays free of health code.
+      "app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts",
+      "app/api/internal/outbox/sweep/route.ts",
     ]);
     const offenders = [...sourceFiles("modules"), ...sourceFiles("components"), ...sourceFiles("app"), ...sourceFiles("lib")]
       .filter((path) => !path.startsWith("modules/health-records/"))
@@ -66,6 +70,39 @@ describe("health data stays out of exports, the check-in book, communications an
       expect(read(path), path).not.toMatch(/healthRecordField|openHealthField|sealedValue|fieldValues/);
     }
     expect(read("prisma/migrations/20261022100000_health_privacy_acknowledgment/migration.sql")).not.toMatch(/sealedValue|fieldKey/);
+  });
+
+  it("lets the check-in route and the sweep call only the sealed-copy hooks, and nothing else reach sealed copies except the administrator routes (#924)", () => {
+    for (const path of ["app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts", "app/api/internal/outbox/sweep/route.ts"]) {
+      const imports = [...read(path).matchAll(/from "@\/modules\/health-records\/([a-z-]+)"/g)].map((match) => match[1]);
+      expect(imports, path).toEqual(["snapshot-hooks"]);
+    }
+    const users = [...sourceFiles("modules"), ...sourceFiles("components"), ...sourceFiles("app"), ...sourceFiles("lib")]
+      .filter((path) => !path.startsWith("modules/health-records/"))
+      .filter((path) => /snapshot-(access-)?repository/.test(read(path)))
+      // Event deletion counts and removes copies with the table, not through the module (no health code imported).
+      .sort();
+    expect(users).toEqual([
+      "app/api/staff/health-snapshots/break-glass-grants/route.ts",
+      "app/api/staff/health-snapshots/break-glass/route.ts",
+      "app/api/staff/health-snapshots/holds/[holdId]/lift/route.ts",
+      "app/api/staff/health-snapshots/holds/route.ts",
+      "app/api/staff/health-snapshots/person/[personId]/route.ts",
+    ]);
+  });
+
+  it("puts no health value into a sealed copy's row, its table or its audit rows, and opens values only in the break-glass view (#924)", () => {
+    const migration = read("prisma/migrations/20261023100000_health_record_snapshots/migration.sql");
+    // The sealed fields hold only `sealedValue`; the copy's own row has no value, name or birth date column.
+    expect(migration).not.toMatch(/"(birth\w*|firstName|lastName|phone|email|address\w*)"|allerg|medicat/i);
+    for (const path of ["modules/health-records/snapshot-repository.ts", "modules/health-records/snapshot-hooks.ts", "modules/health-records/snapshot-retention.ts"]) {
+      expect(read(path), path).not.toMatch(/openSnapshotField/);
+    }
+    // The birth date is read only to work out the keep-until date: the create call and the audit row never carry it.
+    const taking = read("modules/health-records/snapshot-repository.ts");
+    const create = taking.slice(taking.indexOf("healthRecordSnapshot.create("), taking.indexOf("return { outcome: \"TAKEN\""));
+    expect(create).not.toMatch(/birth|openBirthDate/i);
+    expect(read("modules/health-records/snapshot-access-repository.ts").match(/openSnapshotField\(/g)).toHaveLength(1);
   });
 
   it("lets the email worker use only the link email helpers, which carry no health text", () => {

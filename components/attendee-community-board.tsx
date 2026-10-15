@@ -283,7 +283,7 @@ export function AttendeeCommunityBoard({
         <div className="public-manage-card-heading">
           <MessagesSquare size={21} aria-hidden="true" />
           <div>
-            <p className="public-registration-eyebrow">Retreat updates</p>
+            <p className="public-registration-eyebrow">Event updates</p>
             <h2>{community.eventName} Timeline</h2>
           </div>
         </div>
@@ -293,7 +293,7 @@ export function AttendeeCommunityBoard({
       {error && <p className="inline-notice error" role="alert">{error}</p>}
 
       {!community.settings.isEnabled ? (
-        <p className="public-manage-empty">The event team has not opened attendee discussion yet. Official retreat updates appear here.</p>
+        <p className="public-manage-empty">The event team has not opened attendee discussion yet. Official event updates appear here.</p>
       ) : !community.participation.conductAccepted ? (
         <div className="attendee-community-conduct">
           <ShieldCheck size={24} aria-hidden="true" />
@@ -394,7 +394,7 @@ export function AttendeeCommunityBoard({
                 id="community-post-body"
                 maxLength={1500}
                 name="body"
-                placeholder="Share a helpful update, question, encouragement, or retreat moment."
+                placeholder="Share a helpful update, question, encouragement, or event moment."
                 required
                 rows={3}
                 value={drafts[draftKey()] ?? ""}
@@ -524,7 +524,7 @@ export function AttendeeCommunityBoard({
               </article>
               ;
             })())}
-            {timelineItems.length === 0 && <p className="public-manage-empty">No updates yet. Official retreat news and attendee conversations will appear here.</p>}
+            {timelineItems.length === 0 && <p className="public-manage-empty">No updates yet. Official event news and attendee conversations will appear here.</p>}
           </div>
           {nextPostCursor && (
             <button className="secondary-button" disabled={loadingMore} onClick={() => void loadMorePosts()} type="button">

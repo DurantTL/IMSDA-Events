@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/general-link-registrations/repository", () => ({ clubEventEntryRedirect: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/modules/forms/public-repository", () => ({
   getPublicRegistrationExperience: mocks.getPublicRegistrationExperience,
 }));

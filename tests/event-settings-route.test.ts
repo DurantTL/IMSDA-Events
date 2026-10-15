@@ -210,6 +210,30 @@ describe("event settings routes", () => {
     expect("hotelName" in forwarded ? forwarded.hotelName : undefined).toBeUndefined();
   });
 
+  it("saves the hub copy, keeps it when absent, and clears it on blank or null (#104)", async () => {
+    dependencies.updateEventSettings.mockResolvedValue({ id: "evt_wr28", ...eventPayload });
+    const send = async (extra: Record<string, unknown>) => {
+      dependencies.updateEventSettings.mockClear();
+      const response = await PATCH(
+        eventRequest("/api/events/evt_wr28", "PATCH", { ...eventPayload, ...extra }),
+        { params: Promise.resolve({ eventId: "evt_wr28" }) },
+      );
+      expect(response.status).toBe(200);
+      return dependencies.updateEventSettings.mock.calls[0]![1] as Record<string, unknown>;
+    };
+
+    const saved = await send({ hubTitle: " Weekend guide ", hubIntro: "Welcome." });
+    expect(saved).toMatchObject({ hubTitle: "Weekend guide", hubIntro: "Welcome." });
+
+    const absent = await send({});
+    expect(absent.hubTitle).toBeUndefined();
+    expect(absent.hubIntro).toBeUndefined();
+
+    const blank = await send({ hubTitle: "", hubIntro: null });
+    expect(blank.hubTitle).toBeNull();
+    expect(blank.hubIntro).toBeNull();
+  });
+
   it("keeps an explicit blank as a clear rather than as an omission", async () => {
     dependencies.updateEventSettings.mockResolvedValue({
       id: "evt_wr28",

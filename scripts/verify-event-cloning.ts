@@ -105,7 +105,9 @@ async function buildPopulatedSource(): Promise<Fixture> {
       calendarCategory: "Camp meeting", hotelName: "Synthetic Inn", hotelRate: "$99", isPublished: true, capacity: 400,
       registrationOpensOn: "2027-01-10", registrationClosesOn: "2027-04-20", seminarPreferenceClosesOn: "2027-04-01", seminarPreferenceSelfServiceLocked: true,
       waitlistEnabled: true, autoPromoteWaitlist: true, collectsShirtSizes: true, checksAdultBackgrounds: true,
-      audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", showOnCalendar: false,
+      audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE", showOnCalendar: false, generalRegistrationLinkEnabled: true,
+      operationalPacketConfig: { groupingFieldKey: "club", sections: { coverNotes: false } },
+      hubTitle: "Synthetic annual guide", hubIntro: "Everything for the annual weekend.",
     },
   });
   const eventId = event.id;
@@ -347,7 +349,15 @@ async function run() {
   assert(cloneRow.location === "Synthetic Lodge" && cloneRow.timezone === "America/Denver" && cloneRow.hotelName === "Synthetic Inn" && cloneRow.calendarCategory === "Camp meeting", "branding and details are copied");
   assert(cloneRow.showOnCalendar === false, "showOnCalendar is copied with the event details (the source hides it; the default is shown)");
   assert(cloneRow.audience === "CLUB" && cloneRow.billingMode === "DEFERRED_ORGANIZATION_INVOICE", "audience and billing mode are copied");
+  assert(cloneRow.generalRegistrationLinkEnabled === false, "the general registration link (#931) stays OFF in a clone, though the source has it on: staff turn it on deliberately");
   assert(cloneRow.waitlistEnabled && cloneRow.autoPromoteWaitlist && cloneRow.collectsShirtSizes && cloneRow.checksAdultBackgrounds, "module toggles are copied");
+  assert(cloneRow.hubTitle === "Synthetic annual guide" && cloneRow.hubIntro === "Everything for the annual weekend.", "the attendee hub title and intro are copied with the event details (#104)");
+  const clonedPacketConfig = cloneRow.operationalPacketConfig as { groupingFieldKey?: string; sections?: Record<string, boolean> } | null;
+  assert(
+    clonedPacketConfig?.groupingFieldKey === "club" && clonedPacketConfig.sections?.coverNotes === false
+      && Object.keys(clonedPacketConfig.sections).length === 1,
+    "the packet sections and grouping choice are copied with the module settings (#155)",
+  );
   const community = await prisma.eventCommunitySettings.findUniqueOrThrow({ where: { eventId: cloneId } });
   assert(community.isEnabled && !community.allowReplies && community.retentionDays === 45 && community.updatedByUserId === adminId, "community settings are copied");
 

@@ -72,7 +72,9 @@ including:
   defined in code
 - `modules/reporting/retreat-packets.ts` and `retreat-packets-repository.ts`
 - `modules/attendee-accounts/retreat-hub-repository.ts`
-- `modules/communications/shirt-size-audience.ts`
+- `modules/communications/shirt-size-audience.ts` (isolated behind
+  `modules/merchandise/legacy-shirt-size-audience-compat.ts` in #104; see
+  `docs/SHIRT-SIZES-RETIREMENT.md`)
 - `modules/imports/wr26-bundle.ts` (legitimately event-specific — a migration)
 
 #104 covers this as "generalize retreat-specific naming." The audit says the

@@ -317,6 +317,21 @@ function restoreEscapedLiterals(html: string, literals: readonly string[]) {
  * layout. Safe to call on any string, including one that already contains
  * angle brackets or quotes.
  */
+/**
+ * A line of text that came from outside the template (a team name typed by an anonymous visitor, #931), shown as its own
+ * paragraph: HTML-escaped and never parsed as markdown, so it cannot become a link, an image or any markup.
+ */
+export function renderPlainNoteHtml(note: string) {
+  return `<p style="${PARAGRAPH_STYLE}">${escapeHtml(note)}</p>`;
+}
+
+/** The note and the rendered message as one text body / one HTML body, the note first and never interpreted. */
+export function withPlainLeadNote(rendered: { body: string; bodyHtml: string }, rawNote: string | null | undefined) {
+  const note = rawNote?.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
+  if (!note) return { body: rendered.body, bodyHtml: rendered.bodyHtml };
+  return { body: `${note}\n\n${rendered.body}`, bodyHtml: `${renderPlainNoteHtml(note)}\n${rendered.bodyHtml}` };
+}
+
 export function renderEmailBodyHtml(body: string) {
   const { text, literals } = extractBackslashEscapes(body);
   const html = parseBlocks(escapeHtml(text))

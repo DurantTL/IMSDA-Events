@@ -39,7 +39,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { attendeeCountPhrase, lifecycleActionButtonClass, registrationLifecycleLabel } from "@/lib/confirmation-copy";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
-import { registrationMatchesSearch } from "@/modules/registrations/search";
+import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/registrations/search";
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
@@ -215,7 +215,15 @@ function pricingSnapshotSummary(snapshot: Record<string, unknown>) {
   };
 }
 
+/** A registration made through a personal staff, pastor or volunteer link that the office has not approved yet (#804). */
+function waitingForApproval(record: RegistrationRecord) {
+  return record.status === "DRAFT" && record.staffInvitation?.approval === "WAITING";
+}
+
+const staffGroupLabel = { STAFF: "Staff", PASTOR: "Pastor", VOLUNTEER: "Volunteer" } as const;
+
 function statusTone(record: RegistrationRecord) {
+  if (waitingForApproval(record)) return "gold";
   if (record.status === "CANCELLED" || record.status === "WAITLISTED") return "purple";
   if (attendeeBalanceCents(record) > 0) return "gold";
   return "green";
@@ -229,6 +237,7 @@ function statusLabel(record: RegistrationRecord) {
       ? `Waitlisted at ${record.location.name}${record.locationWaitlistPlace ? ` (#${record.locationWaitlistPlace})` : ""}`
       : "Waitlisted";
   }
+  if (waitingForApproval(record)) return "Waiting for office approval";
   if (record.status === "DRAFT") return "Draft";
   if (record.isDeferredOrganizationBilling) return record.isGroup ? "Billed to group contact" : "Billed to church";
   if (record.totalAmountCents === 0) return "No charge";
@@ -254,6 +263,8 @@ export function PeopleWorkspace({
   responsibleAdults = {},
   locationId = null,
   matchingPersonFilter = false,
+  pageScoped = false,
+  openOnlyRegistration = null,
 }: {
   eventId: string;
   eventSlug: string;
@@ -274,8 +285,12 @@ export function PeopleWorkspace({
   locationId?: string | null;
   /** The list was narrowed by a choice answer (#739): each row holds at least one matching person. */
   matchingPersonFilter?: boolean;
+  /** The rows are one page of a server-side search (#180): this box, filter and count cover that page only, and say so. */
+  pageScoped?: boolean;
+  /** A registration opened by link (?registration=) that is not on this page of a search: it opens the detail and is never a row, a count or a selection. */
+  openOnlyRegistration?: RegistrationRecord | null;
 }) {
-  const initialSelected = initialRegistrations.find((registration) => registration.id === initialRegistrationId) ?? null;
+  const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState(initialFilter);
@@ -305,6 +320,8 @@ export function PeopleWorkspace({
   // disappearing (back/forward) closes it, state only.
   const registrationsRef = useRef(registrations);
   useEffect(() => { registrationsRef.current = registrations; }, [registrations]);
+  const openOnlyRef = useRef(openOnlyRegistration);
+  useEffect(() => { openOnlyRef.current = openOnlyRegistration; }, [openOnlyRegistration]);
   const openedFromParamRef = useRef<ParamOpened>(null);
   const mountedRef = useRef(false);
   useEffect(() => {
@@ -315,7 +332,7 @@ export function PeopleWorkspace({
       openedFromParamRef.current = null;
       resetModalState();
     } else if (action === "open") {
-      const record = registrationsRef.current.find((registration) => registration.id === initialRegistrationId);
+      const record = findRegistrationToOpen(registrationsRef.current, openOnlyRef.current, initialRegistrationId);
       if (!record) return;
       openedFromParamRef.current = { id: record.id, hardLoad: firstRun };
       openDetail(record);
@@ -334,6 +351,7 @@ export function PeopleWorkspace({
     const matchesFilter = filter === "ALL"
       || (filter === "BALANCE" && isActive && attendeeBalanceCents(registration) > 0)
       || (filter === "PAID" && isActive && !registration.isDeferredOrganizationBilling && registration.balanceCents === 0 && registration.totalAmountCents > 0)
+      || (filter === "WAITING_APPROVAL" && waitingForApproval(registration))
       || registration.status === filter;
     return matchesQuery && matchesFilter;
   }), [registrations, query, filter]);
@@ -724,25 +742,29 @@ export function PeopleWorkspace({
     <section className="page-stack">
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
-        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, or confirmation code" /></label>
-        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">Filter registrations</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
+        <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
+        <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Waiting for office approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       <div className="page-intro people-intro">
         <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
         <div className="intro-actions">
-          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected</span>
+          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}</span>
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
           <ActionsMenu>
             <li><a href={`/people/duplicates?event=${encodeURIComponent(eventId)}`}><CopyCheck aria-hidden="true" size={16} /> Find duplicates</a></li>
             {/* Same permission the review page itself requires (MANAGE_REGISTRATION). */}
             {canEdit && <li><a href={`/people/directory-review?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Directory review</a></li>}
+            {/* Teams registered through the general registration link that wait for a club (#931); the same permission. */}
+            {canEdit && <li><a href={`/people/pending-teams?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Teams waiting for a club</a></li>}
+            {/* Personal staff, pastor and volunteer links (#804); the same permission. */}
+            {canEdit && <li><a href={`/people/staff-invitations?event=${encodeURIComponent(eventId)}`}><MailPlus aria-hidden="true" size={16} /> Staff invitations</a></li>}
             <li><a href={`/people/responsible-adults?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Responsible adults</a></li>
             <li><a href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Export CSV</a></li>
             {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
           </ActionsMenu>
         </div>
       </div>
-      <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}</p>
+      <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
       <SortOrderNote>{registrationListOrderText}</SortOrderNote>
       {/* Always shown, so "Select all" is findable before anything is ticked. */}
       {canEmail && (selectedIds.size > 0 || visible.length > 0) && (
@@ -787,6 +809,7 @@ export function PeopleWorkspace({
                 Announcements off
               </span>
             )}
+            {registration.staffInvitation && <span className="status-chip purple">{staffGroupLabel[registration.staffInvitation.group]}</span>}
             <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
           </button>
           </div>
@@ -935,7 +958,7 @@ export function PeopleWorkspace({
                   )
                 ) : (
                   <>
-                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{selected.status.toLowerCase()}</strong></span><span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{money(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{money(selected.balanceCents)}</strong></span></div>
+                <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{money(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{money(selected.balanceCents)}</strong></span></div>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>

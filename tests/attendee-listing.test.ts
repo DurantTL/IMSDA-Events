@@ -59,6 +59,12 @@ describe("attendee listing rows", () => {
     expect(rows[1]).toMatchObject({ attendeeType: "Teen", mealCategory: "regular", hasDietaryNeeds: false, volunteer: "Yes" });
   });
 
+  it("shows the group of a registration made through a personal invitation, and nothing for everyone else (#804)", () => {
+    const covered = { ...registration("S9", "CONFIRMED", [attendee("s1", "Sal", "Synthetic", {}), attendee("s2", "Tam", "Synthetic", {}, { attendeeType: "CHILD" })], {}, null), staffInvitation: { group: "PASTOR", approval: "APPROVED" } } as unknown as RegistrationRecord;
+    expect(buildAttendeeListingRows([covered], { showDietaryDetails: true }).map((row) => row.group)).toEqual(["Pastor", "Pastor"]);
+    expect(rows.every((row) => row.group === "")).toBe(true);
+  });
+
   it("falls back to the typed church when the directory choice is Not listed", () => {
     expect(rows.find((row) => row.name === "Cleo Synthetic")!.church).toBe("Other Fellowship");
   });
@@ -136,9 +142,9 @@ describe("attendee listing CSV", () => {
     const csv = attendeeListingCsv(shown);
     expect(csv.startsWith(ATTENDEE_LISTING_BOM)).toBe(true);
     const lines = csv.slice(1).trim().split("\r\n");
-    expect(lines[0]).toBe('"Confirmation code","Status","Attendee","Type","Church","Meal preference","Dietary needs","Childcare needed","Volunteer","Phone","Account holder","Account holder email"');
+    expect(lines[0]).toBe('"Confirmation code","Status","Attendee","Type","Group","Church","Meal preference","Dietary needs","Childcare needed","Volunteer","Phone","Account holder","Account holder email"');
     expect(lines).toHaveLength(1 + shown.length);
-    expect(lines[1]).toBe('"WR26-A1","CONFIRMED","Ada Synthetic","Adult","Test Church","Vegetarian","synthetic: no peanuts","Yes","No","555-0101","Holder A1","A1@example.test"');
+    expect(lines[1]).toBe('"WR26-A1","CONFIRMED","Ada Synthetic","Adult","","Test Church","Vegetarian","synthetic: no peanuts","Yes","No","555-0101","Holder A1","A1@example.test"');
   });
 
   it("escapes formula-like cells", () => {

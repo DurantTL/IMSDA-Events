@@ -526,7 +526,7 @@ export async function listClubCheckInInfo(eventId: string, options: { locationId
 /** The club and its sponsoring church, straight from the `Organization`
  * record — never from anything a client sends (#482). An inactive church is
  * treated as none, so it is never offered as the default. */
-async function clubDirectoryIdentity(
+export async function clubDirectoryIdentity(
   client: Pick<Prisma.TransactionClient, "organization">,
   organizationId: string,
 ): Promise<ClubDirectoryIdentity> {
@@ -871,6 +871,8 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             temporary?: boolean;
             clubRosterMemberId?: string;
             clubGuestId?: string;
+            /** An extra person's optional link to a roster member (#931); nothing else about the registration changes with it. */
+            linkedRosterMemberId?: string;
             teamRole?: string;
           };
           const temporary = snapshot.temporary === true;
@@ -891,6 +893,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             // which the edit endpoint accepts the same way.
             clubRosterMemberId,
             guestId: temporary ? (snapshot.clubGuestId ?? id) : null,
+            linkedRosterMemberId: temporary && typeof snapshot.linkedRosterMemberId === "string" ? snapshot.linkedRosterMemberId : null,
             // Registered, but no longer on the club's active roster: the
             // edit shows them separately, kept unless the director unticks.
             offRoster: !temporary && !(clubRosterMemberId && activeMemberIds.has(clubRosterMemberId)),

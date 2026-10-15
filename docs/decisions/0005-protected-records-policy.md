@@ -442,7 +442,7 @@ human can accept, change or reject them before any real record is stored.
    | Club Reporter | No |
    | Area Coordinator (verified second step) | **View only** the full record of a member registered for an event (submitted or confirmed registration by that club), from registration through the event's last day (changed 2026-10-14, #923: it was 30 days after); no roster browsing, no Health tab, no edit |
    | Staff holding `VIEW_HEALTH_INFORMATION` on an event membership | **View only**, and only for members registered for that event, inside the same window |
-   | System administrators | View only, any member, all year (no event needed) |
+   | System administrators | **Break-glass only** (decided 2026-10-09, built in #929): view only, one person at a time, inside a 24-hour grant (see "Break-glass for the live record", below). It replaced "view only, any member, all year" |
    | Everyone else by role alone (Event Admins, registration, finance, check-in, read-only staff, and anyone with `VIEW_SENSITIVE_DATA`) | No |
    | The parent, holding a valid private link | Fills in one member's record once; sees no stored value |
 
@@ -503,7 +503,8 @@ human can accept, change or reject them before any real record is stored.
   - know that every use is logged.
 
   The Communication Director reviews each use monthly.
-- **Retention: re-confirm every club year.** At the start of each club year,
+- **Retention: re-confirm every club year** (the live record; a sealed copy
+  for each event attended is kept separately, see 2026-10-14, #924). At the start of each club year,
   last year's health records are marked "needs updating". A record the director
   doesn't re-confirm within 60 days is deleted:
   - **Deleted:** the health fields, insurance details and emergency contacts.
@@ -581,8 +582,225 @@ Owner decisions from Caleb, Communication Director, on 2026-10-14.
    break-glass), and Registrars before entry. The coordinator health view
    (Addendum C) asks for it too, while `HEALTH_RECORDS_ENABLED` is on; with the
    switch off (production today) that view behaves as before.
-7. **Backup retention and legal hold:** still open. Research is going to the
-   owner; #923 does not cover it.
+7. **Backup retention and legal hold:** decided later the same day, in the
+   next subsection (#924). #923 did not cover it.
+
+### Decided 2026-10-14 (Communication Director, #924): sealed copy for each event
+
+Owner decision from Caleb, Communication Director, on 2026-10-14: keep a sealed
+copy of the health form for each event attended.
+
+**Why.** The rule above deletes a member's health details when the yearly
+re-confirmation is missed. That could destroy the record the conference needs
+to answer an injury claim. The live record's rules do not change (yearly
+re-confirmation, the 60-day deletion, deletion at once on removal from a
+roster). A separate, sealed, immutable copy covers the claim period.
+
+**What is kept.** When a club member attends an event, the system seals an
+encrypted copy of their health record and signed consent as they stood at that
+moment, with the consent version and the signature date. It is taken:
+
+- when the person is **checked in** (the check-in route calls the sealing step
+  once the arrival is recorded; a failure there never fails a check-in), or
+- when the **event starts**, for a person on a confirmed club registration who
+  has a live record and no copy yet (the scheduled sweep, within three days of
+  the event's start, so a copy is never of a record far later than the event).
+
+Exactly one per person per event (a unique key, so a second attempt or a race
+changes nothing). A person with no live record, or not on a club registration,
+gets none. The copy uses the existing `sealSecret` (`modules/health-records/crypto.ts`,
+purpose `health-snapshot:<snapshotId>:<fieldKey>`), so a copy's value cannot be
+opened as a live record's field or moved to another copy. The copy's row holds
+only dates, the consent version, a field count and the keep-until date: no
+health text and no birth date. **The copy keeps the whole health record, as
+the issue asks:** every field of the live record, contact fields included
+(address, phone, email, guardian and emergency contacts, insurance), plus the
+signed consent. Nothing is left out to make it smaller; each field is its own
+ciphertext, and a copy is opened only through break-glass. It is **immutable in the database**: triggers
+refuse every update and every delete, except the daily retention job's and
+event deletion's.
+
+**How long (configuration, `modules/health-records/snapshot-retention.ts`; counsel
+can change the constants):**
+
+| Person on the event's first day | Kept until |
+| --- | --- |
+| Under 18 (a minor) | Their 26th birthday |
+| 18 or over (an adult) | 5 years after the event's last day |
+| No usable birth date | The longer of 5 years after the event and the 26th birthday on the latest plausible reading |
+
+For "no birth date" the latest plausible reading takes the youngest age the
+person could have had on the event's first day: the age a form reported, else
+the youngest age for their member type (Underage 0, Youth 4, Staff 16, Adult
+18). The 26th birthday on that reading is the keep-until date when it is later
+than 5 years after the event. This errs on keeping the record the conference may
+need; the choice is recorded here for counsel to confirm. The expiry is
+computed once, from the birth date at the event, and stored per copy; the birth
+date itself is not stored. A Feb 29 birthday lands on Mar 1 in a year without a
+Feb 29. The reported age (used only with no birth date) is taken from the
+roster row for the event's own club year; if only a later year has one, the
+year gap is subtracted (they were younger then); an earlier year's age is used
+as reported, which errs towards the longer keep.
+
+**When a copy actually expires (owner-chosen; counsel to confirm).** The
+keep-until day above is a calendar day. A copy is not deleted when that day
+starts in UTC (which is the evening before in Central time). It becomes
+deletable at the **start of the day after the keep-until day in America/Chicago,
+plus a grace period of 90 days** (`HEALTH_SNAPSHOT_GRACE_DAYS` in
+`snapshot-retention.ts`; days are counted as calendar days, so a daylight saving
+change never moves the hour). So a claim filed on the last day can still get a
+legal hold before the deletion job runs. The 90 days is the owner's choice, not
+a statute; Adventist Risk Management or conference counsel is to confirm it,
+and it is a one-line change that applies to copies sealed afterwards.
+
+**Sources (research, not legal advice).** In Missouri a minor's personal-injury
+claim can be filed until age 26: RSMo 516.120 gives 5 years and RSMo 516.170
+starts the clock at age 21. Iowa's limit is shorter (2 years, or until age 19
+for a minor: Iowa Code 614.1(2) and 614.8), so the Missouri limit sets the
+period. **Adventist Risk Management or conference counsel is to confirm these
+periods.** They are configuration, so a change needs no migration.
+
+**Daily deletion.** A job deletes every copy whose expiry has come (see "When a
+copy actually expires"), unless a legal hold applies. It runs from the existing
+authenticated outbox sweep (the same cron and token as the other periodic work;
+no second scheduler or secret), at most once every 20 hours. It works in
+batches of 500, each batch its own transaction (a commit per batch) with its
+own audit row (ids and count), up to 20 batches per run, so a large backlog
+makes progress; a run that stops at that cap with copies still due does not
+hold the next sweep off for a day. Each run writes one audit row with the
+totals: deleted, skipped under a hold, batches, and whether a backlog remains
+(ids capped, never a value). Each batch takes a table lock on holds so a hold
+placed at the same moment either lands first or waits for the deletion to
+commit. **The job runs whether or not `HEALTH_RECORDS_ENABLED` is on**:
+switching the feature off must never extend how long a copy is kept.
+
+**Legal hold.** A system administrator can place a hold on a person's copies or
+on an event's copies, with a typed reason, and lift it with a reason. While a
+hold applies nothing it covers is deleted, and a copy under a hold also blocks
+deleting its event (lift the hold first). One active hold per person and per
+event; placing it twice, or two people placing it at the same moment, changes
+nothing and returns the one hold. Holds are kept after they are lifted.
+Placing and lifting are audited with the target, the reason and the number of
+copies covered. Event deletion takes the same table lock on holds as the
+retention job before it reads the hold facts, so a hold placed at that moment
+either lands first or waits for the deletion to commit.
+
+**Access: break-glass only.** A system administrator with the privacy
+acknowledgment (#923) types a reason and gets 24 hours of access to one
+person's copies. A grant belongs to the administrator who typed it: a second
+administrator is not let in by it and must start their own. Every grant, every
+view and every refused attempt is audited with ids, counts and the typed
+reason: never a health value. A director, deputy, Registrar, Area Coordinator
+and the event health role never reach a copy, and a refusal is audited. The
+Communication Director reviews each use monthly, as for all break-glass access:
+`GET /api/staff/health-snapshots/break-glass-grants` lists the grants (who, when,
+the typed reason, the person id, when each ends; never a value) for system
+administrators only, and each listing is audited with a count.
+
+**Refused attempts on the staff routes.** Each staff route resolves who is
+asking and checks the role before it reads or parses the body, so a malformed
+body from someone who may not do this is refused as unauthorized (403), not as
+a bad request. A refusal from a **signed-in** staff identity is audited: a
+user with the health permission as that role, a signed-in user without it as
+having no health permission. An **unauthenticated** request (401) cannot be
+attributed to anyone, so it is not audited; it is visible only in the
+request logs.
+
+**The live record is unchanged,** and deleting it never deletes its copies.
+What stays when a roster member is removed and a copy exists, stated exactly:
+the copy's person key is `Restrict`, so the **Person row is kept** until the
+copy is deleted. That is not new for anyone who attended an event: a person
+registered for the event was already kept (the registration needs the row, and a
+registered person keeps their contact fields, as before #924). The Person is
+erased only in the branch where nothing else refers to them (no registration,
+no other roster, no ordered items), and a sealed copy now prevents that erasure.
+When the copy is the only reason left, the Person's email and phone are erased
+and the name remains (the same treatment as ordered items). What a director is
+told does not change: the removal notice reports a kept name only for ordered
+items (`nameKept`), never because of a sealed copy. Deleting an event deletes
+its copies; a copy under a hold blocks the deletion.
+
+**Incident reports for a minor** are kept until the person turns **31** (RSMo
+537.046). Incident records do not exist yet; the rule is recorded here and as a
+constant (`incidentReportMinorKeepUntilAge`, not used by any code today) for
+when they do.
+
+**Backups.** 30 nightly copies, rolling. The sealed copies cover the long-term
+legal need, so the backups do not have to. (The Compose default
+`BACKUP_RETENTION_DAYS` is 14 and the off-site suggestion in #875 was 90 days;
+setting the retention to 30 nightly copies is an operations change for the IT
+Director, not made by #924.)
+
+**The switch.** With `HEALTH_RECORDS_ENABLED` off, nothing is sealed (check-in
+and event-start sealing do nothing) and nothing is opened (break-glass and
+viewing answer like an unknown route). Two things deliberately keep working so
+the switch can never weaken retention or block a legal obligation: the **expiry
+deletion** (above) and the **hold routes** (place, lift, list) plus the
+break-glass review list, all for system administrators only (anyone else gets
+the unknown-route answer while the switch is off), so a legal hold can always be
+placed before a deletion. Routes: `POST /api/staff/health-snapshots/break-glass`,
+`GET /api/staff/health-snapshots/person/<personId>`,
+`GET /api/staff/health-snapshots/break-glass-grants`,
+`GET|POST /api/staff/health-snapshots/holds`,
+`POST /api/staff/health-snapshots/holds/<holdId>/lift`. There is no page yet;
+a break-glass screen is a follow-up.
+
+### Break-glass for the live record (#929)
+
+The 2026-10-09 decision says a system administrator reads health records through break-glass only. #924 built
+break-glass for sealed copies; #929 applies it to the **live record** and shares **one mechanism** with it.
+
+**One grant per person.** A grant (`HealthSnapshotBreakGlass`, unchanged) is one administrator, one person, a typed
+reason of 10 to 500 characters and 24 hours, after the privacy acknowledgment (#923). It now covers that person's
+live Pathfinder Health Record and their sealed copies. It does **not** cover the coordinator / event health sheet (see
+"Scope", below). A
+person needs a live record or a sealed copy to start one (one "not found" answer otherwise). Chosen over a second
+table of live-record grants because the reason, the window, the audit and the review are the same, and one grant
+is one line for the Communication Director to review. Grants started under #924 (not in use: the switch is off)
+cover the live record too. Starting one is still `POST /api/staff/health-snapshots/break-glass`. The code is in
+`modules/health-records/break-glass.ts` (grant lookup, refusal audit, use record) and `snapshot-access-repository.ts`.
+
+**Scope (owner decision, Caleb, 2026-10-14).** Break-glass covers the Pathfinder Health Record only: the live
+record and its sealed copies. The coordinator / event health sheet (#658, Addendum C) reads registration and club
+form data (diet, the medical flag, and the emergency contacts on permission slips and passenger lists), not
+`HealthRecord`. It stays visible to system administrators as in Addendum C, with no break-glass on the sheet, and an
+administrator acting as a director sees it as before. Everything here applies only while `HEALTH_RECORDS_ENABLED` is
+on: with the switch off there are no health records, and break-glass cannot be started.
+
+**Every system-administrator read of the Health Record needs an active grant.** The grant is the administrator's
+own: another administrator's grant, or one for another person, does not count.
+
+| Read path | Without a grant | With a grant |
+| --- | --- | --- |
+| Health tab and staff health record (`viewHealthRecord`) | Refused, `BREAK_GLASS_REQUIRED` (403) | Opens that person's record; a use is recorded |
+| Roster "has a health note" flag (`healthSummariesForMembers`) | Hidden (the status "current" or "needs update" says nothing of the content and stays) | Shown |
+| Sealed copies | Refused, `BREAK_GLASS_REQUIRED` (as #924) | Opens; a use is recorded |
+
+A person with no live record has nothing to open, so that read is not gated. A roster member with no person row can
+never hold a grant, so an administrator cannot read that record at all. The neutral "has a health record" marker
+(one boolean, shown to anyone who sees the roster) is unchanged.
+
+**Acting as a director does not bypass it.** A system administrator "acting as" a club director (#442) is still that
+administrator. The Health tab represents them as a `SYSTEM_ADMIN` viewer carrying `actAsId`, held to the same rule
+against the administrator's own grant, and `actAsId` is written on the refusal, the use and the audit row, so the
+review shows it.
+Acting as a director never grants more than a director has (view only for administrators, as before).
+
+**Refusals and audit.** A refusal writes `HEALTH_RECORD_ACCESS_REFUSED` with `reason: BREAK_GLASS_REQUIRED`, who, the
+ids and what was attempted: never a health value. An allowed read writes its usual audit row (`HEALTH_RECORD_VIEWED`) naming the grant, and
+a `HealthBreakGlassUse` row (grant, person, kind, time) in the same transaction, before any value is opened.
+
+**Monthly review.** `GET /api/staff/health-snapshots/break-glass-grants` lists each grant (who, when, the typed
+reason, the person id, when it ends) with its uses: a total, the last use and a count for each kind
+(`LIVE_RECORD`, `SEALED_COPIES`). It never shows a health value, and it
+stays available to system administrators with `HEALTH_RECORDS_ENABLED` off. Everything else is behind the switch.
+
+**The review trail survives deleting a person.** The grant's and each use's person id is nullable and set to null
+when the Person is deleted (a use's grant id likewise if a grant is deleted), so the trail is kept and the review
+list shows a null person.
+
+**Migration.** `20261025200000_health_break_glass_uses` adds one enum and one table (`HealthBreakGlassUse`), and
+makes `HealthSnapshotBreakGlass.personId` nullable with `ON DELETE SET NULL` (it was `CASCADE`).
 
 ### Still open (blocking production use)
 
@@ -592,9 +810,17 @@ questions this build raised.
 - **Key backup restore test** (decision 2 above): a human has to run it.
 - **Final acceptance:** the full sign-off list below, beyond the interim
   acceptance.
-- **Backup retention and legal hold.** How long off-site backup copies are
-  kept (#875 suggests 90 days), and who can pause deletion under a legal hold.
-  Research is going to the owner.
+- **Retention periods: counsel to confirm.** The keep-until rules for sealed
+  copies (26th birthday for a minor, 5 years for an adult, plus the 90-day
+  grace and the Central-time day boundary), the incident-report
+  rule (age 31) and the 30 nightly backups were decided by the owner on
+  2026-10-14 (#924, above) from research, not legal advice. Adventist Risk
+  Management or conference counsel is to confirm them. Setting the backup
+  retention to 30 nightly copies is still an operations change (Compose
+  defaults to 14 days).
+- **Break-glass screen.** #924 and #929 add the routes only (one grant now covers the live record and the sealed
+  copies); a page for a system administrator to start break-glass and place holds is a follow-up. Until it exists
+  the Health tab explains that break-glass is needed.
 - **Acknowledgment wording.** The notice text in
   `modules/health-records/acknowledgment-domain.ts` is a draft for the
   Communication Director to confirm. A change to it needs a new version.
@@ -685,7 +911,7 @@ contact matched".
 
 | Who | Access |
 | --- | --- |
-| System administrators | Automatic |
+| System administrators | Automatic. Break-glass (Addendum B) covers the Pathfinder Health Record only; this sheet reads registration and club form data, so it has no break-glass (owner decision, 2026-10-14) |
 | Active Area Coordinators, signed in with the second step passed | Automatic, every club |
 | A user holding `VIEW_HEALTH_INFORMATION` on the event | Only that event; granted by a system administrator |
 | A club's own director or deputy | Their own club's attendees only, past the roster's second step |

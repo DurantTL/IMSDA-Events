@@ -17,6 +17,7 @@ import { pickClubPortalForm } from "@/modules/club-registrations/portal-form";
 import { logWarn } from "@/lib/logger";
 import { publicFormDifferentiators } from "@/modules/forms/duplicate-public-forms";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
+import { generalLinkFormProblem, generalLinkPath, GENERAL_LINK_LABEL } from "@/modules/general-link-registrations/domain";
 
 async function loadPublicEventLanding(
   eventSlug: string,
@@ -44,6 +45,7 @@ async function loadPublicEventLanding(
       waitlistEnabled: true,
       billingMode: true,
       teamSettings: { select: { eventId: true } },
+      generalRegistrationLinkEnabled: true,
       announcements: {
         where: {
           status: "PUBLISHED",
@@ -162,7 +164,14 @@ async function loadPublicEventLanding(
     ? primaryForm
     : undefined;
 
+  // The general registration link (#931): club directors with no account register a team. Offered only when staff turned it on
+  // and the club's own form can carry it (a club question that picks from the directory).
+  const generalLink = event.generalRegistrationLinkEnabled && clubPortalEvent && primaryDefinition.success && generalLinkFormProblem(primaryDefinition.data) === null
+    ? { href: generalLinkPath(event.slug), title: GENERAL_LINK_LABEL }
+    : null;
+
   return {
+    generalLink,
     groupRegistration: groupForm
       ? { href: `/register/${event.slug}/group`, title: "Register as a group or individual", label: "Group" }
       : null,

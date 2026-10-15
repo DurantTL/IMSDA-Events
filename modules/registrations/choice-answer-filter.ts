@@ -93,7 +93,7 @@ function offeredQuestion(
 const definitionCache = new WeakMap<object, Map<string, ChoiceQuestion>>();
 
 /** The filterable questions of ONE form definition, by id. Empty when it does not parse. */
-function questionsFromDefinition(definition: Record<string, unknown>): Map<string, ChoiceQuestion> {
+export function questionsFromDefinition(definition: Record<string, unknown>): Map<string, ChoiceQuestion> {
   const cached = definitionCache.get(definition);
   if (cached) return cached;
   const parsed = registrationFormDefinitionSchema.safeParse(definition);
@@ -122,15 +122,35 @@ function questionsFromDefinition(definition: Record<string, unknown>): Map<strin
 }
 
 /**
- * Every question this viewer may filter on across the event's registration
- * forms, deduplicated. A question that is sensitive in any form version is
- * sensitive here, and is left out for a viewer without VIEW_SENSITIVE_DATA.
+ * Every question id (`${scope}:${key}`) that ONE definition treats as sensitive,
+ * whether or not it is offered as a filter there: health type, flagged, or
+ * linked to a sensitive question. The server-side operations search (#180)
+ * unions these across every version, so a key that was sensitive in any version
+ * is never searchable, even in a later version that dropped the flag.
  */
-export function listChoiceQuestions(registrations: readonly RegistrationRecord[], viewer: ChoiceFilterViewer): ChoiceQuestion[] {
+export function sensitiveQuestionIdsFromDefinition(definition: Record<string, unknown>): Set<string> {
+  const ids = new Set<string>();
+  const parsed = registrationFormDefinitionSchema.safeParse(definition);
+  if (!parsed.success) return ids;
+  const paymentKey = parsed.data.payment?.paymentMethodFieldKey ?? null;
+  const allFields = parsed.data.sections.flatMap((section) => section.fields);
+  const context = { allFields, sectionTitleOf: sectionTitleLookup(parsed.data.sections), paymentMethodFieldKey: paymentKey };
+  for (const field of allFields) {
+    if (resolveFieldOffer(field, context).sensitive) ids.add(`${field.scope}:${field.key}`);
+  }
+  return ids;
+}
+
+/**
+ * The questions of several form definitions folded into one set, by id. A
+ * question that is sensitive in any definition is sensitive in the result, and
+ * a later version that adds a choice extends the choices (first-seen order).
+ * Shared by the in-memory list below and the server-side operations search
+ * (#180), so both read "which questions exist" the same way.
+ */
+export function mergeChoiceQuestions(definitions: Iterable<Record<string, unknown>>): ChoiceQuestion[] {
   const byId = new Map<string, ChoiceQuestion>();
-  for (const registration of registrations) {
-    const definition = registration.publicSubmission?.definition;
-    if (!definition) continue;
+  for (const definition of definitions) {
     for (const question of questionsFromDefinition(definition).values()) {
       const existing = byId.get(question.id);
       if (existing && question.sensitive) existing.sensitive = true;
@@ -144,7 +164,21 @@ export function listChoiceQuestions(registrations: readonly RegistrationRecord[]
       }
     }
   }
-  return [...byId.values()].filter((question) => viewer.canViewSensitive || !question.sensitive);
+  return [...byId.values()];
+}
+
+/**
+ * Every question this viewer may filter on across the event's registration
+ * forms, deduplicated. A question that is sensitive in any form version is
+ * sensitive here, and is left out for a viewer without VIEW_SENSITIVE_DATA.
+ */
+export function listChoiceQuestions(registrations: readonly RegistrationRecord[], viewer: ChoiceFilterViewer): ChoiceQuestion[] {
+  const definitions: Record<string, unknown>[] = [];
+  for (const registration of registrations) {
+    const definition = registration.publicSubmission?.definition;
+    if (definition) definitions.push(definition);
+  }
+  return mergeChoiceQuestions(definitions).filter((question) => viewer.canViewSensitive || !question.sensitive);
 }
 
 function answerValues(raw: unknown): string[] {

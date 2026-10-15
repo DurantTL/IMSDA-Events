@@ -35,6 +35,7 @@ function errorResponse(error: unknown, rateLimit?: RateLimitOutcome) {
     let status = 409;
     if (error.code === "FORM_NOT_FOUND") status = 404;
     if (error.code === "REGISTRATION_CLOSED") status = 410;
+    if (error.code === "CLUB_ENTRY_REQUIRED") status = 403;
     if (error.code === "INVALID_SUBMISSION") status = 422;
     response = Response.json(
       { error: error.code, message: error.message, issues: error.issues },
