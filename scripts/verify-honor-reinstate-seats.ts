@@ -34,7 +34,7 @@ const prisma = new PrismaClient();
 const P = "hrs";
 const adminId = `${P}_admin`;
 const eventId = `${P}_event`;
-const clubKeys = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "m1", "m2", "k1", "k2", "e1", "e2", "d1", "d2", "d3", "q1", "q2"] as const;
+const clubKeys = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "m1", "m2", "k1", "k2", "e1", "e2", "d1", "d2", "d3", "q1", "q2", "o1", "o2", "o3", "o4"] as const;
 type ClubKey = (typeof clubKeys)[number];
 const now = new Date("2026-10-15T15:00:00Z");
 const hours = (base: Date, count: number) => new Date(base.getTime() + count * 60 * 60 * 1000);
@@ -460,7 +460,50 @@ async function main() {
   assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 1, "seats of a cancelled registration don't hold the limit up");
   console.log("ok  a seat limit can't be set below the seats taken, and the refusal says how many");
 
-  // ---- 13. The audit trail names no one
+  // ---- 13. A registration being restored keeps its own live offer and its turn in line
+  const classY = await makeClass(s1.id, 1);
+  const classX = await makeClass(s2.id, 2);
+  const classRoomy13 = await makeClass(s3.id, 10);
+  const offerOf = (key: string, classId: string) => prisma.honorClassWaitlistEntry.findFirstOrThrow({ where: { registrationAttendeeId: attendeeOf(key), offeringId: classId }, orderBy: { joinOrder: "desc" } });
+  await addPerson("o3", "ha1");
+  await addPerson("o4", "ha2");
+  await addPerson("o4", "hb2");
+  await addPerson("o1", "rr1");
+  await addPerson("o1", "rr2");
+  await addPerson("o2", "ll1");
+  await addPerson("o2", "ll2");
+  // 13a. Its live offer holds its seat: a second youth waiting for the class is not offered the same seat.
+  await pick("ha1", [classY]);
+  await pick("rr1", [classRoomy13]);
+  await joinClassWaitlist(orgOf("o1"), eventId, director("o1"), { attendeeId: attendeeOf("rr1"), offeringId: classY }, now);
+  await joinClassWaitlist(orgOf("o2"), eventId, director("o2"), { attendeeId: attendeeOf("ll1"), offeringId: classY }, now);
+  await cancel("o3"); // the freed seat is offered to rr1, first in line
+  assert((await offerOf("rr1", classY)).status === "OFFERED", "the freed seat was offered to the first in line");
+  await moveRegistrationToWaitlist(eventId, regOf("o1"), adminId, "synthetic", now);
+  const backWithOffer = await promoteRegistrationFromWaitlist(eventId, regOf("o1"), adminId, "synthetic", now);
+  assert((await offerOf("rr1", classY)).status === "OFFERED" && (await offerOf("ll1", classY)).status === "WAITING", "the restored registration keeps its offer and the next youth is not offered the same seat");
+  assert(backWithOffer.registration.status === "SUBMITTED" && (await holds("rr1", classRoomy13)), "and the registration is back with its pick");
+  await assertNoOverfill("after the restore with a live offer");
+  // The seat limit floor counts that live offer too.
+  const floor = await updateHonorOffering(eventId, classY, { capacity: 0 }, adminId).then(() => null, (error: unknown) => error);
+  assert(floor instanceof HonorConfigurationError && floor.code === "CAPACITY_BELOW_SEATS_TAKEN" && /1 held for waitlist offer/.test(floor.message), `the limit can't go below the seats held for live offers, got ${String(floor)}`);
+  assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classY } })).capacity === 1, "the limit is unchanged");
+  console.log("ok  a restored registration's live offer holds its seat, and the seat-limit floor counts live offers");
+
+  // 13b. Its waiting youth keep their turn: a seat that is free when it comes back goes to it, not to a later joiner.
+  await pick("ha2", [classX]);
+  await pick("hb2", [classX]);
+  await pick("rr2", [classRoomy13]);
+  await joinClassWaitlist(orgOf("o1"), eventId, director("o1"), { attendeeId: attendeeOf("rr2"), offeringId: classX }, now);
+  await joinClassWaitlist(orgOf("o2"), eventId, director("o2"), { attendeeId: attendeeOf("ll2"), offeringId: classX }, now);
+  await moveRegistrationToWaitlist(eventId, regOf("o1"), adminId, "synthetic", now);
+  await prisma.honorEnrollment.deleteMany({ where: { registrationAttendeeId: attendeeOf("hb2") } }); // a seat frees up without any waitlist pass
+  await promoteRegistrationFromWaitlist(eventId, regOf("o1"), adminId, "synthetic", now);
+  assert((await offerOf("rr2", classX)).status === "OFFERED" && (await offerOf("ll2", classX)).status === "WAITING", "the restored registration's youth, first in line, gets the free seat; the later joiner keeps waiting");
+  await assertNoOverfill("after the restore keeps its turn");
+  console.log("ok  a restored registration's waiting youth keep their turn in line");
+
+  // ---- 14. The audit trail names no one
   const entries = await prisma.auditLog.findMany({ where: { eventId, action: "HONOR_CLASS_PICK_NOT_RESTORED" }, select: { summary: true, metadata: true } });
   assert(entries.length >= 6 && entries.every((entry) => !/Test|Director/.test(entry.summary) && !/firstName|lastName|@example/.test(JSON.stringify(entry.metadata))), "every audit entry names no one");
   console.log("ok  every dropped pick is audited with ids and no names");

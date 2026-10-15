@@ -319,18 +319,30 @@ async function promoteOne(
   if (!offering.isActive) return out;
 
   // 2. Free seats: capacity less seats taken and less seats held by live offers.
+  // A registration being brought back by this transaction (#880) holds its live offer as soon as it is active again, so its
+  // unexpired offers count as live here although its status hasn't flipped yet.
+  const liveOffers = {
+    status: "OFFERED" as const,
+    offerExpiresAt: { gt: now },
+    OR: [{ registration: { status: { in: activeStatuses } } }, { registrationId: { in: [...exemptRegistrationIds] } }],
+  } satisfies Prisma.HonorClassWaitlistEntryWhereInput;
   const [taken, live, clubSeatRows, clubOfferRows] = await Promise.all([
     tx.honorEnrollment.count({ where: { offeringId: offering.id, ...seatHoldingEnrollment } }),
-    tx.honorClassWaitlistEntry.count({ where: { offeringId: offering.id, ...liveWaitlistOffer(now) } }),
+    tx.honorClassWaitlistEntry.count({ where: { offeringId: offering.id, ...liveOffers } }),
     tx.honorEnrollment.groupBy({ by: ["organizationId"], where: { offeringId: offering.id, ...seatHoldingEnrollment }, _count: { _all: true } }),
-    tx.honorClassWaitlistEntry.groupBy({ by: ["organizationId"], where: { offeringId: offering.id, ...liveWaitlistOffer(now) }, _count: { _all: true } }),
+    tx.honorClassWaitlistEntry.groupBy({ by: ["organizationId"], where: { offeringId: offering.id, ...liveOffers }, _count: { _all: true } }),
   ]);
   const free = seatsFree(offering.capacity, taken, live);
   if (free === 0) return out;
 
   // 3. In join order, who can take a seat now. Anyone who can't is skipped and keeps their place.
   const waiting = await tx.honorClassWaitlistEntry.findMany({
-    where: { offeringId: offering.id, status: "WAITING", registration: { status: { in: activeStatuses } } },
+    // The registration being brought back keeps its place in line: its waiting youth are not skipped for later joiners (#880).
+    where: {
+      offeringId: offering.id,
+      status: "WAITING",
+      OR: [{ registration: { status: { in: activeStatuses } } }, { registrationId: { in: [...exemptRegistrationIds] } }],
+    },
     orderBy: [{ joinOrder: "asc" }, { id: "asc" }],
     select: waitingEntrySelect,
   });

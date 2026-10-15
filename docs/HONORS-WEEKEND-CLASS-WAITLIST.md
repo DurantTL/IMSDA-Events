@@ -124,8 +124,9 @@ the picks that no longer fit**; after class changes have closed for its site **n
 - A club transfer already re-checks class capacity. An import may not bring a cancelled or waitlisted
   registration back to submitted or confirmed (the preview reports it as an error, and the commit refuses
   it again), so staff reactivate or promote it from the registration instead.
-- A class's seat limit can't be lowered below the seats it holds (seats of active registrations); the
-  refusal says how many are taken.
+- A class's seat limit can't be lowered below the seats it holds (seats of active registrations)
+  plus the seats held for live waitlist offers, counted as a pick save counts them; the refusal says how
+  many of each. The registration being brought back keeps its own live offers and its place in line.
 - Pick saves and the waitlist transactions retry serialization failures and deadlocks (the shared
   `isSerializationFailure`, which also covers 40P01 and raw-query wrapping). A multi-round promotion
   takes class locks in queue order rather than one sorted order, so a rare deadlock is possible; the loser retries.
