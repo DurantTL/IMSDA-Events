@@ -7,6 +7,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { LOCAL_DEMO_EMAIL, LOCAL_DEMO_PASSWORD } from "@/modules/access/local-demo-credentials";
 import { passkeysConfigured } from "@/modules/access/passkeys";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
+import { redirectToUnifiedSignInWhenEnabled } from "@/modules/account-merge/sign-in-redirect";
 
 export const metadata: Metadata = { title: "Staff sign in", robots: { index: false, follow: false } };
 
@@ -16,6 +17,8 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string | string[] }>;
 }) {
   const params = await searchParams;
+  // With the one-sign-in switch on, /login is /sign-in (#554). With it off nothing changes.
+  await redirectToUnifiedSignInWhenEnabled(params);
   // A repeated `?next=` arrives as an array; only a single value is passed on.
   const next = typeof params.next === "string" ? params.next : undefined;
   const session = await getCurrentSession();
