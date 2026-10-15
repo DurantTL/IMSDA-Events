@@ -83,7 +83,10 @@ async function activate(k: Key) {
   return user;
 }
 
-const accountsFor = (k: Key) => prisma.attendeeAccount.findMany({ where: { email: email(k) } });
+const accountsFor = (k: Key) => prisma.attendeeAccount.findMany({
+  where: { email: email(k) },
+  select: { id: true, emailVerifiedAt: true, status: true, disabledAt: true },
+});
 
 async function main() {
   const row = await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { unifiedSignInEnabled: true } });
@@ -118,6 +121,7 @@ async function main() {
   // An existing verified, active, unlinked account with the same email is reused.
   const reusable = await prisma.attendeeAccount.create({
     data: { email: email("reuse"), displayName: "Reuse Synthetic", status: "ACTIVE", emailVerifiedAt: new Date() },
+    select: { id: true },
   });
   await pendingStaff("reuse");
   const reused = await activate("reuse");
@@ -127,11 +131,15 @@ async function main() {
   // An unverified account is neither linked nor verified.
   const unverified = await prisma.attendeeAccount.create({
     data: { email: email("unverified"), displayName: "Unverified Synthetic" },
+    select: { id: true },
   });
   await pendingStaff("unverified");
   const notLinked = await activate("unverified");
   assert(notLinked.attendeeAccountId === null, "an unverified account is not linked");
-  const stillUnverified = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: unverified.id } });
+  const stillUnverified = await prisma.attendeeAccount.findUniqueOrThrow({
+    where: { id: unverified.id },
+    select: { emailVerifiedAt: true, status: true },
+  });
   assert(stillUnverified.emailVerifiedAt === null && stillUnverified.status === "PENDING_VERIFICATION", "activation does not verify someone else's account");
   assert(
     (await prisma.auditLog.count({ where: { entityId: userId("unverified"), action: "STAFF_ATTENDEE_LINK_NEEDS_REVIEW" } })) === 1,
@@ -141,6 +149,7 @@ async function main() {
   // An account already linked to someone else is not taken over.
   const taken = await prisma.attendeeAccount.create({
     data: { email: email("taken"), displayName: "Taken Synthetic", status: "ACTIVE", emailVerifiedAt: new Date() },
+    select: { id: true },
   });
   await prisma.user.create({
     data: { id: `${P}_user_holder`, email: email("holder"), displayName: "Holder Synthetic", attendeeAccountId: taken.id },
@@ -162,6 +171,7 @@ async function main() {
   const gradeUser = await pendingStaff("grade");
   const gradeAccount = await prisma.attendeeAccount.create({
     data: { email: email("grade"), displayName: "Grade Synthetic", status: "ACTIVE", emailVerifiedAt: new Date() },
+    select: { id: true, email: true, displayName: true },
   });
   await prisma.user.update({ where: { id: gradeUser.id }, data: { accountStatus: "ACTIVE", attendeeAccountId: gradeAccount.id } });
   await prisma.attendeeCredential.create({ data: { accountId: gradeAccount.id, passwordHash: await hashPassword(PASSWORD) } });
