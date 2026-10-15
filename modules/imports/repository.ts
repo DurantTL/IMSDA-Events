@@ -191,7 +191,7 @@ async function previewImportRows(input: {
   const [existingRegistrations, existingPeople, targetBefore] = await Promise.all([
     getPrisma().registration.findMany({
       where: { eventId, confirmationCode: { in: confirmationCodes } },
-      include: { accountHolderPerson: true, attendees: { orderBy: { position: "asc" } } },
+      include: { accountHolderPerson: true, attendees: { orderBy: { position: "asc" } }, staffInvitation: { select: { id: true } } },
     }),
     getPrisma().person.findMany({ where: { normalizedEmail: { in: emails } } }),
     getEventTotals(getPrisma(), eventId),
@@ -242,7 +242,11 @@ async function previewImportRows(input: {
       if (emailMatch && (emailMatch.firstName !== row.data.firstName || emailMatch.lastName !== row.data.lastName)) {
         warnings.push(`Email matched existing person ${emailMatch.firstName} ${emailMatch.lastName}; review the name difference.`);
       }
-      if (registration) {
+      if (registration?.staffInvitation) {
+        // A registration made through a personal staff, pastor or volunteer link (#804) is $0 and moves only through the
+        // office's approval, so a legacy file may not change its status, amount or people. The row is flagged and skipped.
+        errors.push("This confirmation code belongs to a staff, pastor or volunteer registration made through a personal invitation link. The import does not change those; the office manages them from Staff invitations.");
+      } else if (registration) {
         differences = differencesFor(row.data, registration);
         if (row.data.attendees) {
           differences.push({
@@ -729,8 +733,9 @@ export async function commitImportRun(eventId: string, importRunId: string, acto
         finalStatus = ImportRecordStatus.CREATED;
         created += 1;
       } else if (record.proposedAction === "UPDATE" && record.matchedRegistrationId) {
-        const registration = await tx.registration.findFirst({ where: { id: record.matchedRegistrationId, eventId }, include: { attendees: { orderBy: { createdAt: "asc" }, take: 1 } } });
+        const registration = await tx.registration.findFirst({ where: { id: record.matchedRegistrationId, eventId }, include: { attendees: { orderBy: { createdAt: "asc" }, take: 1 }, staffInvitation: { select: { id: true } } } });
         if (!registration) throw new ImportOperationError("IMPORT_CONFLICT", `Registration ${data.confirmationCode} changed after preview.`);
+        if (registration.staffInvitation) throw new ImportOperationError("IMPORT_CONFLICT", `Registration ${data.confirmationCode} is a staff invitation registration, which an import does not change.`);
         await tx.person.update({ where: { id: registration.accountHolderPersonId }, data: { firstName: data.firstName, lastName: data.lastName, normalizedEmail: data.email || null, phone: data.phone || null } });
         await tx.registration.update({ where: { id: registration.id }, data: { status: data.status, totalAmount: data.totalAmountCents / 100, submittedAt: data.submittedAt ? new Date(data.submittedAt) : null } });
         if (!data.attendees && registration.attendees[0]) {

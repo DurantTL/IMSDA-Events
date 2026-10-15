@@ -18,7 +18,7 @@ import { loadPlanningState, toDate, toNight, type PlanningState } from "@/module
 import { LodgingError } from "@/modules/lodging/errors";
 import { enqueueLodgingMessage, deliverAfterCommit, lodgingRecipient } from "@/modules/lodging/notices";
 import { categoryFits, isPastLodgingDeadline } from "@/modules/lodging/preferences-domain";
-import { addWaitingDemand, demandFromGroups, loadCategoryCapacity, loadContext, loadDemandGroups, type Client, type DemandGroups, type Tx } from "@/modules/lodging/preferences-service";
+import { addWaitingDemand, isStaffInvitationRegistration, staffRegistrationLodgingRefusal, demandFromGroups, loadCategoryCapacity, loadContext, loadDemandGroups, type Client, type DemandGroups, type Tx } from "@/modules/lodging/preferences-service";
 import { lockEventLodgingUnits, lodgingTransactionTimeoutMs, touchEventLodgingCapacity } from "@/modules/lodging/service";
 
 /**
@@ -475,6 +475,7 @@ export async function applyRegistrantWaitlistAction(input: { eventId: string; re
   const now = input.now ?? new Date();
   const actor: Actor = { kind: "REGISTRANT", accessTokenId: input.accessTokenId };
   return client.$transaction(async (tx) => {
+    if (await isStaffInvitationRegistration(tx, input.registrationId)) throw staffRegistrationLodgingRefusal();
     if (parsed.action === "join") {
       const entry = await joinInTransaction(tx, input.eventId, actor, { registrationId: input.registrationId, ...parsed }, now);
       return { entryId: entry.id, status: "JOINED" as WaitlistStatus, replay: false };

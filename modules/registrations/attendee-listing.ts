@@ -16,6 +16,8 @@ import { toCsv } from "@/modules/reporting/csv";
  * has a stricter gate (`canViewDietaryDetails`).
  */
 
+const STAFF_GROUP_LABEL = { STAFF: "Staff", PASTOR: "Pastor", VOLUNTEER: "Volunteer" } as const;
+
 export type ListingStatus = "CONFIRMED" | "SUBMITTED" | "CANCELLED";
 export const LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED", "SUBMITTED", "CANCELLED"];
 export const DEFAULT_LISTING_STATUSES: readonly ListingStatus[] = ["CONFIRMED"];
@@ -37,6 +39,8 @@ export type AttendeeListingRow = {
   status: string;
   name: string;
   attendeeType: string;
+  /** Staff, Pastor or Volunteer for a registration made through a personal invitation (#804); blank for everyone else. */
+  group: string;
   church: string;
   mealPreference: string;
   mealCategory: MealCategory;
@@ -194,6 +198,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
         status: registration.status,
         name: `${attendee.firstName} ${attendee.lastName}`.trim(),
         attendeeType: attendee.attendeeType,
+        group: registration.staffInvitation ? STAFF_GROUP_LABEL[registration.staffInvitation.group] : "",
         church,
         mealPreference,
         mealCategory: mealCategoryOf(mealPreference),
@@ -216,6 +221,7 @@ export const LISTING_COLUMNS: ReadonlyArray<{ key: ListingSortKey; label: string
   { key: "status", label: "Status" },
   { key: "name", label: "Attendee" },
   { key: "attendeeType", label: "Type" },
+  { key: "group", label: "Group" },
   { key: "church", label: "Church" },
   { key: "mealPreference", label: "Meal preference" },
   { key: "dietaryNeeds", label: "Dietary needs" },

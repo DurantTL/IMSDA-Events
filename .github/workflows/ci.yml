@@ -296,6 +296,15 @@ jobs:
       # roster link; the table constraints.
       - run: npm run test:general-link-registration
 
+      # Real-database check of personal staff, pastor and volunteer invitations (#804): a CSV
+      # preview creates nothing and confirming creates only what was previewed; one derived
+      # personal link per email (copy, reissue, revoke); sending is a previewed, explicit action
+      # that only queues in the outbox; a registration through a link is the person, a spouse and
+      # children up to 18 for $0, waiting for the office as a draft (also under racing clicks);
+      # batch approval confirms it and covers every meal under the conference-paid plan, a
+      # decline cancels it; the table constraints and event deletion.
+      - run: npm run test:staff-invitations
+
       # Check-in desk concurrency (#825): 4 devices checking in the same attendee,
       # the same retry key re-sent, and different attendees of one registration at
       # once, plus check-in racing undo and double undo. One record and one audit

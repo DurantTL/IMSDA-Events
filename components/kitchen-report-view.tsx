@@ -31,6 +31,19 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
         </table></div>
       </section>
 
+      {report.conferenceCovered.length > 0 && (
+        <section className="panel" aria-label="Meals covered by the conference">
+          <h3>Meals covered by the conference</h3>
+          <p className="field-help">Staff, pastors and volunteers (with their immediate family) have every meal covered and chose no meal tickets. They are counted in the totals above.</p>
+          <div className="report-table-wrap"><table className="report-table report-table-auto">
+            <thead><tr><th scope="col">Group</th><th scope="col">People</th></tr></thead>
+            <tbody>
+              {report.conferenceCovered.map((entry) => <tr key={entry.group}><th scope="row">{entry.group}</th><td>{entry.count}</td></tr>)}
+            </tbody>
+          </table></div>
+        </section>
+      )}
+
       <section className="panel" aria-label="Dietary needs">
         <h3>Dietary needs</h3>
         <p className="field-help">People with any dietary need: <strong>{report.peopleWithNeeds}</strong>. One person can give more than one answer.</p>

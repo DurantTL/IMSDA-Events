@@ -28,6 +28,11 @@ export type KitchenReport = {
   peopleWithNeeds: number;
   /** People counted (confirmed attendees). */
   totalPeople: number;
+  /**
+   * How many of them registered through a personal staff, pastor or volunteer invitation (#804): their meals are covered by
+   * the conference, and none of them chose a meal ticket. A count per group, groups with nobody left out; no names.
+   */
+  conferenceCovered: Array<{ group: string; count: number }>;
 };
 
 /** Trim, lowercase and collapse whitespace: the key answers are grouped by. */
@@ -64,11 +69,15 @@ export function buildKitchenReport(registrations: readonly RegistrationRecord[])
     return { answer, count: group.count };
   });
   needs.sort((a, b) => b.count - a.count || a.answer.localeCompare(b.answer, "en", { sensitivity: "base" }));
+  const conferenceCovered = ["Staff", "Pastor", "Volunteer"]
+    .map((group) => ({ group, count: rows.filter((row) => row.group === group).length }))
+    .filter((entry) => entry.count > 0);
   return {
     meals: mealTotals(rows).map(({ value, label, count }) => ({ value, label, count })),
     needs,
     peopleWithNeeds,
     totalPeople: rows.length,
+    conferenceCovered,
   };
 }
 
@@ -81,6 +90,9 @@ export function kitchenReportCsv(report: KitchenReport): string {
     ["Dietary needs answer", "Count"],
     ...report.needs.map((need) => [need.answer, need.count]),
     ["People with any dietary need", report.peopleWithNeeds],
+    ...(report.conferenceCovered.length > 0
+      ? [[], ["Meals covered by the conference", "Count"], ...report.conferenceCovered.map((entry) => [entry.group, entry.count])]
+      : []),
   ];
   return ATTENDEE_LISTING_BOM + toCsv(table);
 }
