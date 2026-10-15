@@ -64,3 +64,15 @@ contact the event office.
 
 `20261101100000_pbe_level_advancement` is additive: two nullable columns on `ClubTeamResult`, the `ClubTeamLevelCheckIn` table, and
 one `MessageTemplateKey` value. Nothing is backfilled.
+
+## The 2027 paper form changes (#963)
+
+The starter and the `pbe_registration` form template now say the Area date is January 17, 2027, label the director "Club director",
+and ask for the partner club as a pick from the clubs directory ("Not listed" with a typed name is the fallback). A team can't name
+its own club as its partner: this is refused on the server for club-portal submits, general-link submits (for every email alike)
+and staff or director amendments. The "4 or fewer Pathfinders" rule stays as guidance text.
+
+Existing data does not change. A database that already has the PBE starter keeps its old description (it still tells staff to
+choose January 16, 2027), and an event already created from the form keeps the free-text partner field and the old "Pathfinder
+director" label until staff edit that event's form. Staff can re-add the starter or edit the form to pick up the new wording. Reports
+and the printed team form read either shape: a directory pick, the typed name after "Not listed", or the old typed text.

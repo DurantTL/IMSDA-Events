@@ -659,6 +659,10 @@ export async function submitGeneralLinkRegistration(
   // in the same words, so no field can tell a director from anyone else.
   const unsupported = unsupportedFieldProblem(definition, input);
   if (unsupported) throw new PublicRegistrationError("INVALID_SUBMISSION", unsupported.message, unsupported.issues);
+  // A partner club that is the team's own club (#963) is refused here on the answers as typed, for every email, so the
+  // refusal never tells a director's email from any other. The matched path checks again on the club's own answer.
+  const partnerProblem = partnerClubProblem(definition, input.responses);
+  if (partnerProblem) throw new PublicRegistrationError("INVALID_SUBMISSION", partnerProblem.message, [partnerClubIssue(partnerProblem)]);
 
   // The same checks the club submit makes, on the answers as typed, so a team that can never be registered is refused now.
   const prepared = preparePublicRegistration(definition, input, { timeZone: event.timezone, now, ignoreAvailability: true });

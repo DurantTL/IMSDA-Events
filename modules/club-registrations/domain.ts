@@ -200,6 +200,8 @@ export function medicalFreeTextFields(definition: RegistrationFormDefinition): R
     .filter((field) => FREE_TEXT_FIELD_TYPES.has(field.type) && looksLikeMedicalFreeText(field));
 }
 
+const PARTNER_CLUB_KEY = "partner_club";
+
 /** Why a published form can't be used for club registration, or null. */
 export function clubFormProblem(definition: RegistrationFormDefinition) {
   if (!definition.attendeeRoster?.enabled) return "The event's form doesn't collect a list of attendees.";
@@ -211,6 +213,13 @@ export function clubFormProblem(definition: RegistrationFormDefinition) {
   if (medicalFields.length > 0) {
     const labels = medicalFields.map((field) => `"${field.label}"`).join(", ");
     return `The event's form asks attendees a free-text medical, health, or accessibility question (${labels}). Registration answers aren't encrypted, so replace it with a checkbox or yes/no question and republish.`;
+  }
+  const clubQuestions = definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.scope === "REGISTRATION" && field.optionSource === "CLUBS_DIRECTORY");
+  // The first clubs-directory question is the club itself and is locked to the director's club (#963). Refuse a form
+  // where the partner club comes first, so reordering sections can't swap which question is locked.
+  if (clubQuestions.length > 1 && clubQuestions[0]!.key === PARTNER_CLUB_KEY) {
+    return "The event's form asks for the partner club before the club itself. Move the club question first and republish.";
   }
   return null;
 }
@@ -326,6 +335,13 @@ export function lockedClubDirectoryFieldKeys(definition: RegistrationFormDefinit
 /** The validation issue a refused partner club shows against its field. */
 export function partnerClubIssue(problem: { field: RegistrationFormField; message: string }): PublicRegistrationIssue {
   return { kind: "validation", code: "INVALID_RESPONSE", fieldId: problem.field.id, key: problem.field.key, message: problem.message, path: `responses.${problem.field.key}`, attendeeIndex: null };
+}
+
+/** The partner club a team named: the directory pick, or what was typed when the pick was "Not listed" (#963). */
+export function partnerClubName(responses: Readonly<Record<string, unknown>>): string {
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "");
+  const picked = text(responses.partner_club);
+  return picked === DIRECTORY_NOT_LISTED_VALUE ? text(responses.partner_club_other) : picked;
 }
 
 export const PARTNER_CLUB_IS_OWN_CLUB_MESSAGE = "The partner club must be a different club from your own. Choose another club, or leave this blank.";

@@ -1715,10 +1715,6 @@ export async function amendClubRegistration(
     ownedRegistrationResponses: async (hydrated, tx) => (
       clubDirectoryOwnedResponses(hydrated, await clubDirectoryIdentity(tx, organizationId))
     ),
-    registrationResponsesProblem: (hydrated, responses) => {
-      const problem = partnerClubProblem(hydrated, responses);
-      return problem ? { message: problem.message, issues: [partnerClubIssue(problem)] } : null;
-    },
   };
   try {
     const preview = await previewRegistrationAmendment(eventId, registrationId, amendmentInput, engineOptions);

@@ -1,3 +1,4 @@
+import { partnerClubName } from "@/modules/club-registrations/domain";
 import type { ClubAssignmentFields } from "@/modules/club-registrations/assignments";
 import { toCsv } from "@/modules/reporting/csv";
 
@@ -217,7 +218,7 @@ export function buildClubEventRecord(input: BuildClubEventRecordInput): ClubEven
     flagSlots: stringList(responses.flag_slots),
     bathroomDays: stringList(responses.bathroom_days),
     specialActivities: stringList(responses.special_activities),
-    partnerClub: textValue(responses.partner_club),
+    partnerClub: partnerClubName(responses),
     eventRibbons: textValue(responses.event_ribbons),
     sabbathSkit: textValue(responses.sabbath_skit),
     sponsoringMeals: boolValue(responses.sponsoring_meals) || textValue(responses.sponsoring_meals) === "Yes",

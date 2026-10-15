@@ -9,6 +9,7 @@ import {
   clubFormProblem,
   lockedAttendeeFieldKeys,
   lockedClubDirectoryFieldKeys,
+  partnerClubName,
   partnerClubProblem,
   medicalFreeTextFields,
   rosterCarryoverMismatches,
@@ -293,6 +294,24 @@ describe("club and church directory lock (#482)", () => {
     expect(partnerClubProblem(withPartner, { club_name: "Test Pathfinders", partner_club: "" })).toBeNull();
     expect(partnerClubProblem(withPartner, { club_name: "Test Pathfinders", partner_club: "test  pathfinders" })?.field.key).toBe("partner_club");
     expect(partnerClubProblem(directoryForm, { club_name: "Test Pathfinders" })).toBeNull();
+  });
+
+  it("names the partner club from the pick or the typed not-listed name (#963)", () => {
+    expect(partnerClubName({ partner_club: "Sample Eagles" })).toBe("Sample Eagles");
+    expect(partnerClubName({ partner_club: "Not listed", partner_club_other: " Sample Falcons " })).toBe("Sample Falcons");
+    expect(partnerClubName({ partner_club: "Not listed" })).toBe("");
+    expect(partnerClubName({})).toBe("");
+  });
+
+  it("refuses a club form whose partner club question comes before the club question (#963)", () => {
+    const pick = (id: string, key: string) => ({ id, key, label: key, helpText: "", type: "SELECT", scope: "REGISTRATION", required: false, options: [], optionSource: "CLUBS_DIRECTORY" });
+    const base = { ...directoryForm, sections: [
+      { id: "s_a", title: "Club", description: "", fields: [pick("f_partner", "partner_club"), pick("f_club", "club_name")] },
+      directoryForm.sections[1]!,
+    ] };
+    expect(clubFormProblem(registrationFormDefinitionSchema.parse(base))).toMatch(/partner club before the club/);
+    const ordered = { ...base, sections: [{ ...base.sections[0]!, fields: [pick("f_club", "club_name"), pick("f_partner", "partner_club")] }, base.sections[1]!] };
+    expect(clubFormProblem(registrationFormDefinitionSchema.parse(ordered))).toBeNull();
   });
 
   it("reports no locked fields for a form with no directory sources", () => {
