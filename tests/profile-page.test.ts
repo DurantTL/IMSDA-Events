@@ -25,6 +25,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/account-merge/person", () => ({
+  // The one-sign-in switch is off here (#554): no link is ever resolved.
+  resolvePersonFrom: async ({ staff, attendee }: { staff: unknown; attendee: { account: unknown } }) => ({
+    unified: false, staff, attendee: attendee.account, attendeeSessionId: null, link: null, linkedUserId: null, consistent: true,
+  }),
+}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/headers", () => ({
   headers: mocks.headers,
