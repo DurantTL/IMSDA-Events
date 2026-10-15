@@ -26,6 +26,8 @@ describe("health data stays out of exports, the check-in book, communications an
       // (checked below); the check-in module itself stays free of health code.
       "app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts",
       "app/api/internal/outbox/sweep/route.ts",
+      // Shows the "Import health records" link only when the feature is on (#878); it imports the flag and nothing else.
+      "app/(workspace)/admin/organizations/page.tsx",
     ]);
     const offenders = [...sourceFiles("modules"), ...sourceFiles("components"), ...sourceFiles("app"), ...sourceFiles("lib")]
       .filter((path) => !path.startsWith("modules/health-records/"))

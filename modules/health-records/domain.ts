@@ -49,6 +49,8 @@ export const HEALTH_FIELD_KEYS = [
   "insuranceGroupNumber",
   "insurancePolicyNumber",
   "insurancePhone",
+  /** True only on an imported record (#878): the parent had uploaded a card on the old online form. Never a link or a file name. */
+  "insuranceCardInCognito",
   "guardianFirstName",
   "guardianLastName",
   "guardianAddress",

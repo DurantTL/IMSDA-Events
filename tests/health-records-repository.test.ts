@@ -968,3 +968,34 @@ describe("break-glass for a system administrator's live read (#929)", () => {
     expect(state.uses).toHaveLength(0);
   });
 });
+
+describe("a record imported from the 2026 online form (#878)", () => {
+  beforeEach(() => {
+    resetState();
+    // As the import writes it: sealed fields, no confirmed club year, the plain imported marker.
+    state.records = [{ id: "imported-1", organizationId: "club-a", rosterMemberId: "member-1", confirmedClubYear: null, hasHealthNote: true, lastEnteredVia: null, importedAt: now }];
+    state.fields = [];
+  });
+
+  it("reads Needs update and tells the director it came from the old form, until they confirm it", async () => {
+    const before = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(before.status).toBe("NEEDS_UPDATE");
+    expect(before.importedForReview).toBe(true);
+    await confirmHealthRecord(leader, "club-a", "member-1", now);
+    expect(state.records[0]).toMatchObject({ confirmedClubYear: "2026-27", importedAt: null });
+    const after = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(after).toMatchObject({ status: "CURRENT", importedForReview: false });
+  });
+
+  it("is reviewed by a director's save as well, which clears the marker", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    expect(state.records[0]).toMatchObject({ importedAt: null, confirmedClubYear: "2026-27" });
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).importedForReview).toBe(false);
+  });
+
+  it("is not marked for a record that was never imported", async () => {
+    state.records = [];
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).importedForReview).toBe(false);
+  });
+});

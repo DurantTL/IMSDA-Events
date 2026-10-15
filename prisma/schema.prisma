@@ -6448,6 +6448,9 @@ model HealthRecord {
   /// enter a record but not read it, is shown. Plain, carries no text.
   lastConfirmedAt   DateTime?
   lastEnteredVia    HealthRecordEntryChannel?
+  /// Set when the record came from the 2026 Cognito form import (#878) and a director has not yet reviewed it.
+  /// Cleared when a director saves or confirms the record. Plain, carries no text.
+  importedAt        DateTime?
   /// Who last saved it: an attendee account id, or a staff user id for an act-as. Never shown.
   lastSavedByActor  String?
   createdAt         DateTime                  @default(now())

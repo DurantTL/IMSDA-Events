@@ -17,6 +17,14 @@ export function sealHealthField(recordId: string, fieldKey: string, value: unkno
   return sealSecret(JSON.stringify(value), purposeFor(recordId, fieldKey));
 }
 
+/**
+ * Seals every value of a new record in one go, as the rows `HealthRecordField` stores (#878). The import builds a
+ * record id and its rows here, so nothing outside this file and the repository handles a sealed column by name.
+ */
+export function sealHealthFieldRows(recordId: string, values: Record<string, unknown>) {
+  return Object.entries(values).map(([fieldKey, value]) => ({ fieldKey, sealedValue: sealHealthField(recordId, fieldKey, value) }));
+}
+
 /** An unreadable value is an error with a fixed message, never the ciphertext or a partial value. */
 export function openHealthField(recordId: string, fieldKey: string, sealed: string): unknown {
   try {

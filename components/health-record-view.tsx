@@ -8,6 +8,9 @@ import type { HealthTabView } from "@/modules/health-records/repository";
 
 type Values = HealthTabView["values"];
 
+/** Shown on a record that came from the 2026 online form import (#878) until a director saves or confirms it. */
+export const HEALTH_IMPORTED_NOTICE = "Imported from the 2026 online form, director please review.";
+
 function str(values: Values, key: string) {
   const value = values[key];
   return typeof value === "string" && value !== "" ? value : "—";
@@ -38,6 +41,9 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
   if (health.status === "NONE") return <p className="public-manage-empty">No health record has been entered for this person yet.</p>;
   return (
     <div className="page-stack health-record-view">
+      {health.importedForReview && (
+        <p className="public-manage-security-note" role="note">{HEALTH_IMPORTED_NOTICE}</p>
+      )}
       <section className="public-manage-card">
         <h3>Participant</h3>
         <dl className="detail-list">
@@ -59,6 +65,9 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
         <h3>Insurance</h3>
         <dl className="detail-list">
           <Row label="Covered by medical insurance" value={values.hasInsurance === "YES" ? "Yes" : "No"} />
+          {values.insuranceCardInCognito === true && (
+            <Row label="Insurance card" value="Uploaded on the old online form. Ask the parent to upload it again here." />
+          )}
           {values.hasInsurance === "YES" && (
             <>
               <Row label="Company" value={str(values, "insuranceCompany")} />
