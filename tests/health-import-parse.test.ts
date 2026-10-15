@@ -173,9 +173,9 @@ describe("mapping the Cognito columns to Health tab fields", () => {
         { firstName: "Sam", lastName: "Sample", phone: "(515) 555-0181", relationship: "Grandparent" },
       ],
     });
-    expect(entry.values).not.toHaveProperty("consent");
-    expect(entry.values).not.toHaveProperty("signature");
-    expect(entry.sections).toEqual(["tetanus", "allergies", "medications", "restrictions", "insurance", "guardian", "contacts"]);
+    expect(entry.values.consent).toEqual({ version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-09-20", importedFromOnlineForm: true });
+    expect(entry.values.signature).toEqual({ typedName: "Pat Sample", signedOn: "2026-09-20" });
+    expect(entry.sections).toEqual(["tetanus", "allergies", "medications", "restrictions", "insurance", "guardian", "contacts", "consent"]);
     expect(entry.needsCorrection).toEqual([]);
   });
 
@@ -240,17 +240,41 @@ describe("mapping the Cognito columns to Health tab fields", () => {
     expect(entries[4]!.values).not.toHaveProperty("medicalRestrictions");
   });
 
-  it("imports no consent and never reads the signature, whatever the form holds", () => {
+  it("imports the three consents only when the signature cell is not empty", () => {
     const { entries } = parse([
       mainRow({ PathfinderHealthRecord_Id: "1", Signature: "Pat Sample" }),
-      mainRow({ PathfinderHealthRecord_Id: "2", Signature: "https://storage.example.test/signature.png" }),
+      mainRow({ PathfinderHealthRecord_Id: "2", Signature: "" }),
+      mainRow({ PathfinderHealthRecord_Id: "3", Signature: "   " }),
     ]);
-    for (const entry of entries) {
+    expect(entries[0]!.values.consent).toMatchObject({ emergencyTreatment: true, activities: true, photocopy: true, importedFromOnlineForm: true, version: "cognito-pathfinder-health-record-2026" });
+    expect(entries[0]!.sections).toContain("consent");
+    for (const entry of entries.slice(1)) {
       expect(entry.values).not.toHaveProperty("consent");
       expect(entry.values).not.toHaveProperty("signature");
       expect(entry.sections).not.toContain("consent");
     }
-    expect(JSON.stringify(entries)).not.toMatch(/Pat Sample|signature\.png/);
+  });
+
+  it("counts an image link as signed but never keeps it: the typed name stays blank", () => {
+    const { entries } = parse([mainRow({ Signature: "https://storage.example.test/signature.png" }), mainRow({ PathfinderHealthRecord_Id: "2", Signature: "www.example.test/sig.png" })]);
+    for (const entry of entries) {
+      expect(entry.values.consent).toMatchObject({ emergencyTreatment: true, importedFromOnlineForm: true });
+      expect(entry.values.signature).toEqual({ typedName: "", signedOn: "2026-09-20" });
+    }
+    expect(JSON.stringify(entries)).not.toMatch(/signature\.png|sig\.png|storage\.example/);
+  });
+
+  it("takes the consent date from the Date column only, and leaves it blank when it does not parse", () => {
+    const { entries } = parse([
+      mainRow({ PathfinderHealthRecord_Id: "1", Date: "9/20/2026", Entry_DateSubmitted: "2026-09-01T10:00:00" }),
+      mainRow({ PathfinderHealthRecord_Id: "2", Date: "last Sunday", Entry_DateSubmitted: "2026-09-01T10:00:00" }),
+      mainRow({ PathfinderHealthRecord_Id: "3", Date: "", Entry_DateSubmitted: "2026-09-01T10:00:00" }),
+    ]);
+    expect(entries[0]!.values.consent).toMatchObject({ agreedOn: "2026-09-20" });
+    for (const entry of entries.slice(1)) {
+      expect(entry.values.consent).toMatchObject({ agreedOn: "" });
+      expect(entry.values.signature).toEqual({ typedName: "Pat Sample", signedOn: "" });
+    }
   });
 
   it("keeps text longer than the Health tab form's limit whole and flags it instead of cutting it", () => {

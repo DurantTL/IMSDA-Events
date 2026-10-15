@@ -20,6 +20,9 @@ import type { SheetRows } from "@/modules/health-records/import-files";
  * never dropped.
  */
 
+/** Stored on an imported consent so it shows as coming from the 2026 online form. */
+export const COGNITO_CONSENT_VERSION = "cognito-pathfinder-health-record-2026";
+
 /** The columns the importer cannot work without: who the entry is for and which club it belongs to. */
 const REQUIRED_MAIN_COLUMNS = [
   "PathfinderHealthRecord_Id", "Name_First", "Name_Last", "DateOfBirth", "ChurchAndClubName_First", "ChurchAndClubName_Last",
@@ -38,6 +41,7 @@ export const IMPORT_SECTION_LABELS = {
   insurance: "insurance",
   guardian: "guardian",
   contacts: "emergency contacts",
+  consent: "consent and signature",
 } as const;
 
 export type ImportSection = keyof typeof IMPORT_SECTION_LABELS;
@@ -266,9 +270,26 @@ function entryFrom(
     sections.add("contacts");
   }
 
-  // Consent and the signature are NOT imported (pending a human decision, #878). The three consents stay unset so a
-  // parent gives them through the private link, and the signature column is never read.
+  // Decided by Caleb Durant, 2026-10-15: a signed 2026 Cognito form counts as the three consents (emergency treatment,
+  // activities, photocopy). Only a non-empty `Signature` cell counts as signed; with none, no consent is imported.
+  // A typed name is kept as the signature; an image link is never kept or fetched (the typed name stays blank). The
+  // date is the form's `Date` column when it parses, otherwise blank.
   const submittedAt = importDate(row.Entry_DateSubmitted) ?? "";
+  const signatureCell = clean(row.Signature, 160);
+  if (signatureCell) {
+    const signedOn = importDate(row.Date) ?? "";
+    const isLink = /^(https?:|\/\/|www\.)/i.test(signatureCell);
+    values.consent = {
+      version: COGNITO_CONSENT_VERSION,
+      emergencyTreatment: true,
+      activities: true,
+      photocopy: true,
+      agreedOn: signedOn,
+      importedFromOnlineForm: true,
+    };
+    values.signature = { typedName: isLink ? "" : signatureCell, signedOn };
+    sections.add("consent");
+  }
 
   const guardianEmail = clean(row.GuardianEmail, 160).toLowerCase();
   const status = clean(row.Entry_Status, 40).toLowerCase();

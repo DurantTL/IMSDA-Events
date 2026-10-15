@@ -987,14 +987,27 @@ describe("a record imported from the 2026 online form (#878)", () => {
     expect(after).toMatchObject({ status: "CURRENT", importedForReview: false });
   });
 
-  it("holds no consent after the import and none after the director confirms", async () => {
-    state.fields = [];
+  it("shows the imported consent from the 2026 online form, and keeps it when the director confirms", async () => {
+    const { sealHealthField } = await import("@/modules/health-records/crypto");
+    const consent = { version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-09-20", importedFromOnlineForm: true };
+    state.fields = [
+      { recordId: "imported-1", fieldKey: "consent", sealedValue: sealHealthField("imported-1", "consent", consent) },
+      { recordId: "imported-1", fieldKey: "signature", sealedValue: sealHealthField("imported-1", "signature", { typedName: "", signedOn: "2026-09-20" }) },
+    ];
     const before = JSON.stringify(state.fields);
-    const view = await viewHealthRecord(leader, "club-a", "member-1", now);
-    expect(view.values).not.toHaveProperty("consent");
-    expect(view.values).not.toHaveProperty("signature");
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values.consent).toEqual(consent);
     await confirmHealthRecord(leader, "club-a", "member-1", now);
     expect(JSON.stringify(state.fields)).toBe(before);
+    const after = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(after.values.consent).toEqual(consent);
+    expect(after.status).toBe("CURRENT");
+  });
+
+  it("holds no consent for an imported record whose form was not signed, and confirm creates none", async () => {
+    state.fields = [];
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values).not.toHaveProperty("consent");
+    await confirmHealthRecord(leader, "club-a", "member-1", now);
+    expect(state.fields).toEqual([]);
     expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values).not.toHaveProperty("consent");
   });
 

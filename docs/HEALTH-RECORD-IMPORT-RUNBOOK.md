@@ -95,10 +95,14 @@ Imported records:
 - count as **needing confirmation** under the yearly re-confirmation rule: they
   read "Needs update" until the director saves or confirms them (either clears the
   mark);
-- carry **no consent and no signature**. Consent is not imported (see "Pending
-  decision" below), so the three consents stay unset and the parent gives them
-  through the private link. A director's Confirm does not create consent either;
-  the Health tab says "No consent has been given in the new system yet";
+- carry the **three consents** (emergency treatment, activities, photocopy) when the
+  entry's `Signature` cell is not empty, marked as imported from the 2026 online form
+  (version `cognito-pathfinder-health-record-2026`). A typed name is kept as the
+  signature; an image link counts as signed but is never stored or fetched, so the
+  typed name stays blank. The consent date is the form's `Date` column when it parses,
+  otherwise blank. With no signature, no consent is imported and the Health tab says
+  "No consent has been given in the new system yet"; a director's Confirm keeps an
+  imported consent and creates none;
 - keep the combined "insurance group and policy numbers" answer whole in the
   **Group number** field (it can't be split reliably) and leave **Policy number**
   for the director.
@@ -165,13 +169,21 @@ otherwise:
 - A four-digit number in a date column (a year such as 2019) is kept as typed. Only a
   five-digit Excel date serial (10000 to 60000) is read as a date.
 
-## Pending decision: consent
+## Decisions
 
-Whether the signed 2026 online form can stand in for the new consent statements is
-a decision for Caleb (a human). Until it is made, the importer imports **no consent
-and never reads the `Signature` column**. If it is later approved, the mapping is a
-change to `import-parser.ts` with a new consent version, reviewed like any
-medical-data change.
+**Decided by Caleb Durant, 2026-10-15: a signed 2026 Cognito form counts as consent.**
+Only a non-empty `Signature` cell counts as signed (a typed name or an image link).
+
+Also decided on 2026-10-15:
+
+- **Event health copies** (the sealed per-event copies taken at check-in or event
+  start, #924) may include imported records a director has not reviewed yet. That is
+  the current behaviour and is intended.
+- **Club year:** the forms apply to the **current** roster when the Pathfinder's name
+  matches. Matching stays as described above (name plus birth date or parent email,
+  current club year).
+- **Confirm is never blocked** by "needs correcting" flags or by unanswered
+  questions. A director can confirm an imported record as it stands.
 
 ## Checks
 

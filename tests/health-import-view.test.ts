@@ -37,6 +37,14 @@ describe("the Health tab for an imported record (#878)", () => {
     expect(render(health())).not.toContain("Imported from the 2026 online form");
   });
 
+  it("says an imported consent came from the 2026 online form, and says when there is none", () => {
+    const signed = render(health({ values: { consent: { importedFromOnlineForm: true }, signature: { typedName: "", signedOn: "2026-09-20" }, emergencyContacts: [] } }));
+    expect(signed).toContain("Signed on the 2026 online form on 2026-09-20. Imported from the 2026 online form.");
+    const typed = render(health({ values: { consent: { importedFromOnlineForm: true }, signature: { typedName: "Pat Sample", signedOn: "" }, emergencyContacts: [] } }));
+    expect(typed).toContain("Signed on the 2026 online form by Pat Sample. Imported");
+    expect(render(health({ values: { emergencyContacts: [] } }))).toContain("No consent has been given in the new system yet");
+  });
+
   it("asks for the insurance card again when one was uploaded on the old form, without any link", () => {
     const html = render(health());
     expect(html).toContain("Ask the parent to upload it again here.");

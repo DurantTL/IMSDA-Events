@@ -168,7 +168,8 @@ async function main() {
     assert(record.fields.length >= 10 && new Set(record.fields.map((field) => field.sealedValue)).size === record.fields.length, "each field is its own ciphertext");
   }
   assert(!stored.some((record) => record.rosterMemberId === casey.id), "an unselected member has no record");
-  assert(!stored.some((record) => record.fields.some((field) => field.fieldKey === "consent" || field.fieldKey === "signature")), "no consent and no signature is imported");
+  const consentRecords = stored.filter((record) => record.fields.some((field) => field.fieldKey === "consent"));
+  assert(consentRecords.length === stored.length, "every imported form here was signed, so each record has the imported consent sealed");
   const dump = JSON.stringify(stored) + JSON.stringify(await prisma.auditLog.findMany({ where: { actorUserId: adminUserId } }));
   for (const marker of importMarkers) assert(!dump.includes(marker), `"${marker}" is in no stored column or audit row`);
   assert(!/Riley|Morgan|Nobody|Verify Import/.test(JSON.stringify(await prisma.auditLog.findMany({ where: { actorUserId: adminUserId } }))), "no name is in any audit row");
@@ -182,9 +183,12 @@ async function main() {
   const directorView = await repo.viewHealthRecord(director, clubs.a, riley.id, now);
   assert(directorView.status === "NEEDS_UPDATE" && directorView.importedForReview === true, "the director sees an unreviewed import as Needs update");
   assert(directorView.values.allergyDetails === "Synthetic peanut reaction, mild, synthetic remedy", "the director reads the imported value");
+  const importedConsent = directorView.values.consent as { version?: string; importedFromOnlineForm?: boolean; emergencyTreatment?: boolean } | undefined;
+  assert(importedConsent?.version === "cognito-pathfinder-health-record-2026" && importedConsent.importedFromOnlineForm === true && importedConsent.emergencyTreatment === true, "the director sees the consent imported from the 2026 online form");
   assert(directorView.values.insuranceCardInCognito === true, "the card-on-file note is kept, without a link");
   await repo.confirmHealthRecord(director, clubs.a, riley.id, now);
   const confirmed = await repo.viewHealthRecord(director, clubs.a, riley.id, now);
+  assert((confirmed.values.consent as { importedFromOnlineForm?: boolean } | undefined)?.importedFromOnlineForm === true, "confirming keeps the imported consent");
   assert(confirmed.status === "CURRENT" && confirmed.importedForReview === false, "confirming clears the review notice");
   const morganFields = (await prisma.healthRecord.findUniqueOrThrow({ where: { rosterMemberId: morgan.id }, include: { fields: true } })).fields.map((field) => field.fieldKey);
   assert(morganFields.includes("phone") && morganFields.includes("emergencyContacts"), "a phone that fails the check is kept as entered, not dropped");

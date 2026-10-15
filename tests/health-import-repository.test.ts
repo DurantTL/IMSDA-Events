@@ -266,13 +266,25 @@ describe("applying the import", () => {
     expect(state.records.map((record) => record.rosterMemberId)).toEqual(["m1"]);
   });
 
-  it("writes no consent and no signature, so a parent gives consent through the private link", async () => {
-    await applySelected(files([mainRow({ Signature: "Pat Sample" })]));
+  it("seals the imported consent and signature when the form is signed, and none when it is not", async () => {
+    await applySelected(files([mainRow({ Signature: "Pat Sample", Date: "2026-09-20" })]));
+    const opened = openAll(state.records[0]!.id);
+    expect(opened.consent).toEqual({ version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-09-20", importedFromOnlineForm: true });
+    expect(opened.signature).toEqual({ typedName: "Pat Sample", signedOn: "2026-09-20" });
+    // Sealed like every other field: no plaintext in the stored rows.
+    expect(JSON.stringify(state.fields)).not.toMatch(/Pat Sample|cognito-pathfinder/);
+
+    state.records = [];
+    state.fields = [];
+    await applySelected(files([mainRow({ Signature: "" })]));
     const keys = state.fields.map((field) => field.fieldKey);
     expect(keys).not.toContain("consent");
     expect(keys).not.toContain("signature");
-    expect(Object.keys(openAll(state.records[0]!.id))).not.toContain("consent");
-    expect(JSON.stringify(openAll(state.records[0]!.id))).not.toMatch(/Pat Sample/);
+  });
+
+  it("keeps the consent out of the audit rows", async () => {
+    await applySelected(files([mainRow({ Signature: "Pat Sample" })]));
+    expect(JSON.stringify(state.audit)).not.toMatch(/Pat Sample|cognito-pathfinder|consent/i);
   });
 
   it("imports only what was previewed: a row whose match has changed is reported, not written", async () => {
