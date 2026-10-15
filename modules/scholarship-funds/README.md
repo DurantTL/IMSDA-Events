@@ -36,6 +36,10 @@ award with no sponsor draws on the fund in general; the matching view shows it o
 unallocated money minus general draws always equals the fund balance. A pledged award is the exception at creation
 (promised money is not checked), but must be covered by its own sponsor's money before it can be marked received.
 
+The pledge's sponsor must be the same sponsor as the contribution's: a directory church and the same name typed by hand
+are different sponsors, so money recorded under one does not cover a pledge made under the other. The workaround is to
+reverse the award and award it again under the sponsor the money was recorded under.
+
 ## Cancelled registrations
 
 Nothing is released automatically. A pledge can't be marked received while its registration is not submitted or

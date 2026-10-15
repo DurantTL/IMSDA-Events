@@ -47,7 +47,9 @@ export async function withSerializableRetry<T>(work: (tx: Client) => Promise<T>)
     try {
       return await getPrisma().$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
-      const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      // P2034 is Prisma's serialization failure; a locking raw query reports the same SQLSTATE (40001) as P2010.
+      const retryable = error instanceof Prisma.PrismaClientKnownRequestError
+        && (error.code === "P2034" || (error.code === "P2010" && JSON.stringify(error.meta ?? {}).includes("40001")));
       if (!retryable || attempt === 4) throw error;
     }
   }
@@ -312,8 +314,7 @@ export async function settlePledgedAward(eventId: string, awardId: string, actor
     const award = await tx.scholarshipAward.findFirst({
       where: { id: awardId, eventId },
       select: {
-        id: true, fundId: true, amountCents: true, pledged: true, settledAt: true, sponsorKey: true, sponsorName: true,
-        registration: { select: { status: true } },
+        id: true, fundId: true, registrationId: true, amountCents: true, pledged: true, settledAt: true, sponsorKey: true, sponsorName: true,
         adjustment: { select: { reversedBy: { select: { id: true } } } },
       },
     });
@@ -321,7 +322,11 @@ export async function settlePledgedAward(eventId: string, awardId: string, actor
     if (!award.pledged) throw new ScholarshipFundError("AWARD_NOT_PLEDGED", "That award was not marked pledged.");
     if (award.settledAt) throw new ScholarshipFundError("AWARD_ALREADY_SETTLED", "That pledge was already marked received.");
     if (award.adjustment.reversedBy) throw new ScholarshipFundError("AWARD_REVERSED", "That award was reversed, so there is nothing to settle.");
-    if (award.registration.status !== "SUBMITTED" && award.registration.status !== "CONFIRMED") {
+    // Lock the registration row, then read its status: a cancellation changes that row, so a settle and a cancellation
+    // can't both succeed (the loser waits, then sees the other's result or retries as a serialization failure).
+    await tx.$queryRaw`SELECT "id" FROM "Registration" WHERE "id" = ${award.registrationId} FOR UPDATE`;
+    const registration = await tx.registration.findUniqueOrThrow({ where: { id: award.registrationId }, select: { status: true } });
+    if (registration.status !== "SUBMITTED" && registration.status !== "CONFIRMED") {
       throw new ScholarshipFundError(
         "AWARD_REGISTRATION_INACTIVE",
         "That registration is no longer active, so its pledge can't be marked received. Reverse the scholarship to release the pledge instead.",
@@ -372,6 +377,8 @@ export type ContributionView = {
 
 export type AwardView = {
   id: string;
+  /** Groups the award with its sponsor in the matching view. Null when it draws on the fund in general. */
+  sponsorKey: string | null;
   registrationId: string;
   confirmationCode: string;
   sponsorName: string | null;
@@ -444,6 +451,7 @@ export async function getFundView(eventId: string): Promise<FundView> {
     })),
     awards: awards.map((award, index) => ({
       id: award.id,
+      sponsorKey: award.sponsorKey,
       registrationId: award.registrationId,
       confirmationCode: award.registration.confirmationCode,
       sponsorName: award.sponsorName,

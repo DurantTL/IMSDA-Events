@@ -82,6 +82,14 @@ export function ScholarshipFundWorkspace({
     await send(`${base}/awards/${encodeURIComponent(awardId)}/settle`, {}, "Unable to mark the pledge received.", "Pledge marked received.");
   }
 
+  const sponsorUnallocated = new Map(summary.sponsors.map((sponsor) => [sponsor.key, sponsor.unallocatedCents]));
+  /** Why "Mark received" is off, or null: the pledging sponsor's own money (and the fund) must cover it. */
+  const settleBlock = (award: FundView["awards"][number]) => {
+    const own = award.sponsorKey ? sponsorUnallocated.get(award.sponsorKey) ?? 0 : 0;
+    if (award.amountCents > own) return `${award.sponsorName ?? "This sponsor"} has only ${formatCents(Math.max(0, own))} unspent. Record their contribution first.`;
+    if (award.amountCents > summary.balanceCents) return "The fund doesn't hold enough yet. Record the contribution first.";
+    return null;
+  };
   const pledgedAwards = fund.awards.filter((award) => award.active && award.pledged && !award.settled && !award.registrationCancelled);
   return (
     <section className="page-stack">
@@ -168,8 +176,8 @@ export function ScholarshipFundWorkspace({
               <span><a className="text-link scholarship-fund-code-link" href={`/finance?event=${encodeURIComponent(eventId)}&registration=${encodeURIComponent(award.registrationId)}`}>{award.confirmationCode}</a></span>
               <span>{formatCents(award.amountCents)}</span>
               <span>
-                <button className="secondary-button" type="button" disabled={saving || award.amountCents > summary.balanceCents} onClick={() => settle(award.id)}>Mark received</button>
-                {award.amountCents > summary.balanceCents && <small>Record the contribution first.</small>}
+                <button className="secondary-button" type="button" disabled={saving || settleBlock(award) !== null} onClick={() => settle(award.id)}>Mark received</button>
+                {settleBlock(award) && <small>{settleBlock(award)}</small>}
               </span>
             </div>
           ))}

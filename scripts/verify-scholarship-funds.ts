@@ -23,6 +23,9 @@
  * - a cancelled registration: its pledge cannot be settled, its award is flagged, and only a fund-linked scholarship
  *   line (nothing else) can be reversed on it, returning the money to the fund; a church-billed registration refuses a
  *   fund award on the server;
+ * - two-way races on a sponsor's money: a sponsored award against a reversal of that sponsor's contribution, and a
+ *   settle against a reversal of the contribution covering it, each with exactly one winner and the fund and every sponsor
+ *   still at or above zero;
  * - the database itself refuses a negative contribution that is not a reversal, a pledge without a sponsor, a settled
  *   award that was never pledged, and a line whose fund belongs to another event;
  * - the finance export is formula-safe through csvCell and audited with counts only;
@@ -337,6 +340,44 @@ async function main() {
   assert(await totalCents(rBilled.id) === 30_000 && await prisma.scholarshipAward.count({ where: { eventId: eBilled } }) === 0, "and records nothing");
   await createRegistrationAdjustment(eBilled, rBilled.id, staff, { kind: "SCHOLARSHIP", amountCents: 1_000, reason: "Plain scholarship reason" });
   assert(await totalCents(rBilled.id) === 29_000, "a plain scholarship on a church-billed registration still works");
+
+  // ---- Two-way races on a sponsor's money: exactly one winner, and neither the fund nor any sponsor goes negative.
+  const refusedOrBusy = (outcome: unknown) => outcome instanceof ScholarshipFundError || (outcome as { code?: string } | null)?.code === "P2034";
+  const assertNonNegative = async (eventId: string, label: string) => {
+    const summary = (await getFundView(eventId)).summary;
+    assert(summary.balanceCents >= 0, `${label}: the fund stays at or above zero`);
+    assert(summary.sponsors.every((sponsor) => sponsor.unallocatedCents >= 0), `${label}: every sponsor stays at or above zero`);
+    assert(summary.sponsors.reduce((total, sponsor) => total + sponsor.unallocatedCents, 0) - summary.generalAwardedCents === summary.balanceCents, `${label}: per-sponsor figures still add up to the balance`);
+  };
+  for (let round = 0; round < 3; round += 1) {
+    const eA = await mkEvent();
+    const covering = await contribute(eA, 10_000, { sponsorName: "Race Sponsor S" });
+    await contribute(eA, 20_000, { sponsorName: "Race Sponsor T" });
+    const regA = await mkRegistration(eA, 300);
+    const outcomesA = await Promise.all([
+      award(eA, regA.id, 10_000, { pledged: false, sponsorName: "Race Sponsor S" }).then(() => "award", (caught: unknown) => caught),
+      reverseContribution(eA, covering, staff, "Check bounced").then(() => "reversal", (caught: unknown) => caught),
+    ]);
+    const winnersA = outcomesA.filter((outcome) => outcome === "award" || outcome === "reversal");
+    assert(winnersA.length === 1, `a sponsored award and the reversal of that sponsor's money have exactly one winner (round ${round}: ${outcomesA.map(String).join(", ")})`);
+    assert(outcomesA.filter((outcome) => outcome !== "award" && outcome !== "reversal").every(refusedOrBusy), `the loser is refused or told to retry (round ${round})`);
+    await assertNonNegative(eA, `award vs reversal (round ${round})`);
+
+    const eB = await mkEvent();
+    const coveringB = await contribute(eB, 5_000, { sponsorName: "Race Sponsor S" });
+    await contribute(eB, 20_000, { sponsorName: "Race Sponsor T" });
+    const regB = await mkRegistration(eB, 300);
+    await award(eB, regB.id, 5_000, { pledged: true, sponsorName: "Race Sponsor S" });
+    const pledgeB = (await awardRow(regB.id))!;
+    const outcomesB = await Promise.all([
+      settlePledgedAward(eB, pledgeB.id, staff).then(() => "settle", (caught: unknown) => caught),
+      reverseContribution(eB, coveringB, staff, "Check bounced").then(() => "reversal", (caught: unknown) => caught),
+    ]);
+    const winnersB = outcomesB.filter((outcome) => outcome === "settle" || outcome === "reversal");
+    assert(winnersB.length === 1, `a settle and the reversal of its covering contribution have exactly one winner (round ${round}: ${outcomesB.map(String).join(", ")})`);
+    assert(outcomesB.filter((outcome) => outcome !== "settle" && outcome !== "reversal").every(refusedOrBusy), `the loser is refused or told to retry (round ${round})`);
+    await assertNonNegative(eB, `settle vs reversal (round ${round})`);
+  }
 
   // ---- The database refuses what the application never writes.
   const fund1 = await prisma.scholarshipFund.findUniqueOrThrow({ where: { eventId: e1 }, select: { id: true } });
