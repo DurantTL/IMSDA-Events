@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   rejectCrossOriginRequest: vi.fn(),
   requireSystemAdministrator: vi.fn(),
+  requirePermission: vi.fn(),
+  getCurrentSession: vi.fn(),
   linkCalendarEntryToEvent: vi.fn(),
   unlinkCalendarEntry: vi.fn(),
   dismissPossibleMatch: vi.fn(),
@@ -14,6 +16,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
 vi.mock("@/modules/organizations/access", () => ({ requireSystemAdministrator: mocks.requireSystemAdministrator }));
+vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
+vi.mock("@/modules/access/authorization", async () => {
+  const actual = await vi.importActual<typeof import("@/modules/access/authorization")>("@/modules/access/authorization");
+  return { ...actual, requirePermission: mocks.requirePermission };
+});
+vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
 vi.mock("@/modules/calendar/event-links", () => ({
   linkCalendarEntryToEvent: mocks.linkCalendarEntryToEvent,
   unlinkCalendarEntry: mocks.unlinkCalendarEntry,
@@ -43,8 +51,6 @@ const calls = () => [
   () => LINK(request({ action: "link", eventId: "event-1" }), entryCtx),
   () => LINK(request({ action: "unlink" }), entryCtx),
   () => LINK(request({ action: "notSame", eventId: "event-1" }), entryCtx),
-  () => DATE_CHANGE(request({ decision: "update", ...dates }), eventCtx),
-  () => DATE_CHANGE(request({ decision: "keep", ...dates }), eventCtx),
 ];
 const writers = [mocks.linkCalendarEntryToEvent, mocks.unlinkCalendarEntry, mocks.dismissPossibleMatch, mocks.resolveCalendarDateChange];
 
@@ -52,6 +58,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.requireSystemAdministrator.mockResolvedValue({ id: "admin-1" });
+  mocks.requirePermission.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });
+  mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1" } });
   for (const writer of writers) writer.mockResolvedValue(undefined);
   mocks.listCalendarEntries.mockResolvedValue([]);
   mocks.listCalendarEvents.mockResolvedValue([]);
@@ -66,8 +74,9 @@ describe("calendar item and event link routes (#445)", () => {
 
   it("refuses cross-origin writes before checking anything else", async () => {
     mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({}, { status: 403 }));
-    for (const call of calls()) expect((await call()).status).toBe(403);
+    for (const call of [...calls(), () => DATE_CHANGE(request({ decision: "keep", ...dates }), eventCtx)]) expect((await call()).status).toBe(403);
     expect(mocks.requireSystemAdministrator).not.toHaveBeenCalled();
+    expect(mocks.requirePermission).not.toHaveBeenCalled();
     for (const writer of writers) expect(writer).not.toHaveBeenCalled();
   });
 
@@ -96,6 +105,22 @@ describe("calendar item and event link routes (#445)", () => {
     expect((await LINK(request({ action: "link", eventId: "event-1" }), entryCtx)).status).toBe(404);
     mocks.linkCalendarEntryToEvent.mockRejectedValueOnce(new CalendarError("NOT_LINKABLE", "No."));
     expect((await LINK(request({ action: "link", eventId: "event-1" }), entryCtx)).status).toBe(409);
+  });
+
+  it("lets whoever may configure the event answer, and nobody else, checked through event membership", async () => {
+    // The event's own Event Admin (not a system administrator) is let in by the same check event settings use.
+    mocks.requirePermission.mockResolvedValue({ user: { id: "event-admin-1", globalRole: null } });
+    expect((await DATE_CHANGE(request({ decision: "keep", ...dates }), eventCtx)).status).toBe(200);
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "CONFIGURE_EVENT", expect.any(Function));
+    expect(mocks.resolveCalendarDateChange).toHaveBeenCalledWith("event-1", "keep", dates, "event-admin-1");
+    // Anyone else is refused before anything is written.
+    mocks.resolveCalendarDateChange.mockClear();
+    mocks.requirePermission.mockRejectedValue(new AccessDeniedError("No.", 403, "PERMISSION_DENIED"));
+    expect((await DATE_CHANGE(request({ decision: "update", ...dates }), eventCtx)).status).toBe(403);
+    expect(mocks.resolveCalendarDateChange).not.toHaveBeenCalled();
+    // Linking and unlinking stay with system administrators.
+    mocks.requireSystemAdministrator.mockRejectedValue(new AccessDeniedError("No.", 403, "PERMISSION_DENIED"));
+    expect((await LINK(request({ action: "unlink" }), entryCtx)).status).toBe(403);
   });
 
   it("applies a date decision only with the dates the staff member saw", async () => {

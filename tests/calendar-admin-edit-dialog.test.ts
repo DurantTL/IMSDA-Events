@@ -32,6 +32,7 @@ const entry: CalendarAdminEntry = {
   canLinkToEvent: true,
   linkedEvent: null,
   datesDifferFromEvent: false,
+  linkedIneligible: false,
   possibleMatch: null,
 };
 

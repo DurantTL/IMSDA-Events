@@ -36,8 +36,6 @@ import { DeleteEventDialog } from "@/components/delete-event-dialog";
 import { SubmitButton } from "@/components/submit-button";
 import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { DraftCreatedGuideBanner } from "@/components/draft-created-guide-banner";
-import { CalendarLinkBanner } from "@/components/calendar-link-banner";
-import type { CalendarLinkNotice } from "@/modules/calendar/event-links";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { FormErrorSummary } from "@/components/form-error-summary";
 import { SettingsBlock } from "@/components/settings-block";
@@ -71,10 +69,6 @@ type EventSettingsWorkspaceProps = {
   canDeleteEvent?: boolean;
   /** Create mode, opened from a calendar item (#445): what the form starts with. The item's id travels with the save. */
   calendarPrefill?: CalendarPrefill;
-  /** Edit mode: what the event's linked calendar item needs staff to look at (#445). */
-  linkNotice?: CalendarLinkNotice | null;
-  /** Whether to offer Update / Keep on the banner: system administrators only. The server decides again. */
-  canAnswerCalendarDates?: boolean;
 };
 
 export type CalendarPrefill = { entryId: string; title: string; startsOn: string; endsOn: string; location: string };
@@ -173,11 +167,13 @@ export function EventSettingsWorkspace({
   areaCoordinators,
   canDeleteEvent = false,
   calendarPrefill,
-  linkNotice = null,
-  canAnswerCalendarDates = false,
 }: EventSettingsWorkspaceProps) {
   const [draft, setDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
   const [savedDraft, setSavedDraft] = useState<EventSettingsInput>(() => startingDraft(initialEvent, calendarPrefill));
+  // The version of the event this form was loaded from (or last saved as). A save sends it back, and the server
+  // refuses it if the event changed meanwhile (for example its dates, after Update on the calendar banner), so a
+  // stale form can never write old values over newer ones.
+  const [version, setVersion] = useState<string | null>(initialEvent?.updatedAt ?? null);
   const [setupWarnings, setSetupWarnings] = useState(initialEvent?.warnings ?? []);
   const [publishedFormCount, setPublishedFormCount] = useState(initialEvent?.publishedFormCount ?? 0);
   // Publishing and unpublishing are their own actions (#471), never a side
@@ -286,6 +282,7 @@ export function EventSettingsWorkspace({
           body: JSON.stringify({
             ...draft,
             ...(mode === "create" && calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}),
+            ...(mode === "edit" && version ? { expectedUpdatedAt: version } : {}),
             location: draft.location || null,
             publicInfoUrl: draft.publicInfoUrl || null,
             supportContact: draft.supportContact || null,
@@ -324,6 +321,7 @@ export function EventSettingsWorkspace({
       setSavedDraft(nextDraft);
       setPublishedFormCount(result.event.publishedFormCount);
       setPublished(result.event.isPublished);
+      setVersion(result.event.updatedAt);
       setSetupWarnings(result.event.warnings ?? []);
       const nextReadiness = getEventPublishReadiness(nextDraft, result.event.publishedFormCount);
       const nextStep = result.event.isPublished
@@ -442,6 +440,7 @@ export function EventSettingsWorkspace({
         throw new Error(result.message ?? "The event could not be published.");
       }
       setPublished(result.event.isPublished);
+      setVersion(result.event.updatedAt);
       setSetupWarnings(result.event.warnings ?? []);
       setPublishDialogOpen(false);
       const warnings = result.warnings ?? [];
@@ -478,6 +477,7 @@ export function EventSettingsWorkspace({
         throw new Error(result.message ?? "The event could not be unpublished.");
       }
       setPublished(result.event.isPublished);
+      setVersion(result.event.updatedAt);
       setSetupWarnings(result.event.warnings ?? []);
       setUnpublishDialogOpen(false);
       setNotice("Event unpublished. Every public registration form is now closed.");
@@ -717,9 +717,6 @@ export function EventSettingsWorkspace({
     <section className="page-stack event-settings-workspace">
       {mode === "edit" && initialEvent && (
         <DraftCreatedGuideBanner eventId={initialEvent.id} />
-      )}
-      {mode === "edit" && initialEvent && linkNotice && (
-        <CalendarLinkBanner eventId={initialEvent.id} notice={linkNotice} canAnswer={canAnswerCalendarDates} />
       )}
       <div className="page-intro">
         <div>

@@ -35,6 +35,11 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
           {entry.datesDifferFromEvent ? " This item's dates differ from the event's; the event's page asks staff to update or keep them." : ""}
           {entry.sourceRemovedAt ? " Google no longer lists this item. The event was not changed." : ""}
         </p>
+        {entry.linkedIneligible && (
+          <p data-testid="calendar-linked-ineligible">
+            <strong>Check this link.</strong> This item is now a deadline, a closure or a repeating item, which can&apos;t stand in for a registration event. It stays linked until you unlink it.
+          </p>
+        )}
         <Link className="secondary-button" href={`/more/event-settings?event=${encodeURIComponent(event.id)}`}>Open event</Link>
         <button
           className="secondary-button"
@@ -84,7 +89,7 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
         </>
       )}
       <Link aria-label={`Add registration for ${entry.title}`} className="secondary-button" href={addHref}>Add registration</Link>
-      {!match && !picking && (
+      {!picking && (
         <button className="secondary-button" disabled={saving || choices.length === 0} onClick={() => setPicking(true)} type="button">
           Link to existing event
         </button>

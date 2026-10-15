@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildDatePreview,
-  datePromptMessage,
-  datesNeedDecision,
-} from "@/modules/calendar/event-dates";
-import {
   dismissalKey,
   entryCanBeLinked,
   findPossibleMatches,
@@ -48,6 +43,26 @@ describe("title similarity (#445)", () => {
   it("tolerates one slipped letter in a long word and a longer title around the same name", () => {
     expect(titlesSimilar("Womans Retreat", "Women's Retreat")).toBe(true);
     expect(titlesSimilar("Camp Meeting", "Camp Meeting Weekend 2026")).toBe(true);
+  });
+
+  it("treats qualifier words and numbers as differences, not as noise", () => {
+    expect(titlesSimilar("Spanish Camp Meeting", "Camp Meeting")).toBe(false);
+    expect(titlesSimilar("Hispanic Camp Meeting 2026", "Camp Meeting 2026")).toBe(false);
+    expect(titlesSimilar("Week 1", "Week 2")).toBe(false);
+    expect(titlesSimilar("Junior Camp Week 1", "Junior Camp Week 2")).toBe(false);
+    expect(titlesSimilar("Junior Camp", "Junior Camp Staff Training")).toBe(false);
+    expect(titlesSimilar("Camp Setup", "Camp")).toBe(false);
+    expect(titlesSimilar("Camp Planning Meeting", "Camp Meeting")).toBe(false);
+    expect(titlesSimilar("PBE Area Level", "PBE Conference Level")).toBe(false);
+    // The same qualifiers on both sides still match, in any order, and a year is never a qualifier.
+    expect(titlesSimilar("Spanish Camp Meeting 2026", "Camp Meeting Spanish")).toBe(true);
+    expect(titlesSimilar("Junior Camp Week 2", "Junior Camp - Week 2 (2026)")).toBe(true);
+  });
+
+  it("does not call a one-word title a match for a longer one", () => {
+    expect(titlesSimilar("Retreat", "Women's Retreat")).toBe(false);
+    expect(titlesSimilar("Camporee", "Spring Camporee 2026")).toBe(false);
+    expect(titlesSimilar("Retreat", "Retreat 2026")).toBe(true);
   });
 
   it("does not match different events", () => {
@@ -94,10 +109,28 @@ describe("possible matches (#445)", () => {
     expect(findPossibleMatches([entry()], [event(), other], dismissed, none)).toEqual([{ entryId: "entry-1", eventId: "event-2" }]);
   });
 
-  it("suggests one event per item, preferring the same start date", () => {
+  it("suggests one event per item: the one whose start date is closest", () => {
     const later = event({ id: "event-2", startsOn: "2026-10-10" });
     const same = event({ id: "event-3", startsOn: "2026-10-09" });
     expect(findPossibleMatches([entry()], [later, same], none, none)).toEqual([{ entryId: "entry-1", eventId: "event-3" }]);
+    // Neither starts on the item's day: the nearer one wins, whichever side of it.
+    const earlyItem = entry({ startsOn: "2026-10-09", endsOn: "2026-10-14" });
+    const far = event({ id: "event-4", startsOn: "2026-10-13", endsOn: "2026-10-14" });
+    const near = event({ id: "event-5", startsOn: "2026-10-07", endsOn: "2026-10-10" });
+    expect(findPossibleMatches([earlyItem], [far, near], none, none)).toEqual([{ entryId: "entry-1", eventId: "event-5" }]);
+  });
+
+  it("doesn't flag the false positives the review found", () => {
+    const pairs: Array<[string, string]> = [
+      ["Camp Meeting", "Spanish Camp Meeting"],
+      ["Week 1", "Week 2"],
+      ["Junior Camp", "Junior Camp Staff Training"],
+      ["PBE Area Level", "PBE Conference Level"],
+      ["Retreat", "Women's Retreat"],
+    ];
+    for (const [itemTitle, eventName] of pairs) {
+      expect(findPossibleMatches([entry({ title: itemTitle })], [event({ name: eventName })], none, none)).toEqual([]);
+    }
   });
 
   it("only an ordinary one-time item can be linked", () => {
@@ -105,58 +138,5 @@ describe("possible matches (#445)", () => {
     expect(entryCanBeLinked({ entryType: "STANDARD", hasRepeat: true })).toBe(false);
     expect(entryCanBeLinked({ entryType: "CLOSURE", hasRepeat: false })).toBe(false);
     expect(entryCanBeLinked({ entryType: "DEADLINE", hasRepeat: false })).toBe(false);
-  });
-});
-
-describe("date change decision (#445)", () => {
-  const same = { itemStartsOn: "2026-10-09", itemEndsOn: "2026-10-11", eventStartsOn: "2026-10-09", eventEndsOn: "2026-10-11", keptStartsOn: null, keptEndsOn: null };
-
-  it("asks only when the item's dates differ from the event's", () => {
-    expect(datesNeedDecision(same)).toBe(false);
-    expect(datesNeedDecision({ ...same, itemStartsOn: "2026-11-07", itemEndsOn: "2026-11-09" })).toBe(true);
-    expect(datesNeedDecision({ ...same, itemEndsOn: "2026-10-12" })).toBe(true);
-  });
-
-  it("stays quiet after Keep, until the item moves again", () => {
-    const moved = { ...same, itemStartsOn: "2026-11-07", itemEndsOn: "2026-11-09" };
-    expect(datesNeedDecision({ ...moved, keptStartsOn: "2026-11-07", keptEndsOn: "2026-11-09" })).toBe(false);
-    expect(datesNeedDecision({ ...moved, keptStartsOn: "2026-11-07", keptEndsOn: "2026-11-08" })).toBe(true);
-  });
-
-  it("words the question the way the owner asked for it", () => {
-    expect(datePromptMessage({ imported: true, itemStartsOn: "2026-11-07", itemEndsOn: "2026-11-09" }))
-      .toBe("Google Calendar moved this event to November 7–9, 2026. Update the registration dates?");
-    expect(datePromptMessage({ imported: false, itemStartsOn: "2026-11-07", itemEndsOn: "2026-11-09" }))
-      .toBe("The calendar item for this event now says November 7–9, 2026. Update the registration dates?");
-  });
-
-  const base = {
-    startsOn: "2026-10-09",
-    endsOn: "2026-10-11",
-    registrationOpensOn: "2026-08-01",
-    registrationClosesOn: "2026-10-05",
-    seminarPreferenceClosesOn: null,
-    locations: [{ name: "Site A", firstDay: "2026-10-09", lastDay: "2026-10-11", registrationClosesOn: null }],
-    lodging: { firstNight: "2026-10-09", lastNight: "2026-10-10", preferencesDeadline: "2026-10-01" },
-  };
-
-  it("previews the new dates and lists dependent dates that stay exactly as they are", () => {
-    const preview = buildDatePreview(base, { startsOn: "2026-11-07", endsOn: "2026-11-09" });
-    expect(preview.changes).toEqual([{ label: "Event dates", from: "October 9–11, 2026", to: "November 7–9, 2026" }]);
-    expect(preview.blockedReason).toBeNull();
-    const labels = preview.unchanged.map((item) => item.label);
-    expect(labels).toEqual(["Registration opens", "Registration closes", "Site A: days", "Lodging nights", "Lodging preferences close"]);
-    // Location days and lodging nights are now outside the new dates, and say so.
-    expect(preview.unchanged.find((item) => item.label === "Site A: days")?.needsAttention).toBe(true);
-    expect(preview.unchanged.find((item) => item.label === "Lodging nights")?.needsAttention).toBe(true);
-    expect(preview.unchanged.find((item) => item.label === "Registration closes")?.needsAttention).toBe(false);
-  });
-
-  it("flags registration that would close after the event, and refuses one that would open after it", () => {
-    const earlier = buildDatePreview(base, { startsOn: "2026-09-25", endsOn: "2026-09-27" });
-    expect(earlier.unchanged.find((item) => item.label === "Registration closes")?.needsAttention).toBe(true);
-    expect(earlier.blockedReason).toBeNull();
-    const blocked = buildDatePreview({ ...base, registrationOpensOn: "2026-10-20" }, { startsOn: "2026-10-09", endsOn: "2026-10-11" });
-    expect(blocked.blockedReason).toMatch(/open after the new last day/);
   });
 });

@@ -5819,10 +5819,11 @@ model CalendarEntry {
   linkedEventId             String?             @unique
   linkedAt                  DateTime?
   linkedByUserId            String?
-  /// The item dates staff chose to keep the event's current dates against ("Keep current dates"). The event's
-  /// date-change banner stays away until the item's dates differ from these again.
-  keptStartsOn              String?
-  keptEndsOn                String?
+  /// The item's dates when staff last acknowledged them (#445): set when the item is linked, if they matched the
+  /// event's then, and at every Update or Keep. The event's date banner appears only when the item's dates move away
+  /// from these. Null while the item and event have differed since linking ("differs", not "moved").
+  baselineStartsOn          String?
+  baselineEndsOn            String?
   createdByUserId String
   updatedByUserId String
   createdAt       DateTime            @default(now())

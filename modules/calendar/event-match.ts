@@ -35,10 +35,20 @@ function withinOneEdit(a: string, b: string) {
   return a.length > b.length ? a.slice(i + 1) === b.slice(i) : b.slice(i + 1) === a.slice(i);
 }
 
+/**
+ * Words that name a different event rather than the same one: "Spanish Camp Meeting" is not "Camp Meeting",
+ * "Junior Camp Staff Training" is not "Junior Camp", and "Week 1" is not "Week 2". Numbers count too. If the two
+ * titles don't carry exactly the same qualifiers they are not similar, whatever else they share.
+ */
+const qualifierWords = new Set(["spanish", "hispanic", "week", "staff", "training", "setup", "planning", "level"]);
+const isQualifier = (token: string) => qualifierWords.has(token) || /^\d+$/.test(token);
+
 /** True when two titles very probably name the same thing. */
 export function titlesSimilar(first: string, second: string) {
-  const a = titleTokens(first);
-  const b = titleTokens(second);
+  const all = [titleTokens(first), titleTokens(second)];
+  const [qualifiersA, qualifiersB] = all.map((tokens) => tokens.filter(isQualifier).sort().join(" "));
+  if (qualifiersA !== qualifiersB) return false;
+  const [a, b] = all.map((tokens) => tokens.filter((token) => !isQualifier(token)));
   if (a.length === 0 || b.length === 0) return false;
   const unused = [...b];
   let matched = 0;
@@ -50,8 +60,10 @@ export function titlesSimilar(first: string, second: string) {
     }
   }
   const smaller = Math.min(a.length, b.length);
+  // A one-word title says too little to call another title a match: only the same word will do ("Retreat" is not "Women's Retreat").
+  if (smaller < 2) return matched === smaller && a.length === b.length;
   // One title wholly inside the other ("Camp Meeting" in "Camp Meeting Weekend"), or most words shared.
-  if (matched === smaller && smaller >= 2) return true;
+  if (matched === smaller) return true;
   return (2 * matched) / (a.length + b.length) >= 0.6;
 }
 
@@ -101,11 +113,16 @@ export function findPossibleMatches(
         && !dismissed.has(dismissalKey(entry.id, event.id))
         && datesOverlap(entry, event)
         && titlesSimilar(entry.title, event.name))
-      .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name));
-    const best = candidates.find((event) => event.startsOn === entry.startsOn) ?? candidates[0];
+      .sort((a, b) => startGap(entry, a) - startGap(entry, b) || a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name));
+    const best = candidates[0];
     if (best) matches.push({ entryId: entry.id, eventId: best.id });
   }
   return matches;
+}
+
+/** Days between two start dates, whichever comes first. */
+function startGap(entry: { startsOn: string }, event: { startsOn: string }) {
+  return Math.abs(Date.parse(`${entry.startsOn}T00:00:00Z`) - Date.parse(`${event.startsOn}T00:00:00Z`)) / 86_400_000;
 }
 
 export function dismissalKey(entryId: string, eventId: string) {

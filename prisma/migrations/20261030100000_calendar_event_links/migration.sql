@@ -3,8 +3,8 @@
 -- clears it (ON DELETE SET NULL) and the item shows on its own again.
 
 -- AlterTable
-ALTER TABLE "CalendarEntry" ADD COLUMN     "keptEndsOn" TEXT,
-ADD COLUMN     "keptStartsOn" TEXT,
+ALTER TABLE "CalendarEntry" ADD COLUMN     "baselineEndsOn" TEXT,
+ADD COLUMN     "baselineStartsOn" TEXT,
 ADD COLUMN     "linkedAt" TIMESTAMP(3),
 ADD COLUMN     "linkedByUserId" TEXT,
 ADD COLUMN     "linkedEventId" TEXT;
@@ -34,6 +34,6 @@ ALTER TABLE "CalendarEventMatchDismissal" ADD CONSTRAINT "CalendarEventMatchDism
 -- AddForeignKey
 ALTER TABLE "CalendarEventMatchDismissal" ADD CONSTRAINT "CalendarEventMatchDismissal_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- The two kept dates are chosen together or not at all.
-ALTER TABLE "CalendarEntry" ADD CONSTRAINT "CalendarEntry_kept_dates_paired_check"
-  CHECK (("keptStartsOn" IS NULL) = ("keptEndsOn" IS NULL));
+-- The two baseline dates are set together or not at all.
+ALTER TABLE "CalendarEntry" ADD CONSTRAINT "CalendarEntry_baseline_dates_paired_check"
+  CHECK (("baselineStartsOn" IS NULL) = ("baselineEndsOn" IS NULL));

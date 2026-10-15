@@ -8,8 +8,6 @@ import { formatDateRange } from "@/modules/calendar/domain";
 type CalendarLinkBannerProps = {
   eventId: string;
   notice: CalendarLinkNotice;
-  /** Update and Keep are offered to system administrators only; the server checks again. */
-  canAnswer: boolean;
 };
 
 /**
@@ -17,13 +15,16 @@ type CalendarLinkBannerProps = {
  * (Google moved it, or staff edited it), nothing changes on its own: the banner
  * asks, previews what Update changes and what it leaves alone, and applies
  * only the choice a staff member clicks. A removed item only warns.
+ *
+ * After an answer the page is loaded again with `calendarDates=updated|kept`, which
+ * remounts the settings form with the event's current dates (so a later save can't
+ * write the old ones back) and shows the confirmation (`CalendarDatesConfirmation`).
  */
-export function CalendarLinkBanner({ eventId, notice, canAnswer }: CalendarLinkBannerProps) {
+export function CalendarLinkBanner({ eventId, notice }: CalendarLinkBannerProps) {
   const router = useRouter();
   const prompt = notice.datePrompt;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState<"update" | "keep" | null>(null);
 
   async function answer(decision: "update" | "keep") {
     if (!prompt) return;
@@ -37,12 +38,10 @@ export function CalendarLinkBanner({ eventId, notice, canAnswer }: CalendarLinkB
       });
       const body = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) throw new Error(body.message ?? "That could not be saved.");
-      setDone(decision);
-      // The event's dates are part of the form below, so load them again.
-      if (decision === "update") router.refresh();
+      router.replace(`/more/event-settings?event=${encodeURIComponent(eventId)}&calendarDates=${decision === "update" ? "updated" : "kept"}`);
+      router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That could not be saved.");
-    } finally {
       setBusy(false);
     }
   }
@@ -54,13 +53,7 @@ export function CalendarLinkBanner({ eventId, notice, canAnswer }: CalendarLinkB
           <p>This event&apos;s calendar item is no longer in Google Calendar. The registration event is unchanged: it was not removed or cancelled. Decide whether it should still go ahead.</p>
         </div>
       )}
-      {done === "keep" && (
-        <div className="inline-notice calendar-link-banner" role="status">Keeping the current registration dates. This is recorded in the event&apos;s history.</div>
-      )}
-      {done === "update" && (
-        <div className="inline-notice calendar-link-banner" role="status">Registration dates updated. This is recorded in the event&apos;s history. Check the dates listed below as unchanged.</div>
-      )}
-      {prompt && !done && (
+      {prompt && (
         <section className="inline-notice clone-warning calendar-link-banner" role="region" aria-label="Calendar date change" data-testid="calendar-date-banner">
           <p><strong>{prompt.message}</strong></p>
           <dl className="calendar-link-preview">
@@ -83,21 +76,29 @@ export function CalendarLinkBanner({ eventId, notice, canAnswer }: CalendarLinkB
               </ul>
             </>
           )}
+          {prompt.preview.notes.map((note) => <p key={note}>{note}</p>)}
           <p>{prompt.pricingNote}</p>
           {prompt.preview.blockedReason && <p className="form-error" role="alert">{prompt.preview.blockedReason}</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
-          {canAnswer ? (
-            <div className="calendar-link-actions">
-              <button className="primary-button" disabled={busy || prompt.preview.blockedReason !== null} onClick={() => answer("update")} type="button">
-                Update to {formatDateRange(prompt.itemStartsOn, prompt.itemEndsOn)}
-              </button>
-              <button className="secondary-button" disabled={busy} onClick={() => answer("keep")} type="button">Keep current dates</button>
-            </div>
-          ) : (
-            <p>A system administrator chooses whether to update the dates or keep them.</p>
-          )}
+          <div className="calendar-link-actions">
+            <button className="primary-button" disabled={busy || prompt.preview.blockedReason !== null} onClick={() => answer("update")} type="button">
+              Update to {formatDateRange(prompt.itemStartsOn, prompt.itemEndsOn)}
+            </button>
+            <button className="secondary-button" disabled={busy} onClick={() => answer("keep")} type="button">Keep current dates</button>
+          </div>
         </section>
       )}
+    </div>
+  );
+}
+
+/** The confirmation shown after Update or Keep, from the page's own address, so it survives the reload. */
+export function CalendarDatesConfirmation({ outcome }: { outcome: "updated" | "kept" }) {
+  return (
+    <div className="inline-notice calendar-link-banner" role="status" data-testid="calendar-dates-confirmation">
+      {outcome === "updated"
+        ? "Registration dates updated to match the calendar. This is recorded in the event's history. Check the dates listed as unchanged in the question you just answered."
+        : "Keeping the current registration dates. This is recorded in the event's history."}
     </div>
   );
 }

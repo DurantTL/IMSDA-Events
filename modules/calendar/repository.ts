@@ -85,6 +85,8 @@ export async function listPublicCalendarItems(
   const publishedLinked = linkedEventIds.length === 0
     ? new Set<string>()
     : new Set((await prisma.event.findMany({
+      // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event must not hide its
+      // item). Whichever of #445 and #635 merges second adds it.
       where: { id: { in: linkedEventIds }, isPublished: true },
       select: { id: true },
     })).map((event) => event.id));
@@ -186,6 +188,8 @@ export async function listCalendarEntries(now = new Date()) {
     ? [[], []]
     : await Promise.all([
       prisma.event.findMany({
+        // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event is not a match
+        // candidate). Whichever of #445 and #635 merges second adds it.
         where: { endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) } },
         select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, isPublished: true },
       }),
@@ -253,6 +257,8 @@ export async function listCalendarEntries(now = new Date()) {
     locallyEditedFields: entry.locallyEditedFields,
     updatedAt: entry.updatedAt.toISOString(),
     /** An ordinary one-off item: the only kind that can stand in for a registration event (#445). */
+    /** Linked, but a refresh or an edit since made it a Deadline, closure or repeating item. Never unlinked automatically. */
+    linkedIneligible: entry.linkedEventId !== null && !entryCanBeLinked({ entryType: entry.entryType, hasRepeat: entry.repeatRule !== null }),
     canLinkToEvent: entryCanBeLinked({ entryType: entry.entryType, hasRepeat: entry.repeatRule !== null }),
     linkedEvent,
     /** Linked, and the item's dates are not the event's: the event shows a banner asking staff to choose. */
@@ -267,6 +273,8 @@ export type CalendarAdminEvent = Awaited<ReturnType<typeof listCalendarEvents>>[
 /** Events that haven't ended (plus the last month), with whether each shows on the calendar. */
 export async function listCalendarEvents(now = new Date()) {
   const events = await getPrisma().event.findMany({
+    // TODO(#635): add `archivedAt: null` here once `Event.archivedAt` exists (an archived event is not offered to
+    // link to). Whichever of #445 and #635 merges second adds it.
     where: { endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
     orderBy: { startsAt: "asc" },
     select: { ...publicEventSelect, showOnCalendar: true, calendarEntryLink: { select: { id: true, title: true } } },

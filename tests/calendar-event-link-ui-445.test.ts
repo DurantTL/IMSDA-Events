@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
-import { CalendarLinkBanner } from "@/components/calendar-link-banner";
+import { CalendarDatesConfirmation, CalendarLinkBanner } from "@/components/calendar-link-banner";
 import { EventSettingsWorkspace } from "@/components/event-settings-workspace";
 import { StartFromTemplate } from "@/components/start-from-template";
 import type { CalendarLinkNotice } from "@/modules/calendar/event-links";
@@ -44,6 +44,7 @@ const entry: CalendarAdminEntry = {
   canLinkToEvent: true,
   linkedEvent: null,
   datesDifferFromEvent: false,
+  linkedIneligible: false,
   possibleMatch: null,
 };
 const events: CalendarAdminEvent[] = [
@@ -69,6 +70,17 @@ describe("calendar item registration actions (#445)", () => {
     expect(html).toContain(">Link<");
     expect(html).toContain(">Not the same<");
     expect(html).toContain("Add registration");
+    // The picker is offered beside the suggestion, not only after Not the same.
+    expect(html).toContain("Link to existing event");
+  });
+
+  it("warns, without unlinking, when a linked item has become a deadline, closure or repeating item", () => {
+    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" };
+    const html = render({ linkedEvent, linkedIneligible: true, canLinkToEvent: false, entryType: "DEADLINE" });
+    expect(html).toContain("calendar-linked-ineligible");
+    expect(html).toContain("stays linked until you unlink it");
+    expect(html).toContain("Unlink event");
+    expect(render({ linkedEvent })).not.toContain("calendar-linked-ineligible");
   });
 
   it("shows a linked item with its event and Unlink, and says the pair shows once", () => {
@@ -104,13 +116,14 @@ describe("the event's date banner (#445)", () => {
       preview: {
         changes: [{ label: "Event dates", from: "October 9–11, 2026", to: "November 7–9, 2026" }],
         unchanged: [{ label: "Registration closes", value: "October 5, 2026", needsAttention: false, note: "" }],
+        notes: ["This event has 3 registrations. Update changes none of them."],
         blockedReason: null,
       },
       pricingNote: "Prices and any deadline written into a registration form stay as they are. Review them after updating.",
     },
   };
-  const banner = (props: Partial<{ notice: CalendarLinkNotice; canAnswer: boolean }> = {}) =>
-    renderToStaticMarkup(createElement(CalendarLinkBanner, { eventId: "event-1", notice, canAnswer: true, ...props }));
+  const banner = (props: Partial<{ notice: CalendarLinkNotice }> = {}) =>
+    renderToStaticMarkup(createElement(CalendarLinkBanner, { eventId: "event-1", notice, ...props }));
 
   it("asks the question, previews what changes and what stays, and offers Update and Keep", () => {
     const html = banner();
@@ -120,12 +133,17 @@ describe("the event's date banner (#445)", () => {
     expect(html).toContain("Update to November 7–9, 2026");
     expect(html).toContain("Keep current dates");
     expect(html).toContain("Prices and any deadline written into a registration form stay as they are.");
+    expect(html).toContain("This event has 3 registrations.");
   });
 
-  it("only a system administrator gets the buttons; others are told who decides", () => {
-    const html = banner({ canAnswer: false });
-    expect(html).not.toContain("Keep current dates");
-    expect(html).toContain("A system administrator chooses");
+  it("shows the confirmation from the page's own address, so it survives the reload", () => {
+    const updated = renderToStaticMarkup(createElement(CalendarDatesConfirmation, { outcome: "updated" }));
+    expect(updated).toContain("Registration dates updated");
+    expect(updated).toContain('role="status"');
+    expect(renderToStaticMarkup(createElement(CalendarDatesConfirmation, { outcome: "kept" }))).toContain("Keeping the current registration dates");
+    const banner = readFileSync(path.join(process.cwd(), "components/calendar-link-banner.tsx"), "utf8");
+    expect(banner).toContain("calendarDates=${decision === \"update\" ? \"updated\" : \"kept\"}");
+    expect(banner).toContain("router.refresh()");
   });
 
   it("disables Update, and says why, when the new dates can't work", () => {

@@ -84,8 +84,13 @@ async function patchHandler(
   try {
     const { eventId } = await context.params;
     const access = await authorize(eventId);
-    const input = eventSettingsInputSchema.parse(await request.json());
-    const event = await updateEventSettings(eventId, input, access.user.id);
+    const body = await request.json();
+    const input = eventSettingsInputSchema.parse(body);
+    // The version of the event the form was loaded from (#445): a save over a newer one is refused.
+    const { expectedUpdatedAt } = z.object({ expectedUpdatedAt: z.iso.datetime().optional() }).parse(body ?? {});
+    const event = expectedUpdatedAt === undefined
+      ? await updateEventSettings(eventId, input, access.user.id)
+      : await updateEventSettings(eventId, input, access.user.id, { expectedUpdatedAt });
     return Response.json({ event });
   } catch (error) { return eventApiError(error); }
 }

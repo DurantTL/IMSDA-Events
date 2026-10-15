@@ -64,7 +64,7 @@ async function postHandler(request: Request) {
     const input = eventSettingsInputSchema.parse(body);
     // Set when the event is set up from a calendar item (#445); the item decides the rest, never the request.
     const calendarEntryId = z.object({ calendarEntryId: z.string().trim().min(1).max(100).optional() }).parse(body ?? {}).calendarEntryId;
-    const event = await calendarEntryId ? await createEvent(input, user.id, { calendarEntryId }) : await createEvent(input, user.id);
+    const event = await (calendarEntryId ? createEvent(input, user.id, { calendarEntryId }) : createEvent(input, user.id));
     return Response.json({ event }, { status: 201 });
   } catch (error) { return eventApiError(error); }
 }

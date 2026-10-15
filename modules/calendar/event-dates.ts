@@ -12,22 +12,40 @@ export type DatePromptSource = {
   itemEndsOn: string;
   eventStartsOn: string;
   eventEndsOn: string;
-  keptStartsOn: string | null;
-  keptEndsOn: string | null;
+  /**
+   * The item's dates when they were last acknowledged: set when the item is linked (only if they matched the
+   * event's then) and at every Update or Keep. Null while the item and event have differed since linking.
+   */
+  baselineStartsOn: string | null;
+  baselineEndsOn: string | null;
 };
 
-/** Whether the event should ask: the item's dates differ from the event's and staff haven't chosen to keep exactly these. */
+/**
+ * Whether the event should ask. The item's dates must differ from the event's, and must not be exactly the dates
+ * staff already acknowledged: an event staff changed by hand while the item stayed put is not a question.
+ */
 export function datesNeedDecision(source: DatePromptSource) {
   if (source.itemStartsOn === source.eventStartsOn && source.itemEndsOn === source.eventEndsOn) return false;
-  return !(source.keptStartsOn === source.itemStartsOn && source.keptEndsOn === source.itemEndsOn);
+  return !(source.baselineStartsOn === source.itemStartsOn && source.baselineEndsOn === source.itemEndsOn);
 }
 
-/** The banner's question, e.g. "Google Calendar moved this event to November 7–9, 2026. Update the registration dates?" */
-export function datePromptMessage(input: { imported: boolean; itemStartsOn: string; itemEndsOn: string }) {
+/** "moved" when the item left dates staff had acknowledged; "differs" when it never agreed with the event since linking. */
+export function datePromptKind(source: Pick<DatePromptSource, "baselineStartsOn" | "baselineEndsOn">): "moved" | "differs" {
+  return source.baselineStartsOn !== null && source.baselineEndsOn !== null ? "moved" : "differs";
+}
+
+/**
+ * The banner's question. Moved from Google: "Google Calendar moved this event to November 7–9, 2026. Update the
+ * registration dates?" An item that never matched its event says it differs instead.
+ */
+export function datePromptMessage(input: { imported: boolean; kind: "moved" | "differs"; itemStartsOn: string; itemEndsOn: string }) {
   const range = formatDateRange(input.itemStartsOn, input.itemEndsOn);
+  if (input.kind === "differs") {
+    return `The calendar item for this event shows ${range}, which differs from the registration dates. Update the registration dates?`;
+  }
   return input.imported
     ? `Google Calendar moved this event to ${range}. Update the registration dates?`
-    : `The calendar item for this event now says ${range}. Update the registration dates?`;
+    : `The calendar item for this event was moved to ${range}. Update the registration dates?`;
 }
 
 export type DependentDate = {
@@ -45,6 +63,12 @@ export type DatePreviewInput = {
   seminarPreferenceClosesOn: string | null;
   locations: Array<{ name: string; firstDay: string | null; lastDay: string | null; registrationClosesOn: string | null }>;
   lodging: { firstNight: string | null; lastNight: string | null; preferencesDeadline: string | null } | null;
+  /** Dates of the event's active meal services. */
+  mealServiceDates: string[];
+  /** The last day of each window of the event's current cancellation policy. */
+  cancellationWindows: Array<{ label: string; endsOn: string }>;
+  /** Registrations that are submitted, confirmed or waitlisted. */
+  registrationCount: number;
 };
 
 export type DatePreview = {
@@ -52,6 +76,8 @@ export type DatePreview = {
   changes: Array<{ label: string; from: string; to: string }>;
   /** Dates that depend on the event's, which Update leaves exactly as they are. */
   unchanged: DependentDate[];
+  /** Things staff should know before choosing, in a sentence each. */
+  notes: string[];
   /** Why Update is refused until staff fix something first, or null. */
   blockedReason: string | null;
 };
@@ -60,16 +86,17 @@ const day = (value: string) => formatDateRange(value, value);
 
 /**
  * Update changes the event's first and last day and nothing else: registration
- * dates, deadlines, location windows and prices stay as staff set them, and the
- * preview lists each with a flag when it no longer fits. Opening registration
- * after the event ends is refused outright, because the event settings could not
- * be saved afterward.
+ * dates, deadlines, location windows, meals, the cancellation policy and prices
+ * stay as staff set them, and the preview lists each with a flag when it no
+ * longer fits. Opening registration after the event ends is refused outright,
+ * because the event settings could not be saved afterward.
  */
 export function buildDatePreview(
   event: { startsOn: string; endsOn: string } & DatePreviewInput,
   next: { startsOn: string; endsOn: string },
 ): DatePreview {
   const unchanged: DependentDate[] = [];
+  const notes: string[] = [];
   let blockedReason: string | null = null;
   if (event.registrationOpensOn) {
     const after = event.registrationOpensOn > next.endsOn;
@@ -131,9 +158,35 @@ export function buildDatePreview(
       unchanged.push({ label: "Lodging preferences close", value: day(event.lodging.preferencesDeadline), needsAttention: after, note: after ? "This is after the new last day." : "" });
     }
   }
+  if (event.mealServiceDates.length > 0) {
+    const outside = [...new Set(event.mealServiceDates.filter((date) => date < next.startsOn || date > next.endsOn))].sort();
+    unchanged.push({
+      label: "Meal services",
+      value: `${event.mealServiceDates.length} ${event.mealServiceDates.length === 1 ? "service" : "services"}`,
+      needsAttention: outside.length > 0,
+      note: outside.length > 0
+        ? `${event.mealServiceDates.filter((date) => date < next.startsOn || date > next.endsOn).length} fall outside the new event dates (${outside.slice(0, 4).map(day).join("; ")}${outside.length > 4 ? "; and more" : ""}).`
+        : "",
+    });
+  }
+  for (const window of event.cancellationWindows) {
+    const after = window.endsOn > next.endsOn;
+    unchanged.push({
+      label: `Cancellation window "${window.label}" ends`,
+      value: day(window.endsOn),
+      needsAttention: after,
+      note: after ? "This is after the new last day." : "",
+    });
+  }
+  if (event.registrationCount > 0) {
+    notes.push(
+      `This event has ${event.registrationCount} ${event.registrationCount === 1 ? "registration" : "registrations"}. Update changes none of them, and the people registered are not told. Whether someone is a minor is measured on the event's first day, so moving it can change who counts as a minor.`,
+    );
+  }
   return {
     changes: [{ label: "Event dates", from: formatDateRange(event.startsOn, event.endsOn), to: formatDateRange(next.startsOn, next.endsOn) }],
     unchanged,
+    notes,
     blockedReason,
   };
 }

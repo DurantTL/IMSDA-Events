@@ -83,6 +83,7 @@ async function cleanup() {
   await prisma.calendarEntry.deleteMany({ where: { createdByUserId: userId } });
   await prisma.calendarFeed.deleteMany({ where: { createdByUserId: userId } });
   await prisma.event.deleteMany({ where: { slug: { startsWith: `${P}-` } } });
+  await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.eventTemplate.deleteMany({ where: { createdByUserId: userId } });
   await prisma.user.deleteMany({ where: { id: userId } });
 }
@@ -91,7 +92,7 @@ async function main() {
   const { createCalendarFeed, deleteCalendarFeed, syncCalendarFeed } = await import("../modules/calendar/feeds");
   const { listCalendarEntries, listCalendarEvents, listPublicCalendarItems } = await import("../modules/calendar/repository");
   const links = await import("../modules/calendar/event-links");
-  const { createEvent } = await import("../modules/events/repository");
+  const { createEvent, getEventSettings, updateEventSettings } = await import("../modules/events/repository");
   const { deleteEvent } = await import("../modules/events/deletion-repository");
   const { eventSettingsInputSchema } = await import("../modules/events/schemas");
   const { applyEventTemplate, createEventTemplate, publishEventTemplateVersion } = await import("../modules/event-templates/repository");
@@ -186,14 +187,15 @@ async function main() {
   assert((loser.reason as { code?: string }).code === "EVENT_ALREADY_LINKED", "the loser is told the event is already linked");
   assert(await prisma.calendarEntry.count({ where: { linkedEventId: retreatEvent.id } }) === 1, "one item is linked");
   await prisma.calendarEntry.updateMany({ where: { linkedEventId: retreatEvent.id }, data: { linkedEventId: null } });
+  await prisma.calendarEntry.updateMany({ where: { id: spare.id }, data: { baselineStartsOn: null, baselineEndsOn: null } });
   let pairedRefused = false;
   try {
-    await prisma.calendarEntry.update({ where: { id: spare.id }, data: { keptStartsOn: "2026-10-09" } });
+    await prisma.calendarEntry.update({ where: { id: spare.id }, data: { baselineStartsOn: "2026-10-09" } });
   } catch {
     pairedRefused = true;
   }
-  assert(pairedRefused, "the database refuses a kept start date without a kept end date");
-  console.log("ok  the database allows one item per event; racing links leave exactly one; kept dates come as a pair");
+  assert(pairedRefused, "the database refuses a baseline start date without a baseline end date");
+  console.log("ok  the database allows one item per event; racing links leave exactly one; baseline dates come as a pair");
 
   // 5. Add registration (blank flow): linked in the same transaction, location and description carried, draft only.
   const created = await createEvent(settings("Evlink Conference", `${P}-spring-conference`, conferenceEntry.startsOn, conferenceEntry.endsOn, conferenceEntry.location), userId, { calendarEntryId: conferenceEntry.id });
@@ -239,6 +241,10 @@ async function main() {
     name: "Picnic Again", slug: `${P}-picnic-again`, startsOn: picnic.startsOn, endsOn: picnic.endsOn, requestKey: `${P}-key-picnic-2`, calendarEntryId: picnic.id,
   }), "ENTRY_ALREADY_LINKED", "an item that already has an event can't make another through a template");
   assert(await prisma.event.count() === eventsBefore, "the refused template apply left no event behind");
+  await rejectsWith(applyEventTemplate(template.id, userId, {
+    name: "Evlink Picnic Registration", slug: `${P}-picnic`, startsOn: picnic.startsOn, endsOn: picnic.endsOn, requestKey: `${P}-key-picnic-1`, calendarEntryId: spare.id,
+  }), "REQUEST_KEY_REUSED", "the same request key with another calendar item is a reused key, not a replay");
+  assert((await entryRow(spare.id)).linkedEventId === null, "and it linked nothing");
   console.log("ok  Add registration links the item in the creation transaction (blank and template flows); an item that can't be linked leaves no event behind");
 
   // 6. A draft event never leaks; the item stands in alone. Publishing shows the pair once; unpublishing brings the item back.
@@ -283,11 +289,28 @@ async function main() {
 
   // Update: the event's dates only, audited; dependent dates untouched.
   await prisma.event.update({ where: { id: created.id }, data: { registrationClosesOn: "2026-11-01" } });
+  // The settings form was opened before Update: it holds the old dates and the old version.
+  const openForm = (await getEventSettings(created.id))!;
+  const staleInput = eventSettingsInputSchema.parse({ ...openForm, approvedPaymentInstructions: openForm.approvedPaymentInstructions ?? null });
   await links.resolveCalendarDateChange(created.id, "update", { startsOn: "2026-11-21", endsOn: "2026-11-23" }, userId);
   const updated = await prisma.event.findUniqueOrThrow({ where: { id: created.id } });
   assert(updated.startsAt.toISOString().startsWith("2026-11-21") && updated.endsAt.toISOString().startsWith("2026-11-23"), "Update changed the event's dates to the item's");
   assert(updated.registrationClosesOn === "2026-11-01", "Update left the registration close date exactly as staff set it");
   assert(await links.getCalendarLinkNotice(created.id) === null, "after Update the banner is gone");
+  // A save from that stale form must not write the old dates back.
+  await rejectsWith(updateEventSettings(created.id, { ...staleInput, name: "Evlink Conference (stale save)" }, userId, { expectedUpdatedAt: openForm.updatedAt }), "EVENT_CHANGED", "a save from the form opened before Update is refused");
+  const afterStale = await prisma.event.findUniqueOrThrow({ where: { id: created.id } });
+  assert(afterStale.name === "Evlink Conference" && afterStale.startsAt.toISOString().startsWith("2026-11-21") && afterStale.endsAt.toISOString().startsWith("2026-11-23"), "the refused save changed nothing: the new dates stand");
+  // The form loaded again (what the remount does) saves fine and keeps the new dates.
+  const reloaded = (await getEventSettings(created.id))!;
+  assert(reloaded.startsOn === "2026-11-21" && reloaded.endsOn === "2026-11-23", "the reloaded form carries the new dates");
+  const fresh = eventSettingsInputSchema.parse({ ...reloaded, approvedPaymentInstructions: reloaded.approvedPaymentInstructions ?? null });
+  await updateEventSettings(created.id, { ...fresh, location: "Hall Example Annex" }, userId, { expectedUpdatedAt: reloaded.updatedAt });
+  const afterFresh = await prisma.event.findUniqueOrThrow({ where: { id: created.id } });
+  assert(afterFresh.location === "Hall Example Annex" && afterFresh.startsAt.toISOString().startsWith("2026-11-21") && afterFresh.endsAt.toISOString().startsWith("2026-11-23"), "a save from the reloaded form keeps the new dates");
+  await rejectsWith(updateEventSettings(created.id, fresh, userId, { expectedUpdatedAt: reloaded.updatedAt }), "EVENT_CHANGED", "and the version it was loaded from is stale after that save");
+  await updateEventSettings(created.id, { ...fresh, location: "Hall Example Annex" }, userId);
+  assert(true, "a save that sends no version still works (older clients)");
   const updatedAudit = await prisma.auditLog.findMany({ where: { action: "CALENDAR_EVENT_DATES_UPDATED", entityId: created.id } });
   assert(updatedAudit.length === 1, "Update is audited, once");
   const updatedMeta = updatedAudit[0]!.metadata as { from: { startsOn: string }; to: { startsOn: string } };
@@ -302,6 +325,45 @@ async function main() {
   assert(conflict?.datePrompt?.preview.blockedReason !== null, "the banner says why Update is unavailable");
   await prisma.event.update({ where: { id: created.id }, data: { registrationOpensOn: null } });
   console.log("ok  the link survives refreshes; a moved item never changes the event; Keep and Update are staff's choice, previewed, audited, and refuse stale or conflicting answers");
+
+  // The baseline (#445): staff changing the event by hand while the item stays put is not a question for the calendar.
+  const aside = await createEvent(settings("Evlink Aside", `${P}-aside`, "2026-12-05", "2026-12-07"), userId);
+  assert(aside, "an event was made for the baseline checks");
+  const asideItem = await prisma.calendarEntry.create({ data: { title: "Evlink Aside Item", startsOn: "2026-12-05", endsOn: "2026-12-07", isPublished: true, createdByUserId: userId, updatedByUserId: userId } });
+  await links.linkCalendarEntryToEvent(asideItem.id, aside.id, userId);
+  const asideLinked = await entryRow(asideItem.id);
+  assert(asideLinked.baselineStartsOn === "2026-12-05" && asideLinked.baselineEndsOn === "2026-12-07", "linking an item that agrees with its event records the item's dates as the baseline");
+  await prisma.event.update({ where: { id: aside.id }, data: { startsAt: new Date("2026-12-12T12:00:00Z"), endsAt: new Date("2026-12-14T12:00:00Z") } });
+  assert(await links.getCalendarLinkNotice(aside.id) === null, "the event changed and the item didn't: no banner");
+  await prisma.calendarEntry.update({ where: { id: asideItem.id }, data: { startsOn: "2026-12-19", endsOn: "2026-12-20" } });
+  const asideMoved = await links.getCalendarLinkNotice(aside.id);
+  assert(asideMoved?.datePrompt?.message === "The calendar item for this event was moved to December 19–20, 2026. Update the registration dates?", `the item really moving brings the banner (${asideMoved?.datePrompt?.message})`);
+
+  // An item that already differs from its event when linked says "differs", not "moved", and the preview is complete.
+  const differs = await createEvent(settings("Evlink Differs", `${P}-differs`, "2026-12-05", "2026-12-07"), userId);
+  assert(differs, "an event was made for the differs checks");
+  const differsItem = await prisma.calendarEntry.create({ data: { title: "Evlink Differs Item", startsOn: "2026-12-19", endsOn: "2026-12-20", isPublished: true, createdByUserId: userId, updatedByUserId: userId } });
+  await links.linkCalendarEntryToEvent(differsItem.id, differs.id, userId);
+  const differsLinked = await entryRow(differsItem.id);
+  assert(differsLinked.baselineStartsOn === null && differsLinked.baselineEndsOn === null, "an item that differs from its event when linked has no baseline");
+  await prisma.eventMealService.createMany({ data: [
+    { eventId: differs.id, name: "Evlink Supper", mealType: "SUPPER", serviceDate: "2026-12-06", startTime: "18:00" },
+    { eventId: differs.id, name: "Evlink Lunch", mealType: "LUNCH", serviceDate: "2026-12-19", startTime: "12:00" },
+    { eventId: differs.id, name: "Evlink Cancelled Lunch", mealType: "LUNCH", serviceDate: "2026-12-08", startTime: "12:00", status: "CANCELLED", cancelledAt: new Date(), cancelReason: "Synthetic check" },
+  ] });
+  await prisma.person.create({ data: { id: `${P}_person`, firstName: "Sample", lastName: "Person" } });
+  await prisma.registration.create({ data: { eventId: differs.id, accountHolderPersonId: `${P}_person`, confirmationCode: `${P.toUpperCase()}-0001`, status: "CONFIRMED", totalAmount: 0 } });
+  await prisma.registration.create({ data: { eventId: differs.id, accountHolderPersonId: `${P}_person`, confirmationCode: `${P.toUpperCase()}-0002`, status: "DRAFT", totalAmount: 0 } });
+  const differsNotice = await links.getCalendarLinkNotice(differs.id);
+  assert(differsNotice?.datePrompt?.message === "The calendar item for this event shows December 19–20, 2026, which differs from the registration dates. Update the registration dates?", `a differing item is worded as differs (${differsNotice?.datePrompt?.message})`);
+  assert(!/moved/.test(differsNotice.datePrompt.message), "and never says moved");
+  const meals = differsNotice.datePrompt.preview.unchanged.find((row) => row.label === "Meal services");
+  assert(meals?.value === "2 services" && meals.needsAttention && /1 fall outside/.test(meals.note), `the preview lists the active meal services, flagging the one outside the new dates (${meals?.value}; ${meals?.note})`);
+  assert(differsNotice.datePrompt.preview.notes.length === 1 && /has 1 registration\./.test(differsNotice.datePrompt.preview.notes[0]!) && /minor/.test(differsNotice.datePrompt.preview.notes[0]!), "the preview says the event has a registration (a draft doesn't count) and mentions minor status");
+  await links.resolveCalendarDateChange(differs.id, "keep", { startsOn: "2026-12-19", endsOn: "2026-12-20" }, userId);
+  const differsKept = await entryRow(differsItem.id);
+  assert(differsKept.baselineStartsOn === "2026-12-19" && await links.getCalendarLinkNotice(differs.id) === null, "Keep records the baseline and ends the question");
+  console.log("ok  baseline dates: an event edited by hand is no question; a moved item is; one that differed at linking says differs; the preview lists meals and registrations");
 
   // 8. Gone from Google: never deleted, the event never removed or cancelled; staff are warned. It comes back linked.
   feedBody = ics([retreat, unrelated]);

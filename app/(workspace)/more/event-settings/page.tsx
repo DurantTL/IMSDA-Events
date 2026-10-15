@@ -10,6 +10,7 @@ import { EventGeneralLinkPanel } from "@/components/event-general-link-panel";
 import { generalLinkUrl } from "@/modules/general-link-registrations/domain";
 import { getGeneralLinkSettings } from "@/modules/general-link-registrations/repository";
 import { getServerEnv } from "@/lib/env";
+import { CalendarDatesConfirmation, CalendarLinkBanner } from "@/components/calendar-link-banner";
 import { getCalendarLinkNotice } from "@/modules/calendar/event-links";
 import { getEventSettings } from "@/modules/events/repository";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -20,9 +21,9 @@ export const metadata: Metadata = { title: staffPageTitles.eventSettings };
 export default async function EventSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string }>;
+  searchParams: Promise<{ event?: string; calendarDates?: string }>;
 }) {
-  const { event: requested } = await searchParams;
+  const { event: requested, calendarDates } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." />;
@@ -32,7 +33,11 @@ export default async function EventSettingsPage({
   if (!settings) notFound();
   return (
     <>
-      <EventSettingsWorkspace key={event.id} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} linkNotice={linkNotice} canAnswerCalendarDates={user?.globalRole === "SYSTEM_ADMIN"} />
+      {(calendarDates === "updated" || calendarDates === "kept") && <CalendarDatesConfirmation outcome={calendarDates} />}
+      {linkNotice && <CalendarLinkBanner key={`calendar-link-${event.id}`} eventId={event.id} notice={linkNotice} />}
+      {/* Keyed on the event's version too: after Update from the calendar banner the form remounts with the new dates,
+          so a later save can't write the old ones back (the server also refuses a save over a newer version). */}
+      <EventSettingsWorkspace key={`${event.id}:${settings.updatedAt}`} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} />
       {settings.audience === "CLUB" && <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />}
       {settings.audience === "CLUB" && generalLink && (
         <EventGeneralLinkPanel

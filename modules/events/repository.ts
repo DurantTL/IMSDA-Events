@@ -18,7 +18,7 @@ import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export class EventOperationError extends Error {
   constructor(
-    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY",
+    public readonly code: "EVENT_NOT_FOUND" | "EVENT_NOT_READY" | "EVENT_HAS_SPONSORED_PROMO_CODES" | "EVENT_BUSY" | "EVENT_CHANGED",
     message: string,
   ) {
     super(message);
@@ -342,6 +342,8 @@ export async function updateEventSettings(
   eventId: string,
   input: EventSettingsInput,
   actorUserId: string,
+  /** The `updatedAt` of the event the form was loaded from. When given and the event has changed since, nothing is saved. */
+  options: { expectedUpdatedAt?: string } = {},
 ) {
   const prisma = getPrisma();
   try {
@@ -392,6 +394,7 @@ export async function updateEventSettings(
           seminarPreferenceClosesOn: true,
           seminarPreferenceSelfServiceLocked: true,
           autoPromoteWaitlist: true,
+          updatedAt: true,
         },
       }),
       tx.eventPaymentInstructionVersion.findFirst({
@@ -402,6 +405,14 @@ export async function updateEventSettings(
     ]);
     if (!current) {
       throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
+    }
+    // Stale-write guard (#445): the form carries the version it was loaded from. If the event changed since (another
+    // save, or its dates updated from the calendar banner), saving would write old values over newer ones.
+    if (options.expectedUpdatedAt !== undefined && new Date(options.expectedUpdatedAt).getTime() !== current.updatedAt.getTime()) {
+      throw new EventOperationError(
+        "EVENT_CHANGED",
+        "This event changed after you opened it (someone saved it, or its dates were updated from the calendar). Nothing was saved. Reload the page to see the latest, then make your change again.",
+      );
     }
     // An update without an audience keeps the stored one (#481 review), so a
     // stale client can't silently reset a CLUB event to GENERAL.
@@ -493,7 +504,7 @@ export async function updateEventSettings(
         entityId: eventId,
         correlationId: crypto.randomUUID(),
         summary: `Updated event settings: ${input.name}.`,
-        metadata: { before: current, after: { ...input, audience } },
+        metadata: { before: Object.fromEntries(Object.entries(current).filter(([key]) => key !== "updatedAt")), after: { ...input, audience } },
       },
     });
   });

@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import {
   buildDatePreview,
+  datePromptKind,
   datePromptMessage,
   datesNeedDecision,
   pricingDeadlineNote,
@@ -50,13 +51,24 @@ async function linkInTransaction(tx: Tx, entryId: string, eventId: string, actor
   if (problem) throw new CalendarError("NOT_LINKABLE", problem);
   if (entry.linkedEventId === eventId) return entry;
   if (entry.linkedEventId) throw new CalendarError("ENTRY_ALREADY_LINKED", "That calendar item is already linked to a registration event. Unlink it first.");
-  const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true } });
+  // TODO(#635): when `Event.archivedAt` lands, an archived event is not linkable here; add `archivedAt: null` to this
+  // lookup (whichever of #445 and #635 merges second adds it).
+  const event = await tx.event.findUnique({ where: { id: eventId }, select: { id: true, startsAt: true, endsAt: true, timezone: true } });
   if (!event) throw new CalendarError("EVENT_NOT_FOUND", "That event could not be found.");
   const other = await tx.calendarEntry.findUnique({ where: { linkedEventId: eventId }, select: { id: true } });
   if (other) throw new CalendarError("EVENT_ALREADY_LINKED", "That event is already linked to another calendar item. Unlink it first.");
+  // The baseline is the item's dates when they agree with the event's. If they already differ, there is no baseline:
+  // the event asks about it straight away, and says "differs" rather than "moved".
+  const agrees = entry.startsOn === calendarDateIn(event.startsAt, event.timezone) && entry.endsOn === calendarDateIn(event.endsAt, event.timezone);
   const linked = await tx.calendarEntry.update({
     where: { id: entryId },
-    data: { linkedEventId: eventId, linkedAt: new Date(), linkedByUserId: actorUserId, keptStartsOn: null, keptEndsOn: null },
+    data: {
+      linkedEventId: eventId,
+      linkedAt: new Date(),
+      linkedByUserId: actorUserId,
+      baselineStartsOn: agrees ? entry.startsOn : null,
+      baselineEndsOn: agrees ? entry.endsOn : null,
+    },
   });
   // A pair staff once said was not the same is now one they chose to link.
   await tx.calendarEventMatchDismissal.deleteMany({ where: { calendarEntryId: entryId, eventId } });
@@ -95,7 +107,7 @@ export async function unlinkCalendarEntry(entryId: string, actorUserId: string) 
     if (!entry.linkedEventId) throw new CalendarError("NOT_LINKED", "That calendar item isn't linked to an event.");
     await tx.calendarEntry.update({
       where: { id: entryId },
-      data: { linkedEventId: null, linkedAt: null, linkedByUserId: null, keptStartsOn: null, keptEndsOn: null },
+      data: { linkedEventId: null, linkedAt: null, linkedByUserId: null, baselineStartsOn: null, baselineEndsOn: null },
     });
     await writeAuditLog({
       eventId: entry.linkedEventId,
@@ -209,17 +221,33 @@ export type CalendarLinkNotice = {
   sourceRemoved: boolean;
 };
 
+/** The last window ends of the current cancellation policy, read without trusting the stored JSON's exact shape. */
+export function cancellationWindowsOf(rules: unknown): Array<{ label: string; endsOn: string }> {
+  const windows = (rules as { windows?: unknown } | null)?.windows;
+  if (!Array.isArray(windows)) return [];
+  return windows.flatMap((window) => {
+    const { label, endsOn } = (window ?? {}) as { label?: unknown; endsOn?: unknown };
+    return typeof endsOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(endsOn) ? [{ label: typeof label === "string" ? label : "Window", endsOn }] : [];
+  });
+}
+
 async function previewInputs(db: Tx | ReturnType<typeof getPrisma>, eventId: string) {
-  const [event, locations, lodging] = await Promise.all([
+  const [event, locations, lodging, meals, policy, registrationCount] = await Promise.all([
     db.event.findUnique({
       where: { id: eventId },
       select: { startsAt: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true, seminarPreferenceClosesOn: true },
     }),
     db.eventLocation.findMany({ where: { eventId }, orderBy: { sortOrder: "asc" }, select: { name: true, firstDay: true, lastDay: true, registrationClosesOn: true } }),
     db.eventLodging.findUnique({ where: { eventId }, select: { firstNight: true, lastNight: true, preferencesDeadline: true } }),
+    db.eventMealService.findMany({ where: { eventId, status: "ACTIVE" }, select: { serviceDate: true } }),
+    db.eventCancellationPolicyVersion.findFirst({ where: { eventId }, orderBy: { version: "desc" }, select: { rules: true } }),
+    db.registration.count({ where: { eventId, status: { in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] } } }),
   ]);
   if (!event) return null;
   return {
+    mealServiceDates: meals.map((meal) => meal.serviceDate),
+    cancellationWindows: cancellationWindowsOf(policy?.rules),
+    registrationCount,
     startsOn: calendarDateIn(event.startsAt, event.timezone),
     endsOn: calendarDateIn(event.endsAt, event.timezone),
     registrationOpensOn: event.registrationOpensOn,
@@ -247,14 +275,19 @@ export async function getCalendarLinkNotice(eventId: string): Promise<CalendarLi
     itemEndsOn: entry.endsOn,
     eventStartsOn: event.startsOn,
     eventEndsOn: event.endsOn,
-    keptStartsOn: entry.keptStartsOn,
-    keptEndsOn: entry.keptEndsOn,
+    baselineStartsOn: entry.baselineStartsOn,
+    baselineEndsOn: entry.baselineEndsOn,
   });
   // A removed item's dates are stale; asking staff to adopt them would be asking about a ghost.
   const datePrompt: CalendarDatePrompt | null = needsDecision && !sourceRemoved
     ? {
       entryId: entry.id,
-      message: datePromptMessage({ imported: entry.sourceUid !== null, itemStartsOn: entry.startsOn, itemEndsOn: entry.endsOn }),
+      message: datePromptMessage({
+        imported: entry.sourceUid !== null,
+        kind: datePromptKind({ baselineStartsOn: entry.baselineStartsOn, baselineEndsOn: entry.baselineEndsOn }),
+        itemStartsOn: entry.startsOn,
+        itemEndsOn: entry.endsOn,
+      }),
       itemStartsOn: entry.startsOn,
       itemEndsOn: entry.endsOn,
       eventStartsOn: event.startsOn,
@@ -294,7 +327,7 @@ export async function resolveCalendarDateChange(
     const event = await previewInputs(tx, eventId);
     if (!event) throw new CalendarError("EVENT_NOT_FOUND", "That event could not be found.");
     if (decision === "keep") {
-      await tx.calendarEntry.update({ where: { id: entry.id }, data: { keptStartsOn: entry.startsOn, keptEndsOn: entry.endsOn } });
+      await tx.calendarEntry.update({ where: { id: entry.id }, data: { baselineStartsOn: entry.startsOn, baselineEndsOn: entry.endsOn } });
       await writeAuditLog({
         eventId,
         actorUserId,
@@ -309,7 +342,7 @@ export async function resolveCalendarDateChange(
     const preview = buildDatePreview(event, { startsOn: entry.startsOn, endsOn: entry.endsOn });
     if (preview.blockedReason) throw new CalendarError("DATES_CONFLICT", preview.blockedReason);
     await tx.event.update({ where: { id: eventId }, data: { startsAt: eventDate(entry.startsOn), endsAt: eventDate(entry.endsOn) } });
-    await tx.calendarEntry.update({ where: { id: entry.id }, data: { keptStartsOn: null, keptEndsOn: null } });
+    await tx.calendarEntry.update({ where: { id: entry.id }, data: { baselineStartsOn: entry.startsOn, baselineEndsOn: entry.endsOn } });
     await writeAuditLog({
       eventId,
       actorUserId,
