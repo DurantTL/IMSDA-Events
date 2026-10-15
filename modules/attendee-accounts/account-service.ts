@@ -618,6 +618,14 @@ export async function completeAttendeePasswordReset(input: {
         lockedUntil: null,
       },
     });
+    // The code was emailed to the account's CURRENT address and has just been typed back, which
+    // is what verifying an address means. It re-verifies an account whose verification was
+    // cleared by an administrator's email change (Caleb, Oct 15, 2026); for any other account
+    // `emailVerifiedAt` is already set and this matches no row.
+    await tx.attendeeAccount.updateMany({
+      where: { id: record.accountId, emailVerifiedAt: null },
+      data: { emailVerifiedAt: now },
+    });
     await tx.attendeeSession.updateMany({
       where: { accountId: record.accountId, revokedAt: null },
       data: { revokedAt: now },

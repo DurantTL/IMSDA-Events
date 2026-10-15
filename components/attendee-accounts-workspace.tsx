@@ -2,7 +2,7 @@
 
 import { SortOrderNote } from "@/components/list-sort";
 import { useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, LogOut, Mail, MapPinned, Search, ShieldOff } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Link2, LogOut, Mail, MapPinned, Search, ShieldOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import {
@@ -313,6 +313,27 @@ export function AttendeeAccountsWorkspace({
                           type="button"
                         >
                           <Mail aria-hidden="true" size={14} /> Change email
+                        </button>
+                        <button
+                          className="secondary-button"
+                          disabled={busy === account.id}
+                          onClick={() => {
+                            const reasonHelp = "Reason (required, recorded in the audit log; do not enter personal details):";
+                            if (account.linkedToStaff) {
+                              const reason = window.prompt(`Unlink ${account.email} from its team sign-in? ${reasonHelp}`);
+                              if (reason?.trim()) void act(account, { action: "unlink-staff", reason });
+                              return;
+                            }
+                            const staffEmail = window.prompt(
+                              `Link ${account.email} to a team sign-in used by the same person. Team account email:`,
+                            );
+                            if (!staffEmail?.trim()) return;
+                            const reason = window.prompt(reasonHelp);
+                            if (reason?.trim()) void act(account, { action: "link-staff", staffEmail, reason });
+                          }}
+                          type="button"
+                        >
+                          <Link2 aria-hidden="true" size={14} /> {account.linkedToStaff ? "Unlink team sign-in" : "Link team sign-in"}
                         </button>
                       </div>
                     </td>

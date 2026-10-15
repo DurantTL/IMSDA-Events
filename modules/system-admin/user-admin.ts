@@ -48,7 +48,9 @@ async function changeLinkedEmailTogether(
     ]);
     if (takenUser || takenAccount) throw new UserAdminError("EMAIL_IN_USE", "Another account already uses that email.");
     await tx.user.update({ where: { id: link.userId }, data: { email } });
-    await tx.attendeeAccount.update({ where: { id: link.attendeeAccountId }, data: { email } });
+    // The address changed, so nobody has verified the new one yet (Caleb, Oct 15, 2026): the
+    // attendee side's verification is cleared with it.
+    await tx.attendeeAccount.update({ where: { id: link.attendeeAccountId }, data: { email, emailVerifiedAt: null } });
     await writeAuditLog({
       actorUserId,
       action: "STAFF_EMAIL_CHANGED",
@@ -183,6 +185,7 @@ export async function listAttendeeAccountsWithCap(query: string, sort: AccountSo
       _count: { select: { passkeys: { where: { revokedAt: null } } } },
       sessions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
       areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true } },
+      linkedUser: { select: { id: true } },
       clubDirectorGrants: {
         where: { revokedAt: null, OR: [{ effectiveTo: null }, { effectiveTo: { gt: new Date() } }] },
         select: { role: true, organization: { select: { name: true } } },
@@ -199,6 +202,8 @@ export async function listAttendeeAccountsWithCap(query: string, sort: AccountSo
     lastSignedInAt: account.sessions[0]?.createdAt.toISOString() ?? null,
     authenticatorOn: account.mfaEnrollment?.status === "ACTIVE",
     passkeyCount: account._count.passkeys,
+    /** A boolean only: whether a staff sign-in is linked to this account (#554). */
+    linkedToStaff: Boolean(account.linkedUser),
     clubRoles: account.clubDirectorGrants.map((grant) => ({ role: grant.role, clubName: grant.organization.name })),
     areaCoordinator: Boolean(
       account.areaCoordinatorGrant
@@ -250,7 +255,8 @@ export async function signOutAttendeeEverywhere(accountId: string, actorUserId: 
 
 /**
  * Changes an account's email. Registrations are found by verified email, so
- * the account will see registrations made with the new address, not the old.
+ * the account will see registrations made with the new address, not the old,
+ * once the new address is verified: the change clears `emailVerifiedAt`.
  */
 export async function changeAttendeeEmail(accountId: string, email: string, actorUserId: string) {
   await requireAttendee(accountId);
@@ -258,7 +264,11 @@ export async function changeAttendeeEmail(accountId: string, email: string, acto
   if (link) return changeLinkedEmailTogether(link, email, actorUserId);
   const taken = await getPrisma().attendeeAccount.findFirst({ where: { email, id: { not: accountId } }, select: { id: true } });
   if (taken) throw new UserAdminError("EMAIL_IN_USE", "Another account already uses that email.");
-  await getPrisma().attendeeAccount.update({ where: { id: accountId }, data: { email } });
+  // Registrations are claimed by VERIFIED email and an administrator typing an address verifies
+  // nothing, so the verification is cleared (Caleb, Oct 15, 2026). This is an admin-tool safety
+  // fix and applies whether or not the one-sign-in switch is on. The person verifies the new
+  // address again (a password reset code or Google sign-in for that address does it).
+  await getPrisma().attendeeAccount.update({ where: { id: accountId }, data: { email, emailVerifiedAt: null } });
   await revokeAllAttendeeSessions(accountId);
   await writeAuditLog({
     actorUserId,

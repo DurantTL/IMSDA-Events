@@ -2,6 +2,11 @@ import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireSystemAdministrator } from "@/modules/organizations/access";
 import { setAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import {
+  findStaffUserIdByEmail,
+  linkStaffAndAttendeeByHand,
+  unlinkStaffAndAttendee,
+} from "@/modules/account-merge/hand-link";
 import { changeAttendeeEmail, resetAttendeeTwoStep, signOutAttendeeEverywhere } from "@/modules/system-admin/user-admin";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
 import { withRequestContext } from "@/lib/request-context";
@@ -10,6 +15,9 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset-two-step") }).strict(),
   z.object({ action: z.literal("sign-out") }).strict(),
   z.object({ action: z.literal("area-coordinator"), on: z.boolean() }).strict(),
+  // Hand-linking a person's team sign-in and this account when their emails differ (#554).
+  z.object({ action: z.literal("link-staff"), staffEmail: z.string().trim().toLowerCase().pipe(z.email("Enter the team account's email.")), reason: z.string().trim().min(1).max(1000) }).strict(),
+  z.object({ action: z.literal("unlink-staff"), reason: z.string().trim().min(1).max(1000) }).strict(),
   z.object({ action: z.literal("change-email"), email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.")) }).strict(),
 ]);
 
@@ -32,6 +40,17 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
           ? "Now an Area Coordinator: sees every club, view only, after a second sign-in step."
           : "No longer an Area Coordinator.",
       });
+    }
+    if (input.action === "link-staff") {
+      await linkStaffAndAttendeeByHand(
+        { userId: await findStaffUserIdByEmail(input.staffEmail), attendeeAccountId: accountId, reason: input.reason },
+        actor.id,
+      );
+      return Response.json({ message: "Linked. Sign-in is unchanged: the team account still signs in to the staff workspace only with its own password and second step." });
+    }
+    if (input.action === "unlink-staff") {
+      await unlinkStaffAndAttendee({ attendeeAccountId: accountId, reason: input.reason }, actor.id);
+      return Response.json({ message: "Unlinked." });
     }
     if (input.action === "sign-out") {
       await signOutAttendeeEverywhere(accountId, actor.id);
