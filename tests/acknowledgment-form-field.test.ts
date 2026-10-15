@@ -239,6 +239,19 @@ describe("the screens (#150)", () => {
     expect(publicForm).toContain("disabled={!display}");
   });
 
+  it("shows acknowledgments read-only, with a note, when staff act as the director, and never requires them", () => {
+    expect(publicForm).toContain("staffActingAsDirector?: boolean");
+    expect(publicForm).toContain("The director must give this acknowledgment themselves, or staff can record a paper copy afterward.");
+    // The tick box is only rendered when staff are not acting as the director.
+    expect(publicForm).toMatch(/club\?\.staffActingAsDirector \? \(\s*<p className="field-help public-registration-acknowledgment-note" role="note">/);
+    expect(publicForm).toContain("!actingAsDirectorKeys.has(issue.key)");
+    expect(publicForm).toContain("!club?.staffActingAsDirector");
+    const workspace = readFileSync("components/club-registration-workspace.tsx", "utf8");
+    expect(workspace).toContain("staffActingAsDirector,");
+    const page = readFileSync("app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", "utf8");
+    expect(page).toContain('staffActingAsDirector={access.actor.kind !== "ATTENDEE"}');
+  });
+
   it("keeps the wording out of the review step's answer list", () => {
     expect(publicForm).toContain('|| field.type === "ACKNOWLEDGMENT"');
   });

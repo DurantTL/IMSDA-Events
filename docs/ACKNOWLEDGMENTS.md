@@ -16,9 +16,9 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
    without acknowledgments: they are not required, a ticked one is dropped, and no evidence is recorded. The acknowledgment stays
    "not acknowledged" until the director gives it or staff record paper evidence through the staff route. Giving staff that
    power would need a schema change and a decision about what it claims.
-5b. **Where people stand.** Reports, CSV exports and emails show the answer as ticked at submission. Evidence status (voids, paper
+6. **Where people stand.** Reports, CSV exports and emails show the answer as ticked at submission. Evidence status (voids, paper
    and staff-entered records included) is the source of truth.
-6. **Policy references are by version id.** To change wording for new registrants, publish a new policy version (or a new form
+7. **Policy references are by version id.** To change wording for new registrants, publish a new policy version (or a new form
    version for typed text) and point the field at it. People who acknowledged the earlier version stay acknowledged of it;
    whether they must acknowledge again is the human "material change" flag set when the policy version was published.
 
@@ -29,9 +29,8 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
   to the church and events with the general registration link; only per-attendee ones are refused (at form save and publish),
   because club rosters have no responsible-adult declarations. A director's tick covers the club's roster; nothing is recorded
   per youth.
-- **Corrections: staff void an acknowledgment, with a reason.** Needs VIEW_SENSITIVE_DATA, and (the safer default, to confirm with the
-  owner) MANAGE_REGISTRATION as well. See "Voiding" below. Evidence is
-  never edited or deleted.
+- **Corrections: staff void an acknowledgment, with a reason.** Voiding needs both MANAGE_REGISTRATION and VIEW_SENSITIVE_DATA. See
+  "Voiding" below. Evidence is never edited or deleted.
 
 ## Voiding an acknowledgment
 

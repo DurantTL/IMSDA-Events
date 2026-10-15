@@ -835,6 +835,19 @@ async function main() {
     assert(await prisma.acknowledgmentEvidence.count({ where: { eventId, registrationId: ticked.registrationId } }) === 0, "a tick sent with an act-as submission records nothing");
     assert((ticked.registration.publicFormSubmission?.responses as Record<string, unknown> | null)?.ack_release === undefined, "and is not stored as the director's answer");
   }
+  // The director's own submission is different: the acknowledgment is required of them, and without the tick it is refused and
+  // records nothing (no registration, no evidence).
+  const ownMembers = await newRosterMembers("c");
+  const registrationsBeforeOwn = await prisma.clubEventRegistration.count({ where: { eventId } });
+  const evidenceBeforeOwn = await prisma.acknowledgmentEvidence.count({ where: { eventId } });
+  const ownRefusal = await caught(club.submitClubRegistration(clubOf("g"), eventId, { accountId: accountOf("both") }, actAsInput({}, ownMembers), now, { locationId: missouri!.id, teamName: "Own Untick", draftKey: randomUUID().replaceAll("-", "") }));
+  assert(ownRefusal && (ownRefusal as { code?: string }).code === "INVALID_SUBMISSION" && JSON.stringify((ownRefusal as { issues?: unknown }).issues ?? []).includes("ack_release"), `the director's own submission without the required tick is refused on that field, got ${String(ownRefusal)}`);
+  assert(await prisma.clubEventRegistration.count({ where: { eventId } }) === registrationsBeforeOwn && await prisma.acknowledgmentEvidence.count({ where: { eventId } }) === evidenceBeforeOwn, "and no registration or evidence is left behind");
+  const ownDone = await club.submitClubRegistration(clubOf("g"), eventId, { accountId: accountOf("both") }, actAsInput({ ack_release: true }, ownMembers), now, { locationId: missouri!.id, teamName: "Own Ticked", draftKey: randomUUID().replaceAll("-", "") });
+  assert(ownDone, "with the tick it registers");
+  const ownRegistration = await teamRow("g", "Own Ticked");
+  const ownEvidence = await prisma.acknowledgmentEvidence.findMany({ where: { eventId, registrationId: ownRegistration.registrationId } });
+  assert(ownEvidence.length === 1 && ownEvidence[0]!.channel === "ONLINE" && ownEvidence[0]!.recordedByUserId === null, "and records the director's own online acknowledgment");
   // Later, staff record it on paper for the director (the account holder), and the evidence names that.
   const actAsRecord = await recordStaffAcknowledgment({ eventId, registrationId: actAsTeam.registrationId, fieldKey: "ack_release", channel: "PAPER", actorUserId: staffUserId, clientRequestId: randomUUID() });
   assert(actAsRecord.created && actAsRecord.evidence.channel === "PAPER" && actAsRecord.evidence.registrationId === actAsTeam.registrationId, "a paper record by staff afterward works");
