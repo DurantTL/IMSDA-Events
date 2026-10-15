@@ -109,11 +109,17 @@ export async function getAudienceFilterOptions(eventId: string, permissions: rea
 
 const SUPPRESSION_TIMEOUT_MS = 15_000;
 
-/** A statement timeout (SQLSTATE 57014), an expired or closed interactive transaction (P2028), or a pool wait that ran out. */
+/**
+ * A statement timeout (SQLSTATE 57014) or an interactive transaction that expired or was closed while it ran: the lookup
+ * itself was too big. A pool timeout (P2024) or a transaction that could not even start (P2028 "unable to start") means the
+ * database is busy, not that the audience is large, so those are not matched and surface as the logged 500.
+ */
 export function isSuppressionTimeout(error: unknown) {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2028" || error.code === "P2024")) return true;
   const text = error instanceof Error ? `${(error as { code?: string }).code ?? ""} ${error.message}` : "";
-  return /57014|statement timeout|canceling statement|transaction (already )?closed|transaction.*expired/i.test(text);
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2024") return false;
+  if (/unable to start a new transaction|unable to start/i.test(text)) return false;
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028") return true;
+  return /57014|statement timeout|canceling statement|transaction (already )?closed|expired transaction|transaction.*expired/i.test(text);
 }
 
 async function loadSuppressions(

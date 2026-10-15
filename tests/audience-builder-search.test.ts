@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 import type { EventPermission } from "@/modules/access/permissions";
 
 vi.mock("server-only", () => ({}));
@@ -182,9 +183,11 @@ describe("the audience builder selects registrations through the operations sear
   });
 
   it("answers a suppression lookup that timed out or lost its transaction as AUDIENCE_TOO_BROAD, and gives the transaction room above the statement timeout", async () => {
+    const known = (code: string, message: string) => new Prisma.PrismaClientKnownRequestError(message, { code, clientVersion: "test" });
     for (const failure of [
-      Object.assign(new Error("Transaction API error: Transaction already closed"), { code: "P2028" }),
-      new Error('canceling statement due to statement timeout (57014)'),
+      known("P2028", "Transaction API error: Transaction already closed: A query cannot be executed on an expired transaction. The timeout for this transaction was 20000 ms."),
+      known("P2028", "Transaction already closed"),
+      new Error("canceling statement due to statement timeout (57014)"),
     ]) {
       const { prisma } = prismaFixture();
       mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
@@ -197,6 +200,14 @@ describe("the audience builder selects registrations through the operations sear
     mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
     await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" });
     expect(prisma.$transaction.mock.calls[0]![1]).toEqual({ timeout: 20_000, maxWait: 5_000 });
+    // A busy database is not a too-large audience: a pool timeout and a transaction that could not start stay real errors.
+    for (const busy of [
+      known("P2024", "Timed out fetching a new connection from the connection pool."),
+      known("P2028", "Transaction API error: Unable to start a new transaction in the given time."),
+    ]) {
+      prisma.$transaction.mockRejectedValue(busy);
+      await expect(evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" })).rejects.toBe(busy);
+    }
     // Anything else stays a real error.
     prisma.$transaction.mockRejectedValue(new Error("connection refused"));
     await expect(evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" })).rejects.toThrow("connection refused");
