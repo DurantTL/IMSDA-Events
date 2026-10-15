@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Club portal fixes from the owner's iPad review (#918). Items: roster name prominence, Emergency contact
- * wording for adults, the date field layout rules, the two item searches that must visibly filter, Orders
+ * wording (and, since #510, minors only), the date field layout rules, the two item searches that must visibly filter, Orders
  * hidden from Area Coordinators (the server half is in the route tests), and the Team permissions intro.
  * Synthetic data only. The two search tests run the real components on a tiny hook runtime (no DOM here).
  */
@@ -36,7 +36,7 @@ import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { RosterGuardianFields } from "@/components/roster-guardian-fields";
 import { searchResultSummary } from "@/lib/search-match";
 import { isAdultRosterPerson } from "@/modules/club-rosters/domain";
-import { guardianTerm } from "@/modules/club-rosters/guardians-domain";
+import { EMERGENCY_CONTACT_TERM } from "@/modules/club-rosters/guardians-domain";
 import { areaClubPortalNavItems } from "@/modules/club-rosters/portal-nav";
 import { teamPermissionsIntro } from "@/modules/club-teams/permission-domain";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
@@ -92,8 +92,8 @@ describe("1. roster: the name is the most prominent thing in the row", () => {
   });
 });
 
-describe("2. adults have an Emergency contact, a minor has a Guardian", () => {
-  it("treats staff, adults, and anyone 18 or over as an adult", () => {
+describe("2. the contact section reads Emergency contact, and only minors have one (#510)", () => {
+  it("still treats staff, adults, and anyone 18 or over as an adult", () => {
     expect(isAdultRosterPerson("STAFF")).toBe(true);
     expect(isAdultRosterPerson("ADULT")).toBe(true);
     expect(isAdultRosterPerson("YOUTH")).toBe(false);
@@ -101,25 +101,20 @@ describe("2. adults have an Emergency contact, a minor has a Guardian", () => {
     expect(isAdultRosterPerson("YOUTH", "2008-10-14", "2026-10-14")).toBe(true);
     expect(isAdultRosterPerson("YOUTH", "2008-10-15", "2026-10-14")).toBe(false);
     expect(isAdultRosterPerson("YOUTH", "not a date", "2026-10-14")).toBe(false);
-    expect(guardianTerm(true)).toEqual({ singular: "Emergency contact", plural: "Emergency contacts" });
-    expect(guardianTerm(false)).toEqual({ singular: "Guardian", plural: "Guardians" });
+  });
+  it("calls the contact an Emergency contact for everyone, never a Guardian", () => {
+    expect(EMERGENCY_CONTACT_TERM).toEqual({ singular: "Emergency contact", plural: "Emergency contacts" });
   });
 
-  const fields = (adult: boolean) => renderToStaticMarkup(createElement(RosterGuardianFields, { adult, errors: {}, guardianState: "ready", records: undefined }));
-  it("words the roster dialog's contact section for an adult as Emergency contact, with no Guardian", () => {
-    const html = fields(true);
+  const fields = () => renderToStaticMarkup(createElement(RosterGuardianFields, { errors: {}, guardianState: "ready", records: undefined }));
+  it("words the roster dialog's contact section as Emergency contact, with no Guardian", () => {
+    const html = fields();
     expect(html).toContain("<legend>Emergency contacts (optional)</legend>");
     expect(html).toContain("<h3>Emergency contact 1</h3>");
     expect(html).toContain('aria-label="Emergency contact 2"');
     expect(html).not.toMatch(/Guardian/);
   });
-  it("keeps Guardian for a minor", () => {
-    const html = fields(false);
-    expect(html).toContain("<legend>Guardians (optional)</legend>");
-    expect(html).toContain("<h3>Guardian 1</h3>");
-    expect(html).not.toContain("Emergency contact");
-  });
-  it("words the form's Add to roster contact section by who the person is, not always Guardian", () => {
+  it("shows the form's Add to roster contact section for a minor only", () => {
     const blank = { name: "", relationship: "", email: "", phone: "" };
     const review = (attendeeType: string, birthDate: string) => ({
       submissionId: "sub-1", organizationId: "club-1", formName: "Synthetic form", clubYear: "2026-27", duplicates: [], canAdd: true,
@@ -127,26 +122,25 @@ describe("2. adults have an Emergency contact, a minor has a Guardian", () => {
     }) as never;
     const render = (attendeeType: string, birthDate: string) => renderToStaticMarkup(createElement(ClubFormRosterAdd, { review: review(attendeeType, birthDate), formHref: "/forms/1" }));
     for (const html of [render("STAFF", ""), render("ADULT", ""), render("YOUTH", "1980-01-01")]) {
-      expect(html).toContain("<legend>Emergency contacts (optional)</legend>");
-      expect(html).toContain('aria-label="Emergency contact 1"');
-      expect(html).not.toContain("Guardian contacts");
-      expect(html).not.toContain('aria-label="Guardian');
+      expect(html).not.toContain("roster-guardians");
+      expect(html).not.toContain("Emergency contact");
+      expect(html).not.toContain("Guardian");
     }
-    const minor = render("YOUTH", "2013-04-09");
-    expect(minor).toContain("<legend>Guardians (optional)</legend>");
-    expect(minor).toContain('aria-label="Guardian 2"');
-    expect(minor).not.toContain("Emergency contact");
+    for (const minor of [render("YOUTH", "2013-04-09"), render("UNDERAGE", ""), render("YOUTH", "")]) {
+      expect(minor).toContain("<legend>Emergency contacts (optional)</legend>");
+      expect(minor).toContain('aria-label="Emergency contact 2"');
+      expect(minor).not.toContain("Guardian");
+    }
   });
-  it("labels each row of the read-only contacts panel by who it is for", async () => {
+  it("labels each row of the read-only contacts panel Emergency contact", async () => {
     vi.resetModules();
     vi.doMock("server-only", () => ({}));
     vi.doMock("@/modules/club-rosters/guardians-repository", async () => {
       const actual = await vi.importActual<typeof import("@/modules/club-rosters/guardians-repository")>("@/modules/club-rosters/guardians-repository");
-      const entry = { name: "Synthetic Contact", relationship: "Spouse", email: "", phone: "" };
+      const entry = { name: "Synthetic Contact", relationship: "Mother", email: "", phone: "" };
       return {
         ...actual,
         listGuardianContactsForClub: async () => [
-          { memberId: "m1", firstName: "Staff", lastName: "Person", attendeeType: "STAFF", status: "ACTIVE", guardians: [{ position: 1, ...entry }] },
           { memberId: "m2", firstName: "Youth", lastName: "Person", attendeeType: "YOUTH", status: "ACTIVE", guardians: [{ position: 1, ...entry }] },
         ],
       };
@@ -154,11 +148,8 @@ describe("2. adults have an Emergency contact, a minor has a Guardian", () => {
     const { ClubGuardiansPanel: Panel } = await import("@/components/club-guardians-panel");
     const element = await Panel({ organizationId: "club-1", viewer: { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: "a1" } } as never });
     const html = renderToStaticMarkup(element!);
-    const [, staffRow, youthRow] = html.split("</tr>");
-    expect(staffRow).toContain("Emergency contact");
-    expect(staffRow).not.toContain(">Guardian<");
-    expect(youthRow).toContain(">Guardian<");
-    expect(youthRow).not.toContain("Emergency contact");
+    expect(html).toContain(">Emergency contact<");
+    expect(html).not.toContain(">Guardian<");
   });
 });
 

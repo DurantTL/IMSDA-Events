@@ -20,7 +20,7 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
-  isAdultRosterPerson,
+  isMinorRosterPerson,
   missingRosterFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
@@ -196,8 +196,11 @@ export function ClubRosterWorkspace({
   }
 
   const today = calendarDateInEventTimeZone(new Date(), "America/Chicago");
-  /** Adults (staff, adult members, and anyone 18 or over) name an emergency contact; only a minor has a guardian (#918). */
-  const adultContact = isAdultRosterPerson(formType, formBirthDate, today);
+  /**
+   * Emergency contacts are collected for minors only (#510). A birth date typed in the dialog decides; an
+   * edit that leaves it blank falls back to the age the server worked out for this member.
+   */
+  const minorContact = isMinorRosterPerson(formType, formBirthDate, today, editing ? (editing.age ?? editing.reportedAge) : null);
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, today)
     : null;
@@ -263,12 +266,12 @@ export function ClubRosterWorkspace({
       editing: Boolean(editing),
     });
     setFieldErrors(errors);
-    // Guardian contacts (#510): two slots, every field optional; only email and phone format are checked.
-    if (canEditGuardians && guardianState === "loading") {
-      setError("Still loading this person's guardian contacts. Try again in a moment.");
+    // Emergency contacts (#510): minors only, two slots, every field optional; only email and phone format are checked.
+    if (canEditGuardians && minorContact && guardianState === "loading") {
+      setError("Still loading this person's emergency contacts. Try again in a moment.");
       return;
     }
-    const guardianSlots = canEditGuardians && guardianState === "ready"
+    const guardianSlots = canEditGuardians && minorContact && guardianState === "ready"
       ? Array.from({ length: GUARDIAN_SLOTS }, (_, index) => ({
         name: String(form.get(`g${index + 1}Name`) ?? "").trim(),
         relationship: String(form.get(`g${index + 1}Relationship`) ?? "").trim(),
@@ -656,9 +659,8 @@ export function ClubRosterWorkspace({
             {fieldErrors.gender && <span className="roster-field-error" id="roster-gender-error" role="alert">{fieldErrors.gender}</span>}
           </label>
         </div>
-        {canEditGuardians && (
+        {canEditGuardians && minorContact && (
           <RosterGuardianFields
-            adult={adultContact}
             errors={guardianErrors}
             guardianState={guardianState}
             key={`${editing?.id ?? "new"}-${guardianRev}`}

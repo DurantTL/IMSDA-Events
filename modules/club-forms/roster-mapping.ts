@@ -148,7 +148,7 @@ export function mappedFieldKeys(mapping: RosterMapping): Array<{ target: string;
   mapping.guardians.forEach((guardian, index) => {
     for (const part of guardianMappingParts) {
       const key = guardian[part];
-      if (key) pairs.push({ target: `guardian${index + 1}.${part}`, fieldKey: key, label: `Guardian ${index + 1} ${part}` });
+      if (key) pairs.push({ target: `guardian${index + 1}.${part}`, fieldKey: key, label: `Emergency contact ${index + 1} ${part}` });
     }
   });
   return pairs;

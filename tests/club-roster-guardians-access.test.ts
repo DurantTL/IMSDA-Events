@@ -90,8 +90,10 @@ describe("guardian viewers from a club role (#510)", () => {
 
   it("returns guardians for the roster response to a director, and nothing at all to a registrar", async () => {
     mocks.guardianFindMany.mockResolvedValue([
-      { rosterMemberId: "member-1", position: 1, name: "Synthetic Guardian", relationship: "Mother", email: "", phone: "" },
+      { rosterMemberId: "member-1", position: 1, name: "Synthetic Guardian", relationship: "Mother", email: "", phone: "", rosterMember: { attendeeType: "YOUTH", reportedAge: null, sealedBirthDate: null } },
+      { rosterMemberId: "member-2", position: 1, name: "Synthetic Adult Contact", relationship: "Spouse", email: "", phone: "", rosterMember: { attendeeType: "ADULT", reportedAge: null, sealedBirthDate: null } },
     ]);
+    // An adult's old contact row is stored but never returned (minors only, #510).
     await expect(rosterGuardiansForAccess(openAccess("DIRECTOR"), "club-1", "2026-27")).resolves.toEqual({
       "member-1": [{ position: 1, name: "Synthetic Guardian", relationship: "Mother", email: "", phone: "" }],
     });

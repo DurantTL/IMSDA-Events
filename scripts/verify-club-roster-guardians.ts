@@ -9,6 +9,9 @@
  *   inactive members keep theirs, and deleting the row cascades;
  * - readers: the club's own leader, any Area Coordinator and sensitive-data
  *   staff read; another club's leader is refused;
+ * - emergency contacts are for minors only (owner decision Oct 15, 2026): a
+ *   contact for an adult is refused, an old stored adult row is never read or
+ *   exported, and the export carries a minor's contact with formula-safe cells;
  * - no audit row holds a guardian value.
  *
  * Uses fictitious rows it creates and removes itself.
@@ -20,6 +23,7 @@ import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { addRosterMember, removeRosterMember, updateRosterMember } from "@/modules/club-rosters/repository";
+import { runRosterExport } from "@/modules/club-rosters/export-repository";
 import { GuardianAccessError, listGuardianContactsForClub, listGuardiansByMember } from "@/modules/club-rosters/guardians-repository";
 import type { GuardianViewer } from "@/modules/club-rosters/guardians-domain";
 
@@ -107,6 +111,29 @@ async function main() {
   assert((await listGuardianContactsForClub(coordinator, clubs.a, clubYear)).length === 2, "an Area Coordinator reads any club");
   assert((await listGuardianContactsForClub(staff, clubs.a, clubYear)).length === 2, "sensitive-data staff read any club");
 
+  // Minors only (owner decision Oct 15, 2026).
+  const adultInput = { ...base, attendeeType: "ADULT" as const, role: "", firstName: "Verifya", lastName: "Beta", birthDate: "1985-03-04" };
+  assert(await rejects(addRosterMember(clubs.a, clubYear, { ...adultInput, guardians: [guardian("Verify Adult Contact")] }, actor)), "a contact for an adult is refused on add");
+  const adult = await addRosterMember(clubs.a, clubYear, adultInput, actor);
+  assert((await countFor(adult.memberId)) === 0, "the refused add stored no contact");
+  assert(await rejects(updateRosterMember(clubs.a, adult.memberId, { guardians: [guardian("Verify Adult Contact")] }, actor)), "a contact for an adult is refused on edit");
+  // A row left from before the decision stays stored but is never read or exported.
+  await prisma.clubRosterGuardian.create({ data: { rosterMemberId: adult.memberId, position: 1, name: "Verify Legacy Adult Contact", phone: "(515) 555-0199" } });
+  assert(!(adult.memberId in (await listGuardiansByMember(leaderA, clubs.a, clubYear))), "an adult's stored contact is not listed for the roster dialog");
+  assert(!(await listGuardianContactsForClub(coordinator, clubs.a, clubYear)).some((contact) => contact.memberId === adult.memberId), "an adult's stored contact is not shown to a coordinator");
+  const exportColumns = [
+    { key: "firstName" as const, header: "First" },
+    { key: "guardian1Name" as const, header: "Emergency contact 1 name" },
+    { key: "guardian1Phone" as const, header: "Emergency contact 1 phone" },
+  ];
+  await updateRosterMember(clubs.a, added.memberId, { guardians: [guardian("=SUM(1+1)", { phone: "+15155550134" }), blank] }, actor);
+  const exported = await runRosterExport(clubs.a, clubYear, { mode: "csv", columns: exportColumns, confirmSensitive: true }, false, actor, true);
+  const csv = "csv" in exported ? exported.csv : "";
+  assert(csv.includes(`"Verifya","'=SUM(1+1)","(515) 555-0134"`), `the export carries a minor's contact with formula-safe cells (got ${JSON.stringify(csv)})`);
+  assert(!csv.includes("Verify Legacy Adult Contact") && !csv.includes("555-0199"), "the export never carries an adult's stored contact");
+  assert(await rejects(runRosterExport(clubs.a, clubYear, { mode: "csv", columns: exportColumns, confirmSensitive: true }, false, actor, false)), "the export refuses a role that may not see emergency contacts");
+  await updateRosterMember(clubs.a, added.memberId, { guardians: [guardian(SECRET_NAME, { email: SECRET_EMAIL, phone: SECRET_PHONE }), guardian("Verify Second", { relationship: "Uncle" })] }, actor);
+
   // An inactive member keeps theirs; removal deletes only that member's.
   await updateRosterMember(clubs.a, other.memberId, { status: "INACTIVE" }, actor);
   assert((await countFor(other.memberId)) === 1, "an inactive member keeps their guardians");
@@ -122,7 +149,7 @@ async function main() {
   // No audit row holds a guardian value.
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
   const text = JSON.stringify(audits);
-  for (const secret of [SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian"]) {
+  for (const secret of [SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Legacy Adult Contact", "=SUM(1+1)"]) {
     assert(!text.includes(secret), `no audit row contains "${secret}"`);
   }
   assert(audits.some((row) => row.action === "CLUB_ROSTER_GUARDIANS_VIEWED"), "a coordinator's or staff opening is audited");

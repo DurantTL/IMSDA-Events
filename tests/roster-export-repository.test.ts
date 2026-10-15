@@ -41,7 +41,11 @@ function fakeDatabase() {
     },
     clubRosterGuardian: {
       findMany: vi.fn(async ({ where }: { where: { rosterMemberId?: { in: string[] } } }) => db.guardians
-        .filter((row) => (where.rosterMemberId ? where.rosterMemberId.in.includes(row.rosterMemberId as string) : true))),
+        .filter((row) => (where.rosterMemberId ? where.rosterMemberId.in.includes(row.rosterMemberId as string) : true))
+        .map((row) => {
+          const member = db.members.find((candidate) => candidate.id === row.rosterMemberId);
+          return { ...row, rosterMember: { attendeeType: member?.attendeeType, reportedAge: member?.reportedAge ?? null, sealedBirthDate: member?.sealedBirthDate ?? null } };
+        })),
     },
     clubRosterExportFormat: {
       findFirst: async ({ where }: { where: Row & { name?: { equals: string; mode?: string } } }) => db.formats.find((row) => {
@@ -253,8 +257,8 @@ describe("saved export formats (#490)", () => {
 describe("guardian columns in a roster export (#510)", () => {
   const guardianColumns = [
     { key: "firstName" as const, header: "First" },
-    { key: "guardian1Name" as const, header: "Guardian 1 name" },
-    { key: "guardian1Phone" as const, header: "Guardian 1 cell phone" },
+    { key: "guardian1Name" as const, header: "Emergency contact 1 name" },
+    { key: "guardian1Phone" as const, header: "Emergency contact 1 phone" },
   ];
 
   beforeEach(() => {
@@ -287,6 +291,40 @@ describe("guardian columns in a roster export (#510)", () => {
     expect(preview.rows).toEqual([["Ana", "Synthetic Guardian One", "(555) 010-0101"]]);
     const csvResult = await runRosterExport("club-1", "2026-27", { mode: "csv", columns: guardianColumns, confirmSensitive: true }, false, actor, true);
     expect("csv" in csvResult && csvResult.csv).toContain('"Ana","Synthetic Guardian One","(555) 010-0101"');
+  });
+
+  it("exports a minor's contact only: an adult's contact is never offered, even if one is stored", async () => {
+    // A staff member, an adult, and a youth whose birth date makes them 18 (all with a stored contact).
+    addMember(db, { id: "member-2", firstName: "Sam", lastName: "Staff", attendeeType: "STAFF", sealedBirthDate: sealSecret("1980-01-01", "club-roster:birth-date") });
+    addMember(db, { id: "member-3", firstName: "Ari", lastName: "Grown", attendeeType: "YOUTH", sealedBirthDate: sealSecret("2008-10-01", "club-roster:birth-date") });
+    addMember(db, { id: "member-4", firstName: "Imported", lastName: "Kid", attendeeType: "YOUTH", reportedAge: 12, sealedBirthDate: null });
+    for (const id of ["member-2", "member-3", "member-4"]) {
+      db.guardians.push({ id: `g-${id}`, rosterMemberId: id, position: 1, name: `Contact of ${id}`, relationship: "Relative", email: "", phone: "555-010-0303" });
+    }
+    const csvResult = await runRosterExport("club-1", "2026-27", { mode: "csv", columns: guardianColumns, confirmSensitive: true }, false, actor, true);
+    const csv = "csv" in csvResult ? csvResult.csv : "";
+    expect(csv).toContain('"Ana","Synthetic Guardian One"');
+    expect(csv).toContain('"Imported","Contact of member-4"');
+    expect(csv).toContain('"Sam",""');
+    expect(csv).toContain('"Ari",""');
+    expect(csv).not.toContain("Contact of member-2");
+    expect(csv).not.toContain("Contact of member-3");
+    // The audit count is of contacts actually exported, and holds no value.
+    const entry = mocks.writeAuditLog.mock.calls.map(([call]) => call).find((call) => call.action === "CLUB_ROSTER_EXPORTED");
+    expect(entry.metadata).toMatchObject({ guardianContactsExported: 3 });
+  });
+
+  it("neutralizes spreadsheet formulas in an emergency contact's name, relationship and phone", async () => {
+    db.guardians.length = 0;
+    db.guardians.push({ id: "g1", rosterMemberId: "member-1", position: 1, name: "=HYPERLINK(\"http://example.test\")", relationship: "@cmd", email: "", phone: "+15155550134" });
+    const columns = [
+      { key: "guardian1Name" as const, header: "Name" },
+      { key: "guardian1Relationship" as const, header: "Relationship" },
+      { key: "guardian1Phone" as const, header: "Phone" },
+    ];
+    const result = await runRosterExport("club-1", "2026-27", { mode: "csv", columns, confirmSensitive: true }, false, actor, true);
+    const csv = "csv" in result ? result.csv : "";
+    expect(csv).toContain(`"'=HYPERLINK(""http://example.test"")","'@cmd","'+15155550134"`);
   });
 
   it("audits column keys and counts, never a guardian value", async () => {

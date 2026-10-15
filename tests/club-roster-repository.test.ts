@@ -207,6 +207,42 @@ describe("club roster storage", () => {
       expect(onFile(memberId)).toEqual([]);
     });
 
+    it("keeps emergency contacts for minors only: a contact for staff or an adult is refused, and nothing is stored (#510)", async () => {
+      const adult = { ...youth, attendeeType: "ADULT" as const, role: "", birthDate: "1985-03-04" };
+      await expect(addRosterMember("club-1", "2026-27", { ...adult, guardians: [first] }, actor, { now }))
+        .rejects.toMatchObject({ code: "CONTACT_MINORS_ONLY" });
+      await expect(addRosterMember("club-1", "2026-27", { ...adult, attendeeType: "STAFF", guardians: [first, second] }, actor, { now }))
+        .rejects.toMatchObject({ code: "CONTACT_MINORS_ONLY" });
+      // A youth whose birth date makes them 18 on the day is an adult for this purpose.
+      await expect(addRosterMember("club-1", "2026-27", { ...youth, birthDate: "2008-10-01", guardians: [first] }, actor, { now }))
+        .rejects.toMatchObject({ code: "CONTACT_MINORS_ONLY" });
+      expect(db.members).toHaveLength(0);
+      expect(db.guardians).toHaveLength(0);
+      // A blank set, or no contact at all, is fine for an adult.
+      await expect(addRosterMember("club-1", "2026-27", { ...adult, guardians: [blank, blank] }, actor, { now })).resolves.toBeDefined();
+      await expect(addRosterMember("club-1", "2026-27", { ...adult, firstName: "Other" }, actor, { now })).resolves.toBeDefined();
+      expect(db.guardians).toHaveLength(0);
+      // An underage child (a minor by age) can have one.
+      await expect(addRosterMember("club-1", "2026-27", { ...youth, attendeeType: "UNDERAGE", birthDate: "2023-01-02", firstName: "Little", guardians: [first] }, actor, { now }))
+        .resolves.toBeDefined();
+      expect(db.guardians).toHaveLength(1);
+    });
+
+    it("works out minor status on the server from the stored birth date when a contact is edited (#510)", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first] }, actor, { now });
+      // Still a minor: an edit that sends a contact works.
+      await expect(updateRosterMember("club-1", memberId, { guardians: [{ ...second, phone: "" }] }, actor, now)).resolves.toBeDefined();
+      // Moving the birth date to an adult one, in the same save as a contact, is refused and leaves the stored contact alone.
+      await expect(updateRosterMember("club-1", memberId, { birthDate: "1990-01-01", guardians: [first] }, actor, now))
+        .rejects.toMatchObject({ code: "CONTACT_MINORS_ONLY" });
+      expect(onFile(memberId)).toEqual([{ position: 1, name: second.name }]);
+      // Changing the type to Staff with a contact is refused too, and a blank set still clears.
+      await expect(updateRosterMember("club-1", memberId, { attendeeType: "STAFF", guardians: [first] }, actor, now))
+        .rejects.toMatchObject({ code: "CONTACT_MINORS_ONLY" });
+      await expect(updateRosterMember("club-1", memberId, { attendeeType: "STAFF", guardians: [] }, actor, now)).resolves.toBeDefined();
+      expect(onFile(memberId)).toEqual([]);
+    });
+
     it("lets a saved guardian phone through unchanged, but not a new bad one, per slot (#855)", async () => {
       const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, guardians: [first, second] }, actor, { now });
       // Both slots resent as stored (invalid by today's rules): the edit goes through.

@@ -112,11 +112,11 @@ describe("POST .../roster/export (#490)", () => {
 });
 
 describe("guardian columns on the export routes (#510)", () => {
-  const guardianBody = { mode: "preview", columns: [{ key: "guardian1Name", header: "Guardian 1 name" }], confirmSensitive: true };
+  const guardianBody = { mode: "preview", columns: [{ key: "guardian1Name", header: "Emergency contact 1 name" }], confirmSensitive: true };
 
   it("passes the club role's guardians capability down to the export", async () => {
     mocks.requireRosterAccess.mockResolvedValueOnce({ ...openAccess, capabilities: { seeBirthDates: true, guardians: true } });
-    mocks.runRosterExport.mockResolvedValueOnce({ headers: ["Guardian 1 name"], rows: [["Synthetic Guardian"]], totalRows: 1 });
+    mocks.runRosterExport.mockResolvedValueOnce({ headers: ["Emergency contact 1 name"], rows: [["Synthetic Guardian"]], totalRows: 1 });
     const response = await postExport(jsonRequest("https://events.imsda.test/x", "POST", guardianBody), ctx);
     expect(response.status).toBe(200);
     expect(mocks.runRosterExport).toHaveBeenCalledWith("club-1", expect.any(String), guardianBody, true, { accountId: "director-1" }, true);
