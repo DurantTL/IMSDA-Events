@@ -26,6 +26,8 @@ import {
   type ClubGuest,
   lockedAttendeeFieldKeys,
   lockedClubDirectoryFieldKeys,
+  partnerClubIssue,
+  partnerClubProblem,
   rosterCarryoverMismatches,
   rosterGenderPrefill,
   rosterRolePrefill,
@@ -1254,6 +1256,11 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
     }
     // Part of the submit transaction: a failed submit saves nothing back (#639).
     if (actor && saveBack.length > 0) await saveRosterAgesBack(tx, organizationId, clubYearFor(event.startsAt), actor, saveBack);
+    // A joint team's partner club can't be the team's own club (#963), checked on the server after the own club is set.
+    const partnerProblem = partnerClubProblem(definition as RegistrationFormDefinition, { ...input.responses, ...directoryResponses });
+    if (partnerProblem) {
+      throw new PublicRegistrationError("INVALID_SUBMISSION", partnerProblem.message, [partnerClubIssue(partnerProblem)]);
+    }
     return {
       input: {
         ...input,
@@ -1708,6 +1715,10 @@ export async function amendClubRegistration(
     ownedRegistrationResponses: async (hydrated, tx) => (
       clubDirectoryOwnedResponses(hydrated, await clubDirectoryIdentity(tx, organizationId))
     ),
+    registrationResponsesProblem: (hydrated, responses) => {
+      const problem = partnerClubProblem(hydrated, responses);
+      return problem ? { message: problem.message, issues: [partnerClubIssue(problem)] } : null;
+    },
   };
   try {
     const preview = await previewRegistrationAmendment(eventId, registrationId, amendmentInput, engineOptions);

@@ -163,6 +163,14 @@ export type AmendmentServerOptions = {
     tx: Prisma.TransactionClient,
   ) => Promise<Record<string, unknown>>;
   /**
+   * A server-side check of the registration answers once the owned ones are laid over them (e.g. a joint team's
+   * partner club can't be the team's own club, #963). Returns the refusal, or null when the answers are fine.
+   */
+  registrationResponsesProblem?: (
+    definition: RegistrationFormDefinition,
+    responses: Record<string, unknown>,
+  ) => { message: string; issues: PublicRegistrationIssue[] } | null;
+  /**
    * The form the registration is validated and priced against, given its own
    * hydrated form. A "Group" registration (#650) sees the club form without
    * the club and church questions, on amendment as it did on submit.
@@ -1025,6 +1033,8 @@ async function prepareAmendment(
       responses: { ...input.responses, ...owned },
     };
   }
+  const responsesProblem = serverOptions.registrationResponsesProblem?.(definition, input.responses);
+  if (responsesProblem) throw new RegistrationAmendmentError("INVALID_AMENDMENT", responsesProblem.message, responsesProblem.issues);
   // Acknowledgments (#150) are given only through their evidence path: an amendment keeps each answer as stored and
   // gives a new attendee none, so a stored `true` always has its evidence beside it.
   const held = holdAcknowledgmentAnswers(definition, input, {

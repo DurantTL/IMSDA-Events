@@ -9,6 +9,7 @@ import {
   clubFormProblem,
   lockedAttendeeFieldKeys,
   lockedClubDirectoryFieldKeys,
+  partnerClubProblem,
   medicalFreeTextFields,
   rosterCarryoverMismatches,
   rosterGenderPrefill,
@@ -270,6 +271,28 @@ describe("club and church directory lock (#482)", () => {
     };
     expect(clubDirectoryOwnedResponses(hydrated, { clubName: "test  pathfinders", churchName: null }))
       .toMatchObject({ club_name: "Test Pathfinders" });
+  });
+
+  it("locks only the first clubs-directory question; a partner club question stays the director's own pick (#963)", () => {
+    const withPartner = registrationFormDefinitionSchema.parse({
+      ...directoryForm,
+      sections: [
+        { ...directoryForm.sections[0]!, fields: [
+          ...directoryForm.sections[0]!.fields,
+          { id: "f_partner", key: "partner_club", label: "Partner club", helpText: "", type: "SELECT", scope: "REGISTRATION", required: false, options: [], optionSource: "CLUBS_DIRECTORY" },
+          { id: "f_partner_other", key: "partner_club_other", label: "Partner club — not listed", helpText: "", type: "TEXT", scope: "REGISTRATION", required: true, options: [], conditional: { fieldKey: "partner_club", operator: "EQUALS", value: "Not listed" } },
+        ] },
+        directoryForm.sections[1]!,
+      ],
+    });
+    expect(lockedClubDirectoryFieldKeys(withPartner)).toEqual(["club_name"]);
+    expect(clubDirectoryOwnedResponses(withPartner, { clubName: "Test Pathfinders", churchName: null }))
+      .toEqual({ club_name: "Test Pathfinders", club_name_other: null });
+    expect(partnerClubProblem(withPartner, { club_name: "Test Pathfinders", partner_club: "Sample Eagles" })).toBeNull();
+    expect(partnerClubProblem(withPartner, { club_name: "Test Pathfinders", partner_club: "Not listed", partner_club_other: "Test Pathfinders" })).toBeNull();
+    expect(partnerClubProblem(withPartner, { club_name: "Test Pathfinders", partner_club: "" })).toBeNull();
+    expect(partnerClubProblem(withPartner, { club_name: "Test Pathfinders", partner_club: "test  pathfinders" })?.field.key).toBe("partner_club");
+    expect(partnerClubProblem(directoryForm, { club_name: "Test Pathfinders" })).toBeNull();
   });
 
   it("reports no locked fields for a form with no directory sources", () => {

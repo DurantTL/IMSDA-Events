@@ -2,6 +2,7 @@ import { permissionShortLabel } from "@/modules/club-teams/permission-domain";
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { DIRECTORY_NOT_LISTED_VALUE } from "@/modules/forms/definition";
 import { teamLabel } from "@/modules/club-teams/domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { ALTERNATE_FIELD_KEY, isAlternateAnswer } from "@/modules/club-teams/rules";
@@ -22,6 +23,12 @@ export type TeamFormPage = { eventName: string; title: string; model: TeamFormMo
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+}
+
+/** The partner club: the directory pick, or what was typed when the pick was "Not listed" (#963). */
+function partnerClubName(responses: Record<string, unknown>) {
+  const picked = text(responses.partner_club);
+  return picked === DIRECTORY_NOT_LISTED_VALUE ? text(responses.partner_club_other) : picked;
 }
 
 async function eventContext(eventId: string, options: { publishedClubOnly?: boolean } = {}) {
@@ -123,7 +130,7 @@ export async function loadFilledTeamForm(which: Which): Promise<TeamFormPage | n
       phone: text(responses.coordinator_phone),
       email: text(responses.coordinator_email),
     },
-    partnerClub: text(responses.partner_club),
+    partnerClub: partnerClubName(responses),
     members,
     alternate,
     coaches,

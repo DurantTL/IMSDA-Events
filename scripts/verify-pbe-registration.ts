@@ -180,7 +180,7 @@ async function main() {
   await addStarterEventTemplates(staffUserId);
   const template = await prisma.eventTemplate.findFirstOrThrow({ where: { versions: { some: { payload: { path: ["starterKey"], equals: "pathfinder_bible_experience" } } } } });
   const applied = await applyEventTemplate(template.id, staffUserId, {
-    name: `Pbe check ${P}`, slug: `${S}-pbe`, startsOn: "2027-01-16", endsOn: "2027-01-16", requestKey: `${P}-apply-key-1`,
+    name: `Pbe check ${P}`, slug: `${S}-pbe`, startsOn: "2027-01-17", endsOn: "2027-01-17", requestKey: `${P}-apply-key-1`,
   });
   assert(applied.event, "the template creates an event");
   const eventId = applied.event.id;
@@ -432,7 +432,7 @@ async function main() {
   const filled = await loadFilledTeamForm({ eventId, organizationId: clubOf("a"), teamKey: "bible bees" });
   assert(filled, "the filled form loads under the club and team");
   const html = renderToStaticMarkup(createElement(TeamFormSheet, { model: filled.model }));
-  for (const text of ["Iowa-Missouri Conference Pathfinder", "Due December 18", "January 16, 2027", "Pbe Coordinator", "PbeAlex Aa1", "PbeCoach One", "Bible Bees", `Pbe Club a ${P}`, "4-1"]) {
+  for (const text of ["Iowa-Missouri Conference Pathfinder", "Due December 18", "January 17, 2027", "Pbe Coordinator", "PbeAlex Aa1", "PbeCoach One", "Bible Bees", `Pbe Club a ${P}`, "4-1"]) {
     assert(html.includes(text), `the filled form shows "${text}"`);
   }
   assert(!(await loadFilledTeamForm({ eventId, organizationId: clubOf("c"), teamKey: "bible bees" })), "another club cannot load a team's form");
@@ -440,7 +440,7 @@ async function main() {
   const blank = await loadBlankTeamForm(eventId, { publishedClubOnly: true });
   assert(blank, "the blank form loads");
   const blankHtml = renderToStaticMarkup(createElement(TeamFormSheet, { model: blank.model }));
-  assert(blankHtml.includes("Club Director&#x27;s Signature:") && blankHtml.includes("January 16, 2027") && !blankHtml.includes("Pbe Coordinator"), "the blank form has the signature line, the dates, and no one's details");
+  assert(blankHtml.includes("Club Director&#x27;s Signature:") && blankHtml.includes("January 17, 2027") && !blankHtml.includes("Pbe Coordinator"), "the blank form has the signature line, the dates, and no one's details");
   console.log("ok  the printed form renders filled and blank");
 
   // 14. Billing and church views: each team is its own line; a club's teams group together.
@@ -699,7 +699,7 @@ async function main() {
 
   // 15h. An event with team rules but one registration per club keeps the rules on every edit.
   const soloEventId = `${P}_solo_event`;
-  await prisma.event.create({ data: { id: soloEventId, slug: `${S}-solo`, name: "Pbe check solo team event", ...plainEventData, startsAt: new Date("2027-01-16T16:00:00Z"), endsAt: new Date("2027-01-16T22:00:00Z") } });
+  await prisma.event.create({ data: { id: soloEventId, slug: `${S}-solo`, name: "Pbe check solo team event", ...plainEventData, startsAt: new Date("2027-01-17T16:00:00Z"), endsAt: new Date("2027-01-17T22:00:00Z") } });
   await prisma.registrationForm.create({
     data: {
       id: `${P}_soloform`, eventId: soloEventId, createdByUserId: staffUserId, name: "solo", slug: `${S}-solo-form`, status: RegistrationFormStatus.PUBLISHED,
