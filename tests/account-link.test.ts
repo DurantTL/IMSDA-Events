@@ -44,16 +44,25 @@ describe("account link reads (#554 slice a)", () => {
     await expect(getAccountLinkForAttendeeAccount("acc_x", client())).resolves.toBeNull();
   });
 
-  it("only reads: the client exposes no write method to it", async () => {
-    const c = client({ user: { id: "usr_1", attendeeAccountId: "acc_1" } }) as unknown as {
-      user: Record<string, unknown>;
-      platformSettings: Record<string, unknown>;
+  it("only reads, and always with a select", async () => {
+    const find = vi.fn().mockResolvedValue({ id: "usr_1", attendeeAccountId: "acc_1", unifiedSignInEnabled: true });
+    const writes = {
+      create: vi.fn(), createMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(),
+      upsert: vi.fn(), delete: vi.fn(), deleteMany: vi.fn(),
     };
-    await getAttendeeAccountLinkForUser("usr_1", c as never);
-    await getAccountLinkForAttendeeAccount("acc_1", c as never);
-    await isUnifiedSignInEnabled(c as never);
-    expect(Object.keys(c.user)).toEqual(["findUnique"]);
-    expect(Object.keys(c.platformSettings)).toEqual(["findUnique"]);
+    const c = {
+      user: { findUnique: find, ...writes },
+      platformSettings: { findUnique: find, ...writes },
+    } as never;
+    await getAttendeeAccountLinkForUser("usr_1", c);
+    await getAccountLinkForAttendeeAccount("acc_1", c);
+    await isUnifiedSignInEnabled(c);
+
+    expect(find).toHaveBeenCalledTimes(3);
+    for (const [args] of find.mock.calls) {
+      expect(args.select).toBeDefined();
+    }
+    for (const write of Object.values(writes)) expect(write).not.toHaveBeenCalled();
   });
 
   it("keeps the one-sign-in switch off unless the settings row turns it on", async () => {

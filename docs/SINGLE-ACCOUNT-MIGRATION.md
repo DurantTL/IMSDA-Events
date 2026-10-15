@@ -1,8 +1,9 @@
 # Single account per person: migration plan (#554)
 
-Companion to [ADR 0013](decisions/0013-one-account-per-person.md), which Caleb accepted on
-Oct 15 2026 (build slice by slice, each its own PR, the new sign-in behind a switch that is
-off by default). The plan and the read-only dry run (`npm run accounts:dry-run`) shipped
+Companion to [ADR 0013](decisions/0013-one-account-per-person.md). Status: Accepted: the
+open questions were answered by Caleb on Oct 15, 2026 (build slice by slice, each its own
+PR, the new sign-in behind a switch that is off by default). One question from the Oct 8
+comment (staff linking different emails by hand) is still open for him. The plan and the read-only dry run (`npm run accounts:dry-run`) shipped
 first. **Slice (a)** adds the link column and the switch with **no behaviour change**: no
 sign-in, session, permission or email changes, and no existing account is linked, created or
 merged. Slices (b) to (e) follow, each its own PR.
@@ -272,14 +273,16 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 
 ## 3. Order of operations
 
-1. **Before anything:** merge nothing until the director says to start (ADR, Oct 1 hold) and
-   the Women's Retreat (Oct 9-11) is over.
+1. **Before anything:** build now, slice by slice (Oct 15). The switch stays off by default
+   until Caleb turns it on, and production linking waits for his review of the dry-run
+   preview. The target window is November, before Honors Weekend registration opens in
+   December (Oct 8).
 2. Take a database backup (`scripts/backup`) and record its identifier in the approval note.
 3. Run `npm run accounts:dry-run` against a **copy** of production, then against production
    (it only reads). Review counts and conflicts with the director. Do not share full emails.
 4. Deploy slice (a)'s migration (human step). Verify with queries 6.1 and 6.2.
 5. Deploy slices (b) and (c) behind the switch, off. Turn the switch on for staff testers,
-   then for everyone after the retreat.
+   then for everyone, when Caleb says.
 6. Apply links (slice (d)) one person per transaction, **clean pairs first**, then
    `needs-review` pairs after a person has chosen what survives, never `blocked` pairs until
    their blocker is resolved by hand.

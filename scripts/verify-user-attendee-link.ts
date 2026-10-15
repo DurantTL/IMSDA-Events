@@ -60,8 +60,14 @@ async function main() {
   assert(column.length === 1 && column[0].is_nullable === "YES", "User.attendeeAccountId exists and is nullable");
   assert(column[0].column_default === null, "User.attendeeAccountId has no default");
 
+  // CLEAN-DATABASE CHECK (whole table, not just this script's rows): on a freshly migrated and
+  // seeded database no user is linked. Do not run this script against a database where people
+  // have been linked on purpose (a later slice); it is meant for CI and throwaway databases.
   const linkedBefore = await prisma.user.count({ where: { attendeeAccountId: { not: null } } });
-  assert(linkedBefore === 0, `no existing user is linked (found ${linkedBefore})`);
+  assert(
+    linkedBefore === 0,
+    `clean-database check: no user in the whole database should be linked (found ${linkedBefore}); run this on a freshly migrated and seeded database`,
+  );
 
   await prisma.attendeeAccount.createMany({
     data: accountIds.map((id, i) => ({ id, email: email(`acct${i}`), displayName: `Link Synthetic ${i}` })),
@@ -72,8 +78,8 @@ async function main() {
 
   const fresh = await prisma.user.findUniqueOrThrow({ where: { id: userIds[0] } });
   assert(fresh.attendeeAccountId === null, "a new user starts unlinked");
-  assert((await getAttendeeAccountLinkForUser(userIds[0])) === null, "unlinked user reads as null");
-  assert((await getAccountLinkForAttendeeAccount(accountIds[0])) === null, "unlinked account reads as null");
+  assert((await getAttendeeAccountLinkForUser(userIds[0], prisma)) === null, "unlinked user reads as null");
+  assert((await getAccountLinkForAttendeeAccount(accountIds[0], prisma)) === null, "unlinked account reads as null");
 
   // Both sides must exist.
   const missing = await prismaCode(
@@ -83,17 +89,17 @@ async function main() {
 
   // A real link, read back through the module.
   await prisma.user.update({ where: { id: userIds[0] }, data: { attendeeAccountId: accountIds[0] } });
-  const forUser = await getAttendeeAccountLinkForUser(userIds[0]);
+  const forUser = await getAttendeeAccountLinkForUser(userIds[0], prisma);
   assert(
     forUser?.userId === userIds[0] && forUser.attendeeAccountId === accountIds[0],
     "the link reads from the user side",
   );
-  const forAccount = await getAccountLinkForAttendeeAccount(accountIds[0]);
+  const forAccount = await getAccountLinkForAttendeeAccount(accountIds[0], prisma);
   assert(
     forAccount?.userId === userIds[0] && forAccount.attendeeAccountId === accountIds[0],
     "the link reads from the account side",
   );
-  assert((await getAccountLinkForAttendeeAccount(accountIds[1])) === null, "an unlinked account stays unlinked");
+  assert((await getAccountLinkForAttendeeAccount(accountIds[1], prisma)) === null, "an unlinked account stays unlinked");
 
   // 1:1: a second user cannot take the same account, and a user may still move to a free one.
   const dup = await prismaCode(
@@ -111,13 +117,13 @@ async function main() {
   const unlinked = await prisma.user.findUnique({ where: { id: userIds[1] } });
   assert(unlinked !== null, "deleting the attendee account keeps the staff user");
   assert(unlinked.attendeeAccountId === null, "deleting the attendee account unlinks the staff user");
-  assert((await getAttendeeAccountLinkForUser(userIds[1])) === null, "the helper sees the unlink");
+  assert((await getAttendeeAccountLinkForUser(userIds[1], prisma)) === null, "the helper sees the unlink");
 
   // Deleting the user leaves the attendee account alone.
   await prisma.user.delete({ where: { id: userIds[0] } });
   const account = await prisma.attendeeAccount.findUnique({ where: { id: accountIds[0] }, select: { id: true } });
   assert(account !== null, "deleting the staff user keeps the attendee account");
-  assert((await getAccountLinkForAttendeeAccount(accountIds[0])) === null, "the account is free to link again");
+  assert((await getAccountLinkForAttendeeAccount(accountIds[0], prisma)) === null, "the account is free to link again");
 
   // The one-sign-in switch is off by default.
   const settingsColumn = await prisma.$queryRaw<Array<{ column_default: string | null; is_nullable: string }>>`
@@ -127,7 +133,11 @@ async function main() {
     settingsColumn.length === 1 && settingsColumn[0].column_default === "false" && settingsColumn[0].is_nullable === "NO",
     "PlatformSettings.unifiedSignInEnabled is NOT NULL DEFAULT false",
   );
-  assert((await isUnifiedSignInEnabled()) === false, "the one-sign-in switch reads off on a fresh database");
+  // CLEAN-DATABASE CHECK: reads the real settings row, so it holds only before anyone turns the switch on.
+  assert(
+    (await isUnifiedSignInEnabled(prisma)) === false,
+    "clean-database check: the one-sign-in switch should read off on a freshly seeded database (was it turned on here?)",
+  );
 
   console.log("User/attendee link verification passed.");
 }
