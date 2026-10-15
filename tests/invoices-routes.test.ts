@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => ({
   },
   grant: vi.fn(),
   ensureDocument: vi.fn(),
+  churchOfPromoInvoice: vi.fn(),
+  prepareChurchDraft: vi.fn(),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership, listEventsForUser: mocks.listEventsForUser }));
@@ -44,6 +46,7 @@ vi.mock("@/modules/invoices/repository", async () => {
   return { InvoiceError, ...mocks.service };
 });
 vi.mock("@/modules/invoices/delivery-repository", () => ({ ensureInvoiceDocument: mocks.ensureDocument }));
+vi.mock("@/modules/promo-codes/church-invoice-repository", () => ({ churchOfPromoInvoice: mocks.churchOfPromoInvoice, prepareChurchCodeInvoiceDraft: mocks.prepareChurchDraft }));
 vi.mock("@/modules/invoices/finalize-access", () => {
   class InvoiceAccessGrantError extends Error {
     constructor(public readonly code: string, message: string) { super(message); }
@@ -101,6 +104,8 @@ beforeEach(() => {
   mocks.service.finalizeInvoiceVersion.mockResolvedValue({ changed: true, versionId: "v1", invoiceId: "i1", number: "SC27-0001", revision: 0, amountDueCents: 5000 });
   mocks.grant.mockResolvedValue({ granted: true, changed: true });
   mocks.ensureDocument.mockResolvedValue({ id: "doc1" });
+  mocks.churchOfPromoInvoice.mockResolvedValue(null);
+  mocks.prepareChurchDraft.mockResolvedValue({ outcome: "REFRESHED", invoiceId: "i1", versionId: "v1", revision: 0, amountDueCents: 5000, lineCount: 2, contactChanged: false });
 });
 
 const finalizeBody = { action: "finalize", versionId: "v1", idempotencyKey: KEY, confirm: true };
@@ -130,6 +135,21 @@ describe("POST /api/events/[eventId]/invoices", () => {
     mocks.ensureDocument.mockClear();
     expect((await POST(request(finalizeBody), context())).status).toBe(409);
     expect(mocks.ensureDocument).not.toHaveBeenCalled();
+  });
+
+  it("a church's promo code invoice (#399) is refreshed from its redemptions, never rebuilt from a reconciliation, and a contact-only revision is refused", async () => {
+    mocks.churchOfPromoInvoice.mockResolvedValue("church-a");
+    expect((await POST(request({ action: "regenerate", invoiceId: "i1" }), context())).status).toBe(200);
+    // Regenerate only rebuilds an open draft (the service refuses NOT_A_DRAFT otherwise).
+    expect(mocks.prepareChurchDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance", requireDraft: true });
+    expect((await POST(request({ action: "revise", invoiceId: "i1", mode: "FROM_RECONCILIATION", reason: "Usage changed" }), context())).status).toBe(200);
+    // The user's reason travels to the revision.
+    expect(mocks.prepareChurchDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance", revisionReason: "Usage changed" });
+    expect(mocks.prepareChurchDraft).toHaveBeenCalledTimes(2);
+    expect((await POST(request({ action: "revise", invoiceId: "i1", mode: "CONTACT_ONLY", reason: "New treasurer" }), context())).status).toBe(409);
+    expect(mocks.service.regenerateInvoiceDraft).not.toHaveBeenCalled();
+    expect(mocks.service.reviseInvoice).not.toHaveBeenCalled();
+    expect(mocks.service.finalizeInvoiceVersion).not.toHaveBeenCalled();
   });
 
   it("MANAGE_FINANCE alone does not carry the Finalize invoices permission into finalization", async () => {

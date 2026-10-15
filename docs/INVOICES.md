@@ -353,6 +353,14 @@ Database triggers (not only application code) enforce, and `npm run test:invoice
   reconciliation, only a revision can bring its finalized invoice to $0; an unfinalized draft for it cannot
   be finalized.
 - **Per-event permission** (see above): the treasurer is granted per event.
+- **Church promo code invoices (#399).** A church that sponsors a promo code on a general, attendee-paid event is invoiced
+  for what its code covered through this same machinery: a `CHURCH_PROMO_CODES` version with no reconciliation, drafted by a
+  staff action from the church report (idempotent, SERIALIZABLE), finalized only by someone with the Finalize invoices
+  permission, then sent, posted and paid like any other. These invoices are left out of a deferred event's invoice list and
+  draft run. See `modules/promo-codes/README.md`.
+  - **Invoice code (open owner decision).** On an attendee-paid event there is no screen for the invoice code, so the first
+    church invoice finalized takes the code derived from the event name (and freezes it on the event, as for any event).
+    Staff cannot choose it yet; whether they should is an owner decision.
 - The code of two events in the same year must differ; the screen explains the refusal.
 
 ## Checks
