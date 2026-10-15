@@ -197,6 +197,8 @@ const pages: PageSpec[] = [
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),
   staff("finance-church-owed", "/finance/church-owed"),
+  // The event's scholarship fund (#398): a long sponsor name, a pledge, and an award on a cancelled registration.
+  staff("finance-scholarship-fund", "/finance/scholarship-fund"),
   staff("finance-cancellation-policy", "/finance/cancellation-policy"),
   staff("finance-square-payments", "/finance/square-payments"),
   staff("lodging", "/more/lodging"),
@@ -521,6 +523,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.honor.deleteMany({ where: { code: { startsWith: `${P}-honor-` } } }),
     prisma.registrationAttendee.deleteMany({ where: { registrationId: { startsWith: `${P}_reg_` } } }),
     prisma.registration.deleteMany({ where: { id: { startsWith: `${P}_reg_` } } }),
+    prisma.scholarshipContribution.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
+    prisma.scholarshipFund.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.clubMonthlyReport.deleteMany({ where: orgs }),
     prisma.clubRosterMember.deleteMany({ where: orgs }),
     prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
@@ -997,6 +1001,31 @@ async function seedHonorsAndRegistrations(prisma: PrismaClient) {
         submittedAt: status === "DRAFT" ? null : new Date("2026-09-20T15:00:00Z"), cancelledAt: status === "CANCELLED" ? new Date("2026-09-25T15:00:00Z") : null,
       },
     });
+    if (status === "SUBMITTED" || status === "CANCELLED") {
+      // A scholarship line that draws on the event's fund (#398), pledged on the submitted one.
+      const fundId = `${P}_fund`;
+      await prisma.scholarshipFund.upsert({ where: { id: fundId }, update: {}, create: { id: fundId, eventId } });
+      const adjustmentId = `${P}_reg_adjustment_${index + 1}`;
+      await prisma.registrationAdjustment.upsert({
+        where: { id: adjustmentId }, update: {},
+        create: { id: adjustmentId, eventId, registrationId, kind: "SCHOLARSHIP", amountCents: -2500, reason: "Mobile layout check scholarship", createdByNameSnapshot: "Layout Check" },
+      });
+      await prisma.scholarshipAward.upsert({
+        where: { id: `${P}_reg_award_${index + 1}` }, update: {},
+        create: {
+          id: `${P}_reg_award_${index + 1}`, eventId, fundId, registrationId, adjustmentId, amountCents: 2500, pledged: status === "SUBMITTED",
+          sponsorName: "Mobile Layout Check Sponsoring Church With A Very Long Name For Wrapping", sponsorKey: `name:${P}-long-sponsor`,
+        },
+      });
+      await prisma.scholarshipContribution.upsert({
+        where: { id: `${P}_contribution` }, update: {},
+        create: {
+          id: `${P}_contribution`, eventId, fundId, sponsorName: "Mobile Layout Check Sponsoring Church With A Very Long Name For Wrapping",
+          sponsorKey: `name:${P}-long-sponsor`, amountCents: 10_000, receivedOn: new Date("2026-09-20T00:00:00Z"), method: "CHECK",
+          note: "Check 1001 with a long note to check wrapping on a phone", createdByNameSnapshot: "Layout Check",
+        },
+      });
+    }
     for (let slot = 0; slot < 3; slot += 1) {
       const personId = slot === 0 ? holderId : `${P}_reg_person_${index + 1}_${slot}`;
       if (slot > 0) {
