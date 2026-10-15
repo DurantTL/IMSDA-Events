@@ -6,23 +6,17 @@ import { redirect } from "next/navigation";
 import {
   Activity,
   ArrowRight,
-  Award,
-  CalendarDays,
   BellRing,
   CalendarPlus,
   CheckCircle2,
-  Church,
+  ChevronDown,
   CircleAlert,
-  CloudCog,
-  LayoutTemplate,
   Map as MapIcon,
   MailCheck,
-  Package,
   RefreshCw,
   ShieldCheck,
   TentTree,
   Timer,
-  Trophy,
   UsersRound,
 } from "lucide-react";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -34,7 +28,8 @@ import { listPendingModuleRequests } from "@/modules/event-modules/requests";
 import { getReleaseIdentity } from "@/lib/release";
 import packageInfo from "@/package.json";
 import styles from "./system-admin.module.css";
-import { staffPageTitles } from "@/components/staff-navigation";
+import { eventFeaturesHref, staffPageTitles } from "@/components/staff-navigation";
+import { systemNavGroups } from "@/components/system-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.systemManagement };
 
@@ -189,23 +184,30 @@ export default async function SystemAdminPage({
           <h2>System command center</h2>
           <p>Every event, the system&rsquo;s health, and the exceptions that need someone. Each link opens the event workspace that can change the record.</p>
         </div>
-        <div className={styles.heroActions}>
-          <Link className="primary-button" href="/event-setup"><CalendarPlus aria-hidden="true" size={16} /> Create event</Link>
-          <Link className="secondary-button" href="/admin/event-templates"><LayoutTemplate aria-hidden="true" size={15} /> Event templates</Link>
-          <Link className="secondary-button" href="/admin/team"><UsersRound aria-hidden="true" size={15} /> Team</Link>
-          <Link className="secondary-button" href="/admin/accounts"><UsersRound aria-hidden="true" size={15} /> Accounts</Link>
-          <Link className="secondary-button" href="/admin/settings"><CloudCog aria-hidden="true" size={15} /> Platform settings</Link>
-          <Link className="secondary-button" href="/admin/readiness"><CheckCircle2 aria-hidden="true" size={15} /> System readiness</Link>
-          <Link className="secondary-button" href="/admin/organizations"><Church aria-hidden="true" size={15} /> Clubs and churches</Link>
-          <Link className="secondary-button" href="/admin/honors"><Award aria-hidden="true" size={15} /> Honor catalog</Link>
-          <Link className="secondary-button" href="/admin/club-supplies"><Package aria-hidden="true" size={15} /> Club supply catalog</Link>
-          <Link className="secondary-button" href="/admin/club-forms"><Package aria-hidden="true" size={15} /> Club forms</Link>
-          <Link className="secondary-button" href="/admin/master-award-rules"><Trophy aria-hidden="true" size={15} /> Master Award rules</Link>
-          <Link className="secondary-button" href="/admin/calendar"><CalendarDays aria-hidden="true" size={15} /> Public calendar</Link>
-          <Link className="secondary-button" href="/admin/organizations/background-checks"><ShieldCheck aria-hidden="true" size={15} /> Sterling Volunteers</Link>
-          <Link className="secondary-button" href="/admin"><RefreshCw aria-hidden="true" size={15} /> Refresh</Link>
-        </div>
       </section>
+
+      <nav className={styles.tasks} aria-label="System management tasks">
+        {systemNavGroups.map((group) => {
+          const cards = group.items.map(({ href, label, description, icon: Icon }) => (
+            <Link className={styles.taskCard} href={href} key={href}>
+              <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
+              <span><strong>{label}</strong><small>{description}</small></span>
+            </Link>
+          ));
+          // Catalogs and settings start closed; a disclosure needs no script, so it also works before hydration.
+          return group.collapsedByDefault ? (
+            <details className={styles.taskGroup} key={group.key} data-testid={`task-group-${group.key}`}>
+              <summary><h2>{group.label}</h2><ChevronDown aria-hidden="true" size={16} /></summary>
+              <div className={styles.taskGrid}>{cards}</div>
+            </details>
+          ) : (
+            <section className={styles.taskGroup} key={group.key} aria-labelledby={`task-group-${group.key}`} data-testid={`task-group-${group.key}`}>
+              <h2 id={`task-group-${group.key}`}>{group.label}</h2>
+              <div className={styles.taskGrid}>{cards}</div>
+            </section>
+          );
+        })}
+      </nav>
 
       <section className={styles.metrics} aria-label="System summary">
         <article><span className={styles.metricIcon}><TentTree aria-hidden="true" size={20} /></span><strong>{dashboard.summary.currentEventCount}</strong><p>Current events</p><small>{dashboard.summary.publishedEventCount} published across {dashboard.summary.eventCount} total</small></article>
@@ -285,6 +287,8 @@ export default async function SystemAdminPage({
                     </div>
                     <div className={styles.eventLinks}>
                       <Link href={`/registration-builder?${query}`}>Form</Link>
+                      {/* TODO(#965): the Event features page is not merged; this is its placeholder href until it lands. */}
+                      <Link href={withEvent(eventFeaturesHref, query)}>Features</Link>
                       <Link href={`/finance/square-payments?${query}`}>Square matching</Link>
                       <Link href={`/more/promo-codes?${query}`}>Promo codes</Link>
                       <Link href={`/staff?${query}`}>Team</Link>
