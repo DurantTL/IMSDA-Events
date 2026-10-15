@@ -116,8 +116,8 @@ async function main() {
   const typeIds = { ADULT: `${P}_type_adult`, YOUTH: `${P}_type_youth` };
   await prisma.eventAttendeeType.createMany({
     data: [
-      { id: typeIds.ADULT, eventId: ids.event, code: "ADULT", label: "Adult" },
-      { id: typeIds.YOUTH, eventId: ids.event, code: "YOUTH", label: "Youth" },
+      { id: typeIds.ADULT, eventId: ids.event, code: "ADULT", label: "Adult", minimumAge: 18 },
+      { id: typeIds.YOUTH, eventId: ids.event, code: "YOUTH", label: "Youth", minimumAge: 0, maximumAge: 17 },
     ],
   });
   // One ordinary choice question and one sensitive one (the kind that holds health information).
@@ -134,6 +134,16 @@ async function main() {
           sections: [{ id: `${P}_s1`, title: "Details", description: "", fields: [
             formField("f_meal", "meal", "Dinner choice", ["plain", "vegan"]),
             formField("f_medical", "medical_condition", "Medical condition", ["asthma", "none"], { sensitive: true }),
+            formField("f_diet", "diet", "Diet", ["plain", "gluten_free"]),
+          ] }],
+        }),
+      }, {
+        // An older, archived version marks the same question sensitive: sensitive in any version is unsearchable.
+        id: `${P}_formv2`, createdByUserId: ids.admin, versionNumber: 2, status: "ARCHIVED", publishedAt: new Date("2027-02-01T00:00:00Z"),
+        definition: registrationFormDefinitionSchema.parse({
+          title: "Audience check form", description: "Fictitious.", confirmationMessage: "Thanks.",
+          sections: [{ id: `${P}_s2`, title: "Details", description: "", fields: [
+            formField("f_diet2", "diet", "Diet", ["plain", "gluten_free"], { sensitive: true }),
           ] }],
         }),
       }] },
@@ -208,7 +218,7 @@ async function main() {
   await prisma.emailAnnouncementOptOut.create({ data: { normalizedEmail: email("optout"), scope: "EVENT", eventId: ids.event, scopeKey: ids.event, source: "PAGE" } });
   await prisma.messageOutbox.create({
     data: {
-      eventId: ids.other, templateKey: "EVENT_ANNOUNCEMENT", recipientKind: "REGISTRANT", recipientEmail: email("bounce"),
+      eventId: ids.other, templateKey: "EVENT_ANNOUNCEMENT", recipientKind: "REGISTRANT", recipientEmail: email("bounce").toUpperCase().replace("@EXAMPLE.TEST", "@Example.Test"),
       senderNameSnapshot: "Synthetic", subjectSnapshot: "x", bodyTextSnapshot: "x", idempotencyKey: `${P}-bounce`, correlationId: randomUUID(),
       status: "SENT", providerDeliveryStatus: "BOUNCED", providerStatusAt: new Date(),
     },
@@ -221,7 +231,7 @@ async function main() {
   const emails = (result: Awaited<ReturnType<typeof run>>) => result.result.recipients.map((recipient) => recipient.email);
 
   // 1. One email in several roles and registrations: one recipient, roles and reasons kept, balances never merged.
-  const shared = await run(commsPermissions, { roles: ["REGISTRATION_CONTACT", "ATTENDEE"], messageKind: "OPERATIONAL" });
+  const shared = await run(adminPermissions, { roles: ["REGISTRATION_CONTACT", "ATTENDEE"], messageKind: "OPERATIONAL" });
   const sharedRecipient = shared.result.recipients.find((recipient) => recipient.email === email("shared"));
   assert(sharedRecipient, "the shared address is a recipient");
   assert(shared.result.recipients.filter((recipient) => recipient.email === email("shared")).length === 1, "the shared address is listed once");
@@ -239,9 +249,19 @@ async function main() {
   assert(due.result.recipients.every((recipient) => recipient.reasons.some((reason) => reason.dimension === "payment" && reason.value === "UNPAID,PARTIAL")), "each recipient says why");
   const paid = await run(adminPermissions, { search: "payment=PAID", messageKind: "OPERATIONAL" });
   assert(emails(paid).join() === email("vera"), `paid in full: ${emails(paid)}`);
-  const youth = await run(commsPermissions, { roles: ["ATTENDEE"], search: "attendeeType=YOUTH", messageKind: "OPERATIONAL" });
-  assert(emails(youth).join() === email("kid"), `attendee type: ${emails(youth)}`);
-  assert(youth.result.recipients[0]!.reasons.some((reason) => reason.dimension === "attendeeType" && reason.label === "Attendee type Youth"), "the attendee-type rule is a reason, with its label");
+  // A minor is never written to, decided from the attendee type: the youth attendee is one address-free exclusion.
+  const youth = await run(adminPermissions, { roles: ["ATTENDEE"], search: "attendeeType=YOUTH", messageKind: "OPERATIONAL" });
+  assert(emails(youth).length === 0, `a minor attendee is never a recipient: ${emails(youth)}`);
+  assert(youth.result.exclusions.length === 1 && youth.result.exclusions[0]!.code === "MINOR_ATTENDEE" && youth.result.exclusions[0]!.email === null, "the minor is one MINOR_ATTENDEE exclusion without an address");
+  assert(!JSON.stringify(youth).includes(email("kid")) && !JSON.stringify(youth).includes("Kid"), "the minor's name and address appear nowhere in the preview");
+  const adultsOnly = await run(adminPermissions, { roles: ["ATTENDEE"], search: "attendeeType=ADULT", messageKind: "OPERATIONAL" });
+  assert(emails(adultsOnly).includes(email("shared")) && !emails(adultsOnly).includes(email("kid")), `adult attendees are reachable: ${emails(adultsOnly)}`);
+  assert(adultsOnly.result.recipients.find((recipient) => recipient.email === email("shared"))!.reasons.some((reason) => reason.dimension === "attendeeType" && reason.label === "Attendee type Adult"), "the attendee-type rule is a reason, with its label");
+  // An attendee type with no age information is excluded too, while the event has youth types (fail closed).
+  await prisma.eventAttendeeType.update({ where: { id: typeIds.ADULT }, data: { minimumAge: null } });
+  const unknownAge = await run(adminPermissions, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" });
+  assert(emails(unknownAge).length === 0 && unknownAge.result.exclusions.some((exclusion) => exclusion.code === "MINOR_ATTENDEE"), "unknown-age attendees are excluded on an event with youth types");
+  await prisma.eventAttendeeType.update({ where: { id: typeIds.ADULT }, data: { minimumAge: 18 } });
   const defaults = await run(commsPermissions, { messageKind: "OPERATIONAL" });
   assert(!emails(defaults).includes(email("cancelled")) && !emails(defaults).includes(email("draft")), "cancelled and draft are not in the default audience");
   assert(emails(await run(commsPermissions, { search: "status=CANCELLED", messageKind: "OPERATIONAL" })).join() === email("cancelled"), "cancelled can be chosen");
@@ -289,24 +309,32 @@ async function main() {
   const noFinance = await refusal(commsPermissions, { search: "payment=UNPAID" });
   const noIdentity = await refusal(commsPermissions, { search: "q=Pat" });
   const noReadiness = await refusal(commsPermissions, { readinessStates: ["ATTENDEE_RESPONSES_INCOMPLETE"] });
+  const noAttendeeRole = await refusal(commsPermissions, { roles: ["ATTENDEE"] });
+  const noOrgRoleFinance = await refusal([...commsPermissions, "VIEW_SENSITIVE_DATA"], { roles: ["ORGANIZATION_CONTACT"] });
+  const noGroupRolePerm = await refusal(commsPermissions, { roles: ["GROUP_LEADER"] });
+  const attendeeText = await refusal(adminPermissions, { roles: ["ATTENDEE"], search: "q=Pat" });
+  const attendeeCheckIn = await refusal(adminPermissions, { roles: ["ATTENDEE"], search: "checkIn=ALL" });
+  const attendeeAnswer = await refusal(adminPermissions, { roles: ["ATTENDEE"], search: "answer=ATTENDEE:meal=vegan" });
+  const sensitiveAnyVersion = await refusal(adminPermissions, { search: "answer=ATTENDEE:diet=gluten_free" });
   const noGroups = await refusal(adminPermissions, { roles: ["GROUP_LEADER"] });
   const noOrgs = await refusal(adminPermissions, { roles: ["ORGANIZATION_CONTACT"] });
   const sensitiveAnswer = await refusal(adminPermissions, { search: "answer=ATTENDEE:medical_condition=asthma" });
   const staleAnswer = await refusal(adminPermissions, { search: "answer=ATTENDEE:no_such_question=x" });
   const malformed = await refusal(adminPermissions, { search: "payment=MAYBE" });
-  assert(new Set([forbidden, otherEventTag, missingTag, noCheckIn, noFinance, noIdentity, noReadiness, noGroups, noOrgs, sensitiveAnswer, staleAnswer, malformed]).size === 1, "every refusal is the same fixed message");
+  assert(new Set([forbidden, otherEventTag, missingTag, noCheckIn, noFinance, noIdentity, noReadiness, noAttendeeRole, noOrgRoleFinance, noGroupRolePerm, attendeeText, attendeeCheckIn, attendeeAnswer, sensitiveAnyVersion, noGroups, noOrgs, sensitiveAnswer, staleAnswer, malformed]).size === 1, "every refusal is the same fixed message");
   assert(!forbidden.includes("VIP") && !forbidden.match(/\d/), "the refusal names no value and no count");
   const commsOptions = JSON.stringify(await getAudienceFilterOptions(ids.event, commsPermissions));
   assert(!commsOptions.includes("Synthetic VIP") && !commsOptions.includes('"key":"tag"') && !commsOptions.includes('"key":"checkIn"') && !commsOptions.includes('"key":"payment"'), "the filter list for comms holds nothing it may not use");
-  assert(!commsOptions.includes("GROUP_LEADER") && !commsOptions.includes("ORGANIZATION_CONTACT"), "domains the event lacks are not offered");
+  assert(!commsOptions.includes("GROUP_LEADER") && !commsOptions.includes("ORGANIZATION_CONTACT") && !commsOptions.includes('"ATTENDEE"'), "roles the caller or the event lacks are not offered");
   assert(!commsOptions.includes('"DRAFT"'), "a draft is never offered");
   const adminOptions = JSON.stringify(await getAudienceFilterOptions(ids.event, adminPermissions));
   assert(adminOptions.includes("Synthetic VIP") && adminOptions.includes("Dinner choice"), "an authorized caller is offered the tag and the ordinary question");
+  assert(!adminOptions.includes("ATTENDEE:diet") && !adminOptions.includes("gluten_free"), "a question sensitive in any form version is never offered");
   assert(!adminOptions.includes("medical_condition") && !adminOptions.includes("Medical condition") && !adminOptions.includes("asthma"), "a sensitive question is never offered, even to an administrator");
 
   // 6. Group and organization domains appear only when the event has them; only an approved, current contact qualifies.
   await prisma.groupEventRegistration.create({ data: { eventId: ids.event, registrationId: r3.id, billingPersonId: leader } });
-  const groups = await run(commsPermissions, { roles: ["GROUP_LEADER"], messageKind: "OPERATIONAL" });
+  const groups = await run(adminPermissions, { roles: ["GROUP_LEADER"], messageKind: "OPERATIONAL" });
   assert(emails(groups).join() === email("groupleader") && groups.result.recipients[0]!.roles.join() === "GROUP_LEADER", `group leader: ${emails(groups)}`);
   for (const [orgId, label] of [[ids.org, "A"], [ids.org2, "B"]] as const) {
     await prisma.organization.create({ data: { id: orgId, type: "CLUB", name: `Synthetic Club ${label} ${P}`, normalizedName: `synthetic club ${label.toLowerCase()} ${P}` } });
@@ -316,7 +344,7 @@ async function main() {
   // Club B's contact is on file but unverified; Club A's is verified and current.
   await prisma.organizationBillingContact.create({ data: { organizationId: ids.org2, name: "Unverified Rep", email: email("unverified"), roleLabel: "Treasurer" } });
   await prisma.organizationBillingContact.create({ data: { organizationId: ids.org, name: "OrgRep", email: email("orgrep"), roleLabel: "Treasurer", verifiedAt: new Date(), verifiedByUserId: ids.admin } });
-  const orgs = await run(commsPermissions, { roles: ["ORGANIZATION_CONTACT"], messageKind: "OPERATIONAL" });
+  const orgs = await run(adminPermissions, { roles: ["ORGANIZATION_CONTACT"], messageKind: "OPERATIONAL" });
   assert(emails(orgs).join() === email("orgrep"), `only the approved organization contact qualifies: ${emails(orgs)}`);
   void orgPerson;
 

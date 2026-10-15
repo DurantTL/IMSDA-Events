@@ -16,12 +16,13 @@ vi.mock("@/modules/registrations/operations-search-repository", () => ({
   loadOperationsSearchCatalog: mocks.loadCatalog,
 }));
 
-import { evaluateEventAudience, getAudienceFilterOptions } from "@/modules/communications/audience-repository";
+import { createAudienceSnapshot, evaluateEventAudience, getAudienceFilterOptions } from "@/modules/communications/audience-repository";
 import { AudienceFilterNotAvailableError } from "@/modules/communications/audience-query";
 import { MessagingError } from "@/modules/communications/messaging-error";
 import { emptySearchCatalog } from "@/modules/registrations/operations-search-domain";
 
 const comms: EventPermission[] = ["VIEW_EVENT", "MANAGE_COMMUNICATIONS"];
+const sensitiveComms: EventPermission[] = [...comms, "VIEW_SENSITIVE_DATA"];
 
 function registrationRow(id: string) {
   return {
@@ -38,19 +39,24 @@ function registrationRow(id: string) {
   };
 }
 
-function prismaFixture() {
-  const registrationFindMany = vi.fn(async ({ where }: { where: { eventId: string; id: { in: string[] } } }) => where.id.in.map(registrationRow));
+type BatchArgs = { where: { eventId: string; id: { in: string[] }; status: { in: string[] } }; select: Record<string, unknown> };
+
+function prismaFixture(options: { bounced?: Array<{ email: string; status: string }>; types?: Array<{ code: string; minimumAge: number | null; maximumAge: number | null }>; rows?: (id: string) => Record<string, unknown> } = {}) {
+  const registrationFindMany = vi.fn(async ({ where }: BatchArgs) => where.id.in.map(options.rows ?? registrationRow));
+  const queryRaw = vi.fn().mockResolvedValue(options.bounced ?? []);
   const prisma = {
+    $transaction: vi.fn(async (work: (tx: unknown) => unknown) => work({ $executeRaw: vi.fn().mockResolvedValue(1), $queryRaw: queryRaw })),
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue(options.types ?? []) },
+    eventAudienceSnapshot: { findFirst: vi.fn().mockResolvedValue(null), findUnique: vi.fn() },
     event: { findUnique: vi.fn().mockResolvedValue({ audience: "OPEN", billingMode: "ATTENDEE_PAY" }) },
     groupEventRegistration: { findFirst: vi.fn().mockResolvedValue(null) },
     clubEventRegistration: { findFirst: vi.fn().mockResolvedValue(null) },
     registrationBillingResponsibility: { findFirst: vi.fn().mockResolvedValue(null) },
     registration: { findMany: registrationFindMany },
     registrationAttendee: { findMany: vi.fn().mockResolvedValue([]) },
-    messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
-  return { prisma, registrationFindMany };
+  return { prisma, registrationFindMany, queryRaw };
 }
 
 beforeEach(() => {
@@ -91,6 +97,81 @@ describe("the audience builder selects registrations through the operations sear
     expect(mocks.loadCatalog).not.toHaveBeenCalled();
   });
 
+  it("refuses the attendee, group billing and organization roles to a communications-only caller before any search or read", async () => {
+    const { registrationFindMany } = prismaFixture();
+    for (const role of ["ATTENDEE", "ORGANIZATION_CONTACT", "GROUP_LEADER"]) {
+      const failure = await evaluateEventAudience("event-a", comms, { roles: [role] }).catch((error) => error);
+      expect(failure).toBeInstanceOf(AudienceFilterNotAvailableError);
+    }
+    expect(mocks.enumerate).not.toHaveBeenCalled();
+    expect(mocks.loadCatalog).not.toHaveBeenCalled();
+    expect(registrationFindMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses text, check-in and attendee-scoped answer filters with the attendee role before any search", async () => {
+    prismaFixture();
+    for (const search of ["q=pat", "checkIn=NONE", "answer=ATTENDEE:meal=vegan"]) {
+      await expect(evaluateEventAudience("event-a", sensitiveComms, { roles: ["ATTENDEE"], search })).rejects.toBeInstanceOf(AudienceFilterNotAvailableError);
+    }
+    expect(mocks.enumerate).not.toHaveBeenCalled();
+  });
+
+  it("reads tag assignments the way the search does: an inactive tag is still a tag, and a stale status drops out", async () => {
+    const { registrationFindMany } = prismaFixture();
+    mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
+    await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL", search: "status=CONFIRMED" });
+    const [args] = registrationFindMany.mock.calls[0]!;
+    expect(args.where.status).toEqual({ in: ["CONFIRMED"] });
+    expect(args.where.eventId).toBe("event-a");
+    expect(JSON.stringify(args.select)).not.toContain("isActive");
+    await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" });
+    expect(registrationFindMany.mock.calls[1]![0].where.status).toEqual({ in: ["SUBMITTED", "CONFIRMED"] });
+  });
+
+  it("drops a registration that was cancelled after the ids were enumerated", async () => {
+    // The database applies the status guard; a row the guard removes is simply not returned.
+    const registrationFindMany = vi.fn(async ({ where }: BatchArgs) => where.id.in.filter((id) => id !== "gone").map(registrationRow));
+    const { prisma } = prismaFixture();
+    prisma.registration.findMany = registrationFindMany;
+    mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 2, registrationIds: ["r1", "gone"] });
+    const { result } = await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" });
+    expect(result.counts.consideredRegistrationCount).toBe(1);
+    expect(result.recipients.map((recipient) => recipient.email)).toEqual(["r1@example.test"]);
+  });
+
+  it("matches provider suppression case-insensitively in one bounded query per chunk", async () => {
+    const { queryRaw, prisma } = prismaFixture({
+      bounced: [{ email: "r1@example.test", status: "BOUNCED" }],
+      rows: (id) => ({ ...registrationRow(id), contactSnapshot: { firstName: "Pat", lastName: id, email: `${id.toUpperCase()}@Example.TEST` } }),
+    });
+    mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 2, registrationIds: ["r1", "r2"] });
+    const { result } = await evaluateEventAudience("event-a", comms, { messageKind: "OPERATIONAL" });
+    expect(result.recipients.map((recipient) => recipient.email)).toEqual(["r2@example.test"]);
+    expect(result.exclusions.map((exclusion) => [exclusion.code, exclusion.email])).toEqual([["PROVIDER_BOUNCED", "r1@example.test"]]);
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const [strings, list] = queryRaw.mock.calls[0]!;
+    expect(strings.join("?")).toContain('lower("recipientEmail") IN');
+    expect((list as { values: string[] }).values).toEqual(["r1@example.test", "r2@example.test"]);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("never writes to a minor or unknown-age attendee, deciding from the event's attendee types", async () => {
+    const attendee = (id: string, code: string | null) => ({
+      id, attendeeTypeDefinition: code ? { code } : null, tagAssignments: [],
+      person: { firstName: "A", lastName: id, normalizedEmail: `${id}@example.test` },
+    });
+    const { prisma } = prismaFixture({
+      types: [{ code: "ADULT", minimumAge: 18, maximumAge: null }, { code: "YOUTH", minimumAge: 0, maximumAge: 17 }],
+      rows: (id) => ({ ...registrationRow(id), attendees: [attendee("grown", "ADULT"), attendee("kid", "YOUTH"), attendee("typeless", null)] }),
+    });
+    mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 1, registrationIds: ["r1"] });
+    const { result } = await evaluateEventAudience("event-a", sensitiveComms, { roles: ["ATTENDEE"], messageKind: "OPERATIONAL" });
+    expect(result.recipients.map((recipient) => recipient.email)).toEqual(["grown@example.test"]);
+    expect(result.exclusions.map((exclusion) => [exclusion.code, exclusion.contactCount])).toEqual([["MINOR_ATTENDEE", 2]]);
+    expect(JSON.stringify(result)).not.toMatch(/kid@|typeless@/);
+    expect(prisma.eventAttendeeType.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId: "event-a" } }));
+  });
+
   it("never returns a truncated audience: one larger than the search can enumerate is AUDIENCE_TOO_BROAD", async () => {
     const { registrationFindMany } = prismaFixture();
     mocks.enumerate.mockResolvedValue({ ok: false, issues: [{ filter: "search", code: "too-broad", message: "x" }], total: 0, registrationIds: [] });
@@ -126,8 +207,24 @@ describe("the audience builder selects registrations through the operations sear
     const options = await getAudienceFilterOptions("event-a", comms);
     expect(options.search.map((filter) => filter.key)).toEqual(["status", "source"]);
     expect(JSON.stringify(options)).not.toContain("Secret VIP");
+    expect(options.roles.map((role) => role.role)).toEqual(["REGISTRATION_CONTACT"]);
     const sensitive = await getAudienceFilterOptions("event-a", [...comms, "VIEW_SENSITIVE_DATA", "MANAGE_REGISTRATION"]);
+    expect(sensitive.roles.map((role) => role.role)).toEqual(["REGISTRATION_CONTACT", "ATTENDEE"]);
     expect(JSON.stringify(sensitive)).toContain("Secret VIP");
     expect(sensitive.readiness).toHaveLength(1);
+  });
+});
+
+describe("audience snapshot replay", () => {
+  it("looks a snapshot id up inside the event, so another event's snapshot is never read", async () => {
+    const { prisma } = prismaFixture();
+    mocks.enumerate.mockResolvedValue({ ok: true, issues: [], total: 0, registrationIds: [] });
+    const evaluated = await evaluateEventAudience("event-a", comms, {});
+    const snapshotId = "7b0e5f0e-9a58-4e7a-8c64-0f6a1a2b3c4d";
+    prisma.eventAudienceSnapshot.findFirst.mockResolvedValueOnce(null);
+    await createAudienceSnapshot("event-a", "user-1", comms, { snapshotId, query: {}, previewFingerprint: "0".repeat(64) }).catch(() => undefined);
+    expect(prisma.eventAudienceSnapshot.findFirst).toHaveBeenCalledWith({ where: { id: snapshotId, eventId: "event-a" } });
+    expect(prisma.eventAudienceSnapshot.findUnique).not.toHaveBeenCalled();
+    expect(evaluated.result.fingerprint).toHaveLength(64);
   });
 });

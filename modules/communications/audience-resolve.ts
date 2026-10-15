@@ -37,6 +37,19 @@ export type AudienceAttendeeRow = {
   tagIds: readonly string[];
 };
 
+/**
+ * How an attendee type's configured age range classifies its attendees. Decided from the type only (ADR 0005 Addendum A:
+ * never from a birth date). A type whose maximum age is under 18 is MINOR; one whose minimum age is 18 or more is ADULT;
+ * anything else (no age range, or one that spans 18) is UNKNOWN.
+ */
+export type AttendeeAgeClass = "ADULT" | "MINOR" | "UNKNOWN";
+
+export function classifyAttendeeType(type: { minimumAge: number | null; maximumAge: number | null }): AttendeeAgeClass {
+  if (type.maximumAge !== null && type.maximumAge < 18) return "MINOR";
+  if (type.minimumAge !== null && type.minimumAge >= 18) return "ADULT";
+  return "UNKNOWN";
+}
+
 export type AudienceContactRow = { name: string; email: string | null };
 
 export type AudienceRegistrationRow = {
@@ -59,6 +72,12 @@ export type AudienceEvaluationContext = {
   tagNames: ReadonlyMap<string, string>;
   attendeeTypeLabels: ReadonlyMap<string, string>;
   /**
+   * Age class of each of the event's attendee types, by code. An attendee is written to only when their type is ADULT,
+   * or UNKNOWN on an event that has no MINOR type at all (an adult-only event has no youth to protect). A MINOR
+   * attendee, an UNKNOWN one on an event with youth types, and one with no type are excluded as MINOR_ATTENDEE.
+   */
+  attendeeAge: ReadonlyMap<string, AttendeeAgeClass>;
+  /**
    * What the search selected on, as the operations search read it. Only used to decide which ATTENDEES of a matched
    * registration are written to: an attendee qualifies on their own type, and on a tag of theirs or of the registration.
    */
@@ -77,6 +96,8 @@ export type AudienceCandidate = {
   confirmationCode: string;
   balanceCents: number;
   reasons: AudienceReason[];
+  /** Set when this contact may not be written to; the contact is then an exclusion that carries no address. */
+  blocked?: "MINOR_ATTENDEE";
 };
 
 const emailSchema = z.email();
@@ -170,8 +191,14 @@ export function evaluateAudienceRegistration(
 
   const balanceCents = audienceBalanceCents(row, context.isOrganizationBilled);
   const candidates: AudienceCandidate[] = [];
-  const push = (role: AudienceRole, contact: AudienceContactRow) => {
+  const eventHasMinorTypes = [...context.attendeeAge.values()].includes("MINOR");
+  const attendeeBlocked = (attendee: AudienceAttendeeRow) => {
+    const age = context.attendeeAge.get(attendee.attendeeType) ?? "UNKNOWN";
+    return age === "MINOR" || (age === "UNKNOWN" && eventHasMinorTypes);
+  };
+  const push = (role: AudienceRole, contact: AudienceContactRow, blocked?: "MINOR_ATTENDEE") => {
     candidates.push({
+      ...(blocked ? { blocked } : {}),
       role,
       name: contact.name.trim() || "Recipient",
       email: contact.email,
@@ -193,7 +220,8 @@ export function evaluateAudienceRegistration(
           const hit = row.tagIds.some((id) => tagIds.includes(id)) || attendee.tagIds.some((id) => tagIds.includes(id));
           if (!hit) continue;
         }
-        push(role, { name: attendee.name, email: attendee.email });
+        if (attendeeBlocked(attendee)) push(role, { name: "", email: null }, "MINOR_ATTENDEE");
+        else push(role, { name: attendee.name, email: attendee.email });
       }
     }
   }
@@ -218,11 +246,12 @@ export type AudienceSuppressionCode =
   | "PROVIDER_BOUNCED"
   | "PROVIDER_COMPLAINED";
 
-export type AudienceExclusionCode = "NO_EMAIL" | "INVALID_EMAIL" | AudienceSuppressionCode;
+export type AudienceExclusionCode = "NO_EMAIL" | "INVALID_EMAIL" | "MINOR_ATTENDEE" | AudienceSuppressionCode;
 
 export const AUDIENCE_EXCLUSION_LABELS: Record<AudienceExclusionCode, string> = {
   NO_EMAIL: "No email address on file",
   INVALID_EMAIL: "Email address is not valid",
+  MINOR_ATTENDEE: "Attendee is a minor or their age group is unknown, so they are not messaged directly",
   OPTED_OUT_EVENT: "Opted out of this event's announcements",
   OPTED_OUT_ALL: "Opted out of all announcements",
   PROVIDER_BOUNCED: "The last email to this address bounced",
@@ -328,9 +357,9 @@ export class AudienceAccumulator {
   }
 
   private add(candidate: AudienceCandidate) {
-    const email = normalizeAudienceEmail(candidate.email);
-    if (!email || !emailSchema.safeParse(email).success) {
-      const code: AudienceExclusionCode = email ? "INVALID_EMAIL" : "NO_EMAIL";
+    const email = candidate.blocked ? "" : normalizeAudienceEmail(candidate.email);
+    if (candidate.blocked || !email || !emailSchema.safeParse(email).success) {
+      const code: AudienceExclusionCode = candidate.blocked ?? (email ? "INVALID_EMAIL" : "NO_EMAIL");
       const key = [code, "", candidate.confirmationCode, candidate.role].join("\u0000");
       const existing = this.contactExclusions.get(key);
       if (existing) {

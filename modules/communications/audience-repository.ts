@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, type RegistrationStatus } from "@prisma/client";
 import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import {
@@ -20,6 +20,7 @@ import {
 import {
   AudienceAccumulator,
   buildSearchReasons,
+  classifyAttendeeType,
   audiencePageSchema,
   pageAudienceList,
   type AudiencePageInput,
@@ -106,25 +107,32 @@ export async function getAudienceFilterOptions(eventId: string, permissions: rea
   };
 }
 
+const SUPPRESSION_TIMEOUT_MS = 15_000;
+
 async function loadSuppressions(
-  client: Client,
+  client: ReturnType<typeof getPrisma>,
   eventId: string,
   query: NormalizedAudienceQuery,
   emails: readonly string[],
 ) {
   const suppressions = new Map<string, AudienceSuppressionCode>();
   for (let offset = 0; offset < emails.length; offset += SUPPRESSION_CHUNK) {
-    const chunk = emails.slice(offset, offset + SUPPRESSION_CHUNK);
+    const chunk = emails.slice(offset, offset + SUPPRESSION_CHUNK).map((email) => email.toLowerCase());
     // Provider suppression (a bounce or a spam complaint as the address's latest delivery state) applies to every kind.
-    const latest = await client.messageOutbox.findMany({
-      where: { recipientEmail: { in: chunk }, providerDeliveryStatus: { not: null }, providerStatusAt: { not: null } },
-      orderBy: [{ providerStatusAt: "desc" }, { id: "asc" }],
-      distinct: ["recipientEmail"],
-      select: { recipientEmail: true, providerDeliveryStatus: true },
+    // Addresses are compared lower-cased on both sides, so a mixed-case address stored on an outbox row still matches.
+    // One bounded query per chunk: a statement timeout fails the preview closed instead of letting it run on.
+    const latest = await client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(SUPPRESSION_TIMEOUT_MS)}, true)`;
+      return tx.$queryRaw<Array<{ email: string; status: string }>>`
+        SELECT DISTINCT ON (lower("recipientEmail")) lower("recipientEmail") AS email, "providerDeliveryStatus"::text AS status
+        FROM "MessageOutbox"
+        WHERE lower("recipientEmail") IN (${Prisma.join(chunk)})
+          AND "providerDeliveryStatus" IS NOT NULL AND "providerStatusAt" IS NOT NULL
+        ORDER BY lower("recipientEmail"), "providerStatusAt" DESC, "id" ASC`;
     });
     for (const row of latest) {
-      if (row.providerDeliveryStatus === "BOUNCED") suppressions.set(row.recipientEmail.toLowerCase(), "PROVIDER_BOUNCED");
-      else if (row.providerDeliveryStatus === "COMPLAINED") suppressions.set(row.recipientEmail.toLowerCase(), "PROVIDER_COMPLAINED");
+      if (row.status === "BOUNCED") suppressions.set(row.email, "PROVIDER_BOUNCED");
+      else if (row.status === "COMPLAINED") suppressions.set(row.email, "PROVIDER_COMPLAINED");
     }
     // Only an announcement can be opted out of (#838).
     if (query.messageKind === "ANNOUNCEMENT") {
@@ -144,13 +152,15 @@ async function loadRegistrationBatch(
   eventId: string,
   query: NormalizedAudienceQuery,
   registrationIds: readonly string[],
+  statuses: readonly RegistrationStatus[],
   now: Date,
 ): Promise<AudienceRegistrationRow[]> {
   const wantsOrganization = query.roles.includes("ORGANIZATION_CONTACT");
   const wantsGroup = query.roles.includes("GROUP_LEADER");
   const registrations = await client.registration.findMany({
     // The ids came from the permission-gated search; the event id is still the first guard on every read.
-    where: { eventId, id: { in: [...registrationIds] } },
+    // A registration that left the audience's statuses since the ids were enumerated (cancelled, say) drops out here.
+    where: { eventId, id: { in: [...registrationIds] }, status: { in: [...statuses] } },
     orderBy: { id: "asc" },
     select: {
       id: true,
@@ -164,14 +174,14 @@ async function loadRegistrationBatch(
         where: { status: "SUCCEEDED" },
         select: { amount: true, refunds: { where: { status: "SUCCEEDED" }, select: { amount: true } } },
       },
-      tagAssignments: { where: { removedAt: null, tag: { isActive: true } }, select: { tagId: true } },
+      tagAssignments: { where: { removedAt: null }, select: { tagId: true } },
       attendees: {
         orderBy: [{ position: "asc" }, { id: "asc" }],
         select: {
           id: true,
           attendeeTypeDefinition: { select: { code: true } },
           person: { select: { firstName: true, lastName: true, normalizedEmail: true } },
-          tagAssignments: { where: { removedAt: null, tag: { isActive: true } }, select: { tagId: true } },
+          tagAssignments: { where: { removedAt: null }, select: { tagId: true } },
         },
       },
       ...(wantsGroup
@@ -304,18 +314,25 @@ export async function evaluateEventAudience(
 
   const event = await prisma.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
   if (!event) throw new MessagingError("MESSAGE_NOT_FOUND", "That event is no longer available.");
+  // Attendee age classes come from the attendee types only, never from a birth date. Every type of the event counts, active
+  // or not, so a retired youth type still protects the attendees that were registered under it.
+  const attendeeTypes = query.roles.includes("ATTENDEE")
+    ? await prisma.eventAttendeeType.findMany({ where: { eventId }, select: { code: true, minimumAge: true, maximumAge: true } })
+    : [];
   const accumulator = new AudienceAccumulator(query, {
     isOrganizationBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
     tagNames: new Map(catalog.tags.map((tag) => [tag.id, tag.name] as const)),
     attendeeTypeLabels: new Map(catalog.attendeeTypes.map((type) => [type.code, type.label] as const)),
+    attendeeAge: new Map(attendeeTypes.map((type) => [type.code, classifyAttendeeType(type)] as const)),
     selection: { attendeeTypes: search.attendeeType, tagIds: search.tag },
     searchReasons: buildSearchReasons(search, catalog),
   }, eventId);
 
   const batchSize = Math.max(1, options.batchSize ?? DEFAULT_BATCH_SIZE);
   const now = options.now ?? new Date();
+  const statuses = search.status as RegistrationStatus[];
   for (let offset = 0; offset < selection.registrationIds.length; offset += batchSize) {
-    const rows = await loadRegistrationBatch(prisma, eventId, query, selection.registrationIds.slice(offset, offset + batchSize), now);
+    const rows = await loadRegistrationBatch(prisma, eventId, query, selection.registrationIds.slice(offset, offset + batchSize), statuses, now);
     for (const row of rows) accumulator.consider(row);
   }
 
@@ -431,7 +448,7 @@ export async function createAudienceSnapshot(
     row.eventId === eventId && row.fingerprint === input.previewFingerprint && row.queryHash === queryHash
   );
 
-  const existing = await prisma.eventAudienceSnapshot.findUnique({ where: { id: input.snapshotId } });
+  const existing = await prisma.eventAudienceSnapshot.findFirst({ where: { id: input.snapshotId, eventId } });
   if (existing) {
     if (!sameRequest(existing)) throw reuseError();
     return toRecord(existing, true);
@@ -485,7 +502,7 @@ export async function createAudienceSnapshot(
     return toRecord(created, false);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const raced = await prisma.eventAudienceSnapshot.findUnique({ where: { id: input.snapshotId } });
+      const raced = await prisma.eventAudienceSnapshot.findFirst({ where: { id: input.snapshotId, eventId } });
       if (raced && sameRequest(raced)) return toRecord(raced, true);
       throw reuseError();
     }

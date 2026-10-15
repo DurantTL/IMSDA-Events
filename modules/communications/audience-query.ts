@@ -49,7 +49,7 @@ export type AudienceRole = (typeof AUDIENCE_ROLES)[number];
 export const AUDIENCE_ROLE_LABELS: Record<AudienceRole, string> = {
   REGISTRATION_CONTACT: "Registration contact",
   ATTENDEE: "Attendee",
-  GROUP_LEADER: "Group leader",
+  GROUP_LEADER: "Group billing contact",
   ORGANIZATION_CONTACT: "Approved organization contact",
 };
 
@@ -93,6 +93,20 @@ export const AUDIENCE_ROLE_DOMAINS: Record<AudienceRole, AudienceDomain> = {
   ATTENDEE: "REGISTRATION",
   GROUP_LEADER: "GROUPS",
   ORGANIZATION_CONTACT: "ORGANIZATIONS",
+};
+
+/**
+ * Permission each role needs on top of MANAGE_COMMUNICATIONS, which the whole builder needs. Messaging an attendee or a
+ * group's billing person reaches people by name and address, minors included, so it needs VIEW_SENSITIVE_DATA; an
+ * organization's billing contact is finance data, so it needs MANAGE_FINANCE. The registration contact is the person who
+ * registered and needs nothing more. The GROUP_LEADER key stays for stored queries; the person it names is the group
+ * registration's billing person, and its label says so.
+ */
+export const AUDIENCE_ROLE_PERMISSIONS: Record<AudienceRole, EventPermission | null> = {
+  REGISTRATION_CONTACT: null,
+  ATTENDEE: "VIEW_SENSITIVE_DATA",
+  GROUP_LEADER: "VIEW_SENSITIVE_DATA",
+  ORGANIZATION_CONTACT: "MANAGE_FINANCE",
 };
 
 /** Strict: an unknown key (a note, medical or consent field, say) is a validation error, not a quiet no-op. */
@@ -173,7 +187,19 @@ export type AudienceCapabilities = {
 };
 
 export function roleAvailable(role: AudienceRole, capabilities: AudienceCapabilities) {
-  return capabilities.domains.has(AUDIENCE_ROLE_DOMAINS[role]);
+  const permission = AUDIENCE_ROLE_PERMISSIONS[role];
+  return capabilities.domains.has(AUDIENCE_ROLE_DOMAINS[role]) && (permission === null || capabilities.permissions.has(permission));
+}
+
+/**
+ * With the ATTENDEE role the search still selects registrations, but only the attendee-type and tag filters are decided
+ * per attendee. Free text, a check-in state and an attendee-scoped form answer are facts about people the message would
+ * not be filtered by, so they are refused rather than quietly reaching every attendee of a matched registration.
+ * An answer id is `${scope}:${field key}`.
+ */
+export function attendeeRoleSearchRefused(query: Pick<NormalizedAudienceQuery, "search">) {
+  const search = audienceSearchQuery(query);
+  return Boolean(search.text) || Boolean(search.checkIn) || search.answers.some((answer) => answer.question.startsWith("ATTENDEE:"));
 }
 
 export function readinessAvailable(capabilities: AudienceCapabilities) {
@@ -181,7 +207,7 @@ export function readinessAvailable(capabilities: AudienceCapabilities) {
 }
 
 /**
- * Refuses what the caller may not use in the audience-specific part of a query: a role whose domain the event lacks, or
+ * Refuses what the caller may not use in the audience-specific part of a query: a role whose domain the event lacks or whose permission the caller lacks, or
  * the readiness narrowing without its permission. The search filters are decided by the operations search itself (its
  * `resolveOperationsSearch`), which the repository runs before anything is read. Every refusal is the same fixed error.
  */
@@ -189,6 +215,7 @@ export function assertQueryAvailable(query: NormalizedAudienceQuery, capabilitie
   for (const role of query.roles) {
     if (!roleAvailable(role, capabilities)) throw new AudienceFilterNotAvailableError();
   }
+  if (query.roles.includes("ATTENDEE") && attendeeRoleSearchRefused(query)) throw new AudienceFilterNotAvailableError();
   if (query.readinessStates.length > 0 && !readinessAvailable(capabilities)) throw new AudienceFilterNotAvailableError();
 }
 

@@ -17,6 +17,8 @@ import {
   type AudienceEvaluationContext,
   type AudienceRegistrationRow,
   type AudienceSuppressionCode,
+  classifyAttendeeType,
+  type AttendeeAgeClass,
 } from "@/modules/communications/audience-resolve";
 import {
   availableOperationsFilters,
@@ -31,6 +33,7 @@ const baseContext: AudienceEvaluationContext = {
   isOrganizationBilled: false,
   tagNames: new Map([["tag-vip", "VIP"]]),
   attendeeTypeLabels: new Map([["YOUTH", "Youth"]]),
+  attendeeAge: new Map<string, AttendeeAgeClass>([["ADULT", "ADULT"], ["YOUTH", "MINOR"], ["GUEST", "UNKNOWN"]]),
   selection: { attendeeTypes: [], tagIds: [] },
   searchReasons: [],
 };
@@ -141,7 +144,7 @@ describe("audience query contract", () => {
   it("refuses a role whose domain the event lacks, and readiness without its permission, with one fixed message", () => {
     const group = normalizeAudienceQuery({ roles: ["GROUP_LEADER"] });
     expect(() => assertQueryAvailable(group, caps([]))).toThrow(AudienceFilterNotAvailableError);
-    expect(() => assertQueryAvailable(group, caps([], ["REGISTRATION", "GROUPS"]))).not.toThrow();
+    expect(() => assertQueryAvailable(group, caps(["VIEW_SENSITIVE_DATA"], ["REGISTRATION", "GROUPS"]))).not.toThrow();
     const readiness = normalizeAudienceQuery({ readinessStates: ["ATTENDEE_RESPONSES_INCOMPLETE"] });
     let failure: unknown;
     try {
@@ -152,6 +155,36 @@ describe("audience query contract", () => {
     expect(failure).toBeInstanceOf(AudienceFilterNotAvailableError);
     expect((failure as Error).message).not.toMatch(/readiness|responses|incomplete/i);
     expect(() => assertQueryAvailable(readiness, caps(["MANAGE_REGISTRATION"]))).not.toThrow();
+  });
+
+  it("a communications-only caller is refused the attendee, group billing and organization roles; each needs its own permission", () => {
+    const all: AudienceDomain[] = ["REGISTRATION", "GROUPS", "ORGANIZATIONS"];
+    const commsOnly = caps(["VIEW_EVENT", "MANAGE_COMMUNICATIONS"], all);
+    for (const role of ["ATTENDEE", "GROUP_LEADER", "ORGANIZATION_CONTACT"] as const) {
+      const query = normalizeAudienceQuery({ roles: [role] });
+      expect(() => assertQueryAvailable(query, commsOnly)).toThrow(AudienceFilterNotAvailableError);
+    }
+    expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["REGISTRATION_CONTACT"] }), commsOnly)).not.toThrow();
+    const sensitive = caps(["MANAGE_COMMUNICATIONS", "VIEW_SENSITIVE_DATA"], all);
+    expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["ATTENDEE", "GROUP_LEADER"] }), sensitive)).not.toThrow();
+    expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["ORGANIZATION_CONTACT"] }), sensitive)).toThrow(AudienceFilterNotAvailableError);
+    const finance = caps(["MANAGE_COMMUNICATIONS", "MANAGE_FINANCE"], all);
+    expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["ORGANIZATION_CONTACT"] }), finance)).not.toThrow();
+    expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["ATTENDEE"] }), finance)).toThrow(AudienceFilterNotAvailableError);
+    // The offered roles follow the same rule, and the label says what the group role really is.
+    expect(describeAvailableFilters(viewer(["MANAGE_COMMUNICATIONS"]), catalog, commsOnly).roles.map((role) => role.role)).toEqual(["REGISTRATION_CONTACT"]);
+    expect(describeAvailableFilters(viewer(["MANAGE_COMMUNICATIONS"]), catalog, sensitive).roles.find((role) => role.role === "GROUP_LEADER")!.label).toBe("Group billing contact");
+  });
+
+  it("with the attendee role, text, check-in and attendee-scoped answer filters are refused; registration-level ones are not", () => {
+    const permissions = caps(["MANAGE_COMMUNICATIONS", "VIEW_SENSITIVE_DATA"]);
+    for (const search of ["q=pat", "checkIn=NONE", "answer=ATTENDEE:meal=vegan"]) {
+      expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["ATTENDEE"], search }), permissions)).toThrow(AudienceFilterNotAvailableError);
+      expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["REGISTRATION_CONTACT"], search }), permissions)).not.toThrow();
+    }
+    for (const search of ["attendeeType=ADULT", "tag=tag-vip", "payment=UNPAID", "answer=REGISTRATION:bus=yes"]) {
+      expect(() => assertQueryAvailable(normalizeAudienceQuery({ roles: ["ATTENDEE"], search }), permissions)).not.toThrow();
+    }
   });
 
   it("a search filter the viewer may not use is refused by the operations search, identically to one the event lacks", () => {
@@ -177,7 +210,7 @@ describe("audience query contract", () => {
     expect(limited.search.map((filter) => filter.key)).not.toContain("tag");
     expect(JSON.stringify(limited)).not.toContain("VIP");
     expect(JSON.stringify(limited)).not.toContain("DRAFT");
-    expect(limited.roles.map((role) => role.role)).toEqual(["REGISTRATION_CONTACT", "ATTENDEE"]);
+    expect(limited.roles.map((role) => role.role)).toEqual(["REGISTRATION_CONTACT"]);
     expect(limited.readiness).toEqual([]);
     const adminPermissions = ["VIEW_EVENT", "VIEW_SENSITIVE_DATA", "MANAGE_REGISTRATION", "MANAGE_FINANCE", "MANAGE_CHECK_IN"] as const;
     const full = describeAvailableFilters(viewer(adminPermissions), catalog, caps([...adminPermissions], ["REGISTRATION", "GROUPS", "ORGANIZATIONS"]));
@@ -281,8 +314,8 @@ describe("audience resolution", () => {
       registrationId: "r1",
       attendees: [attendee("adult", { attendeeType: "ADULT" }), attendee("youth", { attendeeType: "YOUTH" })],
     })];
-    const youth = run(rows, { roles: ["ATTENDEE"], search: "attendeeType=YOUTH" });
-    expect(youth.recipients.map((recipient) => recipient.email)).toEqual(["youth@example.test"]);
+    const adults = run(rows, { roles: ["ATTENDEE"], search: "attendeeType=ADULT" });
+    expect(adults.recipients.map((recipient) => recipient.email)).toEqual(["adult@example.test"]);
     const tagged = run([row({
       registrationId: "r2",
       attendees: [attendee("t1", { tagIds: ["tag-vip"] }), attendee("t2")],
@@ -291,6 +324,42 @@ describe("audience resolution", () => {
     expect(tagged.recipients.map((recipient) => recipient.email)).toEqual(["t1@example.test"]);
     const registrationTag = run([row({ registrationId: "r3", tagIds: ["tag-vip"], attendees: [attendee("t3"), attendee("t4")] })], { roles: ["ATTENDEE"], search: "tag=tag-vip" });
     expect(registrationTag.counts.recipientCount).toBe(2);
+  });
+
+  it("a minor attendee is never written to: they are one address-free exclusion, decided from the attendee type", () => {
+    const rows = [row({
+      registrationId: "r1",
+      attendees: [attendee("adult", { attendeeType: "ADULT" }), attendee("kid", { attendeeType: "YOUTH", name: "Kid Secret", email: "kid@example.test" })],
+    })];
+    const result = run(rows, { roles: ["ATTENDEE"] });
+    expect(result.recipients.map((recipient) => recipient.email)).toEqual(["adult@example.test"]);
+    expect(result.exclusions.map((exclusion) => [exclusion.code, exclusion.email, exclusion.contactCount])).toEqual([["MINOR_ATTENDEE", null, 1]]);
+    expect(JSON.stringify(result)).not.toMatch(/kid@example|Kid Secret/);
+    const youth = run(rows, { roles: ["ATTENDEE"], search: "attendeeType=YOUTH" });
+    expect(youth.recipients).toEqual([]);
+    expect(youth.exclusions[0]!.code).toBe("MINOR_ATTENDEE");
+    // The registration contact is the person who registered; a minor attendee does not affect them.
+    expect(run(rows, { roles: ["REGISTRATION_CONTACT"] }).recipients).toHaveLength(1);
+  });
+
+  it("an attendee whose type has no age information is excluded on an event with youth types, and reachable on one without", () => {
+    const rows = [row({ registrationId: "r1", attendees: [attendee("guest", { attendeeType: "GUEST" }), attendee("none", { attendeeType: "" })] })];
+    const withYouth = run(rows, { roles: ["ATTENDEE"] });
+    expect(withYouth.recipients).toEqual([]);
+    expect(withYouth.exclusions[0]!.code).toBe("MINOR_ATTENDEE");
+    expect(withYouth.exclusions[0]!.contactCount).toBe(2);
+    const adultOnly = run(rows, { roles: ["ATTENDEE"] }, undefined, { attendeeAge: new Map<string, AttendeeAgeClass>([["GUEST", "UNKNOWN"]]) });
+    expect(adultOnly.recipients.map((recipient) => recipient.email).sort()).toEqual(["guest@example.test", "none@example.test"]);
+  });
+
+  it("classifies an attendee type by its configured ages only", () => {
+    expect(classifyAttendeeType({ minimumAge: 0, maximumAge: 17 })).toBe("MINOR");
+    expect(classifyAttendeeType({ minimumAge: null, maximumAge: 12 })).toBe("MINOR");
+    expect(classifyAttendeeType({ minimumAge: 18, maximumAge: null })).toBe("ADULT");
+    expect(classifyAttendeeType({ minimumAge: 21, maximumAge: 65 })).toBe("ADULT");
+    expect(classifyAttendeeType({ minimumAge: null, maximumAge: null })).toBe("UNKNOWN");
+    expect(classifyAttendeeType({ minimumAge: 16, maximumAge: null })).toBe("UNKNOWN");
+    expect(classifyAttendeeType({ minimumAge: 10, maximumAge: 40 })).toBe("UNKNOWN");
   });
 
   it("readiness is only the normalized status, never what a response says", () => {
