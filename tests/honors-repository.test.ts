@@ -17,6 +17,7 @@ import {
   updateHonorSession,
   getEventHonorSetup,
   updateHonorOffering,
+  serializable,
 } from "@/modules/honors/repository";
 
 type Row = Record<string, unknown> & { id: string };
@@ -37,6 +38,8 @@ function fakeDatabase() {
     locations: [] as Row[],
     /** Enrollments by offering, for the "clubs already picked" guard (#589). */
     pickedOfferingIds: [] as string[],
+    /** Seats held for live class waitlist offers (#880). */
+    liveOffers: 0,
     /** The club (organization) behind the picks of an offering; "org-a" when unset. */
     pickOrganizations: {} as Record<string, string>,
     /** Makes the next class update hit the (sessionId, honorId) unique index, as a concurrent save would. */
@@ -80,7 +83,7 @@ function fakeDatabase() {
   const sessionQueries: Array<{ where: Record<string, unknown>; orderBy?: unknown; select?: unknown }> = [];
   const client = {
     // No class waitlist places in these tests; turning a class off closes any (#831).
-    honorClassWaitlistEntry: { findMany: async () => [] },
+    honorClassWaitlistEntry: { findMany: async () => [], count: async () => db.liveOffers },
     honorEnrollment: {
       groupBy: async () => [],
       count: async ({ where }: { where: { offeringId?: string | { in: string[] }; offering?: { sessionId: string } } }) => db.pickedOfferingIds
@@ -97,6 +100,8 @@ function fakeDatabase() {
       },
     },
     $executeRaw: async () => 1,
+    // The class lock a seat-limit edit takes (#880).
+    $queryRaw: async () => [],
     honorWeekendCompletionLink: {
       groupBy: async ({ where }: { where: { honorId: { in: string[] }; enrollment: { offeringId: string } } }) => db.writtenBackHonors
         .filter((row) => row.offeringId === where.enrollment.offeringId && where.honorId.in.includes(row.honorId))
@@ -324,6 +329,44 @@ describe("honor offerings", () => {
       .rejects.toMatchObject({ code: "OFFERING_NOT_FOUND" });
     await updateHonorOffering("site-a", offeringId, { capacity: 12, isActive: false }, "staff-1");
     expect(fake.db.offerings[0]).toMatchObject({ capacity: 12, isActive: false });
+  });
+
+  it("refuses a seat limit below the seats the class holds, saying how many are taken (#880)", async () => {
+    await createHonorOffering("site-a", offeringInput({ capacity: 5 }), "staff-1");
+    const offeringId = fake.db.offerings[0].id;
+    fake.db.pickedOfferingIds.push(offeringId, offeringId, offeringId);
+    await expect(updateHonorOffering("site-a", offeringId, { capacity: 2 }, "staff-1")).rejects.toMatchObject({
+      code: "CAPACITY_BELOW_SEATS_TAKEN",
+      message: expect.stringMatching(/already has 3 seats taken.*lowered to 2/),
+      details: { seatsTaken: 3, requestedCapacity: 2 },
+    });
+    expect(fake.db.offerings[0].capacity).toBe(5);
+    await updateHonorOffering("site-a", offeringId, { capacity: 3 }, "staff-1");
+    expect(fake.db.offerings[0].capacity).toBe(3);
+    await updateHonorOffering("site-a", offeringId, { capacity: 10 }, "staff-1");
+    expect(fake.db.offerings[0].capacity).toBe(10);
+  });
+
+  it("counts seats held for live waitlist offers in the floor, and says so (#880)", async () => {
+    await createHonorOffering("site-a", offeringInput({ capacity: 5 }), "staff-1");
+    const offeringId = fake.db.offerings[0].id;
+    fake.db.pickedOfferingIds.push(offeringId);
+    fake.db.liveOffers = 2;
+    await expect(updateHonorOffering("site-a", offeringId, { capacity: 2 }, "staff-1")).rejects.toMatchObject({
+      code: "CAPACITY_BELOW_SEATS_TAKEN",
+      message: expect.stringMatching(/already has 1 seat taken and 2 held for waitlist offers.*lowered to 2.*3 or more/),
+      details: { seatsTaken: 1, seatsHeldForOffers: 2, requestedCapacity: 2 },
+    });
+    await updateHonorOffering("site-a", offeringId, { capacity: 3 }, "staff-1");
+    expect(fake.db.offerings[0].capacity).toBe(3);
+  });
+
+  it("lets an edit that leaves the seat limit as it is through, even when the class is already over it", async () => {
+    await createHonorOffering("site-a", offeringInput({ capacity: 1 }), "staff-1");
+    const offeringId = fake.db.offerings[0].id;
+    fake.db.pickedOfferingIds.push(offeringId, offeringId);
+    await updateHonorOffering("site-a", offeringId, { capacity: 1, teacherName: "A. Teacher" }, "staff-1");
+    expect(fake.db.offerings[0]).toMatchObject({ capacity: 1, teacherName: "A. Teacher" });
   });
 
   it("removes an empty session, and a session with unpicked classes together with them (#615)", async () => {
@@ -1000,5 +1043,30 @@ describe("a class that teaches several honors (#812)", () => {
     expect(plan.offerings.map((row) => [row.honorName, row.action])).toEqual([["Knot Tying + Birds", "CREATE"], ["Fire Building", "SKIP"]]);
     const { setup } = await applyHonorCopy("site-b", "site-a", plan.fingerprint, "staff-1");
     expect(setup.offerings).toEqual([expect.objectContaining({ honorIds: ["honor-knots", "honor-birds"], honorName: "Knot Tying + Birds" })]);
+  });
+});
+
+describe("serializable honor edits retry a lost conflict (#880)", () => {
+  const wrapped = (code: string) => new Prisma.PrismaClientKnownRequestError("Raw query failed.", { code: "P2010", clientVersion: "test", meta: { code } });
+
+  it("retries a serialization failure or deadlock a raw query reports as P2010", async () => {
+    for (const state of ["40001", "40P01"]) {
+      const transaction = vi.fn().mockRejectedValueOnce(wrapped(state)).mockResolvedValue("done");
+      mocks.getPrisma.mockReturnValue({ $transaction: transaction });
+      await expect(serializable(async () => "unused")).resolves.toBe("done");
+      expect(transaction).toHaveBeenCalledTimes(2);
+    }
+  });
+
+  it("still retries P2034, and gives up on anything else or after three tries", async () => {
+    const p2034 = new Prisma.PrismaClientKnownRequestError("conflict", { code: "P2034", clientVersion: "test" });
+    const transaction = vi.fn().mockRejectedValue(p2034);
+    mocks.getPrisma.mockReturnValue({ $transaction: transaction });
+    await expect(serializable(async () => "unused")).rejects.toBe(p2034);
+    expect(transaction).toHaveBeenCalledTimes(3);
+    const other = vi.fn().mockRejectedValue(wrapped("23505"));
+    mocks.getPrisma.mockReturnValue({ $transaction: other });
+    await expect(serializable(async () => "unused")).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect(other).toHaveBeenCalledTimes(1);
   });
 });
