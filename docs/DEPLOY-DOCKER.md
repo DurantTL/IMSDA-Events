@@ -277,11 +277,13 @@ already tagged `imsda-events:live`. A systemd timer finishes the job:
   published, it runs `imsda-deploy`.
 - [`deploy/xcloud/cleanup.sh`](../deploy/xcloud/cleanup.sh), installed as
   `/usr/local/bin/imsda-cleanup`, runs after each successful `imsda-deploy` and
-  daily from `imsda-cleanup.timer`. It removes old release tags, unused build
-  cache, untagged images and xCloud's unused `xcloud-site-*-app` images. It
-  never touches containers or volumes and never forces a removal, so
-  `imsda-events:live`, `imsda-events:previous` and anything a container uses
-  stay. A failed cleanup never fails a deploy.
+  daily from `imsda-cleanup.timer`. It removes all
+  `ghcr.io/duranttl/imsda-events:<sha>` tags (live and previous keep their
+  `imsda-events:*` tags), unused build cache older than a day, untagged images
+  and this site's unused `xcloud-site-239298-app` image. It never touches
+  containers or volumes and never forces a removal, so anything a container uses
+  stays. Cleanup and deploy take turns through `flock` on
+  `/run/imsda-deploy.lock`; a failed cleanup never fails a deploy.
 
 So after a merge: xCloud pulls the commit within a minute (and restarts the old
 version briefly), GitHub publishes the image about 10 minutes later, and the
@@ -316,6 +318,7 @@ cat > /etc/systemd/system/imsda-cleanup.service <<'UNIT'
 Description=Remove old IMSDA Events images and Docker build cache
 [Service]
 Type=oneshot
+TimeoutStartSec=30min
 ExecStart=/usr/local/bin/imsda-cleanup
 UNIT
 cat > /etc/systemd/system/imsda-cleanup.timer <<'UNIT'
@@ -330,6 +333,9 @@ WantedBy=timers.target
 UNIT
 systemctl daemon-reload && systemctl enable --now imsda-autodeploy.timer imsda-cleanup.timer
 ```
+
+`OnCalendar` uses the server's time zone; 09:30 is meant as UTC, so check it
+with `timedatectl`.
 
 Run `imsda-cleanup` by hand to free space now, and check it with
 `journalctl -u imsda-cleanup.service` and `df -h /`.
@@ -351,6 +357,10 @@ docker inspect xcloud-site-239298-app-1 --format '{{range .Config.Env}}{{println
 docker tag imsda-events:previous imsda-events:live
 docker compose -f /home/u_events/239298/docker-compose.yml up -d app
 ```
+
+Stop the autodeploy timer before a rollback (`systemctl stop imsda-autodeploy.timer`),
+otherwise autodeploy redeploys the checked-out version within 2 minutes; start it
+again once `main` is fixed.
 
 Migrations only move forward; rolling back the image does not undo them.
 

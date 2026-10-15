@@ -4,8 +4,9 @@
 # The app runs the image GitHub builds for each merge to main
 # (ghcr.io/duranttl/imsda-events:<sha>). deploy/xcloud/deploy.sh pulls the image
 # for the deployed commit and tags it imsda-events:live; this file only ever
-# runs that tag, so nothing builds on the 4 GB server and a restart by xCloud
-# keeps the deployed version. The release SHA is baked into the image.
+# runs that tag, so the site runs the GitHub-built image and nothing it runs is
+# built on the server (xCloud's own build is unused and cleaned by
+# imsda-cleanup), and a restart by xCloud keeps the deployed version. The release SHA is baked into the image.
 #
 # xCloud's generated version of this file has no settings, so a container
 # started from it refuses to start. Keep this version in place on the server,
