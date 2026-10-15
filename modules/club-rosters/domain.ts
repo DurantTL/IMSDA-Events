@@ -101,17 +101,43 @@ export function clubYearChoices(now = new Date()) {
   return [year - 1, year, year + 1].map((start) => `${start}-${String((start + 1) % 100).padStart(2, "0")}`);
 }
 
+/** The club years whose rows may hold emergency contact edits (#959): current and next. */
+export function guardianEditableYears(now = new Date()) {
+  const [, current, next] = clubYearChoices(now);
+  return [current!, next!];
+}
+
 /**
  * Which club year a roster screen shows for `?year=` (#541). Anything but the
  * previous, current, or next year falls back to the current one. Only the
  * current year is editable: every roster write route works on the current
- * year, so an older or newer year is shown read-only.
+ * year, so an older or newer year is shown read-only. The one exception is
+ * emergency contacts, which a director can also edit on next year's rows (#959).
  */
 export function rosterYearView(yearParam: string | string[] | undefined, now = new Date()) {
   const currentClubYear = clubYearFor(now);
   const choices = clubYearChoices(now);
   const clubYear = choices.find((year) => year === yearParam) ?? currentClubYear;
-  return { clubYear, currentClubYear, choices, readOnly: clubYear !== currentClubYear };
+  const nextClubYear = choices[2]!;
+  return {
+    clubYear,
+    currentClubYear,
+    nextClubYear,
+    choices,
+    readOnly: clubYear !== currentClubYear,
+    // Emergency contacts stay editable on next year's rows too (#959); a past year is history.
+    contactsEditable: clubYear === currentClubYear || clubYear === nextClubYear,
+  };
+}
+
+/**
+ * The club year a roster route answers for: the current year, or next year
+ * when `?year=` names it (#959). Anything else, a past year included, is the
+ * current year, so a route never lists a past year's emergency contacts.
+ */
+export function contactsRosterYear(yearParam: string | null | undefined, now = new Date()) {
+  const { clubYear, contactsEditable } = rosterYearView(yearParam ?? undefined, now);
+  return contactsEditable ? clubYear : clubYearFor(now);
 }
 
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

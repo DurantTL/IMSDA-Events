@@ -1,7 +1,7 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { rosterApiError } from "@/modules/club-rosters/api-errors";
-import { clubYearFor } from "@/modules/club-rosters/domain";
+import { clubYearFor, contactsRosterYear } from "@/modules/club-rosters/domain";
 import { requireGuardianEditor, rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
 import { addRosterMember, listRoster } from "@/modules/club-rosters/repository";
 import { rosterMemberInputSchema } from "@/modules/club-rosters/schemas";
@@ -10,11 +10,12 @@ import { withRequestContext } from "@/lib/request-context";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
-async function getHandler(_request: Request, context: RouteContext) {
+async function getHandler(request: Request, context: RouteContext) {
   try {
     const { organizationId } = await context.params;
     const access = await requireRosterAccess(organizationId);
-    const clubYear = clubYearFor(new Date());
+    // The current year, or next year when `?year=` names it (#959), so the contact fields can reload there.
+    const clubYear = contactsRosterYear(new URL(request.url).searchParams.get("year"));
     // Guardian contacts (#510) are in the response for a director or deputy only.
     const guardians = await rosterGuardiansForAccess(access, organizationId, clubYear);
     return Response.json({ clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) });
