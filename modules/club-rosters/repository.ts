@@ -289,7 +289,7 @@ export async function updateRosterMember(
     // Guardian contacts live only on the current club year's row (#510): a
     // crafted request against a prior or later year's row is refused.
     if (input.guardians !== undefined && member.clubYear !== clubYearFor(now)) {
-      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Guardian contacts can only be changed on the current club year's roster.");
+      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts can only be changed on the current club year's roster.");
     }
     // Nothing to change (an older client sending only `willingToDrive`, which
     // the schema strips, or an empty edit): no write, no audit entry.

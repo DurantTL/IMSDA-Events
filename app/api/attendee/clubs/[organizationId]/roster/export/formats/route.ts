@@ -28,7 +28,7 @@ async function postHandler(request: Request, context: RouteContext) {
     const input = rosterExportFormatInputSchema.parse(await request.json());
     // A saved format never carries guardian columns for a role that may not see guardians (#510).
     if (!access.capabilities.guardians && input.columns.some((column) => isGuardianRosterExportColumn(column.key))) {
-      throw new RosterAccessError("ROLE_NOT_ALLOWED", 403, "Guardian contacts are for your club's director and deputy.");
+      throw new RosterAccessError("ROLE_NOT_ALLOWED", 403, "Emergency contacts are for your club's director and deputy.");
     }
     const format = await saveRosterExportFormat(organizationId, input, actorAttribution(access.actor));
     return Response.json({ format, formats: await listRosterExportFormats(organizationId) }, { status: 201 });

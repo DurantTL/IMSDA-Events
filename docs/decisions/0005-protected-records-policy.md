@@ -1000,3 +1000,29 @@ issue #787, from the Communication Director's decision of 2026-10-05.
 - **Accepted risk.** Free text can still identify someone at a small event
   (for example a rare allergy at a small club event). The director accepted that
   risk for this report.
+
+## Addendum E: Emergency contacts on club roster members
+
+Status: **Proposed**, like the rest of this ADR. Recorded 2026-10-15 for GitHub
+issue #510, from the owner decision of 2026-10-15. It builds on the 2026-10-01
+and 2026-10-03 decisions on the same issue (plain text, not encrypted; readable
+by the club's director and deputy, every Area Coordinator, and staff holding
+`VIEW_SENSITIVE_DATA`), which are unchanged.
+
+- **Every member.** Emergency contacts apply to every roster member, adult or
+  minor. Nothing already saved is hidden. An earlier same-day answer limiting
+  them to minors was withdrawn.
+- **One label.** "Emergency contact" is the label everywhere staff see it: the
+  roster popup, the Add to roster review, the form mapping, the coordinator and
+  staff panel, and the export builder and headers. The old "Guardian" wording is
+  retired. Export column keys keep their `guardian` names so saved formats
+  still open.
+- **What is kept.** Up to two contacts per member, each with a name,
+  relationship, phone and email, all optional, in the existing
+  `ClubRosterGuardian` table (no new model or migration).
+- **Who edits.** The club director and deputy, in the roster add and edit popup.
+- **Export.** Offered as sensitive columns in the roster export builder, behind
+  the sensitive-column confirmation, to the director and deputy only. Cells go
+  through `csvCell`. Audit rows and logs hold column keys and counts, never a
+  value.
+- **Retention.** Unchanged: deleted when the member is removed.

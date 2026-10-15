@@ -14,7 +14,7 @@ import {
 } from "@/modules/club-rosters/guardians-domain";
 
 /**
- * Guardian contact storage (#510). Plain text by decision, so the protection
+ * Emergency contact storage (#510), kept in the `ClubRosterGuardian` table. Plain text by decision, so the protection
  * is who may ask: every read below takes a `GuardianViewer`, which callers are
  * expected to build only through `guardians-access.ts` (the type is
  * structural, so that is a convention, not a compile-time guarantee), and the
@@ -26,7 +26,7 @@ import {
 
 export class GuardianAccessError extends Error {
   readonly code = "FORBIDDEN";
-  constructor(message = "You don't have access to guardian contacts for this club.") {
+  constructor(message = "You don't have access to emergency contacts for this club.") {
     super(message);
     this.name = "GuardianAccessError";
   }
@@ -149,7 +149,7 @@ export async function listGuardianContactsForClub(
       action: "CLUB_ROSTER_GUARDIANS_VIEWED",
       entityType: "Organization",
       entityId: organizationId,
-      summary: "Opened the guardian contacts on a club roster.",
+      summary: "Opened the emergency contacts on a club roster.",
       metadata: {
         ...who.metadata,
         organizationId,
