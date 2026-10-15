@@ -89,3 +89,43 @@ the write is guarded on that count. If a claim commits first, the unlink is
 refused; if the unlink commits first, the claim redeems an unsponsored code and
 no church is billed. Either order is consistent, and a church is never billed
 for a use it could not have been linked to.
+
+## Church promo code invoices and the church report (#399)
+
+Owner decision (Caleb, Oct 14, 2026): a church is **invoiced** for what its code
+covered, through the organization invoicing built for Camporee (#165-#168). The
+office finalizes and sends the invoice; finalizing stays a named human action.
+Automation may prepare a draft and must never finalize or send one.
+
+- **Draft, by a staff action.** On **Finance, Owed by churches**, staff with
+  `MANAGE_FINANCE` press **Create draft invoice** for a church. It builds one
+  draft `Invoice` per church per event (group key `church-promo:<churchId>`,
+  version basis `CHURCH_PROMO_CODES`, no reconciliation) from the lines #545
+  already counts: one line per billed redemption, at the amount the church owes
+  for it, in whole cents. Cancelled, waitlisted and draft registrations and other
+  churches' lines are left out.
+- **Safe to repeat.** It runs SERIALIZABLE and retries conflicts
+  (`isSerializationFailure`), under the same per-event lock finalizing takes. With
+  nothing changed it writes nothing; a change to the redemptions or to the church's
+  billing contact refreshes the same draft; after finalization a change starts a
+  revision draft beside the finalized version, which stays as it was. With nothing
+  billable, no draft is made.
+- **Never finalized or sent from here.** A draft has no number, receivable,
+  delivery or email. Finalizing needs the Finalize invoices permission and is
+  refused when the draft no longer matches the redemptions or the church has no
+  billing contact. Sending, "Posted to AR" and recording payments are the existing
+  invoice actions. The PDF prints one row per redemption and never the promo code,
+  a confirmation code or an attendee name; the invoice goes to the church's own
+  active billing contact.
+- **The church report** (same page) shows, per church that sponsors a code on the
+  event: who used the code (by confirmation code and code, never a name), covered,
+  invoiced (the live finalized invoice), paid and still owed (both from the
+  invoice ledger), and what is not yet invoiced (or invoiced beyond current use).
+- **Audit** (`CHURCH_CODE_INVOICE_DRAFT_PREPARED`) holds ids, counts and amounts
+  only. Money is integer cents throughout.
+- **Not built here** (see the follow-up on issue #399): a church contact
+  registering several women at once with the code applied only to the people it
+  covers, a contact-only revision of a finalized church code invoice, a CSV of the
+  report, and an invoice code setting for general events.
+
+Real-database check: `npm run test:church-code-invoices`.

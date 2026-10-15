@@ -30,7 +30,7 @@ import {
   type InvoiceVersionStatus,
 } from "@/modules/invoices/domain";
 import { CHURCH_PROMO_GROUP_KEY_PREFIX, churchIdOfPromoGroupKey } from "@/modules/promo-codes/church-invoice";
-import { loadChurchBillingContact, loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
+import { loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
 import {
   MANUAL_LINES_MAX,
   fingerprintWithManualLines,

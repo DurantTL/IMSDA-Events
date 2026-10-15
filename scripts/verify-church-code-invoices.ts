@@ -187,8 +187,8 @@ async function main() {
   assert(code(await failure(prepare(ids.churchA, ids.club))) === "CHURCH_CODE_NOT_ELIGIBLE", "a club event bills no church promo code");
 
   // ---- The draft is the church's billed lines, in cents.
-  const a1 = await redeem(ids.general, "CHURCHA", "CONFIRMED");
-  const a2 = await redeem(ids.general, "CHURCHA", "SUBMITTED");
+  await redeem(ids.general, "CHURCHA", "CONFIRMED");
+  await redeem(ids.general, "CHURCHA", "SUBMITTED");
   await redeem(ids.general, "CHURCHA", "WAITLISTED");
   await redeem(ids.general, "CHURCHA", "DRAFT");
   await redeem(ids.general, "CHURCHB", "CONFIRMED");

@@ -70,14 +70,14 @@ export function InvoiceDetailView({
       {detail.amountsOutOfDate && !isDraft && (
         <section className="panel billing-settings" role="status" aria-label="Amounts out of date">
           {isChurchCodes
-            ? <p><strong>The church's promo code usage has changed since this invoice was finalized.</strong> Start a revision draft from the church report; the finalized version stays readable.</p>
+            ? <p><strong>The church&apos;s promo code usage has changed since this invoice was finalized.</strong> Start a revision draft from the church report; the finalized version stays readable.</p>
             : <p><strong>This invoice no longer matches the approved reconciliation.</strong> Revise it to rebuild the amounts; the finalized version stays readable.</p>}
         </section>
       )}
       {stale && (
         <section className="panel billing-settings" role="status" aria-label="Reconciliation not current">
           {isChurchCodes
-            ? <p><strong>This draft cannot be finalized yet.</strong> The church's promo code usage changed after it was made. Refresh the draft, then review it again.</p>
+            ? <p><strong>This draft cannot be finalized yet.</strong> The church&apos;s promo code usage changed after it was made. Refresh the draft, then review it again.</p>
             : <p><strong>This draft cannot be finalized yet.</strong> The approved reconciliation is not current (a newer one was approved, or the facts changed). Prepare and approve the reconciliation, then regenerate the draft.</p>}
         </section>
       )}
@@ -161,7 +161,7 @@ export function InvoiceDetailView({
           </>
         )}
         {!isDraft && !detail.hasOpenDraft && detail.liveFinalized && shown.id === detail.liveFinalized.id && isChurchCodes && (
-          <p><small>If the church's code is used or a registration is cancelled after this invoice, start a revision draft from the <a href={`/finance/church-owed?event=${eventId}`}>church promo code report</a>.</small></p>
+          <p><small>If the church&apos;s code is used or a registration is cancelled after this invoice, start a revision draft from the <a href={`/finance/church-owed?event=${eventId}`}>church promo code report</a>.</small></p>
         )}
         {!isDraft && !detail.hasOpenDraft && detail.liveFinalized && shown.id === detail.liveFinalized.id && !isChurchCodes && (
           <ReviseForm amountsOutOfDate={detail.amountsOutOfDate} contactChanged={detail.contactChanged} eventId={eventId} invoiceId={detail.invoice.id} />
