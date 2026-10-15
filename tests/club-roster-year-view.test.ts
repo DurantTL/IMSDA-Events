@@ -103,6 +103,9 @@ describe("which club year a roster shows (#541)", () => {
     expect(rosterYearView("2027-28", now)).toMatchObject({ clubYear: "2027-28", readOnly: true });
     expect(rosterYearView("2026-27", now)).toMatchObject({ clubYear: "2026-27", readOnly: false });
     expect(rosterYearView(undefined, now)).toMatchObject({ clubYear: "2026-27", readOnly: false });
+    expect(rosterYearView("2025-26", now).contactsEditable).toBe(false);
+    expect(rosterYearView("2026-27", now).contactsEditable).toBe(true);
+    expect(rosterYearView("2027-28", now).contactsEditable).toBe(true);
     expect(rosterYearView("2026-27", now).choices).toEqual(["2025-26", "2026-27", "2027-28"]);
   });
 

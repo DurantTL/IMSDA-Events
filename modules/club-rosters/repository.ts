@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
 import { openBirthDate, sealBirthDate } from "@/modules/club-rosters/birth-dates";
-import { ageOn, birthDateProblem, calendarDateOf, clubYearFor, defaultRosterRole } from "@/modules/club-rosters/domain";
+import { ageOn, birthDateProblem, calendarDateOf, defaultRosterRole, guardianEditableYears } from "@/modules/club-rosters/domain";
 import { guardianSetPhoneProblem } from "@/modules/club-rosters/guardians-domain";
 import { deleteGuardiansForMember, replaceGuardians } from "@/modules/club-rosters/guardians-repository";
 import type { RosterMemberInput, RosterMemberUpdate } from "@/modules/club-rosters/schemas";
@@ -286,10 +286,12 @@ export async function updateRosterMember(
   if (input.birthDate !== undefined) assertBirthDate(input.birthDate, now);
   return getPrisma().$transaction(async (tx) => {
     const member = await findMember(tx, organizationId, memberId);
-    // Guardian contacts live only on the current club year's row (#510): a
-    // crafted request against a prior or later year's row is refused.
-    if (input.guardians !== undefined && member.clubYear !== clubYearFor(now)) {
-      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts can only be changed on the current club year's roster.");
+    // Emergency contacts can be changed on the current club year's row and on
+    // next year's (#959: a director fixes a carried-forward contact in August,
+    // not in September). A past year is history: a crafted request against
+    // it, or against a year further out, is refused.
+    if (input.guardians !== undefined && !guardianEditableYears(now).includes(member.clubYear)) {
+      throw new RosterOperationError("GUARDIANS_PRIOR_YEAR", "Emergency contacts can only be changed on the current or next club year's roster.");
     }
     // Nothing to change (an older client sending only `willingToDrive`, which
     // the schema strips, or an empty edit): no write, no audit entry.
@@ -297,7 +299,8 @@ export async function updateRosterMember(
     // A details edit from the roster form (#424) must leave the person with a
     // gender, sent or already on file. Marking someone active or inactive
     // doesn't touch their details, so it stays exempt.
-    const editsDetails = Object.keys(input).some((field) => field !== "status");
+    // Nor does an emergency-contact-only edit (#959), such as one on next year's row.
+    const editsDetails = Object.keys(input).some((field) => field !== "status" && field !== "guardians");
     if (options.requireGender && editsDetails && (input.gender === undefined ? member.gender : input.gender) === null) {
       throw new RosterOperationError("GENDER_REQUIRED", "Choose Male or Female.");
     }

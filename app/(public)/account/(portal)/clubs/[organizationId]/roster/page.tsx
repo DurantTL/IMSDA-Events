@@ -39,7 +39,7 @@ export default async function ClubRosterPage({
   // The previous or next club year can be opened with ?year= (#541), read-only:
   // every roster write, the birth-date reveal, and transfers work on the
   // current year, so none of them is offered for another year.
-  const { clubYear, currentClubYear, readOnly } = rosterYearView(yearParam);
+  const { clubYear, currentClubYear, readOnly, contactsEditable } = rosterYearView(yearParam);
   // Status only, never the note, and only for a director or deputy: this is the club's own page (#427).
   // Transfers (#489) are the same leader-only capability that manages the club's team.
   const canTransfer = access.capabilities.manageTeam && !readOnly;
@@ -47,8 +47,8 @@ export default async function ClubRosterPage({
     listRoster(organizationId, clubYear),
     clubPortalComplianceStatuses(organizationId, clubYear, access.capabilities),
     canTransfer ? listTransferClubOptions(organizationId) : Promise.resolve([]),
-    // Guardian contacts (#510): the club's director and deputy only, and only on the current year, where they can be edited.
-    readOnly ? Promise.resolve(undefined) : rosterGuardiansForAccess(access, organizationId, clubYear),
+    // Guardian contacts (#510): the club's director and deputy only, and only on the current and next year, where they can be edited (#959).
+    contactsEditable ? rosterGuardiansForAccess(access, organizationId, clubYear) : Promise.resolve(undefined),
   ]);
   // No class history link for someone who has moved to another club (#791); the page would 404 for them. One query for the whole roster.
   const movedAway = await personIdsMovedToOtherClubs(organizationId, members.flatMap((member) => (member.personId ? [member.personId] : [])));
@@ -87,7 +87,8 @@ export default async function ClubRosterPage({
       <NextYearRosterOffer offer={nextYearOffer} organizationId={organizationId} />
       {readOnly && (
         <p className="inline-notice" role="status">
-          Showing the {clubYear} roster, read-only. <a href={`/account/clubs/${organizationId}/roster`}>Back to {currentClubYear}</a> to
+          Showing the {clubYear} roster, read-only. {contactsEditable && guardians ? "A director or deputy can still edit emergency contacts here. " : ""}
+          <a href={`/account/clubs/${organizationId}/roster`}>Back to {currentClubYear}</a> to
           add, edit, or remove people.
         </p>
       )}
@@ -101,6 +102,7 @@ export default async function ClubRosterPage({
         complianceStatuses={complianceStatuses}
         headingActions={canTransfer ? <RequestTransferButton clubOptions={clubOptions} organizationId={organizationId} /> : undefined}
         guardians={guardians}
+        guardiansOnly={readOnly && contactsEditable}
         healthRecordFlags={healthRecordFlags}
         healthTab={healthTab}
         healthEntryOnly={healthEntryOnly}

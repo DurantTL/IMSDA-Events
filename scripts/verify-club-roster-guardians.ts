@@ -100,6 +100,23 @@ async function main() {
   assert((await countFor(other.memberId)) === 1, "the refused write changed nothing");
   await prisma.clubRosterMember.update({ where: { id: other.memberId }, data: { clubYear } });
 
+  // August (#959): the current club year is 2025-26, so the 2026-27 rows are next year's, and a director edits their contacts.
+  const august = new Date("2026-08-15T15:00:00Z");
+  await updateRosterMember(clubs.a, other.memberId, { guardians: [guardian("Verify August Contact", { phone: "515-555-0134" }), guardian("Verify August Second")] }, actor, august);
+  assert((await countFor(other.memberId)) === 2, "an August edit adds contacts on a next-year row");
+  await updateRosterMember(clubs.a, other.memberId, { guardians: [guardian("Verify August Contact Two"), blank] }, actor, august);
+  const augustRows = await prisma.clubRosterGuardian.findMany({ where: { rosterMemberId: other.memberId } });
+  assert(augustRows.length === 1 && augustRows[0]!.name === "Verify August Contact Two", "an August edit changes and a blank slot clears a next-year contact");
+  await updateRosterMember(clubs.a, other.memberId, { guardians: [blank, blank] }, actor, august);
+  assert((await countFor(other.memberId)) === 0, "an August edit clears every contact on a next-year row");
+  await updateRosterMember(clubs.a, other.memberId, { guardians: [guardian("Verify Other Guardian")] }, actor, august);
+  assert(await rejects(updateRosterMember(clubs.b, other.memberId, { guardians: [guardian("Verify Other Club")] }, actor, august)), "another club's director is refused on a next-year row");
+  assert((await countFor(other.memberId)) === 1, "the other club's refused write changed nothing");
+  await prisma.clubRosterMember.update({ where: { id: other.memberId }, data: { clubYear: "2024-25" } });
+  assert(await rejects(updateRosterMember(clubs.a, other.memberId, { guardians: [guardian("Verify Past Year")] }, actor, august)), "a past-year row still refuses contact edits in August");
+  assert((await countFor(other.memberId)) === 1, "the past-year refusal changed nothing");
+  await prisma.clubRosterMember.update({ where: { id: other.memberId }, data: { clubYear } });
+
   // Readers.
   const leaderA: GuardianViewer = { kind: "CLUB_LEADER", organizationId: clubs.a, actor: { kind: "ATTENDEE", accountId: actor.accountId } };
   const leaderB: GuardianViewer = { kind: "CLUB_LEADER", organizationId: clubs.b, actor: { kind: "ATTENDEE", accountId: `${P}_acct_b` } };
@@ -146,7 +163,7 @@ async function main() {
   // No audit row holds a guardian value.
   const audits = await prisma.auditLog.findMany({ where: { metadata: { path: ["organizationId"], string_starts_with: P } } });
   const text = JSON.stringify(audits);
-  for (const secret of [SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Adult Contact Two", "=SUM(1+1)"]) {
+  for (const secret of [SECRET_NAME, SECRET_EMAIL, SECRET_PHONE, "Verify Renamed", "Verify Second", "Verify Other Guardian", "Verify Adult Contact", "Verify Adult Contact Two", "=SUM(1+1)", "Verify August Contact", "Verify August Second", "Verify Past Year", "Verify Other Club"]) {
     assert(!text.includes(secret), `no audit row contains "${secret}"`);
   }
   assert(audits.some((row) => row.action === "CLUB_ROSTER_GUARDIANS_VIEWED"), "a coordinator's or staff opening is audited");

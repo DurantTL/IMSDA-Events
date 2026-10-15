@@ -35,6 +35,8 @@ vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackg
 
 import { GET as getRoster, POST as postRoster } from "@/app/api/attendee/clubs/[organizationId]/roster/route";
 import { DELETE as deleteMember, PATCH as patchMember } from "@/app/api/attendee/clubs/[organizationId]/roster/[memberId]/route";
+import { RosterAccessError } from "@/modules/club-rosters/access";
+import { clubYearChoices } from "@/modules/club-rosters/domain";
 import { RosterOperationError } from "@/modules/club-rosters/repository";
 import { clubCapabilities, type ClubRole } from "@/modules/organizations/director-grants-domain";
 
@@ -132,6 +134,37 @@ describe("roster routes and guardian contacts (#510)", () => {
     const response = await patchMember(request("PATCH", { guardians }), memberCtx);
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({ error: "GUARDIANS_PRIOR_YEAR", message: expect.any(String) });
+  });
+
+  it("answers for next year when ?year= names it, and never lists a past year's contacts (#959)", async () => {
+    mocks.requireRosterAccess.mockResolvedValue(accessFor("DIRECTOR"));
+    const at = (year: string, method: string, body?: unknown) => new Request(`https://events.imsda.test/api/attendee/clubs/club-1/roster?year=${year}`, {
+      method,
+      headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const [previous, current, next] = clubYearChoices();
+    let response = await getRoster(at(next!, "GET"), orgCtx);
+    await expect(response.json()).resolves.toMatchObject({ clubYear: next });
+    expect(mocks.listGuardiansByMember).toHaveBeenLastCalledWith(expect.anything(), "club-1", next);
+    response = await patchMember(at(next!, "PATCH", { guardians }), memberCtx);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ clubYear: next, guardians: storedGuardians });
+    response = await getRoster(at(previous!, "GET"), orgCtx);
+    await expect(response.json()).resolves.toMatchObject({ clubYear: current });
+    expect(mocks.listGuardiansByMember).toHaveBeenLastCalledWith(expect.anything(), "club-1", current);
+  });
+
+  it("refuses another club's director before any contact write, next-year rows included (#959)", async () => {
+    mocks.requireRosterAccess.mockRejectedValue(new RosterAccessError("ROLE_NOT_ALLOWED", 403, "Not your club."));
+    const response = await patchMember(new Request(`https://events.imsda.test/api/attendee/clubs/club-1/roster/member-1?year=${clubYearChoices()[2]}`, {
+      method: "PATCH",
+      headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
+      body: JSON.stringify({ guardians }),
+    }), memberCtx);
+    expect(response.status).toBe(403);
+    expect(mocks.updateRosterMember).not.toHaveBeenCalled();
+    expect(mocks.listGuardiansByMember).not.toHaveBeenCalled();
   });
 
   it("rejects a malformed guardian with 400 before anything is written", async () => {
