@@ -26,6 +26,8 @@ export type EventDeletionCounts = {
   announcements: number;
   /** Succeeded payments that are not sandbox (test-mode) card payments. */
   realPayments: number;
+  /** Money recorded into the event's scholarship fund (#398), reversal lines included. Real finance records, so it blocks. */
+  scholarshipContributions: number;
   /** Sealed health copies of this event (#924). Deleted with the event (counts only; never what they hold). */
   healthSnapshots: number;
   /** Of those, copies a legal hold covers (an event hold, or a hold on the person). Any one blocks the deletion. */
@@ -59,6 +61,7 @@ export function eventDeletionBlockers(counts: EventDeletionCounts) {
   if (counts.attendees > 0) blockers.push(plural(counts.attendees, "attendee"));
   if (counts.payments > 0) blockers.push(plural(counts.payments, "payment"));
   if (counts.invoices > 0) blockers.push(plural(counts.invoices, "invoice"));
+  if (counts.scholarshipContributions > 0) blockers.push(plural(counts.scholarshipContributions, "scholarship fund contribution"));
   if (counts.honorEnrollments > 0) blockers.push(plural(counts.honorEnrollments, "honors enrollment"));
   if (counts.formSubmissions > 0) blockers.push(plural(counts.formSubmissions, "form submission"));
   if (counts.imports > 0) blockers.push(plural(counts.imports, "import run"));
