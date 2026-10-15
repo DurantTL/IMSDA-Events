@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
 import { GripVertical, MoveRight, Pencil, Plus, Save, Trash2, TriangleAlert, Users, X } from "lucide-react";
@@ -50,6 +51,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   useEffect(() => {
     if (!selected) return undefined;
     const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
       if (event.key === "Escape") {
         setSelectedId(null);
         focusMove(selected.id);
@@ -152,12 +154,19 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   }
 
   async function removeRoom(room: BoardRoom) {
-    if (!window.confirm(`Remove the room ${room.name}?`)) return;
+    if (!(await askConfirm({
+      title: `Remove the room ${room.name}`,
+      body: <p>The room is removed from the schedule board. Classes placed in it become unscheduled.</p>,
+      confirmLabel: `Remove ${room.name}`,
+      destructive: true,
+    }))) return;
     if (await call(`${base}/rooms/${encodeURIComponent(room.id)}`, "DELETE", undefined)) setNotice("Room removed.");
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack schedule-board">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Honors Weekend</p>

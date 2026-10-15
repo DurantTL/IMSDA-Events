@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import {
   Pencil,
@@ -118,8 +119,13 @@ export function TeamDirectoryWorkspace({
     }
   }
 
-  function resetTwoStep(member: TeamDirectory["members"][number]) {
-    if (!window.confirm(`Reset two-step sign-in for ${member.displayName}? Their authenticator and passkeys are removed and they're signed out; they set it up again at their next sign-in.`)) return;
+  async function resetTwoStep(member: TeamDirectory["members"][number]) {
+    if (!(await askConfirm({
+      title: `Reset two-step sign-in for ${member.displayName}`,
+      body: <p>Their authenticator and passkeys are removed and they&apos;re signed out. They set it up again at their next sign-in.</p>,
+      confirmLabel: `Reset two-step for ${member.displayName}`,
+      destructive: true,
+    }))) return;
     void accountAction(member, { action: "reset-two-step" });
   }
 
@@ -130,9 +136,12 @@ export function TeamDirectoryWorkspace({
   }
 
   async function setDisabled(userId: string, displayName: string, disabled: boolean) {
-    if (disabled && !window.confirm(
-      `Disable sign-in for ${displayName}? Their sessions end immediately and they cannot sign in until this is undone.`,
-    )) return;
+    if (disabled && !(await askConfirm({
+      title: `Disable sign-in for ${displayName}`,
+      body: <p>Their sessions end immediately and they cannot sign in until this is undone.</p>,
+      confirmLabel: `Disable ${displayName}`,
+      destructive: true,
+    }))) return;
     setBusyUserId(userId);
     setError("");
     setNotice("");
@@ -157,8 +166,10 @@ export function TeamDirectoryWorkspace({
     }
   }
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">System administration</p>

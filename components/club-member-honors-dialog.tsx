@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HonorCombobox } from "@/components/honor-combobox";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -176,7 +177,7 @@ export function ClubMemberHonorsDialog({
             </div>
             <div className="form-actions">
               <button className="secondary-button" onClick={onClose} type="button">Close</button>
-              <button className="primary-button" disabled={saving || honors.length === 0} type="submit">Record honor</button>
+              <SubmitButton className="primary-button" disabled={honors.length === 0} label="Record honor" submitting={saving} submittingLabel="Recording…" />
             </div>
           </form>
         )}

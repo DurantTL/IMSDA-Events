@@ -1,5 +1,6 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { Save } from "lucide-react";
 import type { ClubProfileRecord } from "@/modules/organizations/club-profile-repository";
@@ -115,9 +116,7 @@ export function ClubProfileForm({
         young person&apos;s. Every change is recorded.
       </p>
       <div>
-        <button className="primary-button" disabled={saving} type="submit">
-          <Save aria-hidden="true" size={16} /> Save profile
-        </button>
+        <SubmitButton className="primary-button" icon={<Save aria-hidden="true" size={16} />} label="Save profile" submitting={saving} submittingLabel="Saving…" />
       </div>
     </form>
   );

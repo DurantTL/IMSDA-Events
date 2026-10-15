@@ -8173,6 +8173,9 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .act-as .inline-notice a { font-weight: 800; }
 
 .confirm-dialog { width: min(440px, 100%); }
+.confirm-backdrop { z-index: 110; } /* above any editor dialog it opens over (#743) */
+.confirm-dialog .form-actions { flex-wrap: wrap; }
+.confirm-dialog :is(h2, button) { overflow-wrap: anywhere; }
 .confirm-dialog-body { display: grid; gap: 12px; margin-bottom: 4px; }
 .confirm-dialog-facts { display: grid; gap: 9px; margin: 0; }
 .confirm-dialog-facts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-radius: 9px; background: var(--paper); padding: 8px 11px; }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { useMemo, useState } from "react";
 import { CheckCircle2, Plus, Shirt, Trash2, X } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
@@ -11,6 +12,31 @@ export type ClubUniformData = UniformWorkspaceData;
 export const emptyUniformData: ClubUniformData = { catalog: [], members: [], needs: [], issuedCount: 0 };
 
 type Chosen = { itemId: string; label: string };
+
+type PreviewNeed = { needId: string; firstName: string; lastName: string; itemName: string; size?: string | null };
+
+/** The first few picked needs, in list order, each keyed by its own id (#743 bulk preview). */
+export function uniformNeedPreview(needs: readonly PreviewNeed[], pickedIds: readonly string[], limit = 5) {
+  const picked = needs.filter((need) => pickedIds.includes(need.needId));
+  return {
+    rows: picked.slice(0, limit).map((need) => ({
+      needId: need.needId,
+      line: `${need.firstName} ${need.lastName}, ${need.itemName}${need.size ? ` ${need.size}` : ""}`,
+    })),
+    more: Math.max(0, picked.length - limit),
+  };
+}
+
+function NeedPreview({ needs, pickedIds }: { needs: readonly PreviewNeed[]; pickedIds: readonly string[] }) {
+  const { rows, more } = uniformNeedPreview(needs, pickedIds);
+  return (
+    <>
+      <ul>{rows.map((row) => <li key={row.needId} translate="no">{row.line}</li>)}</ul>
+      {more > 0 && <p>{`and ${more} more`}</p>}
+    </>
+  );
+}
+
 
 /**
  * The Uniforms section of a club's Orders screen (#497). A director or
@@ -97,8 +123,11 @@ export function ClubUniformSection({
   const canRecord = !busy && chosen.length > 0 && memberIds.size > 0 && !tooMany;
   const openCount = data.needs.length;
 
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+
   return (
     <section aria-labelledby="club-uniforms" className={styles.block}>
+      {confirmDialog}
       <h3 id="club-uniforms"><Shirt aria-hidden="true" size={14} /> Uniforms</h3>
       <p className="field-help">
         {readOnly
@@ -224,7 +253,20 @@ export function ClubUniformSection({
             <button
               className="secondary-button"
               disabled={busy || pickedNeeded.length === 0}
-              onClick={async () => { if (await onAlreadyHasOne(pickedNeeded)) setPicked(new Set()); }}
+              onClick={async () => {
+                const noun = `uniform need${pickedNeeded.length === 1 ? "" : "s"}`;
+                if (!(await askConfirm({
+                  title: `Mark ${pickedNeeded.length} ${noun} as already issued`,
+                  body: (
+                    <>
+                      <p>{`These ${noun} are marked as already issued. Stock isn't changed, and each is removed from the open list.`}</p>
+                      <NeedPreview needs={data.needs} pickedIds={pickedNeeded} />
+                    </>
+                  ),
+                  confirmLabel: `Mark ${pickedNeeded.length} as already issued`,
+                }))) return;
+                if (await onAlreadyHasOne(pickedNeeded)) setPicked(new Set());
+              }}
               type="button"
             >
               <CheckCircle2 aria-hidden="true" size={14} /> Already has one{pickedNeeded.length > 0 ? ` (${pickedNeeded.length})` : ""}
@@ -232,7 +274,21 @@ export function ClubUniformSection({
             <button
               className="secondary-button"
               disabled={busy || pickedNeeded.length === 0}
-              onClick={async () => { if (await onRemove(pickedNeeded)) setPicked(new Set()); }}
+              onClick={async () => {
+                const noun = `uniform need${pickedNeeded.length === 1 ? "" : "s"}`;
+                if (!(await askConfirm({
+                  title: `Remove ${pickedNeeded.length} ${noun}`,
+                  body: (
+                    <>
+                      <p>{`These ${noun} are deleted from this order list. Nothing has been handed out, and stock isn't changed.`}</p>
+                      <NeedPreview needs={data.needs} pickedIds={pickedNeeded} />
+                    </>
+                  ),
+                  confirmLabel: `Remove ${pickedNeeded.length} ${noun}`,
+                  destructive: true,
+                }))) return;
+                if (await onRemove(pickedNeeded)) setPicked(new Set());
+              }}
               type="button"
             >
               <Trash2 aria-hidden="true" size={14} /> Remove{pickedNeeded.length > 0 ? ` (${pickedNeeded.length})` : ""}

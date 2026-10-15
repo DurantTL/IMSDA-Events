@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { mealTicketBinding } from "@/modules/meals/domain";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { EmptyState } from "@/components/empty-state";
@@ -467,14 +468,26 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
     finally { setBusy(null); }
   }
 
-  function chooseForm(form: FormView) {
-    if (dirty && !window.confirm("Discard the unsaved draft changes and open another form?")) return;
+  async function chooseForm(form: FormView) {
+    if (dirty && !(await askConfirm({
+      title: `Open ${form.name} and discard draft changes`,
+      body: <p>The unsaved changes to the draft of {selectedForm?.name ?? "the current form"} are lost.</p>,
+      confirmLabel: `Discard changes and open ${form.name}`,
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return;
     const nextDefinition = structuredClone(form.activeVersion.definition);
     setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
   }
 
-  function chooseVersion(version: FormVersionView) {
-    if (dirty && !window.confirm("Discard the unsaved draft changes and view another version?")) return;
+  async function chooseVersion(version: FormVersionView) {
+    if (dirty && !(await askConfirm({
+      title: `View version ${version.versionNumber} and discard draft changes`,
+      body: <p>The unsaved changes to the current draft are lost.</p>,
+      confirmLabel: `Discard changes and view version ${version.versionNumber}`,
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return;
     const nextDefinition = structuredClone(version.definition);
     setSelectedVersionId(version.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
   }
@@ -913,7 +926,9 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
 
   const previewAllowedFieldKeys = new Set(previewStep?.fieldKeys ?? []);
 
-  return <section className="page-stack builder-workspace">
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+
+  return <section className="page-stack builder-workspace">{confirmDialog}
     <div className="page-intro"><div><p className="eyebrow">Public registration setup</p><h2 className="duplicate-page-title">{staffPageTitles.registrationForm}</h2><p>Create, arrange, preview, test, and publish versioned registration forms for {eventName} without code.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview &amp; test</button>}<button className="secondary-button" type="button" onClick={() => setShowTemplates((value) => !value)}><CopyPlus size={16} /> New from template</button></div></div>
 
     {showTemplates && <section className="panel builder-template-panel"><div className="section-heading"><div><p className="eyebrow">Start with a safe foundation</p><h2>Choose a template</h2></div><button className="icon-button" aria-label="Close templates" type="button" onClick={() => setShowTemplates(false)}><X size={18} /></button></div><div className="template-card-grid">{templatesForPicker(templates, eventAudience, eventBillingMode).map((template) => <article className="template-card" key={template.key}><span><Layers3 size={20} /></span><small>{template.audience}</small><h3>{template.name}</h3><p>{template.description}</p><div>{template.sectionCount} sections · {template.fieldCount} fields</div><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => createFromTemplate(template.key)}>Use template <ChevronRight size={15} /></button></article>)}</div></section>}
