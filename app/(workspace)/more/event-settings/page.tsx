@@ -10,6 +10,7 @@ import { EventGeneralLinkPanel } from "@/components/event-general-link-panel";
 import { generalLinkUrl } from "@/modules/general-link-registrations/domain";
 import { getGeneralLinkSettings } from "@/modules/general-link-registrations/repository";
 import { getServerEnv } from "@/lib/env";
+import { decideEventArchiveAccess } from "@/modules/events/archive";
 import { getEventSettings } from "@/modules/events/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -22,7 +23,7 @@ export default async function EventSettingsPage({
   searchParams: Promise<{ event?: string }>;
 }) {
   const { event: requested } = await searchParams;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, membership, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return <AccessRestricted title="Event settings are restricted" detail="Only event administrators can change public details, capacity, registration dates, waitlist behavior, and publishing." />;
   }
@@ -31,7 +32,7 @@ export default async function EventSettingsPage({
   if (!settings) notFound();
   return (
     <>
-      <EventSettingsWorkspace key={event.id} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} />
+      <EventSettingsWorkspace key={event.id} mode="edit" initialEvent={settings} initialLocations={locations} areaCoordinators={coordinators} canDeleteEvent={user?.globalRole === "SYSTEM_ADMIN"} canArchiveEvent={decideEventArchiveAccess({ globalRole: user?.globalRole, eventRole: membership?.role ?? null }).allowed} />
       {settings.audience === "CLUB" && <EventTeamSettingsPanel key={`teams-${event.id}`} eventId={event.id} initialSettings={teamSettings} />}
       {settings.audience === "CLUB" && generalLink && (
         <EventGeneralLinkPanel

@@ -170,11 +170,10 @@ async function assertEventScope(
         attendees: { some: { personId: input.member.personId } },
       },
     },
-    select: { event: { select: { timezone: true, endsAt: true, isPublished: true } } },
+    select: { event: { select: { timezone: true, endsAt: true, isPublished: true, archivedAt: true } } },
   });
-  // The event model has no cancelled or archived state, and a deleted event takes
-  // its registrations with it; an unpublished event is the one "not open" state.
-  if (!registration || !registration.event.isPublished || !healthWindowOpen(registration.event, input.now)) throw notFound();
+  // A deleted event takes its registrations with it; an unpublished or archived (#635) event is "not open".
+  if (!registration || !registration.event.isPublished || registration.event.archivedAt || !healthWindowOpen(registration.event, input.now)) throw notFound();
 }
 
 /**

@@ -41,7 +41,7 @@ export default async function ClubRegistrationEntryPage({
   }
 
   const event = await getPrisma().event.findFirst({
-    where: { slug: eventSlug, isPublished: true, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
+    where: { slug: eventSlug, isPublished: true, archivedAt: null, audience: "CLUB", billingMode: "DEFERRED_ORGANIZATION_INVOICE" },
     select: { id: true, name: true, slug: true },
   });
   if (!event) notFound();

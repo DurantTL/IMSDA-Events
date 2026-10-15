@@ -95,7 +95,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   ].filter((metric): metric is NonNullable<typeof metric> => Boolean(metric) && Boolean(metric?.visible));
   const quickActions = [
     canSeeSensitiveData ? { href: `/people${query}`, label: "Find a person", detail: "Search registrations and attendees", icon: Search, tone: "navy" } : null,
-    permissions.includes("MANAGE_REGISTRATION") ? { href: `/events/${event.slug}`, label: "Start registration", detail: "Use the same published form as attendees", icon: UserRoundPlus, tone: "purple" } : null,
+    permissions.includes("MANAGE_REGISTRATION") && !event.archivedAt ? { href: `/events/${event.slug}`, label: "Start registration", detail: "Use the same published form as attendees", icon: UserRoundPlus, tone: "purple" } : null,
     permissions.includes("MANAGE_FINANCE") ? { href: `/finance${query}`, label: "Review finances", detail: "Payments, refunds, and balances", icon: WalletCards, tone: "gold" } : null,
     permissions.includes("MANAGE_CHECK_IN") ? { href: `/check-in${query}`, label: "Open check-in", detail: "Record attendee arrivals", icon: CheckCircle2, tone: "green" } : null,
     { href: `/communications${query}${permissions.includes("MANAGE_COMMUNICATIONS") ? "&new=1" : ""}`, label: permissions.includes("MANAGE_COMMUNICATIONS") ? "Draft an update" : "View updates", detail: permissions.includes("MANAGE_COMMUNICATIONS") ? "Create an attendee announcement" : "Review attendee announcements", icon: Megaphone, tone: "gold" },
@@ -103,6 +103,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
+      {event.archivedAt && (
+        <div className="inline-notice" role="status">
+          <span>This event is archived: hidden from pickers and the public site, with registration closed. Its records, reports and exports still work. {permissions.includes("CONFIGURE_EVENT") ? <Link className="text-link" href={`/more/event-settings${query}`}>Unarchive it in Event settings.</Link> : null}</span>
+        </div>
+      )}
       <section className="event-hero">
         <div className="hero-copy">
           <span className="event-state">{eventState}</span>

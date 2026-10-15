@@ -616,6 +616,18 @@ select:focus-visible {
 /* The visible "Event workspace" label above names the picker; this one is for screen readers only. */
 .event-picker-wrap label.sr-only { margin: -1px; }
 
+/* Link to the Archived events list (#635); 44px tall for touch. */
+.event-picker-archived-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin: 2px 0 0 5px;
+  color: #d3e2e8;
+  font-size: max(var(--type-body-floor, 0px), 0.82rem);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .select-shell { position: relative; }
 
 .select-shell select {

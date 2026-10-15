@@ -105,9 +105,9 @@ describe("getAreaCoordinatorCard", () => {
     expect(mocks.locationFindMany.mock.calls[0]![0].where).toEqual({
       coordinatorAccountId: "acct-1",
       isActive: true,
-      event: { isPublished: true, audience: "CLUB", endsAt: { gte: now } },
+      event: { isPublished: true, archivedAt: null, audience: "CLUB", endsAt: { gte: now } },
     });
-    expect(mocks.eventFindMany.mock.calls[0]![0].where).toEqual({ isPublished: true, audience: "CLUB", endsAt: { gte: now } });
+    expect(mocks.eventFindMany.mock.calls[0]![0].where).toEqual({ isPublished: true, archivedAt: null, audience: "CLUB", endsAt: { gte: now } });
     expect(mocks.eventFindMany.mock.calls[0]![0].select.clubRegistrations.where).toEqual({ organization: { isActive: true } });
     expect(mocks.orgFindMany.mock.calls[0]![0].where).toEqual({ type: "CLUB", isActive: true });
   });

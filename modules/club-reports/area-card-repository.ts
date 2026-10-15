@@ -58,7 +58,7 @@ export async function getAreaCoordinatorCard(account: { id: string }, now = new 
   const clubYear = clubYearFor(now);
   const [locations, clubEvents, needingAttention] = await Promise.all([
     prisma.eventLocation.findMany({
-      where: { coordinatorAccountId: accountId, isActive: true, event: { isPublished: true, audience: "CLUB", endsAt: { gte: now } } },
+      where: { coordinatorAccountId: accountId, isActive: true, event: { isPublished: true, archivedAt: null, audience: "CLUB", endsAt: { gte: now } } },
       orderBy: [{ event: { startsAt: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -68,7 +68,7 @@ export async function getAreaCoordinatorCard(account: { id: string }, now = new 
       },
     }),
     prisma.event.findMany({
-      where: { isPublished: true, audience: "CLUB", endsAt: { gte: now } },
+      where: { isPublished: true, archivedAt: null, audience: "CLUB", endsAt: { gte: now } },
       orderBy: { startsAt: "asc" },
       select: {
         id: true,

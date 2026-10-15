@@ -72,6 +72,7 @@
     "test:location-waitlist": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-location-waitlist.ts",
     "test:event-cloning": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-cloning.ts",
     "test:event-deletion": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-deletion.ts",
+    "test:event-archive": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-archive.ts",
     "test:badge-print": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-badge-print.ts",
     "test:mobile-layout": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-mobile-layout.ts",
     "test:form-revisions": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-form-revisions.ts",

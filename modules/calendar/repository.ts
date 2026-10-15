@@ -47,6 +47,7 @@ const publicEventSelect = {
   location: true,
   calendarCategory: true,
   isPublished: true,
+  archivedAt: true,
   registrationOpensOn: true,
   registrationClosesOn: true,
   waitlistEnabled: true,
@@ -70,6 +71,7 @@ export async function listPublicCalendarItems(
     prisma.event.findMany({
       where: {
         isPublished: true,
+        archivedAt: null,
         showOnCalendar: true,
         startsAt: { lt: new Date(`${addDays(to, 2)}T00:00:00Z`) },
         endsAt: { gte: new Date(`${addDays(from, -1)}T00:00:00Z`) },
@@ -203,7 +205,7 @@ export type CalendarAdminEvent = Awaited<ReturnType<typeof listCalendarEvents>>[
 /** Events that haven't ended (plus the last month), with whether each shows on the calendar. */
 export async function listCalendarEvents(now = new Date()) {
   const events = await getPrisma().event.findMany({
-    where: { endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
+    where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
     orderBy: { startsAt: "asc" },
     select: { ...publicEventSelect, showOnCalendar: true },
   });

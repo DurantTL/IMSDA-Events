@@ -317,6 +317,7 @@ export default async function SystemAdminPage({
               </div>
             </details>
           )}
+          <Link className="text-link" href="/archived-events">Archived events</Link>
         </section>
 
         <aside className={styles.sideColumn}>

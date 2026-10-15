@@ -28,7 +28,7 @@ import { campingReportCsv, buildCampingReport, withLocationColumn, type ClubEven
  */
 
 const event = {
-  isPublished: true,
+  isPublished: true, archivedAt: null,
   timezone: "America/Chicago",
   registrationOpensOn: "2026-10-01",
   registrationClosesOn: "2026-11-30",

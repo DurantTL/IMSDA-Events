@@ -50,6 +50,7 @@ function event(id: string, overrides: Record<string, unknown> = {}) {
     location: null,
     capacity: null,
     isPublished: true,
+    archivedAt: null,
     registrationOpensOn: null,
     registrationClosesOn: null,
     waitlistEnabled: false,

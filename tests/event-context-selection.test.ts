@@ -12,7 +12,7 @@ function draft(id: string, startsAt: string): EventSelectionCandidate {
   return {
     id,
     startsAt: new Date(startsAt),
-    isPublished: false,
+    isPublished: false, archivedAt: null,
     timezone: "America/Chicago",
     registrationOpensOn: null,
     registrationClosesOn: null,
@@ -28,7 +28,7 @@ function published(
   return {
     id,
     startsAt: new Date(startsAt),
-    isPublished: true,
+    isPublished: true, archivedAt: null,
     timezone: "America/Chicago",
     registrationOpensOn: null,
     registrationClosesOn: null,

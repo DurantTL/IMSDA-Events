@@ -270,6 +270,8 @@ export async function getStaffEventHubPreview(
   const accessibleEvents = await listEventsForUser(
     user.id,
     user.globalRole === "SYSTEM_ADMIN",
+    // Staff may preview an archived event's hub (#635); registrants still reach it too.
+    { archived: "include" },
   );
   const accessibleEvent = accessibleEvents.find(
     (event) => event.slug === eventSlug,

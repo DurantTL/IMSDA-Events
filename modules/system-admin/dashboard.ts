@@ -12,6 +12,7 @@ export type SystemAdminEventSource = {
   location: string | null;
   capacity: number | null;
   isPublished: boolean;
+  archivedAt: Date | null;
   registrationOpensOn: string | null;
   registrationClosesOn: string | null;
   waitlistEnabled: boolean;

@@ -68,7 +68,7 @@ const activeStatuses: ActiveStatus[] = ["SUBMITTED", "CONFIRMED"];
 const locationDates = { firstDay: true, lastDay: true, registrationClosesOn: true } satisfies Prisma.EventLocationSelect;
 
 const lifecycleEvent = {
-  id: true, name: true, isPublished: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true,
+  id: true, name: true, isPublished: true, archivedAt: true, endsAt: true, timezone: true, registrationOpensOn: true, registrationClosesOn: true,
   waitlistEnabled: true, honorWaitlistOfferHours: true,
 } satisfies Prisma.EventSelect;
 
@@ -239,6 +239,8 @@ export async function promoteClassWaitlists(
   await lockOfferings(tx, ids);
   const event = await tx.event.findUnique({ where: { id: eventId }, select: lifecycleEvent });
   if (!event) return result;
+  // An archived event (#635) is frozen: a cancellation, transfer or staff action on it must not lapse live offers, and unarchiving could not undo that.
+  if (event.archivedAt) return result;
   const offeringsById = new Map((await loadOfferings(tx, eventId)).map((offering) => [offering.id, offering]));
   const prerequisiteHonorIds = await eventPrerequisiteHonorIds(tx, eventId);
   for (const offeringId of ids) {
@@ -574,7 +576,8 @@ export async function sweepClassWaitlists(now = new Date(), pageSize = 100, maxC
   // Phase A: classes with an offer that has run out, earliest expiry first.
   while (result.classes < maxClasses && !outOfTime()) {
     const rows = await prisma.honorClassWaitlistEntry.findMany({
-      where: { status: "OFFERED", offerExpiresAt: { lte: now }, offeringId: { notIn: [...done] } },
+      // Archived events (#635) are skipped: archiving must not lapse a live offer, and unarchiving could not undo it.
+      where: { status: "OFFERED", offerExpiresAt: { lte: now }, offeringId: { notIn: [...done] }, event: { archivedAt: null } },
       orderBy: [{ offerExpiresAt: "asc" }, { id: "asc" }],
       select: { eventId: true, offeringId: true },
       take: pageSize,
@@ -589,7 +592,7 @@ export async function sweepClassWaitlists(now = new Date(), pageSize = 100, maxC
   let after: string | undefined;
   while (result.classes < maxClasses && !outOfTime()) {
     const rows = await prisma.honorClassWaitlistEntry.findMany({
-      where: { status: { in: ["WAITING", "OFFERED"] }, ...(after ? { offeringId: { gt: after } } : {}) },
+      where: { status: { in: ["WAITING", "OFFERED"] }, event: { archivedAt: null }, ...(after ? { offeringId: { gt: after } } : {}) },
       orderBy: [{ offeringId: "asc" }],
       select: { eventId: true, offeringId: true },
       distinct: ["offeringId"],

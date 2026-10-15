@@ -9,7 +9,7 @@ import {
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
 const baseEvent = {
-  isPublished: true,
+  isPublished: true, archivedAt: null,
   timezone: "America/Chicago",
   capacity: 100,
   registrationOpensOn: "2026-08-01",

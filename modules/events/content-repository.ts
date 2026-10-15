@@ -118,7 +118,7 @@ export async function listPublishedRegistrationInfoCards(
 ): Promise<EventContentSectionRecord[]> {
   const rows = await getPrisma().eventContentSection.findMany({
     where: {
-      event: { slug: eventSlug, isPublished: true },
+      event: { slug: eventSlug, isPublished: true, archivedAt: null },
       isPublished: true,
       kind: { in: [...registrationFormKinds] },
       placement: { in: ["REGISTRATION_FORM", "BOTH"] },
