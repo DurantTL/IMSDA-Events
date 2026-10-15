@@ -1,4 +1,7 @@
+import { after } from "next/server";
 import { z } from "zod";
+import { deliverQueuedAttendeeEmail } from "@/modules/attendee-accounts/attendee-email-dispatch";
+import { HAND_LINK_NOTE_MAX, HAND_LINK_REASON_CODES } from "@/modules/account-merge/hand-link-reasons";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireSystemAdministrator } from "@/modules/organizations/access";
 import { setAreaCoordinator } from "@/modules/organizations/area-coordinators";
@@ -7,17 +10,24 @@ import {
   linkStaffAndAttendeeByHand,
   unlinkStaffAndAttendee,
 } from "@/modules/account-merge/hand-link";
-import { changeAttendeeEmail, resetAttendeeTwoStep, signOutAttendeeEverywhere } from "@/modules/system-admin/user-admin";
+import { changeAttendeeEmail, resetAttendeeTwoStep, sendAttendeeVerificationByAdmin, signOutAttendeeEverywhere } from "@/modules/system-admin/user-admin";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
 import { withRequestContext } from "@/lib/request-context";
+
+// A reason code from a fixed list plus an optional note (5 to 500 characters for "Other"; the server re-checks).
+const handLinkReason = z.object({
+  code: z.enum(HAND_LINK_REASON_CODES),
+  note: z.string().trim().max(HAND_LINK_NOTE_MAX, `Keep the note to ${HAND_LINK_NOTE_MAX} characters.`).optional(),
+}).strict();
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset-two-step") }).strict(),
   z.object({ action: z.literal("sign-out") }).strict(),
   z.object({ action: z.literal("area-coordinator"), on: z.boolean() }).strict(),
   // Hand-linking a person's team sign-in and this account when their emails differ (#554).
-  z.object({ action: z.literal("link-staff"), staffEmail: z.string().trim().toLowerCase().pipe(z.email("Enter the team account's email.")), reason: z.string().trim().min(1).max(1000) }).strict(),
-  z.object({ action: z.literal("unlink-staff"), reason: z.string().trim().min(1).max(1000) }).strict(),
+  z.object({ action: z.literal("link-staff"), staffEmail: z.string().trim().toLowerCase().pipe(z.email("Enter the team account's email.")), reason: handLinkReason }).strict(),
+  z.object({ action: z.literal("unlink-staff"), reason: handLinkReason }).strict(),
+  z.object({ action: z.literal("send-verification") }).strict(),
   z.object({ action: z.literal("change-email"), email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.")) }).strict(),
 ]);
 
@@ -51,6 +61,11 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
     if (input.action === "unlink-staff") {
       await unlinkStaffAndAttendee({ attendeeAccountId: accountId, reason: input.reason }, actor.id);
       return Response.json({ message: "Unlinked." });
+    }
+    if (input.action === "send-verification") {
+      const { messageId } = await sendAttendeeVerificationByAdmin(accountId, actor.id);
+      if (messageId) after(() => deliverQueuedAttendeeEmail(messageId));
+      return Response.json({ message: "Verification email sent to the account's current address. The email is verified when the person enters the code." });
     }
     if (input.action === "sign-out") {
       await signOutAttendeeEverywhere(accountId, actor.id);

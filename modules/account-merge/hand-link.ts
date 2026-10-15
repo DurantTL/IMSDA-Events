@@ -3,6 +3,13 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import {
+  HAND_LINK_NOTE_MAX,
+  HAND_LINK_NOTE_MIN_FOR_OTHER,
+  HAND_LINK_REASON_CODES,
+  HAND_LINK_REASON_LABELS,
+  type HandLinkReasonCode,
+} from "@/modules/account-merge/hand-link-reasons";
 
 /**
  * Linking a person's staff `User` and `AttendeeAccount` by hand when their
@@ -30,6 +37,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 
 export type HandLinkErrorCode =
   | "NOT_SYSTEM_ADMIN"
+  | "NOT_ON_YOURSELF"
   | "REASON_REQUIRED"
   | "USER_NOT_FOUND"
   | "ACCOUNT_NOT_FOUND"
@@ -46,20 +54,22 @@ export class HandLinkError extends Error {
   }
 }
 
-export const HAND_LINK_REASON_MIN = 5;
-export const HAND_LINK_REASON_MAX = 500;
+export { HAND_LINK_NOTE_MAX, HAND_LINK_REASON_CODES, HAND_LINK_REASON_LABELS, type HandLinkReasonCode };
 
-export function cleanHandLinkReason(reason: unknown): string {
-  const text = typeof reason === "string" ? reason.trim().replace(/\s+/g, " ") : "";
-  if (text.length < HAND_LINK_REASON_MIN) {
-    throw new HandLinkError("REASON_REQUIRED", "Give a reason of at least a few words. Do not include personal details.");
+/** A reason code is required; a short note is optional (required for "Other"). No personal details belong in it. */
+export function cleanHandLinkReason(reason: unknown): { code: HandLinkReasonCode; note: string | null } {
+  const input = (typeof reason === "object" && reason !== null ? reason : {}) as { code?: unknown; note?: unknown };
+  const code = HAND_LINK_REASON_CODES.find((candidate) => candidate === input.code);
+  const note = typeof input.note === "string" ? input.note.trim().replace(/\s+/g, " ").slice(0, HAND_LINK_NOTE_MAX) : "";
+  if (!code || (code === "OTHER" && note.length < HAND_LINK_NOTE_MIN_FOR_OTHER)) {
+    throw new HandLinkError("REASON_REQUIRED", "Choose a reason (add a short note for \"Other\"). Do not include personal details.");
   }
-  return text.slice(0, HAND_LINK_REASON_MAX);
+  return { code, note: note || null };
 }
 
 type Tx = Prisma.TransactionClient;
 
-async function requireSystemAdminActor(tx: Tx, actorUserId: string) {
+export async function requireSystemAdminActor(tx: Tx, actorUserId: string) {
   const actor = await tx.user.findUnique({
     where: { id: actorUserId },
     select: { globalRole: true, accountStatus: true },
@@ -95,11 +105,13 @@ export async function linkStaffAndAttendeeByHand(
         select: { id: true, accountStatus: true, attendeeAccountId: true },
       });
       if (!user) throw new HandLinkError("USER_NOT_FOUND", "That team account could not be found.");
+      if (user.id === actorUserId) throw new HandLinkError("NOT_ON_YOURSELF", "Ask another system administrator to change your own sign-in links.");
       const account = await tx.attendeeAccount.findUnique({
         where: { id: input.attendeeAccountId },
         select: { id: true, status: true, disabledAt: true, emailVerifiedAt: true, linkedUser: { select: { id: true } } },
       });
       if (!account) throw new HandLinkError("ACCOUNT_NOT_FOUND", "That account could not be found.");
+      if (account.linkedUser?.id === actorUserId) throw new HandLinkError("NOT_ON_YOURSELF", "Ask another system administrator to change your own sign-in links.");
       if (user.attendeeAccountId) throw new HandLinkError("USER_ALREADY_LINKED", USER_LINKED);
       if (account.linkedUser) throw new HandLinkError("ACCOUNT_ALREADY_LINKED", ACCOUNT_LINKED);
       if (user.accountStatus !== "ACTIVE") throw new HandLinkError("USER_NOT_ACTIVE", "The team account must be active before it can be linked.");
@@ -112,7 +124,7 @@ export async function linkStaffAndAttendeeByHand(
         data: { attendeeAccountId: account.id },
       });
       if (claimed.count !== 1) throw new HandLinkError("USER_ALREADY_LINKED", USER_LINKED);
-      const metadata = { userId: user.id, attendeeAccountId: account.id, reason, method: "HAND_LINK" };
+      const metadata = { userId: user.id, attendeeAccountId: account.id, reasonCode: reason.code, note: reason.note, method: "HAND_LINK" };
       const summary = "A system administrator linked a team account and an attendee account by hand.";
       await writeAuditLog({
         actorUserId, action: "STAFF_ATTENDEE_HAND_LINKED", entityType: "User", entityId: user.id, summary, metadata,
@@ -142,12 +154,20 @@ export async function unlinkStaffAndAttendee(
       select: { id: true },
     });
     if (!linked) throw new HandLinkError("NOT_LINKED", "That account is not linked to a team account.");
+    if (linked.id === actorUserId) throw new HandLinkError("NOT_ON_YOURSELF", "Ask another system administrator to change your own sign-in links.");
     const cleared = await tx.user.updateMany({
       where: { id: linked.id, attendeeAccountId: input.attendeeAccountId },
       data: { attendeeAccountId: null },
     });
     if (cleared.count !== 1) throw new HandLinkError("NOT_LINKED", "That account is not linked to a team account.");
-    const metadata = { userId: linked.id, attendeeAccountId: input.attendeeAccountId, reason };
+    // Attendee sessions issued through the link (a staff sign-in creates one for the linked
+    // account) must not outlive it: they would stay alive for up to 14 days.
+    const now = new Date();
+    await tx.attendeeSession.updateMany({
+      where: { accountId: input.attendeeAccountId, revokedAt: null },
+      data: { revokedAt: now },
+    });
+    const metadata = { userId: linked.id, attendeeAccountId: input.attendeeAccountId, reasonCode: reason.code, note: reason.note };
     const summary = "A system administrator unlinked a team account from an attendee account.";
     await writeAuditLog({
       actorUserId, action: "STAFF_ATTENDEE_UNLINKED", entityType: "User", entityId: linked.id, summary, metadata,

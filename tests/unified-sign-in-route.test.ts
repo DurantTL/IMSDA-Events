@@ -78,20 +78,21 @@ async function observable(response: Response) {
 }
 
 type StaffRow = {
+  pending?: boolean;
   globalRole?: "SYSTEM_ADMIN" | null;
   mfa?: boolean;
   locked?: boolean;
   disabled?: boolean;
   attendeeAccountId?: string | null;
 };
-type AttendeeRow = { locked?: boolean; disabled?: boolean };
+type AttendeeRow = { locked?: boolean; disabled?: boolean; unverified?: boolean };
 
 /** Builds the database stub: at most one staff row and one attendee row. */
 function database(options: { switchOn?: boolean; staff?: StaffRow | null; attendee?: AttendeeRow | null }) {
   const created = { userSession: vi.fn(async () => ({})), attendeeSession: vi.fn(async () => ({})), attendeeSessionRevoke: vi.fn(async () => ({ count: 1 })) };
   const staff = options.staff;
   const attendee = options.attendee;
-  mocks.getPrisma.mockReturnValue({
+  const db = {
     platformSettings: { findUnique: vi.fn(async () => ({ unifiedSignInEnabled: options.switchOn !== false })) },
     user: {
       findUnique: vi.fn(async (args: { select: Record<string, unknown> }) => {
@@ -99,7 +100,7 @@ function database(options: { switchOn?: boolean; staff?: StaffRow | null; attend
         if ("credential" in args.select) {
           return {
             id: "user-1",
-            accountStatus: "ACTIVE",
+            accountStatus: staff.pending ? "PENDING_ACTIVATION" : "ACTIVE",
             globalRole: staff.globalRole ?? null,
             memberships: [],
             mfaEnrollment: staff.mfa ? { status: "ACTIVE" } : null,
@@ -127,7 +128,11 @@ function database(options: { switchOn?: boolean; staff?: StaffRow | null; attend
       findUnique: vi.fn(async () => (attendee
         ? {
           id: "acct-1",
-          status: "ACTIVE",
+          email: "person@example.test",
+          displayName: "Person",
+          emailVerifiedAt: attendee.unverified ? null : new Date(),
+          linkedUser: null,
+          status: attendee.unverified ? "PENDING_VERIFICATION" : "ACTIVE",
           disabledAt: attendee.disabled ? new Date() : null,
           credential: {
             id: "att-cred",
@@ -143,8 +148,9 @@ function database(options: { switchOn?: boolean; staff?: StaffRow | null; attend
     attendeeCredential: { update: vi.fn(async () => ({})), updateMany: vi.fn(async () => ({ count: 0 })) },
     userSession: { create: created.userSession },
     attendeeSession: { create: created.attendeeSession, updateMany: created.attendeeSessionRevoke },
-  });
-  return created;
+  };
+  mocks.getPrisma.mockReturnValue(db);
+  return { ...created, staffMiss: db.authCredential.updateMany, attendeeMiss: db.attendeeCredential.updateMany };
 }
 
 /** Which password hashes the typed password satisfies. */
@@ -188,6 +194,7 @@ describe("one response for every failure (switch on)", () => {
     ["a wrong password for a staff only", { staff: {}, attendee: null }],
     ["locked credentials", { staff: { locked: true }, attendee: { locked: true } }],
     ["disabled accounts", { staff: { disabled: true }, attendee: { disabled: true } }],
+    ["a pending staff user and an unverified attendee", { staff: { pending: true }, attendee: { unverified: true } }],
     ["a staff user with a second step and a wrong password", { staff: { globalRole: "SYSTEM_ADMIN", mfa: true }, attendee: {} }],
   ];
 
@@ -284,22 +291,22 @@ describe("what a correct password grants (switch on)", () => {
   });
 
   it("checks the two credentials independently: the staff password alone, the attendee password alone, both, neither", async () => {
-    const rows = { staff: {}, attendee: {} };
+    const rows = { staff: { attendeeAccountId: "acct-1" }, attendee: {} };
     const cases: Array<[{ staff?: boolean; attendee?: boolean }, string[]]> = [
-      [{ staff: true }, ["imsda_session"]],
+      [{ staff: true }, ["imsda_attendee_session", "imsda_session"]],
       [{ attendee: true }, ["imsda_attendee_session"]],
       [{ staff: true, attendee: true }, ["imsda_attendee_session", "imsda_session"]],
       [{}, []],
     ];
     for (const [match, expected] of cases) {
       mocks.cookieSet.mockClear();
+      mocks.verifyPassword.mockClear();
+      mocks.spendPasswordCheck.mockClear();
       database(rows);
       passwordMatches(match);
       await POST(request());
       expect(cookiesSet().sort()).toEqual(expected);
       expect(derivations()).toBe(2);
-      mocks.verifyPassword.mockClear();
-      mocks.spendPasswordCheck.mockClear();
     }
   });
 
@@ -311,7 +318,103 @@ describe("what a correct password grants (switch on)", () => {
     expect(result.body.mfa).toMatchObject({ required: true, gate: "challenge" });
     expect(created.userSession).not.toHaveBeenCalled();
     expect(mocks.cookieSet).not.toHaveBeenCalled();
-    // The attendee session the same password earned is revoked, not left behind.
-    expect(created.attendeeSessionRevoke).toHaveBeenCalledTimes(1);
+    // No attendee session is made for the same password while the second step is pending.
+    expect(created.attendeeSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("misses count on a side only when the other side did not succeed (S1)", () => {
+  const rows = { staff: { attendeeAccountId: "acct-1" }, attendee: {} };
+
+  it("the staff password right: the attendee credential is not charged a miss", async () => {
+    const db = database(rows);
+    passwordMatches({ staff: true });
+    await POST(request());
+    expect(db.attendeeMiss).not.toHaveBeenCalled();
+    expect(db.staffMiss).not.toHaveBeenCalled();
+  });
+
+  it("the attendee password right: the staff credential is not charged a miss", async () => {
+    const db = database(rows);
+    passwordMatches({ attendee: true });
+    await POST(request());
+    expect(db.staffMiss).not.toHaveBeenCalled();
+    expect(db.attendeeMiss).not.toHaveBeenCalled();
+  });
+
+  it("a wrong password on both sides counts on both", async () => {
+    const db = database(rows);
+    passwordMatches({});
+    await POST(request());
+    expect(db.staffMiss).toHaveBeenCalledTimes(1);
+    expect(db.attendeeMiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("a wrong password against one side with nothing on the other counts on that side only", async () => {
+    let db = database({ staff: {}, attendee: null });
+    await POST(request());
+    expect(db.staffMiss).toHaveBeenCalledTimes(1);
+    expect(db.attendeeMiss).not.toHaveBeenCalled();
+    db = database({ staff: null, attendee: {} });
+    await POST(request());
+    expect(db.attendeeMiss).toHaveBeenCalledTimes(1);
+    expect(db.staffMiss).not.toHaveBeenCalled();
+  });
+
+  it("locked or disabled credentials are never counted", async () => {
+    for (const lockedRows of [{ staff: { locked: true }, attendee: { locked: true } }, { staff: { disabled: true }, attendee: { disabled: true } }]) {
+      const db = database(lockedRows);
+      await POST(request());
+      expect(db.staffMiss).not.toHaveBeenCalled();
+      expect(db.attendeeMiss).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("a correct password on a locked or disabled credential", () => {
+  it("is refused exactly like a wrong one, and is not even checked", async () => {
+    const wrong = database({ staff: {}, attendee: {} });
+    passwordMatches({});
+    const reference = await observable(await POST(request()));
+    expect(wrong).toBeDefined();
+    for (const rows of [{ staff: { locked: true }, attendee: { locked: true } }, { staff: { disabled: true }, attendee: { disabled: true } }]) {
+      mocks.verifyPassword.mockClear();
+      mocks.spendPasswordCheck.mockClear();
+      mocks.cookieSet.mockClear();
+      database(rows);
+      passwordMatches({ staff: true, attendee: true });
+      expect(await observable(await POST(request()))).toEqual(reference);
+      expect(mocks.verifyPassword).not.toHaveBeenCalled();
+      expect(mocks.spendPasswordCheck).toHaveBeenCalledTimes(2);
+      expect(mocks.cookieSet).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("rate limiting on /api/sign-in", () => {
+  const blocked = { allowed: false, decisions: [{ policy: "sign-in", allowed: false, limit: 10, remaining: 0, count: 11, windowSeconds: 900, resetAfterSeconds: 300 }] };
+
+  it("answers 429 from the client limit before reading the body or any credential", async () => {
+    database({ staff: {}, attendee: {} });
+    mocks.checkLoginClientRateLimit.mockResolvedValue(blocked);
+    const response = await POST(request());
+    expect(response.status).toBe(429);
+    expect((await response.json()).error).toBe("RATE_LIMITED");
+    expect(derivations()).toBe(0);
+  });
+
+  it("answers 429 from either per-address limit, identically for known and unknown addresses", async () => {
+    const answers: unknown[] = [];
+    for (const rows of [{ staff: {}, attendee: {} }, { staff: null, attendee: null }]) {
+      for (const which of ["staff", "attendee"] as const) {
+        database(rows);
+        mocks.checkLoginAccountRateLimit.mockResolvedValue(which === "staff" ? blocked : allowed());
+        mocks.checkAttendeeSignInRateLimit.mockResolvedValue(which === "attendee" ? blocked : allowed());
+        answers.push(await observable(await POST(request())));
+        expect(derivations()).toBe(0);
+      }
+    }
+    expect((answers[0] as { status: number }).status).toBe(429);
+    for (const answer of answers) expect(answer).toEqual(answers[0]);
   });
 });

@@ -3,12 +3,12 @@ import "server-only";
 import type { GlobalRole } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
-import { authenticateWithPassword } from "@/modules/access/auth-service";
+import { checkStaffPasswordNoCount } from "@/modules/access/auth-service";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { staffSessionAllowedFor } from "@/modules/account-merge/staff-elevation";
-import { authenticateAttendee } from "@/modules/attendee-accounts/account-service";
+import { checkAttendeePasswordNoCount } from "@/modules/attendee-accounts/account-service";
 import { findSwitchableAttendeeAccountForStaff } from "@/modules/attendee-accounts/current-attendee";
-import { createAttendeeSession, revokeAttendeeSession } from "@/modules/attendee-accounts/session-store";
+import { createAttendeeSession } from "@/modules/attendee-accounts/session-store";
 
 /**
  * The single sign-in (#554, ADR 0013, slice (c)). Everything here runs only
@@ -29,8 +29,11 @@ import { createAttendeeSession, revokeAttendeeSession } from "@/modules/attendee
  * - Staff password right, second step needed: no session yet, only the staff
  *   challenge (`mfa`, or `passkey_required`). Once the staff second factor is
  *   completed (`/api/auth/mfa/challenge`) the staff session and the linked
- *   attendee session are issued together. An attendee session that the same
- *   typed password earned is not left behind in the meantime.
+ *   attendee session are issued together. No attendee session is made for the
+ *   same typed password in the meantime.
+ * - A miss counts toward a side's lockout only when that side failed and the
+ *   other side did not succeed (the one-credential sign-in of a linked person
+ *   never locks the other credential).
  * - Only the attendee password right: the attendee session only. An attendee
  *   password is an attendee-grade method (`staffSessionAllowedFor`) and never
  *   yields a staff session, whatever follows, including a valid staff TOTP code:
@@ -53,33 +56,41 @@ export async function unifiedPasswordSignIn(
   password: string,
   userAgent: string | null,
 ): Promise<UnifiedSignInOutcome> {
-  // Both checks always run, in this order, so the work is the same for every case.
-  const staff = await authenticateWithPassword(email, password, userAgent);
-  const attendee = await authenticateAttendee(email, password, userAgent);
+  // Both checks always run, in this order, one derivation each, so the work is the
+  // same for every case. Neither counts a miss yet.
+  const staff = await checkStaffPasswordNoCount(email, password);
+  const attendee = await checkAttendeePasswordNoCount(email, password);
 
-  if (staff?.outcome === "mfa" || staff?.outcome === "passkey_required") {
-    // A staff second step is pending: nothing is issued until it is passed.
-    if (attendee) await revokeAttendeeSession(attendee.session.token);
-    return staff.outcome === "mfa"
-      ? { kind: "mfa", userId: staff.userId, gate: staff.gate }
-      : { kind: "passkey_required" };
+  // A miss is counted on a side only when that side failed AND the other side did not
+  // succeed: signing in with one credential must not lock the other. A wrong password on
+  // both sides counts on both. Locked and disabled credentials are "unavailable" and are
+  // never counted, exactly as today.
+  if (staff.kind === "wrong" && attendee.kind !== "ok") await staff.countMiss();
+  if (attendee.kind === "wrong" && staff.kind !== "ok") await attendee.countMiss();
+
+  if (staff.kind === "ok") {
+    const result = await staff.complete(userAgent);
+    if (result.outcome === "mfa") return { kind: "mfa", userId: result.userId, gate: result.gate };
+    if (result.outcome === "passkey_required") return { kind: "passkey_required" };
+    // Staff access needs the staff-grade method. `complete` only ever returns a session for
+    // the staff password, so this is that method and no other.
+    if (staffSessionAllowedFor("STAFF_PASSWORD_AND_SECOND_FACTOR").allowed) {
+      // A staff person's attendee side is always the LINKED one. The attendee session the
+      // typed password earned is never created, so none can be left for another account.
+      const linked = await issueLinkedAttendeeSession(result.userId, userAgent, { secondFactorVerified: false });
+      return {
+        kind: "signed_in",
+        staff: { userId: result.userId, globalRole: result.globalRole, session: result.session },
+        attendee: linked,
+      };
+    }
   }
 
-  // Staff access needs the staff-grade method. `authenticateWithPassword` only ever
-  // returns a session for the staff password, so this is that method and no other.
-  const staffSession = staff?.outcome === "session"
-    && staffSessionAllowedFor("STAFF_PASSWORD_AND_SECOND_FACTOR").allowed
-    ? { userId: staff.userId, globalRole: staff.globalRole, session: staff.session }
-    : null;
-
-  let attendeeSession = attendee ? { accountId: attendee.accountId, session: attendee.session } : null;
-  if (staffSession && !attendeeSession) {
-    // A staff person has both sessions: the linked attendee side, with no second factor claimed.
-    attendeeSession = await issueLinkedAttendeeSession(staffSession.userId, userAgent, { secondFactorVerified: false });
+  if (attendee.kind === "ok") {
+    // An attendee password is attendee-grade (`staffSessionAllowedFor`): attendee session only.
+    return { kind: "signed_in", staff: null, attendee: await attendee.complete(userAgent) };
   }
-
-  if (!staffSession && !attendeeSession) return { kind: "refused" };
-  return { kind: "signed_in", staff: staffSession, attendee: attendeeSession };
+  return { kind: "refused" };
 }
 
 /**

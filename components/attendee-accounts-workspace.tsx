@@ -2,8 +2,14 @@
 
 import { SortOrderNote } from "@/components/list-sort";
 import { useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Link2, LogOut, Mail, MapPinned, Search, ShieldOff } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Link2, LogOut, MailCheck, Mail, MapPinned, Search, ShieldOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  HAND_LINK_NOTE_MAX,
+  HAND_LINK_REASON_CODES,
+  HAND_LINK_REASON_LABELS,
+  type HandLinkReasonCode,
+} from "@/modules/account-merge/hand-link-reasons";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import {
   accountColumnSortKeys,
@@ -41,7 +47,10 @@ export function AttendeeAccountsWorkspace({
   initialQuery = "",
   initialSort = null,
   initialCapped = false,
+  linkedEmailChangesTogether = false,
 }: {
+  /** The one-sign-in switch is on, so a linked account's email change also changes the team sign-in email. */
+  linkedEmailChangesTogether?: boolean;
   initialAccounts: AttendeeAccountSummary[];
   initialQuery?: string;
   initialSort?: AccountSort;
@@ -61,6 +70,13 @@ export function AttendeeAccountsWorkspace({
   // silently fail to show at all.
   const [pendingAction, setPendingAction] = useState<PendingAccountAction | null>(null);
   const [dialogError, setDialogError] = useState("");
+  // One form dialog for change-email, link and unlink (replaces window.prompt).
+  const [form, setForm] = useState<{ kind: "change-email" | "link" | "unlink"; account: AttendeeAccountSummary } | null>(null);
+  const [formEmail, setFormEmail] = useState("");
+  const [formStaffEmail, setFormStaffEmail] = useState("");
+  const [formReason, setFormReason] = useState<HandLinkReasonCode>("DIFFERENT_STAFF_EMAIL");
+  const [formNote, setFormNote] = useState("");
+  const [formError, setFormError] = useState("");
 
   // The search and sort stay in the URL together (#738).
   function accountParams(nextQuery: string, nextSort: AccountSort) {
@@ -106,7 +122,7 @@ export function AttendeeAccountsWorkspace({
   }
 
   /** Resolves to `null` on success, or the specific message to show on failure. */
-  async function act(account: AttendeeAccountSummary, body: Record<string, string | boolean>): Promise<string | null> {
+  async function act(account: AttendeeAccountSummary, body: Record<string, unknown>): Promise<string | null> {
     setBusy(account.id);
     setError("");
     setNotice("");
@@ -128,6 +144,37 @@ export function AttendeeAccountsWorkspace({
     } finally {
       setBusy("");
     }
+  }
+
+  function openForm(next: { kind: "change-email" | "link" | "unlink"; account: AttendeeAccountSummary }) {
+    setFormError("");
+    setFormEmail(next.account.email);
+    setFormStaffEmail("");
+    setFormReason(next.kind === "unlink" ? "WRONG_PERSON_LINKED" : "DIFFERENT_STAFF_EMAIL");
+    setFormNote("");
+    setForm(next);
+  }
+
+  async function confirmForm() {
+    if (!form) return;
+    setFormError("");
+    const reason = { code: formReason, note: formNote.trim() || undefined };
+    if (form.kind === "change-email") {
+      if (formEmail.trim().toLowerCase() === form.account.email) { setFormError("That is already this account's email."); return; }
+    } else if (formReason === "OTHER" && formNote.trim().length < 5) {
+      setFormError("Add a note of at least 5 characters for \"Other\".");
+      return;
+    }
+    const failure = await act(
+      form.account,
+      form.kind === "change-email"
+        ? { action: "change-email", email: formEmail }
+        : form.kind === "link"
+          ? { action: "link-staff", staffEmail: formStaffEmail, reason }
+          : { action: "unlink-staff", reason },
+    );
+    if (failure === null) setForm(null);
+    else setFormError(failure);
   }
 
   function openConfirm(pending: PendingAccountAction) {
@@ -303,13 +350,7 @@ export function AttendeeAccountsWorkspace({
                         <button
                           className="secondary-button"
                           disabled={busy === account.id}
-                          onClick={() => {
-                            const email = window.prompt(
-                              `New email for ${account.email}? Registrations are found by email, so they'll see registrations made with the new address instead.`,
-                              account.email,
-                            );
-                            if (email && email.trim().toLowerCase() !== account.email) void act(account, { action: "change-email", email });
-                          }}
+                          onClick={() => openForm({ kind: "change-email", account })}
                           type="button"
                         >
                           <Mail aria-hidden="true" size={14} /> Change email
@@ -317,23 +358,25 @@ export function AttendeeAccountsWorkspace({
                         <button
                           className="secondary-button"
                           disabled={busy === account.id}
-                          onClick={() => {
-                            const reasonHelp = "Reason (required, recorded in the audit log; do not enter personal details):";
-                            if (account.linkedToStaff) {
-                              const reason = window.prompt(`Unlink ${account.email} from its team sign-in? ${reasonHelp}`);
-                              if (reason?.trim()) void act(account, { action: "unlink-staff", reason });
-                              return;
-                            }
-                            const staffEmail = window.prompt(
-                              `Link ${account.email} to a team sign-in used by the same person. Team account email:`,
-                            );
-                            if (!staffEmail?.trim()) return;
-                            const reason = window.prompt(reasonHelp);
-                            if (reason?.trim()) void act(account, { action: "link-staff", staffEmail, reason });
-                          }}
+                          onClick={() => openForm({ kind: account.linkedToStaff ? "unlink" : "link", account })}
                           type="button"
                         >
                           <Link2 aria-hidden="true" size={14} /> {account.linkedToStaff ? "Unlink team sign-in" : "Link team sign-in"}
+                        </button>
+                        <button
+                          className="secondary-button"
+                          disabled={busy === account.id}
+                          onClick={() => openConfirm({
+                            account,
+                            body: { action: "send-verification" },
+                            title: `Send a verification email to ${account.email}?`,
+                            description: "A six-digit code is emailed to this account's current address. The email counts as verified only when the person enters it. Nothing is marked verified here.",
+                            confirmLabel: "Send verification email",
+                            destructive: false,
+                          })}
+                          type="button"
+                        >
+                          <MailCheck aria-hidden="true" size={14} /> Send verification email
                         </button>
                       </div>
                     </td>
@@ -344,6 +387,63 @@ export function AttendeeAccountsWorkspace({
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        busy={form ? busy === form.account.id : false}
+        confirmLabel={form?.kind === "change-email" ? "Change email" : form?.kind === "link" ? "Link sign-ins" : "Unlink sign-ins"}
+        destructive={form?.kind === "unlink"}
+        error={formError}
+        onCancel={() => setForm(null)}
+        onConfirm={() => void confirmForm()}
+        open={form !== null}
+        title={form?.kind === "change-email" ? `Change email for ${form.account.email}` : form?.kind === "link" ? `Link ${form.account.email} to a team sign-in` : form ? `Unlink ${form.account.email} from its team sign-in` : ""}
+      >
+        {form?.kind === "change-email" && (
+          <>
+            <p>
+              Registrations are found by verified email. The new address starts unverified, the account is signed out
+              everywhere, and codes already sent to the old address stop working. Use &ldquo;Send verification email&rdquo; afterwards.
+            </p>
+            {form.account.linkedToStaff && linkedEmailChangesTogether && (
+              <p><strong>This account is linked to a team sign-in, so this also changes the team sign-in email.</strong></p>
+            )}
+            <label>
+              New email
+              <input maxLength={254} onChange={(event) => setFormEmail(event.target.value)} type="email" value={formEmail} />
+            </label>
+          </>
+        )}
+        {form?.kind === "link" && (
+          <>
+            <p>
+              For a person whose team sign-in uses a different email. Linking gives no staff access: the team account still
+              signs in to the staff workspace only with its own password and second step. Either side already linked is refused.
+            </p>
+            <label>
+              Team account email
+              <input maxLength={254} onChange={(event) => setFormStaffEmail(event.target.value)} type="email" value={formStaffEmail} />
+            </label>
+          </>
+        )}
+        {form?.kind === "unlink" && (
+          <p>Unlinking signs the account out everywhere, including attendee sessions opened through the link.</p>
+        )}
+        {form && form.kind !== "change-email" && (
+          <>
+            <label>
+              Reason
+              <select onChange={(event) => setFormReason(event.target.value as HandLinkReasonCode)} value={formReason}>
+                {HAND_LINK_REASON_CODES.map((code) => <option key={code} value={code}>{HAND_LINK_REASON_LABELS[code]}</option>)}
+              </select>
+            </label>
+            <label>
+              Note {formReason === "OTHER" ? "(required, 5 to" : "(optional, up to"} {HAND_LINK_NOTE_MAX} characters; no personal details)
+              <textarea maxLength={HAND_LINK_NOTE_MAX} onChange={(event) => setFormNote(event.target.value)} rows={3} value={formNote} />
+            </label>
+            <p className="field-help">{formNote.length}/{HAND_LINK_NOTE_MAX}</p>
+          </>
+        )}
+      </ConfirmDialog>
 
       <ConfirmDialog
         busy={pendingAction ? busy === pendingAction.account.id : false}

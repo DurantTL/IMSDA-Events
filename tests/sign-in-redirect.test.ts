@@ -59,6 +59,8 @@ describe("the old pages call it before anything else", () => {
 
   it("the /sign-in page sends visitors to /login while the switch is off", () => {
     const text = readFileSync("app/sign-in/page.tsx", "utf8");
-    expect(text).toContain('if (!(await isUnifiedSignInEnabled())) redirect("/login");');
+    expect(text).toContain('if (!enabled) redirect("/login");');
+    // Fail closed: an unreadable switch is "off".
+    expect(text).toMatch(/try \{\s+enabled = await isUnifiedSignInEnabled\(\);\s+\} catch \{\s+enabled = false;/);
   });
 });

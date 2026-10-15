@@ -33,7 +33,14 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<{ error?: string | string[]; next?: string | string[] }>;
 }) {
-  if (!(await isUnifiedSignInEnabled())) redirect("/login");
+  // Fail closed: if the switch cannot be read, the old staff sign-in is the page.
+  let enabled = false;
+  try {
+    enabled = await isUnifiedSignInEnabled();
+  } catch {
+    enabled = false;
+  }
+  if (!enabled) redirect("/login");
 
   const { error, next: rawNext } = await searchParams;
   const next = typeof rawNext === "string" ? rawNext : undefined;

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ActAsButton } from "@/components/act-as-button";
 import { AttendeeAccountsWorkspace } from "@/components/attendee-accounts-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { parseAccountSort } from "@/modules/system-admin/account-sort";
 import { listAttendeeAccountsWithCap } from "@/modules/system-admin/user-admin";
 
@@ -24,6 +25,7 @@ export default async function AttendeeAccountsPage({
   const initialQuery = typeof params.q === "string" ? params.q.slice(0, 120) : "";
   const initialSort = parseAccountSort(params.sort, params.dir);
   const initial = await listAttendeeAccountsWithCap(initialQuery, initialSort);
+  const linkedEmailChangesTogether = await isUnifiedSignInEnabled();
   return (
     <>
       <div className="intro-actions club-admin-links">
@@ -41,6 +43,7 @@ export default async function AttendeeAccountsPage({
         initialCapped={initial.capped}
         initialQuery={initialQuery}
         initialSort={initialSort}
+        linkedEmailChangesTogether={linkedEmailChangesTogether}
       />
     </>
   );

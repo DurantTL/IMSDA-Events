@@ -33,21 +33,24 @@ function world(overrides: World = {}) {
     ...overrides,
   };
   const updateMany = vi.fn(async () => ({ count: 1 }));
+  const sessionRevoke = vi.fn(async () => ({ count: 2 }));
   const tx = {
     user: {
-      findUnique: vi.fn(async (args: { where: { id?: string; attendeeAccountId?: string } }) => {
+      findUnique: vi.fn(async (args: { where: { id?: string; attendeeAccountId?: string }; select?: Record<string, unknown> }) => {
         if (args.where.attendeeAccountId) return w.linkedUserOfAccount;
-        return args.where.id === "admin-1" ? w.actor : w.user;
+        // The administrator check selects the role; the staff-user lookup does not.
+        return args.select && "globalRole" in args.select ? w.actor : w.user;
       }),
       updateMany,
     },
     attendeeAccount: { findUnique: vi.fn(async () => w.account) },
+    attendeeSession: { updateMany: sessionRevoke },
   };
   mocks.getPrisma.mockReturnValue({ $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) });
-  return { updateMany };
+  return { updateMany, sessionRevoke };
 }
 
-const input = { userId: "user-1", attendeeAccountId: "acct-1", reason: "Same person, personal address on file" };
+const input = { userId: "user-1", attendeeAccountId: "acct-1", reason: { code: "DIFFERENT_STAFF_EMAIL", note: "Personal address on file" } };
 const code = async (run: () => Promise<unknown>) => run().then(() => null, (error: unknown) => (error instanceof HandLinkError ? error.code : error));
 
 beforeEach(() => vi.clearAllMocks());
@@ -61,7 +64,7 @@ describe("linking by hand", () => {
     for (const [entry] of mocks.writeAuditLog.mock.calls) {
       expect(entry.action).toBe("STAFF_ATTENDEE_HAND_LINKED");
       expect(entry.actorUserId).toBe("admin-1");
-      expect(entry.metadata).toMatchObject({ userId: "user-1", attendeeAccountId: "acct-1", method: "HAND_LINK" });
+      expect(entry.metadata).toMatchObject({ userId: "user-1", attendeeAccountId: "acct-1", method: "HAND_LINK", reasonCode: "DIFFERENT_STAFF_EMAIL", note: "Personal address on file" });
       expect(JSON.stringify(entry)).not.toMatch(/@/);
     }
   });
@@ -78,11 +81,12 @@ describe("linking by hand", () => {
 
   it("requires a reason", async () => {
     world();
-    for (const reason of [undefined, "", "   ", "ok"]) {
+    for (const reason of [undefined, "", { code: "NOPE" }, { code: "OTHER" }, { code: "OTHER", note: "ok" }, "free text"]) {
       expect(await code(() => linkStaffAndAttendeeByHand({ ...input, reason }, "admin-1"))).toBe("REASON_REQUIRED");
     }
-    expect(() => cleanHandLinkReason("x".repeat(2000))).not.toThrow();
-    expect(cleanHandLinkReason("x".repeat(2000))).toHaveLength(500);
+    expect(cleanHandLinkReason({ code: "CORRECTION" })).toEqual({ code: "CORRECTION", note: null });
+    expect(cleanHandLinkReason({ code: "OTHER", note: "a real note" })).toEqual({ code: "OTHER", note: "a real note" });
+    expect(cleanHandLinkReason({ code: "CORRECTION", note: "x".repeat(2000) }).note).toHaveLength(500);
   });
 
   it("refuses when either side is already linked", async () => {
@@ -106,6 +110,14 @@ describe("linking by hand", () => {
     expect(await code(() => linkStaffAndAttendeeByHand(input, "admin-1"))).toBe("USER_NOT_ACTIVE");
   });
 
+  it("refuses to change the administrator's own links", async () => {
+    world({ user: { id: "admin-1", accountStatus: "ACTIVE", attendeeAccountId: null } });
+    expect(await code(() => linkStaffAndAttendeeByHand({ ...input, userId: "admin-1" }, "admin-1"))).toBe("NOT_ON_YOURSELF");
+    world({ account: { id: "acct-1", status: "ACTIVE", disabledAt: null, emailVerifiedAt: new Date(), linkedUser: { id: "admin-1" } } });
+    expect(await code(() => linkStaffAndAttendeeByHand(input, "admin-1"))).toBe("NOT_ON_YOURSELF");
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
   it("never touches a staff session (the database stub has no session table to call)", async () => {
     world();
     await expect(linkStaffAndAttendeeByHand(input, "admin-1")).resolves.toBeUndefined();
@@ -114,16 +126,20 @@ describe("linking by hand", () => {
 
 describe("unlinking", () => {
   it("clears the link with a reason and an ids-only audit, and refuses when nothing is linked", async () => {
-    const { updateMany } = world({ linkedUserOfAccount: { id: "user-1" } });
-    await unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: "Linked in error, different people" }, "admin-1");
+    const { updateMany, sessionRevoke } = world({ linkedUserOfAccount: { id: "user-1" } });
+    await unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: { code: "WRONG_PERSON_LINKED" } }, "admin-1");
+    // Attendee sessions issued through the link do not outlive it.
+    expect(sessionRevoke).toHaveBeenCalledWith({ where: { accountId: "acct-1", revokedAt: null }, data: { revokedAt: expect.any(Date) } });
     expect(updateMany).toHaveBeenCalledWith({ where: { id: "user-1", attendeeAccountId: "acct-1" }, data: { attendeeAccountId: null } });
     expect(mocks.writeAuditLog.mock.calls.map(([entry]) => entry.action)).toEqual(["STAFF_ATTENDEE_UNLINKED", "STAFF_ATTENDEE_UNLINKED"]);
 
     world({ linkedUserOfAccount: null });
-    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: "Linked in error, different people" }, "admin-1"))).toBe("NOT_LINKED");
+    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: { code: "WRONG_PERSON_LINKED" } }, "admin-1"))).toBe("NOT_LINKED");
+    world({ linkedUserOfAccount: { id: "admin-1" } });
+    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: { code: "CORRECTION" } }, "admin-1"))).toBe("NOT_ON_YOURSELF");
     world({ linkedUserOfAccount: { id: "user-1" } });
-    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: "" }, "admin-1"))).toBe("REASON_REQUIRED");
+    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: undefined }, "admin-1"))).toBe("REASON_REQUIRED");
     world({ actor: { globalRole: null, accountStatus: "ACTIVE" }, linkedUserOfAccount: { id: "user-1" } });
-    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: "Linked in error, different people" }, "admin-1"))).toBe("NOT_SYSTEM_ADMIN");
+    expect(await code(() => unlinkStaffAndAttendee({ attendeeAccountId: "acct-1", reason: { code: "WRONG_PERSON_LINKED" } }, "admin-1"))).toBe("NOT_SYSTEM_ADMIN");
   });
 });

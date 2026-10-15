@@ -285,10 +285,13 @@ runs only when `PlatformSettings.unifiedSignInEnabled` is true; the admin tools 
   identical 401. A staff second step appears only after the staff password is right, and when it is
   completed (or a staff passkey signs in) both sessions are issued. `/login` and `/account/sign-in`
   redirect to it with the switch on.
-- **Admin email change** clears the attendee side's `emailVerifiedAt` (switch on or off). A password reset
-  code, or a Google sign-in, for the account's current address verifies it again.
+- **Admin email change** clears the attendee side's `emailVerifiedAt` and spends every unused attendee
+  token in the same transaction (switch on or off). "Send verification email" (system administrator only,
+  rate-limited, ids-only audit) mails a code to the current address; the person enters it at
+  `/account/verify-email`. A password reset code or a Google sign-in for the current address also verifies
+  it again. There is no "mark verified" toggle.
 - **Hand-link tool** (System administration, Accounts): a system administrator links or unlinks a staff
-  user and an attendee account by hand, for people whose emails differ. Reason required, audit rows
+  user and an attendee account by hand, for people whose emails differ. Reason code (and optional note) required, never on yourself, unlinking revokes the attendee sessions, audit rows
   `STAFF_ATTENDEE_HAND_LINKED` / `STAFF_ATTENDEE_UNLINKED` with ids and the reason, refused if either side
   is already linked. It writes only `User.attendeeAccountId` and never creates a session. It is not the
   slice (d) apply tool: nothing is linked in bulk, and the dry run still only lists such pairs.

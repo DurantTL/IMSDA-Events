@@ -36,17 +36,23 @@ import { isUnifiedSignInEnabled } from "../modules/account-merge/account-link";
 import { HandLinkError, linkStaffAndAttendeeByHand, unlinkStaffAndAttendee } from "../modules/account-merge/hand-link";
 import {
   beginAttendeePasswordReset,
+  attachVerificationCode,
   beginAttendeeSignUp,
   completeAttendeePasswordReset,
+  verifyAttendeeEmailByAddress,
 } from "../modules/attendee-accounts/account-service";
 import { createOneTimeCode, hashOneTimeCode } from "../modules/attendee-accounts/codes";
 import { signInWithGoogle } from "../modules/attendee-accounts/federated-sign-in";
-import { changeAttendeeEmail, changeStaffEmail } from "../modules/system-admin/user-admin";
+import { changeAttendeeEmail, changeStaffEmail, sendAttendeeVerificationByAdmin } from "../modules/system-admin/user-admin";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
 // The authenticator secret is sealed with this key; a synthetic value for this run only.
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-unified-sign-in-synthetic-key-not-a-secret");
+// "Send verification email" queues a message (nothing is ever sent from this script).
+process.env.EMAIL_PROVIDER = "resend";
+process.env.RESEND_API_KEY = "synthetic-key-never-used";
+process.env.ACCOUNT_EMAIL_SENDER_ADDRESS = "accounts@example.test";
 
 const prisma = new PrismaClient();
 const P = `usi_${randomUUID().slice(0, 8)}`;
@@ -140,9 +146,26 @@ async function main() {
   assert(attendeeOnly.kind === "signed_in" && attendeeOnly.staff === null && attendeeOnly.attendee?.accountId === linkedAccount.id, "attendee password: attendee session only");
   assert((await staffSessions(both.id)) === sessionsBefore, "attendee password: no staff session row");
   const staffFails = await prisma.authCredential.findUniqueOrThrow({ where: { userId: both.id }, select: { failedAttempts: true } });
-  assert(staffFails.failedAttempts === 1, "the staff credential is checked independently (and counts the miss, as it always has)");
-  // Reset the counter so this check does not drift toward a lock.
+  assert(staffFails.failedAttempts === 0, "the attendee password alone does not charge the staff credential a miss");
+  // The other direction, repeatedly: six staff sign-ins never lock or count against the attendee credential.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const again = await unifiedPasswordSignIn(email("both"), PASSWORD, null);
+    assert(again.kind === "signed_in" && again.staff !== null, "the staff password keeps working");
+  }
+  const attendeeCredential = await prisma.attendeeCredential.findUniqueOrThrow({ where: { accountId: linkedAccount.id }, select: { failedAttempts: true, lockedUntil: true } });
+  assert(attendeeCredential.failedAttempts === 0 && attendeeCredential.lockedUntil === null, "six staff sign-ins leave the attendee credential untouched");
+  for (let attempt = 0; attempt < 6; attempt += 1) await unifiedPasswordSignIn(email("both"), OTHER_PASSWORD, null);
+  const staffCredential = await prisma.authCredential.findUniqueOrThrow({ where: { userId: both.id }, select: { failedAttempts: true, lockedUntil: true } });
+  assert(staffCredential.failedAttempts === 0 && staffCredential.lockedUntil === null, "six attendee sign-ins leave the staff credential untouched");
+  // A wrong password on both sides still counts on both (four, short of the lock).
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    assert((await unifiedPasswordSignIn(email("both"), "wrong-for-both-sides-1", null)).kind === "refused", "wrong on both: refused");
+  }
+  const bothStaff = await prisma.authCredential.findUniqueOrThrow({ where: { userId: both.id }, select: { failedAttempts: true } });
+  const bothAttendee = await prisma.attendeeCredential.findUniqueOrThrow({ where: { accountId: linkedAccount.id }, select: { failedAttempts: true } });
+  assert(bothStaff.failedAttempts === 4 && bothAttendee.failedAttempts === 4, "a wrong password on both sides counts on both");
   await prisma.authCredential.update({ where: { userId: both.id }, data: { failedAttempts: 0 } });
+  await prisma.attendeeCredential.update({ where: { accountId: linkedAccount.id }, data: { failedAttempts: 0 } });
 
   // ---- An attendee-only person gets one session. ----
   const solo = await attendee("solo");
@@ -231,7 +254,23 @@ async function main() {
   const adminUser = await staffUser("admin", { globalRole: "SYSTEM_ADMIN" });
   const plain = await attendee("plain");
   assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt !== null, "starts verified");
+  // An unused reset code emailed to the OLD address before the change (B1).
+  const oldToken = `${P}-old-reset-pending`;
+  const oldCode = createOneTimeCode();
+  await prisma.attendeeAccountToken.create({
+    data: {
+      accountId: plain.id, tokenHash: hashOpaqueToken(oldToken), codeHash: hashOneTimeCode(oldCode),
+      codeExpiresAt: new Date(Date.now() + 10 * 60_000), purpose: "PASSWORD_RESET", expiresAt: new Date(Date.now() + 60 * 60_000),
+    },
+  });
+  let noOp: unknown = null;
+  try { await changeAttendeeEmail(plain.id, email("plain"), adminUser.id); } catch (error) { noOp = error; }
+  assert(noOp instanceof Error && (noOp as { code?: string }).code === "EMAIL_UNCHANGED", "a no-op email change is refused");
   await changeAttendeeEmail(plain.id, email("plain-new"), adminUser.id);
+  assert((await prisma.attendeeAccountToken.count({ where: { accountId: plain.id, usedAt: null } })) === 0, "an email change spends every unused attendee token");
+  const lateReset = await completeAttendeePasswordReset({ pendingToken: oldToken, code: oldCode, passwordHash: await hashPassword(PASSWORD), userAgent: null });
+  assert(lateReset.outcome === "rejected", "a reset code sent to the old address is rejected after the change");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt === null, "and it verified nothing");
   const plainAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } });
   assert(plainAfter.email === email("plain-new") && plainAfter.emailVerifiedAt === null, "switch off: an admin email change clears the verification");
 
@@ -259,10 +298,38 @@ async function main() {
   assert(google.outcome === "signed-in", "Google sign-in for the new address works");
   assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { email: true, emailVerifiedAt: true } })).emailVerifiedAt !== null, "Google for the new address verifies it again");
 
+  // "Send verification email": the only admin way to fix verification. Nothing is marked verified by the send.
+  await changeAttendeeEmail(plain.id, email("plain-latest"), adminUser.id);
+  const sendResult = await sendAttendeeVerificationByAdmin(plain.id, adminUser.id);
+  assert(sendResult.messageId !== null, "the verification email was queued");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { emailVerifiedAt: true } })).emailVerifiedAt === null, "sending verifies nothing");
+  const sendAudit = await prisma.auditLog.findFirstOrThrow({ where: { action: "ATTENDEE_VERIFICATION_EMAIL_SENT_BY_ADMIN", entityId: plain.id } });
+  assert(!JSON.stringify(sendAudit.metadata).includes("@"), "the send audit carries ids only");
+  let nonAdminSend: unknown = null;
+  try { await sendAttendeeVerificationByAdmin(plain.id, id("nobody")); } catch (error) { nonAdminSend = error; }
+  assert(nonAdminSend instanceof Error && (nonAdminSend as { code?: string }).code === "NOT_SYSTEM_ADMIN", "only a system administrator can send it");
+  const deliveredCode = createOneTimeCode();
+  assert(await attachVerificationCode({ accountId: plain.id, messageId: sendResult.messageId!, code: deliveredCode, now: new Date() }), "delivery mints the code for the pending request");
+  const wrongCode = await verifyAttendeeEmailByAddress({ email: email("plain-latest"), code: deliveredCode === "000000" ? "111111" : "000000", userAgent: null });
+  assert(wrongCode.outcome === "rejected", "a wrong code does not verify");
+  const byCode = await verifyAttendeeEmailByAddress({ email: email("plain-latest"), code: deliveredCode, userAgent: null });
+  assert(byCode.outcome === "verified", "the person enters the code and the address is verified");
+  assert((await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: plain.id }, select: { emailVerifiedAt: true } })).emailVerifiedAt !== null, "verified only now");
+  let sentAgain: unknown = null;
+  try { await sendAttendeeVerificationByAdmin(plain.id, adminUser.id); } catch (error) { sentAgain = error; }
+  assert(sentAgain instanceof Error && (sentAgain as { code?: string }).code === "ALREADY_VERIFIED", "an already verified account is refused");
+
   await setSwitch(true);
   const pairAccount = await attendee("pair");
   const pairUser = await staffUser("pair", { attendeeAccountId: pairAccount.id });
+  await prisma.attendeeAccountToken.create({
+    data: {
+      accountId: pairAccount.id, tokenHash: hashOpaqueToken(`${P}-pair-token`), codeHash: hashOneTimeCode(createOneTimeCode()),
+      codeExpiresAt: new Date(Date.now() + 10 * 60_000), purpose: "PASSWORD_RESET", expiresAt: new Date(Date.now() + 60 * 60_000),
+    },
+  });
   await changeStaffEmail(pairUser.id, email("pair-new"), adminUser.id);
+  assert((await prisma.attendeeAccountToken.count({ where: { accountId: pairAccount.id, usedAt: null } })) === 0, "linked pair: the email change spends every unused attendee token");
   const pairAfter = await prisma.attendeeAccount.findUniqueOrThrow({ where: { id: pairAccount.id }, select: { email: true, emailVerifiedAt: true } });
   assert(pairAfter.email === email("pair-new") && pairAfter.emailVerifiedAt === null, "switch on, linked pair: both emails change and the attendee verification is cleared");
   assert((await prisma.user.findUniqueOrThrow({ where: { id: pairUser.id } })).email === email("pair-new"), "switch on, linked pair: the staff email changed with it");
@@ -275,7 +342,7 @@ async function main() {
     const personal = await attendee(`${key}-attendee`);
     const noAdmin = await staffUser(`${key}-notadmin`);
     const sessionRows = await staffSessions(person.id);
-    const input = { userId: person.id, attendeeAccountId: personal.id, reason: "Same person; personal address on file" };
+    const input = { userId: person.id, attendeeAccountId: personal.id, reason: { code: "DIFFERENT_STAFF_EMAIL", note: "Personal address on file" } };
 
     for (const [who, actorId] of [["a non-admin", noAdmin.id], ["a missing actor", id("nobody")]] as const) {
       let refused: unknown = null;
@@ -283,7 +350,7 @@ async function main() {
       assert(refused instanceof HandLinkError && refused.code === "NOT_SYSTEM_ADMIN", `${who} cannot link (switch ${enabled ? "on" : "off"})`);
     }
     let noReason: unknown = null;
-    try { await linkStaffAndAttendeeByHand({ ...input, reason: " " }, adminUser.id); } catch (error) { noReason = error; }
+    try { await linkStaffAndAttendeeByHand({ ...input, reason: { code: "OTHER" } }, adminUser.id); } catch (error) { noReason = error; }
     assert(noReason instanceof HandLinkError && noReason.code === "REASON_REQUIRED", "a reason is required");
     assert((await prisma.user.findUniqueOrThrow({ where: { id: person.id } })).attendeeAccountId === null, "nothing linked yet");
 
@@ -315,10 +382,17 @@ async function main() {
       assert(viaAttendeePassword.kind === "signed_in" && viaAttendeePassword.staff === null, "a hand-linked person still gets no staff session from the attendee password");
     }
 
-    await unlinkStaffAndAttendee({ attendeeAccountId: personal.id, reason: "Linked in error during verification" }, adminUser.id);
+    // An attendee session opened through the link must not outlive it (B2).
+    await prisma.attendeeSession.create({ data: { accountId: personal.id, tokenHash: `${P}-${key}-link-session`, expiresAt: new Date(Date.now() + 3_600_000) } });
+    // The administrator cannot change their own links.
+    let onSelf: unknown = null;
+    try { await linkStaffAndAttendeeByHand({ ...input, userId: adminUser.id, attendeeAccountId: otherAccount.id }, adminUser.id); } catch (error) { onSelf = error; }
+    assert(onSelf instanceof HandLinkError && onSelf.code === "NOT_ON_YOURSELF", "an administrator cannot link their own team account");
+    await unlinkStaffAndAttendee({ attendeeAccountId: personal.id, reason: { code: "WRONG_PERSON_LINKED" } }, adminUser.id);
+    assert((await attendeeSessions(personal.id)) === 0, "unlinking revokes the attendee sessions issued through the link");
     assert((await prisma.user.findUniqueOrThrow({ where: { id: person.id } })).attendeeAccountId === null, "unlinked");
     let notLinked: unknown = null;
-    try { await unlinkStaffAndAttendee({ attendeeAccountId: personal.id, reason: "Linked in error during verification" }, adminUser.id); } catch (error) { notLinked = error; }
+    try { await unlinkStaffAndAttendee({ attendeeAccountId: personal.id, reason: { code: "WRONG_PERSON_LINKED" } }, adminUser.id); } catch (error) { notLinked = error; }
     assert(notLinked instanceof HandLinkError && notLinked.code === "NOT_LINKED", "unlinking an unlinked account is refused");
   }
 

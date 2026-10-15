@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { MessageTemplateKey, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { attendeePublicUrl } from "@/modules/attendee-accounts/public-navigation";
 import {
   getAccountEmailSender,
   isAccountEmailConfigured,
@@ -60,6 +61,31 @@ function verificationBody(displayName: string) {
       `The code expires in ${EMAIL_VERIFICATION_LIFETIME_MINUTES} minutes and can only be used in the browser that asked for it.`,
       "",
       "If you did not start creating an account, you can ignore this. The code is useless on its own, and nothing has been created that can reach your registrations.",
+      "",
+      "IMSDA Events",
+    ].join("\n"),
+  };
+}
+
+/**
+ * Sent by "Send verification email" (a system administrator) to an ACTIVE account
+ * whose verification was cleared. The code is spent at /account/verify-email.
+ */
+function adminVerificationBody(displayName: string) {
+  return {
+    subject: "Verify your IMSDA Events email address",
+    bodyText: [
+      `Hello ${greeting(displayName)},`,
+      "",
+      "An IMSDA Events administrator asked us to verify this email address for your account. Enter this code, with this email address, on the Verify your email page:",
+      "",
+      `${attendeePublicUrl("/account/verify-email").toString()}`,
+      "",
+      VERIFICATION_CODE_SENTINEL,
+      "",
+      `The code expires in ${EMAIL_VERIFICATION_LIFETIME_MINUTES} minutes.`,
+      "",
+      "If you did not expect this, you can ignore it. Nothing changes unless the code is entered.",
       "",
       "IMSDA Events",
     ].join("\n"),
@@ -149,7 +175,7 @@ function editVerificationBody(displayName: string) {
 }
 
 type AttendeeEmailKind =
-  | { kind: "verification"; alreadyRegistered: boolean }
+  | { kind: "verification"; alreadyRegistered: boolean; adminSent?: boolean }
   | { kind: "password-reset"; federatedOnly: boolean }
   | { kind: "edit-verification" };
 
@@ -160,7 +186,9 @@ function contentFor(selection: AttendeeEmailKind, displayName: string) {
       trigger: "ATTENDEE_SIGN_UP",
       ...(selection.alreadyRegistered
         ? alreadyRegisteredBody(displayName)
-        : verificationBody(displayName)),
+        : selection.adminSent
+          ? adminVerificationBody(displayName)
+          : verificationBody(displayName)),
     };
   }
   if (selection.kind === "edit-verification") {

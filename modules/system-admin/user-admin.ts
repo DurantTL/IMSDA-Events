@@ -6,6 +6,10 @@ import { revokeAllUserSessions } from "@/modules/access/session-store";
 import { revokeAllAttendeeSessions } from "@/modules/attendee-accounts/session-store";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { requireSystemAdminActor } from "@/modules/account-merge/hand-link";
+import { beginAdminVerification } from "@/modules/attendee-accounts/account-service";
+import { queueAttendeeVerificationEmail } from "@/modules/attendee-accounts/attendee-email-dispatch";
+import { checkAdminVerificationEmailRateLimit } from "@/modules/rate-limit/service";
 import { sendAccountRecoveryEmail } from "@/modules/communications/account-email-dispatch";
 import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-sort";
 
@@ -18,7 +22,7 @@ import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-s
  */
 
 export class UserAdminError extends Error {
-  constructor(public readonly code: "ACCOUNT_NOT_FOUND" | "EMAIL_IN_USE" | "NOT_ON_YOURSELF" | "EMAIL_NOT_CONFIGURED", message: string) {
+  constructor(public readonly code: "ACCOUNT_NOT_FOUND" | "EMAIL_IN_USE" | "NOT_ON_YOURSELF" | "EMAIL_NOT_CONFIGURED" | "EMAIL_UNCHANGED" | "ALREADY_VERIFIED" | "ACCOUNT_NOT_USABLE" | "RATE_LIMITED", message: string) {
     super(message);
     this.name = "UserAdminError";
   }
@@ -51,6 +55,12 @@ async function changeLinkedEmailTogether(
     // The address changed, so nobody has verified the new one yet (Caleb, Oct 15, 2026): the
     // attendee side's verification is cleared with it.
     await tx.attendeeAccount.update({ where: { id: link.attendeeAccountId }, data: { email, emailVerifiedAt: null } });
+    // Spend every unused attendee token (reset, verification) in the same transaction: a code
+    // emailed to the OLD mailbox must not be able to verify the NEW address.
+    await tx.attendeeAccountToken.updateMany({
+      where: { accountId: link.attendeeAccountId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
     await writeAuditLog({
       actorUserId,
       action: "STAFF_EMAIL_CHANGED",
@@ -121,7 +131,8 @@ export async function resetStaffTwoStep(userId: string, actorUserId: string, now
 }
 
 export async function changeStaffEmail(userId: string, email: string, actorUserId: string) {
-  await requireStaffUser(userId);
+  const current = await requireStaffUser(userId);
+  if (current.email === email) throw new UserAdminError("EMAIL_UNCHANGED", "That is already this account's email.");
   const link = await activeLinkForUser(userId);
   if (link) return changeLinkedEmailTogether(link, email, actorUserId);
   const taken = await getPrisma().user.findFirst({ where: { email, id: { not: userId } }, select: { id: true } });
@@ -220,8 +231,9 @@ export async function listAttendeeAccountsWithCap(query: string, sort: AccountSo
 export type AttendeeAccountSummary = Awaited<ReturnType<typeof listAttendeeAccounts>>[number];
 
 async function requireAttendee(accountId: string) {
-  const account = await getPrisma().attendeeAccount.findUnique({ where: { id: accountId }, select: { id: true } });
+  const account = await getPrisma().attendeeAccount.findUnique({ where: { id: accountId }, select: { id: true, email: true } });
   if (!account) throw new UserAdminError("ACCOUNT_NOT_FOUND", "That account could not be found.");
+  return account;
 }
 
 /** Removes the authenticator and every passkey; club roles set one up again at their next sign-in. */
@@ -259,7 +271,8 @@ export async function signOutAttendeeEverywhere(accountId: string, actorUserId: 
  * once the new address is verified: the change clears `emailVerifiedAt`.
  */
 export async function changeAttendeeEmail(accountId: string, email: string, actorUserId: string) {
-  await requireAttendee(accountId);
+  const current = await requireAttendee(accountId);
+  if (current.email === email) throw new UserAdminError("EMAIL_UNCHANGED", "That is already this account's email.");
   const link = await activeLinkForAccount(accountId);
   if (link) return changeLinkedEmailTogether(link, email, actorUserId);
   const taken = await getPrisma().attendeeAccount.findFirst({ where: { email, id: { not: accountId } }, select: { id: true } });
@@ -268,7 +281,12 @@ export async function changeAttendeeEmail(accountId: string, email: string, acto
   // nothing, so the verification is cleared (Caleb, Oct 15, 2026). This is an admin-tool safety
   // fix and applies whether or not the one-sign-in switch is on. The person verifies the new
   // address again (a password reset code or Google sign-in for that address does it).
-  await getPrisma().attendeeAccount.update({ where: { id: accountId }, data: { email, emailVerifiedAt: null } });
+  // The write and the token spend are one transaction: every unused reset or verification code
+  // was emailed to the OLD address and must not verify the new one.
+  await getPrisma().$transaction([
+    getPrisma().attendeeAccount.update({ where: { id: accountId }, data: { email, emailVerifiedAt: null } }),
+    getPrisma().attendeeAccountToken.updateMany({ where: { accountId, usedAt: null }, data: { usedAt: new Date() } }),
+  ]);
   await revokeAllAttendeeSessions(accountId);
   await writeAuditLog({
     actorUserId,
@@ -277,4 +295,46 @@ export async function changeAttendeeEmail(accountId: string, email: string, acto
     entityId: accountId,
     summary: "A system administrator changed an account's email.",
   });
+}
+
+/**
+ * "Send verification email" (#554 slice c): the way an administrator fixes an
+ * unverified attendee address. There is no "mark verified" switch: the code is
+ * mailed to the account's CURRENT address and the address is verified only when
+ * the person types it back (`verifyAttendeeEmailByAddress`). System administrator
+ * only (re-checked in the database), rate-limited, audited with ids only. Returns
+ * the queued message id so the route can deliver it after the response.
+ */
+export async function sendAttendeeVerificationByAdmin(accountId: string, actorUserId: string) {
+  await getPrisma().$transaction((tx) => requireSystemAdminActor(tx, actorUserId));
+  const account = await getPrisma().attendeeAccount.findUnique({
+    where: { id: accountId },
+    select: { id: true, email: true, displayName: true, status: true, disabledAt: true, emailVerifiedAt: true },
+  });
+  if (!account) throw new UserAdminError("ACCOUNT_NOT_FOUND", "That account could not be found.");
+  if (account.status !== "ACTIVE" || account.disabledAt) {
+    throw new UserAdminError("ACCOUNT_NOT_USABLE", "Only an active account can be sent a verification email.");
+  }
+  if (account.emailVerifiedAt) throw new UserAdminError("ALREADY_VERIFIED", "That account's email is already verified.");
+  const limit = await checkAdminVerificationEmailRateLimit(actorUserId, accountId);
+  if (!limit.allowed) throw new UserAdminError("RATE_LIMITED", "Too many verification emails for this account. Try again later.");
+
+  await beginAdminVerification(account.id);
+  const dispatch = await queueAttendeeVerificationEmail({
+    accountId: account.id,
+    email: account.email,
+    displayName: account.displayName,
+    alreadyRegistered: false,
+    adminSent: true,
+  });
+  if (!dispatch.configured) throw new UserAdminError("EMAIL_NOT_CONFIGURED", "Account email isn't set up on this server.");
+  await writeAuditLog({
+    actorUserId,
+    action: "ATTENDEE_VERIFICATION_EMAIL_SENT_BY_ADMIN",
+    entityType: "AttendeeAccount",
+    entityId: account.id,
+    summary: "A system administrator sent an account a verification email.",
+    metadata: { attendeeAccountId: account.id },
+  });
+  return { messageId: dispatch.messageId };
 }

@@ -18,7 +18,7 @@ export function userAdminApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status: error.code === "ACT_AS_CONFLICT" ? 409 : 404 });
   }
   if (error instanceof UserAdminError) {
-    const status = error.code === "ACCOUNT_NOT_FOUND" ? 404 : error.code === "EMAIL_NOT_CONFIGURED" ? 503 : 409;
+    const status = error.code === "ACCOUNT_NOT_FOUND" ? 404 : error.code === "EMAIL_NOT_CONFIGURED" ? 503 : error.code === "RATE_LIMITED" ? 429 : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
   }
   if (error instanceof HandLinkError) {

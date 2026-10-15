@@ -423,24 +423,47 @@ human-gated and never run from CI.
   identically for existing, unknown and staff addresses (tests; the attendee flows never read the staff
   table). Support text never says an address has a staff account.
 - **Admin email change clears verification** (any switch state): `changeAttendeeEmail` and the
-  linked both-sides change set `emailVerifiedAt` to null on the attendee side. So the person can verify
-  again, a completed password reset code and a Google sign-in for the new address now verify an account
-  whose verification is null (they matched no row before). Without that, a cleared ACTIVE account
-  would have had no way back.
-- **Hand-linking different emails** (`modules/account-merge/hand-link.ts`, the "Link team sign-in" /
-  "Unlink team sign-in" buttons on System administration, Accounts): system administrator only
-  (checked in the route and again against the database), reason required, audited with ids and the
-  reason text (no email or name), refused when either side is already linked, the staff user must be
-  ACTIVE and the attendee account ACTIVE, not disabled and verified, and it never creates or changes a
-  staff session. Works with the switch off.
+  linked both-sides change set `emailVerifiedAt` to null on the attendee side, **and spend every unused
+  attendee token in the same transaction**. A code emailed to the old mailbox can therefore never verify
+  the new address (an attendee reset code or verification code completed after the change is rejected).
+  A change to the address the account already has is refused. For a linked pair the admin confirm says it
+  also changes the team sign-in email. Nothing marks an address verified by itself: there is **no "mark
+  verified" toggle**.
+- **Send verification email** (System administration, Accounts): the way an administrator fixes
+  verification, including for a staff person's attendee side that has no attendee password. It mails a
+  six-digit code to the account's CURRENT address (a new `EMAIL_VERIFICATION` token, the existing token
+  purpose; system administrator only, re-checked in the database; rate-limited per account and per
+  administrator; audit `ATTENDEE_VERIFICATION_EMAIL_SENT_BY_ADMIN` with ids only). The person enters the
+  address and code at `/account/verify-email` (`POST /api/attendee/verify-email/by-address`), which
+  accepts only an ACTIVE account whose verification is cleared, so an unfinished sign-up's handle stays
+  bound to its browser. A completed password reset code or a Google sign-in for the account's own address
+  also verifies it again.
+- **Hand-linking different emails** (`modules/account-merge/hand-link.ts`, one dialog on System
+  administration, Accounts): system administrator only (checked in the route and again against the
+  database), a reason **code** (wrong person linked, different staff email, correction, other) plus an
+  optional note of up to 500 characters (5 to 500 for "Other"), audited with ids, the code and the note
+  (no email or name), refused when either side is already linked, refused on yourself
+  (`NOT_ON_YOURSELF`: the staff user is the acting administrator, or the account is linked to them), the
+  staff user must be ACTIVE and the attendee account ACTIVE, not disabled and verified, and it never
+  creates or changes a staff session. **Unlinking revokes the account's attendee sessions in the same
+  transaction**, because a staff sign-in issues one through the link and it would otherwise live 14 days.
+  Works with the switch off.
 - **Removed:** `attendeePasskeyCountsAsStaffSecondFactor` and its TODO.
 - **Not built here:** the role chooser and header switcher (#108); a single password-reset form for both
-  sides (the sign-in page links to both existing reset flows); an administrator action to mark an
-  attendee email verified again; backfilling or linking existing pairs (d); removing old paths (e).
-- **Known transitional effect until (d):** a person who has both credentials with different passwords
-  and signs in with the attendee password counts that miss against the staff lock (the independent
-  check is the one rule), which can lock the staff credential and email them after five. Slice (d)
-  disables the attendee password for people with staff access, which ends it.
+  sides (the sign-in page links to both existing reset flows); a "mark verified" toggle (deliberately
+  none: "Send verification email" is the admin fix); backfilling or linking existing pairs (d); removing old paths (e).
+- **Lockout counting (S1), fixed in this slice.** The two checks are independent, but a miss on one
+  side is counted toward its lockout only when that side failed AND the other side did not succeed.
+  Signing in with the staff password never charges the attendee credential, and signing in with the
+  attendee password never charges the staff credential, in both directions. A wrong password on both
+  sides counts on both. Locked and disabled credentials are never counted, as today. The verification
+  was split from the counting (`checkStaffPasswordNoCount`, `checkAttendeePasswordNoCount`, each still
+  exactly one derivation); `authenticateWithPassword` and `authenticateAttendee` behave exactly as
+  before for `/api/auth/login` and `/api/attendee/sign-in`.
+- **Remaining timing note.** The refusal is identical and spends the same two derivations, but a miss
+  that is counted does one or two extra database writes, so a wrong password against a live credential
+  can take a few milliseconds longer than an unknown address. That is far below the hash cost and is
+  the same on the old routes; it is not removed.
 - Acceptance, each met: identical status, body shape and timing for unknown, wrong-password, locked and
   disabled cases; staff MFA, passkey and rate-limit tests unchanged; a staff person gets both sessions,
   an attendee-only person gets one; attendee password plus a valid staff TOTP code yields no staff
