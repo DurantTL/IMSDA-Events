@@ -231,6 +231,16 @@ describe("finalizing and revising are refused before anything changes", () => {
     expect(numberAllocations()).toBe(0);
   });
 
+  it("on an event that is not billed to organizations, an unknown version is not found (404), and a real reconciliation version is refused as not deferred (#399)", async () => {
+    approve([group("organization:church-1", "Church One", [registration("r1", "Alpha", [person("a1", true)])])]);
+    await createInvoiceDrafts({ eventId: "event-1", actorUserId: actor });
+    state.versions[0]!.invoice = { id: "inv-1", groupKey: "organization:church-1", partyKind: "ORGANIZATION", partyId: "church-1", clubId: null, baseNumber: null };
+    state.event = { ...state.event, billingMode: "ATTENDEE_PAY" };
+    expect(await code(finalizeInvoiceVersion({ ...base, versionId: "ver-does-not-exist", confirm: true, canFinalizeInvoices: true }))).toBe("VERSION_NOT_FOUND");
+    expect(await code(finalizeInvoiceVersion({ ...base, versionId: state.versions[0]!.id as string, confirm: true, canFinalizeInvoices: true }))).toBe("NOT_DEFERRED_EVENT");
+    expect(numberAllocations()).toBe(0);
+  });
+
   it("cannot finalize an original from an approval whose facts changed", async () => {
     approve([group("organization:church-1", "Church One", [registration("r1", "Alpha", [person("a1", true)])])]);
     await createInvoiceDrafts({ eventId: "event-1", actorUserId: actor });

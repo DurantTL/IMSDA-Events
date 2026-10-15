@@ -160,6 +160,21 @@ export function churchInvoiceState(input: {
   return invoice.finalized!.amountsFingerprint === figures.amountsFingerprint ? "FINALIZED_CURRENT" : "FINALIZED_STALE";
 }
 
+/**
+ * Whether a church draft would be refused at finalization as stale: its lines differ from the redemptions now (DRAFT_STALE),
+ * or the church's billing contact is not the one the draft carries (CONTACT_STALE). The invoice screen uses the same
+ * `contactsMatch` as the report, so it never offers Finalize for a draft the server would refuse. `now` is null when the
+ * church or event can no longer be read.
+ */
+export function churchDraftIsStale(input: {
+  draft: Pick<InvoiceFigures, "amountsFingerprint"> & { contactName: string | null; contactEmail: string | null };
+  now: { eligible: boolean; amountsFingerprint: string; contact: { name: string; email: string } | null } | null;
+}) {
+  const { draft, now } = input;
+  if (!now || !now.eligible) return true;
+  return draft.amountsFingerprint !== now.amountsFingerprint || !contactsMatch(draft, now.contact);
+}
+
 export function buildChurchCodeReportRow(input: {
   event: { id: string; name: string };
   church: { id: string; name: string };

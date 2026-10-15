@@ -358,6 +358,9 @@ Database triggers (not only application code) enforce, and `npm run test:invoice
   staff action from the church report (idempotent, SERIALIZABLE), finalized only by someone with the Finalize invoices
   permission, then sent, posted and paid like any other. These invoices are left out of a deferred event's invoice list and
   draft run. See `modules/promo-codes/README.md`.
+  - **Invoice code (open owner decision).** On an attendee-paid event there is no screen for the invoice code, so the first
+    church invoice finalized takes the code derived from the event name (and freezes it on the event, as for any event).
+    Staff cannot choose it yet; whether they should is an owner decision.
 - The code of two events in the same year must differ; the screen explains the refusal.
 
 ## Checks

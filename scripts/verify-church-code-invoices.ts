@@ -256,7 +256,7 @@ async function main() {
   assert(code(await failure(finalize(created.versionId))) === "DRAFT_STALE", "a draft that no longer matches the redemptions is not finalized");
   const refreshedAgain = await prepare(ids.churchA);
   assert(refreshedAgain.outcome === "REFRESHED" && refreshedAgain.amountDueCents === 8_734, "refreshed after another use");
-  assert(["VERSION_NOT_FOUND", "NOT_DEFERRED_EVENT"].includes(code(await failure(finalize(created.versionId, { eventId: ids.other })))), "another event's version is not reachable");
+  assert(code(await failure(finalize(created.versionId, { eventId: ids.other }))) === "VERSION_NOT_FOUND", "another event's version is not found");
   assert((await prisma.invoiceVersion.findUniqueOrThrow({ where: { id: created.versionId } })).status === "DRAFT", "and it is still a draft");
   assert(code(await failure(finalize(raced[0]!.versionId))) === "CONTACT_MISSING", "a church with no billing contact cannot be invoiced yet");
 

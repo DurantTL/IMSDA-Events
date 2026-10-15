@@ -93,8 +93,16 @@ describe("POST /api/events/[eventId]/church-code-invoices", () => {
   it("maps refusals to statuses and never finalizes", async () => {
     mocks.prepare.mockRejectedValueOnce(new InvoiceError("Nothing to invoice.", "NOTHING_TO_INVOICE"));
     expect((await POST(request({ churchId: "church-a" }), context())).status).toBe(409);
-    mocks.prepare.mockRejectedValueOnce(new InvoiceError("No such organization.", "PARTY_NOT_FOUND"));
-    expect((await POST(request({ churchId: "church-a" }), context())).status).toBe(404);
     expect(mocks.finalize).not.toHaveBeenCalled();
+  });
+
+  it("answers an unknown organization and one that sponsors no code here identically, so callers cannot learn which organizations exist", async () => {
+    mocks.prepare.mockRejectedValueOnce(new InvoiceError("No such organization.", "PARTY_NOT_FOUND"));
+    const unknown = await POST(request({ churchId: "church-x" }), context());
+    mocks.prepare.mockRejectedValueOnce(new InvoiceError("This organization does not sponsor a promo code on this event.", "NOT_A_SPONSOR"));
+    const notSponsor = await POST(request({ churchId: "church-y" }), context());
+    expect(unknown.status).toBe(404);
+    expect(notSponsor.status).toBe(404);
+    expect(await unknown.json()).toEqual(await notSponsor.json());
   });
 });

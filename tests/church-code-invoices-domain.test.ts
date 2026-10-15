@@ -4,6 +4,7 @@ import {
   buildChurchCodeReportRow,
   buildChurchPromoInvoiceFigures,
   churchDraftAction,
+  churchDraftIsStale,
   churchIdOfPromoGroupKey,
   churchInvoiceState,
   churchPromoGroupKey,
@@ -193,6 +194,18 @@ describe("church promo code report", () => {
     expect(churchDraftAction("NOTHING_TO_INVOICE")).toMatchObject({ enabled: false });
     expect(churchDraftAction("DRAFT_CURRENT")).toMatchObject({ enabled: false });
     expect(churchDraftAction("FINALIZED_CURRENT")).toMatchObject({ enabled: false });
+  });
+
+  it("calls a draft stale for changed lines, a changed contact, an ineligible event or an unreadable church, so Finalize is never offered when the server would refuse", () => {
+    const draft = { amountsFingerprint: figures.amountsFingerprint, contactName: "Tina Treasurer", contactEmail: "tina@example.test" };
+    const now = { eligible: true, amountsFingerprint: figures.amountsFingerprint, contact: { name: "Tina Treasurer", email: "TINA@example.test" } };
+    expect(churchDraftIsStale({ draft, now })).toBe(false);
+    expect(churchDraftIsStale({ draft, now: { ...now, amountsFingerprint: "other" } })).toBe(true);
+    expect(churchDraftIsStale({ draft, now: { ...now, contact: { name: "Sue Secretary", email: "sue@example.test" } } })).toBe(true);
+    expect(churchDraftIsStale({ draft, now: { ...now, contact: null } })).toBe(true);
+    expect(churchDraftIsStale({ draft: { ...draft, contactName: null, contactEmail: null }, now: { ...now, contact: null } })).toBe(false);
+    expect(churchDraftIsStale({ draft, now: { ...now, eligible: false } })).toBe(true);
+    expect(churchDraftIsStale({ draft, now: null })).toBe(true);
   });
 
   it("keeps the state function honest with no invoice at all", () => {

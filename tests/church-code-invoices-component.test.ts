@@ -43,6 +43,7 @@ describe("Church promo code report", () => {
     expect(markup).toContain("Create draft invoice");
     expect(markup).toContain("Tina Treasurer");
     expect(markup).toContain("Nothing is sent from here");
+    expect(markup).toContain("covers the whole event, whatever location filter");
     expect(markup).not.toMatch(/finalize invoice<\/button>/i);
   });
 

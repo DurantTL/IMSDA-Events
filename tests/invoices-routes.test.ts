@@ -140,8 +140,11 @@ describe("POST /api/events/[eventId]/invoices", () => {
   it("a church's promo code invoice (#399) is refreshed from its redemptions, never rebuilt from a reconciliation, and a contact-only revision is refused", async () => {
     mocks.churchOfPromoInvoice.mockResolvedValue("church-a");
     expect((await POST(request({ action: "regenerate", invoiceId: "i1" }), context())).status).toBe(200);
-    expect(mocks.prepareChurchDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance" });
+    // Regenerate only rebuilds an open draft (the service refuses NOT_A_DRAFT otherwise).
+    expect(mocks.prepareChurchDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance", requireDraft: true });
     expect((await POST(request({ action: "revise", invoiceId: "i1", mode: "FROM_RECONCILIATION", reason: "Usage changed" }), context())).status).toBe(200);
+    // The user's reason travels to the revision.
+    expect(mocks.prepareChurchDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance", revisionReason: "Usage changed" });
     expect(mocks.prepareChurchDraft).toHaveBeenCalledTimes(2);
     expect((await POST(request({ action: "revise", invoiceId: "i1", mode: "CONTACT_ONLY", reason: "New treasurer" }), context())).status).toBe(409);
     expect(mocks.service.regenerateInvoiceDraft).not.toHaveBeenCalled();

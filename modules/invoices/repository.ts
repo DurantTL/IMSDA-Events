@@ -29,7 +29,7 @@ import {
   amountsFingerprintOf,
   type InvoiceVersionStatus,
 } from "@/modules/invoices/domain";
-import { CHURCH_PROMO_GROUP_KEY_PREFIX, churchIdOfPromoGroupKey } from "@/modules/promo-codes/church-invoice";
+import { CHURCH_PROMO_GROUP_KEY_PREFIX, churchDraftIsStale, churchIdOfPromoGroupKey } from "@/modules/promo-codes/church-invoice";
 import { loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
 import {
   MANUAL_LINES_MAX,
@@ -851,9 +851,9 @@ export async function finalizeInvoiceVersion(input: {
       });
       // A church's promo code invoice (#399) is finalized by the same named person with the same permission, on an
       // attendee-paid event; every other invoice needs the event to bill organizations after the event.
-      const churchBasis = version?.basis === "CHURCH_PROMO_CODES";
-      if (!churchBasis) assertDeferred(event);
       if (!version) throw new InvoiceError("That invoice version does not belong to this event.", "VERSION_NOT_FOUND");
+      const churchBasis = version.basis === "CHURCH_PROMO_CODES";
+      if (!churchBasis) assertDeferred(event);
       const used = await tx.invoiceVersion.findUnique({ where: { finalizeIdempotencyKey: input.idempotencyKey }, select: { id: true } });
       if (used && used.id !== version.id) {
         throw new InvoiceError("That request key was already used for a different invoice. Reload the page and try again.", "IDEMPOTENCY_KEY_REUSED");
@@ -1280,7 +1280,13 @@ export async function getInvoiceDetail(eventId: string, invoiceId: string, optio
     const inputs = await loadChurchInvoiceInputs(prisma, eventId, churchId);
     currentContact = inputs?.contact ?? null;
     if (liveFinalized && inputs) amountsOutOfDate = inputs.figures.amountsFingerprint !== liveFinalized.amountsFingerprint;
-    if (shown.status === "DRAFT") churchDraftStale = !inputs || !inputs.event.eligible || inputs.figures.amountsFingerprint !== shown.amountsFingerprint;
+    // Stale when the lines or the contact differ: the same two checks finalizing makes (DRAFT_STALE, CONTACT_STALE).
+    if (shown.status === "DRAFT") {
+      churchDraftStale = churchDraftIsStale({
+        draft: { amountsFingerprint: shown.amountsFingerprint, contactName: shown.contact?.name ?? null, contactEmail: shown.contact?.email ?? null },
+        now: inputs ? { eligible: inputs.event.eligible, amountsFingerprint: inputs.figures.amountsFingerprint, contact: inputs.contact } : null,
+      });
+    }
   } else if (event.billingMode === "DEFERRED_ORGANIZATION_INVOICE") {
     const billing = await getBillingResponsibilityView(eventId, {}, prisma);
     currentContact = contactOfGroup(billing.groups.find((candidate) => candidate.key === invoice.groupKey));

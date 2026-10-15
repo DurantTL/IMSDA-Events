@@ -66,7 +66,17 @@ const liveVersionSelect = {
   billableCount: true,
 } satisfies Prisma.InvoiceVersionSelect;
 
-async function prepareOnce(tx: Prisma.TransactionClient, input: { eventId: string; churchId: string; actorUserId: string }): Promise<ChurchDraftResult> {
+export type PrepareChurchDraftInput = {
+  eventId: string;
+  churchId: string;
+  actorUserId: string;
+  /** The invoice screen's Regenerate: refuse unless the latest version is an open draft, instead of starting a revision. */
+  requireDraft?: boolean;
+  /** The reason staff gave when asking for a revision; kept on the revision draft. */
+  revisionReason?: string;
+};
+
+async function prepareOnce(tx: Prisma.TransactionClient, input: PrepareChurchDraftInput): Promise<ChurchDraftResult> {
   // The same per-event lock finalizing takes: this draft is built from, and compared with, one settled state.
   await lockEvent(tx, input.eventId);
   const inputs = await loadChurchInvoiceInputs(tx, input.eventId, input.churchId);
@@ -82,6 +92,9 @@ async function prepareOnce(tx: Prisma.TransactionClient, input: { eventId: strin
     select: { id: true, versions: { where: { status: { not: "DISCARDED" } }, orderBy: { revision: "desc" }, take: 1, select: liveVersionSelect } },
   });
   const latest = invoice?.versions[0] ?? null;
+  if (input.requireDraft && latest?.status !== "DRAFT") {
+    throw new InvoiceError("This invoice has no open draft to regenerate. Start a revision from the church report to make a new version.", "NOT_A_DRAFT");
+  }
   const audit = (outcome: ChurchDraftOutcome, versionId: string, invoiceId: string, revision: number, previousAmountCents: number | null) =>
     writeAuditLog({
       eventId: input.eventId,
@@ -124,6 +137,10 @@ async function prepareOnce(tx: Prisma.TransactionClient, input: { eventId: strin
   if (latest.status === "DRAFT") {
     const same = latest.amountsFingerprint === figures.amountsFingerprint && contactsMatch(latest, contact);
     if (same) return result("UNCHANGED", invoice.id, latest.id, latest.revision);
+    // Every use was cancelled or reversed: an original draft is not refreshed to a $0 invoice someone could finalize.
+    if (latest.revision === 0 && figures.amountDueCents <= 0) {
+      throw new InvoiceError("Nothing is covered by this church's codes any more, so this draft would be $0. Discard this draft instead.", "NOTHING_TO_INVOICE");
+    }
     await tx.invoiceVersion.update({
       where: { id: latest.id },
       data: { regenerationCount: { increment: 1 }, regeneratedAt: new Date(), ...figureColumns(figures, contact) },
@@ -144,7 +161,7 @@ async function prepareOnce(tx: Prisma.TransactionClient, input: { eventId: strin
       supersedesVersionId: latest.id,
       reconciliationVersionId: null,
       createdByUserId: input.actorUserId,
-      revisionReason: "Refreshed from the church's promo code redemptions.",
+      revisionReason: input.revisionReason?.trim() || "Refreshed from the church's promo code redemptions.",
       ...figureColumns(figures, contact),
     },
     select: { id: true, revision: true },
@@ -162,7 +179,7 @@ function isUniqueViolation(error: unknown) {
  * which the caller (the route) has checked; the event and the organization come from the request, and the lines from
  * the database. Never finalizes or sends. Repeating it with nothing changed writes nothing.
  */
-export async function prepareChurchCodeInvoiceDraft(input: { eventId: string; churchId: string; actorUserId: string }): Promise<ChurchDraftResult> {
+export async function prepareChurchCodeInvoiceDraft(input: PrepareChurchDraftInput): Promise<ChurchDraftResult> {
   const prisma = getPrisma();
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {

@@ -44,7 +44,13 @@ async function postHandler(request: Request, context: RouteContext) {
       return Response.json({ error: "INVALID_CHURCH_CODE_INVOICE_REQUEST", message: "Choose a church and try again." }, { status: 400 });
     }
     if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
-    if (error instanceof InvoiceError) return Response.json({ error: error.code, message: error.message }, { status: statusFor(error) });
+    if (error instanceof InvoiceError) {
+      // An unknown organization and one that sponsors no code here answer identically, so a caller cannot probe which organizations exist.
+      if (error.code === "PARTY_NOT_FOUND" || error.code === "NOT_A_SPONSOR") {
+        return Response.json({ error: "CHURCH_NOT_FOUND", message: "That organization has no promo code on this event." }, { status: 404 });
+      }
+      return Response.json({ error: error.code, message: error.message }, { status: statusFor(error) });
+    }
     logError("Church code invoice request failed", error);
     return Response.json({ error: "CHURCH_CODE_INVOICE_FAILED", message: "The draft could not be prepared." }, { status: 500 });
   }

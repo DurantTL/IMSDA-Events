@@ -32,6 +32,7 @@ export function ChurchCodeInvoices({ eventId, report, canFinalize }: { eventId: 
             {canFinalize ? "." : " (finalizing needs permission to finalize invoices, which a system administrator grants)."}
             {" "}Nothing is sent from here.
           </p>
+          <p><small>This report covers the whole event, whatever location filter is selected on this page.</small></p>
         </div>
       </div>
       {!report.eligible && (
