@@ -65,9 +65,10 @@ export function evaluateEventRegistrationPhase(
   event: EventLifecycleSource,
   now = new Date(),
 ): EventRegistrationPhase {
-  // An archived event takes no registrations (#635), whatever its dates or published flag say.
-  if (event.archivedAt) return "CLOSED";
+  // An unpublished event reads as a draft even when archived; an archived published event takes no
+  // registrations (#635), whatever its dates say. Either way registration is not open.
   if (!event.isPublished) return "DRAFT";
+  if (event.archivedAt) return "CLOSED";
   if (hasEventEnded(event, now)) return "CLOSED";
   const today = calendarDateInEventTimeZone(now, event.timezone);
   if (event.registrationOpensOn && today < event.registrationOpensOn) return "UPCOMING";

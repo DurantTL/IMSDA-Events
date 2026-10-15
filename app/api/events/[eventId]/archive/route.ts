@@ -22,7 +22,7 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
   try {
     const { eventId } = await context.params;
     const access = await requireEventMembership(await getCurrentSession(), eventId, findActiveMembership);
-    // Whether this actor may archive is decided inside the transaction, from their system role or active role on this event.
+    // The role is read for the event in this URL before the transaction starts; the decision on it is made in the transaction.
     const result = await archiveEvent({
       eventId,
       actor: { userId: access.user.id, globalRole: access.user.globalRole, eventRole: access.membership?.role ?? null },

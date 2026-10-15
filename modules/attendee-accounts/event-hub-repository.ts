@@ -105,7 +105,7 @@ export async function getEventHubTitleForViewer(input: {
   const hub = await getAttendeeEventHub(input.attendeeEmail, input.eventSlug);
   if (!hub) return null;
   const published = await getPrisma().event.findFirst({
-    where: { slug: input.eventSlug, isPublished: true, archivedAt: null },
+    where: { slug: input.eventSlug, isPublished: true },
     select: { hubTitle: true },
   });
   return published?.hubTitle ?? null;
@@ -270,6 +270,8 @@ export async function getStaffEventHubPreview(
   const accessibleEvents = await listEventsForUser(
     user.id,
     user.globalRole === "SYSTEM_ADMIN",
+    // Staff may preview an archived event's hub (#635); registrants still reach it too.
+    { archived: "include" },
   );
   const accessibleEvent = accessibleEvents.find(
     (event) => event.slug === eventSlug,

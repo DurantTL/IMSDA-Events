@@ -73,6 +73,8 @@ async function cleanup() {
   const events = { id: { startsWith: `${P}_` } };
   await prisma.auditLog.deleteMany({ where: { OR: [{ actorUserId: { startsWith: `${P}_` } }, { entityId: { startsWith: `${P}_` } }] } });
   await prisma.event.deleteMany({ where: events });
+  await prisma.honor.deleteMany({ where: events });
+  await prisma.person.deleteMany({ where: events });
   await prisma.user.deleteMany({ where: { id: { startsWith: `${P}_` } } });
 }
 
@@ -199,6 +201,36 @@ async function main() {
   assert(unarchiveAudit.length === 1 && JSON.stringify(unarchiveAudit[0].metadata) === JSON.stringify({ eventId }), "one EVENT_UNARCHIVED audit row, ids only");
   const again = await unarchiveEvent({ eventId, actor: actor(adminId, null, "SYSTEM_ADMIN") });
   assert(!again.archived && !again.changed, "unarchiving a live event changes nothing");
+
+  // ---- The class waitlist sweep leaves an archived event's live offers alone (they are not lapsed, and unarchiving could not undo that). ----
+  const { sweepClassWaitlists } = await import("../modules/honors/waitlist-repository");
+  const sweepNow = new Date("2028-10-01T12:00:00Z");
+  async function offeredEntry(forEventId: string, key: string) {
+    const honor = await prisma.honor.create({ data: { id: id(`honor_${key}`), code: `EVARC-${key}`, name: `Evarc honor ${key}`, normalizedName: `evarc honor ${key}` } });
+    const offering = await prisma.honorOffering.create({ data: { id: id(`offering_${key}`), eventId: forEventId, honorId: honor.id, span: "ALL_SESSIONS", capacity: 5 } });
+    const holder = await prisma.person.create({ data: { id: id(`holder_${key}`), firstName: "Evarc", lastName: `Holder ${key}` } });
+    const registration = await prisma.registration.create({ data: { id: id(`reg_${key}`), eventId: forEventId, accountHolderPersonId: holder.id, confirmationCode: `REG-${P}-${key}`, status: "SUBMITTED", totalAmount: 0, submittedAt: sweepNow } });
+    const attendee = await prisma.registrationAttendee.create({
+      data: { eventId: forEventId, registrationId: registration.id, personId: holder.id, attendeeType: "YOUTH", position: 0, profileSnapshot: { firstName: "Evarc", lastName: key, ageOnEventDate: 13 } },
+    });
+    return prisma.honorClassWaitlistEntry.create({
+      data: {
+        id: id(`entry_${key}`), eventId: forEventId, offeringId: offering.id, registrationId: registration.id, registrationAttendeeId: attendee.id,
+        status: "OFFERED", offeredAt: new Date("2028-09-20T12:00:00Z"), offerExpiresAt: new Date("2028-09-25T12:00:00Z"), offerCount: 1,
+      },
+    });
+  }
+  const liveEntry = await offeredEntry(eventId, "live");
+  const controlEntry = await offeredEntry(siblingId, "control");
+  const readEntry = (entryId: string) => prisma.honorClassWaitlistEntry.findUniqueOrThrow({ where: { id: entryId } });
+  const liveBefore = await readEntry(liveEntry.id);
+  await archiveEvent({ eventId, actor: actor(adminId, null, "SYSTEM_ADMIN") });
+  const sweep = await sweepClassWaitlists(sweepNow);
+  assert(sweep.failed === 0, "the sweep ran cleanly");
+  assert(JSON.stringify(await readEntry(liveEntry.id)) === JSON.stringify(liveBefore), "the sweep leaves an archived event's OFFERED entry exactly as it was");
+  assert((await readEntry(controlEntry.id)).status === "EXPIRED", "the same sweep still lapses an expired offer on an event that is not archived");
+  await unarchiveEvent({ eventId, actor: actor(adminId, null, "SYSTEM_ADMIN") });
+  assert(JSON.stringify(await readEntry(liveEntry.id)) === JSON.stringify(liveBefore), "unarchiving finds the entry unchanged");
 
   // ---- A deleted archiver does not block anything. ----
   await archiveEvent({ eventId, actor: actor(staffId, "EVENT_ADMIN") });

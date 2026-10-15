@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
+import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   EVENT_ARCHIVED_AUDIT_ACTION,
   EVENT_UNARCHIVED_AUDIT_ACTION,
@@ -19,7 +20,9 @@ type ArchiveActor = EventArchiveActor & { userId: string };
 
 /**
  * Archives or unarchives one event (#635). The actor's permission is decided
- * here, so every caller gets the same rule. Only `archivedAt` and
+ * here from the role the caller read for this event (the route scopes it to the
+ * event in the URL, and reads it before the transaction starts), so every caller
+ * gets the same rule. Only `archivedAt` and
  * `archivedByUserId` change, and the change is audited (ids only) in the same
  * transaction. Idempotent: repeating a request that already holds changes
  * nothing and writes no second audit row.
@@ -40,18 +43,15 @@ async function setEventArchived(input: { eventId: string; actor: ArchiveActor; a
     if (count !== 1) return { archived: input.archive, changed: false };
 
     const metadata: EventArchiveAuditMetadata = { eventId: input.eventId };
-    await tx.auditLog.create({
-      data: {
-        eventId: input.eventId,
-        actorUserId: input.actor.userId,
-        action: input.archive ? EVENT_ARCHIVED_AUDIT_ACTION : EVENT_UNARCHIVED_AUDIT_ACTION,
-        entityType: "Event",
-        entityId: input.eventId,
-        correlationId: crypto.randomUUID(),
-        summary: input.archive ? "Archived event." : "Unarchived event.",
-        metadata,
-      },
-    });
+    await writeAuditLog({
+      eventId: input.eventId,
+      actorUserId: input.actor.userId,
+      action: input.archive ? EVENT_ARCHIVED_AUDIT_ACTION : EVENT_UNARCHIVED_AUDIT_ACTION,
+      entityType: "Event",
+      entityId: input.eventId,
+      summary: input.archive ? "Archived event." : "Unarchived event.",
+      metadata,
+    }, tx);
     return { archived: input.archive, changed: true };
   });
 }

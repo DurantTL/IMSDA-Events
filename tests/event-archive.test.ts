@@ -89,10 +89,10 @@ describe("pickers and default selection", () => {
 describe("registration for an archived event", () => {
   const open = event("open", "2027-02-01T12:00:00.000Z", { endsAt: new Date("2027-02-03T12:00:00.000Z") });
 
-  it("is closed whatever the dates and published flag say", () => {
+  it("is closed whatever the dates say, and never open when unpublished", () => {
     expect(evaluateEventRegistrationPhase(open, NOW)).toBe("OPEN");
     expect(evaluateEventRegistrationPhase({ ...open, archivedAt: ARCHIVED_AT }, NOW)).toBe("CLOSED");
-    expect(evaluateEventRegistrationPhase({ ...open, isPublished: false, archivedAt: ARCHIVED_AT }, NOW)).toBe("CLOSED");
+    expect(evaluateEventRegistrationPhase({ ...open, isPublished: false, archivedAt: ARCHIVED_AT }, NOW)).toBe("DRAFT");
   });
 
   it("reopens exactly as before once unarchived", () => {
