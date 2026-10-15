@@ -25,7 +25,7 @@ async function postHandler(request: Request) {
       );
     }
 
-    const account = await findSwitchableAttendeeAccountForStaff(user.email);
+    const account = await findSwitchableAttendeeAccountForStaff(user.email, user.id);
     if (!account) {
       return Response.json(
         {
