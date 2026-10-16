@@ -6,6 +6,7 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { BackLink } from "@/components/back-link";
 import { BackgroundCheckImportPanel } from "@/components/background-check-import-panel";
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
+import { cardCell } from "@/components/table-card-labels";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { backgroundCheckSummary } from "@/modules/background-checks/repository";
 
@@ -74,16 +75,16 @@ export default async function BackgroundChecksPage() {
           <p className="report-empty">No upcoming event is marked as a youth or children&apos;s event. Turn it on in an event&apos;s settings.</p>
         ) : (
           <div className="report-table-wrap">
-            <table className="report-table">
+            <table role="table" className="report-table table-cards">
               <caption className="sr-only">Youth and children&apos;s events</caption>
-              <thead><tr><th scope="col">Event</th><th scope="col">Starts</th><th scope="col">Adults</th><th scope="col">Need a check</th></tr></thead>
-              <tbody>
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Event</th><th role="columnheader" scope="col">Starts</th><th role="columnheader" scope="col">Adults</th><th role="columnheader" scope="col">Need a check</th></tr></thead>
+              <tbody role="rowgroup">
                 {summary.events.map((event) => (
-                  <tr key={event.id}>
-                    <th scope="row"><Link className="report-record-link" href={`/more/reports?event=${encodeURIComponent(event.id)}#background-checks`}>{event.name}</Link></th>
-                    <td>{event.startsOn}</td>
-                    <td>{event.adults}</td>
-                    <td>
+                  <tr role="row" key={event.id}>
+                    <th role="rowheader" scope="row"><Link className="report-record-link" href={`/more/reports?event=${encodeURIComponent(event.id)}#background-checks`}>{event.name}</Link></th>
+                    <td {...cardCell("Starts")}>{event.startsOn}</td>
+                    <td {...cardCell("Adults")}>{event.adults}</td>
+                    <td {...cardCell("Need a check")}>
                       {event.needed > 0
                         ? <span className="status-chip coral background-check-badge"><ShieldAlert aria-hidden="true" size={12} /> {event.needed}</span>
                         : <span className="status-chip green background-check-badge"><ShieldCheck aria-hidden="true" size={12} /> All current</span>}

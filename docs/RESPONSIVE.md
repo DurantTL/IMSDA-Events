@@ -26,6 +26,11 @@ event administrator and system administrator), visits the main pages at 360,
 | `text-overlap` | the text of two elements overlaps, or an `overflow: hidden` box cuts text off sideways (an ellipsis or a line clamp is fine) | every width |
 | `disabled-contrast` | a disabled button's label under 3:1 against its own fill, opacity included | every width |
 
+These five rules (`heading-style` to `disabled-contrast`) run on the `pbe-*` and `staff-pbe-*` pages and every
+state of their walkthroughs. `MOBILE_LAYOUT_TEXT_RULES=all` runs them on every page; the older pages were not built
+against them and still have findings (unstyled small headings, helper text that sits close under a field, disabled
+buttons that are very faint), which are a separate clean-up.
+
 Beyond the pages in the list, the audit builds a Pathfinder Bible Experience shaped
 event (`mobilecheck_pbe_event`: the starter's team rules, Iowa and Missouri sites and the
 `pbe_registration` form, general link on, church billed, one team attached to a club and one

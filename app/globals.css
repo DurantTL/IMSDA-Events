@@ -8291,8 +8291,8 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .clone-none-toggle { min-height: 44px; font-size: max(var(--type-body-floor, 0px), 0.8rem) !important; color: var(--ink) !important; }
 .clone-none-toggle input { width: 22px !important; height: 22px; flex: 0 0 auto; }
 .event-clone input:disabled { opacity: 0.55; }
-.inline-notice.warning,
 .inline-notice.clone-warning { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; line-height: 1.5; font-size: 0.78rem; }
+.inline-notice.warning { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; line-height: 1.5; }
 .clone-link { overflow-wrap: anywhere; font-size: max(var(--type-body-floor, 0px), 0.74rem); }
 
 /* Staff account menu (#543): 44px touch targets and a popover that fits 390px. */
@@ -11046,3 +11046,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .public-manage-card > .field-help { margin: 4px 0 0; }
 .club-team-name .field-help { margin: 0; }
 .public-registration-option-item > .expandable-text-toggle { min-height: 44px; }
+/* A result form's long select option never widens the card past a phone screen. */
+.team-result-level { min-width: 0; }
+.team-result-level :is(input, select) { width: 100%; max-width: 100%; min-width: 0; }
