@@ -16,7 +16,7 @@ import {
   requireClubEvent,
   type ClubEvent,
 } from "@/modules/club-registrations/repository";
-import { clubDirectoryOwnedResponses, lockedClubDirectoryFieldKeys } from "@/modules/club-registrations/domain";
+import { clubDirectoryOwnedResponses, lockedClubDirectoryFieldKeys, partnerClubIssue, partnerClubProblem } from "@/modules/club-registrations/domain";
 import { NO_TEAM_KEY, resolveTeamName, teamNameTakenMessage } from "@/modules/club-teams/domain";
 import { ClubTeamError } from "@/modules/club-teams/errors";
 import { peopleOnOtherTeams, throwIfOnOtherTeams } from "@/modules/club-teams/registration-guard";
@@ -166,6 +166,11 @@ export function typedInAttendeePreparer(options: {
     const directoryResponses = lockedClubDirectoryFieldKeys(definition).length > 0
       ? clubDirectoryOwnedResponses(definition as RegistrationFormDefinition, await clubDirectoryIdentity(tx, options.organizationId))
       : {};
+    // A joint team's partner club can't be the team's own club (#963).
+    const partnerProblem = partnerClubProblem(definition as RegistrationFormDefinition, { ...input.responses, ...directoryResponses });
+    if (partnerProblem) {
+      throw new PublicRegistrationError("INVALID_SUBMISSION", partnerProblem.message, [partnerClubIssue(partnerProblem)]);
+    }
     return { input: { ...input, responses: { ...input.responses, ...directoryResponses } } satisfies PublicRegistrationInput, attendees: resolved };
   };
 }
@@ -654,6 +659,10 @@ export async function submitGeneralLinkRegistration(
   // in the same words, so no field can tell a director from anyone else.
   const unsupported = unsupportedFieldProblem(definition, input);
   if (unsupported) throw new PublicRegistrationError("INVALID_SUBMISSION", unsupported.message, unsupported.issues);
+  // A partner club that is the team's own club (#963) is refused here on the answers as typed, for every email, so the
+  // refusal never tells a director's email from any other. The matched path checks again on the club's own answer.
+  const partnerProblem = partnerClubProblem(definition, input.responses);
+  if (partnerProblem) throw new PublicRegistrationError("INVALID_SUBMISSION", partnerProblem.message, [partnerClubIssue(partnerProblem)]);
 
   // The same checks the club submit makes, on the answers as typed, so a team that can never be registered is refused now.
   const prepared = preparePublicRegistration(definition, input, { timeZone: event.timezone, now, ignoreAvailability: true });

@@ -425,6 +425,15 @@ async function main() {
       await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Sen"), { email, club_name: clubName(clubKey) }), { locationId: missouri!.id, teamName: `Bees ${sentinel}` }, now), "TEAM_INVALID", "a team name with a delivery placeholder is refused for a matching and a non-matching email alike", ["letters, numbers and punctuation"]);
     }
   }
+  // The partner club can't be the team's own club, and the refusal is the same for a director's email and any other (#963).
+  const ownAsPartner: Array<[string, string]> = [[emailOf("dira"), "a"], [emailOf("regc"), "c"], ["gl-stranger@example.test", "a"]];
+  const partnerRefusals: Array<{ code?: string; message: string; issues: unknown }> = [];
+  for (const [email, clubKey] of ownAsPartner) {
+    const refusal = await caught(link.submitGeneralLinkRegistration(eventSlug, request(youth("Par"), { email, club_name: clubName(clubKey), partner_club: clubName(clubKey) }), { locationId: missouri!.id, teamName: `Partner ${email}` }, now)) as { code?: string; message: string; issues: unknown } | undefined;
+    assert(refusal?.code === "INVALID_SUBMISSION" && refusal.message.includes("different club from your own"), "the team's own club as partner is refused");
+    partnerRefusals.push(refusal);
+  }
+  assert(partnerRefusals.every((refusal) => refusal.message === partnerRefusals[0]!.message && JSON.stringify(refusal.issues) === JSON.stringify(partnerRefusals[0]!.issues)), "a matched and an unmatched email are refused in the same words, with the same issues");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, { ...request(youth("Noq")), versionId: "not-the-live-version" }, { locationId: missouri!.id, teamName: "Old Form" }, now), "FORM_VERSION_CHANGED", "a form that changed while open is refused");
   const afterClose = new Date("2026-12-19T15:00:00Z");
   await expectCode(link.submitGeneralLinkRegistration(eventSlug, request(youth("Clo")), { locationId: missouri!.id, teamName: "Too Late" }, afterClose), "REGISTRATION_CLOSED", "after December 18 a matched team is refused");
