@@ -157,10 +157,13 @@ ticked as covered; the rest pay for themselves.
   for different people stay allowed, as #397 requires, until Caleb decides otherwise.
   The rule counts only codes that validated, so a mistyped first code never blocks a
   valid one after it.
-- **The tick.** The person who types the code first holds it. Once it is applied,
-  every other person shows a "Covered by the code ...: name" tickbox, unticked by
-  default; ticking fills their code, unticking clears it, and changing or removing the
-  holder's code rewrites every ticked person to match. Unticked people pay for
+- **The tick (church codes only).** The person who types the code first holds it. Once
+  a church-sponsored code is applied, every other person shows a "Covered by the code
+  ...: name" tickbox, unticked by default; ticking fills their code, unticking clears
+  it, and changing or removing the holder's code rewrites every ticked person to match
+  (logic in `church-tick.ts`). Someone carrying a different code (a restored draft)
+  keeps a text input with a conflict message. With an ordinary code, or before Apply,
+  everyone keeps their own text input as before (#397). Unticked people pay for
   themselves.
 - **Amendments.** A person added in an amendment takes no promo code (use Adjust
   amount owed in Payments).
@@ -172,5 +175,5 @@ ticked as covered; the rest pay for themselves.
 - **Club registrations** already cover every person on the registration and bill the
   club's church (#409); nothing changes there.
 - **Not built here:** a separate non-billing church (pastor) contact in the directory.
-  It is tracked in a follow-up issue (to be opened by the coordinator).
+  It is tracked in #977.
 

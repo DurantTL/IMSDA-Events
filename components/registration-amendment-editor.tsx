@@ -656,6 +656,8 @@ export function RegistrationAmendmentEditor({
           );
           const visibleFields = attendeeDefinition.sections.flatMap((section) => section.fields)
             .filter((field) => field.scope === "ATTENDEE" && field.type !== "CALCULATED" && isFieldVisible(field, merged));
+          // A person added here takes no promo code: codes are money, handled in Payments (#961).
+          const hidesPromoCode = !attendee.attendeeId && visibleFields.some((field) => field.key === "promo_code");
           const firstName = valueString(attendee.responses.first_name);
           const lastName = valueString(attendee.responses.last_name);
           return (
@@ -684,7 +686,10 @@ export function RegistrationAmendmentEditor({
                 </label>
               )}
               <div className="amendment-fields">
-                {visibleFields.map((field) => (
+                {hidesPromoCode && (
+                  <p className="amendment-promo-note">A promo code cannot be added to a new person here. Use Adjust amount owed in Payments.</p>
+                )}
+                {visibleFields.filter((field) => !(hidesPromoCode && field.key === "promo_code")).map((field) => (
                   <AmendmentField
                     field={field}
                     values={attendee.responses}

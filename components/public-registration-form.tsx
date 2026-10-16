@@ -1,5 +1,6 @@
 "use client";
 
+import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
 import { useConfirm } from "@/components/use-confirm";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
@@ -849,11 +850,12 @@ export function PublicRegistrationForm({
     ? attendees.find((attendee, index) => attendeeCodes[index] && (!attendees.some((candidate) => candidate.clientId === promoCodeHolderId) || attendee.clientId === promoCodeHolderId)) ?? null
     : null;
   const promoSharedCode = promoCodeHolder ? attendeeCodes[attendees.indexOf(promoCodeHolder)] ?? "" : "";
-  // The tick appears once the holder's code has been checked, not while it is still being typed.
-  const promoSharedCodeApplied = Boolean(
-    promoSharedCode
-    && attendeePromo?.quote.attendeeDiscounts.some((discount) => discount.code.normalize("NFKC").trim().toUpperCase() === promoSharedCode),
-  );
+  // Tick mode is only for an applied church-sponsored code; an ordinary code leaves everyone their own input (#397).
+  const promoTickMode = isChurchTickMode({
+    sharedCode: promoSharedCode,
+    appliedCodes: attendeePromo?.quote.attendeeDiscounts.map((discount) => normalizeTickCode(discount.code)) ?? [],
+    sponsors: attendeePromo?.quote.sponsors,
+  });
   const activeAttendeePromo = attendeePromo
     && attendeePromo.basis === calculationBasis
     && attendeePromo.codes === attendeeCodesSignature
@@ -1244,7 +1246,7 @@ export function PublicRegistrationForm({
   );
   // Ticking or unticking someone re-checks the code for the new set of people (debounced).
   const promoTicksChanged = Boolean(
-    attendeePromo && promoSharedCodeApplied && attendeePromo.codes !== attendeeCodesSignature,
+    attendeePromo && promoTickMode && attendeePromo.codes !== attendeeCodesSignature,
   );
   const applyAttendeePromoRef = useRef(applyAttendeePromoCodes);
   useEffect(() => {
@@ -1771,23 +1773,17 @@ export function PublicRegistrationForm({
       const notice = attendeePromoNotice(attendeeIndex);
       // A church code covers the people who are ticked (#961). One person holds the code; everyone else is a tick.
       const isHolder = promoCodeHolder?.clientId === attendees[attendeeIndex]?.clientId;
-      if (promoSharedCode && !isHolder) {
-        const personName = attendeeName(attendees[attendeeIndex]!, attendeeIndex, roster.attendeeLabel);
+      const view = personPromoView({ tickMode: promoTickMode, isHolder, sharedCode: promoSharedCode, value });
+      const personName = attendeeName(attendees[attendeeIndex]!, attendeeIndex, roster.attendeeLabel);
+      if (view === "TICK") {
         const hintId = `${id}_hint`;
-        if (!promoSharedCodeApplied && value.trim() === "") {
-          return (
-            <div className={`${wrapperClass} public-registration-promo-field`} key={field.id}>
-              <small id={hintId}>Select Apply on the code above, then tick who it covers. {personName} pays for themselves unless ticked.</small>
-            </div>
-          );
-        }
         return (
           <div className={`${wrapperClass} public-registration-promo-field`} key={field.id}>
             <label className="public-registration-check public-registration-promo-covered" htmlFor={id}>
               <input
                 id={id}
                 type="checkbox"
-                checked={value.trim().toUpperCase() === promoSharedCode}
+                checked={normalizeTickCode(value) === promoSharedCode}
                 aria-describedby={hintId}
                 onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.checked ? promoSharedCode : "")}
               />
@@ -1820,13 +1816,14 @@ export function PublicRegistrationForm({
                 const holderId = attendees[attendeeIndex]?.clientId ?? null;
                 if (!promoSharedCode) setPromoCodeHolderId(holderId);
                 context.setValue(field.key, inputEvent.target.value);
-                if (isHolder && holderId) {
-                  // The code changed or was removed: everyone ticked follows it.
-                  const nextCode = inputEvent.target.value.trim().toUpperCase();
-                  setAttendees((current) => current.map((attendee) => attendee.clientId !== holderId
-                    && String(attendee.responses[field.key] ?? "").trim() !== ""
-                    ? { ...attendee, responses: { ...attendee.responses, [field.key]: nextCode } }
-                    : attendee));
+                if (isHolder && promoTickMode) {
+                  // The code changed or was removed: everyone ticked follows it, through the same path as any answer.
+                  const { indexes, code } = ticksToRewrite({
+                    values: attendees.map((attendee) => attendee.responses[field.key]),
+                    holderIndex: attendeeIndex,
+                    nextCode: inputEvent.target.value,
+                  });
+                  for (const index of indexes) setAttendeeFieldValue(index, field.key, code);
                 }
               }}
               onKeyDown={(keyboardEvent) => {
@@ -1841,6 +1838,11 @@ export function PublicRegistrationForm({
             </button>
           </div>
           {fieldSupport(field, context)}
+          {view === "CONFLICT" && (
+            <small className="field-error" role="alert">
+              {personName} has a different code than the church code {promoSharedCode}. Clear it to tick them as covered, or change it to {promoSharedCode}.
+            </small>
+          )}
           {notice && (
             <small className={notice.ok ? "public-registration-promo-success" : "field-error"} role={notice.ok ? "status" : "alert"} aria-live="polite">
               {notice.ok && <BadgePercent size={15} aria-hidden="true" />} {notice.text}
