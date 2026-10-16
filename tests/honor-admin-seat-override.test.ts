@@ -161,12 +161,12 @@ describe("a placed seat sits on top of the class's limit (#962)", () => {
   it("shows the class over capacity with the reason on the roster and in the CSV", () => {
     const rosters = buildClassRosters(sessions, [offering], [
       { id: "p1", offeringId: "o1", attendeeId: "a1", consumesSeat: true },
-      { id: "p2", offeringId: "o1", attendeeId: "a2", consumesSeat: true, adminPlacementReason: "Synthetic: family request" },
+      { id: "p2", offeringId: "o1", attendeeId: "a2", consumesSeat: true, adminPlacementReason: "Synthetic: family request", adminOverCapacity: true },
     ], [attendee("a1", "Able"), attendee("a2", "Baker")]);
-    expect(rosters[0]).toMatchObject({ youthSeats: 2, adminPlacements: 1, overCapacity: true });
+    expect(rosters[0]).toMatchObject({ youthSeats: 2, adminPlacements: 1, overCapacityPlacements: 1, overCapacity: true });
     expect(rosters[0].picks).toEqual([
-      { enrollmentId: "p1", attendeeId: "a1", adminPlaced: false, adminPlacementReason: null },
-      { enrollmentId: "p2", attendeeId: "a2", adminPlaced: true, adminPlacementReason: "Synthetic: family request" },
+      { enrollmentId: "p1", attendeeId: "a1", adminPlaced: false, adminOverCapacity: false, adminPlacementReason: null },
+      { enrollmentId: "p2", attendeeId: "a2", adminPlaced: true, adminOverCapacity: true, adminPlacementReason: "Synthetic: family request" },
     ]);
     const lines = classRostersCsv(rosters, false, true).split("\r\n");
     expect(lines[0]).toContain('"Admin placement reason"');
