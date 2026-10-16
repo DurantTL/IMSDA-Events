@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import {
+  activeFilterKeys,
   hasActiveFilters,
   serializeOperationsSearchQuery,
   type OperationsSearchQuery,
@@ -94,7 +95,9 @@ export function OperationsSearchBar({
 
   return (
     <section aria-label="Search registrations" className="operations-search" data-testid="operations-search">
-      <form action={basePath} className="operations-search-form" method="get">
+      <details className="operations-search-disclosure" data-testid="operations-search-disclosure" open={activeFilterKeys(query).some((key) => key !== "location") || summary !== null}>
+      <summary>Advanced search</summary>
+      <form action={basePath} className="form-stack operations-search-form" method="get">
         <input name="event" type="hidden" value={eventId} />
         {Object.entries(carry).map(([key, value]) => (value ? <input key={key} name={key} type="hidden" value={value} /> : null))}
         {kept.get("sort") ? <input name="sort" type="hidden" value={kept.get("sort") as string} /> : null}
@@ -110,7 +113,7 @@ export function OperationsSearchBar({
           }
           if (filter.kind === "enum" && filter.key === "status") {
             return (
-              <fieldset className="field" key="status">
+              <fieldset className="field operations-search-status" key="status">
                 <legend>{filterLabels.status}</legend>
                 {filter.options.map((option) => (
                   <label className="checkbox-label" key={option.value}>
@@ -181,6 +184,7 @@ export function OperationsSearchBar({
           {active ? <Link className="secondary-button" href={`${basePath}?${clearParams.toString()}`}><X aria-hidden="true" size={14} /> Clear</Link> : null}
         </div>
       </form>
+      </details>
       {summary && summary.issues.length > 0 ? (
         <ul className="form-error" data-testid="operations-search-issues" role="alert">
           {summary.issues.map((issue) => <li key={`${issue.filter}:${issue.code}`}>{filterLabels[issue.filter] ?? humanize(issue.filter)}: {issue.message}</li>)}

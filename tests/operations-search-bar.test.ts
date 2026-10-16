@@ -60,4 +60,26 @@ describe("OperationsSearchBar", () => {
     expect(html).toContain("no longer offered");
     expect(html).not.toContain("registrations match");
   });
+
+  it("wraps the form in a disclosure that opens only when a filter or result is showing", () => {
+    const closed = renderToStaticMarkup(createElement(OperationsSearchBar, {
+      basePath: "/people", carry: {}, eventId: "event-a", query: parseOperationsSearchParams(new URLSearchParams("")).query,
+      filters: availableOperationsFilters({ eventId: "event-a", permissions: ["VIEW_EVENT"] }, catalog), summary: null,
+    }));
+    expect(closed).toContain("<details");
+    expect(closed).toContain("Advanced search");
+    expect(closed).not.toMatch(/<details[^>]*\sopen/);
+    expect(render(["VIEW_EVENT"], "status=CONFIRMED")).toMatch(/<details[^>]*\sopen/);
+    expect(render(["VIEW_EVENT"], "", true)).toMatch(/<details[^>]*\sopen/);
+  });
+
+  it("keeps the disclosure closed when only the location is set, and opens it for a zero-result summary", () => {
+    const { query } = parseOperationsSearchParams(new URLSearchParams("location=site-1"));
+    const filters = availableOperationsFilters({ eventId: "event-a", permissions: ["VIEW_EVENT"] }, catalog);
+    const base = { basePath: "/people", carry: {}, eventId: "event-a", filters, query };
+    const locationOnly = renderToStaticMarkup(createElement(OperationsSearchBar, { ...base, summary: null }));
+    expect(locationOnly).not.toMatch(/<details[^>]*\sopen/);
+    const empty = renderToStaticMarkup(createElement(OperationsSearchBar, { ...base, summary: { total: 0, page: 1, pageCount: 1, issues: [] } }));
+    expect(empty).toMatch(/<details[^>]*\sopen/);
+  });
 });
