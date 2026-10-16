@@ -66,7 +66,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
 
 loadEnvConfig(process.cwd());
@@ -100,6 +100,12 @@ const applicationLinkToken = `${P}-application-link-token-0123456789-abcdefghijk
 const multiHonorSessionId = `${P}_honor_session`;
 const multiHonorIds = [1, 2, 3, 4].map((index) => `${P}_honor_${index}`);
 const multiHonorOfferingId = `${P}_honor_offering`;
+// A PBE-shaped event (the pathfinder_bible_experience starter's rules and the pbe_registration form), published, with the
+// general registration link on and church billing: the public page, the general-link team flow, the club portal and the staff pages.
+const pbeEventId = `${P}_pbe_event`;
+const pbeEventSlug = `${P}-pbe-bible-experience`;
+const pbeTeamName = "Mobilecheck Bible Bees";
+const pbeDraftKey = "0123456789abcdef0123456789abcdef";
 const churchA = `${P}_church_a`;
 const churchB = `${P}_church_b`;
 const reportMonth = "2026-09";
@@ -127,6 +133,8 @@ type PageSpec = {
   role: Role;
   /** Why the page is skipped at every width (kept in the report so nobody wonders). */
   note?: string;
+  /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
+  prepare?: (page: Page, width: number) => Promise<void>;
 };
 
 const staff = (name: string, route: string, role: Role = "event-admin"): PageSpec => ({
@@ -271,6 +279,28 @@ const pages: PageSpec[] = [
   staff("event-content-blocks", `/more/event-content?event=${blocksEventId}`, "system-admin"),
 ];
 
+/** Every page a PBE user touches (the pages that need a row's id are built once the event is seeded). */
+function pbePages(team: { registrationId: string; teamKey: string }): PageSpec[] {
+  const portal = `/account/clubs/${clubA}/events/${pbeEventId}`;
+  const pbeStaff = (name: string, route: string) => staff(`pbe-${name}`, `${route}${route.includes("?") ? "&" : "?"}event=${pbeEventId}`);
+  return [
+    { name: "pbe-public-event-page", path: `/events/${pbeEventSlug}`, role: "visitor" },
+    { name: "pbe-general-link-start", path: `/register/${pbeEventSlug}/general`, role: "visitor" },
+    { name: "pbe-club-portal-teams", path: portal, role: "director" },
+    { name: "pbe-club-portal-new-team", path: `${portal}?draft=${pbeDraftKey}`, role: "director" },
+    { name: "pbe-club-portal-registered-team", path: `${portal}?team=${encodeURIComponent(team.teamKey)}`, role: "director" },
+    { name: "pbe-club-portal-team-form", path: `${portal}/team-form?team=${encodeURIComponent(team.teamKey)}`, role: "director" },
+    { name: "pbe-club-portal-team-form-blank", path: `${portal}/team-form/blank`, role: "director" },
+    pbeStaff("registrations", "/people"),
+    pbeStaff("pending-teams", "/people/pending-teams"),
+    pbeStaff("team-results", "/more/team-results"),
+    pbeStaff("team-form-report", "/more/reports/clubs/team-form"),
+    pbeStaff("team-form-registration", `/more/reports/clubs/team-form/${team.registrationId}`),
+    pbeStaff("team-form-level", "/more/reports/clubs/team-form/level"),
+    pbeStaff("event-settings", "/more/event-settings"),
+  ];
+}
+
 /**
  * Buttons that open a dialog or sheet without `aria-haspopup`. Each is tried on every
  * page (the first visible match); opening is harmless, and Escape closes it unsubmitted.
@@ -413,6 +443,97 @@ async function seedBlocksEvent(prisma: PrismaClient) {
 }
 
 /**
+ * A Pathfinder Bible Experience shaped event: the starter's team rules, the Iowa and Missouri sites and the pbe_registration
+ * form, published, with the general registration link on and church billing. Two teams are registered through the real link
+ * code: one matched to club A by its director's email (so it is an ordinary club registration, shown in the club portal and on
+ * the staff Registrations, team results and team form pages) and one that waits for staff (the pending teams page). Idempotent.
+ * Returns the ids the team pages need.
+ */
+async function seedPbeEvent(prisma: PrismaClient) {
+  const { starterEventTemplates } = await import("../modules/event-templates/starters");
+  const { createRegistrationFormFromTemplateInTransaction } = await import("../modules/forms/repository");
+  const { calendarDateIn, addDays } = await import("../modules/calendar/domain");
+  const starter = starterEventTemplates.find((entry) => entry.starterKey === "pathfinder_bible_experience");
+  if (!starter?.teamSettings || !starter.locations) throw new Error("The Pathfinder Bible Experience starter is missing or has no team rules.");
+  const today = calendarDateIn(new Date());
+  if (!(await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } }))) {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+    await prisma.$transaction(async (tx) => {
+      await tx.event.create({
+        data: {
+          id: pbeEventId, slug: pbeEventSlug, name: "Mobilecheck IA & MO Bible Experience",
+          startsAt: new Date(`${addDays(today, 90)}T15:00:00Z`), endsAt: new Date(`${addDays(today, 90)}T23:00:00Z`), timezone: "America/Chicago",
+          isPublished: true, registrationOpensOn: addDays(today, -5), registrationClosesOn: addDays(today, 60),
+          billingMode: starter.billingMode, audience: "CLUB", checksAdultBackgrounds: starter.checksAdultBackgrounds, generalRegistrationLinkEnabled: true,
+        },
+      });
+      await tx.eventTeamSettings.create({
+        data: { eventId: pbeEventId, ...starter.teamSettings!, levelInfo: (starter.teamSettings!.levelInfo ?? []) as unknown as Prisma.InputJsonValue },
+      });
+      await tx.eventMembership.create({ data: { eventId: pbeEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+      await tx.eventLocation.createMany({
+        data: starter.locations!.map((location, position) => ({
+          eventId: pbeEventId, name: location.name, normalizedName: location.name.toLowerCase(), address: location.address, capacity: location.capacity, sortOrder: position,
+        })),
+      });
+      await createRegistrationFormFromTemplateInTransaction(tx, pbeEventId, "usr_system_admin", starter.formTemplateKey);
+    });
+    const created = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: pbeEventId } });
+    await prisma.registrationFormVersion.updateMany({ where: { formId: created.id }, data: { status: "PUBLISHED", publishedAt: new Date() } });
+    await prisma.registrationForm.update({ where: { id: created.id }, data: { status: "PUBLISHED" } });
+  }
+  const form = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: pbeEventId }, include: { versions: true } });
+  const versionId = form.versions[0]!.id;
+  const locations = await prisma.eventLocation.findMany({ where: { eventId: pbeEventId }, orderBy: { sortOrder: "asc" } });
+  const { submitGeneralLinkRegistration } = await import("../modules/general-link-registrations/repository");
+  const person = (first: string, last: string, age: number, role = "Pathfinder", alternate = false) => ({
+    clientId: `c${`${first}${last}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12)}`,
+    responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
+  });
+  const submit = async (teamName: string, clubName: string, email: string, key: string, location: string) => {
+    if (await prisma.generalLinkSubmission.findFirst({ where: { eventId: pbeEventId, teamName } })) return;
+    await submitGeneralLinkRegistration(pbeEventSlug, {
+      versionId, idempotencyKey: key,
+      responses: {
+        club_name: clubName, director_name: "Dana Mobilecheck-Directorsson", email, phone: "515-555-0100",
+        coordinator_name: "Casey Mobilecheck-Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
+        coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true, photo_video_release: "Yes",
+      },
+      attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, "Pathfinder", true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Coach", 40, "Coach")],
+      website: "",
+    }, { locationId: location, teamName });
+  };
+  // Matched: the account email is club A's director on file. Waiting: an email that matches nobody, naming club B.
+  await submit(pbeTeamName, `Mobilecheck ${longName}`, `${P}.director@example.test`, `${P}-pbe-matched-key-0001`, locations[0]!.id);
+  await submit("Mobilecheck Sword Drillers of the Riverside Valley", "Mobilecheck Eagles Club", `${P}.unmatched.director-with-a-long-address@example.test`, `${P}-pbe-pending-key-0002`, locations[1]!.id);
+  return prisma.clubEventRegistration.findFirstOrThrow({ where: { eventId: pbeEventId, organizationId: clubA }, select: { registrationId: true, teamKey: true } });
+}
+
+/** Removes everything seedPbeEvent made, children before parents, including what the link code wrote (registrations, people, mail, audit). */
+async function cleanupPbeEvent(prisma: PrismaClient) {
+  const exists = await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } });
+  if (!exists) return;
+  const registrations = await prisma.registration.findMany({ where: { eventId: pbeEventId }, select: { id: true, accountHolderPersonId: true, attendees: { select: { personId: true } } } });
+  const registrationIds = registrations.map((row) => row.id);
+  const personIds = [...new Set(registrations.flatMap((row) => [row.accountHolderPersonId, ...row.attendees.map((attendee) => attendee.personId)]).filter((id): id is string => Boolean(id)))];
+  await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
+    prisma.messageOutbox.deleteMany({ where: { OR: [{ eventId: pbeEventId }, { registrationId: { in: registrationIds } }] } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" DISABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.registrationOperation.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" ENABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.auditLog.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.clubRegistrationDraft.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.generalLinkSubmission.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.clubEventRegistration.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.registrationAttendee.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.registration.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.event.deleteMany({ where: { id: pbeEventId } }),
+    prisma.person.deleteMany({ where: { id: { in: personIds } } }),
+  ]);
+}
+
+/**
  * The Emails editor with attachments (#824): on the blocks event, a published announcement template with two
  * attachments (one with a long unbroken name), an uploaded picture and a button in its body, and a draft
  * announcement with an attachment, all saved through the real repository functions.
@@ -505,6 +626,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
   const mine = { startsWith: `${P}_` };
+  await cleanupPbeEvent(prisma);
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.assetDepositCover.deleteMany({ where: { issuanceId: mine } }),
@@ -2421,6 +2543,7 @@ async function main() {
     await assertSeededDatabase(prisma);
     seeded = true;
     await seedSynthetic(prisma);
+    pages.push(...pbePages(await seedPbeEvent(prisma)));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
     browser = await chromium.launch({
