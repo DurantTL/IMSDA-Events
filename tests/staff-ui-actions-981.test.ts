@@ -135,10 +135,15 @@ describe("empty states and the check-in desk (#981 batch 3)", () => {
     for (const key of ["meals", "housing", "seminars", "childcare", "attendance"]) expect(source).toContain(`report.${key}.length > 0 &&`);
   });
 
-  it("shows the balance as a compact badge on a roster row and in full elsewhere", () => {
+  it("shows the balance as a badge on a roster row with the full wording visible, and in full elsewhere", () => {
     const compact = renderToStaticMarkup(createElement(CheckInPaymentDue, { balanceCents: 52_500, confirmationCode: "TEST-1002", partySize: 3, compact: true }));
     expect(compact).toContain("checkin-due-badge");
     expect(compact).toContain("$525.00");
+    expect(compact).toContain("for all 3 people on");
+    expect(compact).toContain("Card in Square app:");
+    expect(compact).toContain("card fee");
+    expect(compact).toContain("Square note:");
+    expect(compact).not.toContain("title=");
     expect(compact).not.toContain("Cash or check");
     const full = renderToStaticMarkup(createElement(CheckInPaymentDue, { balanceCents: 52_500, confirmationCode: "TEST-1002", partySize: 3 }));
     expect(full).toContain("Cash or check");

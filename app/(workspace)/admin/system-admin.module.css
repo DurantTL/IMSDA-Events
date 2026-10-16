@@ -869,3 +869,10 @@ details.taskGroup[open] .taskGrid {
     gap: 0;
   }
 }
+
+/* Phones (#981): each event card drops its stat row to keep the dashboard short. "Open event" has the same numbers. */
+@media (max-width: 700px) {
+  .eventStats {
+    display: none;
+  }
+}
