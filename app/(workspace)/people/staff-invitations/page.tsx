@@ -47,7 +47,6 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
         </div>
         <div className="page-intro-actions">
           <Link className="primary-button" href={`/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`}>Waiting for approval</Link>
-          <Link className="secondary-button" href={`/people?event=${encodeURIComponent(event.id)}`}>Back to Registrations</Link>
         </div>
       </div>
       <StaffInvitationImport eventId={event.id} />

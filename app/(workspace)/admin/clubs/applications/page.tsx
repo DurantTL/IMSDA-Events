@@ -1,8 +1,7 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { NewClubApplicationsQueue } from "@/components/new-club-applications-queue";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listNewClubApplications, listNewClubInvites, listPublicSponsorOptions } from "@/modules/club-applications/repository";
@@ -27,21 +26,13 @@ export default async function NewClubApplicationsAdminPage() {
   ]);
   return (
     <>
-      <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-        <Link className="secondary-button" href="/clubs/register">View the public form</Link>
-        <Link className="secondary-button" href="/admin/settings">Notification address</Link>
-      </div>
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Clubs</p>
-          <h2>New club applications</h2>
-          <p>
-            Directors apply from the public &ldquo;Register a new club&rdquo; page or a private link you send. Approving creates the club under its
-            sponsoring church or company and emails the director the club invite. The Sterling Volunteers status is a flag to review, not a block.
-          </p>
-        </div>
-      </div>
+      <StaffPageHeader
+        description="Directors apply from the public “Register a new club” page or a private link you send. Approving creates the club under its sponsoring church or company and emails the director the club invite. The Sterling Volunteers status is a flag to review, not a block."
+        tools={[
+          { href: "/clubs/register", label: "View the public form" },
+          { href: "/admin/settings", label: "Notification address" },
+        ]}
+      />
       <NewClubApplicationsQueue
         applications={applications}
         canDecide

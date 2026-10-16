@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
 import { EventHealthSheet } from "@/components/event-health-sheet";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
@@ -46,7 +45,6 @@ export default async function EventHealthPage({
   const base = `/more/event-health?event=${encodeURIComponent(event.id)}`;
   return (
     <section className="page-stack">
-      <BackLink href={`/more?event=${encodeURIComponent(event.id)}`} variant="staff">Back to More</BackLink>
       <div className="page-intro">
         <div>
           <p className="eyebrow">Confidential · read only</p>

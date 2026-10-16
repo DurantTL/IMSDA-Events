@@ -189,7 +189,7 @@ export default async function SystemAdminPage({
       <nav className={styles.tasks} aria-label="System management tasks">
         {systemNavGroups.map((group) => {
           const cards = group.items.map(({ href, label, description, icon: Icon }) => (
-            <Link className={styles.taskCard} href={href} key={href}>
+            <Link className={styles.taskCard} href={href} key={href} title={description}>
               <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
               <span><strong>{label}</strong><small>{description}</small></span>
             </Link>
@@ -320,7 +320,6 @@ export default async function SystemAdminPage({
               </div>
             </details>
           )}
-          <Link className="text-link" href="/archived-events">Archived events</Link>
         </section>
 
         <aside className={styles.sideColumn}>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EventFeaturesTable } from "@/components/event-features-table";
@@ -80,19 +81,16 @@ export default async function EventFeaturesPage({ searchParams }: { searchParams
 
   return (
     <section className="page-stack event-features-page">
-      <div className="page-intro">
-        <div>
-          <h2 className="duplicate-page-title">{staffPageTitles.eventFeatures}</h2>
-          <p>Turn features on or off for {event.name}</p>
-          <p className="quiet-copy">
-            A switch changes only whether the feature is used. Turning one off never deletes its data.
-            {!isSystemAdmin && " A system administrator turns modules and the public calendar on or off."}
-            {!canConfigure && " You can see each feature's state but not change it."}
-          </p>
-          {/* A button-styled link, which the phone audit measures at 44px (a bare link in a paragraph is 19px tall). */}
-          <p><Link className="secondary-button" href={`/more${eventQuery}`}>Event modules, requests and recent activity</Link></p>
-        </div>
-      </div>
+      {/* The one cross-link to /more. A button-styled link, which the phone audit measures at 44px (a bare link in a paragraph is 19px tall). */}
+      <StaffPageHeader
+        description={`Turn features on or off for ${event.name}.`}
+        primary={<Link className="secondary-button" href={`/more${eventQuery}`}>Module requests and recent activity</Link>}
+      />
+      <p className="quiet-copy">
+        A switch changes only whether the feature is used. Turning one off never deletes its data.
+        {!isSystemAdmin && " A system administrator turns modules and the public calendar on or off."}
+        {!canConfigure && " You can see each feature's state but not change it."}
+      </p>
       <section className="panel" aria-label="Event features">
         <EventFeaturesTable eventId={event.id} rows={rows} />
       </section>

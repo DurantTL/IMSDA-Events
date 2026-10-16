@@ -1,8 +1,8 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ClubReportsConference } from "@/components/club-reports-conference";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { calendarDateIn } from "@/modules/calendar/domain";
@@ -24,12 +24,15 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
   const label = (value: number) => `${value}-${String((value + 1) % 100).padStart(2, "0")}`;
   return (
     <>
-      <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-        <Link className="secondary-button" href="/admin/clubs/reports/year-end">Year-End Reports</Link>
-        <Link className="secondary-button" href={`/admin/clubs/reports?year=${label(start - 1)}`}>← {label(start - 1)}</Link>
-        {clubYear !== current && <Link className="secondary-button" href={`/admin/clubs/reports?year=${label(start + 1)}`}>{label(start + 1)} →</Link>}
-      </div>
+      <StaffPageHeader
+        extra={(
+          <>
+            <Link className="secondary-button" href={`/admin/clubs/reports?year=${label(start - 1)}`}>← {label(start - 1)}</Link>
+            {clubYear !== current && <Link className="secondary-button" href={`/admin/clubs/reports?year=${label(start + 1)}`}>{label(start + 1)} →</Link>}
+          </>
+        )}
+        primary={<Link className="secondary-button" href="/admin/clubs/reports/year-end">Year-End Reports</Link>}
+      />
       <ClubReportsConference clubYear={clubYear} initialClubs={await listClubReportsForYear(clubYear)} key={clubYear} now={calendarDateIn(now)} />
     </>
   );

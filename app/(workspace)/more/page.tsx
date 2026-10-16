@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { EventActivityPanel } from "@/components/event-activity-panel";
@@ -81,13 +82,10 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
 
   return (
     <section className="page-stack event-modules-page">
-      <div className="page-intro">
-        <div>
-          <h2 className="duplicate-page-title">{staffPageTitles.eventModules}</h2>
-          <p>Turn features on or off for {event.name}</p>
-          {!view.canToggle && <p className="quiet-copy">A system administrator turns features on or off. These are the ones this event uses.</p>}
-        </div>
-      </div>
+      <StaffPageHeader
+        description={`Module requests and the recent activity trail for ${event.name}. Turn features on or off on the Event features page.`}
+      />
+      {!view.canToggle && <p className="quiet-copy">A system administrator turns features on or off. These are the ones this event uses.</p>}
 
       {health && (
         <section className="event-modules-health" data-state={health.state} aria-label="Event health">

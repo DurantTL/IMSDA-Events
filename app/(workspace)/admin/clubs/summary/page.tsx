@@ -1,8 +1,7 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsTable, AreaPointsChart } from "@/components/area-clubs-views";
 import { ClubNewYearStatus } from "@/components/club-new-year-status";
 import { listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
@@ -35,22 +34,16 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   };
   return (
     <section className="page-stack">
-      <div className="intro-actions club-admin-links">
-        <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-        <Link className="secondary-button" href="/admin/clubs/reports">Monthly Records</Link>
-      </div>
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Clubs · {clubYear}</p>
-          <h2>Club summary</h2>
-          <p>Every active club&apos;s reports and points, as Area Coordinators see them. Sterling Volunteers shows counts only.</p>
-        </div>
-        <AreaExportLinks
-          basePath="/api/admin/club-reports/area-export"
-          clubYear={clubYear}
-          reports={[{ key: "summary", label: "Summary CSV" }, { key: "points", label: "Points CSV" }]}
-        />
-      </div>
+      <StaffPageHeader
+        description={`Club year ${clubYear}: every active club's reports and points, as Area Coordinators see them. Sterling Volunteers shows counts only.`}
+        primary={(
+          <AreaExportLinks
+            basePath="/api/admin/club-reports/area-export"
+            clubYear={clubYear}
+            reports={[{ key: "summary", label: "Summary CSV" }, { key: "points", label: "Points CSV" }]}
+          />
+        )}
+      />
       <h3>Overview</h3>
       <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
       <ClubNewYearStatus clubHref={links.clubHref} status={newYearStatus} />

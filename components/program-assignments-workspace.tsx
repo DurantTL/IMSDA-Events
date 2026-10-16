@@ -212,9 +212,6 @@ export function ProgramAssignmentsWorkspace({
             <h2>Seminar assignments</h2>
             <p>Turn attendee rankings into room rosters for {eventName}.</p>
           </div>
-          <Link className="secondary-button" href={`/more?event=${encodeURIComponent(eventId)}`}>
-            Back to More
-          </Link>
         </div>
         <section className="panel assignment-empty">
           <span><UsersRound aria-hidden="true" size={24} /></span>
@@ -247,9 +244,6 @@ export function ProgramAssignmentsWorkspace({
           <h2>Seminar assignments</h2>
           <p>Preview the best fit from attendee rankings, check the result, and apply a frozen roster only when you are ready.</p>
         </div>
-        <Link className="secondary-button" href={`/more?event=${encodeURIComponent(eventId)}`}>
-          Back to More
-        </Link>
       </div>
 
       <div className="assignment-safety-note">

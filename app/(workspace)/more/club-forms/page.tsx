@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
 import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
 import { listClubFormTemplateNames } from "@/modules/club-forms/templates";
@@ -44,7 +43,6 @@ export default async function StaffClubFormsPage({
 
   return (
     <section className="page-stack">
-      <BackLink href={`/more${eventQuery}`} variant="staff">Back to More</BackLink>
       <div className="page-intro">
         <div>
           <p className="eyebrow">Conference staff</p>

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
 import { ClubAssignmentsWorkspace } from "@/components/club-assignments-workspace";
 import {
   canManageClubAssignments,
@@ -22,11 +21,9 @@ export default async function ClubAssignmentsPage({
 }) {
   const requested = (await searchParams).event;
   const { event, permissions } = await resolveEventContext(requested);
-  const back = <BackLink href={`/more?event=${event.id}`} variant="staff">Back to More</BackLink>;
   if (!canManageClubAssignments(permissions)) {
     return (
       <>
-        {back}
         <AccessRestricted
           title="Club assignments are restricted"
           detail="Ask an event administrator for registration-management access before assigning campsites, duties, or activities."
@@ -39,7 +36,6 @@ export default async function ClubAssignmentsPage({
   if (!clubEvent) {
     return (
       <>
-        {back}
         <AccessRestricted
           title="Club assignments are for club events"
           detail="This event doesn't take club registrations. Choose a club event to assign campsites, duties, and activities."
@@ -50,7 +46,6 @@ export default async function ClubAssignmentsPage({
   const assignments = await listClubAssignments(event.id);
   return (
     <>
-      {back}
       <ClubAssignmentsWorkspace
         eventId={event.id}
         eventName={event.name}

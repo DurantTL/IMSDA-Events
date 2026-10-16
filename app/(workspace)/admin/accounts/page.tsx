@@ -1,6 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActAsButton } from "@/components/act-as-button";
 import { AttendeeAccountsWorkspace } from "@/components/attendee-accounts-workspace";
@@ -28,16 +28,18 @@ export default async function AttendeeAccountsPage({
   const linkedEmailChangesTogether = await isUnifiedSignInEnabled();
   return (
     <>
-      <div className="intro-actions club-admin-links">
-        <Link className="secondary-button more-back-link" href="/admin">Back to system administration</Link>
-        <ActAsButton
-          access="View only"
-          endpoint="/api/admin/act-as/area-coordinator"
-          label="Act as Area Coordinator (2 hours)"
-          resultAction="Open the coordinator view"
-          role="Area Coordinator"
-        />
-      </div>
+      <StaffPageHeader
+        description="Attendee and club accounts (people who sign in at /account). Reset two-step sign-in when someone loses their phone: their authenticator and passkeys are removed and they are signed out. Every action here is recorded."
+        primary={(
+          <ActAsButton
+            access="View only"
+            endpoint="/api/admin/act-as/area-coordinator"
+            label="Act as Area Coordinator (2 hours)"
+            resultAction="Open the coordinator view"
+            role="Area Coordinator"
+          />
+        )}
+      />
       <AttendeeAccountsWorkspace
         initialAccounts={initial.accounts}
         initialCapped={initial.capped}

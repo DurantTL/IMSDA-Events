@@ -1,8 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { OrganizationDirectoryWorkspace } from "@/components/organization-directory-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
@@ -10,6 +8,21 @@ import { getOrganizationSummary, listSponsorOptions, listOrganizationsPage } fro
 import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
 
 export const metadata: Metadata = { title: "Clubs and churches" };
+
+/**
+ * The page's Tools menu (#981). Monthly Records, Club summary, Member transfers, New club
+ * applications and Sterling Volunteers are System management sidebar items, so they are not
+ * repeated here; these are the sub-pages the sidebar does not list.
+ */
+function organizationTools(healthImport: boolean): { href: string; label: string }[] {
+  return [
+    { href: "/admin/clubs/import", label: "Import clubs" },
+    ...(healthImport ? [{ href: "/admin/clubs/health-import", label: "Import health records" }] : []),
+    { href: "/admin/organizations/directory", label: "Organization directory" },
+    { href: "/admin/organizations/import", label: "Import from eAdventist" },
+    { href: "/admin/clubs/invites", label: "Club invites" },
+  ];
+}
 
 const statuses = ["ACTIVE", "INACTIVE"] as const;
 
@@ -30,20 +43,8 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
 
   return (
     <>
-      <div className="intro-actions club-admin-links">
-        <BackLink href="/admin" variant="staff">Back to system administration</BackLink>
-        <Link className="secondary-button" href="/admin/clubs/import">Import clubs</Link>
-        {healthRecordsEnabled() && <Link className="secondary-button" href="/admin/clubs/health-import">Import health records</Link>}
-        <Link className="secondary-button" href="/admin/organizations/directory">Organization directory</Link>
-        <Link className="secondary-button" href="/admin/organizations/import">Import from eAdventist</Link>
-        <Link className="secondary-button" href="/admin/clubs/invites">Club invites</Link>
-        <Link className="secondary-button" href="/admin/clubs/applications">New club applications</Link>
-        <Link className="secondary-button" href="/admin/clubs/reports">Monthly Records</Link>
-        <Link className="secondary-button" href="/admin/clubs/summary">Club summary</Link>
-        <Link className="secondary-button" href="/admin/clubs/transfers">Member transfers</Link>
-        <Link className="secondary-button" href="/admin/organizations/background-checks">Sterling Volunteers</Link>
-      </div>
       <OrganizationDirectoryWorkspace
+        tools={organizationTools(healthRecordsEnabled())}
         sponsorOptions={sponsorOptions}
         filters={{ q: query, kind: kind ?? "", status }}
         organizations={list.organizations}

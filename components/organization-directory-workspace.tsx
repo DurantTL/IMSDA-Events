@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader, type StaffPageTool } from "@/components/staff-page-header";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -61,6 +62,7 @@ const statusOptions = [
  */
 export function OrganizationDirectoryWorkspace({
   sponsorOptions,
+  tools,
   filters,
   organizations,
   page,
@@ -69,6 +71,8 @@ export function OrganizationDirectoryWorkspace({
   total,
 }: {
   sponsorOptions: SponsorOption[];
+  /** Sub-pages the system sidebar does not list (imports, the directory, invites). */
+  tools?: readonly StaffPageTool[];
   filters: OrganizationListState;
   organizations: OrganizationRecord[];
   page: number;
@@ -256,20 +260,15 @@ export function OrganizationDirectoryWorkspace({
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Shared IMSDA foundation</p>
-          <h2>Clubs and churches</h2>
-          <p>
-            Maintain one organization directory for events, club rosters,
-            treasury billing, and provider reconciliation. External identifiers
-            are stored separately from names so later syncs do not guess.
-          </p>
-        </div>
-        <button className="primary-button" type="button" onClick={beginCreate}>
-          <Plus aria-hidden="true" size={17} /> Add church or club
-        </button>
-      </div>
+      <StaffPageHeader
+        description="One organization directory for events, club rosters, treasury billing, and provider reconciliation. External identifiers are stored separately from names so later syncs do not guess."
+        primary={(
+          <button className="primary-button" type="button" onClick={beginCreate}>
+            <Plus aria-hidden="true" size={17} /> Add church or club
+          </button>
+        )}
+        tools={tools}
+      />
 
       <section className="finance-summary" aria-label="Organization summary">
         <article className="finance-stat">

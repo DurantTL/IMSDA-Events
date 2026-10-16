@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { BackLink } from "@/components/back-link";
 import { BackgroundCheckImportPanel } from "@/components/background-check-import-panel";
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
 import { cardCell } from "@/components/table-card-labels";
@@ -31,11 +30,8 @@ export default async function BackgroundChecksPage() {
   ];
   return (
     <section className="page-stack">
-      <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
       <div className="page-intro">
         <div>
-          <p className="eyebrow">Clubs and churches</p>
-          <h2>Sterling Volunteers</h2>
           <p>
             Upload the roster export (matched by name and club or church; no email or birth date needed) or the
             older Sterling Volunteers list. The newest upload replaces whatever was on file for a person. At events

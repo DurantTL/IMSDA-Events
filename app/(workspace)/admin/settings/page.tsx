@@ -1,6 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PlatformSettingsWorkspace } from "@/components/platform-settings-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -15,9 +14,6 @@ export default async function PlatformSettingsPage() {
 
   return (
     <>
-      <Link className="secondary-button more-back-link" href="/admin">
-        Back to system administration
-      </Link>
       <PlatformSettingsWorkspace initialSettings={await getPlatformSettings()} />
     </>
   );

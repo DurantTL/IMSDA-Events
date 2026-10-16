@@ -145,3 +145,56 @@ export function systemNavActiveEntryKey(pathname: string): string | null {
 export function createEventHrefFor(isSystemAdmin: boolean): string | undefined {
   return isSystemAdmin ? "/event-setup" : undefined;
 }
+
+type SystemTitleRule = readonly [path: RegExp, title: string];
+
+/**
+ * The topbar title of each /admin page (#981), so the header names the page
+ * ("Team") and not "System management" on every one. Each title is the page's
+ * own `<title>`; `tests/system-admin-navigation-966.test.ts` checks that. The
+ * more specific path comes first. /admin itself is not here: it is System
+ * management.
+ */
+const systemTitleRules: readonly SystemTitleRule[] = [
+  [/^\/admin\/organizations\/background-checks(\/|$)/, "Sterling Volunteers"],
+  [/^\/admin\/background-checks(\/|$)/, "Sterling Volunteers"],
+  [/^\/admin\/organizations\/directory(\/|$)/, "Organization directory"],
+  [/^\/admin\/organizations\/import(\/|$)/, "Import organizations"],
+  [/^\/admin\/organizations\/map-locations(\/|$)/, "Find map locations"],
+  [/^\/admin\/organizations\/[^/]+\/billing(\/|$)/, "Billing contact"],
+  [/^\/admin\/organizations\/[^/]+\/club\/honors(\/|$)/, "Club honors"],
+  [/^\/admin\/organizations\/[^/]+\/club(\/|$)/, "Open club"],
+  [/^\/admin\/organizations\/[^/]+\/directors(\/|$)/, "Club directors"],
+  [/^\/admin\/organizations\/[^/]+\/location(\/|$)/, "Church location"],
+  [/^\/admin\/organizations\/[^/]+\/profile(\/|$)/, "Club profile"],
+  [/^\/admin\/organizations(\/|$)/, "Clubs and churches"],
+  [/^\/admin\/clubs\/applications(\/|$)/, "New club applications"],
+  [/^\/admin\/clubs\/health-import(\/|$)/, "Import health records"],
+  [/^\/admin\/clubs\/import(\/|$)/, "Import clubs"],
+  [/^\/admin\/clubs\/invites(\/|$)/, "Club invites"],
+  [/^\/admin\/clubs\/reports\/year-end(\/|$)/, "Club Year-End Reports"],
+  [/^\/admin\/clubs\/reports\/[^/]+\/[^/]+(\/|$)/, "Club Monthly Record"],
+  [/^\/admin\/clubs\/reports(\/|$)/, "Club Monthly Records"],
+  [/^\/admin\/clubs\/summary(\/|$)/, "Club summary"],
+  [/^\/admin\/clubs\/transfers(\/|$)/, "Club member transfers"],
+  [/^\/admin\/club-forms\/[^/]+(\/|$)/, "Club form builder"],
+  [/^\/admin\/club-forms(\/|$)/, "Club forms"],
+  [/^\/admin\/club-supplies(\/|$)/, "Club supply catalog"],
+  [/^\/admin\/honors(\/|$)/, "Honor catalog"],
+  [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],
+  [/^\/admin\/accounts(\/|$)/, "Accounts"],
+  [/^\/admin\/calendar(\/|$)/, "Conference calendar"],
+  [/^\/admin\/event-templates\/[^/]+(\/|$)/, "Edit event template"],
+  [/^\/admin\/event-templates(\/|$)/, "Event templates"],
+  [/^\/admin\/readiness(\/|$)/, "System readiness"],
+  [/^\/admin\/settings(\/|$)/, "Platform settings"],
+  [/^\/admin\/team(\/|$)/, "Team"],
+];
+
+/** The topbar title of a /admin page, or `null` for /admin itself and any page without a rule (System management). */
+export function systemSubpageTitle(pathname: string): string | null {
+  for (const [path, title] of systemTitleRules) {
+    if (path.test(pathname)) return title;
+  }
+  return null;
+}

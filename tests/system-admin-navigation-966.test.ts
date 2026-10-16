@@ -185,6 +185,17 @@ describe("/admin dashboard page", () => {
     expect(eventFeaturesItem.href.startsWith("/more")).toBe(true);
   });
 
+  it("lists Archived events once (the Events card), and wraps the per-event links in an even grid (#981)", () => {
+    expect(source).not.toContain('href="/archived-events"');
+    expect(systemNavGroups.flatMap((group) => group.items).filter((item) => item.href === "/archived-events")).toHaveLength(1);
+    expect(source).toContain("title={description}");
+    const stylesheet = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
+    expect(stylesheet).toMatch(/\.eventLinks \{\s*display: grid;\s*grid-template-columns: repeat\(auto-fit, minmax\(6\.5rem, 1fr\)\);/);
+    // On a phone the task cards drop their description and sit two to a row, so the page is much shorter.
+    expect(stylesheet).toMatch(/@media \(max-width: 700px\) \{\s*\.tasks \{[^}]*\}\s*\.taskGrid \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    expect(stylesheet).toMatch(/\.taskCard small \{\s*display: none;/);
+  });
+
   it("keeps the event operations, health and version panels", () => {
     for (const text of ["Event operations", "System health", "System version", "Feature requests"]) expect(source).toContain(text);
   });

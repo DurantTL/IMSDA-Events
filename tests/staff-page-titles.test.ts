@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   mobileNavigationLabels,
@@ -75,6 +75,41 @@ describe("staff page names (#685)", () => {
     // The Event features page (#965) is its own page under /more.
     expect(staffSubpageTitle("/more/features")).toBe("Event features");
     expect(staffSubpageTitle("/people")).toBeNull();
+  });
+
+  it("names each /admin page in the topbar instead of 'System management' (#981)", () => {
+    expect(staffSubpageTitle("/admin")).toBeNull();
+    expect(staffSubpageTitle("/admin/team")).toBe("Team");
+    expect(staffSubpageTitle("/admin/settings")).toBe("Platform settings");
+    expect(staffSubpageTitle("/admin/readiness")).toBe("System readiness");
+    expect(staffSubpageTitle("/admin/calendar")).toBe("Conference calendar");
+    expect(staffSubpageTitle("/admin/event-templates")).toBe("Event templates");
+    expect(staffSubpageTitle("/admin/event-templates/tpl_1")).toBe("Edit event template");
+    expect(staffSubpageTitle("/admin/organizations")).toBe("Clubs and churches");
+    expect(staffSubpageTitle("/admin/organizations/background-checks")).toBe("Sterling Volunteers");
+    expect(staffSubpageTitle("/admin/organizations/org_1/directors")).toBe("Club directors");
+    expect(staffSubpageTitle("/admin/clubs/reports")).toBe("Club Monthly Records");
+    expect(staffSubpageTitle("/admin/clubs/reports/org_1/2028-08")).toBe("Club Monthly Record");
+    expect(staffSubpageTitle("/admin/clubs/reports/year-end")).toBe("Club Year-End Reports");
+    expect(staffSubpageTitle("/admin/club-forms/membership")).toBe("Club form builder");
+  });
+
+  it("gives every /admin page a topbar title equal to its own <title>, and never the section name", () => {
+    const adminRoot = join(root, "app/(workspace)/admin");
+    const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return entry.name === "page.tsx" ? [full] : [];
+    });
+    for (const file of walk(adminRoot)) {
+      const route = "/admin/" + relative(adminRoot, file).replace(/page\.tsx$/, "").replace(/\/$/, "").replace(/\[[^\]]+\]/g, "sample");
+      if (route === "/admin/") continue;
+      const title = staffSubpageTitle(route);
+      expect(title, route).not.toBeNull();
+      const declared = /title: "([^"]+)"/.exec(readFileSync(file, "utf8"))?.[1];
+      // A page without its own literal <title> (a redirect) is only checked for having a topbar title.
+      if (declared) expect(title, route).toBe(declared);
+    }
   });
 
   it("has every page's <title> read the shared constant", () => {

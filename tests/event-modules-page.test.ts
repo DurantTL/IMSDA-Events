@@ -70,10 +70,15 @@ describe("/more as the Event modules page", () => {
     signIn({ globalRole: null, permissions: eventPermissions, enabled: [] });
     const markup = await render();
     expect(markup).not.toContain("Customize this event");
-    // One hidden duplicate H2 under the shell's H1, like every other staff page; no separate eyebrow.
-    expect(markup).toContain('<h2 class="duplicate-page-title">Event modules</h2>');
+    // The shell's H1 names the page; the body has no duplicate heading or eyebrow, only the shared header (#981).
+    expect(markup).not.toContain("duplicate-page-title");
+    expect(markup).not.toMatch(/<h2[^>]*>Event modules<\/h2>/);
     expect(markup).not.toContain('class="eyebrow">Event modules');
-    expect(markup).toContain("Turn features on or off for Synthetic Camporee");
+    expect(markup).toContain('class="staff-page-header"');
+    // /more keeps module requests and the activity trail, and says that turning features on or off lives on Event features.
+    expect(markup).toContain("Module requests and the recent activity trail for Synthetic Camporee.");
+    expect(markup).toContain("on the Event features page");
+    expect(markup).not.toContain("Turn features on or off for Synthetic Camporee");
     expect(staffSubpageTitle("/more")).toBe("Event modules");
     expect(staffSubpageTitle("/more/merchandise")).not.toBe("Event modules");
   });

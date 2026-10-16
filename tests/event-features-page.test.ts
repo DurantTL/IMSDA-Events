@@ -94,8 +94,12 @@ describe("/more/features", () => {
   it("is titled Event features and lists every feature in one table", async () => {
     signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions });
     const markup = await render();
-    expect(markup).toContain('<h2 class="duplicate-page-title">Event features</h2>');
-    expect(markup).toContain("Turn features on or off for Synthetic Camporee");
+    // The topbar's h1 names the page; the body draws no second heading, only the shared header (#981).
+    expect(markup).not.toContain("duplicate-page-title");
+    expect(markup).not.toMatch(/<h[12][^>]*>Event features<\/h[12]>/);
+    expect(markup).toContain('class="staff-page-header"');
+    // This page is where features are turned on or off: its one sentence says so.
+    expect(markup).toContain("Turn features on or off for Synthetic Camporee.");
     expect(markup).toContain('class="report-table table-cards event-features-table"');
     for (const id of [
       "module:honors", "module:event-patches", "module:club-assignments", "module:seminar-assignments", "module:merchandise", "module:attendee-community", "module:public-content",
@@ -105,8 +109,10 @@ describe("/more/features", () => {
     // Labelled cells for the phone cards.
     expect(markup).toContain('data-label="State"');
     expect(markup).toContain('data-label="Switch"');
-    // The old Event modules page stays reachable.
+    // The Event modules page stays reachable, through the page's one cross-link.
     expect(markup).toContain('href="/more?event=event_1"');
+    expect(markup.split('href="/more?event=event_1"').length - 1).toBe(1);
+    expect(markup).toContain("Module requests and recent activity");
   });
 
   it("gives a system administrator a switch on modules, event columns, publish and the calendar", async () => {

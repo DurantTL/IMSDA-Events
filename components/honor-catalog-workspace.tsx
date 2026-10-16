@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { cardCell } from "@/components/table-card-labels";
 import { useState } from "react";
 import { Award, Pencil, Plus, Save, X } from "lucide-react";
@@ -59,17 +60,9 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Club ministries</p>
-          <h2>Honor catalog</h2>
-          <p>
-            One list of honors that every Honors Weekend site offers from. Each
-            site then chooses its sessions, classes, and seats under More → Honors
-            Weekend classes.
-          </p>
-        </div>
-        <div className="intro-actions honor-csv-actions">
+      <StaffPageHeader
+        description="One list of honors that every Honors Weekend site offers from. Each site then chooses its sessions, classes, and seats under More → Honors Weekend classes."
+        primary={(
           <CsvImportDialog
             eyebrow="Honor catalog CSV"
             help={(
@@ -88,8 +81,8 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
             title="Import honors"
             variant="staff"
           />
-        </div>
-      </div>
+        )}
+      />
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}

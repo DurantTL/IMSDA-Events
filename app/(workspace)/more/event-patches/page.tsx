@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
 import { EventPatchesWorkspace } from "@/components/event-patches-workspace";
 import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { listEventAwardItems } from "@/modules/earned-awards/event-items";
@@ -13,11 +12,9 @@ export const metadata: Metadata = { title: staffPageTitles.eventPatches };
 export default async function EventPatchesPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
-  const back = <BackLink href={`/more?event=${event.id}`} variant="staff">Back to More</BackLink>;
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return (
       <>
-        {back}
         <AccessRestricted title="Event patches are restricted" detail="Event administrators link the patch or pin a club event gives its attendees." />
       </>
     );
@@ -27,14 +24,12 @@ export default async function EventPatchesPage({ searchParams }: { searchParams:
   if (!clubEvent) {
     return (
       <>
-        {back}
         <AccessRestricted title="Event patches are for club events" detail="This event doesn't take club registrations. Choose a club event to link its patch or pin." />
       </>
     );
   }
   return (
     <>
-      {back}
       <EventPatchesWorkspace eventId={event.id} eventName={event.name} initial={await listEventAwardItems(event.id)} />
     </>
   );
