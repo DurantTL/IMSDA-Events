@@ -48,14 +48,14 @@ export function TypedInRosterLink({
   }
 
   return (
-    <span className="field-help">
+    <span className="field-help typed-in-roster-link">
       <label>
-        Link to your roster (optional){" "}
+        <span>Link to your roster (optional)</span>
         <select disabled={busy} onChange={(event) => setChoice(event.target.value)} value={choice}>
           <option value="">Not linked</option>
           {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
         </select>
-      </label>{" "}
+      </label>
       <button className="text-button" disabled={busy || choice === saved} onClick={() => void save()} type="button">Save link</button>
       {message && <small role="status"> {message}</small>}
     </span>

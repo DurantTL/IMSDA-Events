@@ -32,7 +32,7 @@ export function confirmationEmailHeadline(status: ConfirmationEmailStatus): stri
     case "CAPTURED":
       return "A local confirmation preview was saved; no external email was sent.";
     case "PENDING":
-      return "Your registration is saved and the confirmation email is queued.";
+      return "Your registration is saved. A confirmation email should arrive shortly.";
     case "FAILED":
       return "Your registration is saved, but the confirmation email could not be sent.";
     default:
@@ -60,7 +60,7 @@ export function describeClubConfirmationEmail(
     : status === "CAPTURED"
       ? "A local confirmation preview was saved; no external email was sent."
       : status === "PENDING"
-        ? "The confirmation email is queued and has not been delivered yet."
+        ? "A confirmation email should arrive shortly; it has not been delivered yet."
         : status === "FAILED"
           ? "The confirmation email could not be sent."
           : "No confirmation email is being sent for this registration.";

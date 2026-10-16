@@ -3480,7 +3480,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 }
 .public-registration-attendee-actions button:hover:not(:disabled) { border-color: #9bb9c5; background: var(--imsda-navy-soft); }
 .public-registration-attendee-actions button.is-danger { color: var(--coral); }
-.public-registration-attendee-actions button:disabled { cursor: not-allowed; opacity: 0.36; }
+.public-registration-attendee-actions button:disabled { border-color: #d3dde2; background: #eef2f4; box-shadow: none; cursor: not-allowed; opacity: 0.72; }
 .public-registration-attendee-body { padding-left: 4px; }
 .public-registration-attendee-name-sync {
   margin: 14px 20px 0;
@@ -8303,6 +8303,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .clone-none-toggle input { width: 22px !important; height: 22px; flex: 0 0 auto; }
 .event-clone input:disabled { opacity: 0.55; }
 .inline-notice.clone-warning { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; line-height: 1.5; font-size: 0.78rem; }
+.inline-notice.warning { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; line-height: 1.5; }
 .clone-link { overflow-wrap: anywhere; font-size: max(var(--type-body-floor, 0px), 0.74rem); }
 
 /* Staff account menu (#543): 44px touch targets and a popover that fits 390px. */
@@ -11016,6 +11017,62 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .creation-feature-list, .creation-feature-later { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
 .creation-feature-later { padding-left: 18px; list-style: disc; }
 
+/* PBE phone pass: the general registration link's start card and confirmation (the mobile audit's pbe-* pages). */
+.public-group-flow-card { display: grid; gap: 16px; }
+.public-group-flow-card > * { margin-top: 0; margin-bottom: 0; min-width: 0; }
+.public-group-flow-card h1 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ink); font-size: var(--heading-section); font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; }
+.public-group-flow-card h1 svg { flex: 0 0 auto; color: var(--imsda-purple); }
+.public-group-flow-card > p:not(.public-registration-eyebrow) { color: var(--muted); font-size: var(--text-helper-min); line-height: 1.6; }
+.public-group-flow-card .primary-button:disabled { opacity: 1; border-color: #a9bcc6; background: #e4ebee; color: #455a66; cursor: not-allowed; }
+.public-registration-confirmation-details.is-compact { grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; max-width: 620px; margin: 0 auto; }
+.public-registration-confirmation-details.is-compact > div { display: contents; }
+.public-registration-confirmation-details.is-compact dt { padding: 4px 0; }
+.public-registration-confirmation-details.is-compact dd { margin: 0; padding: 4px 0; }
+.public-registration-account-prompt.is-brief .public-registration-account-actions { margin-top: 8px; }
+@media (max-width: 580px) {
+  .public-registration-account-prompt { grid-template-columns: minmax(0, 1fr); }
+  .public-registration-account-actions a { flex-basis: 100%; }
+  .public-registration-confirmation-details.is-compact { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .public-registration-confirmation-details.is-compact > div { display: block; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 8px 0; }
+  .public-registration-confirmation-details.is-compact > div:last-child { border-bottom: 0; }
+  .public-registration-confirmation-details.is-compact dt, .public-registration-confirmation-details.is-compact dd { padding: 0; }
+  .public-registration-confirmation-actions { flex-direction: column; }
+  .public-registration-confirmation-actions .public-registration-secondary-button { flex: 0 0 auto; width: 100%; margin: 10px 0 0; }
+}
+/* A typed-in team member's optional roster link: full width under the name on a phone, never wider than the card. */
+.public-manage-club-list li:has(.typed-in-roster-link) { flex-wrap: wrap; }
+.public-manage-club-list li:has(.typed-in-roster-link) > span:first-child { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
+.typed-in-roster-link { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; max-width: 100%; }
+.typed-in-roster-link label { display: grid; flex: 1 1 14rem; gap: 4px; min-width: 0; }
+.typed-in-roster-link select { width: 100%; max-width: 100%; min-width: 0; }
+
+/* Teams waiting for a club (staff): one heading line, one meta line, spaced detail lines, one aligned action row. */
+.pending-team { display: grid; gap: 14px; }
+.pending-team-head { display: grid; gap: 6px; min-width: 0; }
+.pending-team-head p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.pending-team-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; color: var(--ink); font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+.pending-team-title svg { flex: 0 0 auto; color: var(--imsda-purple); }
+.pending-team-title > span { flex: 1 1 8rem; min-width: 0; overflow-wrap: anywhere; }
+.pending-team-code { border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--muted); padding: 2px 9px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; }
+.pending-team-meta { color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.78rem); }
+.pending-team-club label { display: grid; gap: 6px; }
+.pending-team-club select { width: 100%; max-width: 100%; }
+.pending-team-actions { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; width: auto; gap: 10px; }
+.pending-team-actions > button { min-height: 44px; }
+.pending-team-reject { border-color: #e3c3be; color: #8f3a30; }
+@media (max-width: 600px) { .pending-team-actions > button { flex: 1 1 100%; } }
+
+/* Phone audit follow-ups: a heading's leading icon shares the heading's line (zero specificity, so any classed heading rule wins);
+   helper text under a field keeps its own line (the global .field-help pulls up by 9px); the "Read more" toggle is a 44px target. */
+:where(:is(h1, h2, h3):has(> svg[aria-hidden="true"]:first-child)) { display: flex; align-items: center; gap: 4px 8px; }
+.panel > .field-help,
+.public-manage-card > .field-help { margin: 4px 0 0; }
+.club-team-name .field-help { margin: 0; }
+.public-registration-option-item > .expandable-text-toggle { min-height: 44px; }
+/* A result form's long select option never widens the card past a phone screen. */
+.team-result-level { min-width: 0; }
+.team-result-level :is(input, select) { width: 100%; max-width: 100%; min-width: 0; }
+
 /* Advanced search on the People page (#180): a native disclosure over the shared form-stack field look. */
 .operations-search { display: grid; gap: 10px; }
 .operations-search-disclosure { border: 1px solid var(--line); border-radius: 12px; background: white; }
@@ -11029,3 +11086,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operations-search-actions .primary-button,
 .operations-search-actions .secondary-button { min-height: 44px; }
+/* The roster link under a typed-in team member takes the whole row (it must beat `.public-manage-club-list li > span { flex: 1 }`). */
+.public-manage-club-list li > .typed-in-roster-link { flex: 1 1 100%; margin: 0; }
+/* Placed after `.public-manage-card > .field-help`, so the account overview keeps its own bottom space. */
+.account-overview-card > .field-help { margin: 0 0 10px; }
+.public-registration-attendee-actions button.is-danger:disabled { opacity: 0.82; }

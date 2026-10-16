@@ -58,6 +58,8 @@
  *   MOBILE_LAYOUT_BROWSER   path to a Chromium executable (default: Playwright's)
  *   MOBILE_LAYOUT_NO_SHOTS  set to 1 to skip the screenshots
  *   MOBILE_LAYOUT_CLEANUP   set to 1 to delete every `mobilecheck` row it created when the run ends
+ *   MOBILE_LAYOUT_TEXT_RULES set to "all" to run the text and form rules (headings, labels, focus rings, text overlap, disabled
+ *                           contrast) on every page; by default they run on the pbe-* pages
  *   MOBILE_LAYOUT_SELF_TEST set to 1 to inject one defect of every kind into each page;
  *                           the run must then FAIL with all of them reported
  *   DATABASE_URL            the local database the app uses (read from .env when not exported)
@@ -66,7 +68,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
 
 loadEnvConfig(process.cwd());
@@ -100,6 +102,12 @@ const applicationLinkToken = `${P}-application-link-token-0123456789-abcdefghijk
 const multiHonorSessionId = `${P}_honor_session`;
 const multiHonorIds = [1, 2, 3, 4].map((index) => `${P}_honor_${index}`);
 const multiHonorOfferingId = `${P}_honor_offering`;
+// A PBE-shaped event (the pathfinder_bible_experience starter's rules and the pbe_registration form), published, with the
+// general registration link on and church billing: the public page, the general-link team flow, the club portal and the staff pages.
+const pbeEventId = `${P}_pbe_event`;
+const pbeEventSlug = `${P}-pbe-bible-experience`;
+const pbeTeamName = "Mobilecheck Bible Bees";
+const pbeDraftKey = "0123456789abcdef0123456789abcdef";
 const churchA = `${P}_church_a`;
 const churchB = `${P}_church_b`;
 const reportMonth = "2026-09";
@@ -127,6 +135,10 @@ type PageSpec = {
   role: Role;
   /** Why the page is skipped at every width (kept in the report so nobody wonders). */
   note?: string;
+  /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
+  prepare?: (page: Page, width: number) => Promise<void>;
+  /** A walkthrough run after the page's first look (it clicks through states, and may submit a synthetic form). */
+  flow?: "general-link" | "pending-teams";
 };
 
 const staff = (name: string, route: string, role: Role = "event-admin"): PageSpec => ({
@@ -271,6 +283,28 @@ const pages: PageSpec[] = [
   staff("event-content-blocks", `/more/event-content?event=${blocksEventId}`, "system-admin"),
 ];
 
+/** Every page a PBE user touches (the pages that need a row's id are built once the event is seeded). */
+function pbePages(team: { registrationId: string; teamKey: string }): PageSpec[] {
+  const portal = `/account/clubs/${clubA}/events/${pbeEventId}`;
+  const pbeStaff = (name: string, route: string) => staff(`pbe-${name}`, `${route}${route.includes("?") ? "&" : "?"}event=${pbeEventId}`);
+  return [
+    { name: "pbe-public-event-page", path: `/events/${pbeEventSlug}`, role: "visitor" },
+    { name: "pbe-general-link-start", path: `/register/${pbeEventSlug}/general`, role: "visitor", flow: "general-link" },
+    { name: "pbe-club-portal-teams", path: portal, role: "director" },
+    { name: "pbe-club-portal-new-team", path: `${portal}?draft=${pbeDraftKey}`, role: "director" },
+    { name: "pbe-club-portal-registered-team", path: `${portal}?team=${encodeURIComponent(team.teamKey)}`, role: "director" },
+    { name: "pbe-club-portal-team-form", path: `${portal}/team-form?team=${encodeURIComponent(team.teamKey)}`, role: "director" },
+    { name: "pbe-club-portal-team-form-blank", path: `${portal}/team-form/blank`, role: "director" },
+    pbeStaff("registrations", "/people"),
+    { ...pbeStaff("pending-teams", "/people/pending-teams"), flow: "pending-teams" },
+    pbeStaff("team-results", "/more/team-results"),
+    pbeStaff("team-form-report", "/more/reports/clubs/team-form"),
+    pbeStaff("team-form-registration", `/more/reports/clubs/team-form/${team.registrationId}`),
+    pbeStaff("team-form-level", "/more/reports/clubs/team-form/level"),
+    pbeStaff("event-settings", "/more/event-settings"),
+  ];
+}
+
 /**
  * Buttons that open a dialog or sheet without `aria-haspopup`. Each is tried on every
  * page (the first visible match); opening is harmless, and Escape closes it unsubmitted.
@@ -413,6 +447,112 @@ async function seedBlocksEvent(prisma: PrismaClient) {
 }
 
 /**
+ * A Pathfinder Bible Experience shaped event: the starter's team rules, the Iowa and Missouri sites and the pbe_registration
+ * form, published, with the general registration link on and church billing. Two teams are registered through the real link
+ * code: one matched to club A by its director's email (so it is an ordinary club registration, shown in the club portal and on
+ * the staff Registrations, team results and team form pages) and one that waits for staff (the pending teams page). Idempotent.
+ * Returns the ids the team pages need.
+ */
+async function seedPbeEvent(prisma: PrismaClient) {
+  const { starterEventTemplates } = await import("../modules/event-templates/starters");
+  const { createRegistrationFormFromTemplateInTransaction } = await import("../modules/forms/repository");
+  const { calendarDateIn, addDays } = await import("../modules/calendar/domain");
+  const starter = starterEventTemplates.find((entry) => entry.starterKey === "pathfinder_bible_experience");
+  if (!starter?.teamSettings || !starter.locations) throw new Error("The Pathfinder Bible Experience starter is missing or has no team rules.");
+  const today = calendarDateIn(new Date());
+  // A database that kept the event from an earlier run (cleanup off): dates move with today so registration is still open, and
+  // the teams an earlier walkthrough submitted (with their mail and audit rows) go, so each run starts the same and can reuse its names.
+  if (await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } })) {
+    await prisma.event.update({
+      where: { id: pbeEventId },
+      data: { startsAt: new Date(`${addDays(today, 90)}T15:00:00Z`), endsAt: new Date(`${addDays(today, 90)}T23:00:00Z`), registrationOpensOn: addDays(today, -5), registrationClosesOn: addDays(today, 60) },
+    });
+    const earlier = await prisma.generalLinkSubmission.findMany({ where: { eventId: pbeEventId, teamName: { startsWith: "Mobilecheck Walkthrough Team" } }, select: { id: true } });
+    if (earlier.length > 0) {
+      const ids = earlier.map((row) => row.id);
+      await prisma.auditLog.deleteMany({ where: { eventId: pbeEventId, entityId: { in: ids } } });
+      await prisma.messageOutbox.deleteMany({ where: { eventId: pbeEventId, recipientEmail: { startsWith: `${P}.walkthrough.` } } });
+      await prisma.generalLinkSubmission.deleteMany({ where: { id: { in: ids } } });
+    }
+  }
+  if (!(await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } }))) {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+    await prisma.$transaction(async (tx) => {
+      await tx.event.create({
+        data: {
+          id: pbeEventId, slug: pbeEventSlug, name: "Mobilecheck IA & MO Bible Experience",
+          startsAt: new Date(`${addDays(today, 90)}T15:00:00Z`), endsAt: new Date(`${addDays(today, 90)}T23:00:00Z`), timezone: "America/Chicago",
+          isPublished: true, registrationOpensOn: addDays(today, -5), registrationClosesOn: addDays(today, 60),
+          billingMode: starter.billingMode, audience: "CLUB", checksAdultBackgrounds: starter.checksAdultBackgrounds, generalRegistrationLinkEnabled: true,
+        },
+      });
+      await tx.eventTeamSettings.create({
+        data: { eventId: pbeEventId, ...starter.teamSettings!, levelInfo: (starter.teamSettings!.levelInfo ?? []) as unknown as Prisma.InputJsonValue },
+      });
+      await tx.eventMembership.create({ data: { eventId: pbeEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+      await tx.eventLocation.createMany({
+        data: starter.locations!.map((location, position) => ({
+          eventId: pbeEventId, name: location.name, normalizedName: location.name.toLowerCase(), address: location.address, capacity: location.capacity, sortOrder: position,
+        })),
+      });
+      await createRegistrationFormFromTemplateInTransaction(tx, pbeEventId, "usr_system_admin", starter.formTemplateKey);
+    });
+    const created = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: pbeEventId } });
+    await prisma.registrationFormVersion.updateMany({ where: { formId: created.id }, data: { status: "PUBLISHED", publishedAt: new Date() } });
+    await prisma.registrationForm.update({ where: { id: created.id }, data: { status: "PUBLISHED" } });
+  }
+  const form = await prisma.registrationForm.findFirstOrThrow({ where: { eventId: pbeEventId }, include: { versions: true } });
+  const versionId = form.versions[0]!.id;
+  const locations = await prisma.eventLocation.findMany({ where: { eventId: pbeEventId }, orderBy: { sortOrder: "asc" } });
+  const { submitGeneralLinkRegistration } = await import("../modules/general-link-registrations/repository");
+  const person = (first: string, last: string, age: number, role = "Pathfinder", alternate = false) => ({
+    clientId: `c${`${first}${last}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12)}`,
+    responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
+  });
+  const submit = async (teamName: string, clubName: string, email: string, key: string, location: string) => {
+    if (await prisma.generalLinkSubmission.findFirst({ where: { eventId: pbeEventId, teamName } })) return;
+    await submitGeneralLinkRegistration(pbeEventSlug, {
+      versionId, idempotencyKey: key,
+      responses: {
+        club_name: clubName, director_name: "Dana Mobilecheck-Directorsson", email, phone: "515-555-0100",
+        coordinator_name: "Casey Mobilecheck-Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
+        coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true, photo_video_release: "Yes",
+      },
+      attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, "Pathfinder", true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Coach", 40, "Coach")],
+      website: "",
+    }, { locationId: location, teamName });
+  };
+  // Matched: the account email is club A's director on file. Waiting: an email that matches nobody, naming club B.
+  await submit(pbeTeamName, `Mobilecheck ${longName}`, `${P}.director@example.test`, `${P}-pbe-matched-key-0001`, locations[0]!.id);
+  await submit("Mobilecheck Sword Drillers of the Riverside Valley", "Mobilecheck Eagles Club", `${P}.unmatched.director-with-a-long-address@example.test`, `${P}-pbe-pending-key-0002`, locations[1]!.id);
+  return prisma.clubEventRegistration.findFirstOrThrow({ where: { eventId: pbeEventId, organizationId: clubA }, select: { registrationId: true, teamKey: true } });
+}
+
+/** Removes everything seedPbeEvent made, children before parents, including what the link code wrote (registrations, people, mail, audit). */
+async function cleanupPbeEvent(prisma: PrismaClient) {
+  const exists = await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } });
+  if (!exists) return;
+  const registrations = await prisma.registration.findMany({ where: { eventId: pbeEventId }, select: { id: true, accountHolderPersonId: true, attendees: { select: { personId: true } } } });
+  const registrationIds = registrations.map((row) => row.id);
+  const personIds = [...new Set(registrations.flatMap((row) => [row.accountHolderPersonId, ...row.attendees.map((attendee) => attendee.personId)]).filter((id): id is string => Boolean(id)))];
+  await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
+    prisma.messageOutbox.deleteMany({ where: { OR: [{ eventId: pbeEventId }, { registrationId: { in: registrationIds } }] } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" DISABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.registrationOperation.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" ENABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.auditLog.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.clubRegistrationDraft.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.generalLinkSubmission.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.clubEventRegistration.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.registrationAttendee.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.registration.deleteMany({ where: { eventId: pbeEventId } }),
+    prisma.event.deleteMany({ where: { id: pbeEventId } }),
+    prisma.person.deleteMany({ where: { id: { in: personIds } } }),
+  ]);
+}
+
+/**
  * The Emails editor with attachments (#824): on the blocks event, a published announcement template with two
  * attachments (one with a long unbroken name), an uploaded picture and a button in its body, and a draft
  * announcement with an attachment, all saved through the real repository functions.
@@ -505,6 +645,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
   const mine = { startsWith: `${P}_` };
+  // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
+  await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.assetDepositCover.deleteMany({ where: { issuanceId: mine } }),
@@ -1353,6 +1495,279 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
   };
 }
 
+/**
+ * Text and form layout (the PBE phone audit): problems a person sees that the other checks do not name. Runs in the page, one
+ * self-contained function. Returns plain data.
+ *
+ *  - headings: an h1 or h2 drawn at body size or with a body weight is unstyled, and an icon in a heading sits on the
+ *    heading's own line, not above it;
+ *  - label-input: a label's text never runs into or touches the control it names (side by side with under 6px between, or
+ *    stacked with under 2px between);
+ *  - focus-ring: the focus outline of a text field never lands on the text of another element (the help text under it);
+ *  - text-overlap: the text of two different elements never overlaps, and text that an `overflow: hidden` box cuts off sideways
+ *    (with no ellipsis or line clamp) is reported;
+ *  - disabled: a disabled button's label keeps at least 3:1 against its own fill, opacity included.
+ * Text in fixed, sticky or absolutely placed boxes is left to the bar and dialog checks.
+ */
+function textLayoutInPage() {
+  type Rgba = { r: number; g: number; b: number; a: number };
+  const parse = (value: string): Rgba | null => {
+    const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/.exec(value);
+    if (!m) return null;
+    const alpha = m[4] === undefined ? 1 : m[4].endsWith("%") ? Number.parseFloat(m[4]) / 100 : Number.parseFloat(m[4]);
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: alpha };
+  };
+  const over = (top: Rgba, under: Rgba): Rgba => {
+    const a = top.a + under.a * (1 - top.a);
+    if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
+    return {
+      r: (top.r * top.a + under.r * under.a * (1 - top.a)) / a,
+      g: (top.g * top.a + under.g * under.a * (1 - top.a)) / a,
+      b: (top.b * top.a + under.b * under.a * (1 - top.a)) / a,
+      a,
+    };
+  };
+  const luminance = ({ r, g, b }: Rgba) => {
+    const [lr, lg, lb] = [r, g, b].map((channel) => {
+      const v = channel / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  };
+  const ratio = (a: Rgba, b: Rgba) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const white: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+  const describe = (el: Element) => {
+    const id = el.id ? `#${el.id}` : "";
+    const classes = typeof (el as HTMLElement).className === "string"
+      ? (el as HTMLElement).className.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => `.${name}`).join("")
+      : "";
+    const field = el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA"
+      ? `[${(el as HTMLInputElement).type ?? ""}|${el.getAttribute("name") ?? el.getAttribute("aria-label") ?? el.getAttribute("placeholder") ?? ""}]`
+      : "";
+    return `${el.tagName.toLowerCase()}${id}${classes}${field} "${(el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 36)}"`;
+  };
+  const visible = (el: Element) => {
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+  const hiddenTree = (el: Element) => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (node.getAttribute("aria-hidden") === "true" || (node as HTMLElement).hidden || node.hasAttribute("inert")) return true;
+      if (node.tagName === "DETAILS" && !(node as HTMLDetailsElement).open && !(node.firstElementChild?.tagName === "SUMMARY" && node.firstElementChild.contains(el))) return true;
+      if (node.matches(".sr-only, .visually-hidden")) return true;
+    }
+    return false;
+  };
+  /** Fixed, sticky or absolutely placed boxes are checked by the bar and dialog rules, and overlap on purpose. */
+  const placed = (el: Element) => {
+    for (let node: Element | null = el; node && node !== document.body; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position === "fixed" || position === "sticky" || position === "absolute") return true;
+    }
+    return false;
+  };
+  /** What a person sees of `rect`: cut by every box around `el` that clips (an ellipsis, a line clamp, a scroller). Null when none of it shows. */
+  const shown = (el: Element, rect: DOMRect) => {
+    let left = rect.left;
+    let right = rect.right;
+    let top = rect.top;
+    let bottom = rect.bottom;
+    for (let node: Element | null = el; node && node !== document.documentElement; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      const box = node.getBoundingClientRect();
+      if (style.overflowX !== "visible") { left = Math.max(left, box.left); right = Math.min(right, box.right); }
+      if (style.overflowY !== "visible") { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
+    }
+    return right - left > 0 && bottom - top > 0 ? new DOMRect(left, top, right - left, bottom - top) : null;
+  };
+  /** The rectangles of the text directly inside `el` (its own text nodes) that are shown. */
+  const ownTextRects = (el: Element) => {
+    const rects: DOMRect[] = [];
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType !== 3 || !(node.textContent ?? "").trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of Array.from(range.getClientRects())) {
+        const visibleRect = rect.width > 0 && rect.height > 0 ? shown(el, rect) : null;
+        if (visibleRect) rects.push(visibleRect);
+      }
+      range.detach();
+    }
+    return rects;
+  };
+  const w = window.innerWidth;
+  const problems = { headings: [] as string[], labelInput: [] as string[], focusRing: [] as string[], textOverlap: [] as string[], disabled: [] as string[] };
+
+  // Headings.
+  const bodySize = Number.parseFloat(getComputedStyle(document.body).fontSize) || 16;
+  for (const heading of Array.from(document.querySelectorAll("h1, h2"))) {
+    if (!visible(heading) || hiddenTree(heading)) continue;
+    const style = getComputedStyle(heading);
+    const size = Number.parseFloat(style.fontSize);
+    const weight = Number.parseInt(style.fontWeight, 10) || 400;
+    if (size < bodySize * 1.1 && weight < 600) {
+      problems.headings.push(`${describe(heading)} is drawn at ${Math.round(size)}px weight ${weight} against ${Math.round(bodySize)}px body text: unstyled`);
+    }
+  }
+  for (const heading of Array.from(document.querySelectorAll("h1, h2, h3"))) {
+    if (!visible(heading) || hiddenTree(heading)) continue;
+    const icon = heading.querySelector(":scope > svg");
+    if (!icon || !visible(icon)) continue;
+    const text = ownTextRects(heading).concat(Array.from(heading.querySelectorAll(":scope > span, :scope > small")).flatMap((child) => ownTextRects(child)));
+    if (text.length === 0) continue;
+    const iconRect = icon.getBoundingClientRect();
+    const top = Math.min(...text.map((rect) => rect.top));
+    const bottom = Math.max(...text.map((rect) => rect.bottom));
+    if (iconRect.bottom <= top + 1 || iconRect.top >= bottom - 1) {
+      problems.headings.push(`${describe(heading)}: the icon sits on its own line (${Math.round(iconRect.top)}..${Math.round(iconRect.bottom)}px, text ${Math.round(top)}..${Math.round(bottom)}px)`);
+    }
+  }
+
+  // Labels against their controls.
+  const controls = Array.from(document.querySelectorAll("input, select, textarea")).filter((el) => {
+    const type = (el as HTMLInputElement).type;
+    return !["checkbox", "radio", "hidden", "range", "file", "button", "submit", "reset", "image", "color"].includes(type) && visible(el) && !hiddenTree(el);
+  });
+  for (const control of controls) {
+    const labels = Array.from((control as HTMLInputElement).labels ?? []);
+    const controlRect = control.getBoundingClientRect();
+    for (const label of labels) {
+      // The label's own words: text outside the control and outside other fields.
+      const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+      const rects: DOMRect[] = [];
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const parent = node.parentElement;
+        if (!(node.textContent ?? "").trim() || !parent || control.contains(parent) || parent.closest("select, textarea, option, .sr-only")) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of Array.from(range.getClientRects())) if (rect.width > 0 && rect.height > 0) rects.push(rect);
+        range.detach();
+      }
+      for (const rect of rects) {
+        const vertical = Math.min(rect.bottom, controlRect.bottom) - Math.max(rect.top, controlRect.top);
+        const horizontal = Math.min(rect.right, controlRect.right) - Math.max(rect.left, controlRect.left);
+        if (vertical > 1 && horizontal > 1) {
+          problems.labelInput.push(`${describe(label)}: the label text overlaps its field by ${Math.round(horizontal)}x${Math.round(vertical)}px`);
+          break;
+        }
+        if (vertical > 1 && horizontal <= 1 && -horizontal < 6) {
+          problems.labelInput.push(`${describe(label)}: the label text runs into its field (${Math.round(-horizontal)}px between them on one line)`);
+          break;
+        }
+        if (vertical <= 1 && horizontal > 1 && controlRect.top - rect.bottom < 2 && controlRect.top >= rect.top) {
+          problems.labelInput.push(`${describe(label)}: the label text touches its field (${Math.round(controlRect.top - rect.bottom)}px between them)`);
+          break;
+        }
+      }
+    }
+  }
+
+  // Focus ring against other text.
+  const textBoxes: Array<{ el: Element; rect: DOMRect }> = [];
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    if (el.closest("select, textarea, option, script, style, noscript")) continue;
+    if (!visible(el) || hiddenTree(el) || placed(el)) continue;
+    for (const rect of ownTextRects(el)) textBoxes.push({ el, rect });
+  }
+  // Focusing a field can scroll the page (a page's own script, a sticky bar): compare in the snapshot's own coordinates.
+  const scrollAtSnapshot = { x: window.scrollX, y: window.scrollY };
+  for (const control of controls.slice(0, 12)) {
+    (control as HTMLElement).focus({ preventScroll: true });
+    const style = getComputedStyle(control);
+    const width = style.outlineStyle === "none" ? 0 : Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+    if (width > 0) {
+      const box = control.getBoundingClientRect();
+      const shiftX = window.scrollX - scrollAtSnapshot.x;
+      const shiftY = window.scrollY - scrollAtSnapshot.y;
+      const ring = { left: box.left + shiftX - width, right: box.right + shiftX + width, top: box.top + shiftY - width, bottom: box.bottom + shiftY + width };
+      for (const text of textBoxes) {
+        if (control.contains(text.el) || text.el.contains(control)) continue;
+        const across = Math.min(ring.right, text.rect.right) - Math.max(ring.left, text.rect.left);
+        const down = Math.min(ring.bottom, text.rect.bottom) - Math.max(ring.top, text.rect.top);
+        if (across > 1 && down > 1) {
+          problems.focusRing.push(`${describe(control)}: its focus outline (${width}px out, ${Math.round(ring.left)}..${Math.round(ring.right)} x ${Math.round(ring.top)}..${Math.round(ring.bottom)}) lands on ${describe(text.el)} (${Math.round(text.rect.left)}..${Math.round(text.rect.right)} x ${Math.round(text.rect.top)}..${Math.round(text.rect.bottom)}) by ${Math.round(down)}px`);
+          break;
+        }
+      }
+    }
+    (control as HTMLElement).blur();
+  }
+  window.scrollTo(scrollAtSnapshot.x, scrollAtSnapshot.y);
+
+  // Text over text, and text cut off sideways.
+  const sorted = textBoxes.slice().sort((a, b) => a.rect.top - b.rect.top);
+  let reported = 0;
+  for (let i = 0; i < sorted.length && reported < 6; i += 1) {
+    const a = sorted[i]!;
+    for (let j = i + 1; j < sorted.length; j += 1) {
+      const b = sorted[j]!;
+      if (b.rect.top >= a.rect.bottom - 1) break;
+      if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      const across = Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left);
+      const down = Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top);
+      // Lines that overlap by a few pixels at their edges are tight leading; text drawn over text is more than that.
+      if (across > 2 && down > Math.min(a.rect.height, b.rect.height) * 0.35 && down > 3) {
+        problems.textOverlap.push(`${describe(a.el)} overlaps ${describe(b.el)} by ${Math.round(across)}x${Math.round(down)}px`);
+        reported += 1;
+        break;
+      }
+    }
+  }
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    if (reported >= 8) break;
+    if (!visible(el) || hiddenTree(el)) continue;
+    const style = getComputedStyle(el);
+    const clamp = style.getPropertyValue("-webkit-line-clamp");
+    if (!/(hidden|clip)/.test(style.overflowX) || style.textOverflow === "ellipsis" || (clamp !== "" && clamp !== "none")) continue;
+    if (el.matches("body, html, table, [role=dialog]") || el.clientWidth === 0 || placed(el)) continue;
+    const box = el.getBoundingClientRect();
+    if (box.right > w + 1) continue;
+    // Text that would be drawn past this box, in a descendant that is not itself an ellipsis or scroll box.
+    const cut = textBoxes.find((entry) => {
+      if (!el.contains(entry.el)) return false;
+      const start = entry.el.getBoundingClientRect();
+      if (start.right <= box.right + 1 && start.left >= box.left - 1) return false;
+      for (let node: Element | null = entry.el; node && node !== el; node = node.parentElement) {
+        const inner = getComputedStyle(node);
+        if (inner.textOverflow === "ellipsis" || inner.overflowX !== "visible") return false;
+      }
+      return true;
+    });
+    if (cut) {
+      problems.textOverlap.push(`${describe(el)}: ${describe(cut.el)} is cut off sideways by the box (${Math.round(cut.el.getBoundingClientRect().right)}px in a box ending at ${Math.round(box.right)}px)`);
+      reported += 1;
+    }
+  }
+
+  // Disabled buttons keep a readable label.
+  for (const button of Array.from(document.querySelectorAll("button:disabled, a[aria-disabled=true]"))) {
+    if (!visible(button) || hiddenTree(button)) continue;
+    let opacity = 1;
+    let fill: Rgba | null = null;
+    for (let node: Element | null = button; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      opacity *= Number(style.opacity);
+      const colour = parse(style.backgroundColor);
+      if (!fill && colour && colour.a > 0) fill = colour;
+    }
+    const style = getComputedStyle(button);
+    const text = parse(style.color);
+    if (!text) continue;
+    // Opacity fades the finished button, so fill and label are each faded against the page behind it.
+    const shownFill = over({ ...(fill ?? white), a: (fill?.a ?? 1) * opacity }, white);
+    const shownText = over({ ...text, a: text.a * opacity }, white);
+    const contrast = ratio(shownText, shownFill);
+    if (contrast < 3) problems.disabled.push(`${describe(button)}: the disabled label has ${contrast.toFixed(2)}:1 against its fill (needs 3:1)`);
+  }
+  return problems;
+}
+
 /** Runs in the page after scrolling to the bottom: is the last content under a fixed bar? */
 function coveredByBarInPage() {
   const h = window.innerHeight;
@@ -1737,6 +2152,16 @@ function injectDefects() {
     // A field whose border is as pale as the old #cbdbe2 (1.4:1), and one with no border at all.
     '<input aria-label="self-test pale field" style="display:block;width:200px;height:32px;border:1px solid #cbdbe2;background:#fff">',
     '<input aria-label="self-test borderless field" style="display:block;width:200px;height:32px;border:0;background:transparent">',
+    // An unstyled heading, a label that runs into its field, text drawn over text, a focus ring on the help text under it, and a disabled button nobody can read.
+    '<h2 style="margin:0;font:inherit">self-test unstyled heading</h2>',
+    '<label style="display:block">self-test label<input style="display:inline-block;margin:0;width:120px;border:1px solid #333"></label>',
+    '<p style="margin:0">self-test line one of two</p><p style="margin:-10px 0 0">self-test line two of two</p>',
+    '<input aria-label="self-test ring" style="display:block;width:200px;height:32px;margin:0;border:1px solid #333;outline:3px solid red;outline-offset:6px"><p style="margin:-4px 0 0">self-test help under the ring</p>',
+    '<button disabled type="button" style="min-width:44px;min-height:44px;background:#fff;color:#ddd;opacity:1">self-test disabled</button>',
+    // A heading whose icon sits above its text, a label with its field right under it, and text that an overflow box cuts off sideways.
+    '<h3 style="margin:0;display:block"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="display:block"><circle cx="10" cy="10" r="8"/></svg>self-test icon heading</h3>',
+    '<label style="display:block;line-height:1;margin:0">self-test stacked label<input style="display:block;margin:0;width:160px;height:32px;border:1px solid #333"></label>',
+    '<div style="width:80px;overflow:hidden;white-space:nowrap"><span>self-test text that is cut off sideways by its box</span></div>',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");
@@ -1942,6 +2367,154 @@ async function auditOrderDescriptions(page: Page, spec: PageSpec, width: number,
   }
 }
 
+/**
+ * The text and form rules (heading-style, label-input, focus-ring-overlap, text-overlap, disabled-contrast) were added with the
+ * Pathfinder Bible Experience pages and hold on every `pbe-*` and `staff-pbe-*` page and every state of its walkthroughs. Run them
+ * on every page with MOBILE_LAYOUT_TEXT_RULES=all: the pages that were not built against them still have findings (see
+ * docs/RESPONSIVE.md), and fixing those is its own piece of work, not a reason to loosen a rule.
+ */
+const textRulesEverywhere = process.env.MOBILE_LAYOUT_TEXT_RULES === "all";
+function textRulesApply(pageName: string) {
+  return textRulesEverywhere || /^(staff-)?pbe-/.test(pageName);
+}
+
+/**
+ * The same measurements as a page's first look, for one state reached by clicking (a step of a form, an open sheet, the
+ * confirmation page). `name` says which state, so a finding names the step.
+ */
+async function auditState(page: Page, name: string, width: number, prefix: string) {
+  await page.evaluate(() => document.fonts.ready).catch(() => undefined);
+  await page.waitForTimeout(150);
+  const touch = width <= touchMaxWidth;
+  const result = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
+  if (result.scrollWidth > result.innerWidth) record("horizontal-scroll", name, width, `page is ${result.scrollWidth}px wide in a ${result.innerWidth}px window; sticking out: ${result.overflowers.join("; ") || "(nothing identified)"}`);
+  for (const target of result.smallTargets) record("small-tap-target", name, width, target);
+  for (const note of result.barNotes) record("sticky-bar-size", name, width, note);
+  const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
+  fieldsChecked += fields.checked;
+  for (const problem of fields.problems) record("field-boundary", name, width, problem);
+  const text = await page.evaluate(textLayoutInPage);
+  for (const problem of text.headings) record("heading-style", name, width, problem);
+  for (const problem of text.labelInput) record("label-input", name, width, problem);
+  for (const problem of text.focusRing) record("focus-ring-overlap", name, width, problem);
+  for (const problem of text.textOverlap) record("text-overlap", name, width, problem);
+  for (const problem of text.disabled) record("disabled-contrast", name, width, problem);
+  const fit = await page.evaluate(dialogFitInPage);
+  dialogsOpened += fit.count;
+  for (const problem of fit.problems) record("dialog-too-tall", name, width, problem);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(60);
+  // Behind an open sheet the page is not what a person reads, so the bar rule is for states with no dialog open.
+  const covered = fit.count === 0 ? await page.evaluate(coveredByBarInPage) : null;
+  if (covered) record("sticky-bar-covers-content", name, width, covered);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  if (takeShots) await page.screenshot({ path: `${prefix}.jpg`, type: "jpeg", quality: 60, fullPage: true }).catch(() => undefined);
+}
+
+/** Fills whatever the visible step of the public registration form requires with synthetic answers, never submitting. */
+async function fillRequiredStep(page: Page, email: string) {
+  const content = page.locator(".public-registration-step-content");
+  const combos = content.locator('input[role="combobox"][required]:visible');
+  for (let index = 0; index < (await combos.count()); index += 1) {
+    const combo = combos.nth(index);
+    if ((await combo.inputValue()) !== "") continue;
+    await combo.click();
+    await combo.fill("Mobilecheck Eagles");
+    await page.waitForTimeout(200);
+    await page.locator('[role="listbox"] [role="option"]:visible').first().click();
+  }
+  const fields = content.locator("input[required]:not([role=combobox]):visible, textarea[required]:visible");
+  for (let index = 0; index < (await fields.count()); index += 1) {
+    const field = fields.nth(index);
+    const type = await field.getAttribute("type");
+    if (type === "checkbox" || type === "radio") { await field.check({ force: true }).catch(() => undefined); continue; }
+    if ((await field.inputValue()) !== "") continue;
+    await field.fill(type === "email" ? email : type === "tel" ? "515-555-0100" : type === "number" ? "14" : "Mobilecheck Synthetic");
+  }
+  const selects = content.locator("select[required]:visible");
+  for (let index = 0; index < (await selects.count()); index += 1) {
+    if ((await selects.nth(index).inputValue()) === "") await selects.nth(index).selectOption({ index: 1 });
+  }
+  // A choice nobody has made yet (the release's Yes): the first option of each radio group with none chosen.
+  const radios = content.locator("input[type=radio]:visible");
+  const groups = new Set<string>();
+  for (let index = 0; index < (await radios.count()); index += 1) {
+    const radio = radios.nth(index);
+    const group = (await radio.getAttribute("name")) ?? `radio-${index}`;
+    if (groups.has(group)) continue;
+    groups.add(group);
+    if (!(await content.locator(`input[type=radio][name="${group}"]:checked`).count())) await radio.check({ force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * The general registration link as a director walks it (a PBE team without an account): the start step filled in, every step of the
+ * form, a team member's sheet, the review, and the confirmation after submitting a synthetic team (named for the width, so each
+ * run adds its own waiting team). Each state is measured like a page of its own.
+ */
+async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, prefix: string) {
+  const name = (state: string) => `${spec.name} (${state})`;
+  const shot = (state: string) => `${prefix}-${state.replace(/[^a-z0-9]+/gi, "-")}`;
+  const email = `${P}.walkthrough.${width}@example.test`;
+  try {
+    await page.locator("input[type=radio][name=club-location]").first().check({ force: true });
+    await page.fill("#general-link-team-name", `Mobilecheck Walkthrough Team ${width}`);
+    await auditState(page, name("start, filled in"), width, shot("start-filled"));
+    await page.click("button:has-text('Continue')");
+    await page.waitForTimeout(400);
+    for (let step = 0; step < 8; step += 1) {
+      const heading = ((await page.locator("#public_registration_step_heading").innerText().catch(() => "")) || `step ${step + 1}`).replace(/\s+/g, " ").trim();
+      await auditState(page, name(heading), width, shot(heading));
+      if (/review/i.test(heading)) break;
+      // The team members step: each person is edited in a sheet. Audit the first one open, then fill them all.
+      const toggles = page.locator('.public-registration-step-content button[id^="public_attendee_"][id$="_toggle"]:visible');
+      const people = await toggles.count();
+      for (let person = 0; person < people; person += 1) {
+        // A card that is already open (a desktop keeps it so) is not toggled shut.
+        if ((await toggles.nth(person).getAttribute("aria-expanded")) !== "true") await toggles.nth(person).click();
+        await page.waitForTimeout(300);
+        if (person === 0) await auditState(page, name(`${heading}, a team member's sheet`), width, shot(`${heading}-sheet`));
+        const sheet = page.locator(`#public_attendee_initial-attendee-${person + 1}`);
+        for (const [suffix, value] of [["pbe_member_first", `Walker${person + 1}`], ["pbe_member_last", "Mobilecheck-Synthetic"], ["pbe_member_age", "14"]] as const) {
+          await sheet.locator(`input[id$="_${suffix}"]`).fill(value);
+        }
+        await sheet.locator('input[type=radio][id$="_pbe_member_role"]').first().check({ force: true }).catch(() => undefined);
+        // A phone edits a person in a sheet that is closed with Done; a desktop edits in place.
+        const done = sheet.locator('button:has-text("Done with"):visible');
+        if ((await done.count()) > 0) await done.first().click({ timeout: 5000 });
+        await page.waitForTimeout(250);
+      }
+      await fillRequiredStep(page, email);
+      await page.click("button.is-continue");
+      await page.waitForTimeout(450);
+      const problem = await page.locator(".public-registration-error-summary").innerText().catch(() => "");
+      if (problem) {
+        record("audit-failed", name(heading), width, `could not move past this step with synthetic answers: ${problem.replace(/\s+/g, " ").slice(0, 200)}`);
+        return;
+      }
+    }
+    // The card's own submit button is hidden on a phone, where the sticky bar carries it.
+    await page.locator('button[type=submit]:has-text("Submit team registration"):visible').first().click({ timeout: 5000 });
+    await page.waitForSelector(".public-registration-confirmation", { timeout: 20_000 });
+    await auditState(page, name("confirmation after submitting"), width, shot("confirmation"));
+  } catch (error) {
+    record("audit-failed", name("walkthrough"), width, (error as Error).message.split("\n").slice(0, 3).join(" | ").slice(0, 400));
+  }
+}
+
+/** The waiting teams page with a team's Reject form open (never submitted) and the club list focused. */
+async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, prefix: string) {
+  const name = `${spec.name} (reject form open)`;
+  try {
+    await page.goto(`${baseUrl}${spec.path}`, { waitUntil: "load" });
+    await page.locator(".pending-team-reject:visible").first().click({ timeout: 5000 });
+    await page.waitForTimeout(200);
+    await auditState(page, name, width, `${prefix}-reject-open`);
+  } catch (error) {
+    record("audit-failed", name, width, (error as Error).message.split("\n")[0] ?? "failed");
+  }
+}
+
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
   const url = `${baseUrl}${spec.path}`;
   // "load", then a bounded wait for quiet: Next prefetches every visible link, so
@@ -1987,6 +2560,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
   fieldsChecked += fields.checked;
   for (const problem of fields.problems) record("field-boundary", spec.name, width, problem);
+  if (textRulesApply(spec.name)) {
+    const text = await page.evaluate(textLayoutInPage);
+    for (const problem of text.headings) record("heading-style", spec.name, width, problem);
+    for (const problem of text.labelInput) record("label-input", spec.name, width, problem);
+    for (const problem of text.focusRing) record("focus-ring-overlap", spec.name, width, problem);
+    for (const problem of text.textOverlap) record("text-overlap", spec.name, width, problem);
+    for (const problem of text.disabled) record("disabled-contrast", spec.name, width, problem);
+  }
 
   // Scroll to the bottom: is the last content hidden behind a fixed bar?
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -2387,6 +2968,8 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.screenshot({ path: `${prefix}.jpg`, type: "jpeg", quality: 60 });
     });
   }
+  if (spec.flow === "general-link") await auditGeneralLinkFlow(page, spec, width, prefix);
+  if (spec.flow === "pending-teams") await auditPendingTeamsFlow(page, spec, width, prefix);
   pagesVisited.push(`${spec.name}@${width}`);
 }
 
@@ -2421,6 +3004,7 @@ async function main() {
     await assertSeededDatabase(prisma);
     seeded = true;
     await seedSynthetic(prisma);
+    pages.push(...pbePages(await seedPbeEvent(prisma)));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
     browser = await chromium.launch({

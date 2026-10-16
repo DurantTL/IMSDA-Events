@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { BackLink } from "@/components/back-link";
 import { PendingTeamsReview } from "@/components/pending-teams-review";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listAttachableClubs, listPendingTeams, resolvedTeamCounts } from "@/modules/general-link-registrations/repository";
@@ -23,22 +23,20 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
 
   return (
     <section className="page-stack">
+      <BackLink href={`/people?event=${encodeURIComponent(event.id)}`} variant="staff">Back to Registrations</BackLink>
       <div className="page-intro">
         <div>
           <p className="eyebrow">Registration integrity</p>
           <h2>Teams waiting for a club</h2>
           <p>
-            Teams registered through the general registration link for {event.name} whose director&rsquo;s email did not match a
-            current director or deputy of the club they picked, or whose club was not listed. Confirm the club, choose another,
-            or reject the team. Until then a team is in no club&rsquo;s registrations, invoice or check-in list. Each team shows its
-            members&rsquo; names and roles, its coaches, the club picked and the director&rsquo;s contact, so you can tell which
-            club it really is. Handle these names as you would a club roster. A team nobody resolves has its names removed 30
-            days after the event ends.
+            These teams registered through the general link for {event.name}, but the director&rsquo;s email did not match the club
+            they picked. Check the members and contact, then confirm the club, choose another, or reject the team.
+          </p>
+          <p className="field-help">
+            Until then a team is in no registration, invoice or check-in list. Handle these names as you would a club roster; a
+            team nobody resolves has its names removed 30 days after the event ends.
           </p>
           <p className="field-help">{counts.attached} attached through the link · {counts.rejected} rejected</p>
-        </div>
-        <div className="page-intro-actions">
-          <Link className="secondary-button" href={`/people?event=${encodeURIComponent(event.id)}`}>Back to Registrations</Link>
         </div>
       </div>
       {teams.length === 0 ? (
@@ -48,7 +46,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
           <p>Every team registered through the link is attached to a club.</p>
         </section>
       ) : (
-        <PendingTeamsReview clubs={clubs} eventId={event.id} teams={teams} />
+        <PendingTeamsReview clubs={clubs} eventId={event.id} teams={teams} timeZone={event.timezone} />
       )}
     </section>
   );
