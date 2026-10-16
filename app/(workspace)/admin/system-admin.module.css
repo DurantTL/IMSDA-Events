@@ -762,7 +762,7 @@ details.taskGroup[open] .taskGrid {
 
 .eventLinks a {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
