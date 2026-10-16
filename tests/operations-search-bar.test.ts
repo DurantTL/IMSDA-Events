@@ -60,4 +60,16 @@ describe("OperationsSearchBar", () => {
     expect(html).toContain("no longer offered");
     expect(html).not.toContain("registrations match");
   });
+
+  it("wraps the form in a disclosure that opens only when a filter or result is showing", () => {
+    const closed = renderToStaticMarkup(createElement(OperationsSearchBar, {
+      basePath: "/people", carry: {}, eventId: "event-a", query: parseOperationsSearchParams(new URLSearchParams("")).query,
+      filters: availableOperationsFilters({ eventId: "event-a", permissions: ["VIEW_EVENT"] }, catalog), summary: null,
+    }));
+    expect(closed).toContain("<details");
+    expect(closed).toContain("Advanced search");
+    expect(closed).not.toMatch(/<details[^>]*\sopen/);
+    expect(render(["VIEW_EVENT"], "status=CONFIRMED")).toMatch(/<details[^>]*\sopen/);
+    expect(render(["VIEW_EVENT"], "", true)).toMatch(/<details[^>]*\sopen/);
+  });
 });

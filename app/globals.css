@@ -10992,3 +10992,17 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .creation-features-step > summary small { display: block; margin-top: 4px; color: var(--muted); }
 .creation-feature-list, .creation-feature-later { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
 .creation-feature-later { padding-left: 18px; list-style: disc; }
+
+/* Advanced search on the People page (#180): a native disclosure over the shared form-stack field look. */
+.operations-search { display: grid; gap: 10px; }
+.operations-search-disclosure { border: 1px solid var(--line); border-radius: 12px; background: white; }
+.operations-search-disclosure > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--imsda-navy); padding: 0 14px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 800; }
+.operations-search-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+.operations-search-form { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); align-items: start; padding: 14px; }
+.operations-search-form .field { display: grid; align-content: start; gap: 6px; min-width: 0; margin: 0; border: 0; padding: 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
+.operations-search-form .operations-search-status { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.operations-search-form .operations-search-status legend { width: 100%; padding: 0; margin-bottom: 6px; }
+.operations-search-form .operations-search-status .checkbox-label { min-height: 44px; }
+.operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.operations-search-actions .primary-button,
+.operations-search-actions .secondary-button { min-height: 44px; }
