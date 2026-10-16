@@ -21,6 +21,7 @@ import {
   firstLauncherMatch,
   launcherSearchStatus,
   omitSidebarDuplicates,
+  omitSidebarFooterLinks,
   isPlainClick,
   launcherFooterLinks,
   launcherGroups,
@@ -436,5 +437,48 @@ describe("launcher search and sidebar duplicates (#967)", () => {
     expect(source).toContain("router.push(first.href)");
     expect(source).toMatch(/event\.key === "Escape" && search !== ""[\s\S]*setSearch\(""\)/);
     expect(source).toContain('["ArrowDown", "ArrowUp", "Tab"]');
+  });
+
+  it("does not open anything on Enter with an empty search or during IME composition", () => {
+    const source = readFileSync("components/more-launcher.tsx", "utf8");
+    expect(source).toContain('search.trim() === "" || event.nativeEvent.isComposing');
+    expect(source).toContain("aria-describedby={statusId}");
+  });
+
+  it("says so when the desktop popover has nothing left after the sidebar duplicates are removed", () => {
+    const cards = cardsFor({ permissions: ["MANAGE_FORMS"], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    const markup = renderToStaticMarkup(
+      createElement(MoreLauncherPanel, { cards, sidebarHrefs: sidebarHrefsFor(["MANAGE_FORMS"]), isSystemAdmin: false, eventQuery: "?event=event_1", variant: "sidebar" }),
+    );
+    expect(markup).toContain("Everything you can open is in the sidebar.");
+    expect(markup).not.toContain("data-card=");
+    // The phone sheet has no sidebar, so it lists the card and shows no such line.
+    const phone = renderToStaticMarkup(createElement(MoreLauncherPanel, { cards, isSystemAdmin: false, eventQuery: "?event=event_1", variant: "tab" }));
+    expect(phone).toContain('data-card="registration-builder"');
+    expect(phone).not.toContain("Everything you can open is in the sidebar.");
+  });
+
+  it("drops footer links that are sidebar items on desktop by exact path, and keeps every footer link on the phone", () => {
+    const links = [
+      { key: "event-features", label: "Synthetic features", href: "/more/features?event=event_1" },
+      { key: "event-modules", label: "Event modules and activity", href: "/more?event=event_1" },
+    ];
+    expect(omitSidebarFooterLinks(links, new Set(["/more/features"])).map((link) => link.key)).toEqual(["event-modules"]);
+    expect(omitSidebarFooterLinks(links, new Set(["/more/featuresx"])).map((link) => link.key)).toEqual(["event-features", "event-modules"]);
+    expect(omitSidebarFooterLinks(links, undefined)).toEqual(links);
+    // In the panel: a viewer whose sidebar draws /more loses the matching footer link on desktop only.
+    const render = (variant: "sidebar" | "tab") => renderToStaticMarkup(
+      createElement(MoreLauncherPanel, { cards: admin(), sidebarHrefs: new Set(["/more"]), isSystemAdmin: false, eventQuery: "?event=event_1", variant }),
+    );
+    expect(render("sidebar")).not.toContain('data-footer="event-modules"');
+    expect(render("tab")).toContain('data-footer="event-modules"');
+  });
+
+  it("passes the drawn sidebar hrefs to the sidebar launcher only, never the phone tab", () => {
+    const source = readFileSync("components/app-shell.tsx", "utf8");
+    expect(source.match(/sidebarHrefs=/g)).toHaveLength(1);
+    const sidebarUse = source.indexOf("sidebarHrefs=");
+    expect(source.lastIndexOf('variant="sidebar"', sidebarUse)).toBeGreaterThan(source.lastIndexOf('variant="tab"', sidebarUse));
+    expect(source).toContain("must stay exactly what is drawn");
   });
 });

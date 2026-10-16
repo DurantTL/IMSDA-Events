@@ -41,6 +41,17 @@ export function omitSidebarDuplicates(cards: readonly MoreDirectoryCard[], sideb
 }
 
 /**
+ * The same rule for footer links (#967): the desktop popover drops a footer
+ * link whose path is already a sidebar item the viewer sees, whichever change
+ * added either one. Without `sidebarHrefs` (the phone sheet) every link stays.
+ */
+export function omitSidebarFooterLinks<T extends { href: string }>(links: readonly T[], sidebarHrefs: ReadonlySet<string> | undefined): T[] {
+  if (!sidebarHrefs || sidebarHrefs.size === 0) return [...links];
+  const paths = new Set([...sidebarHrefs].map(pathOfHref));
+  return links.filter((link) => !paths.has(pathOfHref(link.href)));
+}
+
+/**
  * Cards matching a typed search (#967): every word must appear, in any order,
  * in the card's title or short description, ignoring case. A blank query keeps
  * every card. It only narrows what the viewer may already see; it never adds.

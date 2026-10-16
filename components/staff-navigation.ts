@@ -446,7 +446,7 @@ export function canShowMoreLauncher({
 /**
  * The phone "More" directory (#475): every staff destination that isn't one
  * of the phone bottom tabs (Payments is one of them for finance staff), grouped the way the mobile review asked for
- * (Setup, Content & sales, People & access, Reports) — a different grouping
+ * (Event tools, People & clubs, Sales & content, Reports) — a different grouping
  * from the sidebar's, matched to how staff described the tasks they look
  * for on a phone. `buildMoreDirectoryCards` is a pure function of the
  * signed-in user's access, kept in this shared module (rather than inline

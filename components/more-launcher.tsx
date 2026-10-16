@@ -12,6 +12,7 @@ import {
   firstLauncherMatch,
   launcherSearchStatus,
   omitSidebarDuplicates,
+  omitSidebarFooterLinks,
   isPlainClick,
   launcherFooterLinks,
   launcherGroups,
@@ -30,7 +31,7 @@ import { eventModuleDefinition, moduleForCard } from "@/modules/event-modules/ca
  * sidebar's More item, about 560px wide in two columns; on a phone the same panel
  * is a bottom sheet above the tab bar. It lists every destination the signed-in
  * staff member may open (the universal tools plus the event's enabled modules),
- * grouped Setup / Content & sales / People & access / Reports.
+ * grouped Event tools / People & clubs / Sales & content / Reports.
  *
  * The trigger is a real link to `/more` (the Event modules page), so a browser
  * without scripts, or a modified click, still gets somewhere useful. A plain
@@ -87,13 +88,14 @@ export function MoreLauncherPanel({
   style?: HTMLAttributes<HTMLDivElement>["style"];
 }) {
   const searchId = useId();
+  const statusId = `${searchId}-status`;
   const [search, setSearch] = useState("");
   const listed = omitSidebarDuplicates(cards, variant === "sidebar" ? sidebarHrefs : undefined);
   const matched = filterLauncherCards(listed, search);
   const groups = launcherGroups(matched);
   const matchCount = groups.reduce((total, entry) => total + entry.cards.length, 0);
   const router = useRouter();
-  const footer = launcherFooterLinks({ isSystemAdmin, canRequestFeature, eventQuery });
+  const footer = omitSidebarFooterLinks(launcherFooterLinks({ isSystemAdmin, canRequestFeature, eventQuery }), variant === "sidebar" ? sidebarHrefs : undefined);
   const [confirming, setConfirming] = useState<{ moduleKey: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -157,6 +159,8 @@ export function MoreLauncherPanel({
   function onSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
+      // An empty search opens nothing, and Enter that commits an IME composition is not a request to open.
+      if (search.trim() === "" || event.nativeEvent.isComposing) return;
       const first = firstLauncherMatch(matched);
       if (!first) return;
       onNavigate?.({ key: first.key, href: first.href });
@@ -201,14 +205,16 @@ export function MoreLauncherPanel({
             className="more-launcher-search-input"
             id={searchId}
             onChange={(event) => setSearch(event.target.value)}
+            aria-describedby={statusId}
             onKeyDown={onSearchKeyDown}
             placeholder="Find a tool"
             type="search"
             value={search}
           />
         </label>
-        <p aria-live="polite" className="more-launcher-search-status" role="status">{launcherSearchStatus(search, matchCount)}</p>
+        <p aria-live="polite" className="more-launcher-search-status" id={statusId} role="status">{launcherSearchStatus(search, matchCount)}</p>
       </div>
+      {listed.every((card) => !card.allowed) && <p className="more-launcher-empty">Everything you can open is in the sidebar.</p>}
       <div className="more-launcher-columns" inert={confirming ? true : undefined}>
         {groups.map(({ group, label, cards: groupCards }) => (
           <section className="more-launcher-group" aria-label={label} key={group} data-group={group}>
