@@ -235,7 +235,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
     </div></div>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
 
-    {queue.length > 0 ? <section className="panel" role="status">
+    {queue.length > 0 ? <section className="panel form-stack" role="status">
       <h3>Saved on this device, not confirmed</h3>
       <p>Requests that did not reach the server, or that it refused, stay here until you dismiss them. Retrying is safe: the same saved key can never issue twice.</p>
       <ul>{queue.map((entry) => <li key={entry.idempotencyKey}>{entry.items.map((item) => item.code).join(", ")}{" "}
@@ -244,7 +244,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
         <button className="secondary-button" type="button" disabled={busy} onClick={() => { const rest = readQueue(scope).filter((other) => other.idempotencyKey !== entry.idempotencyKey); writeQueue(scope, rest); setQueue(rest); }}>{entry.rejected ? "Dismiss" : "Discard"}</button></li>)}</ul>
     </section> : null}
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Who is it for?</h3>
       {person ? <p><strong>{person.name}</strong>, registration {person.confirmationCode}.{" "}
         {person.rooms.length === 0 ? "Not placed in a room." : `Room: ${person.rooms.map((room) => room.roomName).join("; ")}.`}
@@ -263,9 +263,9 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       </select></label> : null}
     </section>
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Items</h3>
-      <form onSubmit={(event) => { event.preventDefault(); addCode(codeText, 1, arrivedLikeAScan()); }}>
+      <form className="form-stack" onSubmit={(event) => { event.preventDefault(); addCode(codeText, 1, arrivedLikeAScan()); }}>
         <label>Scan or type a code (K-214) <input ref={codeInput} value={codeText} onChange={(event) => { keyTimes.current.push(Date.now()); setCodeText(event.target.value); }} autoComplete="off" autoCapitalize="characters" maxLength={64} /></label>
         <button className="secondary-button" type="submit">Add</button>
       </form>
@@ -282,7 +282,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       </div> : null}
     </section>
 
-    {person ? <section className="panel">
+    {person ? <section className="panel form-stack">
       <h3>Issued to {person.name}</h3>
       {openForPerson.length === 0 ? <p>Nothing issued yet.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
         <caption className="sr-only">Open items issued to {person.name}</caption>
@@ -301,9 +301,9 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
     {person && money ? <AssetReturnPanel eventId={eventId} userId={userId} person={person} money={money} types={types} canConfigure={canConfigure} canManageMoney={canManageMoney} /> : null}
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Look up an item</h3>
-      <form onSubmit={(event) => { event.preventDefault(); void runLookup(); }}>
+      <form className="form-stack" onSubmit={(event) => { event.preventDefault(); void runLookup(); }}>
         <label>Code <input value={lookupCode} onChange={(event) => setLookupCode(event.target.value)} maxLength={64} /></label>
         <button className="secondary-button" type="submit">Look up</button>
       </form>
@@ -314,7 +314,7 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
       </div> : null}
     </section>
 
-    {!person ? <section className="panel">
+    {!person ? <section className="panel form-stack">
       <h3>Out now</h3>
       {outNow.length === 0 ? <p>Nothing is issued right now.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
         <caption className="sr-only">The most recent {outNow.length} open issues</caption>
@@ -331,7 +331,7 @@ function IssuanceActions({ row, busy, change }: { row: IssuanceRow; busy: boolea
   // Replacing or swapping a key is part of Check out (the original's return, loss or damage is recorded with it).
   return <div>
     <button className="secondary-button" type="button" disabled={busy} onClick={() => setOpen(!open)}>Entered in error</button>
-    {open ? <form onSubmit={(event) => {
+    {open ? <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
       void change(row.id, { action: "correct", reason }, `${row.identifier} withdrawn`).then(() => { setOpen(false); setReason(""); });
     }}>

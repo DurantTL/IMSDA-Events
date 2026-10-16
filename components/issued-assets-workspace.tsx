@@ -53,9 +53,9 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Add a kind of item</h3>
-      <form onSubmit={(event) => {
+      <form className="form-stack" onSubmit={(event) => {
         event.preventDefault();
         const form = event.currentTarget;
         const data = new FormData(form);
@@ -114,7 +114,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
     if (next.length === 0) return;
     void run(`${base}/types`, { action: "update", typeId: type.id, assigneeKinds: next }, () => `${type.name} updated.`);
   };
-  return <section className="panel">
+  return <section className="panel form-stack">
     <h3>{type.name}{type.active ? "" : " (switched off)"}</h3>
     <p>{serialized ? "Numbered" : "Quantity"}. {type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.{type.roomLinked ? " Room-linked." : ""}{type.depositPolicyRef ? ` Deposit policy: ${type.depositPolicyRef}.` : ""}{type.replacementPolicyRef ? ` Replacement policy: ${type.replacementPolicyRef}.` : ""}{type.depositCents > 0 ? ` Usual cash deposit ${formatCents(type.depositCents)}.` : ""}{type.replacementFeeCents > 0 ? ` Replacement fee ${formatCents(type.replacementFeeCents)}.` : ""}</p>
     <div>
@@ -124,7 +124,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
         {assigneeKinds.map((kind) => <label className="checkbox-label" key={kind}><input type="checkbox" checked={type.assigneeKinds.includes(kind)} disabled={busy} onChange={(event) => setKinds(kind, event.target.checked)} /> {assigneeKindLabels[kind]}</label>)}
       </fieldset>
     </div>
-    <form onSubmit={(event) => {
+    <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
       void run(`${base}/types`, {
@@ -138,7 +138,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       <button className="secondary-button" type="submit" disabled={busy}>Save policy</button>
     </form>
 
-    <form onSubmit={(event) => {
+    <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
       const form = event.currentTarget;
       const data = new FormData(form);
@@ -157,7 +157,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       <button className="secondary-button" type="submit" disabled={busy}>Add</button>
     </form>
 
-    {serialized ? <form onSubmit={(event) => {
+    {serialized ? <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget);
       void run(`${base}/items`, {
@@ -187,7 +187,7 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
           <td>{asset.outQuantity}</td>
           <td><label className="visually-hidden" htmlFor={`cond-${asset.id}`}>Condition of {asset.identifier}</label>
             <select id={`cond-${asset.id}`} value={asset.condition} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, condition: event.target.value as AssetCondition }, () => `${asset.identifier} updated.`)}>{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
-          <td><form onSubmit={(event) => {
+          <td><form className="form-stack" onSubmit={(event) => {
             event.preventDefault();
             void run(`${base}/items`, { action: "update", assetId: asset.id, location: new FormData(event.currentTarget).get("location") ?? "" }, () => `${asset.identifier} updated.`);
           }}><label className="visually-hidden" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button className="secondary-button" type="submit" disabled={busy}>Save</button></form></td>

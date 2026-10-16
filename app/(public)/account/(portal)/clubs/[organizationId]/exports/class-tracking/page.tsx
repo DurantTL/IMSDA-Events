@@ -30,7 +30,7 @@ export default async function ClubClassTrackingReportPage({
       <BackLink href={`/account/clubs/${organizationId}/class-tracking`}>Back to class tracking</BackLink>
       <section className="panel" aria-labelledby="class-report-heading">
         <h2 id="class-report-heading">Class tracking report: {access.club.name}, {clubYear}</h2>
-        <form className="report-actions" method="get">
+        <form className="report-actions filter-bar" method="get">
           <label>Club year
             <select defaultValue={clubYear} name="year">
               {choices.map((year) => <option key={year} value={year}>{year}</option>)}

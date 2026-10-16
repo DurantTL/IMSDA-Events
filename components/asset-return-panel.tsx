@@ -158,7 +158,7 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
   const fateOf = (row: IssuanceRow) => money.fates[row.id]?.endReason ?? row.endReason;
   const chargeable = person.issuances.filter((row) => (fateOf(row) === "LOST" || fateOf(row) === "DAMAGED") && !money.fates[row.id]?.writtenOff && !money.charges.some((charge) => charge.issuanceId === row.id));
 
-  return <section className="panel" aria-labelledby="checkout-heading">
+  return <section className="panel form-stack" aria-labelledby="checkout-heading">
     <h3 id="checkout-heading">Check out: {person.name}</h3>
     <p>Choose what happened to each item. The deposit is handed back in full only when every covered item comes back in good order. This desk records; it does not move money.</p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
@@ -201,7 +201,7 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
       <p><button className="secondary-button" type="button" disabled={busy} onClick={() => setChoices(Object.fromEntries(open.map((row) => [row.id, { ...choice(row.id), outcome: "RETURNED" as const }])))}>Mark everything returned</button></p>
     </>}
 
-    <form onSubmit={(event) => { event.preventDefault(); const code = scanText.trim().toUpperCase(); if (code && !scanned.includes(code)) setScanned((current) => [...current, code]); setScanText(""); }}>
+    <form className="form-stack" onSubmit={(event) => { event.preventDefault(); const code = scanText.trim().toUpperCase(); if (code && !scanned.includes(code)) setScanned((current) => [...current, code]); setScanText(""); }}>
       <label>Or scan or type a returned code (K-214) <input value={scanText} onChange={(event) => setScanText(event.target.value)} maxLength={64} autoComplete="off" autoCapitalize="characters" /></label>
       <button className="secondary-button" type="submit">Add</button>
     </form>
@@ -215,7 +215,7 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
     <h4>Cash key deposit</h4>
     {uncoveredByType.map(({ type, rows }) => <DepositForm key={type.id} type={type} rows={rows} busy={busy} onSubmit={(amountCents) => post("deposits", { action: "record", issuanceIds: rows.map((row) => row.id), amountCents }, `Recorded a ${formatCents(amountCents)} cash deposit for ${rows.map((row) => row.identifier).join(", ")}.`)} />)}
     {money.deposits.length === 0 && uncoveredByType.length === 0 ? <p>No deposit has been taken for this person.</p> : null}
-    {money.deposits.map((deposit) => <div key={deposit.entryId} className="panel">
+    {money.deposits.map((deposit) => <div key={deposit.entryId} className="panel form-stack">
       <p><strong>{formatCents(deposit.amountCents)} cash deposit</strong> ({deposit.typeName}), taken by {deposit.takenByName} {new Date(deposit.takenAt).toLocaleString()}. Covers: {deposit.covers.map((cover) => `${cover.identifier} (${stateWords[cover.state] ?? cover.state})`).join(", ")}.</p>
       {deposit.settled ? <p role="status">Settled: {formatCents(deposit.settled.refundCents)} handed back, {formatCents(deposit.settled.keepCents)} kept{deposit.settled.lateHandedBackCents > 0 ? ` (${formatCents(deposit.settled.lateHandedBackCents)} of that handed back later after a found item; ${formatCents(deposit.keptRemainingCents)} still held)` : ""} ({new Date(deposit.settled.at).toLocaleString()}, {deposit.settled.byName}).</p>
         : deposit.outcome && deposit.outcome.ok ? <div>
@@ -250,7 +250,7 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
 function DepositForm({ type, rows, busy, onSubmit }: { type: DeskType; rows: IssuanceRow[]; busy: boolean; onSubmit: (amountCents: number) => Promise<void> }) {
   const [amount, setAmount] = useState((type.depositCents / 100).toFixed(2));
   const cents = Math.round(Number(amount) * 100);
-  return <form onSubmit={(event) => { event.preventDefault(); if (cents >= 1) void onSubmit(cents); }}>
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (cents >= 1) void onSubmit(cents); }}>
     <p>{rows.map((row) => row.identifier).join(", ")} ({type.name}) has no deposit yet. Usual deposit {formatCents(type.depositCents)}.</p>
     <label>Cash taken (dollars) <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
     <button className="secondary-button" type="submit" disabled={busy || !(cents >= 1)}>Record {Number.isFinite(cents) && cents >= 1 ? formatCents(cents) : "the"} deposit taken</button>
@@ -269,7 +269,7 @@ function ChargeForm({ row, lost, fee, keptByDeposit, canManageMoney, busy, onCha
   if (keptByDeposit > 0) {
     return <div>
       <p>{what}. The cash deposit already kept {formatCents(keptByDeposit)} for lost or damaged items, so the standard fee is not offered: charging it as well would take the guest&apos;s money twice.</p>
-      {canManageMoney ? <form onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category === "OTHER" ? "REPLACEMENT" : category, cents, reason.trim(), true); }}>
+      {canManageMoney ? <form className="form-stack" onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category === "OTHER" ? "REPLACEMENT" : category, cents, reason.trim(), true); }}>
         <label>Full cost of the loss (dollars); only the part above {formatCents(keptByDeposit)} is charged <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
         <label>Reason <input value={reason} maxLength={500} minLength={3} required onChange={(event) => setReason(event.target.value)} /></label>
         <button className="secondary-button" type="submit" disabled={busy}>Charge only the part above the kept deposit</button>
@@ -280,7 +280,7 @@ function ChargeForm({ row, lost, fee, keptByDeposit, canManageMoney, busy, onCha
     <p>{what}. {fee > 0 ? `The standard replacement fee is ${formatCents(fee)}. If the cash deposit is settled before this is charged, it will not be kept for this item as well.` : "This kind has no standard replacement fee."}</p>
     {fee > 0 ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void onCharge("REPLACEMENT", fee, `Replacement fee for ${row.identifier}`)}>Charge {formatCents(fee)} to the registration</button> : null}
     {canManageMoney ? <>{" "}<button className="secondary-button" type="button" onClick={() => setCustom(!custom)}>{custom ? "Cancel" : "Another amount"}</button></> : null}
-    {custom && canManageMoney ? <form onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category, cents, reason.trim()); }}>
+    {custom && canManageMoney ? <form className="form-stack" onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category, cents, reason.trim()); }}>
       <label>Kind of charge <select value={category} onChange={(event) => setCategory(event.target.value as typeof category)}>{(["REPLACEMENT", "DAMAGE", "OTHER"] as const).map((value) => <option key={value} value={value}>{chargeCategoryLabels[value]}</option>)}</select></label>
       <label>Amount (dollars) <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
       <label>Reason <input value={reason} maxLength={500} minLength={3} required onChange={(event) => setReason(event.target.value)} /></label>
@@ -299,7 +299,7 @@ function FacilityForm({ rooms, issuanceId, canConfigure, busy, onSubmit }: { roo
   const [firstNight, setFirstNight] = useState(rooms[0]?.lastNight ?? "");
   const [lastNight, setLastNight] = useState(rooms[0]?.lastNight ?? "");
   if (rooms.length === 0) return <p>This person has no room on record, so there is no room to inspect.</p>;
-  return <form onSubmit={(event) => {
+  return <form className="form-stack" onSubmit={(event) => {
     event.preventDefault();
     void onSubmit({
       action: "report", targetKind: "UNIT", eventUnitId: unitId, title, severity, source: "CHECKOUT_INSPECTION", ...(description.trim() ? { description: description.trim() } : {}),

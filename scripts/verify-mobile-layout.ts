@@ -58,8 +58,8 @@
  *   MOBILE_LAYOUT_BROWSER   path to a Chromium executable (default: Playwright's)
  *   MOBILE_LAYOUT_NO_SHOTS  set to 1 to skip the screenshots
  *   MOBILE_LAYOUT_CLEANUP   set to 1 to delete every `mobilecheck` row it created when the run ends
- *   MOBILE_LAYOUT_TEXT_RULES set to "all" to run the text and form rules (headings, labels, focus rings, text overlap, disabled
- *                           contrast) on every page; by default they run on the pbe-* pages
+ *   MOBILE_LAYOUT_TEXT_RULES the text and form rules (headings, labels, focus rings, text overlap, disabled contrast) run on every
+ *                           page by default; set to "pbe" to narrow them to the pbe-* and staff-pbe-* pages while iterating
  *   MOBILE_LAYOUT_SELF_TEST set to 1 to inject one defect of every kind into each page;
  *                           the run must then FAIL with all of them reported
  *   DATABASE_URL            the local database the app uses (read from .env when not exported)
@@ -2471,14 +2471,14 @@ async function auditOrderDescriptions(page: Page, spec: PageSpec, width: number,
 }
 
 /**
- * The text and form rules (heading-style, label-input, focus-ring-overlap, text-overlap, disabled-contrast) were added with the
- * Pathfinder Bible Experience pages and hold on every `pbe-*` and `staff-pbe-*` page and every state of its walkthroughs. Run them
- * on every page with MOBILE_LAYOUT_TEXT_RULES=all: the pages that were not built against them still have findings (see
- * docs/RESPONSIVE.md), and fixing those is its own piece of work, not a reason to loosen a rule.
+ * The text and form rules (heading-style, label-input, focus-ring-overlap, text-overlap, disabled-contrast) run on every page and
+ * every state of its walkthroughs. They started on the Pathfinder Bible Experience pages and were extended to every page in #981,
+ * once the older pages had been fixed; a finding is fixed on the page, never by loosening a rule. MOBILE_LAYOUT_TEXT_RULES=pbe
+ * narrows them to the `pbe-*` and `staff-pbe-*` pages for a quick local run. CI and the pull request check never set it.
  */
-const textRulesEverywhere = process.env.MOBILE_LAYOUT_TEXT_RULES === "all";
+const textRulesOnlyPbe = process.env.MOBILE_LAYOUT_TEXT_RULES === "pbe";
 function textRulesApply(pageName: string) {
-  return textRulesEverywhere || /^(staff-)?pbe-/.test(pageName);
+  return !textRulesOnlyPbe || /^(staff-)?pbe-/.test(pageName);
 }
 
 /**
