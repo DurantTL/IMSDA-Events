@@ -148,7 +148,7 @@ describe("/overview", () => {
   it("keeps every dropped destination one click away: Registrations, Payments and Check-in are sidebar items", () => {
     const sidebar = navigation.filter((item) => item.sidebar === "daily").map((item) => item.href);
     for (const href of ["/people", "/finance", "/check-in"]) expect(sidebar).toContain(href);
-    // Start registration stays on the Registrations header, for the same MANAGE_REGISTRATION holders.
+    // Start registration stays on the Registrations header (its button checks canEdit, MANAGE_REGISTRATION, and not the event's archived state).
     expect(read("components/people-workspace.tsx")).toContain("Start registration");
   });
 });

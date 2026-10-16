@@ -83,9 +83,12 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
   return (
     <section className="page-stack event-modules-page">
       <StaffPageHeader
-        description={`Module requests and the recent activity trail for ${event.name}. Turn features on or off on the Event features page.`}
+        description={`The tools and modules for ${event.name}, with requests for more and the recent activity trail.`}
+        primary={permissions.includes("CONFIGURE_EVENT")
+          ? <Link className="secondary-button" href={`/more/features${eventQuery}`}>Event features</Link>
+          : undefined}
       />
-      {!view.canToggle && <p className="quiet-copy">A system administrator turns features on or off. These are the ones this event uses.</p>}
+      {!view.canToggle && <p className="quiet-copy">Only a system administrator turns modules on or off. These are the ones this event uses.</p>}
 
       {health && (
         <section className="event-modules-health" data-state={health.state} aria-label="Event health">

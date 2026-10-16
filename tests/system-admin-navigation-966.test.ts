@@ -188,7 +188,9 @@ describe("/admin dashboard page", () => {
   it("lists Archived events once (the Events card), and wraps the per-event links in an even grid (#981)", () => {
     expect(source).not.toContain('href="/archived-events"');
     expect(systemNavGroups.flatMap((group) => group.items).filter((item) => item.href === "/archived-events")).toHaveLength(1);
-    expect(source).toContain("title={description}");
+    // The card description is read once, as the card text; there is no title tooltip repeating it.
+    expect(source).not.toContain("title={description}");
+    expect(source).toContain('<span className="sr-only"> for {event.name}</span>');
     const stylesheet = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
     expect(stylesheet).toMatch(/\.eventLinks \{\s*display: grid;\s*grid-template-columns: repeat\(auto-fit, minmax\(6\.5rem, 1fr\)\);/);
     // On a phone the task cards drop their description and sit two to a row, so the page is much shorter.

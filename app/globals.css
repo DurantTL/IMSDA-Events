@@ -11353,3 +11353,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .staff-page-actions .actions-menu-list { right: 0; left: 0; min-width: 0; }
 }
 .setup-checklist { margin-bottom: 20px; }
+
+/* Section titles on the club summary page, now h2 under the topbar's h1 (#981). */
+.club-summary-section { margin: 6px 0 0; font-size: 1.12rem; }

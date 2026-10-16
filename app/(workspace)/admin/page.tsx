@@ -189,7 +189,7 @@ export default async function SystemAdminPage({
       <nav className={styles.tasks} aria-label="System management tasks">
         {systemNavGroups.map((group) => {
           const cards = group.items.map(({ href, label, description, icon: Icon }) => (
-            <Link className={styles.taskCard} href={href} key={href} title={description}>
+            <Link className={styles.taskCard} href={href} key={href}>
               <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
               <span><strong>{label}</strong><small>{description}</small></span>
             </Link>
@@ -287,7 +287,7 @@ export default async function SystemAdminPage({
                     </div>
                     {/* Closed on a phone to keep the page short; always open on wider screens (see the stylesheet). */}
                     <details className={styles.eventTools}>
-                      <summary>Event links <ChevronDown aria-hidden="true" size={16} /></summary>
+                      <summary>Event links<span className="sr-only"> for {event.name}</span> <ChevronDown aria-hidden="true" size={16} /></summary>
                       <div className={styles.eventLinks}>
                         <Link href={`/registration-builder?${query}`}>Form</Link>
                         <Link href={withEvent(eventFeaturesItem.href, query)}>Features</Link>
