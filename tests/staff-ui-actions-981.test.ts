@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 import { CommunicationsWorkspace } from "@/components/communications-workspace";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
+import { formatCents, inPersonCardQuote } from "@/modules/payments/in-person-card";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { staffSubpageTitle } from "@/components/staff-navigation";
 import { isSystemWorkspacePath, systemNavActiveItem } from "@/components/system-navigation";
@@ -141,10 +142,15 @@ describe("empty states and the check-in desk (#981 batch 3)", () => {
     expect(compact).toContain("$525.00");
     expect(compact).toContain("for all 3 people on");
     expect(compact).toContain("Card in Square app:");
-    expect(compact).toContain("card fee");
+    const quote = inPersonCardQuote(52_500)!;
+    expect(compact).toContain(`${formatCents(quote.cardTotalCents)}</b>`);
+    expect(compact).toContain(`${formatCents(quote.cardFeeCents)}</span> card fee`);
     expect(compact).toContain("Square note:");
     expect(compact).not.toContain("title=");
     expect(compact).not.toContain("Cash or check");
+    const single = renderToStaticMarkup(createElement(CheckInPaymentDue, { balanceCents: 52_500, confirmationCode: "TEST-1003", partySize: 1, compact: true }));
+    expect(single).not.toContain("people on");
+    expect(single).toContain("Square note:");
     const full = renderToStaticMarkup(createElement(CheckInPaymentDue, { balanceCents: 52_500, confirmationCode: "TEST-1002", partySize: 3 }));
     expect(full).toContain("Cash or check");
     const workspace = read("components/check-in-workspace.tsx");

@@ -11378,7 +11378,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .field-actions-menu .actions-menu-list { position: absolute; right: 0; min-width: 12rem; margin-top: 0; box-shadow: var(--shadow); }
 }
 
-/* Check-in roster rows (#981): a compact balance badge; the full wording is once above the roster and on hover. */
+/* Check-in roster rows (#981): a balance badge with the full wording; cash or check equals the balance, noted above the roster. */
 .checkin-due-badge { display: inline-flex; align-items: flex-start; gap: 5px; width: fit-content; max-width: 100%; margin-top: 4px; border: 1px solid #ddcd9e; border-radius: 8px; background: var(--imsda-gold-soft); color: #6f5316; padding: 2px 9px; font-size: max(var(--type-floor, 0px), 0.8rem); line-height: 1.4; }
 .checkin-due-badge > svg { flex: 0 0 auto; margin-top: 3px; }
 
