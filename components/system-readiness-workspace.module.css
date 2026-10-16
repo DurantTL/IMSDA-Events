@@ -35,7 +35,7 @@
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 0.85rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.85rem);
 }
 
 .meta {
@@ -46,7 +46,7 @@
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 3px 10px;
-  font-size: 0.75rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.75rem);
   font-weight: 700;
 }
 
@@ -69,7 +69,7 @@
 .people {
   margin: 0;
   padding-left: 18px;
-  font-size: 0.85rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.85rem);
 }
 
 .actions {

@@ -242,3 +242,25 @@ token rather than a pale hex. A control whose inner input is borderless (`.searc
 The audit reports a `field-boundary` finding for any visible field with no border of its
 own or on a wrapper within two levels, or with a boundary under 3:1;
 `tests/field-outline-contrast.test.ts` guards the token.
+
+## Staff text floor, field rows and tables (#981)
+
+- **Text floor.** On the staff workspace (`.app-shell`) meta text, help text, chip and table
+  sub-lines and captions are at least 14px (`--type-floor` and `--type-staff-floor` are
+  `0.875rem` there). Uppercase letter-spaced labels (eyebrows, sidebar group labels, table
+  headers) keep a 12px floor through `--type-label-floor`. Club, account and public pages keep the
+  12px meta floor. Write new small sizes as `max(var(--type-floor, 0px), X)`, or
+  `max(var(--type-staff-floor, 0px), X)` for a plain size.
+- **Field rows and filter bars.** A label sits above its control (6px gap, 15px between rows).
+  A filter bar is `.filter-bar` (labels with `flex: 1 1 14rem`, Apply and Reset in
+  `.filter-bar-actions`, checkboxes as `.checkbox-label`, a checkbox group as `.filter-group`).
+  A panel inside `.form-stack` is itself a stack. Colour and file inputs inside a form stack, form
+  grid, filter bar or message editor are styled; do not stretch a colour input.
+- **Meta stack.** `.meta-stack` (or any of the shared sub-line classes) gives stacked meta lines a
+  4px gap and a line height of 1.45.
+- **Tables.** A column header never breaks inside a word, a wide table scrolls inside its wrapper,
+  and on phones a table is cards (`table-cards`) or a scroll box.
+- **Audit.** `scripts/verify-mobile-layout.ts` reports `text-too-small` (staff pages; exceptions are
+  listed with reasons at the top of the script) and `header-too-narrow` (a column header narrower
+  than its longest word; a hyphenated word may wrap at its hyphen). Overlapping text is the
+  `text-overlap` rule of the text-rules set.

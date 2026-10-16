@@ -91,8 +91,15 @@ describe("heading scale and helper text (issue #645)", () => {
       // #684 writes small sizes as max(var(--type-floor | --type-body-floor, 0px), X):
       // the floor tokens are 0 outside the phone media query, so the desktop size is
       // still X. Compare on X so this stays a guard that desktop sizes did not move.
+      // #981: uppercase labels read their floor from --type-label-floor (12px on the staff
+      // workspace, where --type-floor is now 14px), written
+      // max(var(--type-label-floor, var(--type-floor, 0px)), X). Plain staff sizes under 0.875rem
+      // are written max(var(--type-staff-floor, 0px), X), which is 0 outside .app-shell. All three
+      // wrappers are reduced to X before comparing, so a source size that moves still fails; the
+      // floors themselves are guarded by tests/staff-ui-foundations-981.test.ts.
       const size = body.match(/font-size:\s*([^;]+)/)?.[1].trim()
-        .replace(/^max\(var\(--type-(?:body-)?floor, 0px\), ([\d.]+rem)\)/, "$1");
+        .replace(/^max\(var\(--type-label-floor, var\(--type-floor, 0px\)\), ([\d.]+rem)\)/, "$1")
+        .replace(/^max\(var\(--type-(?:body-|staff-)?floor, 0px\), ([\d.]+(?:rem|px|em))\)/, "$1");
       if (size) current.add(`${selector} | ${size}`);
     }
     expect(snapshot.filter((entry) => !current.has(entry))).toEqual([]);

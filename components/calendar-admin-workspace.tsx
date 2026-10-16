@@ -938,7 +938,7 @@ function EntryFiltersBar({
   sort: EntrySort;
 }) {
   return (
-    <div className="calendar-filters">
+    <div className="calendar-filters filter-bar-stack">
       <label className="calendar-search">
         <span className="calendar-search-label">Search entries</span>
         <input
@@ -949,7 +949,7 @@ function EntryFiltersBar({
           value={filters.search}
         />
       </label>
-      <div className="calendar-filter-row">
+      <div className="calendar-filter-row filter-bar">
       <label>
         Category
         <select onChange={(event) => onChange({ category: event.target.value })} value={filters.category}>
@@ -1001,7 +1001,7 @@ function EntryFiltersBar({
           <option value="category">Category</option>
         </select>
       </label>
-      <button className="secondary-button" onClick={onReset} type="button">Reset filters</button>
+      <div className="filter-bar-actions"><button className="secondary-button" onClick={onReset} type="button">Reset filters</button></div>
       </div>
     </div>
   );

@@ -63,7 +63,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
 
     {!view.property ? <section className="panel">
       <h3>Choose a property</h3>
-      <form onSubmit={(event) => {
+      <form className="form-stack" onSubmit={(event) => {
         event.preventDefault();
         const key = new FormData(event.currentTarget).get("propertyKey");
         void run(() => call(base, "POST", { propertyKey: key }), "Property chosen.");
@@ -72,7 +72,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
           ? <p>No properties are set up yet. Ask a system administrator to load the lodging properties.</p>
           : <>
             <label>Property <select name="propertyKey" required>{view.availableProperties.map((property) => <option key={property.key} value={property.key}>{property.name}</option>)}</select></label>
-            <button className="primary-button" type="submit" disabled={busy}>Use this property</button>
+            <div className="filter-bar-actions"><button className="primary-button" type="submit" disabled={busy}>Use this property</button></div>
           </>}
       </form>
     </section> : <>

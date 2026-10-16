@@ -40,7 +40,7 @@ export function HonorWaitlistSettings({ eventId, initialHours }: { eventId: stri
 
   const valid = Number.isInteger(Number(hours)) && Number(hours) >= waitlistOfferHoursMin && Number(hours) <= waitlistOfferHoursMax;
   return (
-    <section className="panel" aria-labelledby="honor-waitlist-settings-heading">
+    <section className="panel form-stack" aria-labelledby="honor-waitlist-settings-heading">
       <h2 id="honor-waitlist-settings-heading">Class waitlist offers</h2>
       <p className="field-help">
         When a seat opens in a full class, the next youth on its waitlist is offered it and their club director is emailed. They have this long to accept
@@ -59,9 +59,11 @@ export function HonorWaitlistSettings({ eventId, initialHours }: { eventId: stri
       </label>
       {message && <div className="inline-notice success" role="status">{message}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      <button className="secondary-button" disabled={saving || !valid || Number(hours) === saved} onClick={save} type="button">
-        <Save aria-hidden="true" size={16} /> {saving ? "Saving…" : "Save window"}
-      </button>
+      <div className="filter-bar-actions">
+        <button className="secondary-button" disabled={saving || !valid || Number(hours) === saved} onClick={save} type="button">
+          <Save aria-hidden="true" size={16} /> {saving ? "Saving…" : "Save window"}
+        </button>
+      </div>
     </section>
   );
 }

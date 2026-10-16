@@ -50,7 +50,7 @@ describe("calendar admin entries list and edit dialog (#869)", () => {
     expect(panel.indexOf("Search entries")).toBeGreaterThan(-1);
     expect(panel.indexOf("Search entries")).toBeLessThan(panel.indexOf("<select"));
     expect(panel).toContain('class="calendar-search"');
-    expect(panel).toContain('class="calendar-filter-row"');
+    expect(panel).toContain('class="calendar-filter-row filter-bar"');
   });
 
   it("does not render the edit dialog until Edit is used, and Edit announces a dialog", () => {
