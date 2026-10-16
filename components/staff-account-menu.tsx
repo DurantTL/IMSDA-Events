@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRightLeft, CircleUserRound, Eye, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, UserRound } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { WorkspaceContext } from "@/modules/access/workspace-contexts";
 
@@ -19,6 +19,7 @@ export const PROFILE_HREF = "/profile";
 export function StaffAccountMenu({
   attendeePreviewHref,
   canSwitchToAttendee,
+  createEventHref,
   defaultOpen = false,
   displayName,
   email,
@@ -26,6 +27,8 @@ export function StaffAccountMenu({
 }: {
   attendeePreviewHref: string;
   canSwitchToAttendee: boolean;
+  /** Create event (#966): given only to system administrators, the only people who can open that page. */
+  createEventHref?: string;
   /** Render the menu already open (used by render tests). */
   defaultOpen?: boolean;
   displayName: string;
@@ -82,6 +85,12 @@ export function StaffAccountMenu({
             <Link className="account-system-link" href={systemAdminContext.href} onClick={close}>
               <ShieldCheck aria-hidden="true" size={17} />
               {systemAdminContext.label}
+            </Link>
+          )}
+          {createEventHref && (
+            <Link className="account-system-link" href={createEventHref} onClick={close}>
+              <CalendarPlus aria-hidden="true" size={17} />
+              Create event
             </Link>
           )}
           {canSwitchToAttendee && (
