@@ -2159,7 +2159,7 @@ function injectDefects() {
     '<input aria-label="self-test ring" style="display:block;width:200px;height:32px;margin:0;border:1px solid #333;outline:3px solid red;outline-offset:6px"><p style="margin:-4px 0 0">self-test help under the ring</p>',
     '<button disabled type="button" style="min-width:44px;min-height:44px;background:#fff;color:#ddd;opacity:1">self-test disabled</button>',
     // A heading whose icon sits above its text, a label with its field right under it, and text that an overflow box cuts off sideways.
-    '<h3 style="margin:0"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="display:block"><circle cx="10" cy="10" r="8"/></svg>self-test icon heading</h3>',
+    '<h3 style="margin:0;display:block"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="display:block"><circle cx="10" cy="10" r="8"/></svg>self-test icon heading</h3>',
     '<label style="display:block;line-height:1;margin:0">self-test stacked label<input style="display:block;margin:0;width:160px;height:32px;border:1px solid #333"></label>',
     '<div style="width:80px;overflow:hidden;white-space:nowrap"><span>self-test text that is cut off sideways by its box</span></div>',
   ].join("");
