@@ -687,7 +687,7 @@ export function RegistrationAmendmentEditor({
               )}
               <div className="amendment-fields">
                 {hidesPromoCode && (
-                  <p className="amendment-promo-note">A promo code cannot be added to a new person here. Use Adjust amount owed in Payments.</p>
+                  <p className="field-help">A promo code cannot be added to a new person here. Use Adjust amount owed in Payments.</p>
                 )}
                 {visibleFields.filter((field) => !(hidesPromoCode && field.key === "promo_code")).map((field) => (
                   <AmendmentField

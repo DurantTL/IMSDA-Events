@@ -841,7 +841,7 @@ export function PublicRegistrationForm({
     [allFields, rosterEnabled],
   );
   const attendeeCodes = attendeePromoField
-    ? attendees.map((attendee) => String(attendee.responses[attendeePromoField.key] ?? "").trim().toUpperCase())
+    ? attendees.map((attendee) => normalizeTickCode(attendee.responses[attendeePromoField.key]))
     : [];
   const attendeeCodesSignature = attendeeCodes.join("|");
   // The person who holds the church code (#961): the one who typed it first. Everyone else is a tick.
@@ -1816,11 +1816,13 @@ export function PublicRegistrationForm({
                 const holderId = attendees[attendeeIndex]?.clientId ?? null;
                 if (!promoSharedCode) setPromoCodeHolderId(holderId);
                 context.setValue(field.key, inputEvent.target.value);
-                if (isHolder && promoTickMode) {
-                  // The code changed or was removed: everyone ticked follows it, through the same path as any answer.
+                if (isHolder) {
+                  // The code changed or was removed: everyone ticked (holding the previous code) follows every keystroke,
+                  // through the same path as any answer. A different code is never overwritten.
                   const { indexes, code } = ticksToRewrite({
                     values: attendees.map((attendee) => attendee.responses[field.key]),
                     holderIndex: attendeeIndex,
+                    previousCode: value,
                     nextCode: inputEvent.target.value,
                   });
                   for (const index of indexes) setAttendeeFieldValue(index, field.key, code);

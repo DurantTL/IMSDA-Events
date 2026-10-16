@@ -42,17 +42,22 @@ export function personPromoView(input: {
 }
 
 /**
- * The attendees whose code follows the holder when the holder's code changes or is removed: everyone else who has a code.
- * Returns the indexes to rewrite and the code they take.
+ * The attendees whose code follows the holder when the holder's code changes or is removed: the ticked ones, meaning
+ * everyone else whose code equals the holder's previous code. A different code is never overwritten. Returns the indexes
+ * to rewrite and the code they take.
  */
 export function ticksToRewrite(input: {
   values: readonly unknown[];
   holderIndex: number;
+  previousCode: unknown;
   nextCode: unknown;
 }) {
   const code = normalizeTickCode(input.nextCode);
-  const indexes = input.values.flatMap((value, index) => (
-    index !== input.holderIndex && normalizeTickCode(value) !== "" && normalizeTickCode(value) !== code ? [index] : []
-  ));
+  const previous = normalizeTickCode(input.previousCode);
+  const indexes = previous === "" || previous === code
+    ? []
+    : input.values.flatMap((value, index) => (
+      index !== input.holderIndex && normalizeTickCode(value) === previous ? [index] : []
+    ));
   return { indexes, code };
 }

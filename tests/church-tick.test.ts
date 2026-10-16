@@ -32,9 +32,20 @@ describe("church tick mode (#961)", () => {
 
   it("rewrites ticked people when the holder changes or removes the code", () => {
     const values = ["CHURCH", "", "church", "OTHER"];
-    expect(ticksToRewrite({ values, holderIndex: 0, nextCode: "NEWCODE" })).toEqual({ indexes: [2, 3], code: "NEWCODE" });
-    expect(ticksToRewrite({ values, holderIndex: 0, nextCode: "" })).toEqual({ indexes: [2, 3], code: "" });
-    // Nothing to rewrite when everyone already matches, and never the holder or an untouched blank.
-    expect(ticksToRewrite({ values: ["CHURCH", "", "CHURCH"], holderIndex: 0, nextCode: "church" })).toEqual({ indexes: [], code: "CHURCH" });
+    // Only people holding the holder's previous code follow; a different code ("OTHER") is kept, a blank stays blank.
+    expect(ticksToRewrite({ values, holderIndex: 0, previousCode: "CHURCH", nextCode: "NEWCODE" })).toEqual({ indexes: [2], code: "NEWCODE" });
+    expect(ticksToRewrite({ values, holderIndex: 0, previousCode: "church", nextCode: "" })).toEqual({ indexes: [2], code: "" });
+    // Nothing to rewrite when the code did not change, or the holder had none.
+    expect(ticksToRewrite({ values, holderIndex: 0, previousCode: "CHURCH", nextCode: "church" })).toEqual({ indexes: [], code: "CHURCH" });
+    expect(ticksToRewrite({ values, holderIndex: 0, previousCode: "", nextCode: "NEW" })).toEqual({ indexes: [], code: "NEW" });
+  });
+
+  it("follows every keystroke, because each step starts from the previous code", () => {
+    let values = ["CHURCH", "CHURCH", "OTHER"];
+    for (const typed of ["CHURCHX", "CHURCHXY", "CHURCHX"]) {
+      const { indexes, code } = ticksToRewrite({ values, holderIndex: 0, previousCode: values[0], nextCode: typed });
+      values = values.map((value, index) => (index === 0 ? typed : indexes.includes(index) ? code : value));
+    }
+    expect(values).toEqual(["CHURCHX", "CHURCHX", "OTHER"]);
   });
 });
