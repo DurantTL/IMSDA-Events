@@ -3941,6 +3941,17 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   font-weight: 800;
 }
 
+.public-registration-promo-field > label.public-registration-promo-covered {
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.public-registration-promo-covered span,
+.public-registration-promo-field small {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
 .public-registration-promo-control {
   display: flex;
   gap: 8px;

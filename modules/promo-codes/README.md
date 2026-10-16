@@ -138,9 +138,42 @@ Automation may prepare a draft and must never finalize or send one.
   it stays derived from the event name. (4) Audits keep ids only.
 - **Audit** (`CHURCH_CODE_INVOICE_DRAFT_PREPARED`) holds ids, counts and amounts
   only. Money is integer cents throughout.
-- **Not built here** (see the follow-up on issue #399): a church contact
-  registering several women at once with the code applied only to the people it
-  covers, a contact-only revision of a finalized church code invoice, a CSV of the
+- **Not built here** (see the follow-up on issue #399): a contact-only revision of a finalized church code invoice, a CSV of the
   report. (An invoice code setting for general events is not planned: Oct 15 decision above.)
 
 Real-database check: `npm run test:church-code-invoices`.
+
+## Church group registration (#961)
+
+Owner decisions (Caleb, Oct 15, 2026): a church contact (or the office) registers
+several women on the roster form, and the church's code covers only the people
+ticked as covered; the rest pay for themselves.
+
+- **A church code is the registration's only code.** On a form with the per-person
+  promo field (#397), several people may use the same church-sponsored code, each
+  taking one use. A different church code, or any other code beside a church code,
+  is refused for that person, when previewing, claiming, and in a staff per-person
+  code adjustment (`PROMO_ALREADY_APPLIED`). Different ordinary (non-church) codes
+  for different people stay allowed, as #397 requires, until Caleb decides otherwise.
+  The rule counts only codes that validated, so a mistyped first code never blocks a
+  valid one after it.
+- **The tick (church codes only).** The person who types the code first holds it. Once
+  a church-sponsored code is applied, every other person shows a "Covered by the code
+  ...: name" tickbox, unticked by default; ticking fills their code, unticking clears
+  it, and changing or removing the holder's code rewrites every ticked person to match
+  (logic in `church-tick.ts`). Someone carrying a different code (a restored draft)
+  keeps a text input with a conflict message. With an ordinary code, or before Apply,
+  everyone keeps their own text input as before (#397). Unticked people pay for
+  themselves.
+- **Amendments.** A person added in an amendment takes no promo code (use Adjust
+  amount owed in Payments).
+- **Use limits count per person.** Each person who receives the code takes one use,
+  so a single-use code covers one person and a multi-use code covers up to its limit.
+  The code shows as used for that person on the church report (#960).
+- **Contacts and accounts.** The church treasurer is the billing contact (#165); the
+  invoice is emailed to them as in #399. No account is needed to register.
+- **Club registrations** already cover every person on the registration and bill the
+  club's church (#409); nothing changes there.
+- **Not built here:** a separate non-billing church (pastor) contact in the directory.
+  It is tracked in #977.
+
