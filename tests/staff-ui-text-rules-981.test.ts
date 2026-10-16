@@ -52,4 +52,9 @@ describe("text rules run on every page (#981)", () => {
     expect(read("components/background-check-review-panel.tsx")).toContain('<form className="filter-bar background-check-lookup-form" onSubmit={(event) => void runLookup(event)}>');
     expect(read("app/(public)/account/(portal)/clubs/[organizationId]/exports/class-tracking/page.tsx")).toContain('className="report-actions filter-bar"');
   });
+
+  it("keeps the class-tracking year field full width on phones and the issued-assets panels from doubling their spacing", () => {
+    expect(css).toMatch(/@media \(max-width: 440px\) \{\s*\.report-actions\.filter-bar \{ align-items: stretch; flex-direction: column; \}/);
+    expect(css).toMatch(/\.panel\.form-stack > :is\(h2, h3, h4, p\) \{ margin-block: 0; \}/);
+  });
 });

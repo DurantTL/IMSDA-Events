@@ -11214,6 +11214,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 /* A field's focus outline reaches 4px past the field: a heading or help text right above or below it needs that room. */
 :is(h2, h3, h4) + :is(.filter-bar, .form-stack, .field-row) { margin-top: 10px; }
+/* A panel that is itself a form-stack (the issued-assets panels) already spaces its children with the grid gap: no extra default margins. */
+.panel.form-stack > :is(h2, h3, h4, p) { margin-block: 0; }
+/* The phone stack of .report-actions (440px and under) must win over .filter-bar's bottom alignment, so a field stretches full width. */
+@media (max-width: 440px) {
+  .report-actions.filter-bar { align-items: stretch; flex-direction: column; }
+}
 .calendar-filter-row.filter-bar { display: flex; }
 .calendar-filter-row.filter-bar > label { flex: 1 1 10rem; }
 .color-field-row { align-items: start; }
