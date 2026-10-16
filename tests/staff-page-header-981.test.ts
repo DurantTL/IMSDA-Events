@@ -169,3 +169,20 @@ describe("the More cards still reach every page whose back button went", () => {
     }
   });
 });
+
+describe("operational guidance kept after the header change", () => {
+  it("keeps the Accounts two-step and forgotten-password guidance as helper text", () => {
+    const source = read("components/attendee-accounts-workspace.tsx");
+    expect(source).toContain("Nobody can turn it off themselves.");
+    expect(source).toContain("Forgotten passwords are reset by the person with");
+    expect(source).toContain("Every action here is recorded.");
+    expect(source).toMatch(/className="field-help"/);
+  });
+
+  it("draws the Sterling Volunteers intro through the shared header, beside the import panel", () => {
+    const source = read("app/(workspace)/admin/organizations/background-checks/page.tsx");
+    expect(source).toContain("<StaffPageHeader");
+    expect(source).toContain("primary={<BackgroundCheckImportPanel />}");
+    expect(source).not.toContain("page-intro");
+  });
+});

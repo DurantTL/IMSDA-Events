@@ -194,6 +194,15 @@ export function AttendeeAccountsWorkspace({
 
   return (
     <section className="page-stack">
+      <div className="meta-stack">
+        <p className="field-help">
+          Reset two-step sign-in when someone loses their phone: their authenticator and passkeys are removed, they&apos;re
+          signed out, and club roles set it up again at their next sign-in. Nobody can turn it off themselves.
+        </p>
+        <p className="field-help">
+          Forgotten passwords are reset by the person with &ldquo;Forgot password&rdquo;. Every action here is recorded.
+        </p>
+      </div>
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While the confirm dialog is open, its own alert shows the error; one announcement, not two. */}
       {error && !pendingAction && <div className="inline-notice error" role="alert">{error}</div>}

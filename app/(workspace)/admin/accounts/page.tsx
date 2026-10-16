@@ -29,7 +29,7 @@ export default async function AttendeeAccountsPage({
   return (
     <>
       <StaffPageHeader
-        description="Attendee and club accounts (people who sign in at /account). Reset two-step sign-in when someone loses their phone: their authenticator and passkeys are removed and they are signed out. Every action here is recorded."
+        description="Attendee and club accounts (people who sign in at /account). Reset two-step sign-in when someone loses their phone."
         primary={(
           <ActAsButton
             access="View only"
