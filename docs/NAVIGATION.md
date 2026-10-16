@@ -147,18 +147,18 @@ visibility condition is exactly what gated that destination before.
     grouping, and never shows Clubs and churches or System
     (`mobileNavigationOrder` in `components/staff-navigation.ts`).
 - **More page (`app/(workspace)/more/page.tsx`), the phone directory (#475):**
-  its cards are grouped under four headings — **Setup, Content & sales,
-  People & access, Reports** — a different grouping from the sidebar's,
+  its cards are grouped under four headings — **Event tools, People & clubs,
+  Sales & content, Reports** — a different grouping from the sidebar's,
   matched to how staff described the tasks they look for on a phone. It is
   the complete set of destinations reachable from the desktop sidebar that
   aren't one of the six bottom tabs, so together the bottom tabs and this
   page reach exactly what the sidebar reaches, for every role
   (`tests/mobile-directory-parity.test.ts`):
-  - **Setup:** Event settings, Attendee setup, Tags, Honors Weekend classes,
+  - **Event tools:** Event settings, Attendee setup, Tags, Honors Weekend classes,
     Registration forms, Seminar assignments.
-  - **Content & sales:** Public content, Merchandise, Promo codes, Attendee
+  - **Sales & content:** Public content, Merchandise, Promo codes, Attendee
     community.
-  - **People & access:** Staff, Clubs and churches (on a CLUB-audience event
+  - **People & clubs:** Staff, Clubs and churches (on a CLUB-audience event
     only, #481 — two cards: the system-admin directory at
     `/admin/organizations`, and the event's club oversight at `/more/clubs`
     for anyone with club oversight, titled "This event's clubs" for a system

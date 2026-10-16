@@ -37,7 +37,8 @@ function database() {
     },
     groupEventRegistration: { findMany: vi.fn().mockResolvedValue([]) },
     clubRosterMember: { findMany: vi.fn().mockResolvedValue([]) },
-    honorEnrollment: { findMany: vi.fn().mockResolvedValue([{ offeringId: "o-dm", registrationAttendeeId: "a1", consumesSeat: true }]) },
+    honorEnrollment: { findMany: vi.fn().mockResolvedValue([{ offeringId: "o-dm", registrationAttendeeId: "a1", consumesSeat: true }]), groupBy: vi.fn().mockResolvedValue([]) },
+    honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]) },
     eventLocation: {
       findMany: vi.fn().mockResolvedValue([{ id: "loc-dm", name: "Des Moines", sortOrder: 0 }, { id: "loc-hr", name: "Camp Heritage 1", sortOrder: 1 }]),
     },

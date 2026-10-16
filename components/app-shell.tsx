@@ -225,6 +225,9 @@ export function AppShell({
   const moreItemVisible = visibleNavigation.find((item) => item.href === "/more");
   // A page that is no sidebar item lights its parent, or More when the viewer can't see it (#964).
   const visibleHrefs = new Set([...visibleSections.flatMap((view) => view.items.map((item) => item.href)), ...visibleNavigation.map((item) => item.href)]);
+  // The hrefs of the sidebar links actually drawn for this viewer (not the More trigger, which opens the launcher).
+  // The launcher drops cards and footer links that repeat one of these, so this must stay exactly what is drawn (#967).
+  const drawnSidebarHrefs = new Set(visibleSections.flatMap((view) => view.items.map((item) => item.href)));
   const activeHref = onEventFeatures ? null : sidebarActiveHref(current, visibleHrefs);
   const isItemActive = (item: NavigationItem) => {
     if (isProfileRoute) return false;
@@ -424,6 +427,7 @@ export function AppShell({
                 href={withCurrentEvent(href, selectedEventId)}
                 isActive={isActive}
                 cards={launcherCards}
+                sidebarHrefs={drawnSidebarHrefs}
                 isSystemAdmin={isSystemAdmin}
                 canRequestFeature={canRequestFeature}
                 eventQuery={eventQuery}
