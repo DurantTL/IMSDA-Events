@@ -242,7 +242,9 @@ export async function previewEventClone(actorUserId: string, rawInput: unknown) 
   const prisma = getPrisma();
   const config = await loadSourceConfiguration(prisma, sourceEventId);
   if (!config) throw new EventCloneOperationError("SOURCE_NOT_FOUND", "That source event was not found.");
-  const plan = buildClonePlan(config, fingerprintOf(config), appOrigins());
+  // The source's module switches, for the copy flow's features step (#965). Read only; they are not part of the fingerprint.
+  const moduleRows = await prisma.eventModule.findMany({ where: { eventId: sourceEventId }, select: { moduleKey: true } });
+  const plan = buildClonePlan(config, fingerprintOf(config), appOrigins(), moduleRows.map((row) => row.moduleKey));
   await prisma.auditLog.create({ data: {
     eventId: sourceEventId, actorUserId, action: "EVENT_CLONE_PREVIEWED", entityType: "Event", entityId: sourceEventId,
     correlationId: randomUUID(), summary: "Previewed copying this event into a new draft.",

@@ -8,6 +8,7 @@ import { formatDateRange } from "@/modules/calendar/domain";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
 import { listEventTemplates } from "@/modules/event-templates/repository";
 import { StartFromTemplate } from "@/components/start-from-template";
+import { templateFeatureDefaults } from "@/modules/event-templates/feature-defaults";
 
 export const metadata: Metadata = { title: "Start from template" };
 
@@ -20,6 +21,9 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
   // published ones alone left the list blank; the picker disables the ones `applyEventTemplate`
   // would refuse (no valid published version) and says how to publish them.
   const templates = (await listEventTemplates()).filter((template) => template.status !== "ARCHIVED");
+
+  // What each template starts the event with, for the features step (#965).
+  const featureDefaults = Object.fromEntries(templates.map((template) => [template.id, templateFeatureDefaults(template)]));
 
   // Opened from a calendar item's Add registration (#445): the form starts with the item's title and dates.
   const { fromCalendarEntry } = await searchParams;
@@ -46,6 +50,7 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
       <p><Link href={`/event-setup${carry}#blank-event`}>Start blank</Link> instead: fill in the event details by hand.</p>
       <StartFromTemplate
         templates={templates}
+        featureDefaults={featureDefaults}
         calendarPrefill={prefill?.ok ? { entryId: prefill.entry.id, title: prefill.entry.title, startsOn: prefill.entry.startsOn, endsOn: prefill.entry.endsOn } : undefined}
       />
     </main>

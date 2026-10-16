@@ -10960,3 +10960,35 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .staff-invite-preview { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); overflow-wrap: anywhere; }
 .staff-invite-preview pre { white-space: pre-wrap; margin: 0; font: inherit; }
 .staff-invite-party { margin: 0; padding-left: 18px; }
+
+/* Event features page and the creation features step (#965). */
+.event-features-page { display: grid; gap: 14px; }
+.event-features-notice { min-height: 1.4em; margin: 0; }
+.event-features-page .page-intro .secondary-button { max-width: 100%; text-align: center; }
+.event-features-table th[scope="row"] { min-width: 220px; }
+.event-feature-description { display: block; margin-top: 2px; font-weight: 400; }
+.feature-switch {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 6px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer;
+}
+.feature-switch:disabled { cursor: progress; opacity: 0.7; }
+.feature-switch-track {
+  position: relative; display: inline-block; width: 44px; height: 26px; flex: none; border-radius: 13px;
+  background: var(--field-border); transition: background 120ms ease;
+}
+.feature-switch[data-on="true"] .feature-switch-track { background: var(--green); }
+.feature-switch-thumb {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: transform 120ms ease;
+}
+.feature-switch[data-on="true"] .feature-switch-thumb { transform: translateX(18px); }
+.feature-switch-readonly { display: inline-flex; flex-direction: column; gap: 2px; color: var(--muted); font-weight: 700; }
+.feature-switch-readonly small { font-weight: 400; }
+@media (prefers-reduced-motion: reduce) {
+  .feature-switch-track, .feature-switch-thumb { transition: none; }
+}
+.creation-features-step > summary { cursor: pointer; }
+.creation-features-step > summary h2 { display: inline; margin: 0; }
+.creation-features-step > summary small { display: block; margin-top: 4px; color: var(--muted); }
+.creation-feature-list, .creation-feature-later { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.creation-feature-later { padding-left: 18px; list-style: disc; }

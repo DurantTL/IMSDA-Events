@@ -11,6 +11,7 @@ import {
   listEventsForUser,
 } from "@/modules/events/repository";
 import { eventSettingsInputSchema } from "@/modules/events/schemas";
+import { creationFeaturesSchema } from "@/modules/event-features/creation";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -64,7 +65,15 @@ async function postHandler(request: Request) {
     const input = eventSettingsInputSchema.parse(body);
     // Set when the event is set up from a calendar item (#445); the item decides the rest, never the request.
     const calendarEntryId = z.object({ calendarEntryId: z.string().trim().min(1).max(100).optional() }).parse(body ?? {}).calendarEntryId;
-    const event = await (calendarEntryId ? createEvent(input, user.id, { calendarEntryId }) : createEvent(input, user.id));
+    // The "Which features does this event use?" step (#965): the chosen modules and calendar choice. Absent is the
+    // step skipped, so the audience's defaults. The flags (waitlist, shirt sizes, ...) are ordinary settings fields.
+    const features = z.object({ features: creationFeaturesSchema.optional() }).parse(body ?? {}).features;
+    const options = {
+      ...(calendarEntryId ? { calendarEntryId } : {}),
+      ...(features?.modules ? { modules: features.modules } : {}),
+      ...(features?.showOnCalendar === undefined ? {} : { showOnCalendar: features.showOnCalendar }),
+    };
+    const event = await (Object.keys(options).length > 0 ? createEvent(input, user.id, options) : createEvent(input, user.id));
     return Response.json({ event }, { status: 201 });
   } catch (error) { return eventApiError(error); }
 }
