@@ -80,7 +80,7 @@ export function EventGeneralLinkPanel({ eventId, publicUrl, initialSettings }: {
       {settings.problem && <p className="field-help" role="status">{settings.problem}</p>}
       {settings.enabled && !settings.isPublished && <p className="field-help" role="status">The event is not published yet, so the link shows &ldquo;not found&rdquo; until it is.</p>}
       {settings.enabled && (
-        <div className="field-group">
+        <div className="form-stack">
           <label htmlFor="general-link-url">Link to share</label>
           <div className="intro-actions">
             <input id="general-link-url" readOnly onFocus={(event) => event.currentTarget.select()} value={publicUrl} />
