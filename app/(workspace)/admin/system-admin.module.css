@@ -775,3 +775,97 @@ details.taskGroup[open] .taskGrid {
 .eventLinks a:hover {
   border-color: var(--imsda-navy);
 }
+
+/* Phone: denser event cards so the dashboard is much shorter than the 7,375px it was (#981). */
+@media (max-width: 700px) {
+  .eventStats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .eventStats span,
+  .eventStats span + span,
+  .eventStats span:nth-child(even),
+  .eventStats span:nth-child(n + 3) {
+    border: 0;
+    border-left: 1px solid var(--line);
+    padding: 8px 10px;
+  }
+
+  .eventStats span:nth-child(3n + 1) {
+    border-left: 0;
+  }
+
+  .eventStats span:nth-child(n + 4) {
+    border-top: 1px solid var(--line);
+  }
+
+  .eventLinks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .eventLinks a {
+    padding: 2px 4px;
+    font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The per-event links sit in a disclosure that is closed on a phone and always open from 701px up. */
+.eventTools > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  font-weight: 800;
+  list-style: none;
+}
+
+.eventTools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.eventTools[open] > summary svg {
+  transform: rotate(180deg);
+}
+
+@media (min-width: 701px) {
+  @supports selector(::details-content) {
+    .eventTools::details-content {
+      display: block;
+      content-visibility: visible;
+    }
+
+    .eventTools > summary {
+      display: none;
+    }
+  }
+}
+
+@media (max-width: 700px) {
+  .eventMain {
+    gap: 4px;
+    padding: 12px 14px;
+  }
+
+  .eventFooter {
+    padding: 8px 14px;
+    gap: 2px;
+  }
+
+  .eventWarnings {
+    gap: 0;
+  }
+}
