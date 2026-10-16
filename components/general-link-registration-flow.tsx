@@ -52,9 +52,10 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
           </p>
           <ClubLocationPicker allowWaitlist locations={locations} noun="club" onChange={setLocationId} value={locationId} />
           {team.named && (
-            <div className="field-group">
-              <label htmlFor="general-link-team-name">Team name</label>
+            <label className="public-registration-field" htmlFor="general-link-team-name">
+              <span className="public-registration-field-label">Team name</span>
               <input
+                aria-describedby="general-link-team-name-help"
                 id="general-link-team-name"
                 maxLength={TEAM_NAME_MAX}
                 onChange={(event) => setTeamName(event.target.value)}
@@ -62,8 +63,8 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
                 type="text"
                 value={teamName}
               />
-              <p className="field-help">Each team has its own name, different from every other team in the event. A club can register more than one team.</p>
-            </div>
+              <small id="general-link-team-name-help">Each team has its own name, different from every other team in the event. A club can register more than one team.</small>
+            </label>
           )}
           <div className="club-registration-toolbar">
             <button className="primary-button" disabled={!canContinue} onClick={() => setStarted(true)} type="button">
