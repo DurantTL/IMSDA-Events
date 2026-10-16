@@ -32,7 +32,7 @@ import type { EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth, operationalHealthEntryPermissions } from "@/modules/operations/access";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
-import { systemSubpageTitle } from "@/components/system-navigation";
+import { isSystemWorkspacePath, systemSubpageTitle } from "@/components/system-navigation";
 
 /**
  * The single source of the destinations a signed-in staff member may reach:
@@ -198,7 +198,7 @@ const subpageRules: readonly SubpageRule[] = [
 /** The title a staff page shows in the workspace header, or `null` to use its nav label. */
 export function staffSubpageTitle(pathname: string): string | null {
   // A /admin page names itself, not "System management" (#981).
-  if (pathname === "/admin" || pathname.startsWith("/admin/")) return systemSubpageTitle(pathname);
+  if (isSystemWorkspacePath(pathname)) return systemSubpageTitle(pathname);
   for (const [path, match, title] of subpageRules) {
     const isExact = pathname === path;
     const isUnder = pathname.startsWith(path.endsWith("/") ? path : `${path}/`);

@@ -1111,19 +1111,31 @@ export function EventSettingsWorkspace({
             <DangerZone className="event-delete-panel" heading="Unpublish, archive or delete this event">
               {published && (
                 <DangerZoneItem title="Unpublish this event">
-                  <p>Closes every public registration form for {initialEvent.name} immediately. Registrations already taken are kept, and you can publish again later.</p>
-                  <button className="secondary-button danger-outline-button full-button" disabled={unpublishing} onClick={openUnpublishDialog} type="button">
+                  <p className="danger-zone-consequence">Closes public registration now. You can publish again later.</p>
+                  <details className="danger-zone-details">
+                    <summary>More detail</summary>
+                    <p>Closes every public registration form for {initialEvent.name} immediately. Registrations already taken are kept, and you can publish again later.</p>
+                  </details>
+                  <button className="secondary-button full-button" disabled={unpublishing} onClick={openUnpublishDialog} type="button">
                     {unpublishing ? "Unpublishing…" : "Unpublish event…"}
                   </button>
                 </DangerZoneItem>
               )}
               {canArchiveEvent && (
                 <DangerZoneItem title={initialEvent.archivedAt ? "Unarchive this event" : "Archive this event"}>
-                  <p>
+                  <p className="danger-zone-consequence">
                     {initialEvent.archivedAt
-                      ? "This event is archived: hidden from pickers and the public site, with registration closed. Unarchiving restores it exactly."
-                      : "Hides this event from pickers and the public site and closes registration, without deleting anything. Reports and exports still work from the Archived events list, and you can unarchive it later."}
+                      ? "Restores the event to pickers and the public site."
+                      : "Hides the event and closes registration. Nothing is deleted."}
                   </p>
+                  <details className="danger-zone-details">
+                    <summary>More detail</summary>
+                    <p>
+                      {initialEvent.archivedAt
+                        ? "This event is archived: hidden from pickers and the public site, with registration closed. Unarchiving restores it exactly."
+                        : "Hides this event from pickers and the public site and closes registration, without deleting anything. Reports and exports still work from the Archived events list, and you can unarchive it later."}
+                    </p>
+                  </details>
                   <button className="secondary-button danger-outline-button full-button" onClick={() => setArchiveDialogOpen(true)} type="button">
                     {initialEvent.archivedAt ? "Unarchive event…" : "Archive event…"}
                   </button>
@@ -1131,8 +1143,12 @@ export function EventSettingsWorkspace({
               )}
               {canDeleteEvent && (
                 <DangerZoneItem title="Delete this event">
-                  <p>Only a system administrator can delete an event, and only one with no registrations, payments, imports, form submissions or other records attached. Otherwise the dialog explains why, and unpublishing is the way to retire it.</p>
-                  <button className="secondary-button danger-outline-button full-button" onClick={() => setDeleteDialogOpen(true)} type="button">
+                  <p className="danger-zone-consequence">Permanent. Only possible while the event has no registrations or other records.</p>
+                  <details className="danger-zone-details">
+                    <summary>More detail</summary>
+                    <p>Only a system administrator can delete an event, and only one with no registrations, payments, imports, form submissions or other records attached. Otherwise the dialog explains why, and unpublishing is the way to retire it.</p>
+                  </details>
+                  <button className="secondary-button danger-outline-button danger-outline-strong full-button" onClick={() => setDeleteDialogOpen(true)} type="button">
                     Delete event…
                   </button>
                 </DangerZoneItem>

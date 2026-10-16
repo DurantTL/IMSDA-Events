@@ -150,6 +150,14 @@ export default async function OperationalReportsPage({
     listEventBackgroundFlags(event.id, { includeNotes: canSeeIssuesText(user) }),
   ]);
   const peopleQuery = `?event=${encodeURIComponent(event.id)}`;
+  // Sections with nothing configured collapse into one line (#981), instead of eight empty panels.
+  const emptyCountSections = ([
+    ["meal and dietary counts", report.meals],
+    ["housing and lodging counts", report.housing],
+    ["ranked seminar interest", report.seminars],
+    ["childcare planning", report.childcare],
+    ["optional-session attendance", report.attendance],
+  ] as const).filter(([, fields]) => fields.length === 0).map(([label]) => label);
   const summaryCards = [
     {
       label: "Active registrations",
@@ -331,49 +339,57 @@ export default async function OperationalReportsPage({
             </div>}
       </section>
 
-      <section className="panel report-panel" id="meal-counts">
-        <div className="section-heading report-section-heading">
-          <div className="report-title">
-            <span className="report-icon gold"><Utensils aria-hidden="true" size={19} /></span>
-            <div><p className="eyebrow">Food service</p><h2>Meal and dietary-choice counts</h2><p>Counts structured meal choices and ticket quantities. Free-text dietary and allergy notes stay private.</p></div>
+      {report.meals.length > 0 && (
+        <section className="panel report-panel" id="meal-counts">
+          <div className="section-heading report-section-heading">
+            <div className="report-title">
+              <span className="report-icon gold"><Utensils aria-hidden="true" size={19} /></span>
+              <div><p className="eyebrow">Food service</p><h2>Meal and dietary-choice counts</h2><p>Counts structured meal choices and ticket quantities. Free-text dietary and allergy notes stay private.</p></div>
+            </div>
+            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "meals")}><Download aria-hidden="true" size={15} /> Download meal CSV</a>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "meals")}><Download aria-hidden="true" size={15} /> Download meal CSV</a>
-        </div>
-        <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." />
-      </section>
+          <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." />
+        </section>
+      )}
 
-      <section className="panel report-panel" id="housing-counts">
-        <div className="section-heading report-section-heading">
-          <div className="report-title">
-            <span className="report-icon green"><BedDouble aria-hidden="true" size={19} /></span>
-            <div><p className="eyebrow">Lodging</p><h2>Housing and lodging counts</h2><p>Shows configured room, cabin, campsite, overnight, and housing selections without exposing private notes.</p></div>
+      {report.housing.length > 0 && (
+        <section className="panel report-panel" id="housing-counts">
+          <div className="section-heading report-section-heading">
+            <div className="report-title">
+              <span className="report-icon green"><BedDouble aria-hidden="true" size={19} /></span>
+              <div><p className="eyebrow">Lodging</p><h2>Housing and lodging counts</h2><p>Shows configured room, cabin, campsite, overnight, and housing selections without exposing private notes.</p></div>
+            </div>
+            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</a>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</a>
-        </div>
-        <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." />
-      </section>
+          <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." />
+        </section>
+      )}
 
-      <section className="panel report-panel" id="seminar-ranking">
-        <div className="section-heading report-section-heading">
-          <div className="report-title">
-            <span className="report-icon purple"><ListOrdered aria-hidden="true" size={19} /></span>
-            <div><p className="eyebrow">Program planning</p><h2>Ranked seminar interest</h2><p>Compares first choices, second choices, and total interest for every ranked-choice field.</p></div>
+      {report.seminars.length > 0 && (
+        <section className="panel report-panel" id="seminar-ranking">
+          <div className="section-heading report-section-heading">
+            <div className="report-title">
+              <span className="report-icon purple"><ListOrdered aria-hidden="true" size={19} /></span>
+              <div><p className="eyebrow">Program planning</p><h2>Ranked seminar interest</h2><p>Compares first choices, second choices, and total interest for every ranked-choice field.</p></div>
+            </div>
+            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "seminars")}><Download aria-hidden="true" size={15} /> Download ranking CSV</a>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "seminars")}><Download aria-hidden="true" size={15} /> Download ranking CSV</a>
-        </div>
-        <SeminarFields fields={report.seminars} />
-      </section>
+          <SeminarFields fields={report.seminars} />
+        </section>
+      )}
 
-      <section className="panel report-panel" id="childcare-counts">
-        <div className="section-heading report-section-heading">
-          <div className="report-title">
-            <span className="report-icon green"><Baby aria-hidden="true" size={19} /></span>
-            <div><p className="eyebrow">Family support</p><h2>Childcare planning</h2><p>Counts structured childcare requests and child quantities without exporting free-text ages or care notes.</p></div>
+      {report.childcare.length > 0 && (
+        <section className="panel report-panel" id="childcare-counts">
+          <div className="section-heading report-section-heading">
+            <div className="report-title">
+              <span className="report-icon green"><Baby aria-hidden="true" size={19} /></span>
+              <div><p className="eyebrow">Family support</p><h2>Childcare planning</h2><p>Counts structured childcare requests and child quantities without exporting free-text ages or care notes.</p></div>
+            </div>
+            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</a>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</a>
-        </div>
-        <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." />
-      </section>
+          <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." />
+        </section>
+      )}
 
       <section className="panel report-panel" id="volunteer-counts">
         <div className="section-heading report-section-heading">
@@ -393,7 +409,7 @@ export default async function OperationalReportsPage({
             <a className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteers")}><Download aria-hidden="true" size={15} /> Counts CSV</a>
           </span>
         </div>
-        <CountFields fields={report.volunteers} emptyCopy="No structured volunteer fields are configured on an active registration form yet." />
+        {report.volunteers.length > 0 && <CountFields fields={report.volunteers} emptyCopy="" />}
         <article className="roster-report-group" id="volunteer-roster">
           <header>
             <div><h3>Who said yes</h3><p>Everyone who answered yes to a volunteer question, with a phone number to reach them. &ldquo;Email volunteers&rdquo; writes to each registration&rsquo;s contact after you preview it.</p></div>
@@ -421,16 +437,23 @@ export default async function OperationalReportsPage({
         </article>
       </section>
 
-      <section className="panel report-panel" id="attendance-counts">
-        <div className="section-heading report-section-heading">
-          <div className="report-title">
-            <span className="report-icon navy"><CalendarCheck2 aria-hidden="true" size={19} /></span>
-            <div><p className="eyebrow">Programme planning</p><h2>Optional-session attendance</h2><p>Counts structured attendance intentions such as Sunday sessions without treating interest rankings as attendance.</p></div>
+      {report.attendance.length > 0 && (
+        <section className="panel report-panel" id="attendance-counts">
+          <div className="section-heading report-section-heading">
+            <div className="report-title">
+              <span className="report-icon navy"><CalendarCheck2 aria-hidden="true" size={19} /></span>
+              <div><p className="eyebrow">Programme planning</p><h2>Optional-session attendance</h2><p>Counts structured attendance intentions such as Sunday sessions without treating interest rankings as attendance.</p></div>
+            </div>
+            <a className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</a>
           </div>
-          <a className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</a>
-        </div>
-        <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." />
-      </section>
+          <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." />
+        </section>
+      )}
+      {emptyCountSections.length > 0 && (
+        <p className="report-empty" data-testid="empty-report-sections">
+          Not shown, because the active registration form has no structured fields for them: {emptyCountSections.join(", ")}.
+        </p>
+      )}
     </section>
   );
 }

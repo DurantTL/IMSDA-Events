@@ -198,7 +198,7 @@ export function TeamAccountMenu({
           }
         }}
       >
-        <MoreHorizontal size={14} aria-hidden="true" /> More actions
+        <MoreHorizontal size={14} aria-hidden="true" /> More
       </button>
       {open && (
         <ul

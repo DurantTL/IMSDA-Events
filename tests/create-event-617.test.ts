@@ -83,7 +83,7 @@ describe("Start from template picker (#617)", () => {
   });
 
   it("the page lists every template that is not archived, not only published ones", () => {
-    const source = readFileSync("app/event-setup/from-template/page.tsx", "utf8");
+    const source = readFileSync("app/(workspace)/event-setup/from-template/page.tsx", "utf8");
     expect(source).toContain('template.status !== "ARCHIVED"');
     expect(source).not.toContain("filter((template) => template.canApply)");
   });

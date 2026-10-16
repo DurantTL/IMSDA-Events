@@ -371,8 +371,12 @@ describe("empty states offer a create action only to an authorized viewer (#743)
 
   it("tags", () => {
     const render = (canCreate: boolean) => renderToStaticMarkup(createElement(TagConfigurationWorkspace, { eventId: "e1", eventName: "Synthetic", initialTags: [], canCreate }));
-    expect(render(true)).toContain("Add the first tag");
+    // #981: the form is already open below, so no "Add the first tag" button that only scrolls to it.
+    expect(render(true)).toContain("No tags yet");
+    expect(render(true)).not.toContain("Add the first tag");
+    expect(render(true)).not.toContain("Ask an event administrator");
     expect(render(true)).toContain("Add tag");
+    expect(render(false)).toContain("Ask an event administrator to add tags.");
     expect(render(false)).toContain("No tags yet");
     expect(render(false)).not.toContain("Add the first tag");
     expect(render(false)).not.toContain(">Add tag<");
@@ -382,7 +386,11 @@ describe("empty states offer a create action only to an authorized viewer (#743)
     const render = (canCreate: boolean) => renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
       eventId: "e1", eventName: "Synthetic", initialTypes: [], initialClassifications: [], canCreate,
     }));
-    expect(render(true)).toContain("Add the first attendee type");
+    // #981: the add form is open below, so there is no scroll-to-form button.
+    expect(render(true)).toContain("No attendee types yet");
+    expect(render(true)).not.toContain("Add the first attendee type");
+    expect(render(true)).not.toContain("Ask an event administrator");
+    expect(render(false)).toContain("Ask an event administrator to add attendee types.");
     expect(render(false)).toContain("No attendee types yet");
     expect(render(false)).not.toContain("Add the first attendee type");
     expect(render(false)).not.toContain("Add attendee type");

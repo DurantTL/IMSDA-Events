@@ -11,13 +11,29 @@ export function CheckInPaymentDue({
   balanceCents,
   confirmationCode,
   partySize,
+  compact = false,
 }: {
   balanceCents: number;
   confirmationCode: string;
   partySize: number;
+  /** A short badge for a roster row (#981): the balance and the card total, with the full wording on hover. */
+  compact?: boolean;
 }) {
   const quote = inPersonCardQuote(balanceCents);
   if (!quote) return null;
+  if (compact) {
+    return (
+      <span
+        className="checkin-due-badge"
+        role="note"
+        title={`${formatCents(quote.balanceCents)} due for ${partySize > 1 ? `all ${partySize} people on ` : ""}${confirmationCode}. Card in Square app: ${formatCents(quote.cardTotalCents)} (includes ${formatCents(quote.cardFeeCents)} card fee). Square note: ${confirmationCode}.`}
+      >
+        <CreditCard aria-hidden="true" size={13} />
+        <b translate="no">{formatCents(quote.balanceCents)}</b> due
+        {" · "}<span translate="no">{formatCents(quote.cardTotalCents)}</span> by card
+      </span>
+    );
+  }
   return (
     <span className="checkin-payment-due" role="note">
       <CreditCard aria-hidden="true" size={14} />

@@ -85,10 +85,8 @@ export function TagConfigurationWorkspace({
       <div className="section-heading"><div><h2>Configured tags</h2><p>Deactivating a tag hides it from new assignments; it stays visible on anything already tagged.</p></div></div>
       {tags.length === 0 ? (
         <EmptyState
-          actionClass="secondary-button"
-          action={{ label: "Add the first tag", onClick: () => document.getElementById("tag-name-input")?.focus() }}
           canCreate={canCreate}
-          hint="Ask an event administrator to add tags."
+          hint={canCreate ? undefined : "Ask an event administrator to add tags."}
           title="No tags yet"
         >
           Tags are labels staff apply to registrations and attendees, such as VIP or Needs ride. Add one below and it appears on the registrations list.

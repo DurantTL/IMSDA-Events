@@ -2,7 +2,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
@@ -31,11 +31,8 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
-    <main className="event-setup-page">
-      <header className="event-setup-header">
-        <div className="brand"><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></div>
-        <div><p className="eyebrow">System administration</p><h1>Start from template</h1></div>
-      </header>
+    <section className="page-stack event-setup-flow">
+      <StaffPageHeader description="Pick a template and the new event starts with its forms and settings." />
       {prefill?.ok === false && (
         <p className="inline-notice error" role="alert">
           {prefill.reason} <Link href="/admin/calendar">Back to the calendar</Link>
@@ -53,6 +50,6 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
         featureDefaults={featureDefaults}
         calendarPrefill={prefill?.ok ? { entryId: prefill.entry.id, title: prefill.entry.title, startsOn: prefill.entry.startsOn, endsOn: prefill.entry.endsOn } : undefined}
       />
-    </main>
+    </section>
   );
 }

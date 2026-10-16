@@ -565,8 +565,8 @@ export function CheckInScanner({
       >
         <QrCode aria-hidden="true" size={30} />
         <span>
-          <strong>Scan or enter an event pass</strong>
-          <small>Review first; offline actions stay visibly queued</small>
+          <strong>Scan an event pass</strong>
+          <small>Opens the camera. You review before anything is saved.</small>
         </span>
       </button>
 
@@ -678,7 +678,7 @@ export function CheckInScanner({
             </section>
 
             <div className="check-in-scanner-divider">
-              <span>or search by name or confirmation code</span>
+              <span>or type the pass or confirmation code</span>
             </div>
 
             <form
@@ -688,14 +688,14 @@ export function CheckInScanner({
               <label>
                 <span>
                   <Keyboard size={16} aria-hidden="true" />
-                  Name or confirmation code
+                  Pass or confirmation code
                 </span>
                 <input
                   autoCapitalize="off"
                   autoComplete="off"
                   maxLength={80}
                   onChange={(event) => setManualCode(event.target.value)}
-                  placeholder="Sam Rivera or REG-1234ABCD"
+                  placeholder="REG-1234ABCD"
                   required
                   spellCheck={false}
                   value={manualCode}

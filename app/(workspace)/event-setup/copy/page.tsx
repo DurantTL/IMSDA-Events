@@ -1,7 +1,7 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { CopyFromPastEvent } from "@/components/copy-from-past-event";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listEventsForUser } from "@/modules/events/repository";
@@ -25,12 +25,9 @@ export default async function CopyFromPastEventPage() {
   }));
 
   return (
-    <main className="event-setup-page">
-      <header className="event-setup-header">
-        <div className="brand"><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></div>
-        <div><p className="eyebrow">System administration</p><h1>Copy from a past event</h1></div>
-      </header>
+    <section className="page-stack event-setup-flow">
+      <StaffPageHeader description="Start from a past event's settings and forms." />
       <CopyFromPastEvent sources={sources} />
-    </main>
+    </section>
   );
 }

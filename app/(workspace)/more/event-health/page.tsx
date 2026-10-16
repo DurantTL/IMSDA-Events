@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { EventHealthSheet } from "@/components/event-health-sheet";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { PrintReportButton } from "@/components/print-report-button";
@@ -39,6 +40,8 @@ export default async function EventHealthPage({
     data = await loadEventHealth(viewer, event.id, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
     if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="STAFF" />;
+    // The window closes when the event ends: the page no longer applies, which is not a permission failure (#981).
+    if (error instanceof HealthViewError && error.code === "WINDOW_CLOSED") return <NotAvailableForEvent reason={error.message} />;
     if (error instanceof HealthViewError) return <AccessRestricted title="Health information is unavailable" detail={error.message} />;
     throw error;
   }

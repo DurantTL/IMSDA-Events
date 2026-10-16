@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -1367,36 +1368,48 @@ export function CommunicationsWorkspace({
                   <span>{announcement.publishedAt ? new Date(announcement.publishedAt).toLocaleDateString() : "Not published"}</span>
                 </footer>
                 {canManage && announcement.status === "DRAFT" && (
-                  <>
-                    <button className="secondary-button publish-button" type="button" disabled={saving} onClick={() => publishAnnouncement(announcement.id)}>
+                  <div className="announcement-actions">
+                    <button className="secondary-button" type="button" disabled={saving} onClick={() => publishAnnouncement(announcement.id)}>
                       <Send aria-hidden="true" size={16} /> Publish to event feed
                     </button>
-                    <button className="text-button" type="button" disabled={saving} onClick={() => startDraftEdit(announcement)}>
-                      Edit draft
-                    </button>
-                    <button className="text-button" type="button" disabled={saving} onClick={() => { setDiscardError(""); setDiscardTarget(announcement); }}>
-                      Discard draft
-                    </button>
-                  </>
+                    <ActionsMenu label="More">
+                      <li>
+                        <button type="button" disabled={saving} onClick={() => startDraftEdit(announcement)}>Edit draft</button>
+                      </li>
+                      <li className="actions-menu-divider">
+                        <button className="actions-menu-danger" type="button" disabled={saving} onClick={() => { setDiscardError(""); setDiscardTarget(announcement); }}>
+                          Discard draft
+                        </button>
+                      </li>
+                    </ActionsMenu>
+                  </div>
                 )}
                 {canManage && announcement.status === "PUBLISHED" && (
                   <>
-                    <button className="secondary-button publish-button" type="button" disabled={saving} onClick={() => void setAnnouncementPinned(announcement, !announcement.pinnedAt)}>
-                      <Pin aria-hidden="true" size={16} /> {announcement.pinnedAt ? "Unpin update" : "Pin to timeline"}
-                    </button>
-                    <button className="secondary-button publish-button" type="button" disabled={saving || broadcastReviewLoading} onClick={() => void broadcastAnnouncement(announcement)}>
-                      <Mail aria-hidden="true" size={16} /> Email active registrations
-                    </button>
-                    <button className="text-button" type="button" disabled={saving} onClick={() => startCorrection(announcement)}>
-                      Send a correction
-                    </button>
+                    <div className="announcement-actions">
+                      <button className="secondary-button" type="button" disabled={saving || broadcastReviewLoading} onClick={() => void broadcastAnnouncement(announcement)}>
+                        <Mail aria-hidden="true" size={16} /> Email active registrations
+                      </button>
+                      <ActionsMenu label="More">
+                        <li>
+                          <button type="button" disabled={saving} onClick={() => void setAnnouncementPinned(announcement, !announcement.pinnedAt)}>
+                            <Pin aria-hidden="true" size={16} /> {announcement.pinnedAt ? "Unpin update" : "Pin to timeline"}
+                          </button>
+                        </li>
+                        <li>
+                          <button type="button" disabled={saving} onClick={() => startCorrection(announcement)}>Send a correction</button>
+                        </li>
+                        {canMarkEssential && (
+                          <li>
+                            <button type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
+                              {announcement.isEssential ? "Clear essential mark" : "Mark essential (reaches people who opted out)"}
+                            </button>
+                          </li>
+                        )}
+                      </ActionsMenu>
+                    </div>
                     <p className="quiet-copy">Published announcements can&apos;t be edited. A correction creates a new draft; it needs its own publish and its own send review before anyone receives it.</p>
                   </>
-                )}
-                {canMarkEssential && announcement.status === "PUBLISHED" && (
-                  <button className="text-button" type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
-                    {announcement.isEssential ? "Clear essential mark" : "Mark essential (reaches people who opted out)"}
-                  </button>
                 )}
               </article>
             ))}

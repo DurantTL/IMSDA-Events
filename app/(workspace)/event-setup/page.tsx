@@ -2,7 +2,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { EventSettingsWorkspace } from "@/components/event-settings-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { formatDateRange } from "@/modules/calendar/domain";
@@ -25,11 +25,8 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
-    <main className="event-setup-page">
-      <header className="event-setup-header">
-        <div className="brand"><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></div>
-        <div><p className="eyebrow">System administration</p><h1>Set up a new event</h1></div>
-      </header>
+    <section className="page-stack event-setup-flow">
+      <StaffPageHeader description="Start blank, from a template, or from a past event." />
       {prefill?.ok === false && (
         <p className="inline-notice error" role="alert">
           {prefill.reason} <Link href="/admin/calendar">Back to the calendar</Link>
@@ -55,6 +52,6 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
             : undefined}
         />
       </div>
-    </main>
+    </section>
   );
 }

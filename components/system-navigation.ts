@@ -156,6 +156,9 @@ type SystemTitleRule = readonly [path: RegExp, title: string];
  * management.
  */
 const systemTitleRules: readonly SystemTitleRule[] = [
+  [/^\/event-setup\/from-template(\/|$)/, "Start from template"],
+  [/^\/event-setup\/copy(\/|$)/, "Copy from a past event"],
+  [/^\/event-setup(\/|$)/, "Create an event"],
   [/^\/admin\/organizations\/background-checks(\/|$)/, "Sterling Volunteers"],
   [/^\/admin\/background-checks(\/|$)/, "Sterling Volunteers"],
   [/^\/admin\/organizations\/directory(\/|$)/, "Organization directory"],
@@ -190,6 +193,15 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
   [/^\/admin\/team(\/|$)/, "Team"],
 ];
+
+/**
+ * Pages that sit in the System management workspace: every /admin page, and the
+ * event-creation pages under /event-setup (#981), which the system sidebar lists
+ * under Events > Create event / Copy a past event.
+ */
+export function isSystemWorkspacePath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/event-setup" || pathname.startsWith("/event-setup/");
+}
 
 /** The topbar title of a /admin page, or `null` for /admin itself and any page without a rule (System management). */
 export function systemSubpageTitle(pathname: string): string | null {
