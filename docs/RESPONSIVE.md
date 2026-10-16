@@ -20,6 +20,20 @@ event administrator and system administrator), visits the main pages at 360,
 | `small-tap-target` | a button, form control, summary or stand-alone link under 44 px (a link inside a sentence is exempt) | 600 px and under |
 | `dialog-too-tall` | a dialog or sheet taller than the screen, or cut off at the top or bottom | every width |
 | `sticky-bar-covers-content` / `sticky-bar-size` | the last content is hidden under a fixed bar, or fixed bars take over a third of the screen | every width |
+| `heading-style` | an h1 or h2 drawn at body size with a body weight (unstyled), or an icon that sits on its own line above its heading | every width |
+| `label-input` | a label's text runs into, touches or overlaps the field it names | every width |
+| `focus-ring-overlap` | a field's focus outline lands on other text (the help text under it, its label) | every width |
+| `text-overlap` | the text of two elements overlaps, or an `overflow: hidden` box cuts text off sideways (an ellipsis or a line clamp is fine) | every width |
+| `disabled-contrast` | a disabled button's label under 3:1 against its own fill, opacity included | every width |
+
+Beyond the pages in the list, the audit builds a Pathfinder Bible Experience shaped
+event (`mobilecheck_pbe_event`: the starter's team rules, Iowa and Missouri sites and the
+`pbe_registration` form, general link on, church billed, one team attached to a club and one
+waiting for staff) and audits every page a PBE user touches (`pbe-*` and `staff-pbe-*`). The
+`pbe-general-link-start` page is also walked: the start step filled in, each step of the form,
+a team member's sheet, the review, and the confirmation after submitting a synthetic team
+(`flow: "general-link"`); the waiting teams page is audited again with a Reject form open
+(`flow: "pending-teams"`). Run just those with `MOBILE_LAYOUT_ONLY=pbe-`.
 
 It runs as its own workflow, not in `ci.yml` (CI minutes are tight):
 

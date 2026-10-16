@@ -1526,7 +1526,10 @@ function textLayoutInPage() {
     const classes = typeof (el as HTMLElement).className === "string"
       ? (el as HTMLElement).className.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => `.${name}`).join("")
       : "";
-    return `${el.tagName.toLowerCase()}${id}${classes} "${(el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 36)}"`;
+    const field = el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA"
+      ? `[${(el as HTMLInputElement).type ?? ""}|${el.getAttribute("name") ?? el.getAttribute("aria-label") ?? el.getAttribute("placeholder") ?? ""}]`
+      : "";
+    return `${el.tagName.toLowerCase()}${id}${classes}${field} "${(el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 36)}"`;
   };
   const visible = (el: Element) => {
     const style = getComputedStyle(el);
@@ -1654,25 +1657,30 @@ function textLayoutInPage() {
     if (!visible(el) || hiddenTree(el) || placed(el)) continue;
     for (const rect of ownTextRects(el)) textBoxes.push({ el, rect });
   }
+  // Focusing a field can scroll the page (a page's own script, a sticky bar): compare in the snapshot's own coordinates.
+  const scrollAtSnapshot = { x: window.scrollX, y: window.scrollY };
   for (const control of controls.slice(0, 12)) {
     (control as HTMLElement).focus({ preventScroll: true });
     const style = getComputedStyle(control);
     const width = style.outlineStyle === "none" ? 0 : Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
     if (width > 0) {
       const box = control.getBoundingClientRect();
-      const ring = { left: box.left - width, right: box.right + width, top: box.top - width, bottom: box.bottom + width };
+      const shiftX = window.scrollX - scrollAtSnapshot.x;
+      const shiftY = window.scrollY - scrollAtSnapshot.y;
+      const ring = { left: box.left + shiftX - width, right: box.right + shiftX + width, top: box.top + shiftY - width, bottom: box.bottom + shiftY + width };
       for (const text of textBoxes) {
         if (control.contains(text.el) || text.el.contains(control)) continue;
         const across = Math.min(ring.right, text.rect.right) - Math.max(ring.left, text.rect.left);
         const down = Math.min(ring.bottom, text.rect.bottom) - Math.max(ring.top, text.rect.top);
         if (across > 1 && down > 1) {
-          problems.focusRing.push(`${describe(control)}: its focus outline (${width}px out) lands on ${describe(text.el)} by ${Math.round(down)}px`);
+          problems.focusRing.push(`${describe(control)}: its focus outline (${width}px out, ${Math.round(ring.left)}..${Math.round(ring.right)} x ${Math.round(ring.top)}..${Math.round(ring.bottom)}) lands on ${describe(text.el)} (${Math.round(text.rect.left)}..${Math.round(text.rect.right)} x ${Math.round(text.rect.top)}..${Math.round(text.rect.bottom)}) by ${Math.round(down)}px`);
           break;
         }
       }
     }
     (control as HTMLElement).blur();
   }
+  window.scrollTo(scrollAtSnapshot.x, scrollAtSnapshot.y);
 
   // Text over text, and text cut off sideways.
   const sorted = textBoxes.slice().sort((a, b) => a.rect.top - b.rect.top);
@@ -2429,7 +2437,8 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
       const toggles = page.locator('.public-registration-step-content button[id^="public_attendee_"][id$="_toggle"]:visible');
       const people = await toggles.count();
       for (let person = 0; person < people; person += 1) {
-        await toggles.nth(person).click();
+        // A card that is already open (a desktop keeps it so) is not toggled shut.
+        if ((await toggles.nth(person).getAttribute("aria-expanded")) !== "true") await toggles.nth(person).click();
         await page.waitForTimeout(300);
         if (person === 0) await auditState(page, name(`${heading}, a team member's sheet`), width, shot(`${heading}-sheet`));
         const sheet = page.locator(`#public_attendee_initial-attendee-${person + 1}`);
@@ -2437,7 +2446,9 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
           await sheet.locator(`input[id$="_${suffix}"]`).fill(value);
         }
         await sheet.locator('input[type=radio][id$="_pbe_member_role"]').first().check({ force: true }).catch(() => undefined);
-        await sheet.locator('button:has-text("Done with")').click({ timeout: 5000 });
+        // A phone edits a person in a sheet that is closed with Done; a desktop edits in place.
+        const done = sheet.locator('button:has-text("Done with"):visible');
+        if ((await done.count()) > 0) await done.first().click({ timeout: 5000 });
         await page.waitForTimeout(250);
       }
       await fillRequiredStep(page, email);
@@ -2449,11 +2460,12 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
         return;
       }
     }
-    await page.locator(".public-registration-submit-card button[type=submit]").first().click({ timeout: 5000 });
+    // The card's own submit button is hidden on a phone, where the sticky bar carries it.
+    await page.locator('button[type=submit]:has-text("Submit team registration"):visible').first().click({ timeout: 5000 });
     await page.waitForSelector(".public-registration-confirmation", { timeout: 20_000 });
     await auditState(page, name("confirmation after submitting"), width, shot("confirmation"));
   } catch (error) {
-    record("audit-failed", name("walkthrough"), width, (error as Error).message.split("\n")[0] ?? "failed");
+    record("audit-failed", name("walkthrough"), width, (error as Error).message.split("\n").slice(0, 3).join(" | ").slice(0, 400));
   }
 }
 
