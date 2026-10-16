@@ -25,7 +25,7 @@ export default async function CopyFromPastEventPage() {
   }));
 
   return (
-    <section className="page-stack event-setup-flow">
+    <section className="page-stack">
       <StaffPageHeader description="Start from a past event's settings and forms." />
       <CopyFromPastEvent sources={sources} />
     </section>

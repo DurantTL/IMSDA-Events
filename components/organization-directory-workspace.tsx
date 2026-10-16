@@ -387,7 +387,7 @@ export function OrganizationDirectoryWorkspace({
                   >
                     <Pencil aria-hidden="true" size={14} /> Edit
                   </button>
-                  <ActionsMenu label="More">
+                  <ActionsMenu label="More" ariaLabel={`More actions for ${organization.name}`}>
                     <li>
                       <button type="button" onClick={() => beginIdentity(organization)}>
                         <Link2 aria-hidden="true" size={14} /> Link provider

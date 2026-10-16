@@ -64,7 +64,7 @@ Trace the cold start of a brand-new production instance:
 4. The only `SYSTEM_ADMIN` in existence is the seeded `system@imsda-events.test`
    (`prisma/seed.ts:41-49`). `globalRole` is settable **only** by the seed — no UI, no API, no
    script promotes a real user. And `SYSTEM_ADMIN` is required to create an event at all
-   (`app/event-setup/page.tsx:12`, `modules/events/authorization.ts:9`).
+   (`app/(workspace)/event-setup/page.tsx:12`, `modules/events/authorization.ts:9`).
 5. So the fictitious admin account cannot be deleted. It is load-bearing.
 
 Now trace onboarding a real colleague. `addStaffMembership` creates their user with a

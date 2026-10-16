@@ -1372,7 +1372,7 @@ export function CommunicationsWorkspace({
                     <button className="secondary-button" type="button" disabled={saving} onClick={() => publishAnnouncement(announcement.id)}>
                       <Send aria-hidden="true" size={16} /> Publish to event feed
                     </button>
-                    <ActionsMenu label="More">
+                    <ActionsMenu label="More" ariaLabel={`More actions for ${announcement.title}`}>
                       <li>
                         <button type="button" disabled={saving} onClick={() => startDraftEdit(announcement)}>Edit draft</button>
                       </li>
@@ -1384,21 +1384,27 @@ export function CommunicationsWorkspace({
                     </ActionsMenu>
                   </div>
                 )}
-                {canManage && announcement.status === "PUBLISHED" && (
+                {(canManage || canMarkEssential) && announcement.status === "PUBLISHED" && (
                   <>
                     <div className="announcement-actions">
-                      <button className="secondary-button" type="button" disabled={saving || broadcastReviewLoading} onClick={() => void broadcastAnnouncement(announcement)}>
-                        <Mail aria-hidden="true" size={16} /> Email active registrations
-                      </button>
-                      <ActionsMenu label="More">
-                        <li>
-                          <button type="button" disabled={saving} onClick={() => void setAnnouncementPinned(announcement, !announcement.pinnedAt)}>
-                            <Pin aria-hidden="true" size={16} /> {announcement.pinnedAt ? "Unpin update" : "Pin to timeline"}
-                          </button>
-                        </li>
-                        <li>
-                          <button type="button" disabled={saving} onClick={() => startCorrection(announcement)}>Send a correction</button>
-                        </li>
+                      {canManage && (
+                        <button className="secondary-button" type="button" disabled={saving || broadcastReviewLoading} onClick={() => void broadcastAnnouncement(announcement)}>
+                          <Mail aria-hidden="true" size={16} /> Email active registrations
+                        </button>
+                      )}
+                      <ActionsMenu label="More" ariaLabel={`More actions for ${announcement.title}`}>
+                        {canManage && (
+                          <li>
+                            <button type="button" disabled={saving} onClick={() => void setAnnouncementPinned(announcement, !announcement.pinnedAt)}>
+                              <Pin aria-hidden="true" size={16} /> {announcement.pinnedAt ? "Unpin update" : "Pin to timeline"}
+                            </button>
+                          </li>
+                        )}
+                        {canManage && (
+                          <li>
+                            <button type="button" disabled={saving} onClick={() => startCorrection(announcement)}>Send a correction</button>
+                          </li>
+                        )}
                         {canMarkEssential && (
                           <li>
                             <button type="button" disabled={saving} onClick={() => void setAnnouncementEssential(announcement, !announcement.isEssential)}>
@@ -1408,7 +1414,7 @@ export function CommunicationsWorkspace({
                         )}
                       </ActionsMenu>
                     </div>
-                    <p className="quiet-copy">Published announcements can&apos;t be edited. A correction creates a new draft; it needs its own publish and its own send review before anyone receives it.</p>
+                    {canManage && <p className="quiet-copy">Published announcements can&apos;t be edited. A correction creates a new draft; it needs its own publish and its own send review before anyone receives it.</p>}
                   </>
                 )}
               </article>

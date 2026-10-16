@@ -2,7 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/communications",
+  useSearchParams: () => new URLSearchParams(),
+}));
+import { CommunicationsWorkspace } from "@/components/communications-workspace";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { staffSubpageTitle } from "@/components/staff-navigation";
@@ -143,5 +150,62 @@ describe("empty states and the check-in desk (#981 batch 3)", () => {
     const scanner = read("components/check-in-scanner.tsx");
     expect(scanner).toContain("<strong>Scan an event pass</strong>");
     expect(scanner).not.toContain("Scan or enter");
+  });
+});
+
+describe("review fixes (#981 batch 3)", () => {
+  it("keeps Mark essential for a viewer who may only mark essential, without the manager actions", () => {
+    const render = (canManage: boolean, canMarkEssential: boolean) => renderToStaticMarkup(createElement(CommunicationsWorkspace, {
+      eventId: "e1",
+      eventName: "Synthetic",
+      initialAnnouncements: [{
+        id: "a1", title: "Synthetic published", body: "Body", status: "PUBLISHED", priority: "NORMAL", publishedAt: "2026-01-01T00:00:00.000Z",
+        isEssential: false, pinnedAt: null, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      }],
+      initialView: "announcements",
+      canManage,
+      canMarkEssential,
+    } as never));
+    const essentialOnly = render(false, true);
+    expect(essentialOnly).toContain("Mark essential");
+    expect(essentialOnly).not.toContain("Email active registrations");
+    expect(essentialOnly).not.toContain("Send a correction");
+    expect(essentialOnly).not.toContain("Pin to timeline");
+    const manager = render(true, false);
+    expect(manager).toContain("Email active registrations");
+    expect(manager).toContain("Send a correction");
+    expect(manager).not.toContain("Mark essential");
+    expect(render(true, true)).toContain("Mark essential");
+  });
+
+  it("opens the new event with a full navigation from both create-from flows", () => {
+    const template = read("components/start-from-template.tsx");
+    expect(template).toContain("window.location.assign(`/more/event-settings?event=");
+    expect(template).not.toContain("router.push");
+    const copy = read("components/copy-from-past-event.tsx");
+    expect(copy).toContain("window.location.assign(`/more/event-settings?event=");
+    expect(copy).not.toMatch(/<Link[^>]*event-settings/);
+  });
+
+  it("names each row menu after its row, and returns focus to the trigger after a choice", () => {
+    const menu = read("components/actions-menu.tsx");
+    expect(menu).toContain("aria-label={ariaLabel}");
+    expect(menu).toContain('menu.querySelector("summary")?.focus()');
+    expect(read("components/organization-directory-workspace.tsx")).toContain("ariaLabel={`More actions for ${organization.name}`}");
+    expect(read("components/calendar-admin-workspace.tsx")).toContain("ariaLabel={`More actions for ${entry.title}`}");
+    expect(read("components/communications-workspace.tsx")).toContain("ariaLabel={`More actions for ${announcement.title}`}");
+    expect(read("components/registration-builder-workspace.tsx")).toContain("ariaLabel={`Actions for ${field.label}`}");
+  });
+
+  it("labels the check-in manual field for what it does, and dims an inactive card without dimming its menu", () => {
+    expect(read("components/check-in-scanner.tsx")).toContain("Name, pass or confirmation code");
+    expect(read("components/organization-directory-workspace.module.css")).toMatch(/\.organizationCard\.inactive > :not\(\.actions\) \{\s*opacity: 0\.75;/);
+  });
+
+  it("gives the template editor no second h1 or main inside the shell", () => {
+    const source = read("app/(workspace)/admin/event-templates/[templateId]/page.tsx");
+    expect(source).not.toContain("<h1");
+    expect(source).not.toContain("<main");
+    expect(source).toContain("<StaffPageHeader");
   });
 });

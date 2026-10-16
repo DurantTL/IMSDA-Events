@@ -25,7 +25,7 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
-    <section className="page-stack event-setup-flow">
+    <section className="page-stack">
       <StaffPageHeader description="Start blank, from a template, or from a past event." />
       {prefill?.ok === false && (
         <p className="inline-notice error" role="alert">

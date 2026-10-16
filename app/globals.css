@@ -11389,3 +11389,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .danger-zone-details > p { margin: 6px 0 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.8rem); line-height: 1.55; }
 .danger-outline-button.danger-outline-strong { border-width: 3px; background: #fbe9e5; font-weight: 800; }
 .danger-outline-button.danger-outline-strong:hover:not(:disabled) { background: #f6d6d0; }
+
+/* Calendar rows on a phone (#981): Edit and More share the row; the menu opens over the content instead of pushing it. */
+@media (max-width: 640px) {
+  .calendar-admin-actions .actions-menu { flex: 1; position: relative; }
+  .calendar-admin-actions .actions-menu > summary.actions-menu-trigger { min-height: 44px; }
+  .calendar-admin-actions .actions-menu-list { position: absolute; left: auto; right: 0; min-width: min(15rem, 80vw); margin-top: 0; box-shadow: var(--shadow); }
+}

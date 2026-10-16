@@ -10,7 +10,7 @@ import { ChevronDown } from "lucide-react";
  * the script only closes it on Escape, an outside click, or a choice. It is
  * always an outlined button, so the screen keeps its one filled primary action.
  */
-export function ActionsMenu({ label = "Actions", children }: { label?: string; children: ReactNode }) {
+export function ActionsMenu({ label = "Actions", ariaLabel, children }: { label?: string; /** A name that says which row the menu belongs to, e.g. "More actions for Sample club". */ ariaLabel?: string; children: ReactNode }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const menu = ref.current;
@@ -40,10 +40,19 @@ export function ActionsMenu({ label = "Actions", children }: { label?: string; c
   }, []);
   return (
     <details className="actions-menu" ref={ref}>
-      <summary className="secondary-button actions-menu-trigger">
+      <summary className="secondary-button actions-menu-trigger" aria-label={ariaLabel}>
         {label} <ChevronDown aria-hidden="true" size={15} />
       </summary>
-      <ul className="actions-menu-list" onClick={() => { if (ref.current) ref.current.open = false; }}>
+      <ul
+        className="actions-menu-list"
+        onClick={() => {
+          const menu = ref.current;
+          if (!menu) return;
+          menu.open = false;
+          // A dialog opened by a choice returns focus to a visible element, not a hidden menu item.
+          menu.querySelector("summary")?.focus();
+        }}
+      >
         {children}
       </ul>
     </details>

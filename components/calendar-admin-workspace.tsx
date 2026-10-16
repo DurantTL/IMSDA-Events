@@ -418,7 +418,7 @@ export function CalendarAdminWorkspace({
                       <button aria-haspopup="dialog" aria-label={`Edit ${entry.title}`} className="secondary-button" disabled={saving} onClick={(event) => beginEdit(entry, event.currentTarget)} type="button">
                         <Pencil aria-hidden="true" size={14} /> Edit
                       </button>
-                      <ActionsMenu label="More">
+                      <ActionsMenu label="More" ariaLabel={`More actions for ${entry.title}`}>
                         <li>
                           {entry.sourceFeedId ? (
                             // An imported item is hidden here only (a refresh never unhides it); a draft is published instead.

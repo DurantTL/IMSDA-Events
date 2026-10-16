@@ -678,7 +678,7 @@ export function CheckInScanner({
             </section>
 
             <div className="check-in-scanner-divider">
-              <span>or type the pass or confirmation code</span>
+              <span>or type a name, pass or confirmation code</span>
             </div>
 
             <form
@@ -688,14 +688,14 @@ export function CheckInScanner({
               <label>
                 <span>
                   <Keyboard size={16} aria-hidden="true" />
-                  Pass or confirmation code
+                  Name, pass or confirmation code
                 </span>
                 <input
                   autoCapitalize="off"
                   autoComplete="off"
                   maxLength={80}
                   onChange={(event) => setManualCode(event.target.value)}
-                  placeholder="REG-1234ABCD"
+                  placeholder="Sam Rivera or REG-1234ABCD"
                   required
                   spellCheck={false}
                   value={manualCode}

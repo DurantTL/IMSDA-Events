@@ -31,7 +31,7 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
-    <section className="page-stack event-setup-flow">
+    <section className="page-stack">
       <StaffPageHeader description="Pick a template and the new event starts with its forms and settings." />
       {prefill?.ok === false && (
         <p className="inline-notice error" role="alert">
