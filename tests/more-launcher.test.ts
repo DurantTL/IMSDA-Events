@@ -17,6 +17,10 @@ import { MoreLauncherPanel } from "@/components/more-launcher";
 import { readFileSync } from "node:fs";
 import {
   desktopBreakpointQuery,
+  filterLauncherCards,
+  firstLauncherMatch,
+  launcherSearchStatus,
+  omitSidebarDuplicates,
   isPlainClick,
   launcherFooterLinks,
   launcherGroups,
@@ -24,7 +28,7 @@ import {
   nextLauncherIndex,
   returnsFocusToTrigger,
 } from "@/components/more-launcher-model";
-import { buildMoreDirectoryCards, moreDirectoryGroupOrder, type MoreDirectoryContext } from "@/components/staff-navigation";
+import { buildMoreDirectoryCards, moreDirectoryGroupOrder, sidebarSections, type MoreDirectoryContext } from "@/components/staff-navigation";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { buildEventModulesView, removableModuleKeys } from "@/components/event-modules-page-model";
 import { disabledModuleCardKeys, eventModuleCatalog, eventModuleKeys, moduleForCard, type EventModuleKey } from "@/modules/event-modules/catalog";
@@ -49,14 +53,14 @@ function cardsFor(overrides: Partial<MoreDirectoryContext> & { enabled?: readonl
 const keysOf = (cards: ReturnType<typeof cardsFor>) => launcherGroups(cards).flatMap((group) => group.cards.map((card) => card.key));
 
 describe("launcher grouping", () => {
-  it("lists Setup, Content & sales, People & access, Reports in that order, with allowed cards only", () => {
+  it("lists Event tools, Sales & content, People & clubs, Reports in that order, with allowed cards only", () => {
     const groups = launcherGroups(cardsFor({ isSystemAdmin: true }));
-    expect(groups.map((group) => group.label)).toEqual(["Setup", "Content & sales", "People & access", "Reports"]);
+    expect(groups.map((group) => group.label)).toEqual(["Event tools", "Sales & content", "People & clubs", "Reports"]);
     expect(groups.map((group) => group.group)).toEqual(moreDirectoryGroupOrder);
     expect(groups.flatMap((group) => group.cards).every((card) => card.allowed)).toBe(true);
   });
 
-  it("leaves out the groups with nothing the viewer may open (finance staff: no Setup, no People & access)", () => {
+  it("leaves out the groups with nothing the viewer may open (finance staff: no Event tools, no People & clubs)", () => {
     const groups = launcherGroups(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }));
     expect(groups.map((group) => group.group)).toEqual(["content-sales", "reports"]);
     expect(keysOf(cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false }))).toEqual(["meals", "promo-codes", "health"]);
@@ -178,7 +182,7 @@ describe("launcher panel markup", () => {
     const markup = render(true);
     expect(markup).toContain('role="dialog"');
     expect(markup).toContain('aria-label="More tools"');
-    const positions = ["Setup", "Content &amp; sales", "People &amp; access", "Reports"].map((label) => markup.indexOf(`>${label}</h2>`));
+    const positions = ["Event tools", "Sales &amp; content", "People &amp; clubs", "Reports"].map((label) => markup.indexOf(`>${label}</h2>`));
     expect(positions.every((position) => position > 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
     expect(markup).toContain('href="/more/event-settings?event=event_1"');
@@ -262,7 +266,7 @@ describe("turning a module off from the launcher (#810)", () => {
     expect(source).toContain("onClick={cancelConfirm}");
     expect(source).toMatch(/event\.key === "Escape"\) \{\s*event\.preventDefault\(\);\s*cancelConfirm\(\);/);
     expect(source).toContain('pendingFocus.current = { kind: "card"');
-    expect(source.match(/inert=\{confirming \? true : undefined\}/g)).toHaveLength(2);
+    expect(source.match(/inert=\{confirming \? true : undefined\}/g)).toHaveLength(3);
   });
 
   it("shows an Event Admin the enabled modules with no toggles at all", () => {
@@ -345,5 +349,92 @@ describe("phone sheet breakpoint", () => {
     const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
     expect(css).toContain("@media (max-width: 800px)\n{\n".replace("\n{\n", " {"));
     expect(css).toContain("@media (min-width: 801px) {\n  .more-launcher-tab");
+  });
+});
+
+describe("launcher search and sidebar duplicates (#967)", () => {
+  const admin = () => cardsFor({ isSystemAdmin: true });
+  const sidebarHrefsFor = (permissions: readonly EventPermission[]) => new Set(sidebarSections(new Set(permissions)).flatMap((section) => section.items.map((item) => item.href)));
+
+  it("filters by every typed word in the title or description, ignoring case, and never adds a card", () => {
+    const cards = admin();
+    expect(filterLauncherCards(cards, "")).toBe(cards);
+    expect(filterLauncherCards(cards, "   ")).toBe(cards);
+    const promo = filterLauncherCards(cards, "PROMO");
+    expect(promo.map((card) => card.key)).toContain("promo-codes");
+    // A word that only the description holds still matches, in any order.
+    expect(filterLauncherCards(cards, "discounts bounded").map((card) => card.key)).toContain("promo-codes");
+    expect(filterLauncherCards(cards, "zzz-no-such-tool")).toEqual([]);
+    for (const card of filterLauncherCards(cards, "a")) expect(cards).toContain(card);
+  });
+
+  it("only searches destinations the viewer may open, with the cards' own permission gates", () => {
+    const finance = cardsFor({ permissions: ["MANAGE_FINANCE"], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    expect(launcherGroups(filterLauncherCards(finance, "promo")).flatMap((group) => group.cards.map((card) => card.key))).toEqual(["promo-codes"]);
+    // Staff and Imports exist as cards but this viewer may not open them, so they are not found.
+    expect(launcherGroups(filterLauncherCards(finance, "staff")).flatMap((group) => group.cards)).toEqual([]);
+    expect(launcherGroups(filterLauncherCards(finance, "csv")).flatMap((group) => group.cards)).toEqual([]);
+    expect(firstLauncherMatch(filterLauncherCards(finance, "csv"))).toBeNull();
+  });
+
+  it("opens the first match in the order the launcher draws, and reports the count for screen readers", () => {
+    const matches = filterLauncherCards(admin(), "lodging");
+    const ordered = launcherGroups(matches).flatMap((group) => group.cards);
+    expect(ordered.length).toBeGreaterThan(1);
+    expect(firstLauncherMatch(matches)?.key).toBe(ordered[0].key);
+    expect(launcherSearchStatus("", 5)).toBe("");
+    expect(launcherSearchStatus("lodging", 0)).toContain("No tool matches");
+    expect(launcherSearchStatus("lodging", 1)).toMatch(/^1 match\./);
+    expect(launcherSearchStatus("lodging", 3)).toMatch(/^3 matches\./);
+  });
+
+  it("leaves out cards whose destination is a sidebar item the viewer sees, and loses no destination", () => {
+    const cards = admin();
+    const sidebarHrefs = sidebarHrefsFor(allPermissions);
+    const kept = omitSidebarDuplicates(cards, sidebarHrefs);
+    const keptKeys = kept.map((card) => card.key);
+    for (const key of ["event-settings", "attendee-configuration", "tags", "registration-builder", "reports", "health"]) expect(keptKeys).not.toContain(key);
+    // The items moved off the sidebar stay in the launcher.
+    for (const key of ["attendee-list", "imports", "staff", "promo-codes"]) expect(keptKeys).toContain(key);
+    // Every allowed card is either still listed or is one click away in the sidebar.
+    const sidebarPaths = new Set([...sidebarHrefs]);
+    for (const card of cards.filter((entry) => entry.allowed)) {
+      expect(keptKeys.includes(card.key) || sidebarPaths.has(card.href.split("?")[0])).toBe(true);
+    }
+    // No remaining card repeats a sidebar href.
+    for (const card of kept) expect(sidebarPaths.has(card.href.split("?")[0])).toBe(false);
+  });
+
+  it("keeps a card the sidebar does not show for this viewer, and keeps everything without a sidebar (the phone sheet)", () => {
+    const cards = cardsFor({ permissions: ["MANAGE_FINANCE", "VIEW_REPORTS"], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    const finance = new Set(["/finance"]);
+    expect(omitSidebarDuplicates(cards, finance)).toEqual(cards);
+    expect(omitSidebarDuplicates(cards, undefined)).toBe(cards);
+    expect(omitSidebarDuplicates(cards, new Set())).toBe(cards);
+  });
+
+  it("renders a labelled search first in the panel; the desktop popover drops sidebar duplicates and the phone sheet keeps them", () => {
+    const render = (variant: "sidebar" | "tab") => renderToStaticMarkup(
+      createElement(MoreLauncherPanel, { cards: admin(), sidebarHrefs: sidebarHrefsFor(allPermissions), isSystemAdmin: true, eventQuery: "?event=event_1", variant }),
+    );
+    const desktop = render("sidebar");
+    expect(desktop).toContain('role="search"');
+    expect(desktop).toContain('type="search"');
+    expect(desktop).toContain("Find a tool");
+    expect(desktop.indexOf('role="search"')).toBeLessThan(desktop.indexOf("more-launcher-group"));
+    expect(desktop).not.toContain('data-card="event-settings"');
+    expect(desktop).toContain('data-card="promo-codes"');
+    const phone = render("tab");
+    expect(phone).toContain('data-card="event-settings"');
+    expect(phone).toContain('data-card="reports"');
+  });
+
+  it("handles Enter, Escape and the caret keys in the search box", () => {
+    const source = readFileSync("components/more-launcher.tsx", "utf8");
+    expect(source).toContain('event.key === "Enter"');
+    expect(source).toContain("firstLauncherMatch(matched)");
+    expect(source).toContain("router.push(first.href)");
+    expect(source).toMatch(/event\.key === "Escape" && search !== ""[\s\S]*setSearch\(""\)/);
+    expect(source).toContain('["ArrowDown", "ArrowUp", "Tab"]');
   });
 });

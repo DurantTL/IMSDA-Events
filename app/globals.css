@@ -9412,6 +9412,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   color: var(--ink);
   padding: 16px 16px 10px;
 }
+.more-launcher-search { margin-bottom: 10px; }
+.more-launcher-search-status { min-height: 1.1em; margin: 4px 10px 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.74rem); }
+.more-launcher-tab .more-launcher-search input { min-height: 44px; font-size: 1rem; }
 .more-launcher-columns { columns: 2; column-gap: 22px; }
 .more-launcher-group { break-inside: avoid; margin-bottom: 14px; }
 .more-launcher-group-label { margin: 0 0 6px 10px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.68rem); font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }

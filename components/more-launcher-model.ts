@@ -25,6 +25,47 @@ export function launcherGroups(cards: readonly MoreDirectoryCard[]): LauncherGro
     .filter((entry) => entry.cards.length > 0);
 }
 
+const pathOfHref = (href: string) => href.split(/[?#]/)[0];
+
+/**
+ * The desktop popover leaves out a card whose destination is already a sidebar
+ * item this viewer sees (#967), so nothing is listed twice. `sidebarHrefs` is
+ * the set of sidebar hrefs actually drawn for the viewer, so a card the sidebar
+ * does not show for them stays. The phone sheet has no sidebar and passes
+ * nothing, so it keeps every card.
+ */
+export function omitSidebarDuplicates(cards: readonly MoreDirectoryCard[], sidebarHrefs: ReadonlySet<string> | undefined): readonly MoreDirectoryCard[] {
+  if (!sidebarHrefs || sidebarHrefs.size === 0) return cards;
+  const paths = new Set([...sidebarHrefs].map(pathOfHref));
+  return cards.filter((card) => !paths.has(pathOfHref(card.href)));
+}
+
+/**
+ * Cards matching a typed search (#967): every word must appear, in any order,
+ * in the card's title or short description, ignoring case. A blank query keeps
+ * every card. It only narrows what the viewer may already see; it never adds.
+ */
+export function filterLauncherCards(cards: readonly MoreDirectoryCard[], query: string): readonly MoreDirectoryCard[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return cards;
+  return cards.filter((card) => {
+    const text = `${card.title} ${card.description}`.toLowerCase();
+    return words.every((word) => text.includes(word));
+  });
+}
+
+/** What Enter opens: the first allowed match in the order the launcher draws (group by group), or null. */
+export function firstLauncherMatch(cards: readonly MoreDirectoryCard[]): MoreDirectoryCard | null {
+  return launcherGroups(cards)[0]?.cards[0] ?? null;
+}
+
+/** Text for the search's live status line, or an empty string while nothing is typed. */
+export function launcherSearchStatus(query: string, count: number): string {
+  if (query.trim() === "") return "";
+  if (count === 0) return "No tool matches. Clear the search to see them all.";
+  return `${count} ${count === 1 ? "match" : "matches"}. Press Enter to open the first.`;
+}
+
 /**
  * Module requests exist (#741 slice 3): Event Admins get a "Request a feature"
  * link. The flag stays so a deployment-wide switch-off is one line.

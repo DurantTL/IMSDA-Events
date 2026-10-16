@@ -375,6 +375,7 @@ export function AppShell({
                 href={withCurrentEvent(href, selectedEventId)}
                 isActive={isActive}
                 cards={launcherCards}
+                sidebarHrefs={visibleHrefs}
                 isSystemAdmin={isSystemAdmin}
                 canRequestFeature={canRequestFeature}
                 eventQuery={eventQuery}

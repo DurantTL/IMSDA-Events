@@ -470,9 +470,9 @@ export const moreDirectoryGroupOrder: readonly MoreDirectoryGroup[] = [
 ];
 
 export const moreDirectoryGroupLabels: Record<MoreDirectoryGroup, string> = {
-  setup: "Setup",
-  "content-sales": "Content & sales",
-  "people-access": "People & access",
+  setup: "Event tools",
+  "content-sales": "Sales & content",
+  "people-access": "People & clubs",
   reports: "Reports",
 };
 

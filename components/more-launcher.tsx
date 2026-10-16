@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Search } from "lucide-react";
 import type { HTMLAttributes, ReactNode, Ref } from "react";
 import { createPortal } from "react-dom";
 import {
   desktopBreakpointQuery,
+  filterLauncherCards,
+  firstLauncherMatch,
+  launcherSearchStatus,
+  omitSidebarDuplicates,
   isPlainClick,
   launcherFooterLinks,
   launcherGroups,
@@ -48,6 +53,7 @@ function setBackgroundInert(inert: boolean) {
 
 export function MoreLauncherPanel({
   cards,
+  sidebarHrefs,
   isSystemAdmin,
   canRequestFeature = false,
   eventQuery,
@@ -60,6 +66,8 @@ export function MoreLauncherPanel({
   style,
 }: {
   cards: readonly MoreDirectoryCard[];
+  /** Sidebar hrefs drawn for this viewer: cards for them are left out of the desktop popover (#967). The phone sheet passes none. */
+  sidebarHrefs?: ReadonlySet<string>;
   isSystemAdmin: boolean;
   /** An Event Admin who is not a system administrator: shows "Request a feature" (#741). */
   canRequestFeature?: boolean;
@@ -78,9 +86,14 @@ export function MoreLauncherPanel({
   variant: "sidebar" | "tab";
   style?: HTMLAttributes<HTMLDivElement>["style"];
 }) {
-  const groups = launcherGroups(cards);
-  const footer = launcherFooterLinks({ isSystemAdmin, canRequestFeature, eventQuery });
+  const searchId = useId();
+  const [search, setSearch] = useState("");
+  const listed = omitSidebarDuplicates(cards, variant === "sidebar" ? sidebarHrefs : undefined);
+  const matched = filterLauncherCards(listed, search);
+  const groups = launcherGroups(matched);
+  const matchCount = groups.reduce((total, entry) => total + entry.cards.length, 0);
   const router = useRouter();
+  const footer = launcherFooterLinks({ isSystemAdmin, canRequestFeature, eventQuery });
   const [confirming, setConfirming] = useState<{ moduleKey: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -140,6 +153,21 @@ export function MoreLauncherPanel({
     }
   }
 
+  // Enter in the search opens the first match; Escape clears a typed search before it closes the launcher (#967).
+  function onSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const first = firstLauncherMatch(matched);
+      if (!first) return;
+      onNavigate?.({ key: first.key, href: first.href });
+      router.push(first.href);
+    } else if (event.key === "Escape" && search !== "") {
+      event.preventDefault();
+      event.stopPropagation();
+      setSearch("");
+    }
+  }
+
   function onConfirmKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     // The confirm owns the keyboard while it is open: Escape cancels it only, and Tab stays between its two buttons.
     event.stopPropagation();
@@ -164,6 +192,23 @@ export function MoreLauncherPanel({
       tabIndex={-1}
     >
       {/* While the confirm is open the rest of the panel is inert, to match aria-modal. */}
+      <div className="more-launcher-search" role="search" inert={confirming ? true : undefined}>
+        <label className="search-field" htmlFor={searchId}>
+          <Search aria-hidden="true" size={16} />
+          <span className="sr-only">Find a tool</span>
+          <input
+            autoComplete="off"
+            className="more-launcher-search-input"
+            id={searchId}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={onSearchKeyDown}
+            placeholder="Find a tool"
+            type="search"
+            value={search}
+          />
+        </label>
+        <p aria-live="polite" className="more-launcher-search-status" role="status">{launcherSearchStatus(search, matchCount)}</p>
+      </div>
       <div className="more-launcher-columns" inert={confirming ? true : undefined}>
         {groups.map(({ group, label, cards: groupCards }) => (
           <section className="more-launcher-group" aria-label={label} key={group} data-group={group}>
@@ -234,6 +279,7 @@ export function MoreLauncher({
   className,
   isActive,
   cards,
+  sidebarHrefs,
   isSystemAdmin,
   canRequestFeature = false,
   eventQuery,
@@ -249,6 +295,8 @@ export function MoreLauncher({
   className?: string;
   isActive: boolean;
   cards: readonly MoreDirectoryCard[];
+  /** The sidebar hrefs drawn for this viewer (desktop popover only), so cards the sidebar already has are not repeated (#967). */
+  sidebarHrefs?: ReadonlySet<string>;
   isSystemAdmin: boolean;
   canRequestFeature?: boolean;
   eventQuery: string;
@@ -286,7 +334,9 @@ export function MoreLauncher({
     // The memory applies only back on the page it opened (or a child); otherwise first card, top.
     const remembered = recallLauncherPosition({ userId, eventQuery, pathname });
     const rememberedCard = remembered?.cardKey ? panel?.querySelector<HTMLElement>(`a[data-card="${remembered.cardKey}"]`) : null;
-    (rememberedCard ?? panel?.querySelector<HTMLElement>("a[href]"))?.focus({ preventScroll: Boolean(rememberedCard) });
+    // Desktop opens in the search box; the phone sheet starts on the first link so no keyboard pops up (#967).
+    const firstFocus = variant === "sidebar" ? panel?.querySelector<HTMLElement>("input.more-launcher-search-input") : panel?.querySelector<HTMLElement>("a[href]");
+    (rememberedCard ?? firstFocus ?? panel?.querySelector<HTMLElement>("a[href]"))?.focus({ preventScroll: Boolean(rememberedCard) });
     if (panel) panel.scrollTop = rememberedCard && remembered ? remembered.scrollTop : 0;
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
@@ -330,8 +380,10 @@ export function MoreLauncher({
       close("escape");
       return;
     }
-    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("a[href], button.more-launcher-toggle:not([disabled])") ?? []);
+    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
     const current = items.indexOf(document.activeElement as HTMLElement);
+    // In the search box the caret keys and Home/End edit the text; only Up, Down and Tab leave it.
+    if (document.activeElement instanceof HTMLInputElement && !["ArrowDown", "ArrowUp", "Tab"].includes(event.key)) return;
     // The panel is drawn at the end of <body>, so Tab and Shift+Tab walk its links in a loop.
     const key = event.key === "Tab" ? (event.shiftKey ? "ArrowUp" : "ArrowDown") : event.key;
     const next = nextLauncherIndex(current, items.length, key);
@@ -375,6 +427,7 @@ export function MoreLauncher({
           <div className="more-launcher-region" onKeyDown={onPanelKeyDown}>
             <MoreLauncherPanel
               cards={cards}
+              sidebarHrefs={sidebarHrefs}
               eventQuery={eventQuery}
               eventId={eventId}
               removableModules={removableModules}
