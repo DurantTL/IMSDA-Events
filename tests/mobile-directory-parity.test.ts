@@ -12,7 +12,7 @@ import {
   resolveClubsAndChurchesEntry,
   sidebarSections,
 } from "@/components/staff-navigation";
-import { launcherFooterLinks } from "@/components/more-launcher-model";
+import { launcherFooterLinks, omitSidebarDuplicates } from "@/components/more-launcher-model";
 import { eventPermissions, eventRoles, rolePermissions, type EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
@@ -434,4 +434,21 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
     const without = buildMoreDirectoryCards({ ...base, permissions: ["VIEW_REPORTS"] }).filter((card) => card.allowed);
     expect(without.map((card) => card.href)).not.toContain("/more/promo-codes?event=e1");
   });
+});
+
+describe("More launcher without sidebar duplicates (#967)", () => {
+  for (const role of eventRoles) {
+    it(`loses no destination for ${role}: each allowed card is in the desktop launcher or the sidebar, and the phone sheet keeps all`, () => {
+      const permissions = rolePermissions[role];
+      const cards = buildMoreDirectoryCards({ permissions, clubOversight: true, clubEvent: true, isSystemAdmin: false, clubFormsAccess: true, eventQuery: "?event=event_1" });
+      const allowed = cards.filter((card) => card.allowed);
+      const sidebarHrefs = new Set(sidebarSections(new Set(permissions)).flatMap((view) => view.items.map((item) => item.href)));
+      const desktop = omitSidebarDuplicates(cards, sidebarHrefs).filter((card) => card.allowed);
+      for (const card of allowed) {
+        expect(desktop.includes(card) || sidebarHrefs.has(card.href.split("?")[0])).toBe(true);
+      }
+      for (const card of desktop) expect(sidebarHrefs.has(card.href.split("?")[0])).toBe(false);
+      expect(omitSidebarDuplicates(cards, undefined).filter((card) => card.allowed)).toEqual(allowed);
+    });
+  }
 });
