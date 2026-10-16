@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   ChevronDown,
   Eye,
+  LayoutDashboard,
   ShieldCheck,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
@@ -26,10 +27,12 @@ import {
   getSidebarGroupsServerSnapshot,
   getSidebarGroupsSnapshot,
   resolveSidebarGroupOpen,
+  type SidebarGroupKey,
   setSidebarGroupOpen,
   subscribeSidebarGroups,
 } from "@/components/sidebar-groups";
 import { SidebarToggle } from "@/components/sidebar-toggle";
+import { createEventHrefFor, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
@@ -51,7 +54,6 @@ import {
   systemNavigation,
   withCurrentEvent,
   type NavigationItem,
-  type SidebarSection,
 } from "@/components/staff-navigation";
 
 type ShellEvent = {
@@ -125,7 +127,7 @@ export function AppShell({
   // Set up and Reports open and close (#964). Saved per browser; the server
   // always renders with nothing saved, and the pages inside a group open it.
   const savedGroups = useSyncExternalStore(subscribeSidebarGroups, getSidebarGroupsSnapshot, getSidebarGroupsServerSnapshot);
-  const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarSection; pathname: string } | null>(null);
+  const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarGroupKey; pathname: string } | null>(null);
   // Closing a group lasts for that page only: any navigation forgets it. Reset
   // while rendering, not in an effect, so the very render after navigating is right.
   const [lastPathname, setLastPathname] = useState(pathname);
@@ -229,14 +231,17 @@ export function AppShell({
   const activeHref = onEventFeatures ? null : sidebarActiveHref(current, visibleHrefs);
   const isItemActive = (item: NavigationItem) => {
     if (isProfileRoute) return false;
-    // Event features has a placeholder href until its page exists (#965): match its route instead.
-    if (item.label === eventFeaturesItem.label) return onEventFeatures;
+    // Event features lights on its own page, which is under /more but must not light More (#965).
+    if (item.href === eventFeaturesItem.href) return onEventFeatures;
     return item.href.startsWith("/admin") ? pathname.startsWith(item.href) : activeHref === item.href;
   };
-  function toggleGroup(section: SidebarSection, open: boolean) {
+  function toggleGroup(section: SidebarGroupKey, open: boolean) {
     setSidebarGroupOpen(section, !open);
     setDismissedGroup(open ? { section, pathname } : null);
   }
+  // On /admin pages a system administrator's sidebar lists the system groups (#966), not the event workspace's.
+  const showSystemNav = isSystemRoute && isSystemAdmin;
+  const activeSystemEntry = showSystemNav ? systemNavActiveEntryKey(pathname) : null;
   // The mobile tab bar keeps its own, shorter order (see `mobileNavigationOrder`).
   const mobileNavigation = orderedMobileTabs(visibleNavigation);
   const attendeePreviewHref = selectedEvent
@@ -326,11 +331,55 @@ export function AppShell({
             </select>
             <ChevronDown aria-hidden="true" size={16} />
           </div>
-          <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>
+          {!showSystemNav && <Link className="event-picker-archived-link" href="/archived-events">Archived events</Link>}
         </div>}
 
         <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
-          {visibleSections.map(({ section, label: sectionLabel, collapsible, items }) => {
+          {showSystemNav && (
+            <>
+              <Link className="nav-item" href={withCurrentEvent("/overview", selectedEventId)} {...tipProps("Event workspace")}>
+                <LayoutDashboard aria-hidden="true" size={19} strokeWidth={1.9} />
+                <span>Event workspace</span>
+              </Link>
+              {systemNavGroups.map((group) => {
+                const links = group.items.map((item) => {
+                  const { href, icon: Icon, label } = item;
+                  const isActive = activeSystemEntry === systemNavEntryKey(group, item);
+                  return (
+                    <Link key={href} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
+                      <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
+                      <span>{label}</span>
+                    </Link>
+                  );
+                });
+                const open = resolveSidebarGroupOpen({
+                  saved: savedGroups[group.key],
+                  containsCurrentPage: group.items.some((item) => activeSystemEntry === systemNavEntryKey(group, item)),
+                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
+                  defaultOpen: !group.collapsedByDefault,
+                });
+                return (
+                  <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
+                    <button
+                      type="button"
+                      className="nav-group-toggle"
+                      id={`nav-group-${group.key}-toggle`}
+                      aria-expanded={open}
+                      aria-controls={`nav-group-${group.key}`}
+                      onClick={() => toggleGroup(group.key, open)}
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown aria-hidden="true" size={14} />
+                    </button>
+                    <div className="nav-group-items" id={`nav-group-${group.key}`} role="group" aria-labelledby={`nav-group-${group.key}-toggle`} hidden={!open}>
+                      {links}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          {!showSystemNav && visibleSections.map(({ section, label: sectionLabel, collapsible, items }) => {
             const links = items.map((item) => {
               const { href, icon: Icon, label } = item;
               const isActive = isItemActive(item);
@@ -367,7 +416,7 @@ export function AppShell({
               </div>
             );
           })}
-          {moreItemVisible && (() => {
+          {!showSystemNav && moreItemVisible && (() => {
             const { href, icon: Icon, label } = moreItemVisible;
             const isActive = isItemActive(moreItemVisible);
             return (
@@ -434,6 +483,7 @@ export function AppShell({
             <StaffAccountMenu
               attendeePreviewHref={attendeePreviewHref}
               canSwitchToAttendee={canSwitchToAttendee}
+              createEventHref={createEventHrefFor(isSystemAdmin)}
               displayName={user.displayName}
               email={user.email}
               systemAdminContext={systemAdminContext ? { ...systemAdminContext, href: withCurrentEvent(systemAdminContext.href, selectedEventId) } : systemAdminContext}

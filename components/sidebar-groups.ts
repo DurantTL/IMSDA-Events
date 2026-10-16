@@ -1,4 +1,5 @@
 import type { SidebarSection } from "@/components/staff-navigation";
+import type { SystemNavGroupKey } from "@/components/system-navigation";
 
 /**
  * Per-browser open/closed choice for the collapsible sidebar groups (#964),
@@ -8,7 +9,10 @@ import type { SidebarSection } from "@/components/staff-navigation";
  */
 export const sidebarGroupsStorageKey = "imsda-staff-sidebar-groups";
 
-export type SidebarGroupChoices = Readonly<Partial<Record<SidebarSection, boolean>>>;
+/** A collapsible group: an event workspace section, or a system management group (#966). */
+export type SidebarGroupKey = SidebarSection | SystemNavGroupKey;
+
+export type SidebarGroupChoices = Readonly<Partial<Record<SidebarGroupKey, boolean>>>;
 
 const noChoices: SidebarGroupChoices = Object.freeze({});
 
@@ -17,9 +21,9 @@ function parseChoices(raw: string | null): SidebarGroupChoices {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return noChoices;
-    const choices: Partial<Record<SidebarSection, boolean>> = {};
+    const choices: Partial<Record<SidebarGroupKey, boolean>> = {};
     for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === "boolean") choices[key as SidebarSection] = value;
+      if (typeof value === "boolean") choices[key as SidebarGroupKey] = value;
     }
     return choices;
   } catch {
@@ -50,19 +54,22 @@ export function writeSidebarGroups(choices: SidebarGroupChoices, storage?: Pick<
 /**
  * Whether a group is open. A group opens by itself when the current page is
  * inside it, unless the viewer just closed it on this very page (`dismissed`);
- * otherwise the saved choice decides, closed by default.
+ * otherwise the saved choice decides, then `defaultOpen` (closed unless a group
+ * says otherwise; the system groups of #966 start open except Catalogs and settings).
  */
 export function resolveSidebarGroupOpen({
   saved,
   containsCurrentPage,
   dismissedOnThisPage,
+  defaultOpen = false,
 }: {
   saved: boolean | undefined;
   containsCurrentPage: boolean;
   dismissedOnThisPage: boolean;
+  defaultOpen?: boolean;
 }): boolean {
   if (dismissedOnThisPage) return false;
-  return containsCurrentPage || saved === true;
+  return containsCurrentPage || (saved ?? defaultOpen);
 }
 
 /**
@@ -108,7 +115,7 @@ export function getSidebarGroupsServerSnapshot(): SidebarGroupChoices {
   return noChoices;
 }
 
-export function setSidebarGroupOpen(section: SidebarSection, open: boolean): void {
+export function setSidebarGroupOpen(section: SidebarGroupKey, open: boolean): void {
   choices = { ...getSidebarGroupsSnapshot(), [section]: open };
   writeSidebarGroups(choices);
   notify();

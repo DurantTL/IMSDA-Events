@@ -83,13 +83,17 @@ export function launcherSearchStatus(query: string, count: number): string {
  */
 export const moduleRequestsEnabled = true;
 
-export type LauncherFooterLink = { key: "manage-modules" | "event-modules" | "request-feature"; label: string; href: string };
+export type LauncherFooterLink = { key: "event-features" | "event-modules" | "request-feature"; label: string; href: string };
 
 /**
- * Everyone gets a link to the Event modules page, which also holds the audit
- * trail: system administrators as "Manage event modules", everyone else as "Event
- * modules and activity". Event staff also get "Request a feature" when requests
- * exist and the viewer may make one; with the flag off nobody does. Only Event Admins (`CONFIGURE_EVENT`) who are not system administrators can.
+ * Everyone gets "Event features" (#965), the one page where an event's features are
+ * turned on and off: a switch for whoever may change it, read-only state for
+ * everyone else. Staff other than system administrators also keep "Event modules and
+ * activity" (the Event modules page at `/more`, which holds the audit trail and the
+ * module requests; the Event features page links to it for a system administrator).
+ * Event staff also get "Request a feature" when requests exist and the viewer may
+ * make one; with the flag off nobody does. Only Event Admins (`CONFIGURE_EVENT`) who
+ * are not system administrators can.
  */
 export function launcherFooterLinks({
   isSystemAdmin,
@@ -102,8 +106,9 @@ export function launcherFooterLinks({
   requestsEnabled?: boolean;
   eventQuery: string;
 }): LauncherFooterLink[] {
-  if (isSystemAdmin) return [{ key: "manage-modules", label: "Manage event modules", href: `/more${eventQuery}` }];
-  const links: LauncherFooterLink[] = [{ key: "event-modules", label: "Event modules and activity", href: `/more${eventQuery}` }];
+  const features: LauncherFooterLink = { key: "event-features", label: "Event features", href: `/more/features${eventQuery}` };
+  if (isSystemAdmin) return [features];
+  const links: LauncherFooterLink[] = [features, { key: "event-modules", label: "Event modules and activity", href: `/more${eventQuery}` }];
   if (requestsEnabled && canRequestFeature) {
     links.push({ key: "request-feature", label: "Request a feature", href: `/more${eventQuery}#request-a-feature` });
   }

@@ -146,6 +146,9 @@ jobs:
       # duplicates, and key reuse (#157).
       - run: npm run test:event-cloning
 
+      # Real-database check of the features step of event creation (#965): the chosen modules, flags and calendar choice are saved with the event in its own transaction, a skipped step gets the audience's defaults, a failed creation leaves nothing and a repeat changes nothing, a template keeps its settings and takes the overrides (a retry rewrites nothing), a copy carries what its preview showed, and the module permission and data rules are untouched.
+      - run: npm run test:event-creation-features
+
       # Real-database check of the public event page content blocks: every kind saves and
       # reads back, custom HTML is stored sanitized and system-administrator only (a refused
       # save changes nothing), block images must be the event's own uploaded images and are

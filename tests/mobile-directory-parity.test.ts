@@ -12,7 +12,7 @@ import {
   resolveClubsAndChurchesEntry,
   sidebarSections,
 } from "@/components/staff-navigation";
-import { omitSidebarDuplicates } from "@/components/more-launcher-model";
+import { launcherFooterLinks, omitSidebarDuplicates } from "@/components/more-launcher-model";
 import { eventPermissions, eventRoles, rolePermissions, type EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
@@ -271,7 +271,11 @@ function phoneDestinations(scenario: Scenario): Set<string> {
     .filter((item) => matchesVisibility(item, granted))
     .map((item) => item.href);
   const moreHrefs = moreLauncherVisible(scenario) ? allowedMoreCardHrefs(scenario) : [];
-  return new Set([...tabHrefs, ...moreHrefs]);
+  // The launcher's footer links (#965): "Event features" is the phone's way to the sidebar's Event features item.
+  const footerHrefs = moreLauncherVisible(scenario)
+    ? launcherFooterLinks({ isSystemAdmin: scenario.isSystemAdmin, canRequestFeature: false, eventQuery: "" }).filter((link) => link.key === "event-features").map((link) => link.href)
+    : [];
+  return new Set([...tabHrefs, ...moreHrefs, ...footerHrefs]);
 }
 
 /**

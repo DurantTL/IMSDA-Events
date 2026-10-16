@@ -119,26 +119,27 @@ describe("Club forms stay reachable", () => {
 });
 
 describe("launcher footer", () => {
-  it("offers a system administrator Manage event modules, linking to /more for the event", () => {
+  it("offers a system administrator Event features, linking to /more/features for the event (#965)", () => {
     expect(launcherFooterLinks({ isSystemAdmin: true, eventQuery: "?event=event_1" })).toEqual([
-      { key: "manage-modules", label: "Manage event modules", href: "/more?event=event_1" },
+      { key: "event-features", label: "Event features", href: "/more/features?event=event_1" },
     ]);
   });
 
-  it("offers an Event Admin Event modules and activity plus Request a feature, now that requests exist (#741 slice 3)", () => {
+  it("offers an Event Admin Event features, Event modules and activity plus Request a feature, now that requests exist (#741 slice 3, #965)", () => {
     expect(moduleRequestsEnabled).toBe(true);
     expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, eventQuery: "?event=event_1" })).toEqual([
+      { key: "event-features", label: "Event features", href: "/more/features?event=event_1" },
       { key: "event-modules", label: "Event modules and activity", href: "/more?event=event_1" },
       { key: "request-feature", label: "Request a feature", href: "/more?event=event_1#request-a-feature" },
     ]);
     // Anyone who may not request gets no link, and a system administrator turns modules on directly.
-    expect(launcherFooterLinks({ isSystemAdmin: false, eventQuery: "?event=event_1" }).map((link) => link.key)).toEqual(["event-modules"]);
-    expect(launcherFooterLinks({ isSystemAdmin: true, canRequestFeature: true, eventQuery: "?event=event_1" }).map((link) => link.key)).toEqual(["manage-modules"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, eventQuery: "?event=event_1" }).map((link) => link.key)).toEqual(["event-features", "event-modules"]);
+    expect(launcherFooterLinks({ isSystemAdmin: true, canRequestFeature: true, eventQuery: "?event=event_1" }).map((link) => link.key)).toEqual(["event-features"]);
   });
 
   it("is ready to offer Request a feature, only where permitted, once the flag is on", () => {
-    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event modules and activity", "Request a feature"]);
-    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event modules and activity"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event modules and activity", "Request a feature"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event modules and activity"]);
   });
 });
 
@@ -190,9 +191,12 @@ describe("launcher panel markup", () => {
     expect(markup).toContain('href="/more/club-forms?event=event_1"');
   });
 
-  it("shows Manage event modules to a system administrator only, and never Request a feature", () => {
-    expect(render(true)).toContain('data-footer="manage-modules"');
-    expect(render(true)).toContain(">Manage event modules<");
+  it("shows Event features to everyone, the old Manage event modules link to no one, and Event modules and activity to staff who are not system administrators", () => {
+    expect(render(true)).toContain('data-footer="event-features"');
+    expect(render(true)).toContain(">Event features<");
+    expect(render(true)).toContain('href="/more/features?event=event_1"');
+    expect(render(true)).not.toContain("Manage event modules");
+    expect(render(false)).toContain(">Event features<");
     expect(render(false)).not.toContain("Manage event modules");
     expect(render(false)).toContain(">Event modules and activity<");
     expect(render(false)).toContain('href="/more?event=event_1"');

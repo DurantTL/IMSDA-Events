@@ -10,9 +10,14 @@ import {
   type FromTemplateField,
 } from "@/modules/event-templates/from-template-validation";
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
+import type { TemplateFeatureDefaults } from "@/modules/event-templates/feature-defaults";
+import { CreationFeaturesStep } from "@/components/creation-features-step";
+import type { CreationFeatures } from "@/modules/event-features/creation";
 
 type StartFromTemplateProps = {
   templates: EventTemplateRecord[];
+  /** What each template starts the event with, for the features step (#965). Null for a template that cannot be applied. */
+  featureDefaults?: Record<string, TemplateFeatureDefaults | null>;
   /** Opened from a calendar item (#445): the form starts with its title and dates, and the item is linked on create. */
   calendarPrefill?: { entryId: string; title: string; startsOn: string; endsOn: string };
 };
@@ -28,7 +33,7 @@ function slugFromName(value: string) {
     .slice(0, 80);
 }
 
-export function StartFromTemplate({ templates, calendarPrefill }: StartFromTemplateProps) {
+export function StartFromTemplate({ templates, featureDefaults = {}, calendarPrefill }: StartFromTemplateProps) {
   const router = useRouter();
   // Archived templates never appear. A template with no published version is listed
   // but cannot be chosen yet (#617): starters are added as drafts and need publishing.
@@ -40,6 +45,9 @@ export function StartFromTemplate({ templates, calendarPrefill }: StartFromTempl
   const [startsOn, setStartsOn] = useState(calendarPrefill?.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(calendarPrefill?.endsOn ?? "");
   const [requestKey] = useState(() => crypto.randomUUID());
+  // The features step (#965): the template's own settings until staff change one. Changes belong to the template they were
+  // made for, so picking another template shows that template's settings again.
+  const [featureChoice, setFeatureChoice] = useState<{ templateId: string; features: CreationFeatures } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FromTemplateErrors>({});
@@ -71,6 +79,9 @@ export function StartFromTemplate({ templates, calendarPrefill }: StartFromTempl
   }
 
   const selectedTemplate = useMemo(() => templates.find((template) => template.id === templateId), [templates, templateId]);
+  const selectedDefaults = featureDefaults[templateId] ?? null;
+  const chosenFeatures = featureChoice?.templateId === templateId ? featureChoice.features : null;
+  const shownFeatures = chosenFeatures ?? selectedDefaults?.features ?? null;
 
   function updateName(value: string) {
     setName(value);
@@ -94,7 +105,7 @@ export function StartFromTemplate({ templates, calendarPrefill }: StartFromTempl
       const response = await fetch(`/api/event-templates/${templateId}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug, startsOn, endsOn, requestKey, ...(calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}) }),
+        body: JSON.stringify({ name, slug, startsOn, endsOn, requestKey, ...(calendarPrefill ? { calendarEntryId: calendarPrefill.entryId } : {}), ...(chosenFeatures ? { features: chosenFeatures } : {}) }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "The event could not be created from this template.");
@@ -178,6 +189,15 @@ export function StartFromTemplate({ templates, calendarPrefill }: StartFromTempl
           {fieldError("endsOn")}
           </div>
         </div>
+
+        {selectedDefaults && shownFeatures ? (
+          <CreationFeaturesStep
+            audience={selectedDefaults.audience}
+            features={shownFeatures}
+            intro={`These are the settings ${selectedTemplate?.name ?? "the template"} carries. Leave them as they are to keep them, or change any switch for this event. Every switch can also be changed later on the Event features page.`}
+            onChange={(next) => setFeatureChoice({ templateId, features: next })}
+          />
+        ) : null}
 
         <button
           type="button"

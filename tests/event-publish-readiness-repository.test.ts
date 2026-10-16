@@ -530,7 +530,13 @@ describe("createEvent audience (#481)", () => {
     expect(auditLogCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         action: "EVENT_CREATED",
-        metadata: { slug: "synthetic-retreat", audience: "CLUB" },
+        // The features the event started with are recorded too (#965): module keys, no personal data.
+        metadata: {
+          slug: "synthetic-retreat",
+          audience: "CLUB",
+          featuresChosen: false,
+          modules: ["honors", "event-patches", "club-assignments", "public-content"],
+        },
       }),
     }));
   });
