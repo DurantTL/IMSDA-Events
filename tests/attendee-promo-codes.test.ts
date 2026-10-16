@@ -39,6 +39,10 @@ function promo(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const threePeople: FormCalculation = {
+  ...calculation,
+  lineItems: [...calculation.lineItems, { key: "fee-2", label: "Registration", amountCents: 9000, attendeeIndex: 2 }],
+};
 const field = { id: "field-promo", key: "promo_code" };
 const attendees = (codes: string[]) => codes.map((code) => ({ responses: { promo_code: code } }));
 
@@ -73,13 +77,20 @@ describe("per-person promo codes (#397)", () => {
   });
 
   it("explains unknown or expired codes on that person, and skips blank ones", async () => {
-    mocks.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(promo({ endsOn: "2026-05-01" }));
-    const { discounts, issues } = await evaluateAttendeePromoCodes(client as never, {
-      eventId: "event-1", field, attendees: [...attendees(["NOPE", "EARLY"]), { responses: {} }], calculation, pricingDate: "2026-06-01", claim: false,
+    mocks.findUnique.mockResolvedValue(null);
+    const unknown = await evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: [...attendees(["NOPE"]), { responses: {} }], calculation, pricingDate: "2026-06-01", claim: false,
     });
-    expect(discounts).toEqual([]);
-    expect(issues.map((issue) => [issue.attendeeIndex, issue.message])).toEqual([
+    expect(unknown.discounts).toEqual([]);
+    expect(unknown.issues.map((issue) => [issue.attendeeIndex, issue.message])).toEqual([
       [0, "That promo code was not recognized. Check the spelling and try again."],
+    ]);
+    mocks.findUnique.mockResolvedValue(promo({ endsOn: "2026-05-01" }));
+    const ended = await evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: [{ responses: {} }, ...attendees(["EARLY"])], calculation, pricingDate: "2026-06-01", claim: false,
+    });
+    expect(ended.discounts).toEqual([]);
+    expect(ended.issues.map((issue) => [issue.attendeeIndex, issue.message])).toEqual([
       [1, "That promo code ended on 2026-05-01."],
     ]);
   });
@@ -90,6 +101,67 @@ describe("per-person promo codes (#397)", () => {
     });
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(discounts.every((discount) => discount.promoCodeId === "promo-early")).toBe(true);
+  });
+
+  it("covers only the ticked people; the rest pay for themselves and use no code (#961)", async () => {
+    const { discounts, issues } = await evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: attendees(["EARLY", "", "early"]), calculation: threePeople, pricingDate: "2026-06-01", claim: true,
+    });
+    expect(issues).toEqual([]);
+    expect(discounts.map((discount) => discount.attendeeIndex)).toEqual([0, 2]);
+    // A use is counted for each person who received the code, and for nobody else.
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  describe("a church code is the registration's only code (#961)", () => {
+    const byCode = (sponsored: Record<string, string | null>) => mocks.findUnique.mockImplementation(
+      async ({ where }: { where: { eventId_normalizedCode: { normalizedCode: string } } }) => {
+        const code = where.eventId_normalizedCode.normalizedCode;
+        return code in sponsored
+          ? promo({ id: `promo-${code}`, code, normalizedCode: code, sponsoringOrganizationId: sponsored[code] })
+          : null;
+      },
+    );
+    const run = (codes: string[], claim: boolean) => evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: attendees(codes), calculation: threePeople, pricingDate: "2026-06-01", claim,
+    });
+
+    it("refuses a second code beside a church code, and a second church code, when previewing and claiming", async () => {
+      byCode({ CHURCH: "church-1", OTHERCHURCH: "church-2", EARLY: null });
+      for (const claim of [false, true]) {
+        mocks.updateMany.mockClear();
+        const mixed = await run(["CHURCH", "EARLY", "church"], claim);
+        expect(mixed.discounts.map((discount) => discount.attendeeIndex)).toEqual([0, 2]);
+        expect(mixed.issues).toEqual([expect.objectContaining({
+          attendeeIndex: 1,
+          message: "A church-sponsored code can't be combined with another promo code on one registration. CHURCH is already used for another person here.",
+        })]);
+        // The refused code never takes a use.
+        expect(mocks.updateMany).toHaveBeenCalledTimes(claim ? 2 : 0);
+        const reversed = await run(["EARLY", "CHURCH"], claim);
+        expect(reversed.issues.map((issue) => issue.attendeeIndex)).toEqual([1]);
+        const twoChurches = await run(["CHURCH", "OTHERCHURCH"], claim);
+        expect(twoChurches.issues.map((issue) => issue.attendeeIndex)).toEqual([1]);
+      }
+    });
+
+    it("still allows different ordinary codes for different people (#397)", async () => {
+      byCode({ EARLY: null, LATE: null });
+      for (const claim of [false, true]) {
+        const { discounts, issues } = await run(["EARLY", "LATE", "early"], claim);
+        expect(issues).toEqual([]);
+        expect(discounts.map((discount) => discount.code)).toEqual(["EARLY", "LATE", "EARLY"]);
+      }
+    });
+
+    it("does not let a mistyped first code block a valid one after it", async () => {
+      byCode({ CHURCH: "church-1", OTHERCHURCH: "church-2" });
+      for (const claim of [false, true]) {
+        const { discounts, issues } = await run(["TYPO", "CHURCH", "OTHERCHURCH"], claim);
+        expect(discounts.map((discount) => discount.attendeeIndex)).toEqual([1]);
+        expect(issues.map((issue) => issue.attendeeIndex)).toEqual([0, 2]);
+      }
+    });
   });
 
   it("totals the discounts and recalculates the card fee on the discounted amount", () => {

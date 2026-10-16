@@ -88,6 +88,32 @@ describe("staff roster CSV", () => {
   });
 });
 
+describe("hand-placement reasons on the class roster CSV (#962)", () => {
+  const placed = {
+    ...data,
+    enrollments: [{ id: "p1", offeringId: "o1", attendeeId: "a1", consumesSeat: true, adminPlaced: true, adminPlacementReason: "Synthetic: family request" }],
+  };
+
+  it("gives the reason column to system administrators only", async () => {
+    mocks.getHonorRosterData.mockResolvedValue(placed);
+    mocks.requirePermission.mockResolvedValueOnce({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" }, membership: null });
+    const asAdmin = await (await STAFF_GET(staffRequest("view=classes"), staffCtx)).text();
+    expect(mocks.getHonorRosterData).toHaveBeenLastCalledWith("event-1", { includeDietary: false, includeAdminPlacementReasons: true });
+    expect(asAdmin).toContain("Admin placement reason");
+    expect(asAdmin).toContain("Synthetic: family request");
+
+    // Every other report reader, even an event admin with every event permission, gets neither the data request nor the column.
+    for (const role of ["EVENT_ADMIN", "REGISTRATION_MANAGER", "READ_ONLY_STAFF"]) {
+      mocks.requirePermission.mockResolvedValueOnce(member(role, ["VIEW_REPORTS", "VIEW_SENSITIVE_DATA"]));
+      mocks.getHonorRosterData.mockResolvedValueOnce({ ...placed, enrollments: [{ ...placed.enrollments[0], adminPlacementReason: null }] });
+      const csv = await (await STAFF_GET(staffRequest("view=classes"), staffCtx)).text();
+      expect(mocks.getHonorRosterData).toHaveBeenLastCalledWith("event-1", { includeDietary: false });
+      expect(csv).not.toContain("Admin placement reason");
+      expect(csv).not.toContain("Synthetic: family request");
+    }
+  });
+});
+
 describe("staff roster CSV with sites (#589)", () => {
   const siteData = {
     ...data,

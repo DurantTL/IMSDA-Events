@@ -406,7 +406,7 @@ const protectedAttendeeIdentityKeys = new Set([
   "guest_name",
 ]);
 
-function assertProtectedFieldsUnchanged(
+export function assertProtectedFieldsUnchanged(
   definition: RegistrationFormDefinition,
   priorRegistrationResponses: Record<string, unknown>,
   input: RegistrationAmendmentInput,
@@ -428,7 +428,17 @@ function assertProtectedFieldsUnchanged(
   }
   const currentById = new Map(currentAttendees.map((attendee) => [attendee.id, attendee]));
   for (const attendeeInput of input.attendees) {
-    if (!attendeeInput.attendeeId) continue;
+    if (!attendeeInput.attendeeId) {
+      // A person added in an amendment takes no promo code: codes are money, handled in Payments (#961).
+      const newCode = attendeeInput.responses.promo_code;
+      if (typeof newCode === "string" ? newCode.trim() !== "" : newCode !== undefined && newCode !== null) {
+        throw new RegistrationAmendmentError(
+          "PROTECTED_FIELD_CHANGED",
+          "Promo codes cannot be changed through a registration amendment. Use Adjust amount owed in Payments.",
+        );
+      }
+      continue;
+    }
     const current = currentById.get(attendeeInput.attendeeId);
     if (!current) {
       throw new RegistrationAmendmentError(

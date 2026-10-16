@@ -299,3 +299,17 @@ export function applyAttendeePromoCodes(
     attendeeDiscounts: [...discounts],
   };
 }
+
+export type HeldPromoCode = { normalizedCode: string; sponsored: boolean };
+
+/**
+ * A church-sponsored code is the only code on its registration (church group registration, #961). Several people may use
+ * that same code (each counts as one use), but a different church code, or any other code beside a church code, is refused.
+ * Different non-church codes stay allowed (per-person codes, #397). Returns the message for a code that conflicts with a
+ * code already held on the registration, or null.
+ */
+export function promoCodeConflictMessage(held: readonly HeldPromoCode[], next: HeldPromoCode) {
+  const other = held.find((code) => code.normalizedCode !== next.normalizedCode && (code.sponsored || next.sponsored));
+  if (!other) return null;
+  return `A church-sponsored code can't be combined with another promo code on one registration. ${other.normalizedCode} is already used for another person here.`;
+}

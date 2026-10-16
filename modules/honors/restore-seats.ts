@@ -64,6 +64,7 @@ export async function restoreClassSeatsInTransaction(
       offeringId: true,
       organizationId: true,
       consumesSeat: true,
+      adminPlacementOverCapacity: true,
       registrationAttendeeId: true,
       registrationAttendee: { select: { profileSnapshot: true } },
       instructorMark: { select: { id: true } },
@@ -71,7 +72,9 @@ export async function restoreClassSeatsInTransaction(
     },
   });
   const seatPicks = picks
-    .filter((pick) => pick.consumesSeat)
+    // A seat a system administrator placed by hand into a full class (#962) is on top of the class's limit, so bringing the
+    // registration back never drops it for a full class: only a human removes it. A placement that took a free seat is a normal seat.
+    .filter((pick) => pick.consumesSeat && !pick.adminPlacementOverCapacity)
     .map((pick) => ({ ...pick, hasMarks: pick.instructorMark !== null || pick.weekendCompletions.length > 0 }));
   if (seatPicks.length === 0) return nothing();
 

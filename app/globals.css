@@ -3941,6 +3941,17 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   font-weight: 800;
 }
 
+.public-registration-promo-field > label.public-registration-promo-covered {
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.public-registration-promo-covered span,
+.public-registration-promo-field small {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
 .public-registration-promo-control {
   display: flex;
   gap: 8px;
@@ -8170,7 +8181,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 }
 @media print {
   .account-nav, .account-portal .public-registration-header, .account-portal .account-page-hero,
-  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector { display: none !important; }
+  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .honor-seat-override { display: none !important; }
   .club-schedule { border: 0; box-shadow: none; padding: 0; }
   .honor-class-sheet { break-before: page; }
   .report-table td.honor-roster-box { border: 1px solid #555; }
@@ -9413,6 +9424,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   color: var(--ink);
   padding: 16px 16px 10px;
 }
+.more-launcher-search { margin-bottom: 10px; }
+.more-launcher-search-status { min-height: 1.1em; margin: 4px 10px 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.74rem); }
+.more-launcher-tab .more-launcher-search input { min-height: 44px; font-size: 1rem; }
 .more-launcher-columns { columns: 2; column-gap: 22px; }
 .more-launcher-group { break-inside: avoid; margin-bottom: 14px; }
 .more-launcher-group-label { margin: 0 0 6px 10px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.68rem); font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
@@ -10962,6 +10976,15 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .staff-invite-preview pre { white-space: pre-wrap; margin: 0; font: inherit; }
 .staff-invite-party { margin: 0; padding-left: 18px; }
 
+/* System administrators' hand placement and removal on the Honors Weekend roster (#962). Narrow screens: one column, nothing wider than the viewport. */
+.inline-notice.warning { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; line-height: 1.5; }
+details.honor-seat-override { margin-bottom: 12px; }
+details.honor-seat-override > summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 6px; min-height: 44px; }
+.honor-seat-override.form-grid, details.honor-seat-override > .form-grid { grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; }
+.honor-seat-override input, .honor-seat-override select { width: 100%; min-width: 0; max-width: 100%; }
+.report-table td.honor-seat-override { min-width: 0; }
+.report-table td.honor-seat-override .form-grid { min-width: min(240px, 70vw); }
+
 /* Event features page and the creation features step (#965). */
 .event-features-page { display: grid; gap: 14px; }
 .event-features-notice { min-height: 1.4em; margin: 0; }
@@ -11049,3 +11072,17 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* A result form's long select option never widens the card past a phone screen. */
 .team-result-level { min-width: 0; }
 .team-result-level :is(input, select) { width: 100%; max-width: 100%; min-width: 0; }
+
+/* Advanced search on the People page (#180): a native disclosure over the shared form-stack field look. */
+.operations-search { display: grid; gap: 10px; }
+.operations-search-disclosure { border: 1px solid var(--line); border-radius: 12px; background: white; }
+.operations-search-disclosure > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--imsda-navy); padding: 0 14px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 800; }
+.operations-search-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+.operations-search-form { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); align-items: start; padding: 14px; }
+.operations-search-form .field { display: grid; align-content: start; gap: 6px; min-width: 0; margin: 0; border: 0; padding: 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
+.operations-search-form .operations-search-status { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.operations-search-form .operations-search-status legend { width: 100%; padding: 0; margin-bottom: 6px; }
+.operations-search-form .operations-search-status .checkbox-label { min-height: 44px; }
+.operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.operations-search-actions .primary-button,
+.operations-search-actions .secondary-button { min-height: 44px; }
