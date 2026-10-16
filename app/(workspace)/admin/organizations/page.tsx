@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { OrganizationDirectoryWorkspace } from "@/components/organization-directory-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { getOrganizationSummary, listSponsorOptions, listOrganizationsPage } from "@/modules/organizations/repository";
 import { cleanSearchQuery, parsePageParam } from "@/modules/organizations/search";
 
@@ -32,6 +33,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
       <div className="intro-actions club-admin-links">
         <BackLink href="/admin" variant="staff">Back to system administration</BackLink>
         <Link className="secondary-button" href="/admin/clubs/import">Import clubs</Link>
+        {healthRecordsEnabled() && <Link className="secondary-button" href="/admin/clubs/health-import">Import health records</Link>}
         <Link className="secondary-button" href="/admin/organizations/directory">Organization directory</Link>
         <Link className="secondary-button" href="/admin/organizations/import">Import from eAdventist</Link>
         <Link className="secondary-button" href="/admin/clubs/invites">Club invites</Link>

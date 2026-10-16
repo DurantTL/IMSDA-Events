@@ -26,6 +26,8 @@ describe("health data stays out of exports, the check-in book, communications an
       // (checked below); the check-in module itself stays free of health code.
       "app/api/events/[eventId]/attendees/[attendeeId]/check-in/route.ts",
       "app/api/internal/outbox/sweep/route.ts",
+      // Shows the "Import health records" link only when the feature is on (#878); it imports the flag and nothing else.
+      "app/(workspace)/admin/organizations/page.tsx",
     ]);
     const offenders = [...sourceFiles("modules"), ...sourceFiles("components"), ...sourceFiles("app"), ...sourceFiles("lib")]
       .filter((path) => !path.startsWith("modules/health-records/"))
@@ -33,6 +35,11 @@ describe("health data stays out of exports, the check-in book, communications an
       .filter((path) => !allowedOutside.has(path))
       .filter((path) => !/health/i.test(path));
     expect(offenders).toEqual([]);
+  });
+
+  it("lets the organizations page import nothing from the health module but the feature flag (#878)", () => {
+    const imports = [...read("app/(workspace)/admin/organizations/page.tsx").matchAll(/from "(@\/modules\/health-records\/[^"]+)"/g)].map((match) => match[1]);
+    expect(imports).toEqual(["@/modules/health-records/flag"]);
   });
 
   it("is never read by CSV, export, check-in, reporting, club report or message-composing code", () => {

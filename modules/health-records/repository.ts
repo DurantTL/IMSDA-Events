@@ -182,7 +182,7 @@ async function assertEventScope(
  * "Needs update" until it is saved or confirmed again.
  */
 async function findRecord(client: Pick<Client, "healthRecord">, organizationId: string, member: Pick<LoadedMember, "id" | "personId">) {
-  const select = { id: true, confirmedClubYear: true, hasHealthNote: true, lastEnteredVia: true, fields: { select: { fieldKey: true, sealedValue: true } } } as const;
+  const select = { id: true, confirmedClubYear: true, hasHealthNote: true, lastEnteredVia: true, importedAt: true, fields: { select: { fieldKey: true, sealedValue: true } } } as const;
   const own = await client.healthRecord.findUnique({ where: { rosterMemberId: member.id }, select });
   if (own) return own;
   if (!member.personId) return null;
@@ -206,6 +206,8 @@ export type HealthTabView = {
   club: { name: string; sponsoringChurch: string | null };
   status: HealthRecordStatus;
   hasHealthNote: boolean;
+  /** True for a record imported from the 2026 online form that no director has reviewed yet (#878). */
+  importedForReview: boolean;
   /** Opened values, keyed by field. Empty when no record exists. */
   values: Record<string, unknown>;
   /** Stored fields that fail today's checks (#855), by key, so the form can ask for a correction. Never a value. */
@@ -282,6 +284,7 @@ export async function viewHealthRecord(
     club: { name: member.organization.name, sponsoringChurch: member.organization.parentOrganization?.name ?? null },
     status: healthRecordStatus(record, now),
     hasHealthNote: record?.hasHealthNote ?? false,
+    importedForReview: Boolean(record?.importedAt),
     values,
     needsCorrection: healthFieldsNeedingCorrection(values),
     canEdit: viewerCan(viewer, organizationId, "EDIT"),
@@ -341,6 +344,8 @@ async function writeRecord(
     hasHealthNote: hasHealthNoteFor(values),
     lastEnteredVia: input.via,
     lastSavedByActor: input.savedBy,
+    // A director's or parent's save is the review of an imported record (#878).
+    importedAt: null,
   };
   if (existing) {
     await tx.healthRecord.update({ where: { id: recordId }, data: { ...common, rosterMemberId: input.member.id } });
@@ -455,7 +460,7 @@ export async function confirmHealthRecord(viewer: HealthViewer, organizationId: 
     if (!record) throw new HealthRecordError("MEMBER_NOT_FOUND", "There is no health record to confirm yet.");
     await tx.healthRecord.update({
       where: { id: record.id },
-      data: { confirmedClubYear: clubYearFor(now), lastConfirmedAt: now, rosterMemberId: member.id, lastSavedByActor: viewerActorId(viewer) },
+      data: { confirmedClubYear: clubYearFor(now), lastConfirmedAt: now, rosterMemberId: member.id, lastSavedByActor: viewerActorId(viewer), importedAt: null },
     });
     await writeAuditLog({
       actorUserId: who.actorUserId,

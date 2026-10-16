@@ -8,6 +8,9 @@ import type { HealthTabView } from "@/modules/health-records/repository";
 
 type Values = HealthTabView["values"];
 
+/** Shown on a record that came from the 2026 online form import (#878) until a director saves or confirms it. */
+export const HEALTH_IMPORTED_NOTICE = "Imported from the 2026 online form, director please review.";
+
 function str(values: Values, key: string) {
   const value = values[key];
   return typeof value === "string" && value !== "" ? value : "—";
@@ -38,6 +41,9 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
   if (health.status === "NONE") return <p className="public-manage-empty">No health record has been entered for this person yet.</p>;
   return (
     <div className="page-stack health-record-view">
+      {health.importedForReview && (
+        <p className="public-manage-security-note" role="note">{HEALTH_IMPORTED_NOTICE}</p>
+      )}
       <section className="public-manage-card">
         <h3>Participant</h3>
         <dl className="detail-list">
@@ -50,7 +56,7 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
         <h3>Health</h3>
         <dl className="detail-list">
           <Row label="Last tetanus booster" value={str(values, "lastTetanusBooster")} />
-          <Row label="Allergies" value={values.hasAllergies === "YES" ? str(values, "allergyDetails") : "None reported"} />
+          <Row label="Allergies" value={values.hasAllergies === "YES" ? str(values, "allergyDetails") : values.hasAllergies === "NO" ? "None reported" : "Not answered"} />
           <Row label="Medications or other relevant health information" value={str(values, "medications")} />
           <Row label="Medical restrictions" value={str(values, "medicalRestrictions")} />
         </dl>
@@ -58,7 +64,10 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
       <section className="public-manage-card">
         <h3>Insurance</h3>
         <dl className="detail-list">
-          <Row label="Covered by medical insurance" value={values.hasInsurance === "YES" ? "Yes" : "No"} />
+          <Row label="Covered by medical insurance" value={values.hasInsurance === "YES" ? "Yes" : values.hasInsurance === "NO" ? "No" : "Not answered"} />
+          {values.insuranceCardInCognito === true && (
+            <Row label="Insurance card" value="Uploaded on the old online form. Ask the parent to upload it again here." />
+          )}
           {values.hasInsurance === "YES" && (
             <>
               <Row label="Company" value={str(values, "insuranceCompany")} />
@@ -90,7 +99,11 @@ export function HealthRecordView({ health }: { health: HealthTabView }) {
       </section>
       <section className="public-manage-card">
         <h3>Consent</h3>
-        <p>Signed by {signature.typedName ?? "—"} on {signature.signedOn ?? "—"}.</p>
+        {values.consent
+          ? <p>{(values.consent as { importedFromOnlineForm?: boolean }).importedFromOnlineForm
+            ? `Signed on the 2026 online form${signature.typedName ? ` by ${signature.typedName}` : ""}${signature.signedOn ? ` on ${signature.signedOn}` : ""} (imported).`
+            : `Signed by ${signature.typedName || "—"} on ${signature.signedOn || "—"}.`}</p>
+          : <p>No consent has been given in the new system yet. The parent can give it through the private link.</p>}
       </section>
     </div>
   );

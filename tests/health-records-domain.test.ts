@@ -203,3 +203,13 @@ describe("the explicit permission", () => {
     }
   });
 });
+
+describe("stored answers the Health tab asks the director to correct (#878)", () => {
+  it("names a tetanus booster that is not a date, and text longer than the form accepts, with the typed-field checks", () => {
+    expect(healthFieldsNeedingCorrection({ lastTetanusBooster: "2019" })).toEqual(["lastTetanusBooster"]);
+    expect(healthFieldsNeedingCorrection({ lastTetanusBooster: "2024-03-01" })).toEqual([]);
+    expect(healthFieldsNeedingCorrection({ medications: "x".repeat(2001), addressLine1: "ok", insuranceGroupNumber: "g".repeat(81) })).toEqual(["medications", "insuranceGroupNumber"]);
+    expect(healthFieldsNeedingCorrection({ phone: "9".repeat(41), emergencyContacts: [{ firstName: "A".repeat(81), phone: "515-555-0100" }] })).toEqual(["phone", "emergencyContacts.0.firstName"]);
+    expect(healthFieldsNeedingCorrection({ medications: "x".repeat(2000) })).toEqual([]);
+  });
+});

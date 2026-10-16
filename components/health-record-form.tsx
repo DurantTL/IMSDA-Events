@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ClubFormSectionTitle } from "@/components/club-form-section-title";
 import { DateInput } from "@/components/club-form-date-input";
+import { FORM_LIMITS, healthFieldLabel, tetanusNeedsCorrection } from "@/modules/health-records/field-limits";
 import { inputAttributesFor, isUnchangedFromStored, storedContactPhone, problemMessage, validateByType, type FieldValueType } from "@/lib/field-validation";
 
 /**
@@ -67,8 +68,8 @@ const textKeys = [
 
 export function HealthRecordForm({ mode, initialValues, consentText, clubName, sponsoringChurch, memberName, doneHref, needsCorrection = [] }: Props) {
   const [text, setText] = useState<Record<string, string>>(() => Object.fromEntries(textKeys.map((key) => [key, str(initialValues, key)])));
-  const [hasAllergies, setHasAllergies] = useState(str(initialValues, "hasAllergies") || "NO");
-  const [hasInsurance, setHasInsurance] = useState(str(initialValues, "hasInsurance") || "NO");
+  const [hasAllergies, setHasAllergies] = useState(Object.keys(initialValues).length === 0 ? "NO" : str(initialValues, "hasAllergies"));
+  const [hasInsurance, setHasInsurance] = useState(Object.keys(initialValues).length === 0 ? "NO" : str(initialValues, "hasInsurance"));
   const [contacts, setContacts] = useState<Contact[]>(() => contactsFrom(initialValues));
   const [consents, setConsents] = useState({ emergencyTreatment: false, activities: false, photocopy: false });
   const [signature, setSignature] = useState("");
@@ -104,6 +105,10 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setAttempted(true);
+    if (hasAllergies === "" || hasInsurance === "") {
+      setError(`${hasAllergies === "" ? "Allergies: answer whether the participant has allergies. " : ""}${hasInsurance === "" ? "Insurance: answer whether the participant is covered by medical insurance." : ""}`.trim());
+      return;
+    }
     if (blockingProblem()) {
       setError("Check the highlighted fields and try again.");
       return;
@@ -132,9 +137,10 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-      const result = await response.json().catch(() => ({})) as { message?: string };
+      const result = await response.json().catch(() => ({})) as { message?: string; issues?: Array<{ field?: string; message?: string }> };
       if (!response.ok) {
-        setError(result.message ?? "The health record could not be saved.");
+        const named = (result.issues ?? []).filter((issue) => issue.field && issue.message).map((issue) => `${healthFieldLabel(issue.field!)}: ${issue.message}`);
+        setError(named.length > 0 ? named.join(" ") : result.message ?? "The health record could not be saved.");
         return;
       }
       setDone(true);
@@ -154,16 +160,24 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
     );
   }
 
-  const field = (key: string, label: string, options: { wide?: boolean; area?: boolean; date?: boolean } = {}) => options.date ? (
+  const field = (key: string, label: string, options: { wide?: boolean; area?: boolean; date?: boolean } = {}) => options.date && !tetanusNeedsCorrection(text[key]) ? (
     <DateInput className={options.wide ? "club-form-field-wide" : undefined} key={key} label={label} labelText={label} onChange={(value) => set(key, value)} value={text[key] ?? ""} />
   ) : (() => {
     const spec = typedKeys[key];
-    const message = spec ? problemFor(key, text[key] ?? "", initialValues[key], spec) : "";
+    const limit = FORM_LIMITS[key];
+    const value = text[key] ?? "";
+    // A saved answer the form would refuse is shown as typed, with what to fix (#878).
+    const fixMessage = key === "lastTetanusBooster" && tetanusNeedsCorrection(value)
+      ? "Enter the date as year-month-day, like 2024-03-01. This saved answer needs correcting."
+      : limit !== undefined && value.length > limit
+        ? `Keep this to ${limit} characters or fewer. This saved answer needs correcting.`
+        : "";
+    const message = fixMessage || (spec ? problemFor(key, value, initialValues[key], spec) : "");
     const attributes = spec ? inputAttributesFor(spec.type) : null;
     return (
       <label className={options.wide ? "club-form-field-wide" : undefined} key={key}>{label}
         {options.area
-          ? <textarea maxLength={2000} onChange={(event) => set(key, event.target.value)} rows={3} value={text[key] ?? ""} />
+          ? <textarea onChange={(event) => set(key, event.target.value)} rows={3} value={text[key] ?? ""} />
           : (
             <input
               aria-describedby={message ? `health-${key}-problem` : undefined}
@@ -183,7 +197,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
 
   return (
     <form className="club-form-fill" noValidate onSubmit={(event) => void submit(event)}>
-      {needsCorrection.length > 0 && <div className="inline-notice warning" role="status">Some saved answers are not valid phone numbers, emails or ZIP codes. They are marked below; please correct them.</div>}
+      {needsCorrection.length > 0 && <div className="inline-notice warning" role="status">Some saved answers need correcting (a phone number, email, ZIP code or date that isn&apos;t valid, or text that is too long). They are marked below: {needsCorrection.map(healthFieldLabel).join(", ")}.</div>}
       <fieldset className="public-manage-card form-stack" disabled={saving}>
         <ClubFormSectionTitle>Participant</ClubFormSectionTitle>
         <p><strong translate="no">{memberName}</strong></p>
@@ -204,6 +218,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
           {field("lastTetanusBooster", "Date of last tetanus booster", { date: true })}
           <label>Does the participant have allergies?
             <select onChange={(event) => setHasAllergies(event.target.value)} value={hasAllergies}>
+              {hasAllergies === "" && <option value="">Not answered: choose one</option>}
               <option value="NO">No</option>
               <option value="YES">Yes</option>
             </select>
@@ -219,6 +234,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
         <div className="form-grid two-column">
           <label>Is the participant covered by medical insurance?
             <select onChange={(event) => setHasInsurance(event.target.value)} value={hasInsurance}>
+              {hasInsurance === "" && <option value="">Not answered: choose one</option>}
               <option value="NO">No</option>
               <option value="YES">Yes</option>
             </select>

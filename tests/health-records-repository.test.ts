@@ -968,3 +968,84 @@ describe("break-glass for a system administrator's live read (#929)", () => {
     expect(state.uses).toHaveLength(0);
   });
 });
+
+describe("a record imported from the 2026 online form (#878)", () => {
+  beforeEach(() => {
+    resetState();
+    // As the import writes it: sealed fields, no confirmed club year, the plain imported marker.
+    state.records = [{ id: "imported-1", organizationId: "club-a", rosterMemberId: "member-1", confirmedClubYear: null, hasHealthNote: true, lastEnteredVia: null, importedAt: now }];
+    state.fields = [];
+  });
+
+  it("reads Needs update and tells the director it came from the old form, until they confirm it", async () => {
+    const before = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(before.status).toBe("NEEDS_UPDATE");
+    expect(before.importedForReview).toBe(true);
+    await confirmHealthRecord(leader, "club-a", "member-1", now);
+    expect(state.records[0]).toMatchObject({ confirmedClubYear: "2026-27", importedAt: null });
+    const after = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(after).toMatchObject({ status: "CURRENT", importedForReview: false });
+  });
+
+  it("shows the imported consent from the 2026 online form, and keeps it when the director confirms", async () => {
+    const { sealHealthField } = await import("@/modules/health-records/crypto");
+    const consent = { version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-09-20", importedFromOnlineForm: true };
+    state.fields = [
+      { recordId: "imported-1", fieldKey: "consent", sealedValue: sealHealthField("imported-1", "consent", consent) },
+      { recordId: "imported-1", fieldKey: "signature", sealedValue: sealHealthField("imported-1", "signature", { typedName: "", signedOn: "2026-09-20" }) },
+    ];
+    const before = JSON.stringify(state.fields);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values.consent).toEqual(consent);
+    await confirmHealthRecord(leader, "club-a", "member-1", now);
+    expect(JSON.stringify(state.fields)).toBe(before);
+    const after = await viewHealthRecord(leader, "club-a", "member-1", now);
+    expect(after.values.consent).toEqual(consent);
+    expect(after.status).toBe("CURRENT");
+  });
+
+  it("holds no consent for an imported record whose form was not signed, and confirm creates none", async () => {
+    state.fields = [];
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values).not.toHaveProperty("consent");
+    await confirmHealthRecord(leader, "club-a", "member-1", now);
+    expect(state.fields).toEqual([]);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).values).not.toHaveProperty("consent");
+  });
+
+  it("is reviewed by a director's save as well, which clears the marker", async () => {
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    expect(state.records[0]).toMatchObject({ importedAt: null, confirmedClubYear: "2026-27" });
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).importedForReview).toBe(false);
+  });
+
+  it("replaces the imported consent with the standard one when a director saves over the record", async () => {
+    const { sealHealthField, openHealthField } = await import("@/modules/health-records/crypto");
+    state.fields = [{ recordId: "imported-1", fieldKey: "consent", sealedValue: sealHealthField("imported-1", "consent", { version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "", importedFromOnlineForm: true }) }];
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    const stored = state.fields.find((field) => field.fieldKey === "consent")!;
+    const consent = openHealthField("imported-1", "consent", stored.sealedValue) as Record<string, unknown>;
+    expect(consent.version).toBe("pathfinder-health-record-2026");
+    expect(consent).not.toHaveProperty("importedFromOnlineForm");
+    expect(consent).toMatchObject({ emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "2026-10-05" });
+  });
+
+  it("replaces the imported consent with the standard one when the parent submits through the private link", async () => {
+    const { sealHealthField, openHealthField } = await import("@/modules/health-records/crypto");
+    state.fields = [{ recordId: "imported-1", fieldKey: "consent", sealedValue: sealHealthField("imported-1", "consent", { version: "cognito-pathfinder-health-record-2026", importedFromOnlineForm: true }) }];
+    const created = await createHealthRecordLink(leader, { organizationId: "club-a", rosterMemberId: "member-1", recipientEmail: "parent@example.test" }, now);
+    const delivered = await prepareHealthRecordLinkBodyForDelivery({ messageId: created.messageId, bodyText: state.outbox[0]!.bodyTextSnapshot as string, now });
+    const token = decodeURIComponent(delivered.bodyText.match(/https:\/\/\S+/)![0].split("/health-records/")[1]!);
+    await submitHealthRecordViaLink(token, syntheticRecord, now);
+    const stored = state.fields.filter((field) => field.recordId === "imported-1" && field.fieldKey === "consent");
+    expect(stored).toHaveLength(1);
+    const consent = openHealthField("imported-1", "consent", stored[0]!.sealedValue) as Record<string, unknown>;
+    expect(consent.version).toBe("pathfinder-health-record-2026");
+    expect(consent).not.toHaveProperty("importedFromOnlineForm");
+    expect(state.records[0]!.importedAt).toBeNull();
+  });
+
+  it("is not marked for a record that was never imported", async () => {
+    state.records = [];
+    await saveHealthRecord(leader, "club-a", "member-1", syntheticRecord, now);
+    expect((await viewHealthRecord(leader, "club-a", "member-1", now)).importedForReview).toBe(false);
+  });
+});

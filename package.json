@@ -71,6 +71,7 @@
     "test:staff-invitations": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-staff-invitations.ts",
     "test:club-forms": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-forms.ts",
     "test:health-records": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-health-records.ts",
+    "test:health-import": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-health-import.ts",
     "test:health-snapshots": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-health-snapshots.ts",
     "test:location-waitlist": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-location-waitlist.ts",
     "test:event-cloning": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-cloning.ts",

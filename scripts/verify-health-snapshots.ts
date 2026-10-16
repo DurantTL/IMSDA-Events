@@ -348,10 +348,15 @@ async function main() {
   assert(individual.registrationId.length > 0 && submittedReg.registrationId.length > 0, "fixtures exist");
 
   // 4. The event-start trigger: confirmed registrants with a record and no copy.
+  // An imported consent with no date (#878): the copy records the imported version and no date, never an empty string.
+  const unknownLive = await prisma.healthRecord.findUniqueOrThrow({ where: { rosterMemberId: unknownMember.id }, select: { id: true } });
+  await prisma.healthRecordField.update({ where: { recordId_fieldKey: { recordId: unknownLive.id, fieldKey: "consent" } }, data: { sealedValue: crypto.sealHealthField(unknownLive.id, "consent", { version: "cognito-pathfinder-health-record-2026", emergencyTreatment: true, activities: true, photocopy: true, agreedOn: "", importedFromOnlineForm: true }) } });
+  await prisma.healthRecordField.update({ where: { recordId_fieldKey: { recordId: unknownLive.id, fieldKey: "signature" } }, data: { sealedValue: crypto.sealHealthField(unknownLive.id, "signature", { typedName: "", signedOn: "" }) } });
   const started = await snapshots.sealStartedEventSnapshots(now);
   assert(started.taken === 1 && started.failed === 0, `the event-start sweep seals the confirmed member with no copy yet (taken=${started.taken})`);
   const unknownCopy = await prisma.healthRecordSnapshot.findUniqueOrThrow({ where: { personId_eventId: { personId: ids.unknown, eventId: ids.eventA } } });
   assert(unknownCopy.trigger === "EVENT_START", "the event-start copy says so");
+  assert(unknownCopy.consentVersion === "cognito-pathfinder-health-record-2026" && unknownCopy.signedOn === null, "an imported consent with no date is copied with its version and no date, not an empty string");
   assert((await prisma.healthRecordSnapshot.count({ where: { personId: ids.norecord } })) === 0 && (await prisma.healthRecordSnapshot.count({ where: { personId: ids.submitted } })) === 0, "the sweep seals nothing for no record or an unconfirmed registration");
   const again = await snapshots.sealStartedEventSnapshots(now);
   assert(again.taken === 0, "a second sweep seals nothing more");
