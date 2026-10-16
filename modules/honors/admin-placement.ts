@@ -30,8 +30,11 @@ import { classChangesOpen, sessionVisibleAtLocation } from "@/modules/honors/loc
  * - It never touches the class's seat limit. The seat is marked as an administrator placement and sits on top of the limit
  *   (`seatHoldingEnrollment` leaves it out), so the limit, every waitlist position and every live offer stay as they were.
  *   Reports show the class over capacity, with the reason.
- * - Only a class with no seat left takes a placement: a class with a free seat is picked normally, and a youth holding a live
- *   waitlist offer for it accepts that instead, so a placement can never quietly raise a class's capacity.
+ * - While class changes are open only a class with no seat left takes a placement: a class with a free seat is picked normally, and a
+ *   youth holding a live waitlist offer for it accepts that instead, so a placement can never quietly raise a class's capacity.
+ *   After they close a normal pick and an acceptance both fail, so a placement takes a free seat as an ordinary counted seat (the
+ *   limit still holds for later picks), takes the seat of the youth's own offer that the close cut off the same way, and only a
+ *   full class gets an over-capacity placement on top of the limit (`adminPlacementOverCapacity`).
  * - The per-club limit is an explicit waiver: the placement goes ahead and the audit entry says whether it left the club over its
  *   limit (`clubLimitExceeded`, counting every seat the club holds in the class, placements included).
  * - Level and prerequisite rules can be waived in the same step with an `overrideReason` (or a confirmation), recorded exactly as
@@ -187,15 +190,22 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
     if (problem) throw new SeatOverrideError("SELECTION_INVALID", `${person.firstName} ${person.lastName}: ${problem}`.trim());
     const resolution = requirementResolution(person, offering, waivers);
 
-    // A youth holding a live offer for this very class just accepts it.
+    const changesOpen = classChangesOpen(registration.event, registration.location, now);
+    // While class changes are open a youth holding a live offer for this very class just accepts it. After they close accepting fails
+    // too, so the placement takes the offer's seat instead (settled below).
     const liveOwnOffer = await tx.honorClassWaitlistEntry.findFirst({
       where: { registrationAttendeeId: attendee.id, offeringId: offering.id, status: "OFFERED", offerExpiresAt: { gt: now } },
       select: { id: true },
     });
-    if (liveOwnOffer) throw new SeatOverrideError("HAS_LIVE_OFFER", "Accept the youth's offer instead.");
+    if (liveOwnOffer && changesOpen) throw new SeatOverrideError("HAS_LIVE_OFFER", "Accept the youth's offer instead.");
+    // Offers that ran out, or that the close cut off, give their seats back first, as in a pick save (the class row is locked).
+    waitlistMessageIds.push(...(await (await import("@/modules/honors/waitlist-repository")).promoteClassWaitlists(tx, eventId, [offering.id], now)).messageIds);
     const counts = await seatCounts(tx, eventId, owner, now);
-    // Only a class with no seat left takes a placement; otherwise it would quietly raise the class's capacity.
-    if ((counts.taken.get(offering.id) ?? 0) + (counts.reserved.get(offering.id) ?? 0) < offering.capacity) {
+    const full = (counts.taken.get(offering.id) ?? 0) + (counts.reserved.get(offering.id) ?? 0) >= offering.capacity;
+    // While class changes are open, a class with a seat left is picked normally: a placement would quietly raise its capacity.
+    // After they close a normal pick is refused for everyone, so the placement takes the free seat as a counted seat (capacity
+    // still holds for the next pick); only a full class takes it on top of the limit.
+    if (!full && changesOpen) {
       throw new SeatOverrideError("CLASS_HAS_SEAT", "This class still has a seat; pick it normally.");
     }
     // The per-club limit is an explicit waiver, not a refusal: the audit records whether it was passed. Counted over every seat the
@@ -221,6 +231,7 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
         adminPlacementReason: reason,
         adminPlacedAt: now,
         adminPlacedByUserId: actorUserId,
+        adminPlacementOverCapacity: full,
         levelConfirmedByDirector: resolution.levelConfirmed,
         prerequisitesConfirmedByDirector: resolution.prerequisitesConfirmed,
         requirementOverrideReason: resolution.overrideReason,
@@ -229,11 +240,21 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
       select: { id: true },
     });
 
-    // The youth's own place on this class's waitlist is settled, as when a director picks a class they wait for. Nobody else's
-    // position or offer changes.
+    // The youth's own place on this class's waitlist is settled, as when a director picks a class they wait for: a place still in
+    // the line, or the offer the close just cut off (its seat is the one this placement takes). Nobody else's position or offer changes.
     const ownEntry = await tx.honorClassWaitlistEntry.findFirst({
-      where: { registrationAttendeeId: attendee.id, offeringId: offering.id, status: { in: ["WAITING", "OFFERED"] } },
-      select: { id: true, status: true },
+      where: {
+        registrationAttendeeId: attendee.id,
+        offeringId: offering.id,
+        OR: [
+          { status: { in: ["WAITING", "OFFERED"] } },
+          // The offer the close cut off, whether this placement or an earlier sweep or acceptance attempt lapsed it.
+          ...(changesOpen ? [] : [{ status: "EXPIRED" as const, resolution: "Class changes closed" }]),
+          ...(liveOwnOffer ? [{ id: liveOwnOffer.id }] : []),
+        ],
+      },
+      orderBy: { joinOrder: "desc" },
+      select: { id: true },
     });
     if (ownEntry) {
       await tx.honorClassWaitlistEntry.update({
@@ -247,13 +268,12 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
     waitlistMessageIds.push(...(await settleWaitlistAfterSave(tx, {
       eventId,
       registrationId: registration.registrationId,
-      freedOfferingIds: ownEntry?.status === "OFFERED" ? [offering.id] : [],
+      freedOfferingIds: [],
       now,
     })).messageIds);
 
-    const after = await tx.honorEnrollment.count({ where: { offeringId: offering.id, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } });
-    const overCapacity = after > offering.capacity;
-    const wasFull = (counts.taken.get(offering.id) ?? 0) + (counts.reserved.get(offering.id) ?? 0) >= offering.capacity;
+    // Over capacity exactly when the class had no seat left: that placement is on top of the limit.
+    const overCapacity = full;
     const changesClosed = !classChangesOpen(registration.event, registration.location, now);
 
     // Ids and the reason only: no names, contact details or notes.
@@ -270,7 +290,9 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
         offeringId: offering.id,
         ...(owner.kind === "club" ? { organizationId: owner.organizationId } : { group: true }),
         reason,
-        classWasFull: wasFull,
+        classWasFull: full,
+        countedAgainstCapacity: !full,
+        requirementsConfirmed: { level: resolution.levelConfirmed, prerequisites: resolution.prerequisitesConfirmed },
         classChangesClosed: changesClosed,
         overCapacity,
         capacity: offering.capacity,
@@ -320,7 +342,7 @@ export async function removePickAsAdministrator(eventId: string, actorUserId: st
     const pick = await tx.honorEnrollment.findFirst({
       where: { id: input.enrollmentId, eventId },
       select: {
-        id: true, offeringId: true, registrationId: true, registrationAttendeeId: true, organizationId: true, consumesSeat: true, adminPlacementReason: true,
+        id: true, offeringId: true, registrationId: true, registrationAttendeeId: true, organizationId: true, consumesSeat: true, adminPlacementReason: true, adminPlacementOverCapacity: true,
       },
     });
     if (!pick) throw new SeatOverrideError("PICK_NOT_FOUND", "That class pick no longer exists.");
@@ -351,7 +373,8 @@ export async function removePickAsAdministrator(eventId: string, actorUserId: st
         ...(pick.organizationId ? { organizationId: pick.organizationId } : { group: true }),
         reason,
         wasAdminPlacement: pick.adminPlacementReason !== null,
-        freedSeat: pick.consumesSeat && pick.adminPlacementReason === null,
+        // A counted seat frees a normal seat (the waitlist is promoted above); an over-capacity placement frees nothing.
+        freedSeat: pick.consumesSeat && !pick.adminPlacementOverCapacity,
       },
     }, tx);
     return { registrationId: pick.registrationId, offeringId: pick.offeringId };

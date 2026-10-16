@@ -44,6 +44,7 @@ export async function getHonorRosterData(
   options: { includeDietary: boolean; organizationId?: string; /** Load why a system administrator placed a youth by hand (#962); only for a system administrator. */ includeAdminPlacementReasons?: boolean; /** Only this site's registrations and sessions (#589). */ locationId?: string },
 ) {
   const prisma = getPrisma();
+  const noTotals: Array<{ offeringId: string; _count: { _all: number } }> = [];
   const registrationSelect = {
     locationId: true,
     location: { select: { name: true } },
@@ -100,9 +101,10 @@ export async function getHonorRosterData(
       }),
     prisma.eventLocation.findMany({ where: { eventId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, sortOrder: true } }),
     // The limit is the whole class's, whatever site the roster is filtered to (#962): every seat, the seats counted toward the limit, and live offers.
-    prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, _count: { _all: true } }),
-    prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...seatHoldingEnrollment }, _count: { _all: true } }),
-    prisma.honorClassWaitlistEntry.groupBy({ by: ["offeringId"], where: { eventId, ...liveWaitlistOffer(new Date()) }, _count: { _all: true } }),
+    // (A director's own schedule needs none of it.)
+    options.organizationId ? Promise.resolve(noTotals) : prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, _count: { _all: true } }),
+    options.organizationId ? Promise.resolve(noTotals) : prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...seatHoldingEnrollment }, _count: { _all: true } }),
+    options.organizationId ? Promise.resolve(noTotals) : prisma.honorClassWaitlistEntry.groupBy({ by: ["offeringId"], where: { eventId, ...liveWaitlistOffer(new Date()) }, _count: { _all: true } }),
   ]);
   if (!event) return null;
   // One entry per club or per group: its key, the name rosters print, and its registration.
@@ -188,8 +190,10 @@ export async function getHonorRosterData(
     offerings: offerings.map((offering): RosterOffering => ({
       id: offering.id,
       perClubLimit: offering.perClubLimit,
-      seatsAllSites: seatTotalOf.get(offering.id) ?? 0,
-      capacityHeldAllSites: (countedTotalOf.get(offering.id) ?? 0) + (liveOfferTotalOf.get(offering.id) ?? 0),
+      ...(options.organizationId ? {} : {
+        seatsAllSites: seatTotalOf.get(offering.id) ?? 0,
+        capacityHeldAllSites: (countedTotalOf.get(offering.id) ?? 0) + (liveOfferTotalOf.get(offering.id) ?? 0),
+      }),
       // A class can teach several honors (#812); the roster lists everyone in the class under all of them.
       honorName: summarizeOfferingHonors(offering.honors).honorName,
       honorCode: summarizeOfferingHonors(offering.honors).honorCode,

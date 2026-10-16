@@ -150,8 +150,8 @@ describe("the repository checks the role itself, inside a serializable transacti
 });
 
 describe("a placed seat sits on top of the class's limit (#962)", () => {
-  it("is left out of every seat count, so the limit, the waitlist and live offers can't change", () => {
-    expect(seatHoldingEnrollment).toMatchObject({ consumesSeat: true, adminPlacementReason: null });
+  it("leaves an over-capacity placement out of every seat count, so the limit, the waitlist and live offers can't change", () => {
+    expect(seatHoldingEnrollment).toMatchObject({ consumesSeat: true, adminPlacementOverCapacity: false });
   });
 
   const sessions = [{ id: "s1", name: "Sabbath", sortOrder: 0 }];

@@ -143,19 +143,26 @@ hand. Raising a class's seat limit is a human decision, so this is an explicit, 
   (5 to 300 characters; no medical or private details). It works when the class is full and after class changes closed.
   The control is on the staff Honors Weekend roster (classes view), for system administrators.
 - **Remove.** `POST /api/events/{eventId}/honors/seat-overrides/{enrollmentId}/remove` with a `reason`, before or after close.
-  The freed seat goes to the next youth in line (before the deadline, as when a director drops a class). A pick the instructor
+  Removing a counted seat frees a normal seat, which goes to the next youth in line (before the deadline, as when a director drops
+  a class); removing an over-capacity placement frees nothing. A pick the instructor
   already marked, or that was written to an honor record, is refused.
-- **The seat limit never changes.** A placed seat is marked (`adminPlacementReason`, `adminPlacedAt`, `adminPlacedByUserId`) and
-  is not counted toward the limit (`seatHoldingEnrollment`), so the limit, every waitlist position and any live offer are
-  unchanged and an offer can still be accepted. Reports count it: the class shows over capacity on the staff roster page and in
-  the class roster CSV (Youth seats above Capacity); the reason itself is for system administrators (see "Who reads the reason").
-- **Only a class with no seat left.** A class that still has a seat (seats counted toward the limit plus seats held for live
-  offers, less than the limit) refuses with `CLASS_HAS_SEAT`: pick it normally, so a placement can never quietly raise a class's
-  capacity. A youth holding their own live offer for the class gets `HAS_LIVE_OFFER`: accept it instead.
+- **The seat limit never changes.** A placement is marked (`adminPlacementReason`, `adminPlacedAt`, `adminPlacedByUserId`). One
+  that goes into a class with no seat left is also marked `adminPlacementOverCapacity` and is not counted toward the limit
+  (`seatHoldingEnrollment`), so the limit, every waitlist position and any live offer are unchanged and an offer can still be
+  accepted. A placement that took a free seat counts like any other seat. Reports count both: the class shows over capacity on
+  the staff roster page and in the class roster CSV (Youth seats above Capacity); the reason itself is for system administrators
+  (see "Who reads the reason").
+- **Open and closed.** Before the class-change deadline, a class that still has a seat (seats counted toward the limit plus seats
+  held for live offers, less than the limit) refuses with `CLASS_HAS_SEAT`: pick it normally, so a placement can never quietly
+  raise a class's capacity. A youth holding their own live offer for the class gets `HAS_LIVE_OFFER`: accept it instead. After
+  the deadline neither a normal pick nor an acceptance works, so the placement is allowed: into a class with a free seat it is an
+  ordinary counted seat (capacity still holds for later picks); a youth whose offer the close cut off takes that offer's seat the
+  same way, and that entry is settled as taken; only a full class gets an over-capacity placement. Offers that ran out or were
+  cut off lapse first, as in a pick save, and the audit records `overCapacity`.
 - **The per-club limit is an explicit, audited waiver.** The placement goes ahead and the audit entry records
   `clubLimitExceeded` (true or false), counting every active seat the club (or group) holds in the class, placements included,
-  plus its live offers and this seat. The placement form warns before submit with the same count. Placed seats still don't count
-  toward the limit for a director's own picks.
+  plus its live offers and this seat. The placement form warns before submit with the same count. Over-capacity placements don't
+  count toward the per-club limit for a director's own picks.
 - **Level and prerequisites can be waived in the same step** with an optional `overrideReason` (and `confirmed` for a level or
   honor record the roster doesn't show), recorded on the seat exactly as the staff override on a pick save records it
   (`requirementOverrideReason`, `requirementOverriddenByUserId`) and audited as `HONOR_CLASS_REQUIREMENT_OVERRIDDEN`. Age, one
@@ -169,7 +176,7 @@ hand. Raising a class's seat limit is a human decision, so this is an explicit, 
   schedule, sees the class over capacity (the count compares the whole class's seats, across sites, with its limit) but no reason.
 - **A director dropping a placed pick.** A director's pick save keeps today's rules, so leaving a placed pick out of their list
   removes it; the `HONOR_CLASSES_UPDATED` audit entry names it in `droppedAdminPlacementEnrollmentIds`.
-- **Reinstating a registration** never drops a placed seat for a full class.
+- **Reinstating a registration** never drops an over-capacity placement for a full class; a counted placement is a normal seat.
 - **Audit.** `HONOR_CLASS_ADMIN_PLACED` and `HONOR_CLASS_ADMIN_PICK_REMOVED`, with ids and the reason only.
 - Same serializable transaction and class row lock as a pick save, retried on a lost conflict.
 - Proof against a real database, including races with normal pick saves: `npm run test:honor-admin-seat-override`.

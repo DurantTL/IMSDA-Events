@@ -8,6 +8,9 @@
  *  - a class that still has a seat, or a live offer for the youth, refuses the placement (it can't quietly raise capacity);
  *  - the per-club limit is an audited waiver (two placements against a limit of 1), a level rule can be waived in the same step
  *    with a reason recorded like the staff override, and a seatless person, a repeat or a session clash is still refused;
+ *  - after class changes close (a normal pick and an acceptance both fail): a placement into a class with a free seat is an ordinary
+ *    counted seat (capacity still holds for later picks), a youth whose offer the close cut off takes that offer's seat as a counted
+ *    seat, and only a full class gets an over-capacity placement on top of the limit;
  *  - a placement passes on the youth's other live offer in that session, like a pick save does;
  *  - a director dropping a placed pick names it in the audit;
  *  - the audit entry holds ids and the reason only, and the staff roster shows the class over capacity with the reason;
@@ -147,7 +150,7 @@ async function main() {
   for (const [club, keys] of [["c1", ["y1", "y4", "y6", "y7"]], ["c2", ["y2", "y5", "y8"]], ["c3", ["y3", "y9"]]] as const) {
     for (const key of keys) await addPerson(club, key);
   }
-  for (const [club, keys] of [["c3", ["y10"]], ["c1", ["y11"]], ["c2", ["y12", "y13"]]] as const) {
+  for (const [club, keys] of [["c3", ["y10", "zc", "zg"]], ["c1", ["y11", "za", "zd", "zh"]], ["c2", ["y12", "y13", "zb", "ze"]]] as const) {
     for (const key of keys) await addPerson(club, key);
   }
   await addPerson("c1", "staff1", null, "STAFF");
@@ -336,6 +339,49 @@ async function main() {
   const dropAudit = await prisma.auditLog.findMany({ where: { eventId, action: "HONOR_CLASSES_UPDATED" } });
   assert(dropAudit.some((entry) => ((entry.metadata as Record<string, unknown>).droppedAdminPlacementEnrollmentIds as string[] | undefined)?.includes(guardPlaced.enrollmentId)), "the director's save names the placement it dropped");
   console.log("ok  a director can't place past a full class, and dropping a placement is named in the audit");
+
+  // ---- 10. After class changes closed.
+  const opened = new Date("2026-11-30T20:00:00Z"); // still open
+  const closed = new Date("2026-12-01T12:00:00Z"); // closed, but an offer made at `opened` has not run out (24 hours)
+  // 10a. A class with a free seat: nobody can pick it any more, so the placement takes the free seat as an ordinary counted seat.
+  const freeAfterClose = await makeClass(5, 2);
+  await pickAdd("za", freeAfterClose);
+  await expectClass(pickAdd("zb", freeAfterClose, closed), "DEADLINE_PASSED", "a normal pick after close");
+  const counted = await place("zb", freeAfterClose, "Synthetic: free seat after the deadline", closed);
+  const countedRow = await prisma.honorEnrollment.findUniqueOrThrow({ where: { id: counted.enrollmentId } });
+  assert(!counted.overCapacity && countedRow.adminPlacementOverCapacity === false && countedRow.adminPlacementReason !== null, "a placement into a free seat after close is a counted seat");
+  assert((await capacityOf(freeAfterClose)) === 2, "the limit did not change");
+  await expectClass(pickAdd("zc", freeAfterClose), "CLASS_FULL", "the counted placement used the free seat, so capacity holds for the next normal pick");
+  const countedAudit = (await prisma.auditLog.findMany({ where: { eventId, action: "HONOR_CLASS_ADMIN_PLACED", entityId: counted.registrationId }, orderBy: { createdAt: "desc" } }))[0].metadata as Record<string, unknown>;
+  assert(countedAudit.overCapacity === false && countedAudit.countedAgainstCapacity === true && countedAudit.classChangesClosed === true && countedAudit.requirementsConfirmed !== undefined, "the audit says it counted, and records the confirmations");
+  // Removing a counted placement frees a normal seat; before the placement is removed the class is full for a normal pick.
+  await removePickAsAdministrator(eventId, adminId, { enrollmentId: counted.enrollmentId, reason: "Synthetic: undone" }, now);
+  await pickAdd("zc", freeAfterClose);
+  assert((await seatCount(freeAfterClose)) === 2, "removing a counted placement freed a normal seat that a normal pick then took");
+
+  // 10b. An offer the close cut off: the youth takes that offer's seat as a counted seat.
+  const cutoff = await makeClass(3, 1);
+  await pickAdd("zd", cutoff, opened);
+  await joinClassWaitlist(orgOf("c2"), eventId, director("c2"), { attendeeId: attendeeOf("ze"), offeringId: cutoff }, opened);
+  await drop("zd", cutoff, opened); // the seat is offered to ze, good for 24 hours
+  const zeEntry = () => prisma.honorClassWaitlistEntry.findFirstOrThrow({ where: { registrationAttendeeId: attendeeOf("ze"), offeringId: cutoff } });
+  assert((await zeEntry()).status === "OFFERED", "ze holds a live offer when class changes are still open");
+  await expectOverride(place("ze", cutoff, "Synthetic reason", opened), "HAS_LIVE_OFFER", "while class changes are open, a youth with a live offer accepts it");
+  const lateAccept = await rejected(acceptClassWaitlistOffer(orgOf("c2"), eventId, director("c2"), (await zeEntry()).id, closed));
+  assert(lateAccept instanceof ClassSelectionError, "accepting the offer after close fails");
+  const cutPlaced = await place("ze", cutoff, "Synthetic: offer cut off by the close", closed);
+  const cutRow = await prisma.honorEnrollment.findUniqueOrThrow({ where: { id: cutPlaced.enrollmentId } });
+  assert(!cutPlaced.overCapacity && cutRow.adminPlacementOverCapacity === false, "the offer's seat counts as this placement: counted, not over capacity");
+  assert((await zeEntry()).status === "ACCEPTED" && (await seatCount(cutoff)) === 1, "the offer is settled as taken, and the class holds exactly its limit");
+
+  // 10c. A full class after close: over capacity, on top of the limit.
+  const fullAfterClose = await makeClass(4, 1);
+  await pickAdd("zg", fullAfterClose);
+  const overAfterClose = await place("zh", fullAfterClose, "Synthetic: full class after the deadline", closed);
+  const overRow = await prisma.honorEnrollment.findUniqueOrThrow({ where: { id: overAfterClose.enrollmentId } });
+  assert(overAfterClose.overCapacity && overRow.adminPlacementOverCapacity === true, "a placement into a full class after close is over capacity");
+  assert((await prisma.honorEnrollment.count({ where: { offeringId: fullAfterClose, consumesSeat: true, adminPlacementOverCapacity: false } })) === 1 && (await capacityOf(fullAfterClose)) === 1, "one counted seat, the limit unchanged");
+  console.log("ok  after close: a free seat took a counted placement, a cut-off offer became a counted seat, a full class took an over-capacity placement");
 }
 
 main()

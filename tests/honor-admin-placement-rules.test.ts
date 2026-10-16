@@ -18,6 +18,7 @@ vi.mock("@/modules/honors/enrollment-repository", async () => {
 });
 vi.mock("@/modules/honors/waitlist-repository", () => ({
   settleWaitlistAfterSave: vi.fn(async () => ({ messageIds: [] })),
+  promoteClassWaitlists: vi.fn(async () => ({ messageIds: [], offered: 0, lapsed: 0 })),
   deliverWaitlistOfferMessages: vi.fn(),
 }));
 
@@ -155,5 +156,41 @@ describe("a level or prerequisite waiver goes in the same step (#962)", () => {
     (mocks.tx.honorEnrollment as { findMany: ReturnType<typeof vi.fn> }).findMany.mockResolvedValue([{ offeringId: "class-2" }]);
     mocks.loadOfferings.mockResolvedValue([offering(), offering({ id: "class-2", honorName: "Birds" })]);
     await expect(placeYouthInClass("event-1", "admin-1", { ...input, overrideReason: "Synthetic: waive everything" }, now)).rejects.toMatchObject({ code: "SELECTION_INVALID" });
+  });
+});
+
+describe("after class changes close, a placement can still use a free seat (#962)", () => {
+  const closedAt = new Date("2026-12-01T15:00:00Z");
+  const createdData = () => (created[0] as { data: Record<string, unknown> }).data;
+  const auditedPlacement = () => (mocks.writeAuditLog.mock.calls.find(([entry]) => entry.action === "HONOR_CLASS_ADMIN_PLACED")![0] as { metadata: Record<string, unknown> }).metadata;
+
+  it("takes a free seat as an ordinary counted seat, since nobody can pick it any more", async () => {
+    mocks.seatCounts.mockResolvedValue(counts(1));
+    await expect(placeYouthInClass("event-1", "admin-1", input, closedAt)).resolves.toMatchObject({ overCapacity: false });
+    expect(createdData()).toMatchObject({ adminPlacementReason: "Synthetic family request", adminPlacementOverCapacity: false });
+    expect(auditedPlacement()).toMatchObject({ classChangesClosed: true, overCapacity: false, countedAgainstCapacity: true, classWasFull: false });
+  });
+
+  it("puts a full class's placement on top of the limit, and says so in the audit", async () => {
+    mocks.seatCounts.mockResolvedValue(counts(2));
+    await placeYouthInClass("event-1", "admin-1", input, closedAt);
+    expect(createdData()).toMatchObject({ adminPlacementOverCapacity: true });
+    expect(auditedPlacement()).toMatchObject({ overCapacity: true, countedAgainstCapacity: false, classWasFull: true });
+  });
+
+  it("takes the seat of the youth's own offer that the close cut off, counted, and settles that entry as taken", async () => {
+    liveOwnOffer = { id: "entry-1" };
+    const entries = mocks.tx.honorClassWaitlistEntry as { findFirst: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+    entries.findFirst.mockImplementation(async (args: { where: { status?: unknown } }) => (args.where.status === "OFFERED" ? liveOwnOffer : { id: "entry-1" }));
+    mocks.seatCounts.mockResolvedValue(counts(0)); // the lapsed offer no longer holds the seat
+    await expect(placeYouthInClass("event-1", "admin-1", input, closedAt)).resolves.toMatchObject({ overCapacity: false });
+    expect(createdData()).toMatchObject({ adminPlacementOverCapacity: false });
+    expect(entries.update).toHaveBeenCalledWith({ where: { id: "entry-1" }, data: expect.objectContaining({ status: "ACCEPTED" }) });
+  });
+
+  it("still sends a live offer to be accepted while class changes are open", async () => {
+    liveOwnOffer = { id: "entry-1" };
+    mocks.seatCounts.mockResolvedValue(counts(1, 1));
+    await expect(placeYouthInClass("event-1", "admin-1", input, now)).rejects.toMatchObject({ code: "HAS_LIVE_OFFER" });
   });
 });
