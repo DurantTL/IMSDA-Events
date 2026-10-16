@@ -11046,7 +11046,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   line-height: 1.45;
 }
 .app-shell .field-help { margin: 0; line-height: 1.45; }
-.app-shell :is(input, select, textarea, .select-shell) + .field-help,
+.app-shell :where(input, select, textarea, .select-shell) + .field-help,
 .app-shell .form-stack > .field-help,
 .app-shell .form-grid > .field-help { margin-top: -9px; }
 .app-shell .form-stack > .panel > .field-help { margin-top: 0; }
@@ -11058,7 +11058,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
    .switch-toggle, .message-enabled-toggle) has its own layout and keeps it. The box size is set above
    768px only; the 768px block earlier in this file sizes the box (22px) and the row (44px) below it. */
 .app-shell :is(.filter-bar, .form-stack, .form-grid, .field-row) label:not([class]) > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden),
-.app-shell .checkbox-label > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden) {
+.app-shell :is(.checkbox-label, .checkbox-row) > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden) {
   flex: none;
   margin: 0;
   padding: 0;
@@ -11066,7 +11066,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 @media screen and (min-width: 769px) {
   .app-shell :is(.filter-bar, .form-stack, .form-grid, .field-row) label:not([class]) > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden),
-  .app-shell .checkbox-label > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden) {
+  .app-shell :is(.checkbox-label, .checkbox-row) > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden) {
     width: 1.125rem;
     height: 1.125rem;
   }
@@ -11080,6 +11080,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-weight: 500;
 }
 .app-shell .checkbox-label { min-height: var(--check-row-height, 2.25rem); }
+/* .checkbox-row had no CSS of its own: a checkbox beside its text, as a row. */
+.app-shell .checkbox-row { display: flex; align-items: center; gap: 8px; min-height: var(--check-row-height, 2.25rem); }
 /* A checkbox row is a tap target wherever the 44px target rules apply (768px and under). */
 @media screen and (max-width: 768px) {
   :root { --check-row-height: var(--touch-target, 44px); }

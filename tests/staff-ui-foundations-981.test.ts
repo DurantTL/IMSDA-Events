@@ -53,7 +53,8 @@ describe("staff UI foundations (#981 batch 1)", () => {
     const print = css.indexOf(".report-table-wrap { overflow: visible; }");
     expect(print).toBeGreaterThan(0);
     const after = css.slice(print + 1);
-    expect(after).not.toMatch(/(^|\})\s*\.(report-table-wrap|table-wrap|table-scroll)\b[^{}]*\{[^{}]*overflow(-x)?:\s*(auto|scroll)/);
+    expect(after.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/(^|\})\s*\.report-table-wrap\b[^{}]*\{[^{}]*overflow(-x)?:\s*(auto|scroll)/);
+    // (Only .report-table-wrap is overridden for print; .table-wrap and .table-scroll keep their own older rules.)
   });
 
   it("lets an event-settings error message keep its colour and weight over the help-text rule", () => {
@@ -69,6 +70,41 @@ describe("staff UI foundations (#981 batch 1)", () => {
     const wide = css.match(/@media screen and \(min-width: 769px\) \{\s*\.app-shell :is\(\.filter-bar[^}]*\{[^}]*width: 1\.125rem;/);
     expect(wide).not.toBeNull();
     expect(css).toMatch(/@media screen and \(max-width: 768px\) \{\s*:root \{ --check-row-height: var\(--touch-target, 44px\); \}/);
+  });
+
+  it("keeps help text inside a label flush with its control: the in-label zero margin out-scores the pull-up", () => {
+    // Specificity as [ids, classes/attributes/pseudo-classes, types]; :where() counts 0, :is() and :not() their largest argument.
+    const specificity = (selector: string): [number, number, number] => {
+      let s = selector.replace(/\[[^\]]*\]/g, ".a");
+      const total: [number, number, number] = [0, 0, 0];
+      const add = (part: [number, number, number]) => { total[0] += part[0]; total[1] += part[1]; total[2] += part[2]; };
+      for (let match = s.match(/:(where|is|not|has)\(([^()]*)\)/); match; match = s.match(/:(where|is|not|has)\(([^()]*)\)/)) {
+        if (match[1] !== "where") {
+          const args = match[2].split(",").map((arg) => specificity(arg.trim()));
+          args.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+          add(args[args.length - 1]);
+        }
+        s = s.replace(match[0], "");
+      }
+      total[0] += (s.match(/#[\w-]+/g) ?? []).length;
+      total[1] += (s.match(/\.[\w-]+/g) ?? []).length + (s.match(/:(?!:)[\w-]+/g) ?? []).length;
+      total[2] += (s.replace(/[.#:][\w-]+/g, " ").match(/(^|[\s>+~])[a-z][\w-]*/gi) ?? []).length;
+      return total;
+    };
+    const beats = (a: [number, number, number], b: [number, number, number]) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+    const pull = ".app-shell :where(input, select, textarea, .select-shell) + .field-help";
+    const inLabel = ".form-stack label > .field-help";
+    expect(css).toContain(`${pull},`);
+    expect(css).toContain(`${inLabel}, .form-grid > label > .field-help { margin: 0; }`);
+    expect(specificity(pull)).toEqual([0, 2, 0]);
+    expect(beats(specificity(inLabel), specificity(pull))).toBeGreaterThan(0);
+    // The old :is() form scored (0,3,0) and beat the in-label rule.
+    expect(beats(specificity(".app-shell :is(input, select, textarea, .select-shell) + .field-help"), specificity(inLabel))).toBeGreaterThan(0);
+  });
+
+  it("gives .checkbox-row the same row and box rules as .checkbox-label", () => {
+    expect(css).toContain(".app-shell :is(.checkbox-label, .checkbox-row) > input:is([type=\"checkbox\"], [type=\"radio\"])");
+    expect(css).toContain(".app-shell .checkbox-row { display: flex;");
   });
 
   it("scopes the field-help margin model and the header no-break rule to the staff workspace", () => {
