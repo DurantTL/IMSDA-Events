@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   adjustmentFindMany: vi.fn(),
   adjustmentCreate: vi.fn(),
   promoUpdateMany: vi.fn(),
+  promoFindMany: vi.fn(),
   userFindUnique: vi.fn(),
   writeAuditLog: vi.fn(),
   claimPromoCode: vi.fn(),
@@ -17,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 const tx = {
   registration: { findFirst: mocks.registrationFindFirst, update: mocks.registrationUpdate },
   registrationAdjustment: { aggregate: mocks.adjustmentAggregate, findFirst: mocks.adjustmentFindFirst, findMany: mocks.adjustmentFindMany, create: mocks.adjustmentCreate },
-  promoCode: { updateMany: mocks.promoUpdateMany },
+  promoCode: { updateMany: mocks.promoUpdateMany, findMany: mocks.promoFindMany },
   user: { findUnique: mocks.userFindUnique },
 };
 
@@ -157,6 +158,34 @@ describe("registration adjustments (#396)", () => {
       .rejects.toMatchObject({ code: "PROMO_ALREADY_APPLIED" });
     await expect(createRegistrationAdjustment("event-1", "reg-1", "user-1", { kind: "PROMO_CODE", code: "EARLY", reason: "On top", attendeeId: "att-1" }))
       .rejects.toMatchObject({ code: "PROMO_ALREADY_APPLIED" });
+  });
+
+  it("refuses a second code beside a church-sponsored code, but allows two ordinary codes (#961)", async () => {
+    mocks.registrationFindFirst.mockResolvedValue(registration({ totalAmount: 270 }));
+    mocks.adjustmentFindMany.mockResolvedValue([{ registrationAttendeeId: "att-1", promoCodeId: "promo-held" }]);
+    const claim = (normalizedCode: string, sponsoringOrganizationId: string | null) => mocks.claimPromoCode.mockResolvedValue({
+      promoCode: { id: `promo-${normalizedCode}`, code: normalizedCode, sponsoringOrganizationId },
+      evaluation: { discountAmountCents: 1250, normalizedCode },
+    });
+    const apply = (code: string) => createRegistrationAdjustment("event-1", "reg-1", "user-1", { kind: "PROMO_CODE", code, reason: "Second person", attendeeId: "att-2" });
+
+    // A church code is already on Ann; a different code for Sara is refused.
+    mocks.promoFindMany.mockResolvedValue([{ normalizedCode: "CHURCH", sponsoringOrganizationId: "church-1" }]);
+    claim("EARLY", null);
+    await expect(apply("EARLY")).rejects.toMatchObject({ code: "PROMO_ALREADY_APPLIED" });
+    // A different church code beside an ordinary one is refused too.
+    mocks.promoFindMany.mockResolvedValue([{ normalizedCode: "EARLY", sponsoringOrganizationId: null }]);
+    claim("CHURCH", "church-1");
+    await expect(apply("CHURCH")).rejects.toMatchObject({ code: "PROMO_ALREADY_APPLIED" });
+    expect(mocks.adjustmentCreate).not.toHaveBeenCalled();
+    // The same church code for another person, and two different ordinary codes, are fine.
+    mocks.promoFindMany.mockResolvedValue([{ normalizedCode: "CHURCH", sponsoringOrganizationId: "church-1" }]);
+    claim("CHURCH", "church-1");
+    await apply("CHURCH");
+    mocks.promoFindMany.mockResolvedValue([{ normalizedCode: "EARLY", sponsoringOrganizationId: null }]);
+    claim("LATE", null);
+    await apply("LATE");
+    expect(mocks.adjustmentCreate).toHaveBeenCalledTimes(2);
   });
 
   it("reverses with an opposite line and gives a promo use back", async () => {

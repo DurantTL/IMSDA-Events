@@ -20,31 +20,40 @@ export function RegistrationAccountPrompt({
   embedded,
   returnTo,
   intended = false,
+  brief = false,
 }: {
   email: string;
   embedded: boolean;
   returnTo?: string;
   intended?: boolean;
+  /** A team registered without an account: one sentence, the buttons and one short line. */
+  brief?: boolean;
 }) {
   const externalNavigation = embedded
     ? { target: "_blank" as const, rel: "noopener noreferrer" }
     : {};
   return (
-    <section className="public-registration-account-prompt">
+    <section className={`public-registration-account-prompt${brief ? " is-brief" : ""}`}>
       <span><UserRoundPlus size={22} aria-hidden="true" /></span>
       <div>
         <p className="public-registration-eyebrow">
           {intended ? "Your optional next step" : "Optional account"}
         </p>
-        <h2>Create an optional account to manage future registrations</h2>
-        <p>
-          View registrations across events, see the attendees registered with
-          this contact email, and return without requesting another private link.
-        </p>
-        <p>
-          The registration holder is the contact person, attendees are the people
-          registered, and an account is a separate sign-in verified through email.
-        </p>
+        <h2>{brief ? "Create an optional account" : "Create an optional account to manage future registrations"}</h2>
+        {brief ? (
+          <p>An account lets you see your registrations in one place and come back without asking for another private link.</p>
+        ) : (
+          <>
+            <p>
+              View registrations across events, see the attendees registered with
+              this contact email, and return without requesting another private link.
+            </p>
+            <p>
+              The registration holder is the contact person, attendees are the people
+              registered, and an account is a separate sign-in verified through email.
+            </p>
+          </>
+        )}
         <div className="public-registration-account-actions">
           <a {...externalNavigation} href={accountPath("/account/sign-up", email, returnTo)}>
             Create account <ExternalLink size={15} aria-hidden="true" />
@@ -57,11 +66,9 @@ export function RegistrationAccountPrompt({
           </a>
         </div>
         <small>
-          No account is required. Your confirmation code and private link still
-          manage this registration. We verify the account email before matching
-          registrations, and setup does not change the registration holder,
-          attendees, or payment history. If an account already uses this email,
-          no duplicate account is created.
+          {brief
+            ? "No account is required. Your confirmation code still works."
+            : "No account is required. Your confirmation code and private link still manage this registration. We verify the account email before matching registrations, and setup does not change the registration holder, attendees, or payment history. If an account already uses this email, no duplicate account is created."}
         </small>
       </div>
     </section>

@@ -4,6 +4,7 @@ import { Prisma, type RegistrationAdjustmentKind } from "@prisma/client";
 import { z } from "zod";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { promoCodeConflictMessage } from "@/modules/promo-codes/domain";
 import { claimPromoCode, PromoCodeOperationError, PublicPromoCodeError } from "@/modules/promo-codes/repository";
 import { getRegistrationById } from "@/modules/registrations/repository";
 import { fundAwardSchema } from "@/modules/scholarship-funds/domain";
@@ -244,7 +245,7 @@ export async function createRegistrationAdjustment(
       // whole-registration code.
       const activePromos = await tx.registrationAdjustment.findMany({
         where: { registrationId, kind: "PROMO_CODE", reversedBy: null, reversesAdjustmentId: null },
-        select: { registrationAttendeeId: true },
+        select: { registrationAttendeeId: true, promoCodeId: true },
       });
       const wholeRegistrationPromo = Boolean(registration.promoCodeRedemption)
         || activePromos.some((existing) => !existing.registrationAttendeeId);
@@ -283,6 +284,17 @@ export async function createRegistrationAdjustment(
           pricingDate,
           fieldId: "promo_code",
         });
+        // A church-sponsored code is the registration's only code (#961). The claim above is rolled back with this
+        // transaction when the new code conflicts with one already on a person here.
+        const heldIds = [...new Set(activePromos.flatMap((existing) => existing.promoCodeId ? [existing.promoCodeId] : []))];
+        const heldCodes = heldIds.length > 0
+          ? await tx.promoCode.findMany({ where: { id: { in: heldIds } }, select: { normalizedCode: true, sponsoringOrganizationId: true } })
+          : [];
+        const conflict = promoCodeConflictMessage(
+          heldCodes.map((code) => ({ normalizedCode: code.normalizedCode, sponsored: Boolean(code.sponsoringOrganizationId) })),
+          { normalizedCode: claimed.evaluation.normalizedCode, sponsored: Boolean(claimed.promoCode.sponsoringOrganizationId) },
+        );
+        if (conflict) throw new AdjustmentError("PROMO_ALREADY_APPLIED", conflict);
         changeCents = -claimed.evaluation.discountAmountCents;
         promo = { id: claimed.promoCode.id, code: claimed.promoCode.code };
       } catch (error) {
