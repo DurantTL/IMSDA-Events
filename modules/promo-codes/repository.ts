@@ -30,8 +30,9 @@ import {
   evaluatePromoCode,
   normalizePromoCode,
   promoCodeField,
-  secondPromoCodeMessage,
+  promoCodeConflictMessage,
   type AttendeePromoDiscount,
+  type HeldPromoCode,
   type DiscountedFormCalculation,
   type PromoCodeEvaluation,
   type PromoCodeFailureReason,
@@ -583,8 +584,8 @@ export async function evaluateAttendeePromoCodes(
   const discounts: AttendeePromoDiscount[] = [];
   const issues: AttendeePromoIssue[] = [];
   const usedHere = new Map<string, number>();
-  // One code per registration (#961): the first code entered is the registration's code.
-  let registrationCode: string | null = null;
+  // A church code is the registration's only code (#961); codes held so far are the ones that validated.
+  const held: HeldPromoCode[] = [];
   for (const [attendeeIndex, attendee] of input.attendees.entries()) {
     const raw = attendee.responses[input.field.key];
     const submittedCode = typeof raw === "string" ? raw.trim() : "";
@@ -596,12 +597,15 @@ export async function evaluateAttendeePromoCodes(
       path: `attendees.${attendeeIndex}.responses.${input.field.key}`,
       message,
     });
-    const secondCode = secondPromoCodeMessage(registrationCode, submittedCode);
-    if (secondCode) {
-      issueFor(secondCode);
+    const lookedUp = await findPromoForCode(client, input.eventId, submittedCode);
+    const candidate: HeldPromoCode | null = lookedUp
+      ? { normalizedCode: lookedUp.normalizedCode, sponsored: Boolean(lookedUp.sponsoringOrganizationId) }
+      : null;
+    const conflict = candidate ? promoCodeConflictMessage(held, candidate) : null;
+    if (conflict) {
+      issueFor(conflict);
       continue;
     }
-    registrationCode ??= normalizePromoCode(submittedCode);
     const eligibleSubtotalCents = attendeeShareCents(input.calculation, attendeeIndex);
     if (input.claim) {
       try {
@@ -614,6 +618,9 @@ export async function evaluateAttendeePromoCodes(
           hideAmounts: input.hideAmounts,
         });
         discounts.push({ attendeeIndex, code: claimed.promoCode.code, discountAmountCents: claimed.evaluation.discountAmountCents, promoCodeId: claimed.promoCode.id });
+        if (!held.some((code) => code.normalizedCode === claimed.evaluation.normalizedCode)) {
+          held.push({ normalizedCode: claimed.evaluation.normalizedCode, sponsored: Boolean(claimed.promoCode.sponsoringOrganizationId) });
+        }
       } catch (error) {
         if (error instanceof PublicPromoCodeError || error instanceof PromoCodeOperationError) {
           issueFor(error.message);
@@ -623,7 +630,7 @@ export async function evaluateAttendeePromoCodes(
       }
       continue;
     }
-    const promo = await findPromoForCode(client, input.eventId, submittedCode);
+    const promo = lookedUp;
     const earlierUses = promo ? usedHere.get(promo.id) ?? 0 : 0;
     const evaluation = evaluatePromoCode(
       promo ? { ...storedPromoRule(promo), redeemedCount: promo.redeemedCount + earlierUses } : null,
@@ -638,6 +645,7 @@ export async function evaluateAttendeePromoCodes(
       continue;
     }
     usedHere.set(promo!.id, earlierUses + 1);
+    if (candidate && !held.some((code) => code.normalizedCode === candidate.normalizedCode)) held.push(candidate);
     discounts.push({ attendeeIndex, code: evaluation.code, discountAmountCents: evaluation.discountAmountCents });
   }
   return { discounts, issues };

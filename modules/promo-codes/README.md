@@ -149,10 +149,21 @@ Owner decisions (Caleb, Oct 15, 2026): a church contact (or the office) register
 several women on the roster form, and the church's code covers only the people
 ticked as covered; the rest pay for themselves.
 
-- **One code per registration.** On a form with the per-person promo field (#397),
-  the first code entered is the registration's code. Everyone else is a tick
-  ("Covered by the code ...") or is left unticked and pays for themselves. A second,
-  different code is refused for that person, when previewing and when claiming.
+- **A church code is the registration's only code.** On a form with the per-person
+  promo field (#397), several people may use the same church-sponsored code, each
+  taking one use. A different church code, or any other code beside a church code,
+  is refused for that person, when previewing, claiming, and in a staff per-person
+  code adjustment (`PROMO_ALREADY_APPLIED`). Different ordinary (non-church) codes
+  for different people stay allowed, as #397 requires, until Caleb decides otherwise.
+  The rule counts only codes that validated, so a mistyped first code never blocks a
+  valid one after it.
+- **The tick.** The person who types the code first holds it. Once it is applied,
+  every other person shows a "Covered by the code ...: name" tickbox, unticked by
+  default; ticking fills their code, unticking clears it, and changing or removing the
+  holder's code rewrites every ticked person to match. Unticked people pay for
+  themselves.
+- **Amendments.** A person added in an amendment takes no promo code (use Adjust
+  amount owed in Payments).
 - **Use limits count per person.** Each person who receives the code takes one use,
   so a single-use code covers one person and a multi-use code covers up to its limit.
   The code shows as used for that person on the church report (#960).
@@ -160,5 +171,6 @@ ticked as covered; the rest pay for themselves.
   invoice is emailed to them as in #399. No account is needed to register.
 - **Club registrations** already cover every person on the registration and bill the
   club's church (#409); nothing changes there.
-- **Not built:** a separate non-billing church (pastor) contact in the directory.
+- **Not built here:** a separate non-billing church (pastor) contact in the directory.
+  It is tracked in a follow-up issue (to be opened by the coordinator).
 
