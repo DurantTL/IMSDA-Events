@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { PromoCodeWorkspace } from "@/components/promo-code-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -31,9 +30,6 @@ export default async function PromoCodesPage({
   ]);
   return (
     <>
-      <Link className="secondary-button more-back-link" href={`/more?event=${encodeURIComponent(event.id)}`}>
-        Back to More
-      </Link>
       <PromoCodeWorkspace
         eventId={event.id}
         initialPromoCodes={promoCodes}

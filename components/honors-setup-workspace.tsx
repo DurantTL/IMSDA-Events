@@ -1,9 +1,8 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useConfirm } from "@/components/use-confirm";
-import { staffPageTitles } from "@/components/staff-navigation";
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, UsersRound, X } from "lucide-react";
 import { clubClassLevelLabels, clubClassLevels } from "@/modules/club-rosters/domain";
 import { honorOfferingSpanLabels, offeringPlacementPatch, sessionEditPatch } from "@/modules/honors/domain";
@@ -366,29 +365,15 @@ export function HonorsSetupWorkspace({
   return (
     <section className="page-stack">
       {confirmDialog}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Honors Weekend</p>
-          <h2 className="duplicate-page-title">{staffPageTitles.honors}</h2>
-          <p>
-            Name this site&apos;s sessions, then add the classes it teaches. A class can teach one honor or several. Capacity
-            counts youth seats only. Seats and sign-ups appear here once class
-            selection opens.
-          </p>
-        </div>
-        <div className="intro-actions">
-          <span className="count-badge">{totalSeats} youth seats</span>
-          <Link className="secondary-button" href={`/more/honors/schedule?event=${encodeURIComponent(eventId)}`}>
-            <CalendarRange aria-hidden="true" size={15} /> Schedule board
-          </Link>
-          <Link className="secondary-button" href={`/more/honors/rosters?event=${encodeURIComponent(eventId)}`}>
-            <ClipboardList aria-hidden="true" size={15} /> Rosters
-          </Link>
-          <Link className="secondary-button" href={`/more/honors/instructors?event=${encodeURIComponent(eventId)}`}>
-            <UsersRound aria-hidden="true" size={15} /> Instructors
-          </Link>
-        </div>
-      </div>
+      <StaffPageHeader
+        description="Name this site's sessions, then add the classes it teaches. A class can teach one honor or several. Capacity counts youth seats only. Seats and sign-ups appear here once class selection opens."
+        extra={<span className="count-badge">{totalSeats} youth seats</span>}
+        tools={[
+          { href: `/more/honors/schedule?event=${encodeURIComponent(eventId)}`, label: "Schedule board", icon: CalendarRange },
+          { href: `/more/honors/rosters?event=${encodeURIComponent(eventId)}`, label: "Rosters", icon: ClipboardList },
+          { href: `/more/honors/instructors?event=${encodeURIComponent(eventId)}`, label: "Instructors", icon: UsersRound },
+        ]}
+      />
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}

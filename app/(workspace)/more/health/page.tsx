@@ -160,7 +160,6 @@ export default async function OperationalHealthPage({
           <p>See what may need attention for {event.name}, then go straight to the workspace that can resolve it. This page never changes event data.</p>
         </div>
         <div className={styles.introActions}>
-          <Link className="secondary-button" href={`/more?${eventQuery}`}>Back to More</Link>
           <Link className="secondary-button" href={refreshHref}>
             <RefreshCw aria-hidden="true" size={15} />
             Refresh status

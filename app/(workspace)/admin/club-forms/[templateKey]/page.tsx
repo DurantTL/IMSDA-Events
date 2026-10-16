@@ -1,6 +1,7 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { notFound, redirect } from "next/navigation";
 import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { ClubFormBuilder } from "@/components/club-form-builder";
@@ -31,7 +32,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
 
   return (
     <section className="page-stack">
-      <Link className="secondary-button more-back-link" href="/admin/club-forms">Back to club forms</Link>
+      <BackLink href="/admin/club-forms" variant="staff">Back to club forms</BackLink>
       <div className="page-intro">
         <div>
           <p className="eyebrow">System administration</p>

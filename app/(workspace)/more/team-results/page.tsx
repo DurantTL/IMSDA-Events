@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
 import { TeamResultsWorkspace } from "@/components/team-results-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { TeamPermissionPanel } from "@/components/team-permission-panel";
@@ -34,7 +33,6 @@ export default async function TeamResultsPage({ searchParams }: { searchParams: 
   ]);
   return (
     <>
-      <BackLink href={`/more?event=${event.id}`} variant="staff">Back to More</BackLink>
       {/* Pending permissions come first: the Area Coordinator, or staff who manage registrations, decide them (#809). */}
       <TeamPermissionPanel canDecide={permissions.includes("MANAGE_REGISTRATION")} endpointBase={`/api/events/${encodeURIComponent(event.id)}/team-permissions`} rows={permissionRows} />
       <TeamResultsWorkspace

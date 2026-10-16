@@ -449,14 +449,14 @@ async function main() {
   await addPerson("c8", "cap2");
   await pick("cap1", [classCap]);
   await pick("cap2", [classCap]);
-  const refusal = await updateHonorOffering(eventId, classCap, { capacity: 1 }, adminId).then(() => null, (error: unknown) => error);
+  const refusal = await updateHonorOffering(eventId, classCap, { capacity: 1 }, adminId, now).then(() => null, (error: unknown) => error);
   assert(refusal instanceof HonorConfigurationError && refusal.code === "CAPACITY_BELOW_SEATS_TAKEN" && /already has 2 seats taken/.test(refusal.message), `lowering below the seats taken is refused with the count, got ${String(refusal)}`);
   assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 3, "the limit is unchanged");
-  await updateHonorOffering(eventId, classCap, { capacity: 2 }, adminId);
+  await updateHonorOffering(eventId, classCap, { capacity: 2 }, adminId, now);
   assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 2, "lowering to exactly the seats taken is allowed");
   // Cancelled registrations hold no seats, so they don't count.
   await cancel("c8");
-  await updateHonorOffering(eventId, classCap, { capacity: 1 }, adminId);
+  await updateHonorOffering(eventId, classCap, { capacity: 1 }, adminId, now);
   assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classCap } })).capacity === 1, "seats of a cancelled registration don't hold the limit up");
   console.log("ok  a seat limit can't be set below the seats taken, and the refusal says how many");
 
@@ -485,7 +485,7 @@ async function main() {
   assert(backWithOffer.registration.status === "SUBMITTED" && (await holds("rr1", classRoomy13)), "and the registration is back with its pick");
   await assertNoOverfill("after the restore with a live offer");
   // The seat limit floor counts that live offer too.
-  const floor = await updateHonorOffering(eventId, classY, { capacity: 0 }, adminId).then(() => null, (error: unknown) => error);
+  const floor = await updateHonorOffering(eventId, classY, { capacity: 0 }, adminId, now).then(() => null, (error: unknown) => error);
   assert(floor instanceof HonorConfigurationError && floor.code === "CAPACITY_BELOW_SEATS_TAKEN" && /1 held for waitlist offer/.test(floor.message), `the limit can't go below the seats held for live offers, got ${String(floor)}`);
   assert((await prisma.honorOffering.findUniqueOrThrow({ where: { id: classY } })).capacity === 1, "the limit is unchanged");
   console.log("ok  a restored registration's live offer holds its seat, and the seat-limit floor counts live offers");

@@ -61,7 +61,6 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         </div>
         <div className="intro-actions">
           {canExport && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</a>}
-          <Link className="secondary-button" href={`/people?event=${encodeURIComponent(event.id)}`}>Back to Registrations</Link>
         </div>
       </div>
 

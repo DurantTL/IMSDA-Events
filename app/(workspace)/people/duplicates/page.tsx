@@ -69,14 +69,6 @@ export default async function DuplicateFinderPage({
             automatically — open a registration to decide what should happen.
           </p>
         </div>
-        <div className="intro-actions">
-          <Link
-            className="secondary-button"
-            href={`/people?event=${encodeURIComponent(event.id)}`}
-          >
-            Back to Registrations
-          </Link>
-        </div>
       </div>
 
       <section className="finance-summary" aria-label="Duplicate scan summary">

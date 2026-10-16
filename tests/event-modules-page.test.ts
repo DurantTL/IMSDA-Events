@@ -70,12 +70,25 @@ describe("/more as the Event modules page", () => {
     signIn({ globalRole: null, permissions: eventPermissions, enabled: [] });
     const markup = await render();
     expect(markup).not.toContain("Customize this event");
-    // One hidden duplicate H2 under the shell's H1, like every other staff page; no separate eyebrow.
-    expect(markup).toContain('<h2 class="duplicate-page-title">Event modules</h2>');
+    // The shell's H1 names the page; the body has no duplicate heading or eyebrow, only the shared header (#981).
+    expect(markup).not.toContain("duplicate-page-title");
+    expect(markup).not.toMatch(/<h2[^>]*>Event modules<\/h2>/);
     expect(markup).not.toContain('class="eyebrow">Event modules');
-    expect(markup).toContain("Turn features on or off for Synthetic Camporee");
+    expect(markup).toContain('class="staff-page-header"');
+    // /more is the event's tools and modules; Event features (where features are switched) is its one primary link.
+    expect(markup).toContain("The tools and modules for Synthetic Camporee, with requests for more and the recent activity trail.");
+    expect(markup).toContain('href="/more/features?event=event_1"');
+    expect(markup).toContain("Event features</a>");
+    expect(markup).not.toContain("Turn features on or off for Synthetic Camporee");
     expect(staffSubpageTitle("/more")).toBe("Event modules");
     expect(staffSubpageTitle("/more/merchandise")).not.toBe("Event modules");
+  });
+
+  it("offers the Event features link only to staff who can configure the event (#981)", async () => {
+    signIn({ globalRole: null, permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT"), enabled: [] });
+    const markup = await render();
+    expect(markup).not.toContain("/more/features");
+    expect(markup).toContain("Only a system administrator turns modules on or off.");
   });
 
   it("shows a system administrator the enabled modules with Turn off and a collapsed Not used by this event with Enable", async () => {
@@ -105,7 +118,7 @@ describe("/more as the Event modules page", () => {
     expect(markup).not.toContain("Turn off");
     expect(markup).not.toContain('data-module="honors"');
     expect(markup).not.toContain('data-module="attendee-community"');
-    expect(markup).toContain("A system administrator turns features on or off");
+    expect(markup).toContain("Only a system administrator turns modules on or off");
   });
 
   it("shows staff only the enabled modules they may open, and still no switch", async () => {

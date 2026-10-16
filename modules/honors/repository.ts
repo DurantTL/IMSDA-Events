@@ -786,6 +786,8 @@ export async function updateHonorOffering(
   offeringId: string,
   input: HonorOfferingUpdate,
   actorUserId: string,
+  /** The clock for the seat-limit floor's count of live waitlist offers; callers leave it out, a script that pins time passes it. */
+  now: Date = new Date(),
 ) {
   // Serializable, so a class pick saved at the same moment can't slip past the pick count on a site move (#589).
   let unmetCount: number | null = null;
@@ -908,7 +910,7 @@ export async function updateHonorOffering(
         await tx.$queryRaw`SELECT id FROM "HonorOffering" WHERE id = ${offeringId} FOR UPDATE`;
         const [seated, offered] = await Promise.all([
           tx.honorEnrollment.count({ where: { offeringId, ...seatHoldingEnrollment } }),
-          tx.honorClassWaitlistEntry.count({ where: { offeringId, ...liveWaitlistOffer(new Date()) } }),
+          tx.honorClassWaitlistEntry.count({ where: { offeringId, ...liveWaitlistOffer(now) } }),
         ]);
         const taken = seated + offered;
         if (details.capacity < taken) {

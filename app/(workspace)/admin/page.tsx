@@ -285,15 +285,19 @@ export default async function SystemAdminPage({
                           </Link>
                         ))}
                     </div>
-                    <div className={styles.eventLinks}>
-                      <Link href={`/registration-builder?${query}`}>Form</Link>
-                      <Link href={withEvent(eventFeaturesItem.href, query)}>Features</Link>
-                      <Link href={`/finance/square-payments?${query}`}>Square matching</Link>
-                      <Link href={`/more/promo-codes?${query}`}>Promo codes</Link>
-                      <Link href={`/staff?${query}`}>Team</Link>
-                      <Link href={`/more/health?${query}`}>Health</Link>
-                      <Link href={`/more/event-settings?${query}`}>Settings</Link>
-                    </div>
+                    {/* Closed on a phone to keep the page short; always open on wider screens (see the stylesheet). */}
+                    <details className={styles.eventTools}>
+                      <summary>Event links<span className="sr-only"> for {event.name}</span> <ChevronDown aria-hidden="true" size={16} /></summary>
+                      <div className={styles.eventLinks}>
+                        <Link href={`/registration-builder?${query}`}>Form</Link>
+                        <Link href={withEvent(eventFeaturesItem.href, query)}>Features</Link>
+                        <Link href={`/finance/square-payments?${query}`}>Square matching</Link>
+                        <Link href={`/more/promo-codes?${query}`}>Promo codes</Link>
+                        <Link href={`/staff?${query}`}>Team</Link>
+                        <Link href={`/more/health?${query}`}>Health</Link>
+                        <Link href={`/more/event-settings?${query}`}>Settings</Link>
+                      </div>
+                    </details>
                   </div>
                 </article>
               );
@@ -320,7 +324,6 @@ export default async function SystemAdminPage({
               </div>
             </details>
           )}
-          <Link className="text-link" href="/archived-events">Archived events</Link>
         </section>
 
         <aside className={styles.sideColumn}>

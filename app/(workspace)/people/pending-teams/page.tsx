@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
 import { PendingTeamsReview } from "@/components/pending-teams-review";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listAttachableClubs, listPendingTeams, resolvedTeamCounts } from "@/modules/general-link-registrations/repository";
@@ -23,7 +22,6 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
 
   return (
     <section className="page-stack">
-      <BackLink href={`/people?event=${encodeURIComponent(event.id)}`} variant="staff">Back to Registrations</BackLink>
       <div className="page-intro">
         <div>
           <p className="eyebrow">Registration integrity</p>

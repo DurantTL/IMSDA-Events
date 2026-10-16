@@ -11340,3 +11340,19 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Placed after `.public-manage-card > .field-help`, so the account overview keeps its own bottom space. */
 .account-overview-card > .field-help { margin: 0 0 10px; }
 .public-registration-attendee-actions button.is-danger:disabled { opacity: 0.82; }
+
+/* The shared staff page header (#981): a description and the page's actions under the topbar title. */
+.staff-page-header { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; min-width: 0; }
+.staff-page-description { flex: 1 1 22rem; min-width: 0; max-width: 62ch; margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.9rem); line-height: 1.5; }
+.staff-page-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; margin-left: auto; min-width: 0; }
+@media (max-width: 640px) {
+  .staff-page-actions { width: 100%; justify-content: flex-start; margin-left: 0; }
+  .staff-page-actions > :is(a, button).primary-button { flex: 1 1 auto; justify-content: center; }
+  /* The menus open across the header, so they never run off a narrow screen. */
+  .staff-page-actions .actions-menu { position: static; }
+  .staff-page-actions .actions-menu-list { right: 0; left: 0; min-width: 0; }
+}
+.setup-checklist { margin-bottom: 20px; }
+
+/* Section titles on the club summary page, now h2 under the topbar's h1 (#981). */
+.club-summary-section { margin: 6px 0 0; font-size: 1.12rem; }

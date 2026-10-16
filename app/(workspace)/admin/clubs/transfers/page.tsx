@@ -1,7 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { BackLink } from "@/components/back-link";
 import { ClubTransferQueue } from "@/components/club-transfer-queue";
 import { RegistrationMoveApprovals } from "@/components/registration-move-approvals";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -16,7 +15,6 @@ export default async function ClubTransfersAdminPage() {
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
   return (
     <>
-      <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
       <ClubTransferQueue />
       <RegistrationMoveApprovals />
     </>

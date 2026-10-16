@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
 import {
   Award,
@@ -202,24 +203,23 @@ export default async function OperationalReportsPage({
 
   return (
     <section className="page-stack reports-workspace">
-      <div className="page-intro report-page-intro">
-        <div>
-          <p className="eyebrow">Event-day planning</p>
-          <h2 className="duplicate-page-title">{staffPageTitles.operationalReports}</h2>
-          <p>Live planning totals for {event.name}, organized so a staff member can print them or open each CSV in a spreadsheet.</p>
-        </div>
-        <div className="intro-actions report-actions">
-          <Link className="secondary-button" href={`/more${peopleQuery}`}>Back to More</Link>
-          <Link className="secondary-button" href={`/more/reports/packets${peopleQuery}`}><PackageOpen aria-hidden="true" size={15} /> Group packets</Link>
-          <Link className="secondary-button" href={`/more/reports/clubs${peopleQuery}`}><Tent aria-hidden="true" size={15} /> Club event reports</Link>
-          <Link className="secondary-button" href={`/more/reports/clubs/check-in-book${peopleQuery}`}><ClipboardCheck aria-hidden="true" size={15} /> Check-in book</Link>
-          <Link className="secondary-button" href={`/more/honors/rosters${peopleQuery}`}><Award aria-hidden="true" size={15} /> Honors rosters</Link>
-          <Link className="secondary-button" href={`/more/kitchen-report${peopleQuery}`}><Utensils aria-hidden="true" size={15} /> Kitchen report</Link>
-          <a className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-tickets`}><Utensils aria-hidden="true" size={15} /> Meal tickets CSV</a>
-          <a className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-ticket-summary`}><Utensils aria-hidden="true" size={15} /> Meal ticket summary</a>
-          <PrintReportButton />
-        </div>
-      </div>
+      <StaffPageHeader
+        description={`Live planning totals for ${event.name}, organized so a staff member can print them or open each CSV in a spreadsheet.`}
+        primary={<PrintReportButton />}
+        actions={(
+          <>
+            <li><a href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-tickets`}><Utensils aria-hidden="true" size={16} /> Meal tickets CSV</a></li>
+            <li><a href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-ticket-summary`}><Utensils aria-hidden="true" size={16} /> Meal ticket summary</a></li>
+          </>
+        )}
+        tools={[
+          { href: `/more/reports/packets${peopleQuery}`, label: "Group packets", icon: PackageOpen },
+          { href: `/more/reports/clubs${peopleQuery}`, label: "Club event reports", icon: Tent },
+          { href: `/more/reports/clubs/check-in-book${peopleQuery}`, label: "Check-in book", icon: ClipboardCheck },
+          { href: `/more/honors/rosters${peopleQuery}`, label: "Honors rosters", icon: Award },
+          { href: `/more/kitchen-report${peopleQuery}`, label: "Kitchen report", icon: Utensils },
+        ]}
+      />
 
       <div className="report-safety-note">
         <ShieldCheck aria-hidden="true" size={19} />

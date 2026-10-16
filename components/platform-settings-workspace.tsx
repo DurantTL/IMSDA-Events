@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
@@ -93,15 +94,7 @@ export function PlatformSettingsWorkspace({
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">System administration</p>
-          <h2>Platform settings</h2>
-          <p>
-            Identity for the platform as a whole, and the defaults a newly created event starts from.
-          </p>
-        </div>
-      </div>
+      <StaffPageHeader description="Identity for the platform as a whole, and the defaults a newly created event starts from." />
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}

@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
 import {
@@ -487,6 +488,14 @@ export function CheckInWorkspace({
         );
       })}
 
+      <StaffPageHeader
+        tools={[
+          { href: `/check-in/passes?event=${encodeURIComponent(eventId)}`, label: "Print attendee passes", icon: Printer },
+          { href: `/check-in/badges?event=${encodeURIComponent(eventId)}`, label: "Print name badges", icon: ContactRound },
+          { href: `/check-in/assets?event=${encodeURIComponent(eventId)}`, label: "Issue keys and items", icon: KeyRound },
+        ]}
+      />
+
       <div className="checkin-hero">
         <div>
           <p className="hero-eyebrow">On-site operations</p>
@@ -496,29 +505,6 @@ export function CheckInWorkspace({
             arrivals for {eventName}. Offline check-ins stay clearly queued
             until the server confirms them.
           </p>
-          <div className="checkin-print-links">
-            <Link
-              className="secondary-button checkin-pass-link"
-              href={`/check-in/passes?event=${encodeURIComponent(eventId)}`}
-            >
-              <Printer aria-hidden="true" size={16} />
-              Print attendee passes
-            </Link>
-            <Link
-              className="secondary-button checkin-pass-link"
-              href={`/check-in/badges?event=${encodeURIComponent(eventId)}`}
-            >
-              <ContactRound aria-hidden="true" size={16} />
-              Print name badges
-            </Link>
-            <Link
-              className="secondary-button checkin-pass-link"
-              href={`/check-in/assets?event=${encodeURIComponent(eventId)}`}
-            >
-              <KeyRound aria-hidden="true" size={16} />
-              Issue keys and items
-            </Link>
-          </div>
         </div>
         <div className="checkin-tallies">
           <span><strong>{checkedIn}</strong><small>Confirmed</small></span>

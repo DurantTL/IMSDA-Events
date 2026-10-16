@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import {
@@ -170,17 +171,9 @@ export function TeamDirectoryWorkspace({
   return (
     <section className="page-stack">
       {confirmDialog}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">System administration</p>
-          <h2>Team</h2>
-          <p>
-            Everyone who can sign in to IMSDA Events, and the events they work on. Event access is
-            still granted on each event’s own team page; what is decided here is whether an account
-            can sign in at all.
-          </p>
-        </div>
-      </div>
+      <StaffPageHeader
+        description="Everyone who can sign in to IMSDA Events, and the events they work on. Event access is still granted on each event’s own team page; what is decided here is whether an account can sign in at all."
+      />
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}

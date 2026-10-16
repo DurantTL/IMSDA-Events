@@ -1,6 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarAdminWorkspace } from "@/components/calendar-admin-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -19,9 +18,6 @@ export default async function CalendarAdminPage() {
 
   return (
     <>
-      <Link className="secondary-button more-back-link" href="/admin">
-        Back to system administration
-      </Link>
       <CalendarAdminWorkspace initialEntries={entries} initialEvents={events} initialFeeds={feeds} initialReminders={reminders} />
     </>
   );

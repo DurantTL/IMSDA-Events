@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { MerchandiseAdminWorkspace } from "@/components/merchandise-admin-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -19,9 +18,6 @@ export default async function MerchandisePage({
   }
   return (
     <>
-      <Link className="secondary-button more-back-link" href={`/more?event=${encodeURIComponent(event.id)}`}>
-        Back to More
-      </Link>
       <MerchandiseAdminWorkspace eventId={event.id} />
     </>
   );

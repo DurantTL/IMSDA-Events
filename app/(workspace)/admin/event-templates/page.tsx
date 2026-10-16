@@ -1,4 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { logError } from "@/lib/logger";
@@ -24,11 +25,9 @@ export default async function EventTemplatesPage() {
   const templates = await listEventTemplates();
 
   return (
-    <main className="event-setup-page">
-      <header className="event-setup-header">
-        <div><p className="eyebrow">System administration</p><h1>Event templates</h1></div>
-      </header>
+    <section className="page-stack">
+      <StaffPageHeader description="The starting points new events are built from." />
       <EventTemplateList initialTemplates={templates} />
-    </main>
+    </section>
   );
 }

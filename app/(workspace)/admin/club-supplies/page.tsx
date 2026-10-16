@@ -1,6 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClubSupplyCatalogWorkspace } from "@/components/club-supply-catalog-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -16,9 +15,6 @@ export default async function ClubSupplyCatalogPage() {
 
   return (
     <>
-      <Link className="secondary-button more-back-link" href="/admin">
-        Back to system administration
-      </Link>
       <ClubSupplyCatalogWorkspace initialItems={await listClubSupplyItems()} />
     </>
   );

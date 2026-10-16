@@ -1,9 +1,9 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { BackLink } from "@/components/back-link";
 import { BackgroundCheckImportPanel } from "@/components/background-check-import-panel";
 import { BackgroundCheckReviewPanel } from "@/components/background-check-review-panel";
 import { cardCell } from "@/components/table-card-labels";
@@ -31,28 +31,24 @@ export default async function BackgroundChecksPage() {
   ];
   return (
     <section className="page-stack">
-      <BackLink href="/admin/organizations" variant="staff">Back to Clubs and churches</BackLink>
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Clubs and churches</p>
-          <h2>Sterling Volunteers</h2>
-          <p>
-            Upload the roster export (matched by name and club or church; no email or birth date needed) or the
-            older Sterling Volunteers list. The newest upload replaces whatever was on file for a person. At events
-            marked as youth or children&apos;s events (in Event settings), every adult with no check on file, an
-            expired check, or a roster mark of not in compliance is flagged in red on the dashboard, People, rosters,
-            and check-in. Expiring soon is not flagged there, and nothing is blocked.
-          </p>
-          <p>
-            Each adult on a club&apos;s roster shows Clear, Expiring soon, Not in compliance, or No record. Club
-            directors and deputies see the status only; the roster note, with the check and training dates, is shown
-            to staff only.
-          </p>
-          {summary.lastRecordedAt && (
-            <p className="quiet-copy">Last recorded {new Date(summary.lastRecordedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" })}.</p>
-          )}
-        </div>
-        <BackgroundCheckImportPanel />
+      <StaffPageHeader
+        description="Upload the roster export (matched by name and club or church; no email or birth date needed) or the older Sterling Volunteers list. The newest upload replaces whatever was on file for a person."
+        primary={<BackgroundCheckImportPanel />}
+      />
+      <div className="meta-stack">
+        <p className="field-help">
+          At events marked as youth or children&apos;s events (in Event settings), every adult with no check on file, an
+          expired check, or a roster mark of not in compliance is flagged in red on the dashboard, People, rosters,
+          and check-in. Expiring soon is not flagged there, and nothing is blocked.
+        </p>
+        <p className="field-help">
+          Each adult on a club&apos;s roster shows Clear, Expiring soon, Not in compliance, or No record. Club
+          directors and deputies see the status only; the roster note, with the check and training dates, is shown
+          to staff only.
+        </p>
+        {summary.lastRecordedAt && (
+          <p className="field-help">Last recorded {new Date(summary.lastRecordedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" })}.</p>
+        )}
       </div>
 
       <section className="report-summary-grid" aria-label="Sterling Volunteers on file">

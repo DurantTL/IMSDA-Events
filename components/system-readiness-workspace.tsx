@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import type { SystemReadiness, ManualReadinessRow } from "@/modules/system-admin/readiness-repository";
 import styles from "./system-readiness-workspace.module.css";
@@ -57,25 +58,23 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">System administration</p>
-          <h2>System readiness</h2>
-          <p>
+      <StaffPageHeader
+        description={(
+          <>
             What the app can check by itself, and what a person has to confirm before real club data and the next
             event. Ticking an item only records that someone did the work. It never deploys, migrates, sends or
-            unlocks anything.
-          </p>
-          <p>
-            {summary.automaticAttention === 0
-              ? "No automatic check needs attention."
-              : `${summary.automaticAttention} automatic ${summary.automaticAttention === 1 ? "check needs" : "checks need"} attention.`}{" "}
-            {readiness.ticksAvailable
-              ? `${summary.manualDone} of ${summary.manualTotal} manual items ticked.`
-              : "Manual ticks could not be read."}
-          </p>
-        </div>
-      </div>
+            unlocks anything.{" "}
+            <strong>
+              {summary.automaticAttention === 0
+                ? "No automatic check needs attention."
+                : `${summary.automaticAttention} automatic ${summary.automaticAttention === 1 ? "check needs" : "checks need"} attention.`}{" "}
+              {readiness.ticksAvailable
+                ? `${summary.manualDone} of ${summary.manualTotal} manual items ticked.`
+                : "Manual ticks could not be read."}
+            </strong>
+          </>
+        )}
+      />
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}

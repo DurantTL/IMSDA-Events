@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Plus, Trash2, Trophy, X } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
@@ -265,17 +266,7 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Club ministries</p>
-          <h2>Master Award rules</h2>
-          <p>
-            Each rule has honor groups with a minimum; the award is earned when every group reaches its minimum.
-            Rules come from the club&apos;s spreadsheet, so review each one, then activate it. Clubs see progress only
-            for active rules.
-          </p>
-        </div>
-      </div>
+      <StaffPageHeader description="Each rule has honor groups with a minimum; the award is earned when every group reaches its minimum. Rules come from the club's spreadsheet, so review each one, then activate it. Clubs see progress only for active rules." />
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 

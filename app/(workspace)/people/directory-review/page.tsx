@@ -35,9 +35,6 @@ export default async function DirectoryReviewPage({ searchParams }: { searchPara
             only to help you add the organization or fix a typo.
           </p>
         </div>
-        <div className="page-intro-actions">
-          <Link className="secondary-button" href={`/people?event=${encodeURIComponent(event.id)}`}>Back to Registrations</Link>
-        </div>
       </div>
       {entries.length === 0 ? (
         <section className="panel empty-state">

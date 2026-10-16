@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useMemo, useState } from "react";
 import { Check, Download, FileUp, Package, RefreshCw, Upload } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
@@ -159,16 +160,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Club ministries</p>
-          <h2>Club supply catalog</h2>
-          <p>
-            AdventSource items clubs order and keep in stock: insignia, event patches, uniform apparel, honor
-            patches, and master awards. Each size is its own item because each size has its own catalog number.
-          </p>
-        </div>
-      </div>
+      <StaffPageHeader description="AdventSource items clubs order and keep in stock: insignia, event patches, uniform apparel, honor patches, and master awards. Each size is its own item because each size has its own catalog number." />
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}

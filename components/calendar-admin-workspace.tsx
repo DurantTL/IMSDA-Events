@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useId, useMemo, useRef, useState } from "react";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
@@ -265,20 +266,14 @@ export function CalendarAdminWorkspace({
 
   return (
     <section className="page-stack calendar-admin">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Public website</p>
-          <h2>Conference calendar</h2>
-          <p>
-            Published events appear on the public calendar automatically. Hide any that
-            shouldn&apos;t, give them a category, and add dates for things registered elsewhere.
-            A date marked Deadline stays off the public calendar and shows to clubs and Area Coordinators as a deadline, with reminders.
-          </p>
-        </div>
-        <a className="secondary-button" href="/calendar" rel="noreferrer" target="_blank">
-          <CalendarDays aria-hidden="true" size={15} /> View public calendar
-        </a>
-      </div>
+      <StaffPageHeader
+        description="Published events appear on the public calendar automatically. Hide any that shouldn't, give them a category, and add dates for things registered elsewhere. A date marked Deadline stays off the public calendar and shows to clubs and Area Coordinators as a deadline, with reminders."
+        primary={(
+          <a className="secondary-button" href="/calendar" rel="noreferrer" target="_blank">
+            <CalendarDays aria-hidden="true" size={15} /> View public calendar
+          </a>
+        )}
+      />
 
       <datalist id="calendar-categories">
         {categoryOptions.map((category) => <option key={category} value={category} />)}
