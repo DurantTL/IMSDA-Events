@@ -251,9 +251,12 @@ describe("event settings render by event type (#624)", () => {
     expect(markup).toMatch(/<details class="settings-block panel event-more-settings"(?![^>]*\sopen)/);
     expect(more).toContain("Seminar preference deadline");
     expect(more).toContain("Approved payment instructions");
-    // The save body spreads the whole draft, hidden fields included.
+    // The save body spreads the whole draft, hidden fields included. It is built by `eventSettingsRequestBody`
+    // (#965 moved it out of the form so the Event features page sends exactly the same body).
     const source = readFileSync(path.join(process.cwd(), "components/event-settings-workspace.tsx"), "utf8");
-    expect(source).toMatch(/body: JSON\.stringify\(\{\s*\.\.\.draft,/);
+    expect(source).toMatch(/body: JSON\.stringify\(\{\s*\.\.\.eventSettingsRequestBody\(draft\),/);
+    const helper = readFileSync(path.join(process.cwd(), "modules/events/settings-draft.ts"), "utf8");
+    expect(helper).toMatch(/export function eventSettingsRequestBody\(draft: EventSettingsInput\) \{\s*return \{\s*\.\.\.draft,/);
   });
 
   it("renders a saved non-default value outside the disclosure on a club event", () => {

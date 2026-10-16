@@ -118,6 +118,7 @@ export const staffPageTitles = {
   emails: "Emails",
   more: "More",
   eventModules: "Event modules",
+  eventFeatures: "Event features",
   systemManagement: "System management",
   honorsRosters: "Honors Weekend rosters",
   honorsInstructors: "Honors Weekend instructors",
@@ -169,6 +170,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/reports/clubs", "prefix", staffPageTitles.clubReports],
   ["/more/reports/packets", "prefix", staffPageTitles.groupedPackets],
   ["/more/reports", "prefix", staffPageTitles.operationalReports],
+  ["/more/features", "prefix", staffPageTitles.eventFeatures],
   ["/more", "exact", staffPageTitles.eventModules],
   ["/more/clubs/reports/", "under", staffPageTitles.clubMonthlyReport],
   ["/more/clubs/reports", "exact", staffPageTitles.clubMonthlyReports],
@@ -239,15 +241,13 @@ export const navigation: readonly NavigationItem[] = [
 ];
 
 /**
- * The "Event features" page (#965) is a Set up item, shown for CONFIGURE_EVENT.
- * TODO(#965): the page does not exist yet, so the item points at `/more`. Change
- * this one constant to `eventFeaturesRoute` when the page lands.
+ * The "Event features" page (#965) is a Set up item, shown for CONFIGURE_EVENT. It is
+ * a sidebar-only item (not in `navigation`, so it is no phone tab and no More card).
  */
 export const eventFeaturesRoute = "/more/features";
-export const eventFeaturesHref = "/more";
 
 export const eventFeaturesItem: NavigationItem = {
-  href: eventFeaturesHref,
+  href: eventFeaturesRoute,
   label: "Event features",
   icon: ToggleRight,
   requiredPermission: "CONFIGURE_EVENT",
@@ -300,7 +300,7 @@ export function orderedSidebarItems(
   showMore: boolean,
 ): NavigationItem[] {
   const more = navigation.filter((item) => item.href === "/more" && showMore);
-  // Without the sidebar-only inserts: Event features shares More's placeholder href (#965) and is no phone tab.
+  // Without the sidebar-only inserts: Event features is a sidebar item only, never a phone tab (#965).
   const inserted = new Set(sidebarInserts.map((insert) => insert.item));
   return [
     ...sidebarSections(selectedPermissions).flatMap((view) => view.items.filter((item) => !inserted.has(item))),

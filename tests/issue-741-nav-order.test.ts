@@ -26,7 +26,6 @@ import {
   mobileActiveTabHref,
   mobileNavigationLabels,
   mobileNavigationOrder,
-  eventFeaturesHref,
   eventFeaturesRoute,
   navigation,
   orderedSidebarItems,
@@ -144,11 +143,10 @@ describe("sidebar order (#964)", () => {
   it("puts Event features in Set up, behind CONFIGURE_EVENT, after Event settings (#965)", () => {
     const setup = sidebarSections(new Set(["CONFIGURE_EVENT"])).find((view) => view.section === "setup");
     expect(setup?.items.map((item) => item.label)).toEqual(["Event settings", "Event features", "Attendee setup", "Tags"]);
-    expect(setup?.items[1]).toMatchObject({ href: eventFeaturesHref, requiredPermission: "CONFIGURE_EVENT" });
-    // Until the page exists the item links to /more; TODO(#965) points it at the route.
+    expect(setup?.items[1]).toMatchObject({ href: eventFeaturesRoute, requiredPermission: "CONFIGURE_EVENT" });
     expect(eventFeaturesRoute).toBe("/more/features");
     expect(sidebar({ permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT") })).not.toContain("Event features");
-    expect(render(eventAdmin)).toContain(`href="${eventFeaturesHref}?event=event_1"`);
+    expect(render(eventAdmin)).toContain(`href="${eventFeaturesRoute}?event=event_1"`);
   });
 
   it("shows a check-in-only role Dashboard, Check-in and Registrations, with no groups", () => {
@@ -238,6 +236,15 @@ describe("collapsible groups (#964)", () => {
     expect(toggle(viewer, "setup")).toContain('aria-expanded="true"');
     const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
     expect(active).toEqual(["Event features"]);
+    // A page below it lights the same item.
+    const below = [...navMarkup({ ...viewer, pathname: `${eventFeaturesRoute}/anything` }).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    expect(below).toEqual(["Event features"]);
+  });
+
+  it("lights More, not Event features, on the Event modules page at /more (#965)", () => {
+    const viewer = { ...eventAdmin, pathname: "/more" };
+    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span><\/a>/g)].map((match) => match[1]);
+    expect(active).toEqual(["More"]);
   });
 
   it("renders correctly with no browser storage: closed groups, every link still in the document", () => {

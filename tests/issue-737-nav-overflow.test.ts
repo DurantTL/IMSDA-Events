@@ -78,9 +78,12 @@ describe("phone tab for child routes (#737)", () => {
     expect(finance.some((item) => item.href === "/more")).toBe(true);
   });
 
-  it("keeps More as the phone's last tab for staff who see Event features, which shares its placeholder href until #965", () => {
+  it("keeps More as the phone's last tab for staff who see Event features, which is a sidebar item only and no phone tab (#965)", () => {
     const tabs = orderedMobileTabs(orderedSidebarItems(new Set<EventPermission>(["CONFIGURE_EVENT", "MANAGE_FINANCE"]), true));
     expect(tabs.map((item) => item.label)).toEqual(["Dashboard", "Payments", "More"]);
+    // The Event features page is under /more, so on a phone it lights the More tab, and no tab of its own is added.
+    expect(mobileActiveTabHref("/more/features", "/more/features")).toBe("/more");
+    expect(orderedSidebarItems(new Set<EventPermission>(["CONFIGURE_EVENT"]), true).some((item) => item.href === "/more/features")).toBe(false);
     // Pages that left the sidebar (#964) still light More on a phone.
     for (const href of ["/people/attendees", "/imports", "/staff", "/more/promo-codes"]) {
       expect(mobileActiveTabHref(href), href).toBe("/more");

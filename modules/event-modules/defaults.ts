@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { defaultModuleKeys, isEventModuleKey } from "@/modules/event-modules/catalog";
+import { creationModuleKeys, defaultModuleKeys, isEventModuleKey, type EventModuleKey } from "@/modules/event-modules/catalog";
 
 type Tx = Pick<Prisma.TransactionClient, "eventModule">;
 
@@ -13,6 +13,25 @@ type Tx = Pick<Prisma.TransactionClient, "eventModule">;
 export async function writeDefaultModules(tx: Tx, eventId: string, audience: "GENERAL" | "CLUB") {
   await tx.eventModule.createMany({
     data: defaultModuleKeys(audience).map((moduleKey) => ({ eventId, moduleKey })),
+    skipDuplicates: true,
+  });
+}
+
+/**
+ * The starting modules for a new event when staff chose them on the features step
+ * (#965): `requested` is the chosen set, or undefined (step skipped) for the
+ * audience's defaults. Same transaction and same `skipDuplicates` write as
+ * `writeDefaultModules`, so a repeat of the write changes nothing. System
+ * administrators create events, so this never widens who may turn modules on.
+ */
+export async function writeCreationModules(
+  tx: Tx,
+  eventId: string,
+  audience: "GENERAL" | "CLUB",
+  requested?: readonly EventModuleKey[],
+) {
+  await tx.eventModule.createMany({
+    data: creationModuleKeys(audience, requested).map((moduleKey) => ({ eventId, moduleKey })),
     skipDuplicates: true,
   });
 }

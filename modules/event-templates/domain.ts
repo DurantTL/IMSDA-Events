@@ -5,6 +5,7 @@ import { calendarDateSchema, eventNameSchema, eventSlugSchema } from "@/modules/
 import { operationalReportKinds } from "@/modules/reporting/operational-reports";
 import { attendeeClassificationInputSchema, attendeeTypeInputSchema } from "@/modules/attendee-types/domain";
 import { teamSettingsInputSchema } from "@/modules/club-teams/domain";
+import { templateFeatureOverridesSchema } from "@/modules/event-features/creation";
 import { templateMealsSchema } from "@/modules/meals/clone-domain";
 
 /**
@@ -292,6 +293,12 @@ export const applyEventTemplateInputSchema = z.object({
   requestKey: z.string().trim().min(8).max(200),
   /** Set when the event is set up from a calendar item (#445): the item is linked, and its location and description carried over. */
   calendarEntryId: z.string().trim().min(1).max(100).optional(),
+  /**
+   * The "Which features does this event use?" step (#965): the choices staff made on top of what the template carries.
+   * Absent is the step skipped, so exactly the template's own settings. Not part of the idempotency comparison: a retry
+   * returns the event the first attempt created, with the features it was created with.
+   */
+  features: templateFeatureOverridesSchema.optional(),
 }).superRefine((value, context) => {
   if (value.endsOn < value.startsOn) {
     context.addIssue({ code: "custom", path: ["endsOn"], message: "The event cannot end before it starts." });

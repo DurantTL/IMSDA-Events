@@ -75,6 +75,7 @@
     "test:health-snapshots": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-health-snapshots.ts",
     "test:location-waitlist": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-location-waitlist.ts",
     "test:event-cloning": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-cloning.ts",
+    "test:event-creation-features": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-creation-features.ts",
     "test:event-deletion": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-deletion.ts",
     "test:event-archive": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-archive.ts",
     "test:badge-print": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-badge-print.ts",

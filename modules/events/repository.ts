@@ -13,7 +13,8 @@ import {
 import { CLUB_EVENT_BILLING_MESSAGE, getEventPublishReadiness } from "@/modules/events/readiness";
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import type { EventSettingsInput } from "@/modules/events/schemas";
-import { writeDefaultModules } from "@/modules/event-modules/defaults";
+import { writeCreationModules, writeDefaultModules } from "@/modules/event-modules/defaults";
+import { creationModuleKeys, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { linkNewEventToCalendarEntry } from "@/modules/calendar/event-links";
 
 export class EventOperationError extends Error {
@@ -255,7 +256,13 @@ export async function createEvent(
   input: EventSettingsInput,
   actorUserId: string,
   /** Set when the event is set up from a calendar item (#445): the item is linked and its description carried over. */
-  options: { calendarEntryId?: string } = {},
+  options: {
+    calendarEntryId?: string;
+    /** The modules chosen on the features step (#965); absent is the step skipped, so the audience's defaults. */
+    modules?: readonly EventModuleKey[];
+    /** The calendar choice from the features step (#965); absent keeps the column's default (on). */
+    showOnCalendar?: boolean;
+  } = {},
 ) {
   const audience = input.audience ?? "GENERAL";
   const eventId = await getPrisma().$transaction(async (tx) => {
@@ -299,6 +306,7 @@ export async function createEvent(
         seminarPreferenceSelfServiceLocked:
           input.seminarPreferenceSelfServiceLocked,
         autoPromoteWaitlist: input.autoPromoteWaitlist,
+        ...(options.showOnCalendar === undefined ? {} : { showOnCalendar: options.showOnCalendar }),
       },
     });
     await tx.eventMembership.create({
@@ -309,7 +317,8 @@ export async function createEvent(
         status: "ACTIVE",
       },
     });
-    await writeDefaultModules(tx, event.id, audience);
+    // The chosen modules are written in the creating transaction (#965), so the event and its switches exist together or not at all.
+    await writeCreationModules(tx, event.id, audience, options.modules);
     // In the same transaction: an item that can't be linked any more fails the whole creation, leaving no event behind.
     if (options.calendarEntryId) {
       await linkNewEventToCalendarEntry(tx, { entryId: options.calendarEntryId, eventId: event.id, actorUserId });
@@ -335,7 +344,15 @@ export async function createEvent(
         summary: `Created event draft: ${event.name}.`,
         // The initial audience (#481) is recorded, since it decides whether
         // the event gets club features at all.
-        metadata: { slug: event.slug, audience: event.audience, ...(options.calendarEntryId ? { calendarEntryId: options.calendarEntryId } : {}) },
+        metadata: {
+          slug: event.slug,
+          audience: event.audience,
+          ...(options.calendarEntryId ? { calendarEntryId: options.calendarEntryId } : {}),
+          // The features the event started with (#965): module keys and the calendar choice, no personal data.
+          featuresChosen: options.modules !== undefined,
+          modules: creationModuleKeys(audience, options.modules),
+          showOnCalendar: event.showOnCalendar,
+        },
       },
     });
     return event.id;

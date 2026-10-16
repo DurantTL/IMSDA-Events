@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { postJson } from "@/lib/post-json";
 import type { ClonePlan } from "@/modules/event-clones/domain";
+import { CreationFeaturesStep } from "@/components/creation-features-step";
+import { cloneCreationFeatures } from "@/modules/event-features/creation";
 
 export type CloneSourceOption = { id: string; name: string; startsOn: string; endsOn: string; isPublished: boolean };
 
@@ -285,6 +287,20 @@ export function CopyFromPastEvent({ sources }: CopyFromPastEventProps) {
               ))}
             </ul>
           </section>
+
+          {(() => {
+            // The switches the copy will start with (#965), following the "What to copy" choices above. Shown, not edited:
+            // a copy keeps the source's settings, and any switch is changed on the Event features page afterwards.
+            const carried = cloneCreationFeatures(plan.features, { eventDetails: Boolean(include.eventDetails), moduleToggles: Boolean(include.moduleToggles) });
+            return (
+              <CreationFeaturesStep
+                audience={carried.audience}
+                features={carried.features}
+                intro={`These are the settings the copy carries from ${plan.source.name}, following what you chose to copy above. To change one, open the Event features page once the draft exists.`}
+                readOnly
+              />
+            );
+          })()}
 
           {privateLinks.length > 0 ? (
             <section className="panel form-stack event-settings-panel">
