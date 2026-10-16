@@ -20,8 +20,8 @@ describe("confirmation email status (#642)", () => {
 
   it("keeps the public form's headline wording", () => {
     expect(confirmationEmailHeadline("SENT")).toBe("Your confirmation email was accepted for delivery.");
-    expect(confirmationEmailHeadline("PENDING")).toContain("sending a confirmation email");
-    expect(confirmationEmailHeadline("PENDING")).not.toMatch(/queued|delivered/);
+    expect(confirmationEmailHeadline("PENDING")).toBe("Your registration is saved. A confirmation email should arrive shortly.");
+    expect(confirmationEmailHeadline("PENDING")).not.toMatch(/queued|sending|delivered/);
     expect(confirmationEmailHeadline("FAILED")).toContain("could not be sent");
   });
 
@@ -32,9 +32,9 @@ describe("confirmation email status (#642)", () => {
     expect(notice.registrationSaved).toContain("saved");
   });
 
-  it("club card: queued never reads as delivered and shows the event help email", () => {
+  it("club card: a pending email never reads as delivered and shows the event help email", () => {
     const notice = describeClubConfirmationEmail("PENDING", " events@example.test ");
-    expect(notice.email).toContain("queued");
+    expect(notice.email).toContain("should arrive shortly");
     expect(notice.email).toContain("not been delivered");
     expect(notice.email).not.toMatch(/was sent|accepted for delivery/);
     expect(notice.supportEmail).toBe("events@example.test");

@@ -460,6 +460,21 @@ async function seedPbeEvent(prisma: PrismaClient) {
   const starter = starterEventTemplates.find((entry) => entry.starterKey === "pathfinder_bible_experience");
   if (!starter?.teamSettings || !starter.locations) throw new Error("The Pathfinder Bible Experience starter is missing or has no team rules.");
   const today = calendarDateIn(new Date());
+  // A database that kept the event from an earlier run (cleanup off): dates move with today so registration is still open, and
+  // the teams an earlier walkthrough submitted (with their mail and audit rows) go, so each run starts the same and can reuse its names.
+  if (await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } })) {
+    await prisma.event.update({
+      where: { id: pbeEventId },
+      data: { startsAt: new Date(`${addDays(today, 90)}T15:00:00Z`), endsAt: new Date(`${addDays(today, 90)}T23:00:00Z`), registrationOpensOn: addDays(today, -5), registrationClosesOn: addDays(today, 60) },
+    });
+    const earlier = await prisma.generalLinkSubmission.findMany({ where: { eventId: pbeEventId, teamName: { startsWith: "Mobilecheck Walkthrough Team" } }, select: { id: true } });
+    if (earlier.length > 0) {
+      const ids = earlier.map((row) => row.id);
+      await prisma.auditLog.deleteMany({ where: { eventId: pbeEventId, entityId: { in: ids } } });
+      await prisma.messageOutbox.deleteMany({ where: { eventId: pbeEventId, recipientEmail: { startsWith: `${P}.walkthrough.` } } });
+      await prisma.generalLinkSubmission.deleteMany({ where: { id: { in: ids } } });
+    }
+  }
   if (!(await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } }))) {
     const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
     await prisma.$transaction(async (tx) => {
@@ -630,7 +645,8 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   const messageFileKeys = (await prisma.messageFile.findMany({ where: { eventId: blocksEventId }, select: { storageKey: true } }))
     .map((file) => file.storageKey);
   const mine = { startsWith: `${P}_` };
-  await cleanupPbeEvent(prisma);
+  // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
+  await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.assetDepositCover.deleteMany({ where: { issuanceId: mine } }),
@@ -2142,6 +2158,10 @@ function injectDefects() {
     '<p style="margin:0">self-test line one of two</p><p style="margin:-10px 0 0">self-test line two of two</p>',
     '<input aria-label="self-test ring" style="display:block;width:200px;height:32px;margin:0;border:1px solid #333;outline:3px solid red;outline-offset:6px"><p style="margin:-4px 0 0">self-test help under the ring</p>',
     '<button disabled type="button" style="min-width:44px;min-height:44px;background:#fff;color:#ddd;opacity:1">self-test disabled</button>',
+    // A heading whose icon sits above its text, a label with its field right under it, and text that an overflow box cuts off sideways.
+    '<h3 style="margin:0"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="display:block"><circle cx="10" cy="10" r="8"/></svg>self-test icon heading</h3>',
+    '<label style="display:block;line-height:1;margin:0">self-test stacked label<input style="display:block;margin:0;width:160px;height:32px;border:1px solid #333"></label>',
+    '<div style="width:80px;overflow:hidden;white-space:nowrap"><span>self-test text that is cut off sideways by its box</span></div>',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");

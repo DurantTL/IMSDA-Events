@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle2, Users, XCircle } from "lucide-react";
+import { pendingTeamButtons } from "@/modules/general-link-registrations/review-actions";
 import type { PendingTeamMemberView, PendingTeamView } from "@/modules/general-link-registrations/repository";
 
 type Club = { id: string; name: string };
@@ -60,7 +61,7 @@ function TeamRow({ eventId, team, clubs, timeZone }: { eventId: string; team: Pe
   const suggested = team.suggestedClub;
   const chosenName = clubs.find((club) => club.id === choice)?.name ?? "this club";
   // Confirming the club the director named and attaching to the club picked are the same action when they are the same club.
-  const pickedIsSuggested = Boolean(suggested) && (choice === suggested?.id || !choice);
+  const buttons = pendingTeamButtons({ suggestedId: suggested?.id ?? null, choiceId: choice });
   return (
     <article className="panel pending-team" aria-label={`Team ${team.teamName || team.confirmationCode}`}>
       <header className="pending-team-head">
@@ -103,16 +104,16 @@ function TeamRow({ eventId, team, clubs, timeZone }: { eventId: string; team: Pe
             </label>
           </div>
           <div className="intro-actions pending-team-actions">
-            {suggested && (
-              <button className={pickedIsSuggested ? "primary-button" : "secondary-button"} disabled={busy} onClick={() => void send({ action: "CONFIRM", organizationId: suggested.id })} type="button">
+            {suggested && buttons.confirmNamed && (
+              <button className={`${buttons.confirmNamed.style}-button`} disabled={busy} onClick={() => void send({ action: "CONFIRM", organizationId: buttons.confirmNamed!.organizationId })} type="button">
                 Confirm {suggested.name}
               </button>
             )}
-            {!pickedIsSuggested && (
+            {buttons.attachChosen && (
               <button
                 className="primary-button"
                 disabled={busy || !choice}
-                onClick={() => void send({ action: choice === suggested?.id ? "CONFIRM" : "REASSIGN", organizationId: choice })}
+                onClick={() => void send({ action: buttons.attachChosen!.action, organizationId: buttons.attachChosen!.organizationId })}
                 type="button"
               >
                 {suggested ? `Attach to ${chosenName}` : "Attach to this club"}

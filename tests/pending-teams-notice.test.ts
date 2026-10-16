@@ -35,5 +35,7 @@ describe("the Registrations page notice for teams waiting for a club", () => {
     expect(workspace).toMatch(/<PendingTeamsNotice canManage=\{canEdit\} count=\{pendingTeamCount\}/);
     expect(workspace).toMatch(/expected\{pageScoped \? " on this page" : ""\}\{canEdit && pendingTeamCount > 0/);
     expect(workspace).toMatch(/No team is registered yet, but/);
+    // Under a location filter or a search the waiting teams are event-wide, so the "no team yet" wording and badge suffix are not used.
+    expect(workspace).toMatch(/pendingTeamCount > 0 && !locationId && !pageScoped\s*\? `No team is registered yet/);
   });
 });

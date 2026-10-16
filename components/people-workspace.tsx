@@ -766,7 +766,7 @@ export function PeopleWorkspace({
       <div className="page-intro people-intro">
         <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
         <div className="intro-actions">
-          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
+          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 && !locationId && !pageScoped ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
           <ActionsMenu>
             {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
@@ -846,7 +846,7 @@ export function PeopleWorkspace({
             icon={<UsersRound aria-hidden="true" size={24} />}
             title="No registrations yet"
           >
-            {canEdit && pendingTeamCount > 0
+            {canEdit && pendingTeamCount > 0 && !locationId && !pageScoped
               ? `No team is registered yet, but ${pendingTeamsLabel(pendingTeamCount)}. Use the Review them link above to confirm the club; a team becomes a registration then.`
               : "Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page."}
           </EmptyState>

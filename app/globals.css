@@ -3480,7 +3480,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 }
 .public-registration-attendee-actions button:hover:not(:disabled) { border-color: #9bb9c5; background: var(--imsda-navy-soft); }
 .public-registration-attendee-actions button.is-danger { color: var(--coral); }
-.public-registration-attendee-actions button:disabled { cursor: not-allowed; opacity: 0.72; }
+.public-registration-attendee-actions button:disabled { border-color: #d3dde2; background: #eef2f4; box-shadow: none; cursor: not-allowed; opacity: 0.72; }
 .public-registration-attendee-body { padding-left: 4px; }
 .public-registration-attendee-name-sync {
   margin: 14px 20px 0;
@@ -11064,7 +11064,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Phone audit follow-ups: a heading's leading icon shares the heading's line (zero specificity, so any classed heading rule wins);
    helper text under a field keeps its own line (the global .field-help pulls up by 9px); the "Read more" toggle is a 44px target. */
-:where(h1, h2, h3):has(> svg[aria-hidden="true"]:first-child) { display: flex; align-items: center; gap: 4px 8px; }
+:where(:is(h1, h2, h3):has(> svg[aria-hidden="true"]:first-child)) { display: flex; align-items: center; gap: 4px 8px; }
 .panel > .field-help,
 .public-manage-card > .field-help { margin: 4px 0 0; }
 .club-team-name .field-help { margin: 0; }
@@ -11086,3 +11086,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operations-search-actions .primary-button,
 .operations-search-actions .secondary-button { min-height: 44px; }
+/* The roster link under a typed-in team member takes the whole row (it must beat `.public-manage-club-list li > span { flex: 1 }`). */
+.public-manage-club-list li > .typed-in-roster-link { flex: 1 1 100%; margin: 0; }
+/* Placed after `.public-manage-card > .field-help`, so the account overview keeps its own bottom space. */
+.account-overview-card > .field-help { margin: 0 0 10px; }
