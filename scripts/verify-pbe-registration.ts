@@ -119,7 +119,7 @@ async function main() {
   await cleanup();
   await prisma.user.create({ data: { id: staffUserId, email: `${P}-staff@example.test`, displayName: "PBE Check Staff", globalRole: "SYSTEM_ADMIN" } });
   await prisma.organization.create({ data: { id: churchId, type: "CHURCH", name: `Pbe Church ${P}`, normalizedName: `pbe church ${P}` } });
-  const clubKeys = ["a", "b", "c", "d", "e", "f"] as const;
+  const clubKeys = ["a", "b", "c", "d", "e", "f", "g"] as const;
   await prisma.organization.createMany({
     data: clubKeys.map((key) => ({ id: clubOf(key), type: "CLUB" as const, name: `Pbe Club ${key} ${P}`, normalizedName: `pbe club ${key} ${P}`, parentOrganizationId: churchId })),
   });
@@ -174,13 +174,15 @@ async function main() {
   for (let index = 1; index <= 10; index += 1) await addMember("f", `y${index}`, "youth", "YOUTH", "PbeFran", `Ff${index}`);
   // 19 on the solo event's day (born 2007-06-01), so a team member who needs the Area Coordinator's permission there.
   await addMember("f", "tlt19", "eighteen", "YOUTH", "PbeFranTlt", "Nineteen");
+  // Club g: the partner club checks (#963).
+  for (let index = 1; index <= 6; index += 1) await addMember("g", `y${index}`, "youth", "YOUTH", "PbeGina", `Gg${index}`);
   const clientId = (club: string, key: string) => clubAttendeeClientId(members.get(`${club}:${key}`)!);
 
   // 1. The starter template creates the event: team rules, two sites, the deadline, the form.
   await addStarterEventTemplates(staffUserId);
   const template = await prisma.eventTemplate.findFirstOrThrow({ where: { versions: { some: { payload: { path: ["starterKey"], equals: "pathfinder_bible_experience" } } } } });
   const applied = await applyEventTemplate(template.id, staffUserId, {
-    name: `Pbe check ${P}`, slug: `${S}-pbe`, startsOn: "2027-01-16", endsOn: "2027-01-16", requestKey: `${P}-apply-key-1`,
+    name: `Pbe check ${P}`, slug: `${S}-pbe`, startsOn: "2027-01-17", endsOn: "2027-01-17", requestKey: `${P}-apply-key-1`,
   });
   assert(applied.event, "the template creates an event");
   const eventId = applied.event.id;
@@ -432,7 +434,7 @@ async function main() {
   const filled = await loadFilledTeamForm({ eventId, organizationId: clubOf("a"), teamKey: "bible bees" });
   assert(filled, "the filled form loads under the club and team");
   const html = renderToStaticMarkup(createElement(TeamFormSheet, { model: filled.model }));
-  for (const text of ["Iowa-Missouri Conference Pathfinder", "Due December 18", "January 16, 2027", "Pbe Coordinator", "PbeAlex Aa1", "PbeCoach One", "Bible Bees", `Pbe Club a ${P}`, "4-1"]) {
+  for (const text of ["Iowa-Missouri Conference Pathfinder", "Due December 18", "January 17, 2027", "Pbe Coordinator", "PbeAlex Aa1", "PbeCoach One", "Bible Bees", `Pbe Club a ${P}`, "4-1"]) {
     assert(html.includes(text), `the filled form shows "${text}"`);
   }
   assert(!(await loadFilledTeamForm({ eventId, organizationId: clubOf("c"), teamKey: "bible bees" })), "another club cannot load a team's form");
@@ -440,7 +442,7 @@ async function main() {
   const blank = await loadBlankTeamForm(eventId, { publishedClubOnly: true });
   assert(blank, "the blank form loads");
   const blankHtml = renderToStaticMarkup(createElement(TeamFormSheet, { model: blank.model }));
-  assert(blankHtml.includes("Club Director&#x27;s Signature:") && blankHtml.includes("January 16, 2027") && !blankHtml.includes("Pbe Coordinator"), "the blank form has the signature line, the dates, and no one's details");
+  assert(blankHtml.includes("Club Director&#x27;s Signature:") && blankHtml.includes("January 17, 2027") && !blankHtml.includes("Pbe Coordinator"), "the blank form has the signature line, the dates, and no one's details");
   console.log("ok  the printed form renders filled and blank");
 
   // 14. Billing and church views: each team is its own line; a club's teams group together.
@@ -699,7 +701,7 @@ async function main() {
 
   // 15h. An event with team rules but one registration per club keeps the rules on every edit.
   const soloEventId = `${P}_solo_event`;
-  await prisma.event.create({ data: { id: soloEventId, slug: `${S}-solo`, name: "Pbe check solo team event", ...plainEventData, startsAt: new Date("2027-01-16T16:00:00Z"), endsAt: new Date("2027-01-16T22:00:00Z") } });
+  await prisma.event.create({ data: { id: soloEventId, slug: `${S}-solo`, name: "Pbe check solo team event", ...plainEventData, startsAt: new Date("2027-01-17T16:00:00Z"), endsAt: new Date("2027-01-17T22:00:00Z") } });
   await prisma.registrationForm.create({
     data: {
       id: `${P}_soloform`, eventId: soloEventId, createdByUserId: staffUserId, name: "solo", slug: `${S}-solo-form`, status: RegistrationFormStatus.PUBLISHED,
@@ -770,6 +772,45 @@ async function main() {
   await expectCode(amendments.amendRegistration(eventId, gamma.registrationId, { ...nonStaffInput, previewOnly: false, quoteFingerprint: directorQuote.quoteFingerprint }, directorActor, now), "TEAM_RULES", "a non-staff actor's different-person confirmation is ignored", ["is already on another team from your club"]);
   console.log("ok  the different-person confirmation is honored for staff only");
   console.log("ok  an event with team rules and one registration per club keeps the size and alternate rules on every edit, director and staff");
+
+  // 15i. The partner club (#963): picked from the directory, "Not listed" with a typed name, and never the team's own club.
+  const ownClubName = `Pbe Club g ${P}`;
+  await expectCode(submit("g", "Gee Own", [person("g", "y1"), person("g", "y2")], missouri!.id, { partner_club: ownClubName }), "INVALID_SUBMISSION", "a team's own club is refused as its partner", ["different club from your own"]);
+  await expectCode(submit("g", "Gee Own", [person("g", "y1"), person("g", "y2")], missouri!.id, { partner_club: ownClubName.toLowerCase() }), "INVALID_SUBMISSION", "the refusal ignores case", ["different club from your own"]);
+  assert(!(await prisma.clubEventRegistration.findFirst({ where: { eventId, organizationId: clubOf("g") } })), "a refused partner saved nothing");
+  await submit("g", "Gee One", [person("g", "y1"), person("g", "y2")], missouri!.id, { partner_club: `Pbe Club b ${P}` });
+  const geeOne = await rowOf("g", "Gee One");
+  const geeAnswers = (await amendments.currentRegistrationAnswers(eventId, geeOne.registrationId))!;
+  assert(geeAnswers.responses.partner_club === `Pbe Club b ${P}`, "a partner picked from the directory is saved");
+  await submit("g", "Gee Two", [person("g", "y3"), person("g", "y4")], missouri!.id, { partner_club: "Not listed", partner_club_other: "Sample Falcons" });
+  const geeTwoFilled = await loadFilledTeamForm({ eventId, organizationId: clubOf("g"), teamKey: "gee two" });
+  assert(geeTwoFilled && renderToStaticMarkup(createElement(TeamFormSheet, { model: geeTwoFilled.model })).includes("Sample Falcons"), "a not-listed partner prints by its typed name on the team form");
+  const geeTwoPacket = await getClubPacketData(eventId, clubOf("g"), "gee two");
+  assert(geeTwoPacket?.otherDetails.partnerClub === "Sample Falcons", `the packet and report show the typed partner, got ${geeTwoPacket?.otherDetails.partnerClub}`);
+  const geeOnePacket = await getClubPacketData(eventId, clubOf("g"), "gee one");
+  assert(geeOnePacket?.otherDetails.partnerClub === `Pbe Club b ${P}`, "the packet shows a directory partner");
+  // Staff cannot save the own club as the partner either; a different partner is fine, and a director's edit keeps it.
+  async function staffAmendPartner(partner: string) {
+    const answers = (await amendments.currentRegistrationAnswers(eventId, geeOne.registrationId))!;
+    const kept = (await prisma.registrationAttendee.findMany({ where: { registrationId: geeOne.registrationId }, orderBy: { position: "asc" } }))
+      .map((attendee) => ({ attendeeId: attendee.id, clientId: `existing-${attendee.id}`, responses: attendee.formResponses as Record<string, unknown> }));
+    const amendInput = { clientRequestId: randomUUID(), expectedUpdatedAt: answers.updatedAt, reason: "Staff partner check", responses: { ...answers.responses, partner_club: partner }, attendees: kept, previewOnly: true as boolean };
+    const quote = await amendments.previewRegistrationAmendment(eventId, geeOne.registrationId, amendInput);
+    return amendments.amendRegistration(eventId, geeOne.registrationId, { ...amendInput, previewOnly: false, quoteFingerprint: quote.quoteFingerprint }, staffActor, now);
+  }
+  await expectCode(staffAmendPartner(ownClubName), "INVALID_AMENDMENT", "staff cannot set the team's own club as its partner", ["different club from your own"]);
+  await staffAmendPartner(`Pbe Club c ${P}`);
+  assert((await amendments.currentRegistrationAnswers(eventId, geeOne.registrationId))!.responses.partner_club === `Pbe Club c ${P}`, "staff can change the partner to another club");
+  const geeOneNow = await rowOf("g", "Gee One");
+  const geeEdit = {
+    clientRequestId: randomUUID(), expectedUpdatedAt: geeOneNow.registration.updatedAt.toISOString(), selectedMemberIds: ["y1", "y2"].map((key) => members.get(`g:${key}`)!),
+    keptGuestIds: [] as string[], keptOffRosterAttendeeIds: [] as string[], newGuests: [] as never[],
+    attendeeResponses: Object.fromEntries(["y1", "y2"].map((key) => [clientId("g", key), { attendee_type: "Pathfinder" }])), teamKey: "gee one",
+  };
+  await club.amendClubRegistration(clubOf("g"), eventId, actor, geeEdit, now);
+  const geeKept = (await amendments.currentRegistrationAnswers(eventId, geeOne.registrationId))!.responses;
+  assert(geeKept.partner_club === `Pbe Club c ${P}` && geeKept.club_name === ownClubName, "a director's edit keeps the partner and the own club");
+  console.log("ok  a partner club is picked from the directory or typed, never the team's own club, for submit and staff amendment");
 
   // 16. An event without team rules is a club event as it always was.
   await prisma.registrationForm.create({

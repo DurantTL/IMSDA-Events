@@ -2,6 +2,7 @@ import { permissionShortLabel } from "@/modules/club-teams/permission-domain";
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { partnerClubName } from "@/modules/club-registrations/domain";
 import { teamLabel } from "@/modules/club-teams/domain";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { ALTERNATE_FIELD_KEY, isAlternateAnswer } from "@/modules/club-teams/rules";
@@ -123,7 +124,7 @@ export async function loadFilledTeamForm(which: Which): Promise<TeamFormPage | n
       phone: text(responses.coordinator_phone),
       email: text(responses.coordinator_email),
     },
-    partnerClub: text(responses.partner_club),
+    partnerClub: partnerClubName(responses),
     members,
     alternate,
     coaches,

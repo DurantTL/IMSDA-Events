@@ -1,5 +1,6 @@
 import "server-only";
 
+import { partnerClubIssue, partnerClubProblem } from "@/modules/club-registrations/domain";
 import { enforceTeamRegistrationRules } from "@/modules/club-teams/registration-guard";
 import { deliverPermissionMessages } from "@/modules/club-teams/permission-repository";
 import { checkLocationSeats } from "@/modules/event-locations/admission";
@@ -1025,6 +1026,10 @@ async function prepareAmendment(
       responses: { ...input.responses, ...owned },
     };
   }
+  // A joint team's partner club can't be the team's own club (#963), for staff and directors alike. The own club is the
+  // director's directory club above, or what the registration already holds.
+  const partnerProblem = partnerClubProblem(definition, { ...currentRegistrationResponses, ...input.responses });
+  if (partnerProblem) throw new RegistrationAmendmentError("INVALID_AMENDMENT", partnerProblem.message, [partnerClubIssue(partnerProblem)]);
   // Acknowledgments (#150) are given only through their evidence path: an amendment keeps each answer as stored and
   // gives a new attendee none, so a stored `true` always has its evidence beside it.
   const held = holdAcknowledgmentAnswers(definition, input, {

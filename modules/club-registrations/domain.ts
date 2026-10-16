@@ -2,7 +2,7 @@ import { z } from "zod";
 import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { registrationClosedMessage } from "@/modules/events/lifecycle";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
-import { fullNameKeys, splitNameKeyPairs } from "@/modules/forms/public-domain";
+import { fullNameKeys, splitNameKeyPairs, type PublicRegistrationIssue } from "@/modules/forms/public-domain";
 
 /**
  * Club registration (#358): how roster people map onto an event's published
@@ -200,6 +200,8 @@ export function medicalFreeTextFields(definition: RegistrationFormDefinition): R
     .filter((field) => FREE_TEXT_FIELD_TYPES.has(field.type) && looksLikeMedicalFreeText(field));
 }
 
+const PARTNER_CLUB_KEY = "partner_club";
+
 /** Why a published form can't be used for club registration, or null. */
 export function clubFormProblem(definition: RegistrationFormDefinition) {
   if (!definition.attendeeRoster?.enabled) return "The event's form doesn't collect a list of attendees.";
@@ -211,6 +213,19 @@ export function clubFormProblem(definition: RegistrationFormDefinition) {
   if (medicalFields.length > 0) {
     const labels = medicalFields.map((field) => `"${field.label}"`).join(", ");
     return `The event's form asks attendees a free-text medical, health, or accessibility question (${labels}). Registration answers aren't encrypted, so replace it with a checkbox or yes/no question and republish.`;
+  }
+  return clubQuestionOrderProblem(definition);
+}
+
+/**
+ * The first clubs-directory question is the club itself and is locked to the director's club (#963). A form where the
+ * partner club comes first would lock the wrong question, so it is refused, at publish and at registration time.
+ */
+export function clubQuestionOrderProblem(definition: RegistrationFormDefinition) {
+  const clubQuestions = definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.scope === "REGISTRATION" && field.optionSource === "CLUBS_DIRECTORY");
+  if (clubQuestions.length > 1 && clubQuestions[0]!.key === PARTNER_CLUB_KEY) {
+    return "The form asks for the partner club before the club itself. Move the club question first.";
   }
   return null;
 }
@@ -317,9 +332,45 @@ function directoryChoice(field: RegistrationFormField, name: string) {
  * client" pattern as `lockedAttendeeFieldKeys` for roster-owned answers.
  */
 export function lockedClubDirectoryFieldKeys(definition: RegistrationFormDefinition): string[] {
-  return registrationFields(definition)
-    .filter((field) => field.optionSource === "CLUBS_DIRECTORY")
-    .map((field) => field.key);
+  // Only the first clubs-directory question is the club itself. A later one (the PBE partner club, #963) is the
+  // director's own pick of another club and stays editable.
+  const own = registrationFields(definition).find((field) => field.optionSource === "CLUBS_DIRECTORY");
+  return own ? [own.key] : [];
+}
+
+/** The validation issue a refused partner club shows against its field. */
+export function partnerClubIssue(problem: { field: RegistrationFormField; message: string }): PublicRegistrationIssue {
+  return { kind: "validation", code: "INVALID_RESPONSE", fieldId: problem.field.id, key: problem.field.key, message: problem.message, path: `responses.${problem.field.key}`, attendeeIndex: null };
+}
+
+/** The partner club a team named: the directory pick, or what was typed when the pick was "Not listed" (#963). */
+export function partnerClubName(responses: Readonly<Record<string, unknown>>): string {
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "");
+  const picked = text(responses.partner_club);
+  return picked === DIRECTORY_NOT_LISTED_VALUE ? text(responses.partner_club_other) : picked;
+}
+
+export const PARTNER_CLUB_IS_OWN_CLUB_MESSAGE = "The partner club must be a different club from your own. Choose another club, or leave this blank.";
+
+/**
+ * A later clubs-directory question (the joint team's partner club, #963) may not name the team's own club, the first
+ * clubs-directory question. Returns the partner field and a message when it does, else null. "Not listed" and blank never match.
+ */
+export function partnerClubProblem(
+  definition: RegistrationFormDefinition,
+  responses: Readonly<Record<string, unknown>>,
+): { field: RegistrationFormField; message: string } | null {
+  const [own, ...later] = registrationFields(definition).filter((field) => field.optionSource === "CLUBS_DIRECTORY");
+  if (!own) return null;
+  // Only the question keyed `partner_club` is a partner: a staff-built form may ask for two clubs that can be the same one.
+  const partners = later.filter((field) => field.key === PARTNER_CLUB_KEY);
+  const clean = (value: unknown) => (
+    typeof value === "string" && value.trim() && value.trim() !== DIRECTORY_NOT_LISTED_VALUE ? normalizeOrganizationName(value) : null
+  );
+  const ownName = clean(responses[own.key]);
+  if (!ownName) return null;
+  const clash = partners.find((field) => clean(responses[field.key]) === ownName);
+  return clash ? { field: clash, message: PARTNER_CLUB_IS_OWN_CLUB_MESSAGE } : null;
 }
 
 /**
@@ -337,8 +388,9 @@ export function clubDirectoryOwnedResponses(
   const responses: Record<string, string | null> = {};
   if (!identity.clubName) return responses;
   const fields = registrationFields(definition);
+  const ownKey = lockedClubDirectoryFieldKeys(definition)[0];
   for (const field of fields) {
-    if (field.optionSource !== "CLUBS_DIRECTORY") continue;
+    if (field.key !== ownKey) continue;
     responses[field.key] = directoryChoice(field, identity.clubName);
     // The free-text "Not listed" companion (the existing "show only when"
     // convention) no longer applies once the field is locked to a real

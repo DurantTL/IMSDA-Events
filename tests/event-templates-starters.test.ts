@@ -164,6 +164,23 @@ describe("starter event templates (#546)", () => {
       expect(role.options).toEqual(["Pathfinder", "TLT", "Coach"]);
     });
 
+    it("picks the partner club from the clubs directory, with a not-listed fallback, and says Club director (#963)", () => {
+      const fields = fieldsOf("pbe_registration");
+      const partner = fields.find((field) => field.key === "partner_club")!;
+      expect(partner.type).toBe("SELECT");
+      expect(partner.optionSource).toBe("CLUBS_DIRECTORY");
+      expect(partner.required).toBe(false);
+      const other = fields.find((field) => field.key === "partner_club_other")!;
+      expect(other.conditional).toEqual({ fieldKey: "partner_club", operator: "EQUALS", value: "Not listed" });
+      expect(fields.find((field) => field.key === "director_name")!.label).toBe("Club director");
+      expect(JSON.stringify(getFormTemplate("pbe_registration")!.definition)).not.toContain("Pathfinder director");
+    });
+
+    it("tells staff to choose January 17, 2027 for the Area level (#963)", () => {
+      expect(starterDescription(starter)).toContain("January 17, 2027");
+      expect(starterDescription(starter)).not.toContain("January 16, 2027");
+    });
+
     it("is refused for a general event, since team rules are for club events", () => {
       expect(() => parseEventTemplatePayload({ ...starterPayload(starter), audience: "GENERAL" })).toThrow(EventTemplateReferenceError);
     });

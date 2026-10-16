@@ -898,7 +898,7 @@ export const formTemplates: FormTemplate[] = [
           templateField("pbe_club_other", "club_name_other", "Club name — not listed", "TEXT", true, [], { conditional: { fieldKey: "club_name", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
           templateField("pbe_church", "church_name", "Church", "SELECT", false, [], { optionSource: "CHURCHES_DIRECTORY" }),
           templateField("pbe_church_other", "church_name_other", "Church — not listed", "TEXT", true, [], { conditional: { fieldKey: "church_name", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
-          templateField("pbe_director", "director_name", "Pathfinder director", "TEXT", true),
+          templateField("pbe_director", "director_name", "Club director", "TEXT", true),
           templateField("pbe_email", "email", "Director or club email", "EMAIL", true),
           templateField("pbe_phone", "phone", "Director contact number", "PHONE", true),
         ] },
@@ -910,7 +910,8 @@ export const formTemplates: FormTemplate[] = [
           templateField("pbe_coord_zip", "coordinator_zip", "Zip", "TEXT", true),
           templateField("pbe_coord_phone", "coordinator_phone", "Phone", "PHONE", true),
           templateField("pbe_coord_email", "coordinator_email", "Email", "EMAIL", true),
-          templateField("pbe_partner", "partner_club", "Partner club (joint team)", "TEXT", false, [], { helpText: "A club with 4 or fewer interested Pathfinders may join with one other club. Name the other club here, and add its Pathfinders under Who’s going as people not on your roster." }),
+          templateField("pbe_partner", "partner_club", "Partner club (joint team)", "SELECT", false, [], { optionSource: "CLUBS_DIRECTORY", helpText: "A club with 4 or fewer interested Pathfinders may join with one other club. Pick the other club here (not your own), and add its Pathfinders under Who’s going as people not on your roster." }),
+          templateField("pbe_partner_other", "partner_club_other", "Partner club — not listed", "TEXT", true, [], { conditional: { fieldKey: "partner_club", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
         ] },
         { id: "pbe_roster", title: "Team members and coaches", description: "A team has 2 to 7 team members. The 7th is the alternate. Adults and staff are coaches: they are listed with the team and do not count toward the 2 to 7. All adults 18 and over must complete NAD background screening, and all drivers with passengers must be 21 or over.", fields: [
           templateField("pbe_member_first", "first_name", "First name", "TEXT", true, [], { scope: "ATTENDEE" }),

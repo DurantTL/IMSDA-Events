@@ -133,6 +133,16 @@ describe("buildClubEventRecord", () => {
   });
 });
 
+describe("partner club in the reports (#963)", () => {
+  it("shows the directory pick, or the typed name when the pick was Not listed", () => {
+    expect(buildClubEventRecord(clubInput()).partnerClub).toBe("Eagles");
+    const typed = buildClubEventRecord({ ...clubInput(), registrationResponses: { ...clubInput().registrationResponses, partner_club: "Not listed", partner_club_other: "  Sample Falcons " } });
+    expect(typed.partnerClub).toBe("Sample Falcons");
+    const none = buildClubEventRecord({ ...clubInput(), registrationResponses: { ...clubInput().registrationResponses, partner_club: "" } });
+    expect(none.partnerClub).toBe("");
+  });
+});
+
 describe("clubHeadcounts", () => {
   it("counts each roster role plus a total, matching the underlying registration", () => {
     const record = buildClubEventRecord(clubInput());
