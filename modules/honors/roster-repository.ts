@@ -149,13 +149,20 @@ export async function getHonorRosterData(
   const attendeeIds = new Set(attendees.map((attendee) => attendee.id));
   const enrollmentRows = await prisma.honorEnrollment.findMany({
     where: { eventId, ...(options.organizationId ? { organizationId: options.organizationId } : {}) },
-    select: { offeringId: true, registrationAttendeeId: true, consumesSeat: true },
+    select: { id: true, offeringId: true, registrationAttendeeId: true, consumesSeat: true, adminPlacementReason: true },
   });
   // Only people on an active registration appear; enrollments of a cancelled
   // registration are left out rather than shown with no name.
   const enrollments: RosterEnrollment[] = enrollmentRows
     .filter((row) => attendeeIds.has(row.registrationAttendeeId))
-    .map((row) => ({ offeringId: row.offeringId, attendeeId: row.registrationAttendeeId, consumesSeat: row.consumesSeat }));
+    // The reason is staff's: a director's own schedule (`organizationId`) never carries it.
+    .map((row) => ({
+      id: row.id,
+      offeringId: row.offeringId,
+      attendeeId: row.registrationAttendeeId,
+      consumesSeat: row.consumesSeat,
+      adminPlacementReason: options.organizationId ? null : row.adminPlacementReason,
+    }));
 
   return {
     event: {

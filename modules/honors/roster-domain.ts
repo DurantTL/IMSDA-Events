@@ -60,7 +60,15 @@ export type RosterOffering = {
   siteName?: string | null;
 };
 
-export type RosterEnrollment = { offeringId: string; attendeeId: string; consumesSeat: boolean };
+export type RosterEnrollment = {
+  offeringId: string;
+  attendeeId: string;
+  consumesSeat: boolean;
+  /** The pick's id, so a system administrator can remove it (#962). */
+  id?: string;
+  /** Why a system administrator placed the youth although the class was full or closed (#962); null or absent for a normal pick. */
+  adminPlacementReason?: string | null;
+};
 
 function byName(a: { lastName: string; firstName: string }, b: { lastName: string; firstName: string }) {
   return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
@@ -85,6 +93,8 @@ export function buildClassRosters(
     .sort((a, b) => sortKey(a) - sortKey(b) || a.honorName.localeCompare(b.honorName))
     .map((offering) => {
       const rows = enrollments.filter((enrollment) => enrollment.offeringId === offering.id);
+      const youthSeats = rows.filter((row) => row.consumesSeat).length;
+      const adminPlacements = rows.filter((row) => row.consumesSeat && row.adminPlacementReason).length;
       const people = rows
         .map((row) => attendeesById.get(row.attendeeId))
         .filter((attendee): attendee is RosterAttendee => Boolean(attendee))
@@ -94,8 +104,16 @@ export function buildClassRosters(
         session: sessionLabel(offering, sessions),
         siteName: offering.siteName ?? null,
         people,
-        // Counted from the enrollment rows, exactly as H5 counts taken seats.
-        youthSeats: rows.filter((row) => row.consumesSeat).length,
+        // Counted from the enrollment rows, exactly as H5 counts taken seats, plus any placed by a system administrator (#962).
+        youthSeats,
+        /** Seats a system administrator placed on top of the class's limit (#962). */
+        adminPlacements,
+        /** More youth hold seats than the class's limit, which only a system administrator's placement can cause (#962). */
+        overCapacity: youthSeats > offering.capacity,
+        /** Each pick with its id and, for a hand placement, its reason (#962). */
+        picks: rows
+          .filter((row) => attendeesById.has(row.attendeeId))
+          .map((row) => ({ enrollmentId: row.id ?? null, attendeeId: row.attendeeId, adminPlacementReason: row.adminPlacementReason ?? null })),
       };
     });
 }
@@ -164,16 +182,17 @@ export function classRostersCsv(rosters: readonly ClassRoster[], showSite = fals
   const rows: Array<Array<string | number>> = [[
     ...(showSite ? ["Site"] : []),
     "Session", "Honor code", "Honor", "Location", "Teacher", "Youth seats", "Capacity",
-    "Last name", "First name", "Club", "Age at event", "Type",
+    "Last name", "First name", "Club", "Age at event", "Type", "Admin placement reason",
   ]];
   for (const roster of rosters) {
     const head = [
       ...(showSite ? [roster.siteName ?? allSitesLabel] : []),
       roster.session, roster.offering.honorCode, roster.offering.honorName, roster.offering.location, roster.offering.teacherName, roster.youthSeats, roster.offering.capacity,
     ];
-    if (roster.people.length === 0) rows.push([...head, "", "", "", "", ""]);
+    if (roster.people.length === 0) rows.push([...head, "", "", "", "", "", ""]);
+    const reasonByAttendee = new Map(roster.picks.map((pick) => [pick.attendeeId, pick.adminPlacementReason ?? ""]));
     for (const person of roster.people) {
-      rows.push([...head, person.lastName, person.firstName, person.clubName, age(person.ageOnEventDate), rosterGroupLabels[rosterGroupOf(person.attendeeType)]]);
+      rows.push([...head, person.lastName, person.firstName, person.clubName, age(person.ageOnEventDate), rosterGroupLabels[rosterGroupOf(person.attendeeType)], reasonByAttendee.get(person.id) ?? ""]);
     }
   }
   return toCsv(rows);

@@ -236,8 +236,12 @@ export async function loadOfferings(client: Prisma.TransactionClient, eventId: s
   });
 }
 
-/** Seats held by active registrations; a cancelled club registration gives its seats back. */
-export const seatHoldingEnrollment = { consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } satisfies Prisma.HonorEnrollmentWhereInput;
+/**
+ * Seats held by active registrations; a cancelled club registration gives its seats back. A seat a system administrator placed
+ * by hand (#962) is not counted: it sits on top of the class's seat limit, so the limit, the waitlist and live offers behave as
+ * if it were not there. Reports show those placements separately, with their reason.
+ */
+export const seatHoldingEnrollment = { consumesSeat: true, adminPlacementReason: null, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } satisfies Prisma.HonorEnrollmentWhereInput;
 
 /** The seats one owner holds, for its per-club limit: a club's, or a group registration's own (#650). */
 function ownerSeats(owner: SeatOwner | null): Prisma.HonorEnrollmentWhereInput {

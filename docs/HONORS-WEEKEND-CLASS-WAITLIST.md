@@ -132,6 +132,32 @@ the picks that no longer fit**; after class changes have closed for its site **n
   takes class locks in queue order rather than one sorted order, so a rare deadlock is possible; the loser retries.
 - Proof against a real database: `npm run test:honor-reinstate-seats`.
 
+## Placing a youth in a full class by hand (#962)
+
+Decision (Caleb, Oct 15, 2026): the seat order above stands, as long as system administrators can fix any case easily by
+hand. Raising a class's seat limit is a human decision, so this is an explicit, audited action, never automatic.
+
+- **Who.** System administrators only (`requireSeatOverrideAdministrator`, the global role). Event admins, directors and staff
+  acting as directors are refused (403). The repository checks the role again from the database inside its transaction.
+- **Place.** `POST /api/events/{eventId}/honors/seat-overrides` with `registrationAttendeeId`, `offeringId` and a `reason`
+  (5 to 300 characters; no medical or private details). It works when the class is full and after class changes closed.
+  The control is on the staff Honors Weekend roster (classes view), for system administrators.
+- **Remove.** `POST /api/events/{eventId}/honors/seat-overrides/{enrollmentId}/remove` with a `reason`, before or after close.
+  The freed seat goes to the next youth in line (before the deadline, as when a director drops a class). A pick the instructor
+  already marked, or that was written to an honor record, is refused.
+- **The seat limit never changes.** A placed seat is marked (`adminPlacementReason`, `adminPlacedAt`, `adminPlacedByUserId`) and
+  is not counted toward the limit (`seatHoldingEnrollment`), so the limit, every waitlist position and any live offer are
+  unchanged and an offer can still be accepted. Reports count it: the class shows over capacity, with the reason, on the roster
+  page and as an "Admin placement reason" column in the class roster CSV. A director's own schedule never carries the reason.
+- **Still enforced.** Age, class level and prerequisites, one class per session, the person's site, and the per-club limit
+  (counted without placed seats). The action overrides seats and the close date, not eligibility.
+- **A youth's own waitlist place** for that class is marked taken, like a director picking a class they wait for; if it held a
+  live offer, that seat goes to the next in line. Nobody else's place changes.
+- **Reinstating a registration** never drops a placed seat for a full class.
+- **Audit.** `HONOR_CLASS_ADMIN_PLACED` and `HONOR_CLASS_ADMIN_PICK_REMOVED`, with ids and the reason only.
+- Same serializable transaction and class row lock as a pick save, retried on a lost conflict.
+- Proof against a real database, including races with normal pick saves: `npm run test:honor-admin-seat-override`.
+
 ## Not done
 
 Group registrations have no waitlist. The staff catalog table shows seats only. Event

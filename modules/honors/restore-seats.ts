@@ -64,6 +64,7 @@ export async function restoreClassSeatsInTransaction(
       offeringId: true,
       organizationId: true,
       consumesSeat: true,
+      adminPlacementReason: true,
       registrationAttendeeId: true,
       registrationAttendee: { select: { profileSnapshot: true } },
       instructorMark: { select: { id: true } },
@@ -71,7 +72,9 @@ export async function restoreClassSeatsInTransaction(
     },
   });
   const seatPicks = picks
-    .filter((pick) => pick.consumesSeat)
+    // A seat a system administrator placed by hand (#962) is on top of the class's limit, so bringing the registration back
+    // never drops it for a full class: only a human removes it.
+    .filter((pick) => pick.consumesSeat && pick.adminPlacementReason === null)
     .map((pick) => ({ ...pick, hasMarks: pick.instructorMark !== null || pick.weekendCompletions.length > 0 }));
   if (seatPicks.length === 0) return nothing();
 

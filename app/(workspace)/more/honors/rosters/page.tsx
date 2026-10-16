@@ -4,6 +4,7 @@ import { Award, Download, ShieldCheck, UsersRound } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { LocationFilter } from "@/components/location-filter";
+import { HonorPickRemoveButton, HonorSeatPlacementForm } from "@/components/honor-seat-override";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -36,7 +37,9 @@ export default async function HonorRostersPage({
   searchParams: Promise<{ event?: string; view?: string; club?: string; location?: string }>;
 }) {
   const query = await searchParams;
-  const { event, permissions } = await resolveEventContext(query.event);
+  const { event, permissions, user } = await resolveEventContext(query.event);
+  // Placing a youth in a full class by hand, and removing a pick, are for system administrators only (#962); the server checks too.
+  const canOverrideSeats = user.globalRole === "SYSTEM_ADMIN";
   if (!permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="Honors rosters are restricted" detail="Ask an event administrator for report access." />;
   }
@@ -102,6 +105,19 @@ export default async function HonorRostersPage({
           <div className="report-actions honor-roster-downloads">
             <a className="secondary-button report-download" href={csv("classes")}><Download aria-hidden="true" size={15} /> Download class rosters CSV</a>
           </div>
+          {canOverrideSeats && classRosters.length > 0 && (
+            <HonorSeatPlacementForm
+              eventId={event.id}
+              classes={classRosters.map((roster) => ({
+                id: roster.offering.id,
+                label: `${roster.offering.honorName} (${roster.session}${data.hasLocations && roster.siteName ? `, ${roster.siteName}` : ""})`,
+                seatsLeft: roster.offering.capacity - roster.youthSeats + roster.adminPlacements,
+              }))}
+              candidates={data.attendees
+                .filter((person) => rosterGroupOf(person.attendeeType) === "YOUTH")
+                .map((person) => ({ id: person.id, label: `${person.lastName}, ${person.firstName} (${person.clubName})` }))}
+            />
+          )}
           {classRosters.length === 0 && <p className="report-empty">No classes are set up for {site ? <span translate="no">{site.name}</span> : "this site"} yet.</p>}
           {classRosters.map((roster) => (
             <section className="panel report-panel honor-class-sheet" key={roster.offering.id}>
@@ -125,6 +141,7 @@ export default async function HonorRostersPage({
                   {site && !roster.siteName
                     ? `${roster.youthSeats} at this site / ${roster.offering.capacity} youth seats (all sites)`
                     : `${roster.youthSeats} / ${roster.offering.capacity} youth seats`}
+                  {roster.overCapacity && ` · over capacity by ${roster.youthSeats - roster.offering.capacity}`}
                 </span>
               </div>
               {roster.people.length === 0 ? (
@@ -133,17 +150,28 @@ export default async function HonorRostersPage({
                 <div className="report-table-wrap">
                   <table className="report-table">
                     <caption className="sr-only">People in {roster.offering.honorName}</caption>
-                    <thead><tr><th scope="col">Name</th><th scope="col">Club</th><th scope="col">Age</th><th scope="col">Type</th><th scope="col">Present</th></tr></thead>
+                    <thead><tr><th scope="col">Name</th><th scope="col">Club</th><th scope="col">Age</th><th scope="col">Type</th><th scope="col">Present</th>{canOverrideSeats && <th scope="col" className="honor-seat-override">Pick</th>}</tr></thead>
                     <tbody>
-                      {roster.people.map((person) => (
-                        <tr key={person.id}>
-                          <th scope="row" translate="no">{person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}</th>
-                          <td translate="no">{person.clubName}</td>
-                          <td>{ageText(person.ageOnEventDate)}</td>
-                          <td>{rosterGroupLabels[rosterGroupOf(person.attendeeType)]}</td>
-                          <td className="honor-roster-box" aria-label="Attendance box" />
-                        </tr>
-                      ))}
+                      {roster.people.map((person) => {
+                        const pick = roster.picks.find((candidate) => candidate.attendeeId === person.id);
+                        return (
+                          <tr key={person.id}>
+                            <th scope="row" translate="no">
+                              {person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}
+                              {pick?.adminPlacementReason && <small className="field-help"> Placed by a system administrator: {pick.adminPlacementReason}</small>}
+                            </th>
+                            <td translate="no">{person.clubName}</td>
+                            <td>{ageText(person.ageOnEventDate)}</td>
+                            <td>{rosterGroupLabels[rosterGroupOf(person.attendeeType)]}</td>
+                            <td className="honor-roster-box" aria-label="Attendance box" />
+                            {canOverrideSeats && (
+                              <td className="honor-seat-override">
+                                {pick?.enrollmentId && <HonorPickRemoveButton eventId={event.id} enrollmentId={pick.enrollmentId} who={`${person.firstName} ${person.lastName}`} />}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

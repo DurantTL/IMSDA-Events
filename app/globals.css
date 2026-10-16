@@ -8170,7 +8170,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 }
 @media print {
   .account-nav, .account-portal .public-registration-header, .account-portal .account-page-hero,
-  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector { display: none !important; }
+  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .honor-seat-override { display: none !important; }
   .club-schedule { border: 0; box-shadow: none; padding: 0; }
   .honor-class-sheet { break-before: page; }
   .report-table td.honor-roster-box { border: 1px solid #555; }
