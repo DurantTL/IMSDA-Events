@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import {
   orderedFromTemplateErrors,
@@ -34,7 +33,6 @@ function slugFromName(value: string) {
 }
 
 export function StartFromTemplate({ templates, featureDefaults = {}, calendarPrefill }: StartFromTemplateProps) {
-  const router = useRouter();
   // Archived templates never appear. A template with no published version is listed
   // but cannot be chosen yet (#617): starters are added as drafts and need publishing.
   const applicable = templates.filter((template) => template.canApply);
@@ -109,7 +107,9 @@ export function StartFromTemplate({ templates, featureDefaults = {}, calendarPre
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "The event could not be created from this template.");
-      router.push(`/more/event-settings?event=${body.event.id}`);
+      // A full navigation, not a client-side push: the new event is not in the shell's event list until the layout reloads (#981).
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/more/event-settings?event=${encodeURIComponent(body.event.id)}`);
     } catch (applyError) {
       setError(applyError instanceof Error ? applyError.message : "The event could not be created from this template.");
       setSubmitting(false);

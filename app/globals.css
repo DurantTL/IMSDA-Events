@@ -8292,7 +8292,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 
 /* Reviewed annual event cloning (#157): entry links and the copy plan. 44px touch targets,
    16px inputs, and a single column at phone width so nothing scrolls sideways at 390px. */
-.event-setup-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; width: min(1240px, 100%); margin: 0 auto 12px; }
+.event-setup-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
 .event-setup-entry-actions .secondary-button { min-height: 44px; }
 .event-clone { min-width: 0; }
 .event-clone .panel { min-width: 0; }
@@ -9926,6 +9926,10 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .actions-menu-list :is(a, button):hover:not(:disabled) { background: var(--imsda-navy-soft); }
 .actions-menu-list :is(a, button):focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: -2px; }
 .actions-menu-list button:disabled { cursor: not-allowed; opacity: 0.55; }
+/* A destructive choice sits last, set apart and red; its confirmation still applies (#981). */
+.actions-menu-list .actions-menu-divider { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 4px; }
+.actions-menu-list .actions-menu-danger { color: var(--danger, #8f3a30); }
+.actions-menu-list .actions-menu-danger:hover:not(:disabled) { background: #fbeceb; }
 @media (max-width: 640px) {
   .actions-menu { display: block; width: 100%; }
   .actions-menu > summary.actions-menu-trigger { width: 100%; justify-content: center; min-height: 44px; }
@@ -11356,3 +11360,39 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Section titles on the club summary page, now h2 under the topbar's h1 (#981). */
 .club-summary-section { margin: 6px 0 0; font-size: 1.12rem; }
+.template-list { padding-top: 0; }
+.announcement-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 13px; }
+.announcement-card > .quiet-copy { margin: 10px 0 0; }
+
+/* Registration builder (#981): field actions live in one menu so names stay readable; preview step labels wrap. */
+.field-actions-menu { flex: 0 0 auto; }
+.field-actions-menu .actions-menu-trigger { min-height: 36px; padding: 5px 10px; white-space: nowrap; }
+.builder-section:has(.actions-menu[open]) { overflow: visible; }
+.preview-step-progress > div { grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: 6px 4px; }
+.preview-step-progress button { align-content: start; }
+.preview-step-progress button small { overflow: visible; text-align: center; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+@media (max-width: 640px) {
+  .field-module-row { flex-wrap: nowrap; }
+  .field-actions-menu .actions-menu { display: inline-block; width: auto; }
+  .field-actions-menu .actions-menu > summary.actions-menu-trigger { width: auto; }
+  .field-actions-menu .actions-menu-list { position: absolute; right: 0; min-width: 12rem; margin-top: 0; box-shadow: var(--shadow); }
+}
+
+/* Check-in roster rows (#981): a compact balance badge; the full wording is once above the roster and on hover. */
+.checkin-due-badge { display: inline-flex; align-items: center; gap: 5px; width: fit-content; max-width: 100%; margin-top: 4px; border: 1px solid #ddcd9e; border-radius: 999px; background: var(--imsda-gold-soft); color: #6f5316; padding: 2px 9px; font-size: max(var(--type-floor, 0px), 0.8rem); line-height: 1.4; }
+.checkin-due-badge > svg { flex: 0 0 auto; }
+
+/* Danger zone hierarchy (#981): Unpublish is a plain outlined button, Archive a red outline, Delete the heaviest.
+   Each carries a one-line consequence; the longer explanation sits under "More detail". The filled red button stays in the dialogs. */
+.danger-zone-item > p.danger-zone-consequence { color: var(--ink); font-weight: 700; }
+.danger-zone-details > summary { cursor: pointer; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); }
+.danger-zone-details > p { margin: 6px 0 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.8rem); line-height: 1.55; }
+.danger-outline-button.danger-outline-strong { border-width: 3px; background: #fbe9e5; font-weight: 800; }
+.danger-outline-button.danger-outline-strong:hover:not(:disabled) { background: #f6d6d0; }
+
+/* Calendar rows on a phone (#981): Edit and More share the row; the menu opens over the content instead of pushing it. */
+@media (max-width: 640px) {
+  .calendar-admin-actions .actions-menu { flex: 1; position: relative; }
+  .calendar-admin-actions .actions-menu > summary.actions-menu-trigger { min-height: 44px; }
+  .calendar-admin-actions .actions-menu-list { position: absolute; left: auto; right: 0; min-width: min(15rem, 80vw); margin-top: 0; box-shadow: var(--shadow); }
+}

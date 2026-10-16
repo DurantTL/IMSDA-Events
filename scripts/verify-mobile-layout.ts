@@ -3048,8 +3048,11 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   if (spec.name === "staff-communications-announcement-attachments") {
     const draftBefore = page.url();
     try {
+      // Edit draft sits in the card's More menu (#981 batch 3): open that menu first.
+      const menu = page.locator('.announcement-card:has(button:has-text("Edit draft")) summary.actions-menu-trigger').first();
+      await menu.scrollIntoViewIfNeeded({ timeout: 5000 });
+      await menu.click({ timeout: 5000 });
       const edit = page.locator('button:has-text("Edit draft"):visible').first();
-      await edit.scrollIntoViewIfNeeded({ timeout: 5000 });
       await edit.click({ timeout: 5000 });
       await page.waitForTimeout(250);
       const listed = await page.locator('[role="dialog"] .message-attachments-field li:visible').count();

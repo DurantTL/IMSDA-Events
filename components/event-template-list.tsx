@@ -103,7 +103,7 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
   }
 
   return (
-    <div className="page-stack event-settings-workspace">
+    <div className="page-stack template-list">
       {error ? <div className="inline-notice error" role="alert">{error}</div> : null}
 
       <section className="panel form-stack event-settings-panel">

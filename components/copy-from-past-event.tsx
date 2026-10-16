@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { postJson } from "@/lib/post-json";
 import type { ClonePlan } from "@/modules/event-clones/domain";
@@ -218,7 +217,15 @@ export function CopyFromPastEvent({ sources }: CopyFromPastEventProps) {
         <section className="panel form-stack event-settings-panel" aria-live="polite">
           <h2>{result.alreadyCloned ? "This draft was already created" : "Draft event created"}</h2>
           <p className="clone-hint">{result.event.name} is an unpublished draft copied from {plan.source.name}.</p>
-          <Link className="primary-button clone-confirm" href={`/more/event-settings?event=${result.event.id}`}>Open the new event</Link>
+          <button
+            className="primary-button clone-confirm"
+            type="button"
+            // A full navigation: the new event is not in the shell's event list until the layout reloads (#981).
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+            onClick={() => window.location.assign(`/more/event-settings?event=${encodeURIComponent(result.event.id)}`)}
+          >
+            Open the new event
+          </button>
           {summary?.pricingMessage ? <p className="inline-notice clone-warning" role="status">{summary.pricingMessage} Copied forms are drafts and copied promo codes are inactive until you publish or activate them.</p> : null}
           {summary ? (
             <ul className="clone-plain-list">

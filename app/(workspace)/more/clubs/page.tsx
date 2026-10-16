@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileText, UsersRound } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { NotAvailableForEvent } from "@/components/not-available-for-event";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { listEventBackgroundFlags } from "@/modules/background-checks/repository";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
@@ -16,13 +17,14 @@ export const dynamic = "force-dynamic";
 export default async function EventClubsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
   const { event, allowed, clubEvent } = await resolveClubOversight(requested);
+  if (!allowed && !clubEvent) {
+    return <NotAvailableForEvent reason="Clubs register for Pathfinder events only, and this event is not one." />;
+  }
   if (!allowed) {
     return (
       <AccessRestricted
         title="Club oversight is restricted"
-        detail={clubEvent
-          ? "Event administrators of this Pathfinder event can view its clubs."
-          : "Club oversight is for Pathfinder events that clubs register for."}
+        detail="Event administrators of this Pathfinder event can view its clubs."
       />
     );
   }

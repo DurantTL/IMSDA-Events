@@ -124,9 +124,9 @@ describe("Renames and races (#617)", () => {
 describe("Copy result (#617)", () => {
   it("puts the primary Open the new event button ahead of the summary", () => {
     const source = readFileSync("components/copy-from-past-event.tsx", "utf8");
-    const button = source.indexOf(">Open the new event</Link>");
+    const button = source.indexOf(">\n            Open the new event\n          </button>");
     expect(button).toBeGreaterThan(0);
-    expect(source.slice(button - 200, button)).toContain('className="primary-button clone-confirm"');
+    expect(source.slice(button - 500, button)).toContain('className="primary-button clone-confirm"');
     expect(button).toBeLessThan(source.indexOf('<ul className="clone-plain-list">'));
   });
 });

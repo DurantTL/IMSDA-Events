@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { EventTemplateOperationError, getEventTemplate } from "@/modules/event-templates/repository";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { EventTemplateEditor } from "@/components/event-template-editor";
 
 export const metadata: Metadata = { title: "Edit event template" };
@@ -20,12 +21,10 @@ export default async function EventTemplateEditorPage({
   const template = await loadTemplateOrNotFound(templateId);
 
   return (
-    <main className="event-setup-page">
-      <header className="event-setup-header">
-        <div><p className="eyebrow">System administration</p><h1>{template.name}</h1></div>
-      </header>
+    <section className="page-stack">
+      <StaffPageHeader description={`Editing ${template.name}`} />
       <EventTemplateEditor initialTemplate={template} />
-    </main>
+    </section>
   );
 }
 

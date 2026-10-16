@@ -32,7 +32,7 @@ import {
   subscribeSidebarGroups,
 } from "@/components/sidebar-groups";
 import { SidebarToggle } from "@/components/sidebar-toggle";
-import { createEventHrefFor, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
+import { createEventHrefFor, isSystemWorkspacePath, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
@@ -138,7 +138,7 @@ export function AppShell({
   const searchParams = useSearchParams();
   // The staff-only profile page (#623) lives inside the shell but is no nav item.
   const isProfileRoute = pathname === "/profile" || pathname.startsWith("/profile/");
-  const isSystemRoute = pathname.startsWith(systemNavigation.href);
+  const isSystemRoute = isSystemWorkspacePath(pathname);
   const current = isSystemRoute
     ? systemNavigation
     // The most specific match wins, so /people/attendees is "Attendee list", not "Registrations".
@@ -168,7 +168,7 @@ export function AppShell({
   // Same rule as the page (#465): no `?event=` and an automatic choice. Not on
   // pages that aren't event-scoped (/admin, the global duplicate review).
   const showAutoSelectNotice = !requestedEventId && !seenEventId && autoSelected && Boolean(defaultEvent)
-    && !pathname.startsWith(systemNavigation.href) && !pathname.startsWith("/people/matches")
+    && !isSystemRoute && !pathname.startsWith("/people/matches")
     && !isProfileRoute;
   const selectedPermissions = new Set(
     events.find((event) => event.id === selectedEventId)?.permissions ?? [],

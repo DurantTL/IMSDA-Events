@@ -21,6 +21,10 @@
 
 .organizationCard.inactive {
   background: #f5f7f8;
+}
+
+/* Dim the card's content, not the card, so an open actions menu stays opaque. */
+.organizationCard.inactive > :not(.actions) {
   opacity: 0.75;
 }
 

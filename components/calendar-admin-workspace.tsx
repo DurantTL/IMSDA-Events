@@ -2,6 +2,7 @@
 
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useId, useMemo, useRef, useState } from "react";
+import { ActionsMenu } from "@/components/actions-menu";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
@@ -414,55 +415,60 @@ export function CalendarAdminWorkspace({
                       </span>
                     </div>
                     <div className="calendar-admin-actions">
-                      {entry.sourceFeedId ? (
-                        // An imported item is hidden here only (a refresh never unhides it); a draft is published instead.
-                        <button
-                          className="secondary-button"
-                          disabled={saving}
-                          onClick={() => entry.isPublished
-                            ? call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}/source`, "POST", { action: entry.isHiddenLocally ? "show" : "hide" },
-                              entry.isHiddenLocally ? "Shown on the public calendar." : "Hidden from the public calendar. Google is unchanged.")
-                            : call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}`, "PATCH", { isPublished: true }, "Shown on the public calendar.")}
-                          type="button"
-                        >
-                          {entry.isPublished && !entry.isHiddenLocally ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
-                          {entry.isPublished && !entry.isHiddenLocally ? " Hide" : " Show"}
-                        </button>
-                      ) : (
-                        <button
-                          className="secondary-button"
-                          disabled={saving}
-                          onClick={() => call(
-                            `/api/admin/calendar/entries/${encodeURIComponent(entry.id)}`,
-                            "PATCH",
-                            { isPublished: !entry.isPublished },
-                            entry.isPublished ? "Hidden from the public calendar." : "Shown on the public calendar.",
-                          )}
-                          type="button"
-                        >
-                          {entry.isPublished ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
-                          {entry.isPublished ? " Hide" : " Show"}
-                        </button>
-                      )}
-                      {entry.sourceFeedId && entry.locallyEditedFields.some((field) => field !== "entryType") && (
-                        <button
-                          className="secondary-button"
-                          disabled={saving}
-                          onClick={() => call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}/source`, "POST", { action: "reset" }, "Reset to Google's version. A deadline or standard type you chose is kept.")}
-                          type="button"
-                        >
-                          Reset to Google&apos;s version
-                        </button>
-                      )}
                       <button aria-haspopup="dialog" aria-label={`Edit ${entry.title}`} className="secondary-button" disabled={saving} onClick={(event) => beginEdit(entry, event.currentTarget)} type="button">
-                        <Pencil aria-hidden="true" size={14} />
+                        <Pencil aria-hidden="true" size={14} /> Edit
                       </button>
-                      {/* A refresh would bring a deleted import back, so imports are hidden, not removed. */}
-                      {!entry.sourceFeedId && (
-                        <button aria-label={`Remove ${entry.title}`} className="secondary-button" disabled={saving} onClick={() => remove(entry)} type="button">
-                          <Trash2 aria-hidden="true" size={14} />
-                        </button>
-                      )}
+                      <ActionsMenu label="More" ariaLabel={`More actions for ${entry.title}`}>
+                        <li>
+                          {entry.sourceFeedId ? (
+                            // An imported item is hidden here only (a refresh never unhides it); a draft is published instead.
+                            <button
+                              disabled={saving}
+                              onClick={() => entry.isPublished
+                                ? call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}/source`, "POST", { action: entry.isHiddenLocally ? "show" : "hide" },
+                                  entry.isHiddenLocally ? "Shown on the public calendar." : "Hidden from the public calendar. Google is unchanged.")
+                                : call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}`, "PATCH", { isPublished: true }, "Shown on the public calendar.")}
+                              type="button"
+                            >
+                              {entry.isPublished && !entry.isHiddenLocally ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
+                              {entry.isPublished && !entry.isHiddenLocally ? " Hide" : " Show"}
+                            </button>
+                          ) : (
+                            <button
+                              disabled={saving}
+                              onClick={() => call(
+                                `/api/admin/calendar/entries/${encodeURIComponent(entry.id)}`,
+                                "PATCH",
+                                { isPublished: !entry.isPublished },
+                                entry.isPublished ? "Hidden from the public calendar." : "Shown on the public calendar.",
+                              )}
+                              type="button"
+                            >
+                              {entry.isPublished ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
+                              {entry.isPublished ? " Hide" : " Show"}
+                            </button>
+                          )}
+                        </li>
+                        {entry.sourceFeedId && entry.locallyEditedFields.some((field) => field !== "entryType") && (
+                          <li>
+                            <button
+                              disabled={saving}
+                              onClick={() => call(`/api/admin/calendar/entries/${encodeURIComponent(entry.id)}/source`, "POST", { action: "reset" }, "Reset to Google's version. A deadline or standard type you chose is kept.")}
+                              type="button"
+                            >
+                              Reset to Google&apos;s version
+                            </button>
+                          </li>
+                        )}
+                        {/* A refresh would bring a deleted import back, so imports are hidden, not removed. */}
+                        {!entry.sourceFeedId && (
+                          <li className="actions-menu-divider">
+                            <button aria-label={`Remove ${entry.title}`} className="actions-menu-danger" disabled={saving} onClick={() => remove(entry)} type="button">
+                              <Trash2 aria-hidden="true" size={14} /> Remove
+                            </button>
+                          </li>
+                        )}
+                      </ActionsMenu>
                     </div>
                     <CalendarEntryRegistration entry={entry} events={events} saving={saving} send={(url, body, success) => call(url, "POST", body, success)} />
                   </li>

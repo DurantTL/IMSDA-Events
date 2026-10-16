@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
 import { mealTicketBinding } from "@/modules/meals/domain";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
@@ -1025,7 +1026,12 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
             <div className="field-module-row">
               {canEdit ? <button className="drag-handle field-drag-handle" type="button" draggable aria-label={`Drag field ${field.label}`} title="Drag field" onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; setDragging({ kind: "field", sectionIndex, fieldIndex }); }} onDragEnd={() => setDragging(null)}><GripVertical size={16} /></button> : <GripVertical className="field-grip" size={17} />}
               <button className="field-module-summary" type="button" aria-expanded={expandedFieldId === field.id} aria-label={`${expandedFieldId === field.id ? "Close settings for" : "Edit"} ${field.label}`} onClick={() => setExpandedFieldId((current) => current === field.id ? null : field.id)}><span className="field-type-mark">{fieldTypeLabels[field.type].slice(0, 1)}</span><span><strong>{field.label}</strong><small>{fieldTypeLabels[field.type]} · {field.scope === "ATTENDEE" ? "Each attendee" : "Registration"}{field.required ? " · Required" : ""}</small></span><ChevronRight className={expandedFieldId === field.id ? "expanded" : ""} size={16} /></button>
-              {canEdit && <div className="field-actions"><button type="button" aria-label={`Duplicate ${field.label}`} onClick={() => duplicateField(sectionIndex, fieldIndex)}><Copy size={14} /><span>Copy</span></button><button type="button" aria-label={`Move ${field.label} up`} disabled={fieldIndex === 0} onClick={() => moveField(sectionIndex, fieldIndex, -1)}><ArrowUp size={14} /><span>Up</span></button><button type="button" aria-label={`Move ${field.label} down`} disabled={fieldIndex === section.fields.length - 1} onClick={() => moveField(sectionIndex, fieldIndex, 1)}><ArrowDown size={14} /><span>Down</span></button><button className="danger" type="button" aria-label={`Remove ${field.label}`} onClick={() => openRemoveField(sectionIndex, fieldIndex)}><Trash2 size={14} /><span>Remove</span></button></div>}
+              {canEdit && <div className="field-actions-menu"><ActionsMenu label="Actions" ariaLabel={`Actions for ${field.label}`}>
+                <li><button type="button" aria-label={`Duplicate ${field.label}`} onClick={() => duplicateField(sectionIndex, fieldIndex)}><Copy size={14} aria-hidden="true" /> Copy</button></li>
+                <li><button type="button" aria-label={`Move ${field.label} up`} disabled={fieldIndex === 0} onClick={() => moveField(sectionIndex, fieldIndex, -1)}><ArrowUp size={14} aria-hidden="true" /> Move up</button></li>
+                <li><button type="button" aria-label={`Move ${field.label} down`} disabled={fieldIndex === section.fields.length - 1} onClick={() => moveField(sectionIndex, fieldIndex, 1)}><ArrowDown size={14} aria-hidden="true" /> Move down</button></li>
+                <li className="actions-menu-divider"><button className="actions-menu-danger" type="button" aria-label={`Remove ${field.label}`} onClick={() => openRemoveField(sectionIndex, fieldIndex)}><Trash2 size={14} aria-hidden="true" /> Remove</button></li>
+              </ActionsMenu></div>}
             </div>
             {expandedFieldId === field.id && <div className="field-editor-body">
               <div className="field-settings field-basic-settings">

@@ -328,7 +328,11 @@ describe("one filled primary per screen (#743)", () => {
     expect(zone).toContain("Danger zone");
     expect(zone).toContain("Unpublish event…");
     expect(zone).toContain("Delete event…");
-    expect(zone.match(/danger-outline-button/g)?.length).toBe(2);
+    // #981: a clear hierarchy. Unpublish is a plain outlined button (it is reversible), Delete is the one red,
+    // heaviest button (Archive, when offered, sits between them); each carries a one-line consequence.
+    expect(zone.match(/danger-outline-button/g)?.length).toBe(1);
+    expect(zone).toMatch(/danger-outline-button danger-outline-strong[^>]*>[^<]*Delete event…/);
+    expect(zone.match(/class="danger-zone-consequence"/g)?.length).toBe(2);
     expect(zone).not.toContain("lifecycle-danger-button");
     // The Unpublish button is no longer inside the publish toggle.
     const toggle = markup.slice(markup.indexOf("event-publish-toggle"), markup.indexOf('class="panel danger-zone'));

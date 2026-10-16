@@ -2,6 +2,7 @@
 
 import { StaffPageHeader, type StaffPageTool } from "@/components/staff-page-header";
 import Link from "next/link";
+import { ActionsMenu } from "@/components/actions-menu";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BadgeCheck, Building2, Church, Eye, IdCard, Link2, MapPin, Pencil, Plus, Save, ShieldCheck, Trash2, UserCog, UsersRound, X } from "lucide-react";
@@ -382,71 +383,78 @@ export function OrganizationDirectoryWorkspace({
                   <button
                     className="secondary-button"
                     type="button"
-                    onClick={() => beginIdentity(organization)}
-                  >
-                    <Link2 aria-hidden="true" size={14} /> Link provider
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
                     onClick={() => beginEdit(organization)}
                   >
                     <Pencil aria-hidden="true" size={14} /> Edit
                   </button>
-                  <Link
-                    aria-label={`Billing contact for ${organization.name}`}
-                    className="secondary-button"
-                    href={`/admin/organizations/${organization.id}/billing`}
-                  >
-                    <IdCard aria-hidden="true" size={14} /> Billing contact
-                  </Link>
-                  {organization.type === "CHURCH" && (
-                    // A full page load, not a client-side <Link>: the location
-                    // page's Content-Security-Policy is the only staff policy
-                    // that admits the map tiles (#542), and a soft navigation
-                    // keeps the policy of the page we came from, which blocks
-                    // every tile and leaves the "Pick on map" map blank.
-                    <a
-                      aria-label={`Location for ${organization.name}`}
-                      className="secondary-button"
-                      href={`/admin/organizations/${organization.id}/location`}
-                    >
-                      <MapPin aria-hidden="true" size={14} /> Location
-                    </a>
-                  )}
-                  {organization.type === "CLUB" && (
-                    <>
+                  <ActionsMenu label="More" ariaLabel={`More actions for ${organization.name}`}>
+                    <li>
+                      <button type="button" onClick={() => beginIdentity(organization)}>
+                        <Link2 aria-hidden="true" size={14} /> Link provider
+                      </button>
+                    </li>
+                    <li>
                       <Link
-                        aria-label={`Open ${organization.name} as a view-only club`}
-                        className="secondary-button"
-                        href={`/admin/organizations/${organization.id}/club`}
+                        aria-label={`Billing contact for ${organization.name}`}
+                        href={`/admin/organizations/${organization.id}/billing`}
                       >
-                        <Eye aria-hidden="true" size={14} /> Open club
+                        <IdCard aria-hidden="true" size={14} /> Billing contact
                       </Link>
-                      <Link
-                        aria-label={`Club admins for ${organization.name}`}
-                        className="secondary-button"
-                        href={`/admin/organizations/${organization.id}/directors`}
+                    </li>
+                    {organization.type === "CHURCH" && (
+                      <li>
+                        {/* A full page load, not a client-side <Link>: the location
+                            page's Content-Security-Policy is the only staff policy
+                            that admits the map tiles (#542), and a soft navigation
+                            keeps the policy of the page we came from, which blocks
+                            every tile and leaves the "Pick on map" map blank. */}
+                        <a
+                          aria-label={`Location for ${organization.name}`}
+                          href={`/admin/organizations/${organization.id}/location`}
+                        >
+                          <MapPin aria-hidden="true" size={14} /> Location
+                        </a>
+                      </li>
+                    )}
+                    {organization.type === "CLUB" && (
+                      <>
+                        <li>
+                          <Link
+                            aria-label={`Open ${organization.name} as a view-only club`}
+                            href={`/admin/organizations/${organization.id}/club`}
+                          >
+                            <Eye aria-hidden="true" size={14} /> Open club
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            aria-label={`Club admins for ${organization.name}`}
+                            href={`/admin/organizations/${organization.id}/directors`}
+                          >
+                            <UserCog aria-hidden="true" size={14} /> Club admins
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            aria-label={`Profile for ${organization.name}`}
+                            href={`/admin/organizations/${organization.id}/profile`}
+                          >
+                            <IdCard aria-hidden="true" size={14} /> Profile
+                          </Link>
+                        </li>
+                      </>
+                    )}
+                    <li className="actions-menu-divider">
+                      <button
+                        aria-label={`Delete ${organization.name}`}
+                        className="actions-menu-danger"
+                        type="button"
+                        onClick={() => beginDelete(organization)}
                       >
-                        <UserCog aria-hidden="true" size={14} /> Club admins
-                      </Link>
-                      <Link
-                        aria-label={`Profile for ${organization.name}`}
-                        className="secondary-button"
-                        href={`/admin/organizations/${organization.id}/profile`}
-                      >
-                        <IdCard aria-hidden="true" size={14} /> Profile
-                      </Link>
-                    </>
-                  )}
-                  <button
-                    aria-label={`Delete ${organization.name}`}
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => beginDelete(organization)}
-                  >
-                    <Trash2 aria-hidden="true" size={14} /> Delete
-                  </button>
+                        <Trash2 aria-hidden="true" size={14} /> Delete
+                      </button>
+                    </li>
+                  </ActionsMenu>
                 </div>
               </article>
             ))}

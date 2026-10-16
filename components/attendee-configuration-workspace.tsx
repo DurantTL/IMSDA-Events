@@ -105,10 +105,8 @@ export function AttendeeConfigurationWorkspace({
     <section className="panel"><div className="section-heading"><div><h2>Attendee types</h2><p>Codes are permanent identities. Labels, descriptions, sort order, age bands, and active status may be edited; prior registration snapshots remain unchanged.</p></div></div>
       {types.length === 0 ? (
         <EmptyState
-          action={{ label: "Add the first attendee type", onClick: () => document.getElementById("attendee-type-code-input")?.focus() }}
-          actionClass="secondary-button"
           canCreate={canCreate}
-          hint="Ask an event administrator to add attendee types."
+          hint={canCreate ? undefined : "Ask an event administrator to add attendee types."}
           title="No attendee types yet"
         >
           Attendee types, such as Adult or Youth, are what registrants choose and what prices attach to. Without one, nobody can be registered.

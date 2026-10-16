@@ -128,8 +128,8 @@ export function BackgroundCheckImport({ onImported }: { onImported: (result: Imp
 
   return (
     <>
-      <a className="text-button" href="/api/admin/background-checks/template"><Download aria-hidden="true" size={14} /> CSV template</a>
-      <button className="text-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> Upload CSV</button>
+      <a className="secondary-button" href="/api/admin/background-checks/template"><Download aria-hidden="true" size={14} /> CSV template</a>
+      <button className="secondary-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> Upload CSV</button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) close(); }} role="presentation">
           <section aria-labelledby="background-check-import-title" aria-modal="true" className="modal-card roster-csv-dialog" ref={dialogRef} role="dialog" tabIndex={-1}>
