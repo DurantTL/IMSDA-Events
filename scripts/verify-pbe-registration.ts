@@ -773,7 +773,7 @@ async function main() {
   console.log("ok  the different-person confirmation is honored for staff only");
   console.log("ok  an event with team rules and one registration per club keeps the size and alternate rules on every edit, director and staff");
 
-  // 15g. The partner club (#963): picked from the directory, "Not listed" with a typed name, and never the team's own club.
+  // 15i. The partner club (#963): picked from the directory, "Not listed" with a typed name, and never the team's own club.
   const ownClubName = `Pbe Club g ${P}`;
   await expectCode(submit("g", "Gee Own", [person("g", "y1"), person("g", "y2")], missouri!.id, { partner_club: ownClubName }), "INVALID_SUBMISSION", "a team's own club is refused as its partner", ["different club from your own"]);
   await expectCode(submit("g", "Gee Own", [person("g", "y1"), person("g", "y2")], missouri!.id, { partner_club: ownClubName.toLowerCase() }), "INVALID_SUBMISSION", "the refusal ignores case", ["different club from your own"]);

@@ -12,6 +12,7 @@ import {
   summarizeChoiceUsage,
   type RegistrationFormDefinition,
 } from "@/modules/forms/definition";
+import { clubQuestionOrderProblem } from "@/modules/club-registrations/domain";
 import { preparePublicRegistration } from "@/modules/forms/public-domain";
 import { loadSeededFormTemplate } from "@/modules/forms/seeded-templates";
 import { loadTicketPrices } from "@/modules/meals/config-repository";
@@ -79,7 +80,7 @@ async function assertAcknowledgmentPolicies(eventId: string, definition: Registr
 
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE",
     message: string,
   ) {
     super(message);
@@ -439,6 +440,8 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     const draft = form.versions.find((version) => version.status === RegistrationFormStatus.DRAFT);
     if (!draft) throw new FormOperationError("NO_DRAFT", "This form has no draft version to publish.");
     const definition = registrationFormDefinitionSchema.parse(draft.definition);
+    const questionOrder = clubQuestionOrderProblem(definition);
+    if (questionOrder) throw new FormOperationError("CLUB_QUESTION_ORDER", questionOrder);
     await assertAcknowledgmentPolicies(eventId, definition);
     // Every version is gated on its own valid test submission (#564). A test
     // proves the version being published can be filled in and priced; an

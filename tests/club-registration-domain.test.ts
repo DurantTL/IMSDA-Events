@@ -296,6 +296,23 @@ describe("club and church directory lock (#482)", () => {
     expect(partnerClubProblem(directoryForm, { club_name: "Test Pathfinders" })).toBeNull();
   });
 
+  it("leaves a staff-built form with two directory questions alone when both hold the same club (#963)", () => {
+    const pick = (id: string, key: string) => ({ id, key, label: key, helpText: "", type: "SELECT", scope: "REGISTRATION", required: false, options: [], optionSource: "CLUBS_DIRECTORY" });
+    const staffBuilt = registrationFormDefinitionSchema.parse({
+      ...directoryForm,
+      sections: [
+        { id: "s_clubs", title: "Clubs", description: "", fields: [pick("f_home", "home_club"), pick("f_camp", "camping_with_club")] },
+        directoryForm.sections[1]!,
+      ],
+    });
+    const same = { home_club: "Test Pathfinders", camping_with_club: "Test Pathfinders" };
+    expect(partnerClubProblem(staffBuilt, same)).toBeNull();
+    expect(clubFormProblem(staffBuilt)).toBeNull();
+    // Submit still locks only the first question to the director's club and leaves the other as typed.
+    expect(lockedClubDirectoryFieldKeys(staffBuilt)).toEqual(["home_club"]);
+    expect(clubDirectoryOwnedResponses(staffBuilt, { clubName: "Test Pathfinders", churchName: null })).toEqual({ home_club: "Test Pathfinders" });
+  });
+
   it("names the partner club from the pick or the typed not-listed name (#963)", () => {
     expect(partnerClubName({ partner_club: "Sample Eagles" })).toBe("Sample Eagles");
     expect(partnerClubName({ partner_club: "Not listed", partner_club_other: " Sample Falcons " })).toBe("Sample Falcons");

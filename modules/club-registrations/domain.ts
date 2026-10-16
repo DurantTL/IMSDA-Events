@@ -214,12 +214,18 @@ export function clubFormProblem(definition: RegistrationFormDefinition) {
     const labels = medicalFields.map((field) => `"${field.label}"`).join(", ");
     return `The event's form asks attendees a free-text medical, health, or accessibility question (${labels}). Registration answers aren't encrypted, so replace it with a checkbox or yes/no question and republish.`;
   }
+  return clubQuestionOrderProblem(definition);
+}
+
+/**
+ * The first clubs-directory question is the club itself and is locked to the director's club (#963). A form where the
+ * partner club comes first would lock the wrong question, so it is refused, at publish and at registration time.
+ */
+export function clubQuestionOrderProblem(definition: RegistrationFormDefinition) {
   const clubQuestions = definition.sections.flatMap((section) => section.fields)
     .filter((field) => field.scope === "REGISTRATION" && field.optionSource === "CLUBS_DIRECTORY");
-  // The first clubs-directory question is the club itself and is locked to the director's club (#963). Refuse a form
-  // where the partner club comes first, so reordering sections can't swap which question is locked.
   if (clubQuestions.length > 1 && clubQuestions[0]!.key === PARTNER_CLUB_KEY) {
-    return "The event's form asks for the partner club before the club itself. Move the club question first and republish.";
+    return "The form asks for the partner club before the club itself. Move the club question first.";
   }
   return null;
 }
@@ -354,8 +360,10 @@ export function partnerClubProblem(
   definition: RegistrationFormDefinition,
   responses: Readonly<Record<string, unknown>>,
 ): { field: RegistrationFormField; message: string } | null {
-  const [own, ...partners] = registrationFields(definition).filter((field) => field.optionSource === "CLUBS_DIRECTORY");
+  const [own, ...later] = registrationFields(definition).filter((field) => field.optionSource === "CLUBS_DIRECTORY");
   if (!own) return null;
+  // Only the question keyed `partner_club` is a partner: a staff-built form may ask for two clubs that can be the same one.
+  const partners = later.filter((field) => field.key === PARTNER_CLUB_KEY);
   const clean = (value: unknown) => (
     typeof value === "string" && value.trim() && value.trim() !== DIRECTORY_NOT_LISTED_VALUE ? normalizeOrganizationName(value) : null
   );

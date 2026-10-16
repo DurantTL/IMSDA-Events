@@ -17,7 +17,7 @@ import {
   registrationFormDefinitionSchema,
   type RegistrationFormDefinition,
 } from "@/modules/forms/definition";
-import { unpublishRegistrationForm, updateRegistrationForm } from "@/modules/forms/repository";
+import { publishRegistrationForm, unpublishRegistrationForm, updateRegistrationForm } from "@/modules/forms/repository";
 
 // Synthetic fixtures only.
 const rosterTemplate = formTemplates.find((template) => template.definition.attendeeRoster?.enabled);
@@ -191,6 +191,34 @@ describe("serialized form writers (#564)", () => {
     dependencies.getPrisma.mockReturnValue(prismaFor(tx, []));
 
     await expect(unpublishRegistrationForm("event-1", "form-1", "user-1")).rejects.toMatchObject({ code: "FORM_BUSY" });
+  });
+});
+
+describe("publishing a form with a partner club question (#963)", () => {
+  const pick = (id: string, key: string) => ({
+    id, key, label: key, helpText: "", type: "SELECT", scope: "REGISTRATION", required: false, options: [], optionSource: "CLUBS_DIRECTORY",
+  });
+  const withClubQuestions = (keys: Array<[string, string]>) => registrationFormDefinitionSchema.parse({
+    ...structuredClone(individualDefinition),
+    sections: [{ id: "sec_clubs", title: "Clubs", description: "", fields: keys.map(([id, key]) => pick(id, key)) }, ...individualDefinition.sections],
+  });
+
+  it("refuses to publish a form that asks for the partner club before the club itself", async () => {
+    const draft = version({ id: "version-2", versionNumber: 2, status: "DRAFT", publishedAt: null, definition: withClubQuestions([["fld_partner", "partner_club"], ["fld_club", "club_name"]]) });
+    const tx = txFor([draft]);
+    dependencies.getPrisma.mockReturnValue(prismaFor(tx, [draft]));
+
+    await expect(publishRegistrationForm("event-1", "form-1", "user-1")).rejects.toMatchObject({ code: "CLUB_QUESTION_ORDER" });
+    expect(tx.registrationFormVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not refuse on order when the club question comes first", async () => {
+    const draft = version({ id: "version-2", versionNumber: 2, status: "DRAFT", publishedAt: null, definition: withClubQuestions([["fld_club", "club_name"], ["fld_partner", "partner_club"]]) });
+    const tx = txFor([draft]);
+    dependencies.getPrisma.mockReturnValue(prismaFor(tx, [draft]));
+
+    // It goes on to the next publish gate (a valid test submission), not the order one.
+    await expect(publishRegistrationForm("event-1", "form-1", "user-1")).rejects.not.toMatchObject({ code: "CLUB_QUESTION_ORDER" });
   });
 });
 
