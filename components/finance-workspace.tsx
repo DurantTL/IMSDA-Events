@@ -234,11 +234,11 @@ export function FinanceWorkspace({
         <label className="filter-field"><span className="sr-only">Filter financial records</span><select value={filter} onChange={(event) => setFilter(event.target.value)}>{financeFilters.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       </div>
       <section className="panel finance-list">
-        <div className="finance-row finance-head"><span>Registration</span><span>Total</span><span>Received</span><span>Balance</span><span /></div>
+        <div className="finance-row finance-row-cards finance-head"><span>Registration</span><span>Total</span><span>Received</span><span>Balance</span><span /></div>
         {visible.map((registration) => (
-          <button className="finance-row finance-record" type="button" key={registration.id} onClick={() => openDetail(registration)}>
+          <button className="finance-row finance-row-cards finance-record" type="button" key={registration.id} onClick={() => openDetail(registration)}>
             <span><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.status.toLowerCase()} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.isDeferredOrganizationBilling ? (registration.isGroup ? " · group, billed to the contact" : " · billed to church") : ""}</small>{attendeeSummaryLabel(registration) && <small className="finance-attendee-names">{attendeeSummaryLabel(registration)}</small>}</span>
-            <span>{money(registration.totalAmountCents)}</span><span>{money(registration.paidCents)}</span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance">{registration.isGroup ? "Billed to group contact" : "Billed to church"}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"}>{money(registration.balanceCents)}</span>}<span>View</span>
+            <span data-label="Total">{money(registration.totalAmountCents)}</span><span data-label="Received">{money(registration.paidCents)}</span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance" data-label="Balance">{registration.isGroup ? "Billed to group contact" : "Billed to church"}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"} data-label="Balance">{money(registration.balanceCents)}</span>}<span>View</span>
           </button>
         ))}
         {visible.length === 0 && <div className="empty-state"><Search aria-hidden="true" size={24} /><h3>No financial records found</h3><p>Search covers the payer, every attendee on the registration, and the confirmation code. Try another term or balance filter.</p></div>}

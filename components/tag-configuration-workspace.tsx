@@ -101,7 +101,7 @@ export function TagConfigurationWorkspace({
         <td data-label="Actions"><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateTag(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => row.isActive ? openDeactivate(row) : updateTag(row, { isActive: true })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
       </tr>)}</tbody></table></div>}
       {canCreate && <form className="form-stack inset-form" action={addTag}>
-        <div className="form-grid two-column"><label>Name<input id="tag-name-input" name="name" required placeholder="VIP" /></label><label>Color<input name="color" type="color" defaultValue="#4F46E5" /></label></div>
+        <div className="form-grid two-column color-field-row"><label>Name<input id="tag-name-input" name="name" required placeholder="VIP" /></label><label>Color<input name="color" type="color" defaultValue="#4F46E5" /></label></div>
         <label>Description<input name="description" /></label>
         <button className="primary-button" disabled={saving} type="submit">Add tag</button>
       </form>}

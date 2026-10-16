@@ -115,6 +115,18 @@ let fieldsChecked = 0;
  * sizes, and are still checked for page scroll, dialogs and bars.
  */
 const touchMaxWidth = 600;
+/**
+ * Staff text floor (#981): text on a staff page is never smaller than 14px (the body floor,
+ * max(var(--type-body-floor), 0.875rem)). Deliberate exceptions, each with its reason. A selector
+ * matches the text's element or any ancestor of it.
+ */
+const staffTextFloorPx = 14;
+const staffTextFloorExceptions: Array<{ selector: string; reason: string }> = [
+  { selector: ".badge-sheet", reason: "the badge print preview shows the printed label at its real print size (Avery sheets are drawn in inches)" },
+  { selector: ".sr-only, .visually-hidden", reason: "visually hidden text is not shown" },
+];
+/** Uppercase, letter-spaced labels (eyebrows, sidebar group labels) may be 12px: they read larger than lowercase text of the same size. */
+const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
@@ -235,6 +247,8 @@ const pages: PageSpec[] = [
   staff("event-settings", "/more/event-settings"),
   staff("team-results", "/more/team-results"),
   staff("check-in", "/check-in"),
+  // The printable name badge sheets (#981): the sheet preview must not make the page scroll sideways.
+  staff("check-in-badges", "/check-in/badges"),
   staff("communications", "/communications"),
   // The template editor with attachments, a picture and a button (#824), and a draft announcement with attachments.
   staff("communications-editor", `/communications?event=${blocksEventId}&view=templates`, "system-admin"),
@@ -1353,6 +1367,89 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
   };
 }
 
+/**
+ * Text rules for staff pages (#981), run in the page:
+ *  - text-too-small: every visible text node renders at the staff floor or larger (exceptions are listed above);
+ *  - header-too-narrow: no table column header is narrower than its longest word (a header that breaks
+ *    inside a word, "TYP E", is the symptom). A hyphenated word may wrap at its hyphen, so it counts as two.
+ */
+function textAuditInPage(args: { floor: number; upperFloor: number; exceptions: string[] }) {
+  const describe = (el: Element) => {
+    const classes = typeof (el as HTMLElement).className === "string"
+      ? (el as HTMLElement).className.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => `.${name}`).join("")
+      : "";
+    const text = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 32);
+    return `${el.tagName.toLowerCase()}${classes} "${text}"`;
+  };
+  const visible = (el: Element) => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+      if (node.getAttribute("aria-hidden") === "true" || (node as HTMLElement).hidden) return false;
+      if (node.tagName === "DETAILS" && !(node as HTMLDetailsElement).open && node !== el) {
+        // Only the summary of a closed details is shown.
+        let child: Element | null = el;
+        while (child && child.parentElement !== node) child = child.parentElement;
+        if (child && child.tagName !== "SUMMARY") return false;
+      }
+    }
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+  const exception = (el: Element) => args.exceptions.some((selector) => el.closest(selector));
+  const small = new Map<string, { count: number; sample: string }>();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = (node.textContent ?? "").trim();
+    const parent = node.parentElement;
+    if (!text || !parent || ["SCRIPT", "STYLE", "NOSCRIPT", "OPTION", "TEXTAREA"].includes(parent.tagName)) continue;
+    if (parent.closest("svg") || !visible(parent)) continue;
+    const style = getComputedStyle(parent);
+    const size = parseFloat(style.fontSize);
+    if (args.floor > 0 && !exception(parent)) {
+      const upper = style.textTransform === "uppercase";
+      const floor = upper ? args.upperFloor : args.floor;
+      if (size + 0.01 < floor) {
+        const firstClass = typeof parent.className === "string" ? parent.className.split(/\s+/).filter(Boolean)[0] : "";
+        const key = `${parent.tagName.toLowerCase()}${firstClass ? `.${firstClass}` : ""} ${size.toFixed(1)}px${upper ? " (uppercase)" : ""}`;
+        const entry = small.get(key) ?? { count: 0, sample: text.slice(0, 30) };
+        entry.count += 1;
+        small.set(key, entry);
+      }
+    }
+  }
+
+  // Table headers: each is at least as wide as its longest word.
+  const narrowHeaders: string[] = [];
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;top:0";
+  document.body.appendChild(probe);
+  // Column headers only (a row header holds data, such as an unbroken synthetic name, and is not a label).
+  for (const th of Array.from(document.querySelectorAll("thead th"))) {
+    if (narrowHeaders.length >= 6 || !visible(th) || !getComputedStyle(th).display.startsWith("table")) continue;
+    const style = getComputedStyle(th);
+    // A header the card layout hides collapses to its padding: it is not shown.
+    if (th.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) <= 1) continue;
+    probe.style.font = style.font;
+    probe.style.letterSpacing = style.letterSpacing;
+    probe.style.textTransform = style.textTransform;
+    const room = th.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    let widest = 0; let word = "";
+    for (const candidate of (th.textContent ?? "").replace(/[▲▼↑↓]/g, "").split(/[\s-]+/).filter(Boolean)) {
+      probe.textContent = candidate;
+      const width = probe.getBoundingClientRect().width;
+      if (width > widest) { widest = width; word = candidate; }
+    }
+    if (widest > room + 1) narrowHeaders.push(`${describe(th)}: "${word}" is ${Math.round(widest)}px wide in ${Math.round(room)}px`);
+  }
+  probe.remove();
+
+  return {
+    small: Array.from(small, ([key, value]) => `${key} x${value.count}, for example "${value.sample}"`),
+    narrowHeaders,
+  };
+}
+
 /** Runs in the page after scrolling to the bottom: is the last content under a fixed bar? */
 function coveredByBarInPage() {
   const h = window.innerHeight;
@@ -1734,6 +1831,9 @@ function injectDefects() {
     '<table style="table-layout:fixed;width:200px"><thead><tr><th>One</th><th>Two</th></tr></thead><tbody><tr><td data-label="Uno" style="white-space:nowrap">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</td><td data-label="Two">BBBBBBBB</td></tr></tbody></table>',
     '<div style="position:fixed;left:0;right:0;bottom:0;height:90px;background:#ccc;z-index:30">self-test bar</div>',
     '<p style="margin:0 0 0 0">self-test last line</p>',
+    // Text under the staff floor, and a column header narrower than its longest word (#981).
+    '<p style="margin:0;font-size:10px">self-test tiny text</p>',
+    '<table style="table-layout:fixed;width:60px"><thead><tr><th style="padding:0">Wordlongerthanthecolumn</th></tr></thead><tbody><tr><td>x</td></tr></tbody></table>',
     // A field whose border is as pale as the old #cbdbe2 (1.4:1), and one with no border at all.
     '<input aria-label="self-test pale field" style="display:block;width:200px;height:32px;border:1px solid #cbdbe2;background:#fff">',
     '<input aria-label="self-test borderless field" style="display:block;width:200px;height:32px;border:0;background:transparent">',
@@ -1984,6 +2084,15 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   for (const problem of result.cellProblems) record("table-cell", spec.name, width, problem);
   for (const problem of result.pillProblems) record("honor-pill", spec.name, width, problem);
   for (const problem of result.fitProblems) record("table-too-wide", spec.name, width, problem);
+  // Text floor and cramped table headers (#981). Staff pages hold the text floor; every page is checked
+  // for headers. Overlapping text is the text-overlap rule of the text-rules set (claude/pbe-mobile).
+  const text = await page.evaluate(textAuditInPage, {
+    floor: spec.name.startsWith("staff-") ? staffTextFloorPx : 0,
+    upperFloor: spec.name.startsWith("staff-") ? upperLabelFloorPx : 0,
+    exceptions: staffTextFloorExceptions.map((entry) => entry.selector),
+  });
+  for (const problem of text.small) record("text-too-small", spec.name, width, problem);
+  for (const problem of text.narrowHeaders) record("header-too-narrow", spec.name, width, problem);
   const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
   fieldsChecked += fields.checked;
   for (const problem of fields.problems) record("field-boundary", spec.name, width, problem);

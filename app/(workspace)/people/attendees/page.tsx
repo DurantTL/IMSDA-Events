@@ -77,7 +77,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
 
       {/* Keyed on the current query: a header sort link or Reset is a client navigation that keeps this
           form mounted, and uncontrolled fields would otherwise submit the previous values. */}
-      <form key={JSON.stringify([query.sort, query.direction, query.search, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" method="get" className="panel choice-filter-form" aria-label="Filter attendees">
+      <form key={JSON.stringify([query.sort, query.direction, query.search, query.meal, query.dietaryOnly, query.statuses])} action="/people/attendees" method="get" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
         <input type="hidden" name="event" value={event.id} />
         {/* Sort and Direction: on a phone the card list has no header row to click (docs/RESPONSIVE.md),
             so these are shown at 600px and under. They always submit, which also keeps the current sort
@@ -103,15 +103,17 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             {MEAL_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
           </select>
         </label>
-        <label><input type="checkbox" name="dietary" value="1" defaultChecked={query.dietaryOnly} /> Has dietary needs</label>
-        <fieldset>
+        <label className="checkbox-label"><input type="checkbox" name="dietary" value="1" defaultChecked={query.dietaryOnly} /> Has dietary needs</label>
+        <fieldset className="filter-group">
           <legend>Registration status</legend>
           {LISTING_STATUSES.map((status) => (
-            <label key={status}><input type="checkbox" name="statuses" value={status} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
+            <label className="checkbox-label" key={status}><input type="checkbox" name="statuses" value={status} defaultChecked={query.statuses.includes(status)} /> {STATUS_LABELS[status]}</label>
           ))}
         </fieldset>
-        <button className="secondary-button" type="submit">Apply</button>
-        <Link className="text-button" href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Reset</Link>
+        <div className="filter-bar-actions">
+          <button className="secondary-button" type="submit">Apply</button>
+          <Link className="text-button" href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Reset</Link>
+        </div>
       </form>
 
       <div className="table-scroll">

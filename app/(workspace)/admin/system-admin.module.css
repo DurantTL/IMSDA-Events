@@ -258,7 +258,7 @@
 
 .eventStats strong {
   color: var(--imsda-navy);
-  font-size: 0.78rem;
+  font-size: max(var(--type-staff-floor, 0px), 0.78rem);
 }
 
 .eventStats small {
