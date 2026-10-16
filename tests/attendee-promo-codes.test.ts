@@ -39,6 +39,10 @@ function promo(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const threePeople: FormCalculation = {
+  ...calculation,
+  lineItems: [...calculation.lineItems, { key: "fee-2", label: "Registration", amountCents: 9000, attendeeIndex: 2 }],
+};
 const field = { id: "field-promo", key: "promo_code" };
 const attendees = (codes: string[]) => codes.map((code) => ({ responses: { promo_code: code } }));
 
@@ -73,13 +77,20 @@ describe("per-person promo codes (#397)", () => {
   });
 
   it("explains unknown or expired codes on that person, and skips blank ones", async () => {
-    mocks.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(promo({ endsOn: "2026-05-01" }));
-    const { discounts, issues } = await evaluateAttendeePromoCodes(client as never, {
-      eventId: "event-1", field, attendees: [...attendees(["NOPE", "EARLY"]), { responses: {} }], calculation, pricingDate: "2026-06-01", claim: false,
+    mocks.findUnique.mockResolvedValue(null);
+    const unknown = await evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: [...attendees(["NOPE"]), { responses: {} }], calculation, pricingDate: "2026-06-01", claim: false,
     });
-    expect(discounts).toEqual([]);
-    expect(issues.map((issue) => [issue.attendeeIndex, issue.message])).toEqual([
+    expect(unknown.discounts).toEqual([]);
+    expect(unknown.issues.map((issue) => [issue.attendeeIndex, issue.message])).toEqual([
       [0, "That promo code was not recognized. Check the spelling and try again."],
+    ]);
+    mocks.findUnique.mockResolvedValue(promo({ endsOn: "2026-05-01" }));
+    const ended = await evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: [{ responses: {} }, ...attendees(["EARLY"])], calculation, pricingDate: "2026-06-01", claim: false,
+    });
+    expect(ended.discounts).toEqual([]);
+    expect(ended.issues.map((issue) => [issue.attendeeIndex, issue.message])).toEqual([
       [1, "That promo code ended on 2026-05-01."],
     ]);
   });
@@ -90,6 +101,37 @@ describe("per-person promo codes (#397)", () => {
     });
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(discounts.every((discount) => discount.promoCodeId === "promo-early")).toBe(true);
+  });
+
+  it("covers only the ticked people; the rest pay for themselves and use no code (#961)", async () => {
+    const { discounts, issues } = await evaluateAttendeePromoCodes(client as never, {
+      eventId: "event-1", field, attendees: attendees(["EARLY", "", "early"]), calculation: threePeople, pricingDate: "2026-06-01", claim: true,
+    });
+    expect(issues).toEqual([]);
+    expect(discounts.map((discount) => discount.attendeeIndex)).toEqual([0, 2]);
+    // A use is counted for each person who received the code, and for nobody else.
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies only one code per registration, when previewing and when claiming (#961)", async () => {
+    mocks.findUnique.mockImplementation(async ({ where }: { where: { eventId_normalizedCode: { normalizedCode: string } } }) => promo({
+      id: `promo-${where.eventId_normalizedCode.normalizedCode}`,
+      code: where.eventId_normalizedCode.normalizedCode,
+      normalizedCode: where.eventId_normalizedCode.normalizedCode,
+    }));
+    for (const claim of [false, true]) {
+      mocks.updateMany.mockClear();
+      const { discounts, issues } = await evaluateAttendeePromoCodes(client as never, {
+        eventId: "event-1", field, attendees: attendees(["EARLY", "late", "Early"]), calculation: threePeople, pricingDate: "2026-06-01", claim,
+      });
+      expect(discounts.map((discount) => discount.attendeeIndex)).toEqual([0, 2]);
+      expect(issues).toEqual([expect.objectContaining({
+        attendeeIndex: 1,
+        message: "Only one promo code can be used on a registration. EARLY is already used for another person here.",
+      })]);
+      // The refused second code never takes a use.
+      expect(mocks.updateMany).toHaveBeenCalledTimes(claim ? 2 : 0);
+    }
   });
 
   it("totals the discounts and recalculates the card fee on the discounted amount", () => {

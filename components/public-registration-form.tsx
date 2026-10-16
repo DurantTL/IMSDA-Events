@@ -1754,6 +1754,20 @@ export function PublicRegistrationForm({
       const attendeeIndex = context.attendeeIndex;
       const value = typeof context.values[field.key] === "string" ? context.values[field.key] as string : "";
       const notice = attendeePromoNotice(attendeeIndex);
+      // One code per registration (#961): once a code is entered for someone, everyone else is a tick (covered) or not (pays for themselves).
+      const sharedCode = attendeeCodes.find(Boolean) ?? "";
+      const covered = value.trim() !== "";
+      if (sharedCode && !covered) {
+        return (
+          <div className={`${wrapperClass} public-registration-promo-field`} key={field.id}>
+            <label className="public-registration-promo-covered" htmlFor={id}>
+              <input id={id} type="checkbox" checked={false} onChange={() => context.setValue(field.key, sharedCode)} />
+              {" "}Covered by the code {sharedCode}
+            </label>
+            <small>Leave this unticked if this person pays for themselves.</small>
+          </div>
+        );
+      }
       return (
         <div className={`${wrapperClass} public-registration-promo-field`} key={field.id}>
           <label htmlFor={id}>{fieldLabel(field, context)}</label>

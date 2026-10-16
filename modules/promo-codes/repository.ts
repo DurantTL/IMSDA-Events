@@ -30,6 +30,7 @@ import {
   evaluatePromoCode,
   normalizePromoCode,
   promoCodeField,
+  secondPromoCodeMessage,
   type AttendeePromoDiscount,
   type DiscountedFormCalculation,
   type PromoCodeEvaluation,
@@ -582,6 +583,8 @@ export async function evaluateAttendeePromoCodes(
   const discounts: AttendeePromoDiscount[] = [];
   const issues: AttendeePromoIssue[] = [];
   const usedHere = new Map<string, number>();
+  // One code per registration (#961): the first code entered is the registration's code.
+  let registrationCode: string | null = null;
   for (const [attendeeIndex, attendee] of input.attendees.entries()) {
     const raw = attendee.responses[input.field.key];
     const submittedCode = typeof raw === "string" ? raw.trim() : "";
@@ -593,6 +596,12 @@ export async function evaluateAttendeePromoCodes(
       path: `attendees.${attendeeIndex}.responses.${input.field.key}`,
       message,
     });
+    const secondCode = secondPromoCodeMessage(registrationCode, submittedCode);
+    if (secondCode) {
+      issueFor(secondCode);
+      continue;
+    }
+    registrationCode ??= normalizePromoCode(submittedCode);
     const eligibleSubtotalCents = attendeeShareCents(input.calculation, attendeeIndex);
     if (input.claim) {
       try {

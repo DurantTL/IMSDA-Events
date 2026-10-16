@@ -299,3 +299,15 @@ export function applyAttendeePromoCodes(
     attendeeDiscounts: [...discounts],
   };
 }
+
+/**
+ * Only one promo code applies to a registration (church group registration, #961). Several people on a registration may use
+ * that code (each counts as one use), but a second, different code is refused. Returns the message for a code that differs
+ * from the registration's first one, or null when it is the same code or the registration has none yet.
+ */
+export function secondPromoCodeMessage(firstNormalizedCode: string | null, submittedCode: string) {
+  if (!firstNormalizedCode) return null;
+  const normalized = normalizePromoCode(submittedCode);
+  if (normalized === firstNormalizedCode) return null;
+  return `Only one promo code can be used on a registration. ${firstNormalizedCode} is already used for another person here.`;
+}
