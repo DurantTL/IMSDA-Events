@@ -47,7 +47,8 @@ export default async function HonorRostersPage({
   // "All sites" plus each location, from the filter the other staff views share (#413).
   const { locations, locationId, selected: site } = await resolveLocationFilter(event.id, query.location);
   const [data, flagged] = await Promise.all([
-    getHonorRosterData(event.id, { includeDietary, ...(locationId ? { locationId } : {}) }),
+    // Why a youth was placed by hand is for system administrators only (#962).
+    getHonorRosterData(event.id, { includeDietary, includeAdminPlacementReasons: canOverrideSeats, ...(locationId ? { locationId } : {}) }),
     backgroundFlaggedAttendeeIds(event.id),
   ]);
   if (!data) return <AccessRestricted title="Event unavailable" detail="The selected event could not be loaded." />;
@@ -58,6 +59,16 @@ export default async function HonorRostersPage({
     `/api/events/${encodeURIComponent(event.id)}/honors/rosters?view=${kind}${club ? `&club=${encodeURIComponent(club)}` : ""}${site ? `&location=${encodeURIComponent(site.id)}` : ""}`;
   const classRosters = buildClassRosters(data.sessions, data.offerings, data.enrollments, data.attendees, data.locations);
   const siteRoster = buildSiteRoster(data.attendees);
+  // Seats each club holds in each class, placements included, so the placement form can warn before a club passes its limit (#962).
+  const clubOfAttendee = new Map(data.attendees.map((person) => [person.id, person.clubId]));
+  const clubSeatsByClass = new Map<string, Record<string, number>>();
+  for (const row of data.enrollments) {
+    const clubId = clubOfAttendee.get(row.attendeeId);
+    if (!row.consumesSeat || !clubId) continue;
+    const seats = clubSeatsByClass.get(row.offeringId) ?? {};
+    seats[clubId] = (seats[clubId] ?? 0) + 1;
+    clubSeatsByClass.set(row.offeringId, seats);
+  }
   const selectedClubs = query.club ? data.clubs.filter((club) => club.id === query.club) : data.clubs;
 
   return (
@@ -111,11 +122,14 @@ export default async function HonorRostersPage({
               classes={classRosters.map((roster) => ({
                 id: roster.offering.id,
                 label: `${roster.offering.honorName} (${roster.session}${data.hasLocations && roster.siteName ? `, ${roster.siteName}` : ""})`,
-                seatsLeft: roster.offering.capacity - roster.youthSeats + roster.adminPlacements,
+                // Seats counted toward the limit and seats held for live offers, across every site: what a normal pick sees.
+                seatsLeft: roster.offering.capacity - (roster.offering.capacityHeldAllSites ?? roster.youthSeats - roster.adminPlacements),
+                perClubLimit: roster.offering.perClubLimit ?? null,
+                clubSeats: clubSeatsByClass.get(roster.offering.id) ?? {},
               }))}
               candidates={data.attendees
                 .filter((person) => rosterGroupOf(person.attendeeType) === "YOUTH")
-                .map((person) => ({ id: person.id, label: `${person.lastName}, ${person.firstName} (${person.clubName})` }))}
+                .map((person) => ({ id: person.id, label: `${person.lastName}, ${person.firstName} (${person.clubName})`, clubId: person.clubId, clubName: person.clubName }))}
             />
           )}
           {classRosters.length === 0 && <p className="report-empty">No classes are set up for {site ? <span translate="no">{site.name}</span> : "this site"} yet.</p>}
@@ -141,7 +155,7 @@ export default async function HonorRostersPage({
                   {site && !roster.siteName
                     ? `${roster.youthSeats} at this site / ${roster.offering.capacity} youth seats (all sites)`
                     : `${roster.youthSeats} / ${roster.offering.capacity} youth seats`}
-                  {roster.overCapacity && ` · over capacity by ${roster.youthSeats - roster.offering.capacity}`}
+                  {roster.overCapacity && ` · over capacity by ${roster.seatsAllSites - roster.offering.capacity}`}
                 </span>
               </div>
               {roster.people.length === 0 ? (
@@ -158,7 +172,8 @@ export default async function HonorRostersPage({
                           <tr key={person.id}>
                             <th scope="row" translate="no">
                               {person.lastName}, {person.firstName}{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}
-                              {pick?.adminPlacementReason && <small className="field-help"> Placed by a system administrator: {pick.adminPlacementReason}</small>}
+                              {/* Only system administrators are sent the reason, and it never prints on a class sheet (#962). */}
+                              {pick?.adminPlacementReason && <small className="field-help honor-seat-override"> Placed by a system administrator: {pick.adminPlacementReason}</small>}
                             </th>
                             <td translate="no">{person.clubName}</td>
                             <td>{ageText(person.ageOnEventDate)}</td>

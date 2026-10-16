@@ -10960,3 +10960,12 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .staff-invite-preview { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); overflow-wrap: anywhere; }
 .staff-invite-preview pre { white-space: pre-wrap; margin: 0; font: inherit; }
 .staff-invite-party { margin: 0; padding-left: 18px; }
+
+/* System administrators' hand placement and removal on the Honors Weekend roster (#962). Narrow screens: one column, nothing wider than the viewport. */
+.inline-notice.warning { border-color: #ddcd9e; background: var(--imsda-gold-soft); color: #6f5316; line-height: 1.5; }
+details.honor-seat-override { margin-bottom: 12px; }
+details.honor-seat-override > summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 6px; min-height: 44px; }
+.honor-seat-override.form-grid, details.honor-seat-override > .form-grid { grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; }
+.honor-seat-override input, .honor-seat-override select { width: 100%; min-width: 0; max-width: 100%; }
+.report-table td.honor-seat-override { min-width: 0; }
+.report-table td.honor-seat-override .form-grid { min-width: min(240px, 70vw); }

@@ -58,6 +58,12 @@ export type RosterOffering = {
   isActive: boolean;
   /** The site, from the class's session (#589); null for an all-sessions class or an event with no locations. */
   siteName?: string | null;
+  /** The class's per-club limit (#962: the placement form warns when a placement would pass it). */
+  perClubLimit?: number | null;
+  /** Seat-taking youth holding the class across every site, placements included (#962); a site-filtered roster only lists one site's. */
+  seatsAllSites?: number;
+  /** Seats counted toward the limit plus seats held for live offers, across every site, placements left out (#962). */
+  capacityHeldAllSites?: number;
 };
 
 export type RosterEnrollment = {
@@ -68,6 +74,8 @@ export type RosterEnrollment = {
   id?: string;
   /** Why a system administrator placed the youth although the class was full or closed (#962); null or absent for a normal pick. */
   adminPlacementReason?: string | null;
+  /** Whether a system administrator placed it (#962). Every staff viewer's counts know; the reason is only loaded for system administrators. */
+  adminPlaced?: boolean;
 };
 
 function byName(a: { lastName: string; firstName: string }, b: { lastName: string; firstName: string }) {
@@ -94,7 +102,9 @@ export function buildClassRosters(
     .map((offering) => {
       const rows = enrollments.filter((enrollment) => enrollment.offeringId === offering.id);
       const youthSeats = rows.filter((row) => row.consumesSeat).length;
-      const adminPlacements = rows.filter((row) => row.consumesSeat && row.adminPlacementReason).length;
+      const adminPlacements = rows.filter((row) => row.consumesSeat && (row.adminPlaced ?? Boolean(row.adminPlacementReason))).length;
+      // A site-filtered roster lists one site; the limit is the whole class's.
+      const seatsAllSites = offering.seatsAllSites ?? youthSeats;
       const people = rows
         .map((row) => attendeesById.get(row.attendeeId))
         .filter((attendee): attendee is RosterAttendee => Boolean(attendee))
@@ -109,11 +119,12 @@ export function buildClassRosters(
         /** Seats a system administrator placed on top of the class's limit (#962). */
         adminPlacements,
         /** More youth hold seats than the class's limit, which only a system administrator's placement can cause (#962). */
-        overCapacity: youthSeats > offering.capacity,
+        seatsAllSites,
+        overCapacity: seatsAllSites > offering.capacity,
         /** Each pick with its id and, for a hand placement, its reason (#962). */
         picks: rows
           .filter((row) => attendeesById.has(row.attendeeId))
-          .map((row) => ({ enrollmentId: row.id ?? null, attendeeId: row.attendeeId, adminPlacementReason: row.adminPlacementReason ?? null })),
+          .map((row) => ({ enrollmentId: row.id ?? null, attendeeId: row.attendeeId, adminPlaced: row.adminPlaced ?? Boolean(row.adminPlacementReason), adminPlacementReason: row.adminPlacementReason ?? null })),
       };
     });
 }
@@ -178,21 +189,23 @@ function classPlace(offering: RosterOffering) {
 export const allSitesLabel = "All sites";
 
 /** With locations on the event, every export row names its site (#589); without, the columns are unchanged. */
-export function classRostersCsv(rosters: readonly ClassRoster[], showSite = false) {
+/** `showAdminReasons` adds the column of hand-placement reasons (#962); only system administrators get it. */
+export function classRostersCsv(rosters: readonly ClassRoster[], showSite = false, showAdminReasons = false) {
   const rows: Array<Array<string | number>> = [[
     ...(showSite ? ["Site"] : []),
     "Session", "Honor code", "Honor", "Location", "Teacher", "Youth seats", "Capacity",
-    "Last name", "First name", "Club", "Age at event", "Type", "Admin placement reason",
+    "Last name", "First name", "Club", "Age at event", "Type",
+    ...(showAdminReasons ? ["Admin placement reason"] : []),
   ]];
   for (const roster of rosters) {
     const head = [
       ...(showSite ? [roster.siteName ?? allSitesLabel] : []),
       roster.session, roster.offering.honorCode, roster.offering.honorName, roster.offering.location, roster.offering.teacherName, roster.youthSeats, roster.offering.capacity,
     ];
-    if (roster.people.length === 0) rows.push([...head, "", "", "", "", "", ""]);
+    if (roster.people.length === 0) rows.push([...head, "", "", "", "", ...(showAdminReasons ? [""] : [])]);
     const reasonByAttendee = new Map(roster.picks.map((pick) => [pick.attendeeId, pick.adminPlacementReason ?? ""]));
     for (const person of roster.people) {
-      rows.push([...head, person.lastName, person.firstName, person.clubName, age(person.ageOnEventDate), rosterGroupLabels[rosterGroupOf(person.attendeeType)], reasonByAttendee.get(person.id) ?? ""]);
+      rows.push([...head, person.lastName, person.firstName, person.clubName, age(person.ageOnEventDate), rosterGroupLabels[rosterGroupOf(person.attendeeType)], ...(showAdminReasons ? [reasonByAttendee.get(person.id) ?? ""] : [])]);
     }
   }
   return toCsv(rows);

@@ -11,6 +11,9 @@ export const placeYouthSchema = z.object({
   registrationAttendeeId: z.string().trim().min(1).max(100),
   offeringId: z.string().trim().min(1).max(100),
   reason: reasonSchema,
+  // A level or prerequisite waiver, recorded like the staff override on a pick save (#832).
+  overrideReason: z.string().trim().min(3, "Give a reason for placing someone who doesn't meet a class requirement.").max(seatOverrideReasonMax).optional(),
+  confirmed: z.boolean().optional(),
 }).strict();
 
 export const removePickSchema = z.object({ reason: reasonSchema }).strict();
@@ -23,7 +26,8 @@ const statusByCode: Record<SeatOverrideError["code"], number> = {
   NOT_REGISTERED: 409,
   SELECTION_INVALID: 422,
   ALREADY_IN_CLASS: 409,
-  CLUB_LIMIT_REACHED: 409,
+  CLASS_HAS_SEAT: 409,
+  HAS_LIVE_OFFER: 409,
   PICK_HAS_MARKS: 409,
   SELECTION_CONFLICT: 409,
 };

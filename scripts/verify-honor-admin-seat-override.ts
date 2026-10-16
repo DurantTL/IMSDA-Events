@@ -5,7 +5,11 @@
  *  - the placement works in a full class and after class changes closed; a normal pick still refuses both;
  *  - it needs a system administrator (checked against the database inside the transaction) and a reason;
  *  - the class's seat limit, every waitlist position and a live offer are exactly as they were, and the offer can still be accepted;
- *  - eligibility (level, a seatless person, the per-club limit, a repeat) still applies;
+ *  - a class that still has a seat, or a live offer for the youth, refuses the placement (it can't quietly raise capacity);
+ *  - the per-club limit is an audited waiver (two placements against a limit of 1), a level rule can be waived in the same step
+ *    with a reason recorded like the staff override, and a seatless person, a repeat or a session clash is still refused;
+ *  - a placement passes on the youth's other live offer in that session, like a pick save does;
+ *  - a director dropping a placed pick names it in the audit;
  *  - the audit entry holds ids and the reason only, and the staff roster shows the class over capacity with the reason;
  *  - a director's own roster never carries the reason;
  *  - removing a pick works after close; a pick the instructor marked is refused;
@@ -143,6 +147,9 @@ async function main() {
   for (const [club, keys] of [["c1", ["y1", "y4", "y6", "y7"]], ["c2", ["y2", "y5", "y8"]], ["c3", ["y3", "y9"]]] as const) {
     for (const key of keys) await addPerson(club, key);
   }
+  for (const [club, keys] of [["c3", ["y10"]], ["c1", ["y11"]], ["c2", ["y12", "y13"]]] as const) {
+    for (const key of keys) await addPerson(club, key);
+  }
   await addPerson("c1", "staff1", null, "STAFF");
   await addPerson("c2", "novice", "FRIEND");
 
@@ -208,22 +215,53 @@ async function main() {
   await prisma.honorEnrollmentMark.delete({ where: { enrollmentId: marked.id } });
   console.log("ok  after close: normal changes refused, placement and removal worked, an instructor-marked pick stayed");
 
-  // ---- 5. Eligibility and the per-club limit still apply.
+  // ---- 5. Eligibility, the free-seat rule, and the per-club waiver.
   const levelClass = await makeClass(3, 1, { minimumClassLevel: "GUIDE" });
   await pickAdd("y1", levelClass);
-  await expectOverride(place("novice", levelClass), "SELECTION_INVALID", "a youth below the class level");
+  await expectOverride(place("novice", levelClass), "SELECTION_INVALID", "a youth below the class level, with no waiver");
+  const waived = await placeYouthInClass(eventId, adminId, { registrationAttendeeId: attendeeOf("novice"), offeringId: levelClass, reason: "Synthetic: needs both waivers", overrideReason: "Synthetic: level waived by staff" }, now);
+  const waivedRow = await prisma.honorEnrollment.findUniqueOrThrow({ where: { id: waived.enrollmentId } });
+  assert(waivedRow.requirementOverrideReason === "Synthetic: level waived by staff" && waivedRow.requirementOverriddenByUserId === adminId && waivedRow.adminPlacementReason !== null, "the level waiver is recorded as the staff override records it, with the placement");
+  assert((await prisma.auditLog.count({ where: { eventId, action: "HONOR_CLASS_REQUIREMENT_OVERRIDDEN", actorUserId: adminId } })) === 1, "and audited as a requirement override");
   await expectOverride(place("staff1", full), "SELECTION_INVALID", "a person who takes no seat");
   await expectOverride(place("y1", levelClass), "ALREADY_IN_CLASS", "a youth already in the class");
   const limited = await makeClass(4, 1, { perClubLimit: 1 });
   await pickAdd("y1", limited);
-  await expectOverride(place("y4", limited), "CLUB_LIMIT_REACHED", "a second youth from a club at its limit");
+  const overOne = await place("y4", limited, "Synthetic: first placement over the club limit");
+  const overTwo = await place("y6", limited, "Synthetic: second placement over the club limit");
+  assert(overOne.clubLimitExceeded && overTwo.clubLimitExceeded, "two placements for a club at its limit of 1 both go ahead and record the waiver");
+  const otherClub = await place("y2", limited, "Synthetic: another club, one seat");
+  assert(!otherClub.clubLimitExceeded, "a club with no seats there isn't over the limit");
   const clash = await makeClass(4, 5);
   await expectOverride(place("y1", clash), "SELECTION_INVALID", "a class that clashes with the youth's class in that session");
-  console.log("ok  level, seatless, repeat, per-club limit and session clash rules still hold");
+  // A class with a free seat is picked normally; a youth holding their own live offer accepts it.
+  const roomy = await makeClass(5, 2);
+  await pickAdd("y12", roomy);
+  await expectOverride(place("y13", roomy), "CLASS_HAS_SEAT", "a class with a free seat");
+  assert((await capacityOf(roomy)) === 2 && (await prisma.honorEnrollment.count({ where: { offeringId: roomy } })) === 1, "a refused placement changed nothing");
+  const offerClass = await makeClass(1, 1);
+  await pickAdd("y11", offerClass);
+  const joinOffer = (key: string) => joinClassWaitlist(orgOf(people.get(key)!.club), eventId, director(people.get(key)!.club), { attendeeId: attendeeOf(key), offeringId: offerClass }, now);
+  await joinOffer("y10");
+  await joinOffer("y13");
+  await drop("y11", offerClass);
+  const offerStatus = async (key: string) => (await prisma.honorClassWaitlistEntry.findFirstOrThrow({ where: { registrationAttendeeId: attendeeOf(key), offeringId: offerClass } })).status;
+  assert((await offerStatus("y10")) === "OFFERED", "y10 holds the live offer");
+  await expectOverride(place("y10", offerClass), "HAS_LIVE_OFFER", "a youth holding a live offer for the class");
+  console.log("ok  level waiver recorded, club-limit waiver recorded twice, free seat and live offer refused, repeat, seatless and clash refused");
+
+  // ---- 5b. A placement passes on the youth's other live offer in the same session.
+  const sessionTwoFull = await makeClass(1, 1);
+  await pickAdd("y8", sessionTwoFull);
+  const placedSameSession = await place("y10", sessionTwoFull, "Synthetic: placed in the same session as an offer");
+  assert(placedSameSession.overCapacity, "placed in the full class of that session");
+  assert((await offerStatus("y10")) === "WAITING", "the youth's offer for the other class in that session was released; they keep their place");
+  assert((await offerStatus("y13")) === "OFFERED", "and that seat passed to the next youth in line");
+  console.log("ok  a placement released the youth's other live offer in that session and passed it on");
 
   // ---- 6. Audit holds ids and the reason only.
   const entries = await prisma.auditLog.findMany({ where: { eventId, action: "HONOR_CLASS_ADMIN_PLACED" }, orderBy: { createdAt: "asc" } });
-  assert(entries.length === 3, `three placements were audited, found ${entries.length}`);
+  assert(entries.length === 8, `eight placements were audited, found ${entries.length}`);
   for (const entry of entries) {
     assert(entry.actorUserId === adminId, "the audit names the administrator");
     const metadata = entry.metadata as Record<string, unknown>;
@@ -233,28 +271,38 @@ async function main() {
   assert((entries[0].metadata as Record<string, unknown>).overCapacity === true && (entries[0].metadata as Record<string, unknown>).classWasFull === true, "the audit says the class was full and ended over capacity");
   assert((entries[2].metadata as Record<string, unknown>).classChangesClosed === true, "the audit says class changes had closed");
   assert((await prisma.auditLog.count({ where: { eventId, action: "HONOR_CLASS_ADMIN_PICK_REMOVED" } })) === 1, "the removal was audited");
+  const limitFlags = entries.filter((entry) => (entry.metadata as Record<string, unknown>).perClubLimit === 1).map((entry) => (entry.metadata as Record<string, unknown>).clubLimitExceeded);
+  assert(limitFlags.length === 3 && limitFlags.filter(Boolean).length === 2, "the audit records clubLimitExceeded true for the two passes and false for the other club");
   console.log("ok  placements and the removal are audited with ids and the reason only");
 
   // ---- 7. Reports show the class over capacity, with the reason.
-  const data = await getHonorRosterData(eventId, { includeDietary: false });
+  const data = await getHonorRosterData(eventId, { includeDietary: false, includeAdminPlacementReasons: true });
   assert(data, "roster data");
   const rosters = buildClassRosters(data.sessions, data.offerings, data.enrollments, data.attendees, data.locations);
   const fullRoster = rosters.find((roster) => roster.offering.id === full)!;
   assert(fullRoster.overCapacity && fullRoster.youthSeats === 2 && fullRoster.offering.capacity === 1 && fullRoster.adminPlacements === 1, "the staff roster shows the class over capacity");
   assert(fullRoster.picks.some((entry) => entry.adminPlacementReason === "Synthetic: family request"), "the roster carries the reason");
-  assert(classRostersCsv(rosters).includes("Synthetic: family request"), "the CSV carries the reason");
-  const scoped = await getHonorRosterData(eventId, { includeDietary: false, organizationId: orgOf("c2") });
+  // Without the option (every staff reader but a system administrator) the reason is never loaded, but the over-capacity count is.
+  const plain = await getHonorRosterData(eventId, { includeDietary: false });
+  assert(plain && plain.enrollments.every((entry) => entry.adminPlacementReason === null) && plain.enrollments.some((entry) => entry.adminPlaced), "other staff readers get no reason, only that it was a hand placement");
+  const plainRoster = buildClassRosters(plain.sessions, plain.offerings, plain.enrollments, plain.attendees, plain.locations).find((roster) => roster.offering.id === full)!;
+  assert(plainRoster.overCapacity && plainRoster.adminPlacements === 1, "and still see the class over capacity");
+  assert(classRostersCsv(rosters, false, true).includes("Synthetic: family request"), "the system administrator's CSV carries the reason");
+  assert(!classRostersCsv(rosters).includes("Synthetic: family request") && !classRostersCsv(rosters).includes("Admin placement reason"), "every other CSV has no reason column");
+  const scoped = await getHonorRosterData(eventId, { includeDietary: false, includeAdminPlacementReasons: true, organizationId: orgOf("c2") });
   assert(scoped && scoped.enrollments.every((entry) => !entry.adminPlacementReason), "a director's own roster never carries the reason");
   console.log("ok  the staff roster and CSV show the class over capacity with the reason; a director's roster doesn't");
 
-  // ---- 8. Races: placements and normal picks for the same class.
+  // ---- 8. Races: one seat left, two normal picks and a placement for the same class.
+  let placementWonRaces = 0;
   for (let round = 0; round < 6; round += 1) {
-    const raced = await makeClass(5, 1);
+    const raced = await makeClass(5, 2);
     const key = (name: string) => name + round;
-    for (const [club, name] of [["c1", "ra"], ["c2", "rb"], ["c3", "rc"]] as const) {
+    for (const [club, name] of [["c1", "ra"], ["c2", "rb"], ["c3", "rc"], ["c2", "rd"]] as const) {
       // Fresh people each round, so earlier rounds' picks can't clash in session six.
       await addPerson(club, key(name));
     }
+    await pick(key("rd"), [raced]); // one of the two seats is taken: one seat is left
     const results = await Promise.allSettled([
       settle(() => pick(key("ra"), [raced])),
       settle(() => pick(key("rb"), [raced])),
@@ -262,20 +310,32 @@ async function main() {
     ]);
     const normal = results.slice(0, 2);
     const wonNormal = normal.filter((result) => result.status === "fulfilled").length;
-    assert(results[2].status === "fulfilled", `round ${round}: the placement always succeeds, got ${String((results[2] as PromiseRejectedResult).reason)}`);
-    assert(wonNormal === 1, `round ${round}: exactly one normal pick wins the one seat, got ${wonNormal}`);
+    assert(wonNormal === 1, `round ${round}: exactly one normal pick wins the last seat, got ${wonNormal}`);
     const loser = normal.find((result) => result.status === "rejected") as PromiseRejectedResult;
     assert(loser.reason instanceof ClassSelectionError && loser.reason.code === "CLASS_FULL", `round ${round}: the loser is told the class is full`);
+    // The placement either ran after the last seat went (a placement) or before it (the class still had a seat: refused). Nothing else.
+    if (results[2].status === "rejected") {
+      const reason = results[2].reason;
+      assert(reason instanceof SeatOverrideError && reason.code === "CLASS_HAS_SEAT", `round ${round}: a refused placement is CLASS_HAS_SEAT, got ${String(reason)}`);
+      await place(key("rc"), raced, `Synthetic race ${round}, retried`); // now the class is full
+    } else {
+      placementWonRaces += 1;
+    }
     const normalSeats = await prisma.honorEnrollment.count({ where: { offeringId: raced, consumesSeat: true, adminPlacementReason: null } });
-    assert(normalSeats === 1 && (await seatCount(raced)) === 2 && (await capacityOf(raced)) === 1, `round ${round}: one normal seat, one placement, limit still 1`);
+    assert(normalSeats === 2 && (await seatCount(raced)) === 3 && (await capacityOf(raced)) === 2, `round ${round}: two normal seats, one placement, limit still 2`);
   }
-  console.log("ok  six rounds of two normal picks racing a placement: one normal winner, the placement never failed, no normal overfill");
+  console.log(`ok  six rounds of two normal picks racing a placement for the last seat: one normal winner, the limit never overfilled by a normal pick, the placement refused or applied (${placementWonRaces} applied first time)`);
 
-  // ---- 9. Directors and event admins never cross the line through the pick save.
-  const guard = await makeClass(0 + 1, 1);
-  await pick("y8", [guard]);
+  // ---- 9. Directors never cross the line through the pick save; a director dropping a placed pick is named in the audit.
+  const guard = await makeClass(2, 1);
+  await pickAdd("y8", guard);
   await expectClass(pick("y9", [guard]), "CLASS_FULL", "a director cannot place past a full class");
   assert((await capacityOf(guard)) === 1, "the limit is unchanged");
+  const guardPlaced = await place("y9", guard, "Synthetic: placed then dropped by the director");
+  await drop("y9", guard);
+  const dropAudit = await prisma.auditLog.findMany({ where: { eventId, action: "HONOR_CLASSES_UPDATED" } });
+  assert(dropAudit.some((entry) => ((entry.metadata as Record<string, unknown>).droppedAdminPlacementEnrollmentIds as string[] | undefined)?.includes(guardPlaced.enrollmentId)), "the director's save names the placement it dropped");
+  console.log("ok  a director can't place past a full class, and dropping a placement is named in the audit");
 }
 
 main()

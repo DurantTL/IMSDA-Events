@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { liveWaitlistOffer, seatHoldingEnrollment } from "@/modules/honors/enrollment-repository";
 import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import {
   dietaryFieldPattern,
@@ -40,7 +41,7 @@ function dietaryAnswer(responses: unknown, keys: readonly string[]) {
  */
 export async function getHonorRosterData(
   eventId: string,
-  options: { includeDietary: boolean; organizationId?: string; /** Only this site's registrations and sessions (#589). */ locationId?: string },
+  options: { includeDietary: boolean; organizationId?: string; /** Load why a system administrator placed a youth by hand (#962); only for a system administrator. */ includeAdminPlacementReasons?: boolean; /** Only this site's registrations and sessions (#589). */ locationId?: string },
 ) {
   const prisma = getPrisma();
   const registrationSelect = {
@@ -58,7 +59,7 @@ export async function getHonorRosterData(
     },
   };
   const activeInScope = { status: { in: ["SUBMITTED" as const, "CONFIRMED" as const] }, ...(options.locationId ? { locationId: options.locationId } : {}) };
-  const [event, allSessions, allOfferings, clubRegistrationRows, groupRegistrationRows, locations] = await Promise.all([
+  const [event, allSessions, allOfferings, clubRegistrationRows, groupRegistrationRows, locations, seatTotals, countedSeatTotals, liveOfferTotals] = await Promise.all([
     prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true } }),
     prisma.honorSession.findMany({
       where: { eventId, ...(options.locationId ? { OR: [{ locationId: options.locationId }, { locationId: null }] } : {}) },
@@ -69,7 +70,7 @@ export async function getHonorRosterData(
       where: { eventId },
       select: {
         id: true, span: true, sessionId: true, locationId: true, site: { select: { name: true } },
-        capacity: true, teacherName: true, location: true, isActive: true,
+        capacity: true, perClubLimit: true, teacherName: true, location: true, isActive: true,
         honors: offeringHonorsSelect,
       },
     }),
@@ -98,6 +99,10 @@ export async function getHonorRosterData(
         },
       }),
     prisma.eventLocation.findMany({ where: { eventId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, sortOrder: true } }),
+    // The limit is the whole class's, whatever site the roster is filtered to (#962): every seat, the seats counted toward the limit, and live offers.
+    prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, _count: { _all: true } }),
+    prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...seatHoldingEnrollment }, _count: { _all: true } }),
+    prisma.honorClassWaitlistEntry.groupBy({ by: ["offeringId"], where: { eventId, ...liveWaitlistOffer(new Date()) }, _count: { _all: true } }),
   ]);
   if (!event) return null;
   // One entry per club or per group: its key, the name rosters print, and its registration.
@@ -161,8 +166,14 @@ export async function getHonorRosterData(
       offeringId: row.offeringId,
       attendeeId: row.registrationAttendeeId,
       consumesSeat: row.consumesSeat,
-      adminPlacementReason: options.organizationId ? null : row.adminPlacementReason,
+      adminPlaced: Boolean(row.adminPlacementReason),
+      // The reason is a system administrator's to read: not on a director's schedule, and not in any other staff view.
+      adminPlacementReason: options.includeAdminPlacementReasons && !options.organizationId ? row.adminPlacementReason : null,
     }));
+
+  const seatTotalOf = new Map(seatTotals.map((row) => [row.offeringId, row._count._all]));
+  const countedTotalOf = new Map(countedSeatTotals.map((row) => [row.offeringId, row._count._all]));
+  const liveOfferTotalOf = new Map(liveOfferTotals.map((row) => [row.offeringId, row._count._all]));
 
   return {
     event: {
@@ -176,6 +187,9 @@ export async function getHonorRosterData(
     sessions: sessions satisfies RosterSession[],
     offerings: offerings.map((offering): RosterOffering => ({
       id: offering.id,
+      perClubLimit: offering.perClubLimit,
+      seatsAllSites: seatTotalOf.get(offering.id) ?? 0,
+      capacityHeldAllSites: (countedTotalOf.get(offering.id) ?? 0) + (liveOfferTotalOf.get(offering.id) ?? 0),
       // A class can teach several honors (#812); the roster lists everyone in the class under all of them.
       honorName: summarizeOfferingHonors(offering.honors).honorName,
       honorCode: summarizeOfferingHonors(offering.honors).honorCode,

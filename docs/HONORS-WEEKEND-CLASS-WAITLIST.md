@@ -147,12 +147,28 @@ hand. Raising a class's seat limit is a human decision, so this is an explicit, 
   already marked, or that was written to an honor record, is refused.
 - **The seat limit never changes.** A placed seat is marked (`adminPlacementReason`, `adminPlacedAt`, `adminPlacedByUserId`) and
   is not counted toward the limit (`seatHoldingEnrollment`), so the limit, every waitlist position and any live offer are
-  unchanged and an offer can still be accepted. Reports count it: the class shows over capacity, with the reason, on the roster
-  page and as an "Admin placement reason" column in the class roster CSV. A director's own schedule never carries the reason.
-- **Still enforced.** Age, class level and prerequisites, one class per session, the person's site, and the per-club limit
-  (counted without placed seats). The action overrides seats and the close date, not eligibility.
-- **A youth's own waitlist place** for that class is marked taken, like a director picking a class they wait for; if it held a
-  live offer, that seat goes to the next in line. Nobody else's place changes.
+  unchanged and an offer can still be accepted. Reports count it: the class shows over capacity on the staff roster page and in
+  the class roster CSV (Youth seats above Capacity); the reason itself is for system administrators (see "Who reads the reason").
+- **Only a class with no seat left.** A class that still has a seat (seats counted toward the limit plus seats held for live
+  offers, less than the limit) refuses with `CLASS_HAS_SEAT`: pick it normally, so a placement can never quietly raise a class's
+  capacity. A youth holding their own live offer for the class gets `HAS_LIVE_OFFER`: accept it instead.
+- **The per-club limit is an explicit, audited waiver.** The placement goes ahead and the audit entry records
+  `clubLimitExceeded` (true or false), counting every active seat the club (or group) holds in the class, placements included,
+  plus its live offers and this seat. The placement form warns before submit with the same count. Placed seats still don't count
+  toward the limit for a director's own picks.
+- **Level and prerequisites can be waived in the same step** with an optional `overrideReason` (and `confirmed` for a level or
+  honor record the roster doesn't show), recorded on the seat exactly as the staff override on a pick save records it
+  (`requirementOverrideReason`, `requirementOverriddenByUserId`) and audited as `HONOR_CLASS_REQUIREMENT_OVERRIDDEN`. Age, one
+  class per session and the person's site are never waived.
+- **A youth's own waitlist place** for that class is marked taken, like a director picking a class they wait for. After the
+  placement, any other live offer the youth holds for a class in the same session is released back to waiting (keeping its place)
+  and passed on, as `settleWaitlistAfterSave` does after a pick save; a seat freed that way goes to the next in line. Nobody
+  else's place changes.
+- **Who reads the reason.** The reason is loaded and shown only to system administrators: on the staff roster page (never on a
+  printed sheet) and in the class roster CSV's "Admin placement reason" column. Every other staff reader, and a director's own
+  schedule, sees the class over capacity (the count compares the whole class's seats, across sites, with its limit) but no reason.
+- **A director dropping a placed pick.** A director's pick save keeps today's rules, so leaving a placed pick out of their list
+  removes it; the `HONOR_CLASSES_UPDATED` audit entry names it in `droppedAdminPlacementEnrollmentIds`.
 - **Reinstating a registration** never drops a placed seat for a full class.
 - **Audit.** `HONOR_CLASS_ADMIN_PLACED` and `HONOR_CLASS_ADMIN_PICK_REMOVED`, with ids and the reason only.
 - Same serializable transaction and class row lock as a pick save, retried on a lost conflict.

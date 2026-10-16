@@ -97,6 +97,24 @@ describe("seat override routes: system administrators only (#962)", () => {
     expect(mocks.removePickAsAdministrator).not.toHaveBeenCalled();
   });
 
+  it("accepts a level or prerequisite waiver with its reason, and refuses a too-short one", async () => {
+    const waiver = { ...validPlace, overrideReason: "Synthetic: level waived", confirmed: true };
+    expect((await place(request(waiver), ctx)).status).toBe(201);
+    expect(mocks.placeYouthInClass).toHaveBeenLastCalledWith("event-1", "user-1", waiver);
+    expect((await place(request({ ...validPlace, overrideReason: "no" }), ctx)).status).toBe(400);
+  });
+
+  it("refuses a class that still has a seat, and a youth holding their own live offer, with their own codes", async () => {
+    mocks.placeYouthInClass.mockRejectedValueOnce(new SeatOverrideError("CLASS_HAS_SEAT", "This class still has a seat; pick it normally."));
+    const hasSeat = await place(request(validPlace), ctx);
+    expect(hasSeat.status).toBe(409);
+    expect(await hasSeat.json()).toEqual({ error: "CLASS_HAS_SEAT", message: "This class still has a seat; pick it normally." });
+    mocks.placeYouthInClass.mockRejectedValueOnce(new SeatOverrideError("HAS_LIVE_OFFER", "Accept the youth's offer instead."));
+    const offer = await place(request(validPlace), ctx);
+    expect(offer.status).toBe(409);
+    expect(await offer.json()).toEqual({ error: "HAS_LIVE_OFFER", message: "Accept the youth's offer instead." });
+  });
+
   it("explains a refusal with its code and a fitting status", async () => {
     mocks.placeYouthInClass.mockRejectedValue(new SeatOverrideError("ALREADY_IN_CLASS", "Already in the class."));
     const response = await place(request(validPlace), ctx);
@@ -147,13 +165,30 @@ describe("a placed seat sits on top of the class's limit (#962)", () => {
     ], [attendee("a1", "Able"), attendee("a2", "Baker")]);
     expect(rosters[0]).toMatchObject({ youthSeats: 2, adminPlacements: 1, overCapacity: true });
     expect(rosters[0].picks).toEqual([
-      { enrollmentId: "p1", attendeeId: "a1", adminPlacementReason: null },
-      { enrollmentId: "p2", attendeeId: "a2", adminPlacementReason: "Synthetic: family request" },
+      { enrollmentId: "p1", attendeeId: "a1", adminPlaced: false, adminPlacementReason: null },
+      { enrollmentId: "p2", attendeeId: "a2", adminPlaced: true, adminPlacementReason: "Synthetic: family request" },
     ]);
-    const lines = classRostersCsv(rosters).split("\r\n");
+    const lines = classRostersCsv(rosters, false, true).split("\r\n");
     expect(lines[0]).toContain('"Admin placement reason"');
     expect(lines[1]).toMatch(/"Able".*""$/);
     expect(lines[2]).toContain('"Synthetic: family request"');
+    // Only for system administrators: the default CSV has neither the column nor the text.
+    const plain = classRostersCsv(rosters);
+    expect(plain).not.toContain("Admin placement reason");
+    expect(plain).not.toContain("Synthetic: family request");
+  });
+
+  it("compares the whole class's seats to its limit when the roster is filtered to one site", () => {
+    const rosters = buildClassRosters(sessions, [{ ...offering, capacity: 2, seatsAllSites: 3 }], [{ offeringId: "o1", attendeeId: "a1", consumesSeat: true }], [attendee("a1", "Able")]);
+    expect(rosters[0]).toMatchObject({ youthSeats: 1, seatsAllSites: 3, overCapacity: true });
+    const within = buildClassRosters(sessions, [{ ...offering, capacity: 2, seatsAllSites: 2 }], [{ offeringId: "o1", attendeeId: "a1", consumesSeat: true }], [attendee("a1", "Able")]);
+    expect(within[0].overCapacity).toBe(false);
+  });
+
+  it("knows a hand placement without its reason, for staff who may not read it", () => {
+    const rosters = buildClassRosters(sessions, [{ ...offering, capacity: 0 }], [{ offeringId: "o1", attendeeId: "a1", consumesSeat: true, adminPlaced: true, adminPlacementReason: null }], [attendee("a1", "Able")]);
+    expect(rosters[0]).toMatchObject({ adminPlacements: 1, overCapacity: true });
+    expect(rosters[0].picks[0]).toMatchObject({ adminPlaced: true, adminPlacementReason: null });
   });
 
   it("is not over capacity at the limit, and a normal class carries no reason", () => {
