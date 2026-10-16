@@ -167,7 +167,9 @@ function rosterDatabase() {
         { offeringId: "o1", registrationAttendeeId: "club-att", consumesSeat: true },
         { offeringId: "o1", registrationAttendeeId: "grp-att", consumesSeat: true },
       ]),
+      groupBy: vi.fn().mockResolvedValue([]),
     },
+    honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]) },
     eventLocation: { findMany: vi.fn().mockResolvedValue([{ id: "loc-dm", name: "Des Moines", sortOrder: 0 }]) },
   };
   dependencies.getPrisma.mockReturnValue(db);

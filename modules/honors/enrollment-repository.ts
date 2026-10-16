@@ -236,8 +236,12 @@ export async function loadOfferings(client: Prisma.TransactionClient, eventId: s
   });
 }
 
-/** Seats held by active registrations; a cancelled club registration gives its seats back. */
-export const seatHoldingEnrollment = { consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } satisfies Prisma.HonorEnrollmentWhereInput;
+/**
+ * Seats held by active registrations; a cancelled club registration gives its seats back. A seat a system administrator placed
+ * by hand into a class with no seat left (#962) is not counted: it sits on top of the class's seat limit, so the limit, the
+ * waitlist and live offers behave as if it were not there. A hand placement that took a free seat counts like any other.
+ */
+export const seatHoldingEnrollment = { consumesSeat: true, adminPlacementOverCapacity: false, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } } satisfies Prisma.HonorEnrollmentWhereInput;
 
 /** The seats one owner holds, for its per-club limit: a club's, or a group registration's own (#650). */
 function ownerSeats(owner: SeatOwner | null): Prisma.HonorEnrollmentWhereInput {
@@ -424,11 +428,12 @@ async function setOwnerClassSelections(
         const offeringsById = new Map<string, SelectableOffering & (typeof offerings)[number]>(offerings.map((offering) => [offering.id, offering]));
         const existing = await tx.honorEnrollment.findMany({
           where: { registrationId: registration.registrationId },
-          select: { id: true, registrationAttendeeId: true, offeringId: true },
+          select: { id: true, registrationAttendeeId: true, offeringId: true, adminPlacementReason: true },
         });
 
         const toCreate: Array<{ attendeeId: string; offeringId: string; consumesSeat: boolean; levelConfirmed: boolean; prerequisitesConfirmed: boolean; overrideReason: string | null }> = [];
         const toDelete: string[] = [];
+        const droppedPlacementIds: string[] = [];
         // Classes that lose a seat in this save: their waitlists get the seat (#831).
         const freedOfferingIds = new Set<string>();
         for (const [attendeeId, offeringIds] of Object.entries(selections)) {
@@ -455,6 +460,8 @@ async function setOwnerClassSelections(
           const wanted = new Set(offeringIds);
           const dropped = current.filter((enrollment) => !wanted.has(enrollment.offeringId));
           toDelete.push(...dropped.map((enrollment) => enrollment.id));
+          // A seat a system administrator placed by hand (#962) is dropped like any pick when the director's list leaves it out; the audit names it.
+          droppedPlacementIds.push(...dropped.filter((enrollment) => enrollment.adminPlacementReason !== null).map((enrollment) => enrollment.id));
           for (const enrollment of dropped) freedOfferingIds.add(enrollment.offeringId);
           for (const offeringId of offeringIds) {
             if (currentIds.has(offeringId)) continue;
@@ -569,6 +576,7 @@ async function setOwnerClassSelections(
               : "groupContactPersonId" in actor ? { groupContactPersonId: actor.groupContactPersonId } : { actAsId: actor.actAsId }),
             added: toCreate.length,
             removed: toDelete.length,
+            ...(droppedPlacementIds.length > 0 ? { droppedAdminPlacementEnrollmentIds: droppedPlacementIds } : {}),
             people: Object.keys(selections).length,
             // Director confirmations of a missing class level or honor record, by person and class (#832).
             ...(toCreate.some((row) => row.levelConfirmed || row.prerequisitesConfirmed)
