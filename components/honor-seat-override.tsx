@@ -18,7 +18,14 @@ async function post(url: string, body: unknown) {
 
 const reasonHelp = `A short reason, ${seatOverrideReasonMin} to ${seatOverrideReasonMax} characters. It is saved on the seat and in the audit log and shown on class rosters, so leave out medical and other private details.`;
 
-export type PlacementCandidate = { id: string; label: string; clubId: string; clubName: string };
+export type PlacementCandidate = {
+  id: string;
+  label: string;
+  clubId: string;
+  clubName: string;
+  /** Class changes are closed for this youth's site: a normal pick fails, so a placement into a free seat is a counted seat (#962). */
+  changesClosed: boolean;
+};
 
 export type PlacementClass = {
   id: string;
@@ -110,9 +117,9 @@ export function HonorSeatPlacementForm({
           <input maxLength={seatOverrideReasonMax} onChange={(event) => setRequirementReason(event.target.value)} value={requirementReason} />
           <span className="field-help">Recorded and audited like staff placing someone who doesn&apos;t meet a class requirement. Age and one class per session are never waived.</span>
         </label>
-        {chosenClass && chosenClass.seatsLeft > 0 && (
-          <div className="inline-notice" role="status">This class still has a seat, so it can&apos;t be placed by hand. Pick it normally, or accept the youth&apos;s waitlist offer if they have one.</div>
-        )}
+        {chosenClass && chosenYouth && chosenClass.seatsLeft > 0 && (chosenYouth.changesClosed
+          ? <div className="inline-notice" role="status">This class has a seat; placing by hand fills it. Class changes are closed, so it counts like any other seat.</div>
+          : <div className="inline-notice" role="status">This class still has a seat, so it can&apos;t be placed by hand. Pick it normally, or accept the youth&apos;s waitlist offer if they have one.</div>)}
         {chosenClass && chosenClass.seatsLeft <= 0 && <div className="inline-notice" role="status">{chosenClass.label} is full.</div>}
         {clubLimitWarning && <div className="inline-notice warning" role="status">{clubLimitWarning}</div>}
         {message && <div className="inline-notice success" role="status">{message}</div>}

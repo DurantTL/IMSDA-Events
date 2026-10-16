@@ -33,6 +33,8 @@ export type RosterAttendee = {
   /** The site the club registered at (#589); null when the event has no locations. */
   locationId?: string | null;
   locationName?: string | null;
+  /** Whether class changes are closed for this person's site (#962); only loaded for the system administrator's placement form. */
+  changesClosed?: boolean;
   /** Only filled when the viewer may see sensitive answers. */
   dietary: string | null;
 };
@@ -76,6 +78,8 @@ export type RosterEnrollment = {
   adminPlacementReason?: string | null;
   /** Whether a system administrator placed it (#962). Every staff viewer's counts know; the reason is only loaded for system administrators. */
   adminPlaced?: boolean;
+  /** A hand placement into a class with no seat left, on top of the limit (#962); false for one that took a free seat. */
+  adminOverCapacity?: boolean;
 };
 
 function byName(a: { lastName: string; firstName: string }, b: { lastName: string; firstName: string }) {
@@ -103,6 +107,7 @@ export function buildClassRosters(
       const rows = enrollments.filter((enrollment) => enrollment.offeringId === offering.id);
       const youthSeats = rows.filter((row) => row.consumesSeat).length;
       const adminPlacements = rows.filter((row) => row.consumesSeat && (row.adminPlaced ?? Boolean(row.adminPlacementReason))).length;
+      const overCapacityPlacements = rows.filter((row) => row.consumesSeat && row.adminOverCapacity).length;
       // A site-filtered roster lists one site; the limit is the whole class's.
       const seatsAllSites = offering.seatsAllSites ?? youthSeats;
       const people = rows
@@ -116,15 +121,18 @@ export function buildClassRosters(
         people,
         // Counted from the enrollment rows, exactly as H5 counts taken seats, plus any placed by a system administrator (#962).
         youthSeats,
-        /** Seats a system administrator placed on top of the class's limit (#962). */
+        /** Youth a system administrator placed by hand (#962), whether or not the seat counts toward the limit. */
         adminPlacements,
-        /** More youth hold seats than the class's limit, which only a system administrator's placement can cause (#962). */
+        /** Those placed into a class with no seat left, on top of the limit and not counted toward it (#962). */
+        overCapacityPlacements,
+        /** The whole class's seats, every site (#962). */
         seatsAllSites,
+        /** More youth hold seats than the class's limit, which only an over-capacity placement can cause (#962). */
         overCapacity: seatsAllSites > offering.capacity,
         /** Each pick with its id and, for a hand placement, its reason (#962). */
         picks: rows
           .filter((row) => attendeesById.has(row.attendeeId))
-          .map((row) => ({ enrollmentId: row.id ?? null, attendeeId: row.attendeeId, adminPlaced: row.adminPlaced ?? Boolean(row.adminPlacementReason), adminPlacementReason: row.adminPlacementReason ?? null })),
+          .map((row) => ({ enrollmentId: row.id ?? null, attendeeId: row.attendeeId, adminPlaced: row.adminPlaced ?? Boolean(row.adminPlacementReason), adminOverCapacity: row.adminOverCapacity === true, adminPlacementReason: row.adminPlacementReason ?? null })),
       };
     });
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { liveWaitlistOffer, seatHoldingEnrollment } from "@/modules/honors/enrollment-repository";
+import { classChangesOpen } from "@/modules/honors/locations";
 import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import {
   dietaryFieldPattern,
@@ -47,7 +48,7 @@ export async function getHonorRosterData(
   const noTotals: Array<{ offeringId: string; _count: { _all: number } }> = [];
   const registrationSelect = {
     locationId: true,
-    location: { select: { name: true } },
+    location: { select: { name: true, firstDay: true, lastDay: true, registrationClosesOn: true } },
     publicFormSubmission: { select: { formVersion: { select: { definition: true } } } },
     attendees: {
       orderBy: { position: "asc" as const },
@@ -61,7 +62,7 @@ export async function getHonorRosterData(
   };
   const activeInScope = { status: { in: ["SUBMITTED" as const, "CONFIRMED" as const] }, ...(options.locationId ? { locationId: options.locationId } : {}) };
   const [event, allSessions, allOfferings, clubRegistrationRows, groupRegistrationRows, locations, seatTotals, countedSeatTotals, liveOfferTotals] = await Promise.all([
-    prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true } }),
+    prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true, isPublished: true, archivedAt: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true } }),
     prisma.honorSession.findMany({
       where: { eventId, ...(options.locationId ? { OR: [{ locationId: options.locationId }, { locationId: null }] } : {}) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { name: "asc" }],
@@ -148,6 +149,8 @@ export async function getHonorRosterData(
         checkedIn: attendee.checkIns.length > 0,
         locationId: club.registration.locationId,
         locationName: club.registration.location?.name ?? null,
+        // For the system administrator's placement form (#962): whether class changes are closed for this person's site, as the server decides it.
+        ...(options.includeAdminPlacementReasons ? { changesClosed: !classChangesOpen(event, club.registration.location, new Date()) } : {}),
         dietary: options.includeDietary ? dietaryAnswer((attendee as { formResponses?: unknown }).formResponses, keys) : null,
       };
     });
@@ -156,7 +159,7 @@ export async function getHonorRosterData(
   const attendeeIds = new Set(attendees.map((attendee) => attendee.id));
   const enrollmentRows = await prisma.honorEnrollment.findMany({
     where: { eventId, ...(options.organizationId ? { organizationId: options.organizationId } : {}) },
-    select: { id: true, offeringId: true, registrationAttendeeId: true, consumesSeat: true, adminPlacementReason: true },
+    select: { id: true, offeringId: true, registrationAttendeeId: true, consumesSeat: true, adminPlacementReason: true, adminPlacementOverCapacity: true },
   });
   // Only people on an active registration appear; enrollments of a cancelled
   // registration are left out rather than shown with no name.
@@ -169,6 +172,7 @@ export async function getHonorRosterData(
       attendeeId: row.registrationAttendeeId,
       consumesSeat: row.consumesSeat,
       adminPlaced: Boolean(row.adminPlacementReason),
+      adminOverCapacity: row.adminPlacementOverCapacity === true,
       // The reason is a system administrator's to read: not on a director's schedule, and not in any other staff view.
       adminPlacementReason: options.includeAdminPlacementReasons && !options.organizationId ? row.adminPlacementReason : null,
     }));

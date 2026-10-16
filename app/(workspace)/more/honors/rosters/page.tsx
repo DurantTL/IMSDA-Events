@@ -123,13 +123,13 @@ export default async function HonorRostersPage({
                 id: roster.offering.id,
                 label: `${roster.offering.honorName} (${roster.session}${data.hasLocations && roster.siteName ? `, ${roster.siteName}` : ""})`,
                 // Seats counted toward the limit and seats held for live offers, across every site: what a normal pick sees.
-                seatsLeft: roster.offering.capacity - (roster.offering.capacityHeldAllSites ?? roster.youthSeats - roster.adminPlacements),
+                seatsLeft: roster.offering.capacity - (roster.offering.capacityHeldAllSites ?? roster.youthSeats - roster.overCapacityPlacements),
                 perClubLimit: roster.offering.perClubLimit ?? null,
                 clubSeats: clubSeatsByClass.get(roster.offering.id) ?? {},
               }))}
               candidates={data.attendees
                 .filter((person) => rosterGroupOf(person.attendeeType) === "YOUTH")
-                .map((person) => ({ id: person.id, label: `${person.lastName}, ${person.firstName} (${person.clubName})`, clubId: person.clubId, clubName: person.clubName }))}
+                .map((person) => ({ id: person.id, label: `${person.lastName}, ${person.firstName} (${person.clubName})`, clubId: person.clubId, clubName: person.clubName, changesClosed: person.changesClosed === true }))}
             />
           )}
           {classRosters.length === 0 && <p className="report-empty">No classes are set up for {site ? <span translate="no">{site.name}</span> : "this site"} yet.</p>}
