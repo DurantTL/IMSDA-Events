@@ -306,6 +306,7 @@ jobs:
       # a seat given away in between drops that pick (audited, reported to staff, director emailed), for class capacity and
       # the per-club limit, by staff or automatic promotion; a restored pick never jumps the class waitlist; races never overfill.
       - run: npm run test:honor-reinstate-seats
+      - run: npm run test:honor-admin-seat-override
 
       # Real-database check of deleting an event at any stage: a rich event
       # (registrations, payments, honors, forms, messages, locations, club forms,

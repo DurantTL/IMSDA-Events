@@ -831,6 +831,7 @@ model User {
 
   recordedMemberHonorEntries         MemberHonorEntry[]           @relation("MemberHonorEntryRecordedByUser")
   honorEnrollmentOverrides           HonorEnrollment[]            @relation("HonorEnrollmentRequirementOverriddenBy")
+  honorEnrollmentAdminPlacements     HonorEnrollment[]            @relation("HonorEnrollmentAdminPlacedBy")
   honorClassWaitlistOverrides        HonorClassWaitlistEntry[]    @relation("HonorClassWaitlistOverriddenBy")
   voidedMemberHonorEntries           MemberHonorEntryVoid[]       @relation("MemberHonorEntryVoidedByUser")
   initiatedMemberTransfers           MemberTransfer[]             @relation("MemberTransferInitiatedByUser")
@@ -5466,6 +5467,18 @@ model HonorEnrollment {
   /// The staff user who overrode; cleared if that user is deleted (the audit log keeps the entry).
   requirementOverriddenByUserId String?
   requirementOverriddenByUser User? @relation("HonorEnrollmentRequirementOverriddenBy", fields: [requirementOverriddenByUserId], references: [id], onDelete: SetNull)
+  /// Why a system administrator placed the youth although the class was full or class changes had closed (#962). Set only by
+  /// that explicit, audited action, never by a normal pick save or automatically. Null for every normal pick.
+  adminPlacementReason   String?
+  /// True when the placement went into a class with no seat left: that seat is on top of the class's seat limit, so it is not
+  /// counted toward the limit (the limit, and the waitlist and live offers that depend on it, are unchanged) and reports show the
+  /// class over capacity. False for a placement that took a free seat (after class changes closed, when a normal pick can't):
+  /// it counts like any other seat. Only meaningful with a reason.
+  adminPlacementOverCapacity Boolean @default(false)
+  adminPlacedAt          DateTime?
+  /// The system administrator who placed the youth; cleared if that user is deleted (the audit log keeps the entry).
+  adminPlacedByUserId    String?
+  adminPlacedByUser      User? @relation("HonorEnrollmentAdminPlacedBy", fields: [adminPlacedByUserId], references: [id], onDelete: SetNull)
   createdAt              DateTime @default(now())
 
   event                Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -5482,6 +5495,7 @@ model HonorEnrollment {
   @@index([offeringId, consumesSeat])
   @@index([offeringId, organizationId, consumesSeat])
   @@index([registrationId])
+  @@index([adminPlacedByUserId])
 }
 
 enum HonorClassWaitlistStatus {

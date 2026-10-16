@@ -39,12 +39,14 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     const includeDietary = view === "site" && effectivePermissions(access.user, access.membership).includes("VIEW_SENSITIVE_DATA");
     // "All sites" is no `location` parameter; a value that isn't one of this event's locations means all (#413's filter, #589).
     const { locationId } = await resolveLocationFilter(eventId, locationParam(request));
-    const data = await getHonorRosterData(eventId, { includeDietary, ...(locationId ? { locationId } : {}) });
+    // Why a youth was placed by hand (#962) is for system administrators only, not every report reader.
+    const includeAdminReasons = view === "classes" && access.user.globalRole === "SYSTEM_ADMIN";
+    const data = await getHonorRosterData(eventId, { includeDietary, ...(includeAdminReasons ? { includeAdminPlacementReasons: true } : {}), ...(locationId ? { locationId } : {}) });
     if (!data) return Response.json({ error: "EVENT_NOT_FOUND" }, { status: 404 });
     const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
 
     if (view === "classes") {
-      return csvResponse(classRostersCsv(buildClassRosters(data.sessions, data.offerings, data.enrollments, data.attendees, data.locations), data.hasLocations), `${safeEventId}-class-rosters.csv`);
+      return csvResponse(classRostersCsv(buildClassRosters(data.sessions, data.offerings, data.enrollments, data.attendees, data.locations), data.hasLocations, includeAdminReasons), `${safeEventId}-class-rosters.csv`);
     }
     if (view === "site") {
       return csvResponse(siteRosterCsv(buildSiteRoster(data.attendees), includeDietary, data.hasLocations), `${safeEventId}-site-roster.csv`);

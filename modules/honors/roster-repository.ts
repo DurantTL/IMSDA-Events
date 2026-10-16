@@ -2,6 +2,8 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { liveWaitlistOffer, seatHoldingEnrollment } from "@/modules/honors/enrollment-repository";
+import { classChangesOpen } from "@/modules/honors/locations";
 import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import {
   dietaryFieldPattern,
@@ -40,12 +42,13 @@ function dietaryAnswer(responses: unknown, keys: readonly string[]) {
  */
 export async function getHonorRosterData(
   eventId: string,
-  options: { includeDietary: boolean; organizationId?: string; /** Only this site's registrations and sessions (#589). */ locationId?: string },
+  options: { includeDietary: boolean; organizationId?: string; /** Load why a system administrator placed a youth by hand (#962); only for a system administrator. */ includeAdminPlacementReasons?: boolean; /** Only this site's registrations and sessions (#589). */ locationId?: string },
 ) {
   const prisma = getPrisma();
+  const noTotals: Array<{ offeringId: string; _count: { _all: number } }> = [];
   const registrationSelect = {
     locationId: true,
-    location: { select: { name: true } },
+    location: { select: { name: true, firstDay: true, lastDay: true, registrationClosesOn: true } },
     publicFormSubmission: { select: { formVersion: { select: { definition: true } } } },
     attendees: {
       orderBy: { position: "asc" as const },
@@ -58,8 +61,8 @@ export async function getHonorRosterData(
     },
   };
   const activeInScope = { status: { in: ["SUBMITTED" as const, "CONFIRMED" as const] }, ...(options.locationId ? { locationId: options.locationId } : {}) };
-  const [event, allSessions, allOfferings, clubRegistrationRows, groupRegistrationRows, locations] = await Promise.all([
-    prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true } }),
+  const [event, allSessions, allOfferings, clubRegistrationRows, groupRegistrationRows, locations, seatTotals, countedSeatTotals, liveOfferTotals] = await Promise.all([
+    prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, location: true, isPublished: true, archivedAt: true, registrationOpensOn: true, registrationClosesOn: true, waitlistEnabled: true } }),
     prisma.honorSession.findMany({
       where: { eventId, ...(options.locationId ? { OR: [{ locationId: options.locationId }, { locationId: null }] } : {}) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { name: "asc" }],
@@ -69,7 +72,7 @@ export async function getHonorRosterData(
       where: { eventId },
       select: {
         id: true, span: true, sessionId: true, locationId: true, site: { select: { name: true } },
-        capacity: true, teacherName: true, location: true, isActive: true,
+        capacity: true, perClubLimit: true, teacherName: true, location: true, isActive: true,
         honors: offeringHonorsSelect,
       },
     }),
@@ -98,6 +101,11 @@ export async function getHonorRosterData(
         },
       }),
     prisma.eventLocation.findMany({ where: { eventId }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, sortOrder: true } }),
+    // The limit is the whole class's, whatever site the roster is filtered to (#962): every seat, the seats counted toward the limit, and live offers.
+    // (A director's own schedule needs none of it.)
+    options.organizationId ? Promise.resolve(noTotals) : prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, consumesSeat: true, registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } }, _count: { _all: true } }),
+    options.organizationId ? Promise.resolve(noTotals) : prisma.honorEnrollment.groupBy({ by: ["offeringId"], where: { eventId, ...seatHoldingEnrollment }, _count: { _all: true } }),
+    options.organizationId ? Promise.resolve(noTotals) : prisma.honorClassWaitlistEntry.groupBy({ by: ["offeringId"], where: { eventId, ...liveWaitlistOffer(new Date()) }, _count: { _all: true } }),
   ]);
   if (!event) return null;
   // One entry per club or per group: its key, the name rosters print, and its registration.
@@ -141,6 +149,8 @@ export async function getHonorRosterData(
         checkedIn: attendee.checkIns.length > 0,
         locationId: club.registration.locationId,
         locationName: club.registration.location?.name ?? null,
+        // For the system administrator's placement form (#962): whether class changes are closed for this person's site, as the server decides it.
+        ...(options.includeAdminPlacementReasons ? { changesClosed: !classChangesOpen(event, club.registration.location, new Date()) } : {}),
         dietary: options.includeDietary ? dietaryAnswer((attendee as { formResponses?: unknown }).formResponses, keys) : null,
       };
     });
@@ -149,13 +159,27 @@ export async function getHonorRosterData(
   const attendeeIds = new Set(attendees.map((attendee) => attendee.id));
   const enrollmentRows = await prisma.honorEnrollment.findMany({
     where: { eventId, ...(options.organizationId ? { organizationId: options.organizationId } : {}) },
-    select: { offeringId: true, registrationAttendeeId: true, consumesSeat: true },
+    select: { id: true, offeringId: true, registrationAttendeeId: true, consumesSeat: true, adminPlacementReason: true, adminPlacementOverCapacity: true },
   });
   // Only people on an active registration appear; enrollments of a cancelled
   // registration are left out rather than shown with no name.
   const enrollments: RosterEnrollment[] = enrollmentRows
     .filter((row) => attendeeIds.has(row.registrationAttendeeId))
-    .map((row) => ({ offeringId: row.offeringId, attendeeId: row.registrationAttendeeId, consumesSeat: row.consumesSeat }));
+    // The reason is staff's: a director's own schedule (`organizationId`) never carries it.
+    .map((row) => ({
+      id: row.id,
+      offeringId: row.offeringId,
+      attendeeId: row.registrationAttendeeId,
+      consumesSeat: row.consumesSeat,
+      adminPlaced: Boolean(row.adminPlacementReason),
+      adminOverCapacity: row.adminPlacementOverCapacity === true,
+      // The reason is a system administrator's to read: not on a director's schedule, and not in any other staff view.
+      adminPlacementReason: options.includeAdminPlacementReasons && !options.organizationId ? row.adminPlacementReason : null,
+    }));
+
+  const seatTotalOf = new Map(seatTotals.map((row) => [row.offeringId, row._count._all]));
+  const countedTotalOf = new Map(countedSeatTotals.map((row) => [row.offeringId, row._count._all]));
+  const liveOfferTotalOf = new Map(liveOfferTotals.map((row) => [row.offeringId, row._count._all]));
 
   return {
     event: {
@@ -169,6 +193,11 @@ export async function getHonorRosterData(
     sessions: sessions satisfies RosterSession[],
     offerings: offerings.map((offering): RosterOffering => ({
       id: offering.id,
+      perClubLimit: offering.perClubLimit,
+      ...(options.organizationId ? {} : {
+        seatsAllSites: seatTotalOf.get(offering.id) ?? 0,
+        capacityHeldAllSites: (countedTotalOf.get(offering.id) ?? 0) + (liveOfferTotalOf.get(offering.id) ?? 0),
+      }),
       // A class can teach several honors (#812); the roster lists everyone in the class under all of them.
       honorName: summarizeOfferingHonors(offering.honors).honorName,
       honorCode: summarizeOfferingHonors(offering.honors).honorCode,
