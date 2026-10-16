@@ -11090,3 +11090,4 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-manage-club-list li > .typed-in-roster-link { flex: 1 1 100%; margin: 0; }
 /* Placed after `.public-manage-card > .field-help`, so the account overview keeps its own bottom space. */
 .account-overview-card > .field-help { margin: 0 0 10px; }
+.public-registration-attendee-actions button.is-danger:disabled { opacity: 0.82; }
