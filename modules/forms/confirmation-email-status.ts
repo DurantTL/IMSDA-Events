@@ -32,7 +32,7 @@ export function confirmationEmailHeadline(status: ConfirmationEmailStatus): stri
     case "CAPTURED":
       return "A local confirmation preview was saved; no external email was sent.";
     case "PENDING":
-      return "Your registration is saved and the confirmation email is queued.";
+      return "Your registration is saved. We\u2019re sending a confirmation email.";
     case "FAILED":
       return "Your registration is saved, but the confirmation email could not be sent.";
     default:

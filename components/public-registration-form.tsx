@@ -76,6 +76,7 @@ import {
   getAvailabilityMode,
   isFieldOptionalByCondition,
   isFieldVisible,
+  resolveResponsibleOrganization,
   isLatePricingActive,
   numberFieldBounds,
   validateTestResponses,
@@ -3120,6 +3121,9 @@ export function PublicRegistrationForm({
 
   if (confirmation) {
     const waitlisted = confirmation.registrationStatus === "WAITLISTED";
+    // A team registered through the general link (#931): free, so no pricing date or fee band; the team and club are named.
+    const teamConfirmation = Boolean(group?.noCost && group.teamName);
+    const enteredClub = resolveResponsibleOrganization(rosterEnabled ? registrationResponses : responses) ?? "";
     return (
       <main className="public-registration-page">
         <header className="public-registration-header">
@@ -3155,31 +3159,34 @@ export function PublicRegistrationForm({
                 </small>
               </span>
             </div>
-            <dl className="public-registration-confirmation-details">
+            <dl className={`public-registration-confirmation-details${teamConfirmation ? " is-compact" : ""}`}>
               <div><dt>Event</dt><dd>{event.name}</dd></div>
+              {teamConfirmation && <div><dt>Team</dt><dd translate="no">{group?.teamName}</dd></div>}
+              {teamConfirmation && enteredClub && <div><dt>Club</dt><dd translate="no">{enteredClub}</dd></div>}
+              {teamConfirmation && group?.locationName && <div><dt>Location</dt><dd translate="no">{group.locationName}</dd></div>}
               <div><dt>Email</dt><dd>{confirmation.email || "Not provided"}</dd></div>
               {rosterEnabled && (
                 <div>
-                  <dt>Attendees</dt>
+                  <dt>{teamConfirmation ? "Team members" : "Attendees"}</dt>
                   <dd>{confirmation.attendeeCount} {waitlisted ? "on the waitlist" : "registered"}</dd>
                 </div>
               )}
-              <div><dt>{waitlisted ? "Estimate date" : "Pricing date"}</dt><dd>{formatPricingDate(confirmation.pricingDate)}</dd></div>
+              {!teamConfirmation && <div><dt>{waitlisted ? "Estimate date" : "Pricing date"}</dt><dd>{formatPricingDate(confirmation.pricingDate)}</dd></div>}
               {confirmation.totalCents !== undefined && !deferredOrganizationBilling && (
                 <div><dt>{waitlisted ? "Estimated total if promoted" : "Total recorded"}</dt><dd translate="no">{money(confirmation.totalCents)}</dd></div>
               )}
             </dl>
-            {deferredOrganizationBilling && (
+            {deferredOrganizationBilling && !teamConfirmation && (
               <>
                 <PerPersonPriceNotice price={freeTeamEvent ? noCostPrice(confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled })) : (confirmation.perPerson ?? perPersonPrice({ lineItems: confirmation.lineItems, roster: rosterEnabled }))} className="public-registration-review-waitlist" />
                 {!waitlisted && <p className="public-registration-review-waitlist">No payment is due online.</p>}
               </>
             )}
-            {group && !waitlisted && <p className="public-registration-review-waitlist"><strong>{group.billingNotice}</strong>{group.noCost ? "" : " No payment is due online. The total below is an estimate."}</p>}
+            {group && !waitlisted && !teamConfirmation && <p className="public-registration-review-waitlist"><strong>{group.billingNotice}</strong>{group.noCost ? "" : " No payment is due online. The total below is an estimate."}</p>}
             {group && groupHonorsNote && <p className="public-registration-review-waitlist" role="status">{groupHonorsNote}</p>}
             {rosterEnabled && confirmation.attendeeNames.length > 0 && (
               <section className="public-registration-confirmation-attendees" aria-label="Registered attendees">
-                <h2>{waitlisted ? "Waitlisted attendees" : "Registered attendees"}</h2>
+                <h2>{waitlisted ? (teamConfirmation ? "Waitlisted team members" : "Waitlisted attendees") : (teamConfirmation ? "Registered team members" : "Registered attendees")}</h2>
                 <ul>{confirmation.attendeeNames.map((name, index) => <li key={`${name}_${index}`}>{name}</li>)}</ul>
               </section>
             )}
@@ -3227,6 +3234,7 @@ export function PublicRegistrationForm({
                 embedded={embedded}
                 intended={accountChoice === "create"}
                 returnTo={confirmation.managePath ?? undefined}
+                brief={teamConfirmation}
               />
             )}
             <div className="public-registration-confirmation-actions">

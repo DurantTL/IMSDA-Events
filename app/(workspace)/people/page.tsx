@@ -27,6 +27,7 @@ import { ChoiceAnswerFilter, type ChoiceFilterView } from "@/components/choice-a
 import { listEventAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
 import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/repository";
 import { getResponsibleAdultsByAttendee } from "@/modules/guardian-authority/repository";
+import { countPendingTeams } from "@/modules/general-link-registrations/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.registrations };
@@ -56,6 +57,8 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const searchResult = serverSearch ? await searchOperationsRegistrations(searchViewer, searchQuery, searchCatalog, [...searchParseIssues, ...retiredAnswerParams]) : null;
   // A registration opened by link (?registration=) is shown even when it is not on this page of results.
   const offPageRegistrationId = searchResult && registration && !searchResult.registrationIds.includes(registration) ? [registration] : [];
+  // Teams from the general registration link that wait for a club (#931): said at the top, for someone who can resolve them.
+  const pendingTeamCount = permissions.includes("MANAGE_REGISTRATION") ? await countPendingTeams(event.id) : 0;
   const [loaded, flagged, responsibleByAttendee, optOutRows] = await Promise.all([
     searchResult
       ? ([...searchResult.registrationIds, ...offPageRegistrationId].length > 0 ? listRegistrations(event.id, { registrationIds: [...searchResult.registrationIds, ...offPageRegistrationId] }) : Promise.resolve([]))
@@ -107,6 +110,6 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     />
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
-    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} />
+    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} pendingTeamCount={pendingTeamCount} />
   </>;
 }

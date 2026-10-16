@@ -20,7 +20,8 @@ describe("confirmation email status (#642)", () => {
 
   it("keeps the public form's headline wording", () => {
     expect(confirmationEmailHeadline("SENT")).toBe("Your confirmation email was accepted for delivery.");
-    expect(confirmationEmailHeadline("PENDING")).toContain("queued");
+    expect(confirmationEmailHeadline("PENDING")).toContain("sending a confirmation email");
+    expect(confirmationEmailHeadline("PENDING")).not.toMatch(/queued|delivered/);
     expect(confirmationEmailHeadline("FAILED")).toContain("could not be sent");
   });
 

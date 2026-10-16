@@ -135,6 +135,8 @@ type PageSpec = {
   note?: string;
   /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
   prepare?: (page: Page, width: number) => Promise<void>;
+  /** A walkthrough run after the page's first look (it clicks through states, and may submit a synthetic form). */
+  flow?: "general-link" | "pending-teams";
 };
 
 const staff = (name: string, route: string, role: Role = "event-admin"): PageSpec => ({
@@ -285,14 +287,14 @@ function pbePages(team: { registrationId: string; teamKey: string }): PageSpec[]
   const pbeStaff = (name: string, route: string) => staff(`pbe-${name}`, `${route}${route.includes("?") ? "&" : "?"}event=${pbeEventId}`);
   return [
     { name: "pbe-public-event-page", path: `/events/${pbeEventSlug}`, role: "visitor" },
-    { name: "pbe-general-link-start", path: `/register/${pbeEventSlug}/general`, role: "visitor" },
+    { name: "pbe-general-link-start", path: `/register/${pbeEventSlug}/general`, role: "visitor", flow: "general-link" },
     { name: "pbe-club-portal-teams", path: portal, role: "director" },
     { name: "pbe-club-portal-new-team", path: `${portal}?draft=${pbeDraftKey}`, role: "director" },
     { name: "pbe-club-portal-registered-team", path: `${portal}?team=${encodeURIComponent(team.teamKey)}`, role: "director" },
     { name: "pbe-club-portal-team-form", path: `${portal}/team-form?team=${encodeURIComponent(team.teamKey)}`, role: "director" },
     { name: "pbe-club-portal-team-form-blank", path: `${portal}/team-form/blank`, role: "director" },
     pbeStaff("registrations", "/people"),
-    pbeStaff("pending-teams", "/people/pending-teams"),
+    { ...pbeStaff("pending-teams", "/people/pending-teams"), flow: "pending-teams" },
     pbeStaff("team-results", "/more/team-results"),
     pbeStaff("team-form-report", "/more/reports/clubs/team-form"),
     pbeStaff("team-form-registration", `/more/reports/clubs/team-form/${team.registrationId}`),
@@ -1475,6 +1477,271 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
   };
 }
 
+/**
+ * Text and form layout (the PBE phone audit): problems a person sees that the other checks do not name. Runs in the page, one
+ * self-contained function. Returns plain data.
+ *
+ *  - headings: an h1 or h2 drawn at body size or with a body weight is unstyled, and an icon in a heading sits on the
+ *    heading's own line, not above it;
+ *  - label-input: a label's text never runs into or touches the control it names (side by side with under 6px between, or
+ *    stacked with under 2px between);
+ *  - focus-ring: the focus outline of a text field never lands on the text of another element (the help text under it);
+ *  - text-overlap: the text of two different elements never overlaps, and text that an `overflow: hidden` box cuts off sideways
+ *    (with no ellipsis or line clamp) is reported;
+ *  - disabled: a disabled button's label keeps at least 3:1 against its own fill, opacity included.
+ * Text in fixed, sticky or absolutely placed boxes is left to the bar and dialog checks.
+ */
+function textLayoutInPage() {
+  type Rgba = { r: number; g: number; b: number; a: number };
+  const parse = (value: string): Rgba | null => {
+    const m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/.exec(value);
+    if (!m) return null;
+    const alpha = m[4] === undefined ? 1 : m[4].endsWith("%") ? Number.parseFloat(m[4]) / 100 : Number.parseFloat(m[4]);
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: alpha };
+  };
+  const over = (top: Rgba, under: Rgba): Rgba => {
+    const a = top.a + under.a * (1 - top.a);
+    if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
+    return {
+      r: (top.r * top.a + under.r * under.a * (1 - top.a)) / a,
+      g: (top.g * top.a + under.g * under.a * (1 - top.a)) / a,
+      b: (top.b * top.a + under.b * under.a * (1 - top.a)) / a,
+      a,
+    };
+  };
+  const luminance = ({ r, g, b }: Rgba) => {
+    const [lr, lg, lb] = [r, g, b].map((channel) => {
+      const v = channel / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+  };
+  const ratio = (a: Rgba, b: Rgba) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+  const white: Rgba = { r: 255, g: 255, b: 255, a: 1 };
+  const describe = (el: Element) => {
+    const id = el.id ? `#${el.id}` : "";
+    const classes = typeof (el as HTMLElement).className === "string"
+      ? (el as HTMLElement).className.split(/\s+/).filter(Boolean).slice(0, 2).map((name) => `.${name}`).join("")
+      : "";
+    return `${el.tagName.toLowerCase()}${id}${classes} "${(el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 36)}"`;
+  };
+  const visible = (el: Element) => {
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+  const hiddenTree = (el: Element) => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (node.getAttribute("aria-hidden") === "true" || (node as HTMLElement).hidden || node.hasAttribute("inert")) return true;
+      if (node.tagName === "DETAILS" && !(node as HTMLDetailsElement).open && !(node.firstElementChild?.tagName === "SUMMARY" && node.firstElementChild.contains(el))) return true;
+      if (node.matches(".sr-only, .visually-hidden")) return true;
+    }
+    return false;
+  };
+  /** Fixed, sticky or absolutely placed boxes are checked by the bar and dialog rules, and overlap on purpose. */
+  const placed = (el: Element) => {
+    for (let node: Element | null = el; node && node !== document.body; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position === "fixed" || position === "sticky" || position === "absolute") return true;
+    }
+    return false;
+  };
+  /** What a person sees of `rect`: cut by every box around `el` that clips (an ellipsis, a line clamp, a scroller). Null when none of it shows. */
+  const shown = (el: Element, rect: DOMRect) => {
+    let left = rect.left;
+    let right = rect.right;
+    let top = rect.top;
+    let bottom = rect.bottom;
+    for (let node: Element | null = el; node && node !== document.documentElement; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      const box = node.getBoundingClientRect();
+      if (style.overflowX !== "visible") { left = Math.max(left, box.left); right = Math.min(right, box.right); }
+      if (style.overflowY !== "visible") { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
+    }
+    return right - left > 0 && bottom - top > 0 ? new DOMRect(left, top, right - left, bottom - top) : null;
+  };
+  /** The rectangles of the text directly inside `el` (its own text nodes) that are shown. */
+  const ownTextRects = (el: Element) => {
+    const rects: DOMRect[] = [];
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType !== 3 || !(node.textContent ?? "").trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of Array.from(range.getClientRects())) {
+        const visibleRect = rect.width > 0 && rect.height > 0 ? shown(el, rect) : null;
+        if (visibleRect) rects.push(visibleRect);
+      }
+      range.detach();
+    }
+    return rects;
+  };
+  const w = window.innerWidth;
+  const problems = { headings: [] as string[], labelInput: [] as string[], focusRing: [] as string[], textOverlap: [] as string[], disabled: [] as string[] };
+
+  // Headings.
+  const bodySize = Number.parseFloat(getComputedStyle(document.body).fontSize) || 16;
+  for (const heading of Array.from(document.querySelectorAll("h1, h2"))) {
+    if (!visible(heading) || hiddenTree(heading)) continue;
+    const style = getComputedStyle(heading);
+    const size = Number.parseFloat(style.fontSize);
+    const weight = Number.parseInt(style.fontWeight, 10) || 400;
+    if (size < bodySize * 1.1 && weight < 600) {
+      problems.headings.push(`${describe(heading)} is drawn at ${Math.round(size)}px weight ${weight} against ${Math.round(bodySize)}px body text: unstyled`);
+    }
+  }
+  for (const heading of Array.from(document.querySelectorAll("h1, h2, h3"))) {
+    if (!visible(heading) || hiddenTree(heading)) continue;
+    const icon = heading.querySelector(":scope > svg");
+    if (!icon || !visible(icon)) continue;
+    const text = ownTextRects(heading).concat(Array.from(heading.querySelectorAll(":scope > span, :scope > small")).flatMap((child) => ownTextRects(child)));
+    if (text.length === 0) continue;
+    const iconRect = icon.getBoundingClientRect();
+    const top = Math.min(...text.map((rect) => rect.top));
+    const bottom = Math.max(...text.map((rect) => rect.bottom));
+    if (iconRect.bottom <= top + 1 || iconRect.top >= bottom - 1) {
+      problems.headings.push(`${describe(heading)}: the icon sits on its own line (${Math.round(iconRect.top)}..${Math.round(iconRect.bottom)}px, text ${Math.round(top)}..${Math.round(bottom)}px)`);
+    }
+  }
+
+  // Labels against their controls.
+  const controls = Array.from(document.querySelectorAll("input, select, textarea")).filter((el) => {
+    const type = (el as HTMLInputElement).type;
+    return !["checkbox", "radio", "hidden", "range", "file", "button", "submit", "reset", "image", "color"].includes(type) && visible(el) && !hiddenTree(el);
+  });
+  for (const control of controls) {
+    const labels = Array.from((control as HTMLInputElement).labels ?? []);
+    const controlRect = control.getBoundingClientRect();
+    for (const label of labels) {
+      // The label's own words: text outside the control and outside other fields.
+      const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+      const rects: DOMRect[] = [];
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const parent = node.parentElement;
+        if (!(node.textContent ?? "").trim() || !parent || control.contains(parent) || parent.closest("select, textarea, option, .sr-only")) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of Array.from(range.getClientRects())) if (rect.width > 0 && rect.height > 0) rects.push(rect);
+        range.detach();
+      }
+      for (const rect of rects) {
+        const vertical = Math.min(rect.bottom, controlRect.bottom) - Math.max(rect.top, controlRect.top);
+        const horizontal = Math.min(rect.right, controlRect.right) - Math.max(rect.left, controlRect.left);
+        if (vertical > 1 && horizontal > 1) {
+          problems.labelInput.push(`${describe(label)}: the label text overlaps its field by ${Math.round(horizontal)}x${Math.round(vertical)}px`);
+          break;
+        }
+        if (vertical > 1 && horizontal <= 1 && -horizontal < 6) {
+          problems.labelInput.push(`${describe(label)}: the label text runs into its field (${Math.round(-horizontal)}px between them on one line)`);
+          break;
+        }
+        if (vertical <= 1 && horizontal > 1 && controlRect.top - rect.bottom < 2 && controlRect.top >= rect.top) {
+          problems.labelInput.push(`${describe(label)}: the label text touches its field (${Math.round(controlRect.top - rect.bottom)}px between them)`);
+          break;
+        }
+      }
+    }
+  }
+
+  // Focus ring against other text.
+  const textBoxes: Array<{ el: Element; rect: DOMRect }> = [];
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    if (el.closest("select, textarea, option, script, style, noscript")) continue;
+    if (!visible(el) || hiddenTree(el) || placed(el)) continue;
+    for (const rect of ownTextRects(el)) textBoxes.push({ el, rect });
+  }
+  for (const control of controls.slice(0, 12)) {
+    (control as HTMLElement).focus({ preventScroll: true });
+    const style = getComputedStyle(control);
+    const width = style.outlineStyle === "none" ? 0 : Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+    if (width > 0) {
+      const box = control.getBoundingClientRect();
+      const ring = { left: box.left - width, right: box.right + width, top: box.top - width, bottom: box.bottom + width };
+      for (const text of textBoxes) {
+        if (control.contains(text.el) || text.el.contains(control)) continue;
+        const across = Math.min(ring.right, text.rect.right) - Math.max(ring.left, text.rect.left);
+        const down = Math.min(ring.bottom, text.rect.bottom) - Math.max(ring.top, text.rect.top);
+        if (across > 1 && down > 1) {
+          problems.focusRing.push(`${describe(control)}: its focus outline (${width}px out) lands on ${describe(text.el)} by ${Math.round(down)}px`);
+          break;
+        }
+      }
+    }
+    (control as HTMLElement).blur();
+  }
+
+  // Text over text, and text cut off sideways.
+  const sorted = textBoxes.slice().sort((a, b) => a.rect.top - b.rect.top);
+  let reported = 0;
+  for (let i = 0; i < sorted.length && reported < 6; i += 1) {
+    const a = sorted[i]!;
+    for (let j = i + 1; j < sorted.length; j += 1) {
+      const b = sorted[j]!;
+      if (b.rect.top >= a.rect.bottom - 1) break;
+      if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      const across = Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left);
+      const down = Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top);
+      // Lines that overlap by a few pixels at their edges are tight leading; text drawn over text is more than that.
+      if (across > 2 && down > Math.min(a.rect.height, b.rect.height) * 0.35 && down > 3) {
+        problems.textOverlap.push(`${describe(a.el)} overlaps ${describe(b.el)} by ${Math.round(across)}x${Math.round(down)}px`);
+        reported += 1;
+        break;
+      }
+    }
+  }
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    if (reported >= 8) break;
+    if (!visible(el) || hiddenTree(el)) continue;
+    const style = getComputedStyle(el);
+    const clamp = style.getPropertyValue("-webkit-line-clamp");
+    if (!/(hidden|clip)/.test(style.overflowX) || style.textOverflow === "ellipsis" || (clamp !== "" && clamp !== "none")) continue;
+    if (el.matches("body, html, table, [role=dialog]") || el.clientWidth === 0 || placed(el)) continue;
+    const box = el.getBoundingClientRect();
+    if (box.right > w + 1) continue;
+    // Text that would be drawn past this box, in a descendant that is not itself an ellipsis or scroll box.
+    const cut = textBoxes.find((entry) => {
+      if (!el.contains(entry.el)) return false;
+      const start = entry.el.getBoundingClientRect();
+      if (start.right <= box.right + 1 && start.left >= box.left - 1) return false;
+      for (let node: Element | null = entry.el; node && node !== el; node = node.parentElement) {
+        const inner = getComputedStyle(node);
+        if (inner.textOverflow === "ellipsis" || inner.overflowX !== "visible") return false;
+      }
+      return true;
+    });
+    if (cut) {
+      problems.textOverlap.push(`${describe(el)}: ${describe(cut.el)} is cut off sideways by the box (${Math.round(cut.el.getBoundingClientRect().right)}px in a box ending at ${Math.round(box.right)}px)`);
+      reported += 1;
+    }
+  }
+
+  // Disabled buttons keep a readable label.
+  for (const button of Array.from(document.querySelectorAll("button:disabled, a[aria-disabled=true]"))) {
+    if (!visible(button) || hiddenTree(button)) continue;
+    let opacity = 1;
+    let fill: Rgba | null = null;
+    for (let node: Element | null = button; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      opacity *= Number(style.opacity);
+      const colour = parse(style.backgroundColor);
+      if (!fill && colour && colour.a > 0) fill = colour;
+    }
+    const style = getComputedStyle(button);
+    const text = parse(style.color);
+    if (!text) continue;
+    // Opacity fades the finished button, so fill and label are each faded against the page behind it.
+    const shownFill = over({ ...(fill ?? white), a: (fill?.a ?? 1) * opacity }, white);
+    const shownText = over({ ...text, a: text.a * opacity }, white);
+    const contrast = ratio(shownText, shownFill);
+    if (contrast < 3) problems.disabled.push(`${describe(button)}: the disabled label has ${contrast.toFixed(2)}:1 against its fill (needs 3:1)`);
+  }
+  return problems;
+}
+
 /** Runs in the page after scrolling to the bottom: is the last content under a fixed bar? */
 function coveredByBarInPage() {
   const h = window.innerHeight;
@@ -1859,6 +2126,12 @@ function injectDefects() {
     // A field whose border is as pale as the old #cbdbe2 (1.4:1), and one with no border at all.
     '<input aria-label="self-test pale field" style="display:block;width:200px;height:32px;border:1px solid #cbdbe2;background:#fff">',
     '<input aria-label="self-test borderless field" style="display:block;width:200px;height:32px;border:0;background:transparent">',
+    // An unstyled heading, a label that runs into its field, text drawn over text, a focus ring on the help text under it, and a disabled button nobody can read.
+    '<h2 style="margin:0;font:inherit">self-test unstyled heading</h2>',
+    '<label style="display:block">self-test label<input style="display:inline-block;margin:0;width:120px;border:1px solid #333"></label>',
+    '<p style="margin:0">self-test line one of two</p><p style="margin:-10px 0 0">self-test line two of two</p>',
+    '<input aria-label="self-test ring" style="display:block;width:200px;height:32px;margin:0;border:1px solid #333;outline:3px solid red;outline-offset:6px"><p style="margin:-4px 0 0">self-test help under the ring</p>',
+    '<button disabled type="button" style="min-width:44px;min-height:44px;background:#fff;color:#ddd;opacity:1">self-test disabled</button>',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");
@@ -2064,6 +2337,139 @@ async function auditOrderDescriptions(page: Page, spec: PageSpec, width: number,
   }
 }
 
+/**
+ * The same measurements as a page's first look, for one state reached by clicking (a step of a form, an open sheet, the
+ * confirmation page). `name` says which state, so a finding names the step.
+ */
+async function auditState(page: Page, name: string, width: number, prefix: string) {
+  await page.evaluate(() => document.fonts.ready).catch(() => undefined);
+  await page.waitForTimeout(150);
+  const touch = width <= touchMaxWidth;
+  const result = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
+  if (result.scrollWidth > result.innerWidth) record("horizontal-scroll", name, width, `page is ${result.scrollWidth}px wide in a ${result.innerWidth}px window; sticking out: ${result.overflowers.join("; ") || "(nothing identified)"}`);
+  for (const target of result.smallTargets) record("small-tap-target", name, width, target);
+  for (const note of result.barNotes) record("sticky-bar-size", name, width, note);
+  const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
+  fieldsChecked += fields.checked;
+  for (const problem of fields.problems) record("field-boundary", name, width, problem);
+  const text = await page.evaluate(textLayoutInPage);
+  for (const problem of text.headings) record("heading-style", name, width, problem);
+  for (const problem of text.labelInput) record("label-input", name, width, problem);
+  for (const problem of text.focusRing) record("focus-ring-overlap", name, width, problem);
+  for (const problem of text.textOverlap) record("text-overlap", name, width, problem);
+  for (const problem of text.disabled) record("disabled-contrast", name, width, problem);
+  const fit = await page.evaluate(dialogFitInPage);
+  dialogsOpened += fit.count;
+  for (const problem of fit.problems) record("dialog-too-tall", name, width, problem);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(60);
+  // Behind an open sheet the page is not what a person reads, so the bar rule is for states with no dialog open.
+  const covered = fit.count === 0 ? await page.evaluate(coveredByBarInPage) : null;
+  if (covered) record("sticky-bar-covers-content", name, width, covered);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  if (takeShots) await page.screenshot({ path: `${prefix}.jpg`, type: "jpeg", quality: 60, fullPage: true }).catch(() => undefined);
+}
+
+/** Fills whatever the visible step of the public registration form requires with synthetic answers, never submitting. */
+async function fillRequiredStep(page: Page, email: string) {
+  const content = page.locator(".public-registration-step-content");
+  const combos = content.locator('input[role="combobox"][required]:visible');
+  for (let index = 0; index < (await combos.count()); index += 1) {
+    const combo = combos.nth(index);
+    if ((await combo.inputValue()) !== "") continue;
+    await combo.click();
+    await combo.fill("Mobilecheck Eagles");
+    await page.waitForTimeout(200);
+    await page.locator('[role="listbox"] [role="option"]:visible').first().click();
+  }
+  const fields = content.locator("input[required]:not([role=combobox]):visible, textarea[required]:visible");
+  for (let index = 0; index < (await fields.count()); index += 1) {
+    const field = fields.nth(index);
+    const type = await field.getAttribute("type");
+    if (type === "checkbox" || type === "radio") { await field.check({ force: true }).catch(() => undefined); continue; }
+    if ((await field.inputValue()) !== "") continue;
+    await field.fill(type === "email" ? email : type === "tel" ? "515-555-0100" : type === "number" ? "14" : "Mobilecheck Synthetic");
+  }
+  const selects = content.locator("select[required]:visible");
+  for (let index = 0; index < (await selects.count()); index += 1) {
+    if ((await selects.nth(index).inputValue()) === "") await selects.nth(index).selectOption({ index: 1 });
+  }
+  // A choice nobody has made yet (the release's Yes): the first option of each radio group with none chosen.
+  const radios = content.locator("input[type=radio]:visible");
+  const groups = new Set<string>();
+  for (let index = 0; index < (await radios.count()); index += 1) {
+    const radio = radios.nth(index);
+    const group = (await radio.getAttribute("name")) ?? `radio-${index}`;
+    if (groups.has(group)) continue;
+    groups.add(group);
+    if (!(await content.locator(`input[type=radio][name="${group}"]:checked`).count())) await radio.check({ force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * The general registration link as a director walks it (a PBE team without an account): the start step filled in, every step of the
+ * form, a team member's sheet, the review, and the confirmation after submitting a synthetic team (named for the width, so each
+ * run adds its own waiting team). Each state is measured like a page of its own.
+ */
+async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, prefix: string) {
+  const name = (state: string) => `${spec.name} (${state})`;
+  const shot = (state: string) => `${prefix}-${state.replace(/[^a-z0-9]+/gi, "-")}`;
+  const email = `${P}.walkthrough.${width}@example.test`;
+  try {
+    await page.locator("input[type=radio][name=club-location]").first().check({ force: true });
+    await page.fill("#general-link-team-name", `Mobilecheck Walkthrough Team ${width}`);
+    await auditState(page, name("start, filled in"), width, shot("start-filled"));
+    await page.click("button:has-text('Continue')");
+    await page.waitForTimeout(400);
+    for (let step = 0; step < 8; step += 1) {
+      const heading = ((await page.locator("#public_registration_step_heading").innerText().catch(() => "")) || `step ${step + 1}`).replace(/\s+/g, " ").trim();
+      await auditState(page, name(heading), width, shot(heading));
+      if (/review/i.test(heading)) break;
+      // The team members step: each person is edited in a sheet. Audit the first one open, then fill them all.
+      const toggles = page.locator('.public-registration-step-content button[id^="public_attendee_"][id$="_toggle"]:visible');
+      const people = await toggles.count();
+      for (let person = 0; person < people; person += 1) {
+        await toggles.nth(person).click();
+        await page.waitForTimeout(300);
+        if (person === 0) await auditState(page, name(`${heading}, a team member's sheet`), width, shot(`${heading}-sheet`));
+        const sheet = page.locator(`#public_attendee_initial-attendee-${person + 1}`);
+        for (const [suffix, value] of [["pbe_member_first", `Walker${person + 1}`], ["pbe_member_last", "Mobilecheck-Synthetic"], ["pbe_member_age", "14"]] as const) {
+          await sheet.locator(`input[id$="_${suffix}"]`).fill(value);
+        }
+        await sheet.locator('input[type=radio][id$="_pbe_member_role"]').first().check({ force: true }).catch(() => undefined);
+        await sheet.locator('button:has-text("Done with")').click({ timeout: 5000 });
+        await page.waitForTimeout(250);
+      }
+      await fillRequiredStep(page, email);
+      await page.click("button.is-continue");
+      await page.waitForTimeout(450);
+      const problem = await page.locator(".public-registration-error-summary").innerText().catch(() => "");
+      if (problem) {
+        record("audit-failed", name(heading), width, `could not move past this step with synthetic answers: ${problem.replace(/\s+/g, " ").slice(0, 200)}`);
+        return;
+      }
+    }
+    await page.locator(".public-registration-submit-card button[type=submit]").first().click({ timeout: 5000 });
+    await page.waitForSelector(".public-registration-confirmation", { timeout: 20_000 });
+    await auditState(page, name("confirmation after submitting"), width, shot("confirmation"));
+  } catch (error) {
+    record("audit-failed", name("walkthrough"), width, (error as Error).message.split("\n")[0] ?? "failed");
+  }
+}
+
+/** The waiting teams page with a team's Reject form open (never submitted) and the club list focused. */
+async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, prefix: string) {
+  const name = `${spec.name} (reject form open)`;
+  try {
+    await page.goto(`${baseUrl}${spec.path}`, { waitUntil: "load" });
+    await page.locator(".pending-team-reject:visible").first().click({ timeout: 5000 });
+    await page.waitForTimeout(200);
+    await auditState(page, name, width, `${prefix}-reject-open`);
+  } catch (error) {
+    record("audit-failed", name, width, (error as Error).message.split("\n")[0] ?? "failed");
+  }
+}
+
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
   const url = `${baseUrl}${spec.path}`;
   // "load", then a bounded wait for quiet: Next prefetches every visible link, so
@@ -2109,6 +2515,12 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
   fieldsChecked += fields.checked;
   for (const problem of fields.problems) record("field-boundary", spec.name, width, problem);
+  const text = await page.evaluate(textLayoutInPage);
+  for (const problem of text.headings) record("heading-style", spec.name, width, problem);
+  for (const problem of text.labelInput) record("label-input", spec.name, width, problem);
+  for (const problem of text.focusRing) record("focus-ring-overlap", spec.name, width, problem);
+  for (const problem of text.textOverlap) record("text-overlap", spec.name, width, problem);
+  for (const problem of text.disabled) record("disabled-contrast", spec.name, width, problem);
 
   // Scroll to the bottom: is the last content hidden behind a fixed bar?
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -2509,6 +2921,8 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.screenshot({ path: `${prefix}.jpg`, type: "jpeg", quality: 60 });
     });
   }
+  if (spec.flow === "general-link") await auditGeneralLinkFlow(page, spec, width, prefix);
+  if (spec.flow === "pending-teams") await auditPendingTeamsFlow(page, spec, width, prefix);
   pagesVisited.push(`${spec.name}@${width}`);
 }
 

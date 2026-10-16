@@ -2,6 +2,7 @@
 
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
+import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
 import { staffPageTitles } from "@/components/staff-navigation";
@@ -268,6 +269,7 @@ export function PeopleWorkspace({
   matchingPersonFilter = false,
   pageScoped = false,
   openOnlyRegistration = null,
+  pendingTeamCount = 0,
 }: {
   eventId: string;
   eventSlug: string;
@@ -294,6 +296,8 @@ export function PeopleWorkspace({
   pageScoped?: boolean;
   /** A registration opened by link (?registration=) that is not on this page of a search: it opens the detail and is never a row, a count or a selection. */
   openOnlyRegistration?: RegistrationRecord | null;
+  /** Teams from the general registration link waiting for staff to confirm a club (#931): not registrations, so not in any count here. */
+  pendingTeamCount?: number;
 }) {
   const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
   const [registrations, setRegistrations] = useState(initialRegistrations);
@@ -753,6 +757,7 @@ export function PeopleWorkspace({
 
   return (
     <section className="page-stack">
+      <PendingTeamsNotice canManage={canEdit} count={pendingTeamCount} eventId={eventId} />
       {/* Search first, then Start registration, then the maintenance actions in one menu (#743). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
@@ -761,7 +766,7 @@ export function PeopleWorkspace({
       <div className="page-intro people-intro">
         <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
         <div className="intro-actions">
-          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}</span>
+          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
           <ActionsMenu>
             {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
@@ -841,7 +846,9 @@ export function PeopleWorkspace({
             icon={<UsersRound aria-hidden="true" size={24} />}
             title="No registrations yet"
           >
-            Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page.
+            {canEdit && pendingTeamCount > 0
+              ? `No team is registered yet, but ${pendingTeamsLabel(pendingTeamCount)}. Use the Review them link above to confirm the club; a team becomes a registration then.`
+              : "Nobody has registered for this event. Registrations show up here as people submit the public form; staff can also register someone from the public page."}
           </EmptyState>
         : <div className="empty-state panel"><Search aria-hidden="true" size={24} /><h3>No matching registrations</h3><p>Nothing matches this search or filter. Clear it to see all {registrations.length} registrations.</p><button className="secondary-button" onClick={() => { setQuery(""); setFilter("ALL"); }} type="button">Clear search and filter</button></div>)}
 
