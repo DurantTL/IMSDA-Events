@@ -72,4 +72,14 @@ describe("OperationsSearchBar", () => {
     expect(render(["VIEW_EVENT"], "status=CONFIRMED")).toMatch(/<details[^>]*\sopen/);
     expect(render(["VIEW_EVENT"], "", true)).toMatch(/<details[^>]*\sopen/);
   });
+
+  it("keeps the disclosure closed when only the location is set, and opens it for a zero-result summary", () => {
+    const { query } = parseOperationsSearchParams(new URLSearchParams("location=site-1"));
+    const filters = availableOperationsFilters({ eventId: "event-a", permissions: ["VIEW_EVENT"] }, catalog);
+    const base = { basePath: "/people", carry: {}, eventId: "event-a", filters, query };
+    const locationOnly = renderToStaticMarkup(createElement(OperationsSearchBar, { ...base, summary: null }));
+    expect(locationOnly).not.toMatch(/<details[^>]*\sopen/);
+    const empty = renderToStaticMarkup(createElement(OperationsSearchBar, { ...base, summary: { total: 0, page: 1, pageCount: 1, issues: [] } }));
+    expect(empty).toMatch(/<details[^>]*\sopen/);
+  });
 });

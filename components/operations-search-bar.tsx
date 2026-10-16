@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import {
+  activeFilterKeys,
   hasActiveFilters,
   serializeOperationsSearchQuery,
   type OperationsSearchQuery,
@@ -94,7 +95,7 @@ export function OperationsSearchBar({
 
   return (
     <section aria-label="Search registrations" className="operations-search" data-testid="operations-search">
-      <details className="operations-search-disclosure" data-testid="operations-search-disclosure" open={active || summary !== null}>
+      <details className="operations-search-disclosure" data-testid="operations-search-disclosure" open={activeFilterKeys(query).some((key) => key !== "location") || summary !== null}>
       <summary>Advanced search</summary>
       <form action={basePath} className="form-stack operations-search-form" method="get">
         <input name="event" type="hidden" value={eventId} />
