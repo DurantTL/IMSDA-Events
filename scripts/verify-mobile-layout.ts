@@ -1435,7 +1435,10 @@ function textAuditInPage(args: { floor: number; upperFloor: number; exceptions: 
     probe.style.textTransform = style.textTransform;
     const room = th.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     let widest = 0; let word = "";
-    for (const candidate of (th.textContent ?? "").replace(/[▲▼↑↓]/g, "").split(/[\s-]+/).filter(Boolean)) {
+    // Only the words a person sees: visually hidden text (a "Select" or "Actions" label) is not laid out in the column.
+    const shown = th.cloneNode(true) as Element;
+    for (const hidden of Array.from(shown.querySelectorAll(".sr-only, .visually-hidden, [hidden], [aria-hidden='true']"))) hidden.remove();
+    for (const candidate of (shown.textContent ?? "").replace(/[▲▼↑↓]/g, "").split(/[\s-]+/).filter(Boolean)) {
       probe.textContent = candidate;
       const width = probe.getBoundingClientRect().width;
       if (width > widest) { widest = width; word = candidate; }

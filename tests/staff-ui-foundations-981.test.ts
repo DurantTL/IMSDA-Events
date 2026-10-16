@@ -22,7 +22,7 @@ describe("staff UI foundations (#981 batch 1)", () => {
   it("gives stacked meta lines a gap and a line height of at least 1.4", () => {
     expect(css).toMatch(/\.meta-stack \{ display: grid; gap: 4px;/);
     expect(css).toMatch(/\.meta-stack > \* \{ margin: 0; line-height: 1\.45; \}/);
-    expect(css).toMatch(/\n\.field-help \{ margin: 0; line-height: 1\.45; \}/);
+    expect(css).toMatch(/\n\.app-shell \.field-help \{ margin: 0; line-height: 1\.45; \}/);
   });
 
   it("puts icons in an eyebrow inline with its label", () => {
@@ -38,6 +38,48 @@ describe("staff UI foundations (#981 batch 1)", () => {
   it("does not let the colour, file, checkbox and radio rules reach visually hidden inputs", () => {
     expect(css).toContain('input[type="file"]:not(.sr-only, .visually-hidden) {');
     expect(css).toContain('.app-shell input[type="color"]:not(.sr-only, .visually-hidden) {');
+  });
+
+  it("declares the staff and label floors only on .app-shell, so club, account and public pages keep 12px meta text", () => {
+    for (const token of ["--type-staff-floor", "--type-label-floor"]) {
+      const declarations = [...css.matchAll(new RegExp(`${token}:\\s*[^;]+;`, "g"))];
+      expect(declarations, token).toHaveLength(1);
+      const before = css.slice(0, declarations[0].index);
+      expect(before.slice(before.lastIndexOf("{") - 40, before.lastIndexOf("{")), token).toContain(".app-shell");
+    }
+  });
+
+  it("keeps print's overflow: visible on report wrappers (nothing after the print block makes them scroll)", () => {
+    const print = css.indexOf(".report-table-wrap { overflow: visible; }");
+    expect(print).toBeGreaterThan(0);
+    const after = css.slice(print + 1);
+    expect(after).not.toMatch(/(^|\})\s*\.(report-table-wrap|table-wrap|table-scroll)\b[^{}]*\{[^{}]*overflow(-x)?:\s*(auto|scroll)/);
+  });
+
+  it("lets an event-settings error message keep its colour and weight over the help-text rule", () => {
+    expect(css).toContain(".app-shell .form-stack label > small:not(.field-error-message)");
+    expect(css).toMatch(/\.event-settings-panel label > small\.field-error-message \{ color: var\(--danger, #8f3a30\);[^}]*font-weight: 700;/);
+  });
+
+  it("leaves classed toggles alone and sizes checkboxes only above 768px, where the phone block does not", () => {
+    // Only an unclassed label, or .checkbox-label, gets the shared row; .event-setting-toggle and
+    // .public-registration-check keep their own alignment and 3px input margin.
+    expect(css).toContain('label:not([class]) > input:is([type="checkbox"], [type="radio"])');
+    expect(css).not.toMatch(/\.app-shell :is\([^)]*\) input\[type="checkbox"\]/);
+    const wide = css.match(/@media screen and \(min-width: 769px\) \{\s*\.app-shell :is\(\.filter-bar[^}]*\{[^}]*width: 1\.125rem;/);
+    expect(wide).not.toBeNull();
+    expect(css).toMatch(/@media screen and \(max-width: 768px\) \{\s*:root \{ --check-row-height: var\(--touch-target, 44px\); \}/);
+  });
+
+  it("scopes the field-help margin model and the header no-break rule to the staff workspace", () => {
+    expect(css).not.toMatch(/\n\.field-help \{ margin: 0;/);
+    expect(css).not.toMatch(/\n\.report-table thead th,\s*\n\.table-scroll/);
+    expect(css).toContain(".app-shell .report-table thead th,");
+  });
+
+  it("uses .meta-stack where stacked meta lines were touching", () => {
+    expect(read("components/check-in-workspace.tsx")).toContain('className="meta-stack"');
+    expect(read("components/finance-workspace.tsx")).toContain('className="meta-stack"');
   });
 
   it("audits the new rules on the pages the issue names", () => {

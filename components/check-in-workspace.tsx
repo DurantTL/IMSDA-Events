@@ -730,7 +730,7 @@ export function CheckInWorkspace({
               <span className={`person-avatar ${arrival.checkedIn ? "green" : "purple"}`}>
                 {arrival.firstName[0]}{arrival.lastName[0]}
               </span>
-              <span>
+              <span className="meta-stack">
                 <strong translate="no">{arrival.firstName} {arrival.lastName}</strong>
                 <small>
                   <span translate="no">{arrival.confirmationCode}</span> ·{" "}

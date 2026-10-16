@@ -11038,32 +11038,40 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .app-shell .form-stack > .panel > :is(h2, h3, p) { margin-block: 0; }
 
 /* Help written inside a label (<small>) is help text, at the floor and with room between lines. */
-.app-shell .form-stack label > small,
-.app-shell .field-row > small {
+.app-shell .form-stack label > small:not(.field-error-message),
+.app-shell .field-row > small:not(.field-error-message) {
   color: var(--muted);
   font-size: max(var(--type-body-floor, 0px), 0.875rem);
   font-weight: 500;
   line-height: 1.45;
 }
-.field-help { margin: 0; line-height: 1.45; }
-:is(input, select, textarea, .select-shell) + .field-help,
-.form-stack > .field-help,
-.form-grid > .field-help { margin-top: -9px; }
+.app-shell .field-help { margin: 0; line-height: 1.45; }
+.app-shell :is(input, select, textarea, .select-shell) + .field-help,
+.app-shell .form-stack > .field-help,
+.app-shell .form-grid > .field-help { margin-top: -9px; }
 .app-shell .form-stack > .panel > .field-help { margin-top: 0; }
 .app-shell .form-stack > .panel > :is(label, .field-row) + .field-help { margin-top: -9px; }
 
-/* Checkboxes and radios: one size, the brand colour, and a row with the label text beside the box
-   (not a full-width box above it). Colour and file inputs are styled below. */
-.app-shell :is(.form-stack, .form-grid, .field-row, .filter-bar, .checkbox-label) input[type="checkbox"]:not(.sr-only, .visually-hidden),
-.app-shell :is(.form-stack, .form-grid, .field-row, .filter-bar, .checkbox-label) input[type="radio"]:not(.sr-only, .visually-hidden) {
+/* Checkboxes and radios: the brand colour, no stray padding or margin, and a row with the label
+   text beside the box (not a full-width box above it). Only the boxes of an unclassed label and of
+   .checkbox-label are touched: a classed toggle (.event-setting-toggle, .public-registration-check,
+   .switch-toggle, .message-enabled-toggle) has its own layout and keeps it. The box size is set above
+   768px only; the 768px block earlier in this file sizes the box (22px) and the row (44px) below it. */
+.app-shell :is(.filter-bar, .form-stack, .form-grid, .field-row) label:not([class]) > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden),
+.app-shell .checkbox-label > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden) {
   flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
   margin: 0;
   padding: 0;
   accent-color: var(--imsda-purple);
 }
-.app-shell :is(.filter-bar, .form-stack, .form-grid, .field-row) label:has(> input[type="checkbox"], > input[type="radio"]):not(.checkbox-hit, .message-enabled-toggle, .message-delivery-mode label) {
+@media screen and (min-width: 769px) {
+  .app-shell :is(.filter-bar, .form-stack, .form-grid, .field-row) label:not([class]) > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden),
+  .app-shell .checkbox-label > input:is([type="checkbox"], [type="radio"]):not(.sr-only, .visually-hidden) {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
+.app-shell :is(.filter-bar, .form-stack, .form-grid, .field-row) label:not([class]):has(> input:is([type="checkbox"], [type="radio"])) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -11072,8 +11080,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-weight: 500;
 }
 .app-shell .checkbox-label { min-height: var(--check-row-height, 2.25rem); }
-/* A checkbox row is a tap target on a phone. */
-@media screen and (max-width: 600px) {
+/* A checkbox row is a tap target wherever the 44px target rules apply (768px and under). */
+@media screen and (max-width: 768px) {
   :root { --check-row-height: var(--touch-target, 44px); }
 }
 
@@ -11177,24 +11185,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Meta stack: stacked meta lines (a title and its sub-lines) have a gap and a line height of at
    least 1.4, so two lines never touch. */
 .meta-stack { display: grid; gap: 4px; min-width: 0; }
-.meta-stack > * { margin: 0; line-height: 1.45; }
-.finance-record strong, .finance-record small,
-.payment-history strong, .payment-history small,
-.finance-attendee-list strong, .finance-attendee-list small,
-.arrival-row strong, .arrival-row small,
-.attention-row strong, .attention-row small,
-.check-in-queue-item strong, .check-in-queue-item small,
-.activity-row strong, .activity-row small,
-.action-card strong, .action-card small,
-.metric-card small,
-.record-card strong, .record-card small,
-.system-navigation-link small,
-.attendee-summary small,
-.club-check-in-attendee strong, .club-check-in-attendee small { line-height: 1.45; }
-.finance-record small, .payment-history small, .arrival-row small, .attention-row small,
-.activity-row small, .club-check-in-attendee small, .finance-attendee-list small { margin-top: 4px; }
-.arrival-row > span:nth-child(2) { display: grid; justify-items: start; gap: 4px; min-width: 0; }
-.arrival-row > span:nth-child(2) > * { margin: 0; }
+.app-shell .meta-stack > *, .meta-stack > * { margin: 0; line-height: 1.45; }
+.app-shell :is(.finance-record, .payment-history, .finance-attendee-list, .arrival-row, .attention-row, .check-in-queue-item, .activity-row, .action-card, .record-card, .club-check-in-attendee) :is(strong, small),
+.app-shell .metric-card small,
+.app-shell .system-navigation-link small,
+.app-shell .attendee-summary small { line-height: 1.45; }
+.arrival-row > .meta-stack { justify-items: start; }
 
 /* Icons that sit with a label sit inline with it, not on a line of their own (svg is display: block
    from the reset, which put the icon above "Identity", "Sign-in" and the other section labels). */
@@ -11209,21 +11205,20 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
    its longest word at the narrowest), a data column has a readable minimum width, and a table that
    needs more room than the page scrolls inside its own wrapper, never past the screen. On phones a
    table marked table-cards is a stack of cards instead (docs/RESPONSIVE.md). */
-.report-table thead th,
-.table-scroll > table thead th,
-.table-wrap > table thead th {
+.app-shell .report-table thead th,
+.app-shell .table-scroll > table thead th,
+.app-shell .table-wrap > table thead th {
   overflow-wrap: normal;
   word-break: normal;
   hyphens: none;
 }
-.report-table-wrap, .table-wrap, .table-scroll { max-width: 100%; overflow-x: auto; }
 @media screen and (min-width: 601px) {
-  .attendee-listing-table th { overflow-wrap: normal; word-break: normal; white-space: normal; }
-  .attendee-listing-table th:nth-child(n+4) { min-width: 6.5rem; }
-  .attendee-listing-table th:nth-child(1),
-  .attendee-listing-table th:nth-child(2) { min-width: 8rem; }
-  .attendee-listing-table th:nth-child(3) { min-width: 11rem; }
-  .attendee-listing-table { min-width: 88rem; }
+  .attendee-listing-table thead th, .attendee-listing-table td { overflow-wrap: normal; word-break: normal; }
+  /* Only the long free-text columns (the name, the account holder) break inside a word. */
+  .attendee-listing-table tbody th, .attendee-listing-table td:last-child { overflow-wrap: anywhere; }
+  /* The 12 columns take the room their longest header word needs and no more (the 78rem minimum above
+     made the list scroll at 1280 even when the columns fit); what does not fit scrolls in its box. */
+  .attendee-listing-table { min-width: 0; }
 }
 
 /* Finance list on a phone (#981): each registration is a card. The name and its sub-lines take the
