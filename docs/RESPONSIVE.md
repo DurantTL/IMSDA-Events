@@ -88,6 +88,16 @@ authenticator, a roster, a monthly report, invites, a Sterling Volunteers list a
 a club event) and mints sessions that skip the second step. Nothing in it is a
 real person.
 
+**Rules added in #996** (they run on every page and width): `squeezed-text` (text in a box
+narrower than about four characters, text that wraps one character per line, or an
+ordinary 6 to 15 letter word broken in the middle; emails, codes and longer unbroken strings
+may break anywhere), `bar-over-text` (when a page opens, a sticky or fixed action bar that
+holds a button sits on top of text; an action bar stays in the page flow until the reader
+has scrolled past the heading or intro, see `usePinAfterScroll`), and `loading-screen` (the
+shell's "Loading IMSDA Events…" is waited out before measuring, and a page that never leaves
+it is a finding). The sign-in, recovery, calendar and club-directory pages and the
+invalid-link states are in `pages`.
+
 **Adding a page:** add a line to `pages` in the script. A page that needs data
 the script does not create gets that data in `seedSynthetic`. A button that
 opens a dialog without `aria-haspopup="dialog"` goes in `dialogOpeners`.
