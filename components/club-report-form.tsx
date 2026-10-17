@@ -306,22 +306,12 @@ export function ClubReportForm({
     <>
       {renderSummary(asDialog)}
 
-      {readOnly && (
-        <div className="inline-notice" role="status">
-          {readOnlyNote ?? (
-            <>
-              This report closed on {dueLabel}. You can&apos;t submit changes now — email{" "}
-              <a href={`mailto:${REPORT_CHANGE_REQUEST_EMAIL}`}>{REPORT_CHANGE_REQUEST_EMAIL}</a> to request a change.
-            </>
-          )}
-        </div>
-      )}
-      {!readOnly && allowDraft && !isDraft && report && reopenEndpoint && (
+      {allowDraft && !isDraft && report && reopenEndpoint && (
         <div className="inline-notice" role="status">
           Submitted. <button className="text-button" disabled={saving} onClick={reopen} type="button">Reopen as draft</button> to change it.
         </div>
       )}
-      {!readOnly && notesPrefill && (report ? isDraft : notesChanged) && (
+      {notesPrefill && (report ? isDraft : notesChanged) && (
         <div className="inline-notice" role="status">
           {notesChanged && "Meeting notes changed after you opened this report. "}
           <button className="text-button" disabled={saving} onClick={refreshFromNotes} type="button">
@@ -332,7 +322,7 @@ export function ClubReportForm({
       {notice && <div className="inline-notice success" data-report-feedback="" ref={feedbackRef} role="status" tabIndex={-1}>{notice}</div>}
       {error && <div className="inline-notice error" data-report-feedback="" ref={errorRef} role="alert" tabIndex={-1}>{error}</div>}
 
-      <fieldset className={`${card} form-stack`} disabled={readOnly || saving}>
+      <fieldset className={`${card} form-stack`} disabled={saving}>
         <legend className={eyebrow}>Club facts</legend>
         <div className="form-grid two-column">
           <label>Meeting place<input defaultValue={report?.meetingPlace ?? prefill.meetingPlace} maxLength={200} name="meetingPlace" /></label>
@@ -345,7 +335,7 @@ export function ClubReportForm({
         </div>
       </fieldset>
 
-      <fieldset className={`${card} form-stack`} disabled={readOnly || saving}>
+      <fieldset className={`${card} form-stack`} disabled={saving}>
         <legend className={eyebrow}>Points</legend>
         <div className="club-report-item club-report-auto">
           <span><strong>Report submitted by {dueLabel}</strong><small>Worked out from when you first submit.</small></span>
@@ -422,20 +412,18 @@ export function ClubReportForm({
         </div>
       </fieldset>
 
-      <fieldset className={`${card} form-stack`} disabled={readOnly || saving}>
+      <fieldset className={`${card} form-stack`} disabled={saving}>
         <legend className={eyebrow}>Signature</legend>
         <div className="form-grid two-column">
           <label>Type your full name<input autoComplete="name" defaultValue={report?.signatureName ?? ""} maxLength={120} minLength={2} name="signatureName" required /></label>
           <label>Date<input defaultValue={report?.signedOn ?? today()} name="signedOn" required type="date" /></label>
         </div>
-        {!readOnly && (
-          <div className="intro-actions">
-            {allowDraft && (!report || isDraft) && (
-              <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
-            )}
-            <SubmitButton className="primary-button" disabled={saving || problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving && savingIntent === "submit"} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
-          </div>
-        )}
+        <div className="intro-actions">
+          {allowDraft && (!report || isDraft) && (
+            <SubmitButton className="secondary-button" formNoValidate name="intent" value="draft" icon={<Save aria-hidden="true" size={16} />} disabled={saving} label="Save draft" submitting={saving && savingIntent === "draft"} submittingLabel="Saving…" />
+          )}
+          <SubmitButton className="primary-button" disabled={saving || problems.length > 0} icon={<Send aria-hidden="true" size={16} />} label={`${allowDraft ? "Submit report" : (report ? "Save changes" : "Save report")} · ${total} points`} name="intent" submitting={saving && savingIntent === "submit"} submittingLabel={allowDraft ? "Submitting…" : "Saving…"} value="submit" />
+        </div>
       </fieldset>
     </>
   );

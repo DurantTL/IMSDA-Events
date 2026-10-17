@@ -3,6 +3,7 @@
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
 import { useConfirm } from "@/components/use-confirm";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
+import { isCodeLikeAnswer } from "@/modules/forms/review-answer-code";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -2720,7 +2721,7 @@ export function PublicRegistrationForm({
           {answers.map(({ field, answer }) => (
             <div key={field.id}>
               <dt>{field.label}</dt>
-              <dd className={typeof answer === "string" && /@|^[A-Za-z0-9_-]{8,}$/.test(answer.trim()) ? "is-code" : undefined}>{answer}</dd>
+              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined}>{answer}</dd>
             </div>
           ))}
         </dl>

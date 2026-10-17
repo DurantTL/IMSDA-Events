@@ -101,17 +101,22 @@ describe("badge print CSS (#717)", () => {
 });
 
 describe("the vertical (ID sleeve) layout has a slot size to rotate into (#996)", () => {
-  it("defines --slot-w and --slot-h on every sheet, matching the sheet's own columns and rows", () => {
+  it("rotates into a box of the slot's height by its width, sized by the page from the template", () => {
     expect(css).toMatch(/\.badge-sheet-orientation-portrait \.badge-label-inner\s*\{[^}]*width:\s*var\(--slot-h\);[^}]*height:\s*var\(--slot-w\);/);
+    const page = readFileSync(path.join(process.cwd(), "app/(workspace)/check-in/badges/page.tsx"), "utf8");
+    expect(page).toContain('"--slot-w": `${template.slotWidthIn}in`');
+    expect(page).toContain('"--slot-h": `${template.slotHeightIn}in`');
     for (const id of badgeTemplateIds) {
-      const slot = css.match(new RegExp(`\\.badge-sheet-${id}\\s*\\{\\s*--slot-w:\\s*([\\d.]+)in;\\s*--slot-h:\\s*([\\d.]+)in;\\s*\\}`));
-      expect(slot, `${id} needs --slot-w and --slot-h`).not.toBeNull();
-      const sheet = css.match(new RegExp(`\\.badge-sheet-${id}\\s*\\{([^}]*grid-template-columns[^}]*)\\}`))?.[1] ?? "";
-      const column = sheet.match(/grid-template-columns:\s*repeat\(\d+,\s*([\d.]+)in\)/)?.[1];
-      const row = sheet.match(/grid-template-rows:\s*repeat\(\d+,\s*([\d.]+)in\)/)?.[1];
-      expect(Number(slot![1])).toBeCloseTo(Number(column), 3);
-      expect(Number(slot![2])).toBeCloseTo(Number(row), 3);
+      expect(badgeTemplates[id].slotWidthIn, id).toBeGreaterThan(0);
+      expect(badgeTemplates[id].slotHeightIn, id).toBeGreaterThan(0);
     }
+  });
+
+  it("lets the group line wrap to two lines instead of ending in an ellipsis", () => {
+    const block = css.match(/\.badge-sheet-orientation-portrait \.badge-label-inner > p \{([^}]*)\}/)?.[1] ?? "";
+    expect(block).toMatch(/white-space:\s*normal;/);
+    expect(block).toMatch(/-webkit-line-clamp:\s*2;/);
+    expect(block).toMatch(/text-overflow:\s*clip;/);
   });
 });
 

@@ -6666,6 +6666,17 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* #996: in the vertical (ID sleeve) layout the group line wraps to a second line instead of ending in "…". */
+.badge-sheet-orientation-portrait .badge-label-inner > p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  line-height: 1.2;
+}
 .badge-label-card footer {
   display: flex;
   width: 100%;
@@ -11495,7 +11506,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .scheduled-email-roles legend { margin-bottom: 6px; padding: 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; }
 
 /* #996: a bold checkbox label and its description are two lines, never one run-on sentence. */
-.checkbox-label > span:has(> strong, > small) { display: grid; gap: 2px; min-width: 0; }
+.checkbox-label > span:has(> strong + small) { display: grid; gap: 2px; min-width: 0; }
 .checkbox-label > span > small { color: var(--muted); font-weight: 500; }
 
 /* #996: scholarship fund lists. Name and note are two lines, a code never splits, a note pill sits under its status. */
@@ -11503,12 +11514,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .scholarship-fund-list .finance-row > span > small { margin-top: 2px; }
 .scholarship-fund-list .finance-row > span > small.form-error { width: fit-content; max-width: 100%; margin-top: 6px; padding: 4px 8px; line-height: 1.4; }
 .scholarship-fund-code-link { white-space: nowrap; }
-
-/* #996: the size of one label slot. The Vertical (ID sleeve) layout rotates the label's contents inside the slot and
-   needs both numbers; with them undefined the rotated box had no size and clipped names and the footer line. */
-.badge-sheet-avery-5395 { --slot-w: 3.375in; --slot-h: 2.333333in; }
-.badge-sheet-avery-5392 { --slot-w: 4in; --slot-h: 3in; }
-.badge-sheet-avery-presta-94237 { --slot-w: 3in; --slot-h: 2in; }
 
 /* #996: a name or class in a roster table keeps room for a whole word. With overflow-wrap: anywhere the column could shrink to
    a few pixels and split "Lindqvist" or "Companion" across lines. */

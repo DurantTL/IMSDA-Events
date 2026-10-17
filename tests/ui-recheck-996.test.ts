@@ -60,9 +60,21 @@ describe("the Honors Classes table (bug 7)", () => {
   });
 });
 
+describe("calendar chips at dot size", () => {
+  it("leave the tab order and the accessibility tree when they are dots", async () => {
+    const { calendarChipAccessibility, CALENDAR_DOT_QUERY } = await import("@/components/calendar-month-chip");
+    expect(calendarChipAccessibility(true)).toEqual({ item: { "aria-hidden": true }, link: { tabIndex: -1 } });
+    expect(calendarChipAccessibility(false)).toEqual({ item: {}, link: {} });
+    expect(CALENDAR_DOT_QUERY).toBe("(max-width: 760px)");
+    expect(css).toMatch(/@media \(max-width: 760px\) \{\s*\.calendar-day \{ min-height: 54px;/);
+  });
+});
+
 describe("text that ran together (bug 5)", () => {
   it("puts a checkbox's bold label and its description on separate lines", () => {
-    expect(css).toMatch(/\.checkbox-label > span:has\(> strong, > small\) \{ display: grid;/);
+    expect(css).toMatch(/\.checkbox-label > span:has\(> strong \+ small\) \{ display: grid;/);
+    // The copy-from-past-event counts (a strong, then a span) stay on one line.
+    expect(css).not.toContain("span:has(> strong, > small)");
   });
 
   it("gives the scholarship fund lists block names, notes and a code that never splits", () => {

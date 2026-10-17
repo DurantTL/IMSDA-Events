@@ -155,8 +155,10 @@ type PageSpec = {
   note?: string;
   /** The sign-in page itself (or a page that may send a signed-out visitor there): do not report landing on it as "signed-out". */
   signInPage?: boolean;
-  /** An invalid-link state that answers 404 (the not-found page is what a person sees). */
+  /** An invalid-link state that may answer 404 (the not-found page is what a person sees). */
   allow404?: boolean;
+  /** The copy the page must show, so a broken route (a blank page, another error) does not pass as the state it stands for. */
+  expectText?: RegExp;
   /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
   prepare?: (page: Page, width: number) => Promise<void>;
   /** A walkthrough run after the page's first look (it clicks through states, and may submit a synthetic form). */
@@ -187,9 +189,9 @@ const pages: PageSpec[] = [
   { name: "public-recover-registration", path: "/recover-registration", role: "visitor" },
   { name: "public-calendar", path: "/calendar", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
-  { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true },
-  { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true },
-  { name: "public-staff-invite-invalid-link", path: `/staff-invite/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true },
+  { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /no longer active/i },
+  { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /couldn.t find that page/i },
+  { name: "public-staff-invite-invalid-link", path: `/staff-invite/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /isn.t available/i },
   { name: "staff-select-event", path: "/select-event", role: "event-admin" },
   { name: "staff-archived-events", path: "/archived-events", role: "event-admin" },
   // The public event page with one of each content block (#816), signed out.
@@ -2904,9 +2906,15 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   }
   if (finalPath !== spec.path.split("?")[0]) {
     console.log(`  note  ${label}: redirected to ${finalPath}`);
+    // A sign-in page must be the page itself: a broken route that redirects to /login would otherwise pass as the sign-in page (#996).
+    if (spec.signInPage) record("redirected", spec.name, width, `${url} ended at ${finalPath}, not on the page itself`);
   }
   // Let late client effects (fonts, hydration) settle before measuring, and wait out the shell's loading fallback (#996).
   await waitForShell(page);
+  if (spec.expectText) {
+    const shown: string = await page.evaluate(() => document.body.innerText);
+    if (!spec.expectText.test(shown)) record("wrong-page", spec.name, width, `${url} (status ${status}) does not show the expected copy ${spec.expectText}`);
+  }
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
   await page.waitForTimeout(150);
 

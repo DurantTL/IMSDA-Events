@@ -135,7 +135,7 @@ async function main() {
   await prisma.memberHonorEntry.create({ data: { personId: ada.personId!, honorId: `${P}_honor`, status: "COMPLETED", completionDate: "2026-09-20", organizationId: clubs.a } });
   await prisma.clubMeetingNote.create({ data: { organizationId: clubs.a, meetingDate: "2026-09-27", pathfinderCount: 12 } });
   await prisma.clubMonthlyReport.create({
-    data: { organizationId: clubs.a, clubYear, reportMonth: "2026-09", points: {}, honors: [], onTimePoints: 0, totalPoints: 10, signatureName: "Test", signedOn: "2026-09-30", status: "SUBMITTED" },
+    data: { organizationId: clubs.a, clubYear, reportMonth: "2026-09", points: {}, honors: [], onTimePoints: 0, totalPoints: 0, signatureName: "Test", signedOn: "2026-09-30", status: "SUBMITTED" },
   });
 
   // Club-billed event: A and B each have a registration; Ada is on A's with an adjustment line and a class seat.

@@ -31,6 +31,12 @@ describe("the phone audit's #996 rules", () => {
     for (const prefix of ["/manage/", "/unsubscribe/", "/staff-invite/"]) expect(script, prefix).toContain(`path: \`${prefix}\${P}-invalid-link-token`);
   });
 
+  it("does not let a broken route pass as a sign-in page or an invalid-link state", () => {
+    expect(script).toContain('if (spec.signInPage) record("redirected", spec.name, width,');
+    expect(script).toContain('record("wrong-page", spec.name, width,');
+    expect(script.match(/allow404: true, expectText: /g)?.length).toBe(3);
+  });
+
   it("injects a defect for each new rule in the self-test", () => {
     for (const marker of ["self-test squeezed text", "Pathfinder Registration", "self-test bar action", "shell-loading"]) expect(script, marker).toContain(marker);
   });
