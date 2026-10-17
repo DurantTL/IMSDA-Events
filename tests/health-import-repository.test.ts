@@ -221,7 +221,9 @@ describe("applying the import", () => {
     expect(state.audit.map((entry) => entry.action)).toEqual(["HEALTH_RECORD_IMPORTED", "HEALTH_IMPORT_CLUB_APPLIED", "HEALTH_IMPORT_APPLIED"]);
     const dump = JSON.stringify(state.audit);
     for (const marker of importMarkers) expect(dump).not.toContain(marker);
-    expect(dump).not.toMatch(/Riley|Nobody|Listed|Sample|Example Pathfinders|2012|2026-09-20/);
+    // Random UUIDs (the run id) can contain "2012" by chance, so blank them before looking for the birth year.
+    const withoutIds = dump.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<id>");
+    expect(withoutIds).not.toMatch(/Riley|Nobody|Listed|Sample|Example Pathfinders|2012|2026-09-20/);
     const run = state.audit.find((entry) => entry.action === "HEALTH_IMPORT_APPLIED")!;
     expect(run).toMatchObject({ actorUserId: "admin-1", entityType: "HealthImport" });
     expect(run.metadata).toMatchObject({ entryCount: 2, counts: { IMPORTED: 1, UNMATCHED: 1 } });
