@@ -28,7 +28,8 @@ describe("popup close buttons", () => {
     expect(css).toMatch(/\.modal-close-button:hover:not\(:disabled\) \{[^}]*border-color: var\(--imsda-navy\)/);
     expect(css).toMatch(/\.modal-close-button:focus-visible \{[^}]*outline: 3px solid var\(--imsda-navy\)/);
     expect(css).toMatch(/\.modal-close-button \{[^}]*min-width: 44px;[^}]*min-height: 44px/);
-    // The gallery follows the public theme: its hover must not use the fixed light navy-soft fill.
+    // The gallery follows the public theme: same edge and shape as the others, theme fill and X, themed hover.
+    expect(css).toMatch(/\.event-gallery-dialog \.modal-close-button \{[^}]*border-color: #6f8794;[^}]*border-radius: 12px;[^}]*color: var\(--block-accent\)/);
     expect(css).toMatch(/\.event-gallery-dialog \.modal-close-button:hover:not\(:disabled\) \{[^}]*background: var\(--block-soft\)/);
     // The phone rule used to switch the button to inline-flex, which dropped the grid centring and pushed the × left.
     expect(css).not.toMatch(/\.modal-card \.modal-close-button \{ display: inline-flex !important; \}/);
