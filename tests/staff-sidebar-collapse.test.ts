@@ -78,7 +78,10 @@ describe("sidebar collapse toggle", () => {
   it("keeps the icon-only sidebar usable with groups: the group buttons hide and every link shows (#446, #964)", () => {
     const css = readFileSync("app/globals.css", "utf8");
     expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.nav-group-toggle \{ display: none; \}/);
-    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.nav-group-items\[hidden\] \{ display: grid; \}/);
+    // A closed group's links show too. Tailwind's base layer hides `[hidden]` with !important, which beats any unlayered
+    // rule, so the override must sit in the same layer with !important (a plain rule left closed groups invisible).
+    expect(css).toMatch(/@layer base \{\s*@media \(min-width: 801px\) \{\s*html\[data-sidebar="collapsed"\] \.nav-group-items\[hidden\] \{ display: grid !important; \}/);
+    expect(css).not.toMatch(/^\s*html\[data-sidebar="collapsed"\] \.nav-group-items\[hidden\] \{ display: grid; \}/m);
     // The text label is still clipped, not removed, in a link inside a group.
     const markup = sidebar(render(rolePermissions.EVENT_ADMIN));
     expect(markup).toMatch(/<div class="nav-group-items"[^>]*>.*?<a class="nav-item"[^>]*>.*?<span>Event settings<\/span>/);

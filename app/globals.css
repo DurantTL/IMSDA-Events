@@ -10203,13 +10203,21 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 }
 @media (min-width: 801px) {
   html[data-sidebar="collapsed"] .nav-group-toggle { display: none; }
-  html[data-sidebar="collapsed"] .nav-group-items[hidden] { display: grid; }
   html[data-sidebar="collapsed"] .nav-group::before {
     content: "";
     display: block;
     height: 1px;
     margin: 7px 8px 4px;
     background: rgba(255, 255, 255, 0.16);
+  }
+}
+
+/* Collapsed sidebar: every group's icons show, including groups closed in the expanded sidebar (their toggles are
+   hidden). The base layer's `[hidden] { display: none !important }` beats any unlayered rule, so this one sits in the
+   same layer, where its higher specificity wins. */
+@layer base {
+  @media (min-width: 801px) {
+    html[data-sidebar="collapsed"] .nav-group-items[hidden] { display: grid !important; }
   }
 }
 
