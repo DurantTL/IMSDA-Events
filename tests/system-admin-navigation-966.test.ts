@@ -196,6 +196,10 @@ describe("/admin dashboard page", () => {
     // On a phone the task cards drop their description and sit two to a row, so the page is much shorter.
     expect(stylesheet).toMatch(/@media \(max-width: 700px\) \{\s*\.tasks \{[^}]*\}\s*\.taskGrid \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
     expect(stylesheet).toMatch(/\.taskCard small \{\s*display: none;/);
+    // Each event card drops its stat row on a phone, and no later rule lays the row out again.
+    const hide = stylesheet.search(/@media \(max-width: 700px\) \{\s*\.eventStats \{\s*display: none;/);
+    expect(hide).toBeGreaterThan(-1);
+    expect(stylesheet.slice(stylesheet.indexOf("}", hide) + 1)).not.toMatch(/\.eventStats \{[^}]*(display|grid-template-columns)/);
     // The per-event links stay in the page, in a disclosure closed on a phone and forced open from 701px up.
     expect(source).toContain("styles.eventTools");
     expect(source).toContain("<summary>Event links");

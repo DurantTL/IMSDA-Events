@@ -696,8 +696,8 @@ export function CheckInWorkspace({
               <small className="checkin-balance-note">
                 {owingCount} {owingCount === 1 ? "registration still owes" : "registrations still owe"} money.{" "}
                 A balance covers everyone on the registration. The card amount includes Square&rsquo;s in-person fee (2.6% + 15&cent;):
-                key it into the Square app and put the confirmation code in the note. Hover a badge, or scan the
-                pass, for the full wording. Balances are as of when this page loaded &mdash; refresh after
+                key it into the Square app and put the confirmation code in the note. Cash or check is the balance
+                shown. Balances are as of when this page loaded &mdash; refresh after
                 finance records a payment.
               </small>
             )}

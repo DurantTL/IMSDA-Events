@@ -528,22 +528,6 @@
 
 @media (max-width: 700px) {
 
-  .eventStats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .eventStats span + span {
-    border-left: 0;
-  }
-
-  .eventStats span:nth-child(even) {
-    border-left: 1px solid var(--line);
-  }
-
-  .eventStats span:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
-  }
-
   .eventLinks {
     justify-content: flex-start;
   }
@@ -776,27 +760,11 @@ details.taskGroup[open] .taskGrid {
   border-color: var(--imsda-navy);
 }
 
-/* Phone: denser event cards so the dashboard is much shorter than the 7,375px it was (#981). */
+/* Phone: denser event cards so the dashboard is much shorter than the 7,375px it was (#981). Each card drops its stat row;
+   the numbers are on the event's own pages (Open event, Finance). */
 @media (max-width: 700px) {
   .eventStats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .eventStats span,
-  .eventStats span + span,
-  .eventStats span:nth-child(even),
-  .eventStats span:nth-child(n + 3) {
-    border: 0;
-    border-left: 1px solid var(--line);
-    padding: 8px 10px;
-  }
-
-  .eventStats span:nth-child(3n + 1) {
-    border-left: 0;
-  }
-
-  .eventStats span:nth-child(n + 4) {
-    border-top: 1px solid var(--line);
+    display: none;
   }
 
   .eventLinks {

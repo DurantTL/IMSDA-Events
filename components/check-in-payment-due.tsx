@@ -16,21 +16,22 @@ export function CheckInPaymentDue({
   balanceCents: number;
   confirmationCode: string;
   partySize: number;
-  /** A short badge for a roster row (#981): the balance and the card total, with the full wording on hover. */
+  /** A badge for a roster row (#981): the full wording, without the cash line (cash or check is the balance). */
   compact?: boolean;
 }) {
   const quote = inPersonCardQuote(balanceCents);
   if (!quote) return null;
   if (compact) {
     return (
-      <span
-        className="checkin-due-badge"
-        role="note"
-        title={`${formatCents(quote.balanceCents)} due for ${partySize > 1 ? `all ${partySize} people on ` : ""}${confirmationCode}. Card in Square app: ${formatCents(quote.cardTotalCents)} (includes ${formatCents(quote.cardFeeCents)} card fee). Square note: ${confirmationCode}.`}
-      >
+      <span className="checkin-due-badge" role="note">
         <CreditCard aria-hidden="true" size={13} />
-        <b translate="no">{formatCents(quote.balanceCents)}</b> due
-        {" · "}<span translate="no">{formatCents(quote.cardTotalCents)}</span> by card
+        <span>
+          <b translate="no">{formatCents(quote.balanceCents)}</b> due
+          {partySize > 1 && <> for all {partySize} people on <span translate="no">{confirmationCode}</span></>}
+          {" · "}Card in Square app: <b translate="no">{formatCents(quote.cardTotalCents)}</b>
+          {" "}(includes <span translate="no">{formatCents(quote.cardFeeCents)}</span> card fee)
+          {" · "}Square note: <b translate="no">{confirmationCode}</b>
+        </span>
       </span>
     );
   }
