@@ -330,6 +330,16 @@ describe("a youth's address (owner decisions, Oct 17)", () => {
     expect(run(["ATTENDEE"], "shared@example.test", shared, minors(["kid"], ["shared@example.test"])).size).toBe(0);
   });
 
+  it("a Person who is a youth on another registration cannot vouch for their own address through an adult-typed row here", () => {
+    // X attends registration B as a youth, and this registration as an adult-type attendee (for example entered as staff).
+    const adultRowHere = reg({ snapshotEmail: "parent@example.test", attendees: [{ personId: "x", email: "x@example.test", age: "ADULT" }] });
+    const youthElsewhere = minors(["x"], ["x@example.test"]);
+    expect([...run(["ATTENDEE"], "x@example.test", adultRowHere, youthElsewhere)]).toEqual([key("x@example.test")]);
+    // A genuine adult sharing that address on this registration still vouches.
+    const withRealAdult = { ...adultRowHere, attendees: [...adultRowHere.attendees, { personId: "adult", email: "x@example.test", age: "ADULT" as const }] };
+    expect(run(["ATTENDEE"], "x@example.test", withRealAdult, youthElsewhere).size).toBe(0);
+  });
+
   it("a group billing contact or organization contact who holds the role now is allowed", () => {
     const youthOnly = reg({ snapshotEmail: "x@example.test", attendees: [{ personId: "kid", email: "leader@example.test", age: "MINOR" }] });
     const youth = minors(["kid"], ["leader@example.test"]);

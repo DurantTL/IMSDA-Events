@@ -531,7 +531,9 @@ export function refusedYouthTargets(
     const youthAddresses = new Set(eventMinors.emails);
     for (const attendee of registration.attendees) if (attendee.age !== "ADULT" && attendee.email) youthAddresses.add(attendee.email);
     if (holderIsMinor && contactEmail) youthAddresses.add(contactEmail);
-    const adultAttendeeHoldsIt = registration.attendees.some((attendee) => attendee.age === "ADULT" && attendee.email === email);
+    // A Person who is a minor anywhere in the event is a minor here too, even on a row typed as adult.
+    const adultAttendeeHoldsIt = registration.attendees.some((attendee) =>
+      attendee.age === "ADULT" && !eventMinors.personIds.has(attendee.personId) && attendee.email === email);
     const adultBehindIt = target.roles.some((role) => role === "GROUP_LEADER" || role === "ORGANIZATION_CONTACT")
       || (target.roles.includes("REGISTRATION_CONTACT") && !holderIsMinor)
       || adultAttendeeHoldsIt;
