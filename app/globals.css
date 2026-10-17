@@ -11530,3 +11530,5 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (max-width: 700px) {
   .modal-close-button { min-width: 44px; min-height: 44px; }
 }
+/* The gallery's larger view follows the public page theme (dark mode too), so its hover uses the block colours. */
+.event-gallery-dialog .modal-close-button:hover:not(:disabled) { border-color: var(--block-accent); background: var(--block-soft); }

@@ -13,7 +13,9 @@ describe("popup close buttons", () => {
     const missing: string[] = [];
     for (const file of [...sources("components"), ...sources("app")]) {
       const source = readFileSync(file, "utf8");
-      for (const match of source.matchAll(/<button\b[^>]*aria-label=\{?["`]Close[^>]*>/g)) {
+      // Whole elements, so an arrow function (`=>`) before the label or the class can't end the match early.
+      for (const match of source.matchAll(/<button\b[\s\S]*?<\/button>/g)) {
+        if (!/aria-label=\{?["`]Close/.test(match[0])) continue;
         if (!match[0].includes("modal-close-button")) missing.push(`${file}: ${match[0].slice(0, 80)}`);
       }
     }
@@ -22,12 +24,14 @@ describe("popup close buttons", () => {
 
   it("gives the button a visible 3:1 edge, hover and focus states, a 44px phone target, and a centred ×", () => {
     const css = read("app/globals.css");
-    expect(css).toMatch(/\.modal-close-button \{ flex: 0 0 auto; border-color: #6f8794; \}/);
+    expect(css).toMatch(/\.modal-close-button \{[^}]*flex: 0 0 auto;[^}]*border-color: #6f8794/);
     expect(css).toMatch(/\.modal-close-button:hover:not\(:disabled\) \{[^}]*border-color: var\(--imsda-navy\)/);
-    expect(css).toMatch(/\.modal-close-button:focus-visible \{ outline: 3px solid var\(--imsda-navy\)/);
-    expect(css).toMatch(/\.modal-close-button \{ min-width: 44px; min-height: 44px; \}/);
+    expect(css).toMatch(/\.modal-close-button:focus-visible \{[^}]*outline: 3px solid var\(--imsda-navy\)/);
+    expect(css).toMatch(/\.modal-close-button \{[^}]*min-width: 44px;[^}]*min-height: 44px/);
+    // The gallery follows the public theme: its hover must not use the fixed light navy-soft fill.
+    expect(css).toMatch(/\.event-gallery-dialog \.modal-close-button:hover:not\(:disabled\) \{[^}]*background: var\(--block-soft\)/);
     // The phone rule used to switch the button to inline-flex, which dropped the grid centring and pushed the × left.
     expect(css).not.toMatch(/\.modal-card \.modal-close-button \{ display: inline-flex !important; \}/);
-    expect(css).toMatch(/\.modal-card \.modal-close-button \{ display: inline-grid !important; place-items: center; \}/);
+    expect(css).toMatch(/\.modal-card \.modal-close-button \{[^}]*display: inline-grid !important;[^}]*place-items: center/);
   });
 });
