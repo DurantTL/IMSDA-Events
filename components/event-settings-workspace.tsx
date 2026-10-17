@@ -41,6 +41,7 @@ import {
 import { buildRegistrationEmbedCode } from "@/modules/forms/embed";
 import { setEventSettingsDirty } from "@/components/event-settings-dirty";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { PublishEventDialog } from "@/components/publish-event-dialog";
 import { DangerZone, DangerZoneItem } from "@/components/danger-zone";
 import { ArchiveEventDialog } from "@/components/archive-event-dialog";
@@ -197,6 +198,9 @@ export function EventSettingsWorkspace({
     () => JSON.stringify(draft) !== JSON.stringify(savedDraft),
     [draft, savedDraft],
   );
+  // The save bar stays after the form until the page is scrolled or something is edited, so it never covers the first sections (#996).
+  const scrolledPastTop = usePinAfterScroll(null);
+  const savebarPinned = scrolledPastTop || dirty;
   // Tell the calendar banner beside this form whether answering it would discard unsaved changes (#445).
   useEffect(() => {
     if (mode !== "edit") return undefined;
@@ -1157,7 +1161,7 @@ export function EventSettingsWorkspace({
           )}
 
         </aside>
-        <div className="event-savebar" role="region" aria-label="Save event settings">
+        <div className={`event-savebar${savebarPinned ? " is-pinned" : ""}`} role="region" aria-label="Save event settings">
           <p className="event-savebar-status" aria-live={saveMessage?.kind === "error" ? "assertive" : "polite"}>
             {saveMessage
               ? <span className={saveMessage.kind === "error" ? "event-savebar-error" : "event-savebar-ok"} >{saveMessage.text}</span>

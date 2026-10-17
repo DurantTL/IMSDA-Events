@@ -100,6 +100,33 @@ describe("badge print CSS (#717)", () => {
   });
 });
 
+describe("the vertical (ID sleeve) layout has a slot size to rotate into (#996)", () => {
+  it("rotates into a box of the slot's height by its width, sized by the page from the template", () => {
+    expect(css).toMatch(/\.badge-sheet-orientation-portrait \.badge-label-inner\s*\{[^}]*width:\s*var\(--slot-h\);[^}]*height:\s*var\(--slot-w\);/);
+    const page = readFileSync(path.join(process.cwd(), "app/(workspace)/check-in/badges/page.tsx"), "utf8");
+    expect(page).toContain('"--slot-w": `${template.slotWidthIn}in`');
+    expect(page).toContain('"--slot-h": `${template.slotHeightIn}in`');
+    for (const id of badgeTemplateIds) {
+      expect(badgeTemplates[id].slotWidthIn, id).toBeGreaterThan(0);
+      expect(badgeTemplates[id].slotHeightIn, id).toBeGreaterThan(0);
+    }
+  });
+
+  it("lets the group line wrap to two lines instead of ending in an ellipsis", () => {
+    const block = css.match(/\.badge-sheet-orientation-portrait \.badge-label-inner > p \{([^}]*)\}/)?.[1] ?? "";
+    expect(block).toMatch(/white-space:\s*normal;/);
+    expect(block).toMatch(/-webkit-line-clamp:\s*2;/);
+    expect(block).toMatch(/text-overflow:\s*clip;/);
+  });
+});
+
+describe("a long name shrinks to fit in the vertical layout too (#996)", () => {
+  it("has no plain font-size rule that beats the shrink-to-fit rule for the rotated names", () => {
+    expect(css).not.toMatch(/\.badge-sheet-orientation-portrait \.badge-label-name strong(:first-child)? \{ font-size:/);
+    expect(css).toMatch(/\.badge-sheet-orientation-portrait \.badge-label-name strong\[style\]:first-child \{ --name-base: 17pt; \}/);
+  });
+});
+
 describe("badge names fit the label", () => {
   it("shrinks a long name to the label width instead of cutting it off, never above the chosen size", () => {
     expect(css).toMatch(/\.badge-label-inner\s*\{[^}]*container-type:\s*inline-size/);

@@ -4,10 +4,10 @@ import { calendarStatusLabels, closureLabel, formatDateRange, type CalendarItem 
 
 const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function ItemLink({ item, children, className }: { item: CalendarItem; children: React.ReactNode; className?: string }) {
+export function ItemLink({ item, children, className, tabIndex }: { item: CalendarItem; children: React.ReactNode; className?: string; tabIndex?: number }) {
   if (!item.href) return <span className={className}>{children}</span>;
-  if (item.href.startsWith("/")) return <Link className={className} href={item.href}>{children}</Link>;
-  return <a className={className} href={item.href} rel="noreferrer" target="_blank">{children}</a>;
+  if (item.href.startsWith("/")) return <Link className={className} href={item.href} tabIndex={tabIndex}>{children}</Link>;
+  return <a className={className} href={item.href} rel="noreferrer" tabIndex={tabIndex} target="_blank">{children}</a>;
 }
 
 export function AgendaItem({ item }: { item: CalendarItem }) {

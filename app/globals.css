@@ -1279,7 +1279,7 @@ select:focus-visible {
 .duplicate-contact span { display: inline-flex; align-items: center; gap: 4px; }
 
 .record-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.record-card-shell { position: relative; display: grid; }
+.record-card-shell { position: relative; display: grid; container-type: inline-size; }
 .record-card-shell > .record-card { width: 100%; }
 .record-select { position: absolute; z-index: 1; top: 10px; right: 10px; display: grid; place-items: center; cursor: pointer; }
 .record-select input { width: 17px; height: 17px; accent-color: var(--imsda-purple); cursor: pointer; }
@@ -1298,7 +1298,14 @@ select:focus-visible {
 .selected-audience-recipients small { display: block; overflow-wrap: anywhere; }
 .selected-audience-recipients strong { color: var(--ink); font-size: max(var(--type-floor, 0px), 0.7rem); }
 .selected-audience-recipients small { margin-top: 2px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.61rem); }
-.record-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 13px; border-radius: 16px; padding: 16px; }
+.record-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 13px; border-radius: 16px; padding: 16px; }
+.record-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; grid-column: 2; min-width: 0; }
+.record-badges:empty { display: none; }
+/* #996: the badges sit under the name until the card is wide enough to give the name a readable column beside them. */
+@container (min-width: 36rem) {
+  .record-card { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .record-badges { grid-column: 3; grid-row: 1; justify-content: flex-end; max-width: 14rem; }
+}
 .record-card h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.84rem); }
 .record-card p,
 .record-card small { margin: 3px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.66rem); }
@@ -1986,8 +1993,8 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .select-event-list { display: grid; gap: 8px; margin: 0 0 20px; padding: 0; list-style: none; }
 .select-event-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 13px; background: #fbfcfd; padding: 13px 15px; color: inherit; text-decoration: none; transition: border-color 140ms ease, transform 140ms ease; }
 .select-event-option:hover { border-color: #a9c0ca; transform: translateY(-1px); }
-.select-event-option strong { display: block; font-size: max(var(--type-staff-floor, 0px), 0.78rem); }
-.select-event-option small { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.66rem); }
+.select-event-option strong { display: block; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.select-event-option small { display: flex; align-items: center; gap: 5px; margin-top: 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.875rem); }
 .select-event-option > svg:last-child { flex-shrink: 0; color: #9badb5; }
 .account-popover .text-button { width: 100%; justify-content: flex-start; margin-top: 10px; border-top: 1px solid var(--line); padding: 10px 0 0; }
 .account-popover .account-system-link + .text-button { border-top: 0; margin-top: 3px; }
@@ -2631,8 +2638,6 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   .intro-actions .primary-button { width: 100%; }
   .toolbar { align-items: stretch; flex-direction: column; }
   .secondary-button { width: 100%; }
-  .record-card { grid-template-columns: auto minmax(0, 1fr); }
-  .record-card .status-chip { grid-column: 2; width: fit-content; }
   .checkin-tallies { margin-top: 19px; }
   .checkin-tallies { flex-wrap: wrap; }
   .checkin-tallies span { flex: 1; }
@@ -3338,7 +3343,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   font-size: clamp(1.35rem, 3vw, 1.8rem);
   letter-spacing: -0.025em;
 }
-.public-registration-step-heading h2:focus {
+.public-registration-step-heading h2:focus-visible {
   outline: 3px solid rgba(88, 44, 131, 0.17);
   outline-offset: 5px;
 }
@@ -3771,7 +3776,8 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 
 .public-registration-review {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* #996: one full-width column at every width; two ~230px cards broke values mid-word. */
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 12px;
 }
@@ -3875,8 +3881,9 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 }
 .public-registration-review-answers > div {
   display: grid;
-  grid-template-columns: minmax(120px, 0.44fr) minmax(0, 0.56fr);
-  gap: 10px;
+  /* Label above value: values keep the whole row, and only emails and codes break anywhere. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
   border-top: 1px solid #e6edef;
   padding: 8px 0;
 }
@@ -3885,13 +3892,14 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   font-size: var(--text-helper-min);
 }
 .public-registration-review-answers dd {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   margin: 0;
   color: var(--ink);
   font-size: var(--text-helper-min);
   font-weight: 800;
-  text-align: right;
+  text-align: left;
 }
+.public-registration-review-answers dd.is-code { overflow-wrap: anywhere; }
 .public-registration-review-attendees {
   display: grid;
   gap: 9px;
@@ -4457,6 +4465,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   font-size: var(--text-helper-min);
   font-weight: 900;
   text-decoration: none;
+  min-height: 44px;
 }
 .public-event-not-found-link:hover { text-decoration: underline; }
 .public-not-found-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
@@ -5469,6 +5478,9 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   .public-registration-progress li.is-current { flex-grow: 2.5; }
   .public-registration-progress li > span { width: 1.583em; height: 1.583em; font-size: var(--text-badge); }
   .public-registration-progress li > small { font-size: var(--text-helper-min); }
+  /* #996: a step that is not the current one has room for its number only (its label was an ellipsis in a ~25px box).
+     The label stays for screen readers, and "Step N of M" above names the current step. */
+  .public-registration-progress li:not(.is-current) > small { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .public-registration-step-heading { padding: 18px; }
   .public-registration-section,
   .public-registration-roster { border-radius: 17px; }
@@ -5491,13 +5503,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   .public-registration-option { min-height: 56px; }
   .public-registration-step-actions button { flex: 1; }
   .public-registration-step-actions .is-continue { min-width: 0; }
-  .public-registration-review { grid-template-columns: 1fr; }
   .public-registration-review-account fieldset { grid-template-columns: 1fr; }
-  .public-registration-review-answers > div {
-    grid-template-columns: 1fr;
-    gap: 3px;
-  }
-  .public-registration-review-answers dd { text-align: left; }
   .public-registration-submit-card { border-radius: 17px; padding: 19px; }
   .public-registration-summary { border-radius: 17px; padding: 19px; }
   .public-registration-confirmation-wrap { margin-top: 24px; padding: 0 12px 35px; }
@@ -6086,7 +6092,8 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 }
 
 .event-savebar {
-  position: sticky;
+  /* #996: in the page flow after the form until the reader scrolls or edits something (is-pinned), so it never covers the first sections. */
+  position: static;
   bottom: 0;
   z-index: 20;
   grid-column: 1 / -1;
@@ -6101,6 +6108,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   box-shadow: 0 -6px 18px rgba(18, 38, 63, 0.12);
 }
 
+.event-savebar.is-pinned { position: sticky; }
 .event-savebar-status { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.68rem); line-height: 1.45; }
 .event-savebar-error { color: #a12d2d; font-weight: 700; }
 .event-savebar-ok { color: #1c6b4a; font-weight: 700; }
@@ -6645,10 +6653,9 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .badge-label-name strong[style]:last-child { --name-base: 18pt; }
 .badge-sheet-orientation-portrait .badge-label-name strong[style]:first-child { --name-base: 17pt; }
 .badge-sheet-orientation-portrait .badge-label-name strong[style]:last-child { --name-base: 15pt; }
-/* The rotated inner box is narrower than the original landscape card, so
-   trim type sizes slightly to keep names from ellipsizing as often. */
-.badge-sheet-orientation-portrait .badge-label-name strong { font-size: calc(15pt * var(--badge-font-scale, 1)); }
-.badge-sheet-orientation-portrait .badge-label-name strong:first-child { font-size: calc(17pt * var(--badge-font-scale, 1)); }
+/* The rotated inner box is narrower than the original landscape card, so the portrait --name-base values above are
+   smaller. (#996: two plain font-size rules here used to beat the shrink-to-fit rule for names, so a long name in the vertical
+   layout ended in "…" instead of shrinking to fit.) */
 .badge-label-inner > p {
   overflow: hidden;
   width: 100%;
@@ -6658,6 +6665,17 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* #996: in the vertical (ID sleeve) layout the group line wraps to a second line instead of ending in "…". */
+.badge-sheet-orientation-portrait .badge-label-inner > p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  line-height: 1.2;
 }
 .badge-label-card footer {
   display: flex;
@@ -7560,7 +7578,10 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .honor-inline-form label { display: grid; flex: 1 1 180px; gap: 6px; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
 .honor-inline-form select { border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; padding: 10px 11px; font-size: max(var(--type-body-floor, 0px), 0.78rem); }
 .honor-group-heading { margin: 18px 0 8px; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.8rem); }
-.honor-row-actions { display: flex; gap: 6px; }
+.honor-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* #996: "Edit session" is a line of its own above its fields, not squeezed in beside them. */
+.honor-inline-form > .eyebrow { flex: 1 0 100%; margin: 0; }
+.honor-inline-form label:has(> input[name="name"]) { flex: 4 1 260px; }
 /* The table scrolls inside its own region. The visually hidden "Actions"
    header is position: absolute, and without a positioned scroller it escaped
    the clip and widened the document at 360/390px (#570). */
@@ -7632,6 +7653,12 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .club-report-auto { background: #f6f9fa; border-radius: 10px; padding: 10px 12px; }
 .club-report-auto > span { display: grid; gap: 2px; }
 .club-report-problem { display: flex; align-items: center; gap: 4px; color: #b42318 !important; }
+.club-report-readonly h3 { margin: 0 0 6px; }
+.club-report-readonly dl { display: grid; margin: 0; }
+.club-report-readonly dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 16px; border-top: 1px solid var(--line); padding: 8px 0; }
+.club-report-readonly dt { color: var(--muted); }
+.club-report-readonly dd { margin: 0; font-weight: 700; overflow-wrap: break-word; }
+@media (max-width: 600px) { .club-report-readonly dl > div { grid-template-columns: minmax(0, 1fr); } }
 .club-report-sub { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
 .club-report-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .club-report-honor { margin: 0; }
@@ -7767,10 +7794,12 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 @media (pointer: coarse) { .club-guest-form input { font-size: 1rem; } }
 .club-guest-form input:focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
 .club-sticky-bar {
-  position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
+  /* #996: in the page flow until the reader has scrolled past the intro (is-pinned), so it never covers it. */
+  position: static; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center;
   justify-content: space-between; gap: 10px; margin: 16px -4px 0; padding: 12px 4px;
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.85), #fff 30%);
 }
+.club-sticky-bar.is-pinned { position: sticky; }
 .club-class-person legend { float: left; width: 100%; margin: 0 0 4px; padding: 0; }
 .club-class-person legend + * { clear: both; }
 @media (max-width: 640px) {
@@ -7804,6 +7833,28 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .roster-card-table .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
   .roster-card-table .roster-section-empty-row td { padding: 0 0 8px; }
 }
+
+/* #996: the Honors Classes table has nine columns, more than the ~640px beside the staff sidebar can show at tablet and small
+   desktop widths (the first column scrolled out of view). It becomes the same labelled cards up to 1180px. */
+@media (min-width: 721px) and (max-width: 1180px) {
+  .roster-card-table.roster-card-table-wide, .roster-card-table.roster-card-table-wide tbody, .roster-card-table.roster-card-table-wide tr, .roster-card-table.roster-card-table-wide td, .roster-card-table.roster-card-table-wide th { display: block; width: 100%; box-sizing: border-box; }
+  .roster-card-table.roster-card-table-wide { min-width: 0; }
+  .roster-card-table.roster-card-table-wide thead { display: none; }
+  .roster-card-table.roster-card-table-wide tr:not(.roster-section-row):not(.roster-section-empty-row) {
+    position: relative; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  }
+  .roster-card-table.roster-card-table-wide td { border: 0; padding: 2px 0; }
+  .roster-card-table.roster-card-table-wide td[data-label] { display: flex; justify-content: space-between; gap: 12px; font-size: max(var(--type-body-floor, 0px), 0.8rem); }
+  .roster-card-table.roster-card-table-wide td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 600; }
+  .roster-card-table.roster-card-table-wide td.roster-card-name[data-label] { display: block; margin-bottom: 6px; font-size: 0.9rem; }
+  .roster-card-table.roster-card-table-wide .roster-card-name[data-label]::before { content: none; }
+  .roster-card-table.roster-card-table-wide td.roster-card-flags[data-label]::before { padding-top: 2px; }
+  .roster-card-table.roster-card-table-wide td.roster-card-actions { display: flex; width: 100%; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .roster-card-table.roster-card-table-wide td.roster-card-actions .honor-row-actions { gap: 8px; }
+  .roster-card-table.roster-card-table-wide td.roster-card-actions::before { content: none; }
+  .roster-card-table.roster-card-table-wide .roster-card-actions .secondary-button { min-width: 44px; min-height: 44px; }
+  .roster-card-table.roster-card-table-wide .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
+  .roster-card-table.roster-card-table-wide .roster-section-empty-row td { padding: 0 0 8px; }}
 
 /* Account and club pages (split into separate screens) */
 .account-nav { max-width: 1180px; margin: 18px auto 0; }
@@ -7970,7 +8021,9 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .calendar-day.is-outside .calendar-day-number { color: #5a6e79; }
 .calendar-day-number { display: inline-grid; width: 26px; height: 26px; place-items: center; border-radius: 999px; color: var(--ink); font-size: max(var(--type-floor, 0px), 0.72rem); font-weight: 800; }
 .calendar-day.is-today .calendar-day-number { background: var(--imsda-navy); color: #fff; }
-.calendar-day ul { display: grid; gap: 3px; margin: 4px 0 0; padding: 0; list-style: none; }
+.calendar-day { min-width: 0; }
+.calendar-day ul { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 4px 0 0; padding: 0; list-style: none; }
+.calendar-chip { min-width: 0; }
 .calendar-chip a, .calendar-chip span {
   display: block; overflow: hidden; border-radius: 6px; padding: 3px 6px; font-size: max(var(--type-floor, 0px), 0.64rem); font-weight: 700;
   line-height: 1.3; text-decoration: none; text-overflow: ellipsis; white-space: nowrap;
@@ -8056,9 +8109,12 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .calendar-day { min-height: 54px; padding: 4px; text-align: center; }
   .calendar-weekday { padding: 6px 2px; text-align: center; font-size: max(var(--type-floor, 0px), 0.6rem); }
   .calendar-day ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: 2px; }
-  .calendar-chip a, .calendar-chip span { width: 7px; height: 7px; padding: 0; border-radius: 999px; font-size: 0; }
-  .calendar-chip.calendar-kind-event a, .calendar-chip.calendar-kind-event span { background: var(--imsda-navy); }
-  .calendar-chip.calendar-kind-entry a, .calendar-chip.calendar-kind-entry span { background: var(--imsda-purple); }
+  /* #996: a 7px dot is no tap target. The dot is the list item's own background; its link stays for screen readers (the agenda below has the real, full-size links). */
+  .calendar-chip { position: relative; width: 7px; height: 7px; border-radius: 999px; }
+  .calendar-agenda-body h3 a { display: inline-flex; align-items: center; min-height: 44px; }
+  .calendar-chip.calendar-kind-event { background: var(--imsda-navy); }
+  .calendar-chip.calendar-kind-entry { background: var(--imsda-purple); }
+  .calendar-chip a, .calendar-chip span { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; font-size: 0; }
   .calendar-more { display: none; }
   .calendar-agenda-item { grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 12px; }
   .calendar-agenda-action { grid-column: 1 / -1; justify-content: center; min-height: 44px; }
@@ -10044,7 +10100,9 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
      the column, so it never covers the last field, and the error summary is above. */
   .public-registration-form-column { display: flex; flex-direction: column; }
   .public-registration-form-column > .public-registration-step-actions.is-sticky-cta {
-    position: sticky;
+    /* #996: in the page flow after the content until the reader scrolls past the step heading (is-pinned),
+       so the bar never covers the hero, stepper or heading when the page opens. */
+    position: static;
     bottom: 0;
     z-index: 30;
     order: 99;
@@ -10056,6 +10114,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -8px 20px rgba(0, 59, 92, 0.1);
   }
+  .public-registration-form-column > .public-registration-step-actions.is-sticky-cta.is-pinned { position: sticky; }
   .public-registration-step-actions.is-sticky-cta .is-sticky-submit { display: inline-flex; flex: 1; min-height: var(--target-cta, 48px); align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--imsda-gold); border-radius: 12px; background: var(--imsda-gold); color: var(--imsda-navy-deep); cursor: pointer; padding: 11px 18px; font: inherit; font-size: var(--type-button-cta, 1rem); font-weight: 800; }
   .public-registration-step-actions.is-sticky-cta .is-sticky-submit:disabled { cursor: wait; opacity: 0.7; }
   .public-registration-submit-card > button { display: none; }
@@ -10255,9 +10314,8 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .calendar-repeat-hint { margin: 0; color: #6b3410; font-size: max(var(--type-body-floor, 0px), 0.76rem); }
 @media (max-width: 760px) {
   /* Closures stay a distinct, solid, bordered dot when chips shrink to dots, with no icon to overflow. */
-  .calendar-chip.calendar-closure a, .calendar-chip.calendar-closure span:not(.sr-only) {
-    width: 10px; height: 10px; padding: 0; gap: 0; border: 2px solid #6b3410; border-radius: 999px; background: #8a4b1f; font-size: 0;
-  }
+  .calendar-chip.calendar-closure { box-sizing: border-box; width: 10px; height: 10px; border: 2px solid #6b3410; border-radius: 999px; background: #8a4b1f; }
+  .calendar-chip.calendar-closure a, .calendar-chip.calendar-closure span:not(.sr-only) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; font-size: 0; }
   .calendar-chip.calendar-closure svg { display: none; }
 }
 
@@ -10665,7 +10723,11 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   cursor: pointer;
 }
 .event-gallery-dialog figure { display: grid; gap: 8px; margin: 0; justify-items: center; }
-.event-gallery-dialog img { max-width: 100%; max-height: calc(100dvh - 220px); object-fit: contain; border-radius: 8px; }
+.event-gallery-dialog img {
+  /* #996: a photo that is tiny, slow or missing still gets a visible frame; the box never collapses to a strip. */
+  box-sizing: border-box; min-width: min(100%, 16rem); min-height: min(12rem, 40dvh); max-width: 100%; max-height: calc(100dvh - 220px);
+  object-fit: contain; border-radius: 8px; background: var(--block-soft);
+}
 .event-gallery-dialog figcaption { text-align: center; overflow-wrap: anywhere; }
 .event-gallery-dialog-nav { display: flex; justify-content: center; gap: 12px; }
 
@@ -10817,7 +10879,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 @media screen and (min-width: 601px) {
   .honors-table { table-layout: fixed; width: 100%; }
   .honors-table .honors-col-name { width: 22%; }
-  .honors-table .honors-col-class { width: 14%; }
+  .honors-table .honors-col-class { width: max(14%, 7rem); }
   .honors-table .honors-col-add { width: 6.5rem; }
   .honors-table .honors-col-add.is-view-only { width: 9.5rem; }
   .honors-table th, .honors-table td { overflow-wrap: anywhere; word-break: normal; }
@@ -11442,3 +11504,19 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .scheduled-email-exclusions { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: max(var(--type-body-floor, 0px), 0.9375rem); }
 .scheduled-email-roles { display: grid; gap: 4px; margin: 0; border: 0; padding: 0; min-width: 0; }
 .scheduled-email-roles legend { margin-bottom: 6px; padding: 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.875rem); font-weight: 700; }
+
+/* #996: a bold checkbox label and its description are two lines, never one run-on sentence. */
+.checkbox-label > span:has(> strong + small) { display: grid; gap: 2px; min-width: 0; }
+.checkbox-label > span > small { color: var(--muted); font-weight: 500; }
+
+/* #996: scholarship fund lists. Name and note are two lines, a code never splits, a note pill sits under its status. */
+.scholarship-fund-list .finance-row > span > :is(strong, small) { display: block; }
+.scholarship-fund-list .finance-row > span > small { margin-top: 2px; }
+.scholarship-fund-list .finance-row > span > small.form-error { width: fit-content; max-width: 100%; margin-top: 6px; padding: 4px 8px; line-height: 1.4; }
+.scholarship-fund-code-link { white-space: nowrap; }
+
+/* #996: a name or class in a roster table keeps room for a whole word. With overflow-wrap: anywhere the column could shrink to
+   a few pixels and split "Lindqvist" or "Companion" across lines. */
+@media (min-width: 721px) {
+  .roster-card-table td.roster-card-name { min-width: 9.5rem; }
+}

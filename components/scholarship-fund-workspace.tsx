@@ -124,7 +124,7 @@ export function ScholarshipFundWorkspace({
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 
-      <section className="panel finance-list" aria-label="Contributions received against awards made, by sponsor or church">
+      <section className="panel finance-list scholarship-fund-list" aria-label="Contributions received against awards made, by sponsor or church">
         <div className="finance-row finance-head"><span>Sponsor or church</span><span>Received</span><span>Awarded</span><span>Still outstanding (pledged)</span></div>
         {summary.sponsors.map((sponsor) => (
           <div className="finance-row" key={sponsor.key}>
@@ -168,7 +168,7 @@ export function ScholarshipFundWorkspace({
       </section>
 
       {pledgedAwards.length > 0 && (
-        <section className="panel finance-list" aria-label="Pledges not yet received">
+        <section className="panel finance-list scholarship-fund-list" aria-label="Pledges not yet received">
           <div className="finance-row finance-head"><span>Pledged by</span><span>Registration</span><span>Amount</span><span /></div>
           {pledgedAwards.map((award) => (
             <div className="finance-row" key={award.id}>
@@ -184,7 +184,7 @@ export function ScholarshipFundWorkspace({
         </section>
       )}
 
-      <section className="panel finance-list" aria-label="Contributions">
+      <section className="panel finance-list scholarship-fund-list" aria-label="Contributions">
         <div className="finance-row finance-head"><span>Contribution</span><span>Date</span><span>Method</span><span>Amount</span></div>
         {fund.contributions.map((line) => (
           <div className="finance-row" key={line.id}>
@@ -213,7 +213,7 @@ export function ScholarshipFundWorkspace({
         {fund.contributions.length === 0 && <p className="quiet-copy">No contributions recorded.</p>}
       </section>
 
-      <section className="panel finance-list" aria-label="Awards from the fund">
+      <section className="panel finance-list scholarship-fund-list" aria-label="Awards from the fund">
         <div className="finance-row finance-head"><span>Award</span><span>Registration</span><span>Status</span><span>Amount</span></div>
         {fund.awards.map((award) => (
           <div className="finance-row" key={award.id}>

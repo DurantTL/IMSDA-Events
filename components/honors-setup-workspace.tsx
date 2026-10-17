@@ -495,7 +495,7 @@ export function HonorsSetupWorkspace({
         <div className="section-heading">
           <div>
             <p className="eyebrow">Step 2</p>
-            <h2>{editing ? `Edit ${editing.honorName}` : "Add a class"}</h2>
+            <h2>{editing ? (editing.honors.length > 1 ? `Edit class with ${editing.honors.length} honors` : `Edit ${editing.honorName}`) : "Add a class"}</h2>
           </div>
           {editing && (
             <button className="secondary-button" onClick={() => setEditing(null)} type="button">
@@ -662,7 +662,7 @@ export function HonorsSetupWorkspace({
         ) : groups.filter((group) => group.offerings.length > 0).map((group) => (
           <div className="report-table-wrap honor-table-wrap" key={group.key}>
             <h3 className="honor-group-heading">{group.title}</h3>
-            <table className="report-table roster-card-table">
+            <table className="report-table roster-card-table roster-card-table-wide">
               <thead>
                 <tr>
                   <th>Honors</th>
@@ -706,34 +706,36 @@ export function HonorsSetupWorkspace({
                         {offering.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="honor-row-actions roster-card-actions">
-                      <button
-                        aria-label={`Edit ${offering.honorName}`}
-                        className="secondary-button"
-                        disabled={saving}
-                        onClick={() => { setEditing(offering); setEditHonorIds(offering.honorIds); setEditPrerequisiteIds(offering.prerequisiteHonorIds); setEditSpan(offering.span); setNotice(""); setError(""); }}
-                        type="button"
-                      >
-                        <Pencil aria-hidden="true" size={13} />
-                      </button>
-                      <button
-                        aria-label={`${offering.isActive ? "Deactivate" : "Reactivate"} ${offering.honorName}`}
-                        className="secondary-button"
-                        disabled={saving}
-                        onClick={() => toggleOffering(offering)}
-                        type="button"
-                      >
-                        <Power aria-hidden="true" size={13} />
-                      </button>
-                      <button
-                        aria-label={`Delete ${offering.honorName}`}
-                        className="secondary-button"
-                        disabled={saving}
-                        onClick={() => removeOffering(offering)}
-                        type="button"
-                      >
-                        <Trash2 aria-hidden="true" size={13} />
-                      </button>
+                    <td className="roster-card-actions">
+                      <div className="honor-row-actions">
+                        <button
+                          aria-label={`Edit ${offering.honorName}`}
+                          className="secondary-button"
+                          disabled={saving}
+                          onClick={() => { setEditing(offering); setEditHonorIds(offering.honorIds); setEditPrerequisiteIds(offering.prerequisiteHonorIds); setEditSpan(offering.span); setNotice(""); setError(""); }}
+                          type="button"
+                        >
+                          <Pencil aria-hidden="true" size={13} />
+                        </button>
+                        <button
+                          aria-label={`${offering.isActive ? "Deactivate" : "Reactivate"} ${offering.honorName}`}
+                          className="secondary-button"
+                          disabled={saving}
+                          onClick={() => toggleOffering(offering)}
+                          type="button"
+                        >
+                          <Power aria-hidden="true" size={13} />
+                        </button>
+                        <button
+                          aria-label={`Delete ${offering.honorName}`}
+                          className="secondary-button"
+                          disabled={saving}
+                          onClick={() => removeOffering(offering)}
+                          type="button"
+                        >
+                          <Trash2 aria-hidden="true" size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

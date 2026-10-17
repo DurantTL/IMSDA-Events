@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { Award, Save } from "lucide-react";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { NeedsAttention, StatusComplete } from "@/components/needs-attention";
@@ -45,6 +46,9 @@ export function ClubClassPicker({
   const [confirmations, setConfirmations] = useState<Record<string, string[]>>({});
   const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
+  // The Save bar stays after the list until the reader has scrolled past the intro, so it never covers it (#996).
+  const introRef = useRef<HTMLParagraphElement>(null);
+  const barPinned = usePinAfterScroll(introRef);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -180,7 +184,7 @@ export function ClubClassPicker({
       {workspace.location && (
         <p className="field-help">Classes at <strong translate="no">{workspace.location.name}</strong>.</p>
       )}
-      <p>
+      <p ref={introRef}>
         Pick one class per session, or one class that fills every session. Seats go to the first
         {noun === "club" ? "clubs" : "registrations"} to save{noun === "club" ? "; a full class has a waitlist below" : ""}. Only youth use a seat; {noun === "club" ? "staff, adults, and underage children join" : "adults join"} without one.
         {workspace.registrationClosesOn ? ` You can change classes until ${formatCalendarDate(workspace.registrationClosesOn)}.` : ""}
@@ -256,7 +260,7 @@ export function ClubClassPicker({
         <ClassWaitlistPanel canOverrideRequirements={canOverrideRequirements} endpoint={`${saveUrl}/waitlist`} onWorkspace={applyWaitlistWorkspace} workspace={workspace} />
       )}
       {workspace.open && (
-        <div className="club-sticky-bar">
+        <div className={`club-sticky-bar${barPinned ? " is-pinned" : ""}`}>
           <span className="field-help">{Object.values(selections).reduce((total, ids) => total + ids.length, 0)} classes chosen</span>
           <button className="primary-button" disabled={saving} onClick={save} type="button">
             <Save aria-hidden="true" size={16} /> {saving ? "Saving…" : "Save classes"}

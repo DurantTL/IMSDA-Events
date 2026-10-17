@@ -60,10 +60,18 @@ export function BackToTopButton() {
       scannedAt = -Infinity;
       onScroll();
     }
+    // A bar that turns sticky once the reader has scrolled (a class change, #996) joins the list at once, not up to a second later.
+    const barObserver = typeof MutationObserver === "function"
+      ? new MutationObserver((records) => {
+        if (records.some((record) => /sticky|pinned/.test(String((record.target as HTMLElement).className ?? "")))) onResize();
+      })
+      : null;
+    barObserver?.observe(document.body, { attributes: true, attributeFilter: ["class"], subtree: true });
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     return () => {
+      barObserver?.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
       if (frame !== 0) window.cancelAnimationFrame(frame);

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, DoorClosed, List } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
-import { AgendaItem, ItemLink } from "@/components/calendar-agenda-item";
+import { AgendaItem } from "@/components/calendar-agenda-item";
+import { CalendarMonthChip } from "@/components/calendar-month-chip";
 import {
   calendarCategories,
   closureLabel,
@@ -152,13 +153,15 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                   {dayItems.length > 0 && (
                     <ul>
                       {dayItems.slice(0, 3).map((item) => (
-                        <li className={`calendar-chip calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`} key={item.key}>
-                          <ItemLink item={item}>
-                            {item.isClosure && <DoorClosed size={12} aria-hidden="true" />}
-                            {item.isClosure && <span className="sr-only">{closureLabel}: </span>}
-                            {item.title}
-                          </ItemLink>
-                        </li>
+                        <CalendarMonthChip
+                          className={`calendar-chip calendar-kind-${item.kind.toLowerCase()} calendar-status-${item.status.toLowerCase()}${item.isClosure ? " calendar-closure" : ""}`}
+                          item={item}
+                          key={item.key}
+                        >
+                          {item.isClosure && <DoorClosed size={12} aria-hidden="true" />}
+                          {item.isClosure && <span className="sr-only">{closureLabel}: </span>}
+                          {item.title}
+                        </CalendarMonthChip>
                       ))}
                       {dayItems.length > 3 && <li className="calendar-more">+{dayItems.length - 3} more</li>}
                     </ul>

@@ -824,14 +824,16 @@ export function PeopleWorkspace({
           <button className="record-card interactive-record" type="button" onClick={() => openDetail(registration)}>
             <span className={`person-avatar large ${statusTone(registration)}`}>{initials(registration)}</span>
             <span className="record-copy"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.location ? ` · ${registration.location.name}` : ""}</small><small>{registration.attendeeCount > 1 ? registration.attendees.slice(0, 2).map((attendee) => `${attendee.firstName} ${attendee.lastName}`).join(", ") + (registration.attendeeCount > 2 ? ` +${registration.attendeeCount - 2} more` : "") : registration.accountHolder.email || "No email on file"} · {submittedDateTime(registration.submittedAt, eventTimezone)}</small></span>
-            {registration.attendees.some((attendee) => backgroundFlaggedAttendeeIds.includes(attendee.id)) && <BackgroundCheckBadge />}
-            {announcementOptOuts[registration.id] && (
-              <span className="status-chip gold" title={announcementOptOuts[registration.id] === "ALL" ? "Opted out of all IMSDA Events announcements. Confirmations, receipts and reminders still go." : "Opted out of this event's announcements. Confirmations, receipts and reminders still go."}>
-                Announcements off
-              </span>
-            )}
-            {registration.staffInvitation && <span className="status-chip purple">{staffGroupLabel[registration.staffInvitation.group]}</span>}
-            <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
+            <span className="record-badges">
+              {registration.attendees.some((attendee) => backgroundFlaggedAttendeeIds.includes(attendee.id)) && <BackgroundCheckBadge />}
+              {announcementOptOuts[registration.id] && (
+                <span className="status-chip gold" title={announcementOptOuts[registration.id] === "ALL" ? "Opted out of all IMSDA Events announcements. Confirmations, receipts and reminders still go." : "Opted out of this event's announcements. Confirmations, receipts and reminders still go."}>
+                  Announcements off
+                </span>
+              )}
+              {registration.staffInvitation && <span className="status-chip purple">{staffGroupLabel[registration.staffInvitation.group]}</span>}
+              <span className={`status-chip ${statusTone(registration)}`}>{statusLabel(registration)}</span>
+            </span>
           </button>
           </div>
         ))}

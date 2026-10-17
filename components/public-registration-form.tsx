@@ -2,6 +2,8 @@
 
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
 import { useConfirm } from "@/components/use-confirm";
+import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
+import { isCodeLikeAnswer } from "@/modules/forms/review-answer-code";
 import { EventRefundPolicy } from "@/components/event-refund-policy";
 import { pluralAttendeeLabel } from "@/modules/forms/attendee-label";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -799,6 +801,7 @@ export function PublicRegistrationForm({
   }, [draftsEnabled, draftReady, draftDirty, confirmation, draftIdentity, definition, rosterEnabled, registrationResponses, responses, attendees]);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const actionBarPinned = usePinAfterScroll(stepHeadingRef);
   const rosterCsvInputRef = useRef<HTMLInputElement>(null);
 
   const issueByPath = useMemo(
@@ -2718,7 +2721,7 @@ export function PublicRegistrationForm({
           {answers.map(({ field, answer }) => (
             <div key={field.id}>
               <dt>{field.label}</dt>
-              <dd>{answer}</dd>
+              <dd className={isCodeLikeAnswer(answer) ? "is-code" : undefined}>{answer}</dd>
             </div>
           ))}
         </dl>
@@ -3468,7 +3471,7 @@ export function PublicRegistrationForm({
           </div>
 
           <nav
-            className="public-registration-step-actions is-sticky-cta"
+            className={`public-registration-step-actions is-sticky-cta${actionBarPinned ? " is-pinned" : ""}`}
             aria-label="Registration steps"
           >
             {currentStepIndex > 0 ? (

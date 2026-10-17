@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HonorCombobox } from "@/components/honor-combobox";
@@ -129,7 +130,7 @@ export function ClubMemberHonorsDialog({
             <p className="public-registration-eyebrow">Honors</p>
             <h2 id="roster-honors-title" translate="no">{member.firstName} {member.lastName}</h2>
           </div>
-          <button aria-label="Close" className="icon-button modal-close-button" onClick={onClose} type="button">×</button>
+          <button aria-label="Close" className="icon-button modal-close-button" onClick={onClose} type="button"><X aria-hidden="true" size={18} /></button>
         </div>
         {loadError ? (
           <div className="inline-notice error" role="alert">{loadError}</div>

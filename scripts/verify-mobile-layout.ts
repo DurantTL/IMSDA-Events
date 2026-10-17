@@ -27,6 +27,12 @@
  *  - date fields (#918): every date, time and datetime-local input in an opened dialog (the honor history
  *    dialog's Completion date) sits inside its own label and form, is as tall as the dialog's other
  *    single-line fields, and overlaps no other field, helper text or label;
+ *  - squeezed text (#996): no visible text in a box narrower than about four characters, no text that wraps one
+ *    character per line, and no ordinary word (6 to 15 letters) broken in the middle; only emails, codes and
+ *    unbroken strings that cannot fit may break anywhere;
+ *  - sticky bars (#996): when a page opens, no sticky or fixed action bar (one holding a button) sits on top of text;
+ *  - the shell's "Loading IMSDA Events…" fallback is waited out before anything is measured, and a page that never
+ *    leaves it is a finding;
  *  - a full-page screenshot of every page and width, saved as an artifact.
  *
  * Every layout assertion is made for every page at every width. A finding that
@@ -147,6 +153,12 @@ type PageSpec = {
   role: Role;
   /** Why the page is skipped at every width (kept in the report so nobody wonders). */
   note?: string;
+  /** The sign-in page itself (or a page that may send a signed-out visitor there): do not report landing on it as "signed-out". */
+  signInPage?: boolean;
+  /** An invalid-link state that may answer 404 (the not-found page is what a person sees). */
+  allow404?: boolean;
+  /** The copy the page must show, so a broken route (a blank page, another error) does not pass as the state it stands for. */
+  expectText?: RegExp;
   /** Runs after the page loads and before it is measured (fills a step of a form, say). It must leave nothing submitted. */
   prepare?: (page: Page, width: number) => Promise<void>;
   /** A walkthrough run after the page's first look (it clicks through states, and may submit a synthetic form). */
@@ -169,6 +181,19 @@ const pages: PageSpec[] = [
   // Register a new club (#817), signed out: the public form and the private link's form.
   { name: "public-register-new-club", path: "/clubs/register", role: "visitor" },
   { name: "public-register-new-club-invited", path: `/clubs/register/${applicationLinkToken}`, role: "visitor" },
+  // Pages the audit had never visited (#996): sign-in, recovery, calendar, club directory, and the invalid-link states.
+  { name: "public-login", path: "/login", role: "visitor", signInPage: true },
+  { name: "public-forgot-password", path: "/forgot-password", role: "visitor", signInPage: true },
+  { name: "public-reset-password", path: "/reset-password", role: "visitor", signInPage: true },
+  { name: "public-profile-sign-in", path: "/profile/sign-in", role: "visitor", signInPage: true },
+  { name: "public-recover-registration", path: "/recover-registration", role: "visitor" },
+  { name: "public-calendar", path: "/calendar", role: "visitor" },
+  { name: "public-clubs", path: "/clubs", role: "visitor" },
+  { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /no longer active/i },
+  { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /couldn.t find that page/i },
+  { name: "public-staff-invite-invalid-link", path: `/staff-invite/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /isn.t available/i },
+  { name: "staff-select-event", path: "/select-event", role: "event-admin" },
+  { name: "staff-archived-events", path: "/archived-events", role: "event-admin" },
   // The public event page with one of each content block (#816), signed out.
   { name: "public-event-page-all-blocks", path: `/events/${blocksEventSlug}`, role: "visitor" },
   // Club portal (a director of two clubs).
@@ -851,16 +876,20 @@ async function seedSynthetic(prisma: PrismaClient) {
     }
   }
 
-  // A filed monthly report and an invite for the staff lists.
+  // A filed monthly report and an invite for the staff lists. The saved answers add up to the stored total (#996): on time plus the picked points.
+  const { pickedTotal, ON_TIME_POINTS } = await import("../modules/club-reports/domain");
+  const reportPoints = { staffMeeting: 25, meetingsOutings: 50, ratio: 25, uniformMeetings: 20, uniformOutside: 40, devotions: 50, exercise: 0, outreach: 50, guest: 0, honors: 25, classLevel: 25, bonus: 0 };
+  const filedReport = {
+    organizationId: clubA, clubYear, reportMonth, meetingPlace: "Fellowship hall", meetingSchedule: "Saturdays",
+    averageAttendance: 12, pathfinderCount: 12, tltCount: 1, staffCount: 3, classLevels: ["FRIEND" as const], points: reportPoints,
+    honors: [{ name: "Camping Skills I", participants: 6 }],
+    onTimePoints: ON_TIME_POINTS, totalPoints: ON_TIME_POINTS + pickedTotal(reportPoints), signatureName: "Dana Mobilecheck-Directorsson", signedOn: "2026-10-01",
+    status: "SUBMITTED" as const, submittedAt: new Date("2026-10-01T15:00:00Z"), firstSubmittedAt: new Date("2026-10-01T15:00:00Z"),
+  };
   await prisma.clubMonthlyReport.upsert({
     where: { organizationId_reportMonth: { organizationId: clubA, reportMonth } },
-    update: {},
-    create: {
-      organizationId: clubA, clubYear, reportMonth, meetingPlace: "Fellowship hall", meetingSchedule: "Saturdays",
-      averageAttendance: 12, pathfinderCount: 12, tltCount: 1, staffCount: 3, points: {}, honors: [],
-      onTimePoints: 10, totalPoints: 81, signatureName: "Dana Mobilecheck-Directorsson", signedOn: "2026-10-01",
-      status: "SUBMITTED", submittedAt: new Date("2026-10-01T15:00:00Z"), firstSubmittedAt: new Date("2026-10-01T15:00:00Z"),
-    },
+    update: filedReport,
+    create: filedReport,
   });
   for (const [index, status] of (["PENDING", "SENT", "PENDING"] as const).entries()) {
     const id = `${P}_invite_${index}`;
@@ -1911,6 +1940,177 @@ function textAuditInPage(args: { floor: number; upperFloor: number; exceptions: 
   };
 }
 
+/**
+ * Squeezed text (#996), measured in the page. For every visible element that holds its own text:
+ *  - "narrow": its container's content box is narrower than about four characters (2.2em) while the text is
+ *    longer than four characters;
+ *  - "one-per-line": the text wraps to about one character per line;
+ *  - "split-word": an ordinary word of 6 to 15 letters is broken across lines. Emails, codes and anything with
+ *    digits, punctuation or more than 15 letters are exempt: those may break anywhere.
+ * Rotated text (the vertical ID-sleeve badges) and hidden or collapsed boxes are skipped.
+ */
+function squeezedTextInPage() {
+  const problems: string[] = [];
+  const seen = new Set<Element>();
+  const describe = (el: Element) => {
+    const cls = String((el as HTMLElement).className || "").split(/\s+/).filter(Boolean)[0];
+    return `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ""}`;
+  };
+  const skippedTags = /^(SCRIPT|STYLE|NOSCRIPT|OPTION|TEXTAREA|INPUT|SELECT|SVG|PATH|CODE|PRE|TITLE|HEAD)$/i;
+  const rotatedOrHidden = (el: Element) => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (node.hasAttribute("hidden") || node.hasAttribute("inert") || node.getAttribute("aria-hidden") === "true") return true;
+      const style = getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden") return true;
+      if (style.writingMode !== "horizontal-tb") return true;
+      if (style.transform !== "none") {
+        const m = /matrix\(([^)]+)\)/.exec(style.transform);
+        if (m) {
+          const [a, b] = m[1]!.split(",").map(Number);
+          if (Math.abs(b ?? 0) > 0.01 || Math.abs(a ?? 1) < 0.99) return true;
+        } else return true;
+      }
+      if (/(^|\s)(sr-only|visually-hidden)(\s|$)/.test(String((node as HTMLElement).className || ""))) return true;
+    }
+    return false;
+  };
+  const box = (el: Element): HTMLElement => {
+    let node: HTMLElement | null = el as HTMLElement;
+    while (node && getComputedStyle(node).display === "inline") node = node.parentElement;
+    return node ?? (el as HTMLElement);
+  };
+  const lineCount = (range: Range) => {
+    const tops = new Set<number>();
+    for (const rect of Array.from(range.getClientRects())) if (rect.width > 0) tops.add(Math.round(rect.top / 3));
+    return tops.size;
+  };
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    if (problems.length >= 8) break;
+    if (skippedTags.test(el.tagName) || seen.has(el)) continue;
+    const textNodes = Array.from(el.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim().length > 0);
+    if (textNodes.length === 0 || el.getClientRects().length === 0) continue;
+    if (rotatedOrHidden(el)) continue;
+    const style = getComputedStyle(el);
+    // Text a style rule hides on purpose: font-size 0 (an icon-only badge) or the 1px visually-hidden box.
+    if (Number.parseFloat(style.fontSize) < 1) continue;
+    const own = el.getBoundingClientRect();
+    if (own.width <= 2 && own.height <= 2) continue;
+    const container = box(el);
+    const containerStyle = getComputedStyle(container);
+    const width = container.clientWidth - Number.parseFloat(containerStyle.paddingLeft) - Number.parseFloat(containerStyle.paddingRight);
+    const fontSize = Number.parseFloat(style.fontSize) || 16;
+    const text = textNodes.map((node) => node.textContent ?? "").join(" ").replace(/\s+/g, " ").trim();
+    const compact = text.replace(/\s/g, "");
+    const label = `${describe(el)} "${text.slice(0, 40)}"`;
+    // A box narrower than about four characters (2.2em) that holds longer text which then wraps or is cut off. A short label
+    // that still fits on one line in a snug box ("City:") is not squeezed.
+    if (compact.length > 4 && width < fontSize * 2.2) {
+      const wraps = textNodes.some((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return lineCount(range) > 1;
+      });
+      if (wraps || container.scrollWidth > container.clientWidth + 1 || el.scrollWidth > el.clientWidth + 1 || width < fontSize) {
+        seen.add(el);
+        problems.push(`${label} sits in a box ${Math.round(width)}px wide, narrower than four characters (${compact.length} characters of text)`);
+        continue;
+      }
+    }
+    for (const node of textNodes) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const lines = lineCount(range);
+      if (lines < 2) continue;
+      const chars = (node.textContent ?? "").replace(/\s/g, "").length;
+      if (chars >= 6 && lines >= chars * 0.75) {
+        seen.add(el);
+        problems.push(`${label} wraps one character per line (${lines} lines for ${chars} characters, box ${Math.round(width)}px wide)`);
+        break;
+      }
+      if (style.hyphens === "auto") continue;
+      const content = node.textContent ?? "";
+      const wordPattern = /[^\s]+/g;
+      let match: RegExpExecArray | null;
+      while ((match = wordPattern.exec(content))) {
+        const word = match[0].replace(/^[("'“‘]+|[)"'”’.,:;!?]+$/g, "");
+        if (!/^[A-Za-z]{6,15}$/.test(word)) continue;
+        const at = match.index + match[0].indexOf(word);
+        const wordRange = document.createRange();
+        wordRange.setStart(node, at);
+        wordRange.setEnd(node, at + word.length);
+        if (lineCount(wordRange) > 1) {
+          seen.add(el);
+          problems.push(`${label} breaks the word "${word}" across lines (box ${Math.round(width)}px wide)`);
+          break;
+        }
+      }
+      if (seen.has(el)) break;
+    }
+  }
+  return problems;
+}
+
+/**
+ * A sticky or fixed action bar that sits on top of text when the page opens (#996). Run at scroll 0. A bar is a
+ * fixed or sticky element at least 60% of the window wide that holds a button; the top header does not count.
+ * It is a finding when it overlaps any visible text outside the bar (a heading, the intro, a stepper, a label).
+ */
+function barOverTextInPage() {
+  const h = window.innerHeight;
+  const w = window.innerWidth;
+  const bars: Array<{ el: Element; rect: DOMRect }> = [];
+  for (const el of Array.from(document.body.querySelectorAll("*"))) {
+    const style = getComputedStyle(el);
+    if ((style.position !== "fixed" && style.position !== "sticky") || style.display === "none" || style.visibility === "hidden") continue;
+    if (el.tagName === "HEADER" || el.closest("header, [role='dialog'], [aria-modal='true']")) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < w * 0.6 || rect.height <= 0 || rect.height > h * 0.5 || rect.bottom <= 0 || rect.top >= h) continue;
+    if (!el.querySelector("button, [type='submit'], [role='button']")) continue;
+    bars.push({ el, rect });
+  }
+  const problems: string[] = [];
+  if (bars.length === 0) return problems;
+  const insideBar = (el: Element) => bars.some((bar) => bar.el.contains(el));
+  const inFixed = (el: Element) => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position === "fixed" || position === "sticky") return true;
+    }
+    return false;
+  };
+  for (const { el: bar, rect } of bars) {
+    const barName = `${bar.tagName.toLowerCase()}${String((bar as HTMLElement).className || "").split(/\s+/).filter(Boolean)[0] ? `.${String((bar as HTMLElement).className).split(/\s+/).filter(Boolean)[0]}` : ""}`;
+    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+      if (problems.length >= 6) return problems;
+      if (insideBar(el) || inFixed(el) || /^(SCRIPT|STYLE|SVG|PATH|OPTION|INPUT|SELECT|TEXTAREA|BUTTON|IMG)$/i.test(el.tagName)) continue;
+      const own = Array.from(el.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim().length > 3);
+      if (own.length === 0) continue;
+      const style = getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) continue;
+      const rects = own.flatMap((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return Array.from(range.getClientRects());
+      });
+      for (const textRect of rects) {
+        const overlapY = Math.min(textRect.bottom, rect.bottom) - Math.max(textRect.top, rect.top);
+        const overlapX = Math.min(textRect.right, rect.right) - Math.max(textRect.left, rect.left);
+        if (textRect.width > 0 && overlapY > 4 && overlapX > 4 && textRect.top < h) {
+          const text = (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+          problems.push(`${barName} (${Math.round(rect.top)}px to ${Math.round(rect.bottom)}px) sits on top of ${el.tagName.toLowerCase()} "${text}" when the page opens`);
+          break;
+        }
+      }
+    }
+  }
+  return problems;
+}
+
+/** True while the workspace shell's loading fallback ("Loading IMSDA Events…") is on the page. */
+function shellLoadingInPage() {
+  return Boolean(document.querySelector(".shell-loading")) || /Loading IMSDA Events/.test(document.body.innerText);
+}
+
 /** Runs in the page after scrolling to the bottom: is the last content under a fixed bar? */
 function coveredByBarInPage() {
   const h = window.innerHeight;
@@ -2308,6 +2508,11 @@ function injectDefects() {
     '<h3 style="margin:0;display:block"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" style="display:block"><circle cx="10" cy="10" r="8"/></svg>self-test icon heading</h3>',
     '<label style="display:block;line-height:1;margin:0">self-test stacked label<input style="display:block;margin:0;width:160px;height:32px;border:1px solid #333"></label>',
     '<div style="width:80px;overflow:hidden;white-space:nowrap"><span>self-test text that is cut off sideways by its box</span></div>',
+    // Text squeezed into a sliver, an ordinary word split in the middle (#996), a sticky action bar over text, and the shell's loading fallback.
+    '<div style="width:14px;overflow:hidden"><span style="display:block">self-test squeezed text</span></div>',
+    '<div style="width:50px;font:14px sans-serif;overflow-wrap:anywhere">Pathfinder Registration</div>',
+    '<div style="position:fixed;left:0;right:0;top:140px;height:60px;z-index:30;background:#ccc"><button type="button" style="min-height:44px">self-test bar action</button></div><p style="position:absolute;top:150px;left:0;margin:0">self-test paragraph under an action bar</p>',
+    '<div class="shell-loading">Loading IMSDA Events…</div>',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");
@@ -2539,6 +2744,7 @@ async function auditState(page: Page, name: string, width: number, prefix: strin
   const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
   fieldsChecked += fields.checked;
   for (const problem of fields.problems) record("field-boundary", name, width, problem);
+  await auditSqueezeAndBars(page, name, width);
   const text = await page.evaluate(textLayoutInPage);
   for (const problem of text.headings) record("heading-style", name, width, problem);
   for (const problem of text.labelInput) record("label-input", name, width, problem);
@@ -2661,6 +2867,21 @@ async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, 
   }
 }
 
+/** Waits for the shell's "Loading IMSDA Events…" fallback to go away (#996); true when it did. */
+async function waitForShell(page: Page) {
+  return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMSDA Events/.test(document.body.innerText), undefined, { timeout: 20_000 })
+    .then(() => true, () => false);
+}
+
+/** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
+async function auditSqueezeAndBars(page: Page, name: string, width: number) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(60);
+  if (await page.evaluate(shellLoadingInPage)) record("loading-screen", name, width, 'the page still shows "Loading IMSDA Events…" when it is measured');
+  for (const problem of await page.evaluate(squeezedTextInPage)) record("squeezed-text", name, width, problem);
+  for (const problem of await page.evaluate(barOverTextInPage)) record("bar-over-text", name, width, problem);
+}
+
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
   const url = `${baseUrl}${spec.path}`;
   // "load", then a bounded wait for quiet: Next prefetches every visible link, so
@@ -2674,19 +2895,26 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     record("http-error", spec.name, width, `${url} answered ${status}`);
     return;
   }
-  if (status === 404) {
+  if (status === 404 && !spec.allow404) {
     record("not-found", spec.name, width, `${url} answered 404 (the page or its synthetic data is missing)`);
     return;
   }
   const sentToSignIn = /\/(login|account\/sign-in|account\/two-step|no-access)/.test(finalPath);
-  if (sentToSignIn) {
+  if (sentToSignIn && !spec.signInPage) {
     record("signed-out", spec.name, width, `${url} sent the synthetic user to ${finalPath}`);
     return;
   }
   if (finalPath !== spec.path.split("?")[0]) {
     console.log(`  note  ${label}: redirected to ${finalPath}`);
+    // A sign-in page must be the page itself: a broken route that redirects to /login would otherwise pass as the sign-in page (#996).
+    if (spec.signInPage) record("redirected", spec.name, width, `${url} ended at ${finalPath}, not on the page itself`);
   }
-  // Let late client effects (fonts, hydration) settle before measuring.
+  // Let late client effects (fonts, hydration) settle before measuring, and wait out the shell's loading fallback (#996).
+  await waitForShell(page);
+  if (spec.expectText) {
+    const shown: string = await page.evaluate(() => document.body.innerText);
+    if (!spec.expectText.test(shown)) record("wrong-page", spec.name, width, `${url} (status ${status}) does not show the expected copy ${spec.expectText}`);
+  }
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
   await page.waitForTimeout(150);
 
@@ -2715,6 +2943,8 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   });
   for (const problem of floorText.small) record("text-too-small", spec.name, width, problem);
   for (const problem of floorText.narrowHeaders) record("header-too-narrow", spec.name, width, problem);
+  // Squeezed text, an action bar over text, the loading screen (#996): every page, every width, at the top of the page.
+  await auditSqueezeAndBars(page, spec.name, width);
   if (textRulesApply(spec.name)) {
     const text = await page.evaluate(textLayoutInPage);
     for (const problem of text.headings) record("heading-style", spec.name, width, problem);

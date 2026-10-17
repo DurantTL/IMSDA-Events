@@ -4,6 +4,7 @@ import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { ArrowLeft, ArrowRight, Trash2, UserPlus, UsersRound } from "lucide-react";
 import {
   PublicRegistrationForm,
@@ -123,6 +124,9 @@ export function ClubRegistrationWorkspace({
   const [guestError, setGuestError] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(workspace.draft ? "saved" : "idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The Continue bar stays after the list until the reader has scrolled past the intro, so it never covers it (#996).
+  const introRef = useRef<HTMLParagraphElement>(null);
+  const barPinned = usePinAfterScroll(introRef);
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(workspace.event.id)}`;
 
   const [leaveHref, setLeaveHref] = useState<string | null>(null);
@@ -541,7 +545,7 @@ export function ClubRegistrationWorkspace({
         </div>
       )}
       <ClubLocationPicker allowWaitlist locations={locations} onChange={setLocationId} value={locationId} />
-      <p>
+      <p ref={introRef}>
         Tap everyone from your roster who is attending. Ages are as of {workspace.event.ageAsOf ? "" : "the first day of the event, "}
         {workspace.event.ageAsOf ? ageDateText : formatCalendarDate(chosenLocation?.firstDay ?? workspace.event.eventDate)}. Your choices save automatically.
       </p>
@@ -677,7 +681,7 @@ export function ClubRegistrationWorkspace({
       {honorsCatalog && chosenLocation?.full && (
         <p className="inline-notice" role="status">This club will be waitlisted; pick classes after you&apos;re confirmed.</p>
       )}
-      <div className="club-registration-toolbar club-sticky-bar">
+      <div className={`club-registration-toolbar club-sticky-bar${barPinned ? " is-pinned" : ""}`}>
         <Link className="secondary-button" href={rosterHref} onClick={(event) => followRosterLink(event, rosterHref)}>
           <UserPlus aria-hidden="true" size={15} /> {leaving ? "Saving…" : "Add someone new to the roster"}
         </Link>
