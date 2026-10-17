@@ -397,6 +397,44 @@ async function cancelIfLodgingStale(
   return true;
 }
 
+export function scheduledEmailBatchIdOf(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const value = (metadata as Record<string, unknown>).scheduledEmailBatchId;
+  return typeof value === "string" && value ? value : null;
+}
+
+/**
+ * A scheduled email (#177) is checked again immediately before it goes out: the approved recipient may have been
+ * cancelled, transferred, paid up, suppressed or turned out to be a minor since it was queued, or the schedule may have
+ * been cancelled or paused. Such a message ends CANCELLED with the reason on the row and on the recipient, never sent.
+ * When the check itself cannot be made, the attempt is retried after the usual backoff rather than sent on a guess.
+ */
+async function cancelIfScheduledEmailObsolete(
+  prisma: DeliveryPrisma,
+  message: ClaimedMessage,
+  at: Date,
+) {
+  if (!scheduledEmailBatchIdOf(message.metadata)) return false;
+  let obsolete: { code: string; reason: string } | null;
+  try {
+    const scheduled = await import("@/modules/communications/scheduled-email-repository");
+    obsolete = await scheduled.scheduledEmailObsoleteReason(message.id, at);
+    if (!obsolete) return false;
+    await scheduled.cancelObsoleteScheduledMessage(prisma as never, {
+      messageId: message.id,
+      eventId: message.eventId,
+      code: obsolete.code as never,
+      reason: obsolete.reason,
+      where: { status: "PROCESSING", lockToken: message.lockToken },
+    });
+    return true;
+  } catch (error) {
+    logError("Unable to confirm a scheduled email was still wanted; it will be retried.", error);
+    await finalizeFailedAttempt(prisma, message, { code: "SCHEDULED_EMAIL_CHECK_FAILED", message: "Could not confirm the scheduled email was still wanted, so it was not sent.", retryable: true }, at, true);
+    return true;
+  }
+}
+
 function announcementIdOf(metadata: unknown) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
   const value = (metadata as Record<string, unknown>).announcementId;
@@ -990,6 +1028,7 @@ async function runDeliveryLoop(
     // An invoice email is sent only while its version is still FINALIZED (#168): one a revision replaced is cancelled, never sent.
     if (await cancelIfInvoiceReplaced(prisma, message)) continue;
     if (await cancelIfLodgingStale(prisma, message, now())) continue;
+    if (await cancelIfScheduledEmailObsolete(prisma, message, now())) continue;
     if (await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now())) continue;
     let preparedBody: PreparedEmailBody | null = null;
     try {
@@ -1024,6 +1063,7 @@ async function runDeliveryLoop(
       // Checked again immediately before the provider call, so a revision that committed while the body was prepared cannot slip one out.
       if (await cancelIfInvoiceReplaced(prisma, message)) continue;
       if (await cancelIfLodgingStale(prisma, message, now())) continue;
+      if (await cancelIfScheduledEmailObsolete(prisma, message, now())) continue;
       // And the opt-out again (#838): someone may have unsubscribed while the message was being prepared. An essential
       // announcement still goes. The private link minted for the body is unused, so it is withdrawn.
       const recheck = await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now());

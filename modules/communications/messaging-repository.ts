@@ -17,10 +17,12 @@ import {
 } from "@/integrations/email/provider";
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
+import { logError } from "@/lib/logger";
 import {
   ExternalEmailDeliveryError,
   nextAttemptRowNumber,
   processExternalEmailQueue,
+  scheduledEmailBatchIdOf,
   type ExternalEmailDeliveryDependencies,
 } from "@/modules/communications/email-delivery";
 import {
@@ -1054,6 +1056,7 @@ async function captureOneMessageLocally(messageId: string, eventId?: string) {
         eventId: true,
         status: true,
         templateKey: true,
+        metadata: true,
         attemptCount: true,
         event: { select: { messageSettings: { select: { deliveryMode: true } } } },
       },
@@ -1102,6 +1105,29 @@ async function captureOneMessageLocally(messageId: string, eventId?: string) {
             },
           });
         }
+        return false;
+      }
+    }
+
+    // A scheduled email (#177) is checked again right before it is captured, exactly as before a real send: a recipient
+    // who was cancelled, transferred, paid up, suppressed or is a minor, or a schedule that was cancelled, is never captured.
+    // If the check cannot be made the row stays PENDING for the next sweep.
+    if (scheduledEmailBatchIdOf(message.metadata)) {
+      try {
+        const scheduled = await import("@/modules/communications/scheduled-email-repository");
+        const obsolete = await scheduled.scheduledEmailObsoleteReason(message.id);
+        if (obsolete) {
+          await scheduled.cancelObsoleteScheduledMessage(tx, {
+            messageId: message.id,
+            eventId: message.eventId,
+            code: obsolete.code,
+            reason: obsolete.reason,
+            where: { status: "PENDING" },
+          });
+          return false;
+        }
+      } catch (error) {
+        logError("Unable to confirm a scheduled email was still wanted; it stays queued.", error);
         return false;
       }
     }

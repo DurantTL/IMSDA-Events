@@ -151,6 +151,7 @@ export const staffPageTitles = {
   lodgingRequests: "Lodging requests",
   lodgingAssignments: "Lodging assignments",
   issuedAssets: "Issued assets",
+  scheduledEmails: "Scheduled emails",
 } as const;
 
 type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", title: string];
@@ -191,6 +192,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/lodging/requests", "prefix", staffPageTitles.lodgingRequests],
   ["/more/lodging", "prefix", staffPageTitles.lodging],
   ["/more/issued-assets", "prefix", staffPageTitles.issuedAssets],
+  ["/communications/scheduled", "prefix", staffPageTitles.scheduledEmails],
   ["/more/program-assignments/", "under", staffPageTitles.assignmentRoster],
   ["/more/program-assignments", "exact", staffPageTitles.programAssignments],
 ];

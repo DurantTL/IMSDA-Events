@@ -806,6 +806,8 @@ model User {
   merchandiseOrderStatusChanges  MerchandiseOrderStatusChange[]   @relation("MerchandiseOrderStatusActor")
   authoredStaffNotes             StaffNote[]                      @relation("StaffNoteAuthor")
   audienceSnapshots              EventAudienceSnapshot[]          @relation("EventAudienceSnapshotCreatedBy")
+  scheduledEmailsCreated         ScheduledEmailBatch[]            @relation("ScheduledEmailCreatedBy")
+  scheduledEmailsActivated       ScheduledEmailBatch[]            @relation("ScheduledEmailActivatedBy")
   authoredStaffNoteRevisions     StaffNoteRevision[]              @relation("StaffNoteRevisionAuthor")
   appliedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagAppliedBy")
   removedRegistrationTags        RegistrationTagAssignment[]      @relation("RegistrationTagRemovedBy")
@@ -1740,6 +1742,7 @@ model Event {
   lodgingWaitlistHistory              EventLodgingWaitlistHistory[]
   notes                               StaffNote[]
   audienceSnapshots                   EventAudienceSnapshot[]
+  scheduledEmailBatches               ScheduledEmailBatch[]
   registrationTagAssignments          RegistrationTagAssignment[]
   attendeeTagAssignments              AttendeeTagAssignment[]
   templateApplication                 EventTemplateApplication?
@@ -2071,6 +2074,126 @@ model EventAudienceSnapshot {
 
   @@index([eventId, createdAt])
   @@index([eventId, fingerprint])
+}
+
+/// How a scheduled email batch is timed (#177). ONE_TIME is a calendar date and wall-clock time in the event's own
+/// time zone; the others are a number of calendar days before an event anchor, at a wall-clock time in that zone.
+enum ScheduledEmailTrigger {
+  ONE_TIME
+  BEFORE_REGISTRATION_CLOSE
+  BEFORE_EVENT_START
+}
+
+/// SCHEDULED: written and reviewed, but not approved; nothing will send. ACTIVE: a person approved it, so the sweep
+/// sends it at `sendAt`. PAUSED: approval is held (a person paused it, or the event or template changed under it).
+/// CANCELLED: stopped by a person; rows already sent stay sent. COMPLETED: every recipient was dealt with.
+/// FAILED: it could not run (the reason is on the row).
+enum ScheduledEmailBatchStatus {
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+  FAILED
+}
+
+enum ScheduledEmailRecipientStatus {
+  /// Reviewed and approved; no message exists yet.
+  PLANNED
+  /// A message was queued in the outbox (`outboxMessageId`); its own status says whether it was sent.
+  QUEUED
+  /// Re-checked at send time and no longer eligible; `exclusionCode` says why. No message was or will be sent.
+  EXCLUDED
+  /// The schedule was cancelled before this recipient was queued.
+  CANCELLED
+}
+
+/// One reviewed, human-approved email batch that goes out at a future time in the event's time zone (#177).
+/// It never activates or sends itself: `activatedByUserId` is a person, and only the sweep sends an ACTIVE row.
+model ScheduledEmailBatch {
+  /// Client-generated UUID, so a retried request is the same batch.
+  id                       String                    @id
+  eventId                  String
+  name                     String
+  templateKey              MessageTemplateKey
+  announcementTitle        String?
+  announcementBody         String?
+  /// The published template version reviewed; a different published version at send time pauses the schedule.
+  templateVersionId        String?
+  templateVersionNumber    Int?
+  trigger                  ScheduledEmailTrigger
+  /// ONE_TIME: the calendar date (YYYY-MM-DD) in the event's time zone.
+  localDate                String?
+  /// Wall-clock time (HH:MM, 24 hours) in the event's time zone.
+  localTime                String
+  /// Relative triggers: calendar days before the anchor's calendar date.
+  daysBefore               Int?
+  /// The event's time zone and anchor instant as they were when the schedule was last reviewed. A later change to
+  /// either pauses the schedule, because its projected time no longer holds.
+  eventTimezone            String
+  anchorAt                 DateTime?
+  sendAt                   DateTime
+  /// NONE, GAP_SHIFTED (the wall time does not exist that day) or AMBIGUOUS_FIRST (it happens twice; the first is used).
+  dstBehavior              String                    @default("NONE")
+  /// The plain sentence the approver was shown about daylight saving, kept so the list says the same thing.
+  dstNote                  String?
+  audienceQuery           Json
+  audienceQueryVersion     String
+  audienceQueryHash        String
+  audienceFingerprint      String
+  /// Counts from the review that was approved.
+  eligibleCount            Int                       @default(0)
+  excludedCount            Int                       @default(0)
+  revision                 Int                       @default(1)
+  status                   ScheduledEmailBatchStatus @default(SCHEDULED)
+  createdByUserId          String
+  activatedByUserId        String?
+  activatedAt              DateTime?
+  pausedAt                 DateTime?
+  pauseReason              String?
+  cancelledAt              DateTime?
+  cancelledByUserId        String?
+  /// Set by the one worker that claimed the send. A second worker, or a retry, cannot claim a held claim.
+  claimToken               String?
+  claimedAt                DateTime?
+  completedAt              DateTime?
+  failedAt                 DateTime?
+  failureReason            String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  event       Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy   User                       @relation("ScheduledEmailCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  activatedBy User?                      @relation("ScheduledEmailActivatedBy", fields: [activatedByUserId], references: [id], onDelete: Restrict)
+  recipients  ScheduledEmailRecipient[]
+
+  @@index([eventId, createdAt])
+  @@index([status, sendAt])
+}
+
+/// One reviewed recipient of a scheduled batch: an address and the registration it is for. Created when staff activate
+/// the batch, so the approved audience is a fixed list that send time can only shrink, never grow.
+model ScheduledEmailRecipient {
+  id              String                        @id @default(cuid())
+  batchId         String
+  eventId         String
+  registrationId  String
+  recipientEmail  String
+  recipientName   String
+  /// The audience roles that reached the address on this registration, so send time can re-check an adult role.
+  roles           String[]
+  status          ScheduledEmailRecipientStatus @default(PLANNED)
+  exclusionCode   String?
+  outboxMessageId String?                       @unique
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  batch   ScheduledEmailBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  message MessageOutbox?      @relation(fields: [outboxMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, registrationId, recipientEmail])
+  @@index([batchId, status])
+  @@index([eventId])
 }
 
 model EventMembership {
@@ -4319,6 +4442,7 @@ model MessageOutbox {
   invoiceRecipients InvoiceDeliveryRecipient[]
   files             MessageOutboxFile[]
   staffInvitations  StaffInvitation[]
+  scheduledEmailRecipient ScheduledEmailRecipient?
 
   @@index([status, availableAt, createdAt])
   @@index([eventId, createdAt])
