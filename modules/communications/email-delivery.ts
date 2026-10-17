@@ -69,6 +69,7 @@ import {
   type AnnouncementOptOutScope,
 } from "@/modules/communications/email-preferences";
 import { findAnnouncementOptOut, issueUnsubscribeToken } from "@/modules/communications/email-preferences-repository";
+import { isScheduledEmailMetadata } from "@/modules/communications/retry-failed-domain";
 import {
   createStableRegistrationAccessToken,
   revokeRegistrationAccessToken,
@@ -395,6 +396,43 @@ async function cancelIfLodgingStale(
     });
   }
   return true;
+}
+
+/**
+ * A scheduled email (#177) is checked again immediately before it goes out: the approved recipient may have been
+ * cancelled, transferred, paid up, suppressed or turned out to be a minor since it was queued, or the schedule may have
+ * been cancelled or paused. Such a message ends CANCELLED with the reason on the row and on the recipient, never sent.
+ * When the check itself cannot be made, the attempt is retried after the usual backoff rather than sent on a guess.
+ */
+async function cancelIfScheduledEmailObsolete(
+  prisma: DeliveryPrisma,
+  message: ClaimedMessage,
+  at: Date,
+  preparedBody?: PreparedEmailBody | null,
+) {
+  if (!isScheduledEmailMetadata(message.metadata)) return false;
+  let obsolete: { code: string; reason: string } | null;
+  try {
+    const scheduled = await import("@/modules/communications/scheduled-email-repository");
+    obsolete = await scheduled.scheduledEmailObsoleteReason(message.id, at);
+    if (!obsolete) return false;
+    await scheduled.cancelObsoleteScheduledMessage(prisma as never, {
+      messageId: message.id,
+      eventId: message.eventId,
+      code: obsolete.code as never,
+      reason: obsolete.reason,
+      where: { status: "PROCESSING", lockToken: message.lockToken },
+    });
+    // The body was prepared before this check, which minted a private link for it; the message will never be sent, so withdraw it.
+    await preparedBody?.revokeOnDefinitiveFailure?.().catch((revokeError: unknown) => {
+      logError("Unable to revoke an unused private registration link after a scheduled email was cancelled.", revokeError);
+    });
+    return true;
+  } catch (error) {
+    logError("Unable to confirm a scheduled email was still wanted; it will be retried.", error);
+    await finalizeFailedAttempt(prisma, message, { code: "SCHEDULED_EMAIL_CHECK_FAILED", message: "Could not confirm the scheduled email was still wanted, so it was not sent.", retryable: true }, at, true);
+    return true;
+  }
 }
 
 function announcementIdOf(metadata: unknown) {
@@ -1024,6 +1062,7 @@ async function runDeliveryLoop(
       // Checked again immediately before the provider call, so a revision that committed while the body was prepared cannot slip one out.
       if (await cancelIfInvoiceReplaced(prisma, message)) continue;
       if (await cancelIfLodgingStale(prisma, message, now())) continue;
+      if (await cancelIfScheduledEmailObsolete(prisma, message, now(), preparedBody)) continue;
       // And the opt-out again (#838): someone may have unsubscribed while the message was being prepared. An essential
       // announcement still goes. The private link minted for the body is unused, so it is withdrawn.
       const recheck = await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now());

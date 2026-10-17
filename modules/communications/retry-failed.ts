@@ -11,6 +11,7 @@ import {
 } from "@/modules/communications/messaging-repository";
 import {
   classifyFailedMessage,
+  isScheduledEmailMetadata,
   messageBatchKey,
   RETRY_FAILED_REQUEST_CAP,
   RETRY_FAILED_SKIP_LABELS,
@@ -240,6 +241,7 @@ async function buildPlan(
       tooOld: scope.type === "EVENT" && (message.failedAt ?? message.createdAt).getTime() < oldestAllowed,
       registrationId: message.registrationId,
       registrationStatus: message.registration?.status ?? null,
+      scheduledEmail: isScheduledEmailMetadata(message.metadata),
       deliveryMode,
       senderEmailSnapshot: message.senderEmailSnapshot,
       settingsSenderEmail: settings.senderEmail,

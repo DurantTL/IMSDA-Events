@@ -3,6 +3,7 @@
 import { ActionsMenu } from "@/components/actions-menu";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -1318,7 +1319,10 @@ export function CommunicationsWorkspace({
         <div>
           <p className="eyebrow">Event communications</p>
           <h2>Messages & announcements</h2>
-          <p>Manage attendee updates, registration confirmations, and delivery history for {eventName}.</p>
+          <p>
+            Manage attendee updates, registration confirmations, and delivery history for {eventName}.
+            {canManage && <> To send an email later, at a time in the event&apos;s time zone, use <Link href={`/communications/scheduled?event=${eventId}`}>Scheduled emails</Link>.</>}
+          </p>
         </div>
         {canManage && view === "announcements" && (
           <button className="primary-button" type="button" onClick={() => { setError(""); setNotice(""); setDraftAttachments([]); setDraftOpen(true); }}>

@@ -461,6 +461,8 @@ export async function enumerateOperationsRegistrationIds(
   input: SearchParamsInput | OperationsSearchQuery,
   catalog?: SearchCatalog,
   carriedIssues: readonly SearchIssue[] = [],
+  /** Narrow the same predicate to these registrations (the scheduled-email send-time check re-reads one recipient at a time). */
+  onlyIds?: readonly string[],
 ): Promise<OperationsIdEnumeration> {
   const parsed = isQuery(input) ? { query: input, issues: [] as SearchIssue[] } : parseOperationsSearchParams(input);
   const query = parsed.query;
@@ -476,7 +478,9 @@ export async function enumerateOperationsRegistrationIds(
   if (!prepared.ok) return rejected(prepared.result.issues);
   try {
     const rows = await readTransaction(async (tx) => tx.registration.findMany({
-      where: await readWhere(tx, prepared),
+      where: onlyIds
+        ? { AND: [await readWhere(tx, prepared), { id: { in: [...onlyIds] } }] }
+        : await readWhere(tx, prepared),
       orderBy: registrationOrderBy(query),
       take: MAX_ENUMERATED_REGISTRATIONS + 1,
       select: { id: true },

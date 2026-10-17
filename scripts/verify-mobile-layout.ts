@@ -267,6 +267,9 @@ const pages: PageSpec[] = [
   staff("communications-announcement-attachments", `/communications?event=${blocksEventId}`, "system-admin"),
   // The delivery log with a failed send and a queued message (#860): the Retry failed review and the refresh notice.
   staff("communications-deliveries", `/communications?event=${blocksEventId}&view=deliveries`, "system-admin"),
+  // Scheduled email batches (#177): a waiting, an approved and a paused schedule with a long unbroken name, and the new-schedule form.
+  staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
+  staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
@@ -638,6 +641,44 @@ async function seedFailedDeliveries(prisma: PrismaClient) {
 }
 
 /**
+ * Scheduled email batches (#177): one waiting for approval, one approved with a daylight-saving note, and one paused with a
+ * long unbroken name, so the list, its status chips, the label and value grid and the pause reason are on the page. Plain
+ * rows written directly (no recipients), the same shape the page lists.
+ */
+async function seedScheduledEmails(prisma: PrismaClient) {
+  if (await prisma.scheduledEmailBatch.count({ where: { eventId: blocksEventId } }) > 0) return;
+  const common = {
+    eventId: blocksEventId,
+    createdByUserId: "usr_system_admin",
+    templateKey: "BALANCE_REMINDER" as const,
+    trigger: "ONE_TIME" as const,
+    localTime: "09:00",
+    eventTimezone: "America/Chicago",
+    audienceQuery: { messageKind: "OPERATIONAL", roles: ["REGISTRATION_CONTACT"], search: "status=CONFIRMED&status=SUBMITTED", readinessStates: [] },
+    audienceQueryVersion: "audience-query/2",
+    audienceQueryHash: "0".repeat(64),
+    audienceFingerprint: "1".repeat(64),
+    eligibleCount: 12,
+    excludedCount: 3,
+  };
+  const long = "Supercalifragilisticexpialidocious-reminder-with-an-extremely-long-unbroken-synthetic-name";
+  await prisma.scheduledEmailBatch.createMany({
+    data: [
+      { ...common, id: `${P}-sched-1`, name: "Balance reminder before registration closes", localDate: "2099-05-01", sendAt: new Date("2099-05-01T14:00:00Z"), status: "SCHEDULED" },
+      {
+        ...common, id: `${P}-sched-2`, name: "Spring-forward reminder", localDate: "2099-03-08", localTime: "02:30", sendAt: new Date("2099-03-08T08:30:00Z"),
+        dstBehavior: "GAP_SHIFTED", dstNote: "02:30 does not exist on 2099-03-08 in America/Chicago: the clocks skip forward that day. The email goes out at the first moment after the change, Sun, Mar 8, 2099, 3:30 AM CDT.",
+        status: "ACTIVE", activatedByUserId: "usr_system_admin", activatedAt: new Date(),
+      },
+      {
+        ...common, id: `${P}-sched-3`, name: long, localDate: "2099-06-01", sendAt: new Date("2099-06-01T14:00:00Z"), status: "PAUSED",
+        pausedAt: new Date(), pauseReason: "The event's time zone or dates changed after this was approved, so its send time is no longer the one that was reviewed. Review the new time and approve it again.",
+      },
+    ],
+  });
+}
+
+/**
  * The More launcher offers Turn off only for a module with a stored row that its data
  * does not keep on (#810). The seeded event has none, so this adds one switchable
  * module row (Attendee community, no data behind it) and the audit removes it again
@@ -702,6 +743,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.calendarEntry.deleteMany({ where: { id: { startsWith: `${P}_calpair_` } } }),
     prisma.event.deleteMany({ where: { id: { startsWith: `${P}_calpair_` } } }),
     prisma.announcement.deleteMany({ where: { eventId: blocksEventId } }),
+    prisma.scheduledEmailBatch.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.messageOutbox.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.eventMessageTemplate.deleteMany({ where: { eventId: blocksEventId } }),
     prisma.messageFile.deleteMany({ where: { eventId: blocksEventId } }),
@@ -935,6 +977,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedBlocksEvent(prisma);
   await seedMessageFiles(prisma);
   await seedFailedDeliveries(prisma);
+  await seedScheduledEmails(prisma);
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
   await seedIssuedAssets(prisma);

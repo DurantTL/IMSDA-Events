@@ -5,6 +5,8 @@ const dependencies = vi.hoisted(() => ({
   getServerEnv: vi.fn(),
   processPendingMessages: vi.fn(),
   processAccountEmailQueue: vi.fn(),
+  dispatchDueScheduledEmails: vi.fn(),
+  finalizeFinishedScheduledEmails: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -15,6 +17,11 @@ vi.mock("@/modules/communications/messaging-repository", () => ({
 }));
 vi.mock("@/modules/communications/email-delivery", () => ({
   processAccountEmailQueue: dependencies.processAccountEmailQueue,
+}));
+
+vi.mock("@/modules/communications/scheduled-email-repository", () => ({
+  dispatchDueScheduledEmails: dependencies.dispatchDueScheduledEmails,
+  finalizeFinishedScheduledEmails: dependencies.finalizeFinishedScheduledEmails,
 }));
 
 import {
@@ -61,6 +68,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   dependencies.getServerEnv.mockReturnValue({ OUTBOX_SWEEP_TOKEN: sweepToken });
   dependencies.processPendingMessages.mockResolvedValue({});
+  dependencies.dispatchDueScheduledEmails.mockResolvedValue([]);
+  dependencies.finalizeFinishedScheduledEmails.mockResolvedValue(0);
 });
 
 describe("outbox queue readiness", () => {
@@ -216,5 +225,48 @@ describe("sweeping the queue", () => {
       eventId: null,
       reason: "Set ACCOUNT_EMAIL_SENDER_ADDRESS before account email can be sent.",
     }]);
+  });
+});
+
+describe("scheduled email batches in the sweep (#177)", () => {
+  it("runs due approved batches only after the core queues, with a small limit and a time budget", async () => {
+    prismaFixture({ dueEvents: [{ eventId: "evt_a" }] });
+    const order: string[] = [];
+    dependencies.dispatchDueScheduledEmails.mockImplementation(async () => {
+      order.push("dispatch");
+      return [{ batchId: "b1", outcome: "partial", queued: 3, excluded: 1, messageIds: [] }];
+    });
+    dependencies.processPendingMessages.mockImplementation(async () => { order.push("deliver"); return {}; });
+    const now = new Date("2027-04-20T14:00:00Z");
+
+    const result = await sweepOutbox({ now });
+
+    expect(order).toEqual(["deliver", "dispatch"]);
+    expect(dependencies.dispatchDueScheduledEmails).toHaveBeenCalledWith({ now, limit: 3, budgetMs: 60_000 });
+    expect(result.scheduledEmails).toEqual({ due: 1, queued: 3, excluded: 1, paused: 0, failed: 0 });
+    expect(dependencies.finalizeFinishedScheduledEmails).toHaveBeenCalledWith(now);
+  });
+
+  it("counts paused and failed batches without sending anything itself", async () => {
+    prismaFixture();
+    dependencies.dispatchDueScheduledEmails.mockResolvedValue([
+      { batchId: "b1", outcome: "paused", queued: 0, excluded: 0, messageIds: [] },
+      { batchId: "b2", outcome: "failed", queued: 0, excluded: 0, messageIds: [] },
+    ]);
+
+    const result = await sweepOutbox();
+
+    expect(result.scheduledEmails).toMatchObject({ due: 2, paused: 1, failed: 1, queued: 0 });
+  });
+
+  it("a scheduled-email failure never stops the outbox from being swept", async () => {
+    prismaFixture({ dueEvents: [{ eventId: "evt_a" }] });
+    dependencies.dispatchDueScheduledEmails.mockRejectedValue(new Error("database unavailable"));
+    dependencies.finalizeFinishedScheduledEmails.mockRejectedValue(new Error("database unavailable"));
+
+    const result = await sweepOutbox();
+
+    expect(result.sweptEventIds).toEqual(["evt_a"]);
+    expect(result.scheduledEmails).toEqual({ due: 0, queued: 0, excluded: 0, paused: 0, failed: 0 });
   });
 });

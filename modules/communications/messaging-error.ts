@@ -14,7 +14,9 @@ export class MessagingError extends Error {
       | "INVALID_TEMPLATE"
       | "TEMPLATE_NOT_PUBLISHED"
       | "ATTACHMENTS_INVALID"
-      | "AUDIENCE_TOO_BROAD",
+      | "AUDIENCE_TOO_BROAD"
+      | "SCHEDULE_INVALID"
+      | "SCHEDULE_STATE",
     message: string,
     public readonly details?: Record<string, unknown>,
   ) {

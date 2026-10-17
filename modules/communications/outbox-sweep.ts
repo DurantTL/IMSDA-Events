@@ -5,6 +5,8 @@ import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 import { processPendingMessages } from "@/modules/communications/messaging-repository";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
+import { dispatchDueScheduledEmails, finalizeFinishedScheduledEmails } from "@/modules/communications/scheduled-email-repository";
+import { logError } from "@/lib/logger";
 
 /**
  * A message that fails its first attempt is rescheduled with backoff, and a
@@ -13,6 +15,10 @@ import { processAccountEmailQueue } from "@/modules/communications/email-deliver
  * nothing recovered them unless a person happened to look. This sweep is the
  * scheduled caller that closes that gap.
  */
+
+/** At most this many due scheduled batches are run by one sweep, and none is started after the budget is spent. */
+export const SCHEDULED_DISPATCH_BATCH_LIMIT = 3;
+export const SCHEDULED_DISPATCH_BUDGET_MS = 60_000;
 
 /** Depth beyond which the queue is reported degraded. */
 export const OUTBOX_DEPTH_ALERT_THRESHOLD = 25;
@@ -41,6 +47,11 @@ export type OutboxSweepResult = {
   skipped: Array<{ eventId: string | null; reason: string }>;
   sweptAccountMessages: boolean;
   snapshotBefore: OutboxQueueSnapshot;
+  /**
+   * Approved scheduled email batches (#177) that came due and were run before the queue was swept, so what they queued
+   * is delivered in the same sweep. Counts only. The sweep only ever runs a batch a person already approved.
+   */
+  scheduledEmails: { due: number; queued: number; excluded: number; paused: number; failed: number };
 };
 
 /**
@@ -131,6 +142,7 @@ export async function sweepOutbox(
   options: { actorUserId?: string; now?: Date } = {},
 ): Promise<OutboxSweepResult> {
   const now = options.now ?? new Date();
+  const scheduledEmails = { due: 0, queued: 0, excluded: 0, paused: 0, failed: 0 };
   const snapshotBefore = await getOutboxQueueSnapshot(now);
 
   const dueEvents = await getPrisma().messageOutbox.groupBy({
@@ -170,5 +182,30 @@ export async function sweepOutbox(
     }
   }
 
-  return { sweptEventIds, skipped, sweptAccountMessages, snapshotBefore };
+  // Approved scheduled batches that are due run AFTER the core queues above, so a large batch can never starve activation,
+  // password reset or transactional email, and with a time budget and a small batch limit so it cannot time the sweep out.
+  // What they queue is delivered by the next sweep (a local-capture event captures inline). Their failure never fails the sweep.
+  try {
+    const dispatched = await dispatchDueScheduledEmails({
+      now: options.now ?? new Date(),
+      limit: SCHEDULED_DISPATCH_BATCH_LIMIT,
+      budgetMs: SCHEDULED_DISPATCH_BUDGET_MS,
+    });
+    scheduledEmails.due = dispatched.length;
+    for (const entry of dispatched) {
+      scheduledEmails.queued += entry.queued;
+      scheduledEmails.excluded += entry.excluded;
+      if (entry.outcome === "paused") scheduledEmails.paused += 1;
+      if (entry.outcome === "failed") scheduledEmails.failed += 1;
+    }
+  } catch (error) {
+    logError("Scheduled email dispatch failed during the outbox sweep", error);
+  }
+
+  // Batches whose messages have all left the queue are recorded as completed.
+  await finalizeFinishedScheduledEmails(options.now ?? new Date()).catch((error: unknown) => {
+    logError("Recording finished scheduled emails failed during the outbox sweep", error);
+  });
+
+  return { sweptEventIds, skipped, sweptAccountMessages, snapshotBefore, scheduledEmails };
 }

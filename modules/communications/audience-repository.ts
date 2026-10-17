@@ -297,6 +297,12 @@ async function loadRegistrationBatch(
 export type AudienceEvaluationOptions = {
   batchSize?: number;
   now?: Date;
+  /**
+   * Evaluate only these registrations (#177): the scheduled email send-time check re-reads one reviewed recipient's
+   * registration at a time. The query is normalized and authorized, and its full search filters are re-applied to
+   * exactly these ids, so nothing the approved audience required is skipped.
+   */
+  onlyRegistrationIds?: readonly string[];
 };
 
 /**
@@ -322,7 +328,9 @@ export async function evaluateEventAudience(
   const viewer = searchViewerFor(eventId, permissions);
   const catalog = await loadOperationsSearchCatalog(viewer);
   const search = audienceSearchQuery(query);
-  const selection = await enumerateOperationsRegistrationIds(viewer, search, catalog);
+  // With onlyRegistrationIds the very same filtered predicate runs, narrowed to those ids: payment state, tags, location,
+  // form answers and the caller's filter permissions are all applied again, never skipped.
+  const selection = await enumerateOperationsRegistrationIds(viewer, search, catalog, [], options.onlyRegistrationIds ? [...new Set(options.onlyRegistrationIds)] : undefined);
   if (!selection.ok) {
     if (selection.issues.length > 0 && selection.issues.every((issue) => issue.code === "too-broad")) {
       throw new MessagingError("AUDIENCE_TOO_BROAD", "That audience is too large to review at once. Narrow the filters and try again.");

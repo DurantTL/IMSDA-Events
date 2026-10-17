@@ -102,6 +102,7 @@ async function postHandler(request: Request) {
       sweptEventCount: result.sweptEventIds.length,
       sweptAccountMessages: result.sweptAccountMessages,
       skipped: result.skipped,
+      scheduledEmails: result.scheduledEmails,
       queueBefore: result.snapshotBefore,
       alerts: alerts && {
         sent: alerts.sent.map((alert) => alert.key),
