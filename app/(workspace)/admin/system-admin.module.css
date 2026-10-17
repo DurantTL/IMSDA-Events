@@ -1,28 +1,30 @@
+/* System dashboard (#989): a short hero, the summary numbers, the task groups, then health and event operations. */
 .workspace {
   padding-bottom: 32px;
 }
 
+/* ---- Hero: short, one block ---- */
 .hero {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 20px;
   background:
     radial-gradient(circle at 85% 15%, rgba(240, 179, 35, 0.28), transparent 30%),
     linear-gradient(140deg, var(--imsda-navy-deep), var(--imsda-navy) 56%, #245a74);
   color: white;
-  padding: 30px;
+  padding: 20px 26px;
   box-shadow: var(--shadow);
 }
 
 .hero h2 {
-  margin: 5px 0 8px;
-  font-size: clamp(1.75rem, 4vw, 2.7rem);
+  margin: 2px 0 6px;
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
   letter-spacing: -0.04em;
-  line-height: 1.05;
+  line-height: 1.1;
 }
 
 .hero p {
@@ -30,11 +32,11 @@
   margin: 0;
   color: #d6e5ec;
   font-size: max(var(--type-body-floor, 0px), 0.78rem);
-  line-height: 1.65;
+  line-height: 1.55;
 }
 
 .hero :global(.eyebrow) {
-  margin-top: 18px;
+  margin-top: 12px;
   color: #b8d2de;
 }
 
@@ -51,12 +53,13 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
-  padding: 6px 10px;
+  padding: 5px 10px;
   color: white;
   font-size: max(var(--type-floor, 0px), 0.62rem);
   font-weight: 800;
 }
 
+/* ---- Summary: one even row of four ---- */
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -65,13 +68,14 @@
 
 .metrics article {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
   align-items: center;
-  gap: 2px 12px;
+  gap: 1px 12px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 16px;
   background: white;
-  padding: 18px;
+  padding: 14px 16px;
   box-shadow: 0 9px 24px rgba(0, 59, 92, 0.05);
 }
 
@@ -83,10 +87,10 @@
 .metricIcon {
   display: grid;
   grid-row: 1 / 4;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border-radius: 13px;
+  border-radius: 12px;
   background: var(--imsda-navy-soft);
   color: var(--imsda-navy);
 }
@@ -114,15 +118,151 @@
   line-height: 1.4;
 }
 
-.dashboardGrid {
+/* ---- Task groups ---- */
+.tasks {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.75fr);
-  align-items: start;
   gap: 16px;
 }
 
+.taskGroup h2 {
+  margin: 0 0 8px;
+  color: var(--imsda-navy);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.taskGroup summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.taskGroup summary::-webkit-details-marker {
+  display: none;
+}
+
+.taskGroup summary h2 {
+  margin: 0;
+}
+
+.taskGroup summary svg {
+  flex: 0 0 auto;
+  color: var(--imsda-navy);
+  transition: transform 160ms ease;
+}
+
+.taskGroup[open] summary svg {
+  transform: rotate(180deg);
+}
+
+details.taskGroup {
+  border-top: 1px solid var(--line);
+}
+
+details.taskGroup[open] .taskGrid {
+  margin-top: 8px;
+}
+
+/* Equal-height tiles. The grid is sized to the group: five tiles run three and two across a six-column grid so the
+   last row fills the width, two tiles share one row, and a group of any other size fills an auto-fill grid. */
+.taskGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  grid-auto-rows: 1fr;
+  gap: 8px;
+}
+
+.taskGrid[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 701px) {
+  .taskGrid[data-count="5"] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .taskGrid[data-count="5"] > * {
+    grid-column: span 2;
+  }
+
+  .taskGrid[data-count="5"] > :nth-child(n + 4) {
+    grid-column: span 3;
+  }
+}
+
+.taskGrid[data-count="8"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .taskGrid[data-count="8"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.taskCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 10px 12px;
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(0, 59, 92, 0.05);
+}
+
+.taskCard:hover {
+  border-color: var(--imsda-navy);
+}
+
+.taskText {
+  min-width: 0;
+}
+
+.taskCard strong,
+.taskCard small {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+}
+
+.taskCard strong {
+  -webkit-line-clamp: 2;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-body-floor, 0px), 0.72rem);
+  line-height: 1.3;
+}
+
+.taskCard small {
+  -webkit-line-clamp: 2;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: max(var(--type-floor, 0px), 0.62rem);
+  line-height: 1.4;
+}
+
+.taskIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--imsda-navy-soft);
+  color: var(--imsda-navy);
+}
+
+/* ---- Panels ---- */
 .primaryColumn,
-.roadmap,
+.health,
 .scope {
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -131,13 +271,8 @@
 }
 
 .primaryColumn,
-.roadmap {
+.health {
   padding: 20px;
-}
-
-.sideColumn {
-  display: grid;
-  gap: 16px;
 }
 
 .sectionHeading {
@@ -161,6 +296,7 @@
 }
 
 .sectionHeading > span {
+  flex: 0 0 auto;
   border-radius: 999px;
   background: var(--imsda-navy-soft);
   color: var(--imsda-navy);
@@ -169,199 +305,61 @@
   font-weight: 800;
 }
 
-.eventList {
+/* ---- System health: its own full-width row, so no text breaks mid-word ---- */
+.healthGrid {
   display: grid;
-  gap: 12px;
-  margin-top: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
 }
 
-.eventCard {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #fbfcfd;
-}
-
-.eventMain,
-.eventFooter {
+.healthGrid article {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.eventMain {
-  padding: 16px;
-}
-
-.eventTitle {
-  min-width: 0;
-}
-
-.eventTitle h3 {
-  margin: 7px 0 2px;
-  color: var(--imsda-navy);
-  font-size: 0.92rem;
-}
-
-.eventTitle p {
-  margin: 0;
-  color: var(--muted);
-  font-size: max(var(--type-body-floor, 0px), 0.61rem);
-}
-
-.phase {
-  border-radius: 999px;
-  background: var(--imsda-purple-soft);
-  color: var(--imsda-purple);
-  padding: 4px 8px;
-  font-size: max(var(--type-floor, 0px), 0.54rem);
-  font-style: normal;
-  font-weight: 800;
-}
-
-.phaseOpen {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.openEvent {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: 5px;
-  color: var(--imsda-navy);
-  font-size: max(var(--type-floor, 0px), 0.62rem);
-  font-weight: 900;
-  text-decoration: none;
-}
-
-.eventStats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  border-block: 1px solid var(--line);
-  background: white;
-}
-
-.eventStats span {
-  padding: 11px 13px;
-}
-
-.eventStats span + span {
-  border-left: 1px solid var(--line);
-}
-
-.eventStats strong,
-.eventStats small {
-  display: block;
-}
-
-.eventStats strong {
-  color: var(--imsda-navy);
-  font-size: max(var(--type-staff-floor, 0px), 0.78rem);
-}
-
-.eventStats small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: max(var(--type-floor, 0px), 0.52rem);
-}
-
-.eventFooter {
-  align-items: flex-start;
-  padding: 12px 16px;
-}
-
-.eventWarnings,
-.eventLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.eventWarnings span {
-  color: #7b5610;
-  font-size: max(var(--type-floor, 0px), 0.55rem);
-  font-weight: 700;
-}
-
-.eventWarnings .ready {
-  color: var(--green);
-}
-
-.eventLinks {
-  justify-content: flex-end;
-}
-
-.eventLinks a {
-  color: var(--imsda-navy);
-  font-size: max(var(--type-body-floor, 0px), 0.55rem);
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.moduleList {
-  display: grid;
-  gap: 1px;
-  overflow: hidden;
-  margin-top: 15px;
+  flex-direction: column;
+  gap: 8px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--line);
+  background: #fbfcfd;
+  padding: 12px 14px;
 }
 
-.moduleList article {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
+.healthHead {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  background: white;
-  padding: 12px;
+}
+
+.healthHead strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-body-floor, 0px), 0.72rem);
 }
 
 .moduleIcon {
   display: grid;
-  width: 34px;
-  height: 34px;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border-radius: 10px;
   background: var(--imsda-purple-soft);
   color: var(--imsda-purple);
 }
 
-.moduleList strong,
-.moduleList small {
+.healthGrid small {
   display: block;
-}
-
-.moduleList strong {
-  color: var(--ink);
-  font-size: max(var(--type-floor, 0px), 0.65rem);
-}
-
-.moduleList strong a {
-  color: inherit;
-  text-decoration-color: rgba(0, 59, 92, 0.3);
-  text-underline-offset: 3px;
-}
-
-.moduleList strong a:hover {
-  color: var(--imsda-purple);
-  text-decoration-color: currentColor;
-}
-
-.moduleList small {
-  margin-top: 3px;
-  overflow-wrap: anywhere; /* #743: floored text must wrap long paths instead of overflowing */
+  overflow-wrap: break-word;
   color: var(--muted);
-  font-size: max(var(--type-floor, 0px), 0.54rem);
-  line-height: 1.45;
+  font-size: max(var(--type-floor, 0px), 0.6rem);
+  line-height: 1.5;
 }
 
-.moduleList em {
+.healthHead em {
+  flex: 0 0 auto;
   border-radius: 999px;
-  padding: 4px 7px;
-  font-size: max(var(--type-floor, 0px), 0.5rem);
+  padding: 4px 8px;
+  font-size: max(var(--type-floor, 0px), 0.55rem);
   font-style: normal;
   font-weight: 900;
   white-space: nowrap;
@@ -388,35 +386,123 @@
 }
 
 .alertList {
-  margin: 6px 0 0;
+  margin: 0;
   padding-left: 16px;
   color: var(--coral);
   font-size: max(var(--type-floor, 0px), 0.54rem);
   line-height: 1.5;
 }
 
+/* ---- Event operations: compact cards ---- */
+.eventList {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.eventCard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fbfcfd;
+  padding: 14px 16px;
+}
+
+.eventMain {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eventTitle {
+  min-width: 0;
+}
+
+.eventBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.eventTitle h3 {
+  margin: 6px 0 2px;
+  color: var(--imsda-navy);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.eventTitle p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.61rem);
+}
+
+.phase {
+  border-radius: 999px;
+  background: var(--imsda-purple-soft);
+  color: var(--imsda-purple);
+  padding: 4px 8px;
+  font-size: max(var(--type-floor, 0px), 0.54rem);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.phaseOpen {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
 .countdown {
-  margin-left: 6px;
   color: var(--muted);
   font-size: max(var(--type-floor, 0px), 0.54rem);
   font-weight: 800;
 }
 
-.eventWarnings a {
-  display: inline-flex;
+/* One primary action plus the Event links Actions menu (#981). */
+.eventButtons {
+  display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
-  color: #7b5610;
-  font-size: max(var(--type-body-floor, 0px), 0.55rem);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: rgba(123, 86, 16, 0.35);
-  text-underline-offset: 3px;
+  gap: 8px;
 }
 
-.eventWarnings a.exception {
-  color: var(--coral);
-  text-decoration-color: rgba(169, 85, 73, 0.35);
+.openEvent {
+  min-height: 40px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.eventButtons :global(.actions-menu-trigger) {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+/* A line of numbers: label and value stay together, and the line wraps between pairs, never inside a label. */
+.eventStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+}
+
+.eventStats > span,
+.eventStats a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.eventStats strong {
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.82rem);
+}
+
+.eventStats small {
+  color: var(--muted);
+  font-size: max(var(--type-floor, 0px), 0.58rem);
 }
 
 .eventStats a {
@@ -429,19 +515,39 @@
   text-decoration: underline;
 }
 
-.scope {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 11px;
-  padding: 15px;
-  color: var(--imsda-navy);
+.eventWarnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
 }
 
-.scope p {
-  margin: 3px 0 0;
-  color: var(--muted);
+.eventWarnings span {
+  color: #7b5610;
+  font-size: max(var(--type-floor, 0px), 0.55rem);
+  font-weight: 700;
+}
+
+.eventWarnings .ready {
+  color: var(--green);
+}
+
+.eventWarnings a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #7b5610;
   font-size: max(var(--type-body-floor, 0px), 0.58rem);
-  line-height: 1.5;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgba(123, 86, 16, 0.35);
+  text-underline-offset: 3px;
+}
+
+.eventWarnings a.exception {
+  color: var(--coral);
+  text-decoration-color: rgba(169, 85, 73, 0.35);
 }
 
 .pastEvents {
@@ -503,49 +609,29 @@
   font-size: max(var(--type-body-floor, 0px), 0.62rem);
 }
 
-@media (max-width: 1080px) {
-  .metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboardGrid {
-    grid-template-columns: 1fr;
-  }
+/* ---- Footer cards: build roadmap and system version, quieter than the panels above ---- */
+.footerCards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-@media (max-width: 700px) {
-  .hero,
-  .eventMain,
-  .eventFooter {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .hero {
-    padding: 22px;
-  }
+.scope {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 11px;
+  border-radius: 14px;
+  background: transparent;
+  padding: 12px 14px;
+  color: var(--imsda-navy);
+  box-shadow: none;
 }
 
-@media (max-width: 700px) {
-
-  .eventLinks {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 480px) {
-  .metrics {
-    grid-template-columns: 1fr;
-  }
-
-  .moduleList article {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .moduleList em {
-    grid-column: 2;
-    justify-self: start;
-  }
+.scope p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-body-floor, 0px), 0.58rem);
+  line-height: 1.5;
 }
 
 .scope a {
@@ -554,163 +640,65 @@
   text-underline-offset: 3px;
 }
 
-/* #447: links in the event rows are 44px tap targets on a phone (text sizes unchanged). */
+/* ---- Tablet ---- */
+@media (max-width: 1080px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .healthGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .footerCards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* #447: links in the event cards are 44px tap targets on a tablet and a phone (text sizes unchanged). */
 @media (max-width: 768px) {
   .openEvent,
-  .eventLinks a,
-  .eventWarnings a {
-    min-height: 44px;
-    align-items: center;
-  }
-
-  .eventLinks a {
-    display: inline-flex;
-    padding-inline: 6px;
-  }
-
+  .eventWarnings a,
   .eventStats a {
-    display: block;
+    display: inline-flex;
+    align-items: center;
     min-height: 44px;
   }
 }
 
-/* Grouped task cards (#966) */
-.tasks {
-  display: grid;
-  gap: 18px;
-}
-
-.taskGroup h2 {
-  margin: 0 0 8px;
-  color: var(--imsda-navy);
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
-.taskGroup summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 44px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.taskGroup summary::-webkit-details-marker {
-  display: none;
-}
-
-.taskGroup summary h2 {
-  margin: 0;
-}
-
-.taskGroup summary svg {
-  flex: 0 0 auto;
-  color: var(--imsda-navy);
-  transition: transform 160ms ease;
-}
-
-.taskGroup[open] summary svg {
-  transform: rotate(180deg);
-}
-
-details.taskGroup {
-  border-top: 1px solid var(--line);
-}
-
-details.taskGroup[open] .taskGrid {
-  margin-top: 8px;
-}
-
-.taskGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
-  gap: 10px;
-}
-
-.taskCard {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: white;
-  padding: 12px 14px;
-  color: var(--ink);
-  text-decoration: none;
-  box-shadow: 0 6px 18px rgba(0, 59, 92, 0.05);
-}
-
-.taskCard:hover {
-  border-color: var(--imsda-navy);
-}
-
-.taskCard strong,
-.taskCard small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.taskCard strong {
-  color: var(--imsda-navy);
-  font-size: max(var(--type-body-floor, 0px), 0.72rem);
-}
-
-.taskCard small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: max(var(--type-floor, 0px), 0.62rem);
-  line-height: 1.45;
-}
-
-.taskIcon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 11px;
-  background: var(--imsda-navy-soft);
-  color: var(--imsda-navy);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .taskGroup summary svg {
-    transition: none;
-  }
-}
-
-/* Compact dashboard cards and tidy per-event link rows (#981). */
-.taskGrid {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
-  gap: 8px;
-}
-
-.taskCard {
-  padding: 9px 12px;
-  gap: 10px;
-}
-
-.taskIcon {
-  width: 32px;
-  height: 32px;
-}
-
-/* On a phone the cards show the task name only, two to a row; the sidebar and each page say the rest. */
+/* ---- Phone ---- */
 @media (max-width: 700px) {
+  .hero {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 18px;
+    gap: 10px;
+  }
+
+  .hero :global(.eyebrow) {
+    display: none;
+  }
+
   .tasks {
     gap: 12px;
   }
 
-  .taskGrid {
+  /* Task tiles show the name only, two to a row; an odd last tile spans the row. */
+  .taskGrid,
+  .taskGrid[data-count] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
+  .taskGrid[data-count] > * {
+    grid-column: auto;
+  }
+
+  .taskGrid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
   .taskCard {
-    grid-template-columns: auto minmax(0, 1fr);
     min-height: 52px;
     padding: 8px 10px;
   }
@@ -719,122 +707,83 @@ details.taskGroup[open] .taskGrid {
     display: none;
   }
 
+  /* The name is all a phone tile shows, so a long one wraps rather than being cut off. */
+  .taskCard strong {
+    -webkit-line-clamp: 3;
+  }
+
   .taskIcon {
     width: 28px;
     height: 28px;
     border-radius: 9px;
   }
 
-  .hero {
-    padding: 18px;
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .metrics article {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .metricIcon {
+    display: none;
+  }
+
+  .primaryColumn,
+  .health {
+    padding: 16px;
+  }
+
+  .sectionHeading {
+    flex-wrap: wrap;
+  }
+
+  .eventMain {
+    flex-direction: column;
+    align-items: stretch;
     gap: 10px;
   }
-}
 
-/* The warnings sit above one even grid of links, so the row wraps in columns, not in ragged lines. */
-.eventFooter {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.eventLinks {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
-  gap: 6px;
-  justify-content: stretch;
-}
-
-.eventLinks a {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: white;
-  padding: 4px 8px;
-  text-align: center;
-}
-
-.eventLinks a:hover {
-  border-color: var(--imsda-navy);
-}
-
-/* Phone: denser event cards so the dashboard is much shorter than the 7,375px it was (#981). Each card drops its stat row;
-   the numbers are on the event's own pages (Open event, Finance). */
-@media (max-width: 700px) {
+  /* The per-event stat row is hidden on a phone (#987); the numbers are on the event's own pages. */
   .eventStats {
     display: none;
   }
 
-  .eventLinks {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .eventLinks a {
-    padding: 2px 4px;
-    font-size: max(var(--type-body-floor, 0px), 0.8rem);
-  }
-
-  .metrics {
+  .eventButtons {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
 
-@media (max-width: 480px) {
-  .metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* The per-event links sit in a disclosure that is closed on a phone and always open from 701px up. */
-.eventTools > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 44px;
-  cursor: pointer;
-  color: var(--imsda-navy);
-  font-size: max(var(--type-body-floor, 0px), 0.8rem);
-  font-weight: 800;
-  list-style: none;
-}
-
-.eventTools > summary::-webkit-details-marker {
-  display: none;
-}
-
-.eventTools[open] > summary svg {
-  transform: rotate(180deg);
-}
-
-@media (min-width: 701px) {
-  @supports selector(::details-content) {
-    .eventTools::details-content {
-      display: block;
-      content-visibility: visible;
-    }
-
-    .eventTools > summary {
-      display: none;
-    }
-  }
-}
-
-@media (max-width: 700px) {
-  .eventMain {
-    gap: 4px;
-    padding: 12px 14px;
+  .eventButtons :global(.actions-menu) {
+    position: relative;
   }
 
-  .eventFooter {
-    padding: 8px 14px;
-    gap: 2px;
+  .eventButtons :global(.actions-menu-list) {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 13rem;
+    box-shadow: var(--shadow);
+  }
+
+  .openEvent {
+    min-height: 44px;
+  }
+
+  .eventButtons :global(.actions-menu-trigger) {
+    width: 100%;
+    min-height: 44px;
   }
 
   .eventWarnings {
-    gap: 0;
+    padding-top: 8px;
+  }
+
+  .eventWarnings a {
+    min-height: 44px;
   }
 }

@@ -185,25 +185,46 @@ describe("/admin dashboard page", () => {
     expect(eventFeaturesItem.href.startsWith("/more")).toBe(true);
   });
 
-  it("lists Archived events once (the Events card), and wraps the per-event links in an even grid (#981)", () => {
+  it("lists Archived events once (the Events card), and puts the per-event links in an Actions menu (#989)", () => {
     expect(source).not.toContain('href="/archived-events"');
     expect(systemNavGroups.flatMap((group) => group.items).filter((item) => item.href === "/archived-events")).toHaveLength(1);
     // The card description is read once, as the card text; there is no title tooltip repeating it.
     expect(source).not.toContain("title={description}");
-    expect(source).toContain('<span className="sr-only"> for {event.name}</span>');
+    // All seven per-event links stay reachable, in the shared closed-by-default Actions menu (one primary action, #981).
+    expect(source).toContain("<ActionsMenu label=\"Event links\" ariaLabel={`Event links for ${event.name}`}>");
+    const menu = source.slice(source.indexOf("<ActionsMenu"), source.indexOf("</ActionsMenu>"));
+    for (const target of ["/registration-builder?", "eventFeaturesItem.href", "/finance/square-payments?", "/more/promo-codes?", "/staff?", "/more/health?", "/more/event-settings?"]) {
+      expect(menu, target).toContain(target);
+    }
+    expect(source).toContain("Open event <ArrowRight");
     const stylesheet = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
-    expect(stylesheet).toMatch(/\.eventLinks \{\s*display: grid;\s*grid-template-columns: repeat\(auto-fit, minmax\(6\.5rem, 1fr\)\);/);
     // On a phone the task cards drop their description and sit two to a row, so the page is much shorter.
-    expect(stylesheet).toMatch(/@media \(max-width: 700px\) \{\s*\.tasks \{[^}]*\}\s*\.taskGrid \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    // The phone block is the last in the file, so these checks cannot match a rule in another media block.
+    const phone = stylesheet.slice(stylesheet.indexOf("@media (max-width: 700px) {"));
+    expect(phone.match(/@media/g)).toHaveLength(1);
+    expect(phone).toMatch(/\.taskGrid,\s*\.taskGrid\[data-count\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    expect(phone).toMatch(/\.eventButtons :global\(\.actions-menu-trigger\) \{\s*width: 100%;/);
+    // Links keep 44px tap targets on a tablet (#447).
+    expect(stylesheet).toMatch(/@media \(max-width: 768px\) \{\s*\.openEvent,\s*\.eventWarnings a,\s*\.eventStats a \{[^}]*min-height: 44px;/);
     expect(stylesheet).toMatch(/\.taskCard small \{\s*display: none;/);
-    // Each event card drops its stat row on a phone, and no later rule lays the row out again.
-    const hide = stylesheet.search(/@media \(max-width: 700px\) \{\s*\.eventStats \{\s*display: none;/);
-    expect(hide).toBeGreaterThan(-1);
-    expect(stylesheet.slice(stylesheet.indexOf("}", hide) + 1)).not.toMatch(/\.eventStats \{[^}]*(display|grid-template-columns)/);
-    // The per-event links stay in the page, in a disclosure closed on a phone and forced open from 701px up.
-    expect(source).toContain("styles.eventTools");
-    expect(source).toContain("<summary>Event links");
-    expect(stylesheet).toMatch(/@media \(min-width: 701px\) \{\s*@supports selector\(::details-content\) \{\s*\.eventTools::details-content \{\s*display: block;\s*content-visibility: visible;/);
+    // Each event card drops its stat row on a phone (#987), and no later rule lays the row out again.
+    expect(phone).toMatch(/\.eventStats \{\s*display: none;/);
+    expect(stylesheet.slice(stylesheet.lastIndexOf(".eventStats {"))).toMatch(/^\.eventStats \{\s*display: none;/);
+  });
+
+  it("orders the page: hero, summary, task groups, health, then event operations and the footer cards (#989)", () => {
+    const at = (text: string) => source.indexOf(text);
+    const order = ["styles.hero", "styles.metrics", "styles.tasks", "styles.health}", "styles.primaryColumn", "styles.footerCards"].map(at);
+    expect(order.every((position) => position > -1)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    // Tiles are equal height with a two-line description, and the grid is sized to the group's tile count.
+    expect(source).toContain("data-count={group.items.length}");
+    const stylesheet = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
+    expect(stylesheet).toMatch(/\.taskGrid \{[^}]*grid-auto-rows: 1fr;/);
+    expect(stylesheet).toMatch(/\.taskCard small \{[^}]*-webkit-line-clamp: 2;/);
+    expect(stylesheet).toMatch(/\.taskGrid\[data-count="5"\] \{\s*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\);/);
+    // The health text never breaks mid-word unless one word is longer than the card.
+    expect(stylesheet).not.toMatch(/overflow-wrap: anywhere/);
   });
 
   it("keeps the event operations, health and version panels", () => {
