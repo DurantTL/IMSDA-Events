@@ -7,6 +7,7 @@ import { logError } from "@/lib/logger";
 import { effectivePermissions } from "@/modules/access/authorization";
 import {
   AUDIENCE_QUERY_VERSION,
+  AudienceFilterNotAvailableError,
   audienceQueryHash,
   normalizeAudienceQuery,
   type NormalizedAudienceQuery,
@@ -43,6 +44,7 @@ import {
   scheduledEmailUpdateSchema,
   targetKey,
   type CurrentAudienceView,
+  type EventMinors,
   type YouthCheckRegistration,
   type ScheduleExclusionCode,
   type ScheduleProjection,
@@ -203,6 +205,17 @@ export async function findMinorTargets(
     }),
   ]);
   const ageClass = new Map(types.map((type) => [type.code, classifyAttendeeType(type)] as const));
+  // The whole event's non-adult attendees (a type that is not an adult type, or no type at all), read once for this evaluation:
+  // an account holder who attends as a minor anywhere is a minor everywhere, and their address is a youth address.
+  const adultCodes = types.filter((type) => ageClass.get(type.code) === "ADULT").map((type) => type.code);
+  const eventMinorRows = await client.registrationAttendee.findMany({
+    where: { eventId, OR: [{ attendeeTypeDefinitionId: null }, { attendeeTypeDefinition: { code: { notIn: adultCodes } } }] },
+    select: { personId: true, person: { select: { normalizedEmail: true } } },
+  });
+  const eventMinors: EventMinors = {
+    personIds: new Set(eventMinorRows.map((row) => row.personId)),
+    emails: new Set(eventMinorRows.map((row) => normalizeAudienceEmail(row.person.normalizedEmail)).filter(Boolean)),
+  };
   const byRegistration = new Map<string, YouthCheckRegistration>();
   for (const registration of registrations) {
     const snapshot = registration.contactSnapshot && typeof registration.contactSnapshot === "object" && !Array.isArray(registration.contactSnapshot)
@@ -224,7 +237,7 @@ export async function findMinorTargets(
       }),
     });
   }
-  return refusedYouthTargets(targets, byRegistration);
+  return refusedYouthTargets(targets, byRegistration, eventMinors);
 }
 
 function builderExclusionCode(code: string): ScheduleExclusionCode | null {
@@ -955,9 +968,19 @@ async function buildCurrentView(
     exclusionByEmail,
     registrationsWithOtherTarget: withTarget,
     // The reviewed recipients are what is being decided, so the youth check runs over them, not over what the audience lists.
-    minorTargets: await findMinorTargets(client, eventId, reviewed),
+    // Judged on the roles each recipient holds NOW (from the current audience), not those stored at approval, so a role that
+    // lapsed (a group leader or organization contact who is no longer one) cannot vouch for a youth address.
+    minorTargets: await findMinorTargets(client, eventId, reviewed.map((recipient) => ({
+      ...recipient,
+      roles: targets.get(targetKey(recipient.email, recipient.registrationId))?.roles ?? [],
+    }))),
     isOrganizationBilled: event.billingMode === "DEFERRED_ORGANIZATION_INVOICE",
   };
+}
+
+/** A filter that is gone (stale, or the approver lost permission to use it) or an audience grown too broad: a stop, not a crash. */
+function isFilterUnavailable(error: unknown) {
+  return error instanceof AudienceFilterNotAvailableError || (error instanceof MessagingError && error.code === "AUDIENCE_TOO_BROAD");
 }
 
 export type ScheduledMessageObsolescence = { code: ScheduleExclusionCode; reason: string };
@@ -995,10 +1018,17 @@ export async function scheduledEmailObsoleteReason(messageId: string, now = new 
   const permissions = await loadApproverPermissions(prisma, batch.activatedByUserId, batch.eventId);
   if (!permissions.includes(MANAGE)) return drop("APPROVER_NOT_PERMITTED");
 
-  const evaluated = await evaluateEventAudience(batch.eventId, permissions, queryForTemplate(batch.templateKey as ScheduledEmailTemplateKey, batch.audienceQuery), {
-    now,
-    onlyRegistrationIds: [recipient.registrationId],
-  });
+  let evaluated: Awaited<ReturnType<typeof evaluateEventAudience>>;
+  try {
+    evaluated = await evaluateEventAudience(batch.eventId, permissions, queryForTemplate(batch.templateKey as ScheduledEmailTemplateKey, batch.audienceQuery), {
+      now,
+      onlyRegistrationIds: [recipient.registrationId],
+    });
+  } catch (error) {
+    // The audience's own filters can no longer be applied: the message is cancelled with a code, never sent and never retried forever.
+    if (isFilterUnavailable(error)) return drop("FILTER_UNAVAILABLE");
+    throw error;
+  }
   const view = await buildCurrentView(prisma, batch.eventId, evaluated, [
     { registrationId: recipient.registrationId, email: recipient.recipientEmail, roles: recipient.roles },
   ]);
@@ -1120,7 +1150,7 @@ async function failBatch(prisma: PrismaClient, batch: BatchRow, claimToken: stri
  * reviewed), then the whole audience is re-evaluated and each approved recipient is kept or dropped with a code, then
  * the kept ones are queued. The outbox worker delivers them, re-checking each right before it sends.
  */
-export async function runScheduledEmailBatch(batchId: string, options: { now?: Date } = {}): Promise<ScheduledDispatchResult> {
+export async function runScheduledEmailBatch(batchId: string, options: { now?: Date; deadline?: number } = {}): Promise<ScheduledDispatchResult> {
   const now = options.now ?? new Date();
   const prisma = getPrisma();
   const claimToken = randomUUID();
@@ -1174,7 +1204,14 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
     orderBy: [{ registrationId: "asc" }, { recipientEmail: "asc" }],
     select: { id: true, registrationId: true, recipientEmail: true, recipientName: true, roles: true },
   });
-  const evaluated = await evaluateEventAudience(batch.eventId, permissions, queryForTemplate(batch.templateKey as ScheduledEmailTemplateKey, batch.audienceQuery), { now });
+  let evaluated: Awaited<ReturnType<typeof evaluateEventAudience>>;
+  try {
+    evaluated = await evaluateEventAudience(batch.eventId, permissions, queryForTemplate(batch.templateKey as ScheduledEmailTemplateKey, batch.audienceQuery), { now });
+  } catch (error) {
+    if (!isFilterUnavailable(error)) throw error;
+    const stopped = await releaseAndPause(prisma, batch, claimToken, "A filter this schedule uses is no longer available: it changed, the audience grew too large to check, or the approver no longer has permission to use it. Review the schedule's audience and approve it again.");
+    return { ...result, outcome: stopped, reason: "FILTER_UNAVAILABLE" };
+  }
   const view = await buildCurrentView(
     prisma,
     batch.eventId,
@@ -1267,7 +1304,8 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
   // still waiting; the messages are now ordinary outbox rows. A local-capture event captures right away, and real email
   // is delivered by the outbox worker that follows the sweep.
   if (deliveryMode === "LOCAL_CAPTURE" && result.messageIds.length > 0) {
-    await captureMessageIdsLocally(result.messageIds).catch((error: unknown) => {
+    // Past the time budget the rest stay queued; the sweep's own queue pass captures them next time.
+    await captureMessageIdsLocally(result.messageIds, { deadline: options.deadline }).catch((error: unknown) => {
       logError("Capturing scheduled email locally failed; the outbox sweep will retry.", error);
     });
   }
@@ -1350,7 +1388,7 @@ export async function dispatchDueScheduledEmails(options: { now?: Date; limit?: 
     // No new batch is started once the time budget is spent; it stays due for the next sweep.
     if (options.budgetMs !== undefined && Date.now() - startedAt >= options.budgetMs) break;
     try {
-      results.push(await runScheduledEmailBatch(id, { now }));
+      results.push(await runScheduledEmailBatch(id, { now, deadline: options.budgetMs === undefined ? undefined : startedAt + options.budgetMs }));
     } catch (error) {
       logError("A scheduled email batch could not be run; it will be retried.", error);
       results.push({ batchId: id, outcome: "skipped", queued: 0, excluded: 0, messageIds: [], reason: "ERROR" });

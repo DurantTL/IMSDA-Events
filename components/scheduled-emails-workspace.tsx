@@ -9,6 +9,7 @@ import {
   SCHEDULED_EMAIL_TEMPLATE_LABELS,
   SCHEDULED_EMAIL_TRIGGERS,
   SCHEDULED_EMAIL_TRIGGER_LABELS,
+  replaceApprovalReview,
   type ScheduledEmailTemplateKey,
   type ScheduledEmailTrigger,
 } from "@/modules/communications/scheduled-email-options";
@@ -152,7 +153,7 @@ export function ScheduledEmailsWorkspace({
         if (moved) {
           setFormReview(moved);
           // The approval panel shows the changed review too, so the approver sees what is true now before approving again.
-          setApproval((current) => (current ? { ...current, review: moved } : current));
+          setApproval((current) => replaceApprovalReview(current, moved));
         }
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The request could not be completed.");
       }

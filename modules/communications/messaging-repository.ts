@@ -1177,9 +1177,11 @@ async function captureOneMessageLocally(messageId: string, eventId?: string, sch
   return captureOneMessageLocally(messageId, eventId, { obsolete });
 }
 
-export async function captureMessageIdsLocally(messageIds: string[]) {
+export async function captureMessageIdsLocally(messageIds: string[], options: { deadline?: number } = {}) {
   const capturedIds: string[] = [];
   for (const messageId of [...new Set(messageIds)]) {
+    // A caller with a time budget (the sweep's scheduled dispatch) leaves the rest PENDING for the next queue pass.
+    if (options.deadline !== undefined && Date.now() >= options.deadline) break;
     if (await captureOneMessageLocally(messageId)) capturedIds.push(messageId);
   }
   return capturedIds;

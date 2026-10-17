@@ -297,78 +297,105 @@ describe("re-evaluating a reviewed recipient at send time", () => {
   });
 });
 
-describe("a youth's address (owner decision, Oct 17)", () => {
+describe("a youth's address (owner decisions, Oct 17)", () => {
   const reg = (overrides: Partial<YouthCheckRegistration> = {}): YouthCheckRegistration => ({
     registrationId: "reg-1",
     accountHolderPersonId: "parent",
-    holderEmail: "family@example.test",
+    holderEmail: "parent@example.test",
     snapshotEmail: "family@example.test",
     attendees: [
-      { personId: "parent", email: "family@example.test", age: "ADULT" },
       { personId: "kid", email: "family@example.test", age: "MINOR" },
     ],
     ...overrides,
   });
-  const run = (roles: string[], email: string, registration: YouthCheckRegistration) =>
-    refusedYouthTargets([{ email, registrationId: "reg-1", roles }], new Map([["reg-1", registration]]));
+  const noMinors = { personIds: new Set<string>(), emails: new Set<string>() };
+  const minors = (personIds: string[], emails: string[]) => ({ personIds: new Set(personIds), emails: new Set(emails) });
+  const run = (roles: string[], email: string, registration: YouthCheckRegistration, eventMinors = minors(["kid"], ["family@example.test"])) =>
+    refusedYouthTargets([{ email, registrationId: "reg-1", roles }], new Map([["reg-1", registration]]), eventMinors);
   const key = (email: string) => targetKey(email, "reg-1");
 
   it("a parent who shares the youth's address receives it, once, as the adult contact", () => {
+    // The parent attends nothing in the event, so is an adult holder and is not blocked.
     expect(run(["REGISTRATION_CONTACT"], "family@example.test", reg()).size).toBe(0);
   });
 
-  it("an adult attendee who shares the address with a youth attendee is allowed", () => {
+  it("an adult attendee holding the address allows it, even beside a youth attendee", () => {
     const shared = reg({
-      accountHolderPersonId: "other",
-      holderEmail: "other@example.test",
       snapshotEmail: "other@example.test",
       attendees: [
         { personId: "adult", email: "shared@example.test", age: "ADULT" },
         { personId: "kid", email: "shared@example.test", age: "MINOR" },
       ],
     });
-    expect(run(["ATTENDEE"], "shared@example.test", shared).size).toBe(0);
+    expect(run(["ATTENDEE"], "shared@example.test", shared, minors(["kid"], ["shared@example.test"])).size).toBe(0);
   });
 
-  it("a group billing contact or organization contact who shares it is allowed", () => {
-    const youthOnly = reg({ attendees: [{ personId: "kid", email: "leader@example.test", age: "MINOR" }], accountHolderPersonId: "x", holderEmail: "x@example.test", snapshotEmail: "x@example.test" });
-    expect(run(["GROUP_LEADER"], "leader@example.test", youthOnly).size).toBe(0);
-    expect(run(["ORGANIZATION_CONTACT"], "leader@example.test", youthOnly).size).toBe(0);
+  it("a group billing contact or organization contact who holds the role now is allowed", () => {
+    const youthOnly = reg({ snapshotEmail: "x@example.test", attendees: [{ personId: "kid", email: "leader@example.test", age: "MINOR" }] });
+    const youth = minors(["kid"], ["leader@example.test"]);
+    expect(run(["GROUP_LEADER"], "leader@example.test", youthOnly, youth).size).toBe(0);
+    expect(run(["ORGANIZATION_CONTACT"], "leader@example.test", youthOnly, youth).size).toBe(0);
+  });
+
+  it("a lapsed leader role cannot vouch: judged on the roles held now, a youth address with no role left is refused", () => {
+    const youthOnly = reg({ snapshotEmail: "x@example.test", attendees: [{ personId: "kid", email: "leader@example.test", age: "MINOR" }] });
+    const youth = minors(["kid"], ["leader@example.test"]);
+    expect(run([], "leader@example.test", youthOnly, youth).size).toBe(1);
+    expect(run(["ATTENDEE"], "leader@example.test", youthOnly, youth).size).toBe(1);
   });
 
   it("a youth who is their own registration contact through the account-holder fallback is never emailed", () => {
-    const own = reg({
-      accountHolderPersonId: "kid",
-      holderEmail: "kid@example.test",
-      snapshotEmail: "",
-      attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }],
-    });
-    expect([...run(["REGISTRATION_CONTACT"], "kid@example.test", own)]).toEqual([key("kid@example.test")]);
-    // The same when the typed contact address is the youth's own.
-    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", { ...own, snapshotEmail: "kid@example.test" }).size).toBe(1);
+    const own = reg({ accountHolderPersonId: "kid", holderEmail: "kid@example.test", snapshotEmail: "", attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }] });
+    const youth = minors(["kid"], ["kid@example.test"]);
+    expect([...run(["REGISTRATION_CONTACT"], "kid@example.test", own, youth)]).toEqual([key("kid@example.test")]);
+    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", { ...own, snapshotEmail: "kid@example.test" }, youth).size).toBe(1);
     // An age-unknown attendee is treated as a minor.
-    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", { ...own, attendees: [{ personId: "kid", email: "kid@example.test", age: "UNKNOWN" }] }).size).toBe(1);
+    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", { ...own, attendees: [{ personId: "kid", email: "kid@example.test", age: "UNKNOWN" }] }, youth).size).toBe(1);
+  });
+
+  it("a minor account holder who types a younger sibling's address as the contact is refused", () => {
+    // The holder is a youth attendee; the typed contact address is the sibling's own address, held by no adult.
+    const sibling = reg({
+      accountHolderPersonId: "older",
+      holderEmail: "older@example.test",
+      snapshotEmail: "sibling@example.test",
+      attendees: [
+        { personId: "older", email: "older@example.test", age: "MINOR" },
+        { personId: "sibling", email: "sibling@example.test", age: "MINOR" },
+      ],
+    });
+    const youth = minors(["older", "sibling"], ["older@example.test", "sibling@example.test"]);
+    expect([...run(["REGISTRATION_CONTACT"], "sibling@example.test", sibling, youth)]).toEqual([key("sibling@example.test")]);
+    expect(run(["REGISTRATION_CONTACT"], "older@example.test", sibling, youth).size).toBe(1);
+  });
+
+  it("a holder who is a youth attendee on another registration of the event is a minor here too", () => {
+    // R2 has only a parent-looking contact address, but its account holder attends R1 as a youth.
+    const r2 = reg({ registrationId: "reg-1", accountHolderPersonId: "kid", holderEmail: "kid@example.test", snapshotEmail: "typed@example.test", attendees: [] });
+    const eventWide = minors(["kid"], ["kid@example.test"]);
+    expect(run(["REGISTRATION_CONTACT"], "typed@example.test", r2, eventWide).size).toBe(1);
+    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", r2, eventWide).size).toBe(1);
+    // An adult attendee of this registration holding the typed address vouches for it.
+    const withAdult = { ...r2, attendees: [{ personId: "adult", email: "typed@example.test", age: "ADULT" as const }] };
+    expect(run(["REGISTRATION_CONTACT"], "typed@example.test", withAdult, eventWide).size).toBe(0);
+  });
+
+  it("a non-attending parent as account holder is an adult and is not blocked", () => {
+    const parent = reg({ accountHolderPersonId: "parent", holderEmail: "parent@example.test", snapshotEmail: "", attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }] });
+    expect(run(["REGISTRATION_CONTACT"], "parent@example.test", parent, minors(["kid"], ["kid@example.test"])).size).toBe(0);
+    expect(run(["REGISTRATION_CONTACT"], "parent@example.test", parent, noMinors).size).toBe(0);
   });
 
   it("a youth's own address with no adult behind it is refused, as an attendee or under a forged role", () => {
-    const youthOnly = reg({ attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }, { personId: "parent", email: "family@example.test", age: "ADULT" }] });
-    expect(run(["ATTENDEE"], "kid@example.test", youthOnly).size).toBe(1);
-    expect(run([], "kid@example.test", youthOnly).size).toBe(1);
-  });
-
-  it("a contact who typed their own address stays allowed even when the account holder is a youth attendee", () => {
-    const typed = reg({
-      accountHolderPersonId: "kid",
-      holderEmail: "kid@example.test",
-      snapshotEmail: "parent@example.test",
-      attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }],
-    });
-    expect(run(["REGISTRATION_CONTACT"], "parent@example.test", typed).size).toBe(0);
+    const youthOnly = reg({ snapshotEmail: "parent@example.test", attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }] });
+    const youth = minors(["kid"], ["kid@example.test"]);
+    expect(run(["ATTENDEE"], "kid@example.test", youthOnly, youth).size).toBe(1);
+    expect(run([], "kid@example.test", youthOnly, youth).size).toBe(1);
   });
 
   it("an address reached only as an attendee still needs an adult attendee holding it", () => {
-    expect(run(["ATTENDEE"], "nobody@example.test", reg()).size).toBe(1);
-    expect(run(["REGISTRATION_CONTACT", "ATTENDEE"], "nobody@example.test", reg()).size).toBe(0);
+    expect(run(["ATTENDEE"], "nobody@example.test", reg(), noMinors).size).toBe(1);
+    expect(run(["REGISTRATION_CONTACT", "ATTENDEE"], "nobody@example.test", reg(), noMinors).size).toBe(0);
   });
 });
 

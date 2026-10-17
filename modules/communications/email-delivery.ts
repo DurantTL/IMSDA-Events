@@ -408,6 +408,7 @@ async function cancelIfScheduledEmailObsolete(
   prisma: DeliveryPrisma,
   message: ClaimedMessage,
   at: Date,
+  preparedBody?: PreparedEmailBody | null,
 ) {
   if (!isScheduledEmailMetadata(message.metadata)) return false;
   let obsolete: { code: string; reason: string } | null;
@@ -421,6 +422,10 @@ async function cancelIfScheduledEmailObsolete(
       code: obsolete.code as never,
       reason: obsolete.reason,
       where: { status: "PROCESSING", lockToken: message.lockToken },
+    });
+    // The body was prepared before this check, which minted a private link for it; the message will never be sent, so withdraw it.
+    await preparedBody?.revokeOnDefinitiveFailure?.().catch((revokeError: unknown) => {
+      logError("Unable to revoke an unused private registration link after a scheduled email was cancelled.", revokeError);
     });
     return true;
   } catch (error) {
@@ -1057,7 +1062,7 @@ async function runDeliveryLoop(
       // Checked again immediately before the provider call, so a revision that committed while the body was prepared cannot slip one out.
       if (await cancelIfInvoiceReplaced(prisma, message)) continue;
       if (await cancelIfLodgingStale(prisma, message, now())) continue;
-      if (await cancelIfScheduledEmailObsolete(prisma, message, now())) continue;
+      if (await cancelIfScheduledEmailObsolete(prisma, message, now(), preparedBody)) continue;
       // And the opt-out again (#838): someone may have unsubscribed while the message was being prepared. An essential
       // announcement still goes. The private link minted for the body is unused, so it is withdrawn.
       const recheck = await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now());

@@ -33,3 +33,11 @@ export const SCHEDULED_EMAIL_STATUS_LABELS: Record<ScheduledEmailStatus, string>
   COMPLETED: "Completed",
   FAILED: "Failed",
 };
+
+/**
+ * When an approval is refused because the review moved (PREVIEW_CHANGED), the approval panel must show the review that is
+ * true now, so the approver sees what changed before approving again. A panel that is not open stays closed.
+ */
+export function replaceApprovalReview<R, A extends { review: R }>(approval: A | null, moved: R): A | null {
+  return approval ? { ...approval, review: moved } : approval;
+}

@@ -92,7 +92,7 @@ async function main() {
 
 async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   const schedules = await import("@/modules/communications/scheduled-email-repository");
-  const { processExternalEmailQueue } = await import("@/modules/communications/email-delivery");
+  const { processExternalEmailQueue, prepareEmailBodyForDelivery } = await import("@/modules/communications/email-delivery");
   const { MessagingError } = await import("@/modules/communications/messaging-error");
   const { ensureEventMessagingDefaults, publishMessageTemplateVersion } = await import("@/modules/communications/messaging-repository");
   const eventTimezoneForTest = "America/Chicago";
@@ -366,7 +366,19 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   const sReg = await register("s", sParent, email("share.family"), "0.00", [{ person: sParent }, { person: sYouth, type: "YOUTH" }]);
   const tYouth = await person("TYouth", email("youth.own"));
   const tReg = await register("t", tYouth, "", "0.00", [{ person: tYouth, type: "YOUTH" }]);
-  void sReg; void tReg;
+  //  v: a youth (the older sibling) is the account holder and types the younger sibling's own address as the contact.
+  //  v2: the same youth is also the account holder of a second registration whose only attendee is an adult: judged across the
+  //      whole event the holder is a minor, so the contact address they typed there is youth-only too.
+  //  w: a parent who attends nothing is the account holder (the normal case); the youth is the attendee. The parent is not blocked.
+  const vOlder = await person("VOlder", email("sib.older"));
+  const vYounger = await person("VYounger", email("sib.younger"));
+  const vReg = await register("v", vOlder, email("sib.younger"), "0.00", [{ person: vOlder, type: "YOUTH" }, { person: vYounger, type: "YOUTH" }]);
+  const v2Adult = await person("V2Adult", email("v2.adult"));
+  const v2Reg = await register("v2", vOlder, email("typed.v2"), "0.00", [{ person: v2Adult, type: "ADULT" }]);
+  const wParent = await person("WParent", email("w.parent"));
+  const wYouth = await person("WYouth", email("w.youth"));
+  const wReg = await register("w", wParent, email("w.parent"), "0.00", [{ person: wYouth, type: "YOUTH" }]);
+  void sReg; void tReg; void vReg; void v2Reg; void wReg;
 
   // 10. Youth never receive these. The youth attendee's own address is excluded at review, at approval and at send time.
   const youthContent = { name: "Everyone", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic news", announcementBody: "Synthetic body.", rule: { trigger: "ONE_TIME", localDate: "2027-04-22", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT", "ATTENDEE"], search: "status=CONFIRMED" } };
@@ -393,7 +405,12 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   const fourAddresses = fourAfter.map((row) => row.recipientEmail);
   assert(fourAddresses.filter((mail) => mail === email("share.family")).length === 1 && fourAfter.find((row) => row.recipientEmail === email("share.family"))!.status === "QUEUED", "a parent who shares the youth's address is approved and queued once");
   assert(!fourAddresses.includes(email("youth.own")) && (await prisma.messageOutbox.count({ where: { recipientEmail: email("youth.own") } })) === 0, "a youth who is their own registration contact is never emailed");
-  assert((youthCodes.MINOR_RECIPIENT ?? 0) >= 2, "the youth who is their own contact is counted as excluded in the review");
+  assert((youthCodes.MINOR_RECIPIENT ?? 0) >= 4, `the youth contacts are counted as excluded in the review: ${JSON.stringify(youthCodes)}`);
+  for (const blocked of ["sib.younger", "sib.older", "typed.v2"]) {
+    assert(!fourAddresses.includes(email(blocked)) && (await prisma.messageOutbox.count({ where: { recipientEmail: email(blocked) } })) === 0, `${blocked}: a minor account holder's contact address is youth-only and is never emailed`);
+  }
+  assert(fourAddresses.includes(email("w.parent")) && fourAfter.find((row) => row.recipientEmail === email("w.parent"))!.status === "QUEUED", "a parent who attends nothing is an adult holder and is emailed");
+  assert(!fourAddresses.includes(email("w.youth")), "the youth in that family is not");
   assert((await prisma.messageOutbox.count({ where: { recipientEmail: email("share.family") } })) === 1, "the shared parent and youth address has exactly one message");
   // The pre-send check also refuses a youth address that reached the queue some other way.
   const forged = await prisma.messageOutbox.create({
@@ -525,6 +542,121 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   const takeoverMessages = await prisma.messageOutbox.findMany({ where: { metadata: { path: ["scheduledEmailBatchId"], equals: takeover.scheduleId } } });
   assert(takeoverMessages.length >= 2 && takeoverMessages.every((row) => row.status === "CANCELLED"), "and every message of the batch that was still queued was cancelled, even one a crash left unlinked");
   await refusal(() => schedules.activateScheduledEmail(ids.event, ids.admin, allPermissions, takeover.scheduleId, { expectedRevision: 1, previewFingerprint: "3".repeat(64) }), "SCHEDULE_STATE", "approving a failed batch");
+
+  // 12f. A scheduled message cancelled after its body was prepared withdraws the private link it minted.
+  const reminder = await createAndActivate({ name: "Reminder revoke", rule: { trigger: "ONE_TIME", localDate: "2027-05-20", localTime: "09:00" } });
+  await schedules.runScheduledEmailBatch(reminder.scheduleId, { now: new Date("2027-05-20T14:01:00Z") });
+  const reminderRows = await outboxOf(reminder.scheduleId);
+  assert(reminderRows.map((row) => row.recipientEmail).join() === [email("a"), email("e.new")].sort().join(), `a and e.new owe a balance: ${reminderRows.map((row) => row.recipientEmail)}`);
+  await pay(reg.a!.id, "100.00");
+  const revoked: string[] = [];
+  const receivedBeforeRevoke = stub.received.length;
+  await processExternalEmailQueue(ids.event, {
+    dependencies: {
+      // The real preparation (it mints the private link), with the withdrawal of that link recorded.
+      prepareBodyText: async (input) => {
+        const real = await prepareEmailBodyForDelivery(input);
+        return {
+          ...real,
+          revokeOnDefinitiveFailure: async () => {
+            revoked.push(input.messageId);
+            await real.revokeOnDefinitiveFailure?.();
+          },
+        };
+      },
+    },
+  });
+  const aReminder = reminderRows.find((row) => row.recipientEmail === email("a"))!;
+  assert(revoked.join() === aReminder.id, `only the cancelled message's link was withdrawn: ${revoked}`);
+  // (The same pass also delivers announcements other batches had queued, so the provider's list is judged by row, not by count.)
+  const afterRevoke = await outboxOf(reminder.scheduleId);
+  assert(afterRevoke.find((row) => row.recipientEmail === email("a"))!.status === "CANCELLED" && afterRevoke.find((row) => row.recipientEmail === email("e.new"))!.status === "SENT", "a's reminder was cancelled and e.new's was sent");
+  void receivedBeforeRevoke;
+
+  // 12g. A message that names a schedule but is linked to no approved recipient is never sent.
+  const unlinked = await prisma.messageOutbox.create({
+    data: {
+      eventId: ids.event, templateKey: "EVENT_ANNOUNCEMENT", recipientKind: "REGISTRANT", recipientEmail: email("unlinked"),
+      senderNameSnapshot: "Synthetic", senderEmailSnapshot: "events@example.test", subjectSnapshot: "x", bodyTextSnapshot: "x",
+      idempotencyKey: `${P}-unlinked`, correlationId: randomUUID(), status: "PENDING", metadata: { scheduledEmailBatchId: reminder.scheduleId },
+    },
+  });
+  const receivedBeforeUnlinked = stub.received.length;
+  await processExternalEmailQueue(ids.event);
+  assert((await prisma.messageOutbox.findUniqueOrThrow({ where: { id: unlinked.id } })).status === "CANCELLED" && stub.received.length === receivedBeforeUnlinked, "an unlinked scheduled message is cancelled, not sent");
+
+  // 12h. A filter that can no longer be applied (the approver lost the permission to use it) stops the batch with a reason, and
+  //      cancels the queued message, instead of throwing and retrying silently.
+  const filterSchedule = (name: string, day: string) => createAndActivate({
+    name, templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.",
+    rule: { trigger: "ONE_TIME", localDate: day, localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"], search: "payment=UNPAID,PARTIAL" },
+  });
+  const gateA = await filterSchedule("Filter queued", "2027-05-21");
+  await schedules.runScheduledEmailBatch(gateA.scheduleId, { now: new Date("2027-05-21T14:01:00Z") });
+  const gateB = await filterSchedule("Filter at run", "2027-05-22");
+  const gateAMessages = await outboxOf(gateA.scheduleId);
+  assert(gateAMessages.length >= 1 && gateAMessages.every((row) => row.status === "PENDING"), "the first schedule has queued messages");
+  await prisma.eventMembership.update({ where: { eventId_userId: { eventId: ids.event, userId: ids.admin } }, data: { role: "COMMUNICATIONS_MANAGER" } });
+  const filterReason = await schedules.scheduledEmailObsoleteReason(gateAMessages[0]!.id);
+  assert(filterReason?.code === "FILTER_UNAVAILABLE", `the pre-send check returns a code instead of throwing: ${filterReason?.code}`);
+  const receivedBeforeFilter = stub.received.length;
+  await processExternalEmailQueue(ids.event);
+  assert(stub.received.length === receivedBeforeFilter && (await outboxOf(gateA.scheduleId)).every((row) => row.status === "CANCELLED"), "the queued messages are cancelled, not sent");
+  const gateRun = await schedules.runScheduledEmailBatch(gateB.scheduleId, { now: new Date("2027-05-22T14:01:00Z") });
+  assert(gateRun.outcome === "paused" && gateRun.reason === "FILTER_UNAVAILABLE", `the runner pauses with a reason: ${JSON.stringify(gateRun)}`);
+  const gateBRow = await stateOf(gateB.scheduleId);
+  assert(gateBRow.status === "PAUSED" && gateBRow.claimToken === null && /no longer available/.test(gateBRow.pauseReason ?? ""), "paused with a readable reason, and the claim released");
+  await prisma.eventMembership.update({ where: { eventId_userId: { eventId: ids.event, userId: ids.admin } }, data: { role: "EVENT_ADMIN" } });
+
+  // 12i. Local capture: a scheduled message is checked right before it is captured. A failing check leaves it PENDING, an
+  //      obsolete one is cancelled, and a captured one is never captured twice. Past the time budget the rest stay queued.
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryMode: "LOCAL_CAPTURE" } });
+  const { captureMessageIdsLocally } = await import("@/modules/communications/messaging-repository");
+  const capture = await createAndActivate({
+    name: "Capture", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.",
+    rule: { trigger: "ONE_TIME", localDate: "2027-05-23", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"] },
+  });
+  const captureRun = await schedules.runScheduledEmailBatch(capture.scheduleId, { now: new Date("2027-05-23T14:01:00Z"), deadline: Date.now() - 1 });
+  const captureIds = (await outboxOf(capture.scheduleId)).map((row) => row.id);
+  assert(captureRun.queued === captureIds.length && captureIds.length >= 3 && (await outboxOf(capture.scheduleId)).every((row) => row.status === "PENDING"), "past its time budget nothing is captured; the messages wait for the next queue pass");
+  assert((await stateOf(capture.scheduleId)).status === "ACTIVE", "and the batch stays ACTIVE (sending)");
+  const goodQuery = (await stateOf(capture.scheduleId)).audienceQuery;
+  await prisma.scheduledEmailBatch.update({ where: { id: capture.scheduleId }, data: { audienceQuery: { roles: "not a list" } } });
+  assert((await captureMessageIdsLocally(captureIds)).length === 0 && (await outboxOf(capture.scheduleId)).every((row) => row.status === "PENDING"), "a check that cannot be made leaves every message PENDING");
+  await prisma.scheduledEmailBatch.update({ where: { id: capture.scheduleId }, data: { audienceQuery: goodQuery as object } });
+  assert((await captureMessageIdsLocally(captureIds)).length === captureIds.length, "with the check working, each is captured");
+  assert((await captureMessageIdsLocally(captureIds)).length === 0, "and none is captured twice");
+  assert((await prisma.messageDeliveryAttempt.count({ where: { messageOutboxId: { in: captureIds } } })) === captureIds.length, "exactly one attempt row each");
+  const obsoleteBatch = await createAndActivate({
+    name: "Capture obsolete", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.",
+    rule: { trigger: "ONE_TIME", localDate: "2027-05-24", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"] },
+  }, ids.comms, commsPermissions);
+  await schedules.runScheduledEmailBatch(obsoleteBatch.scheduleId, { now: new Date("2027-05-24T14:01:00Z"), deadline: Date.now() - 1 });
+  const obsoleteIds = (await outboxOf(obsoleteBatch.scheduleId)).map((row) => row.id);
+  assert(obsoleteIds.length >= 3, "the second batch has queued messages");
+  await prisma.eventMembership.update({ where: { eventId_userId: { eventId: ids.event, userId: ids.comms } }, data: { status: "INACTIVE" } });
+  assert((await captureMessageIdsLocally(obsoleteIds)).length === 0, "nothing is captured for an approver who lost permission");
+  assert((await outboxOf(obsoleteBatch.scheduleId)).every((row) => row.status === "CANCELLED") && (await recipientsOf(obsoleteBatch.scheduleId)).filter((row) => row.status === "EXCLUDED").every((row) => row.exclusionCode === "APPROVER_NOT_PERMITTED"), "they are cancelled with the reason recorded");
+  await prisma.eventMembership.update({ where: { eventId_userId: { eventId: ids.event, userId: ids.comms } }, data: { status: "ACTIVE" } });
+  const unlinkedLocal = await prisma.messageOutbox.create({
+    data: {
+      eventId: ids.event, templateKey: "EVENT_ANNOUNCEMENT", recipientKind: "REGISTRANT", recipientEmail: email("unlinked"),
+      senderNameSnapshot: "Synthetic", senderEmailSnapshot: "events@example.test", subjectSnapshot: "x", bodyTextSnapshot: "x",
+      idempotencyKey: `${P}-unlinked-local`, correlationId: randomUUID(), status: "PENDING", metadata: { scheduledEmailBatchId: capture.scheduleId },
+    },
+  });
+  assert((await captureMessageIdsLocally([unlinkedLocal.id])).length === 0 && (await prisma.messageOutbox.findUniqueOrThrow({ where: { id: unlinkedLocal.id } })).status === "CANCELLED", "an unlinked scheduled message is cancelled, not captured");
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryMode: "EXTERNAL_EMAIL" } });
+
+  // 12j. The sweep's dispatch honours its batch limit and its time budget; what it leaves stays due.
+  const dueOne = await createAndActivate({ name: "Due one", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.", rule: { trigger: "ONE_TIME", localDate: "2027-07-01", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"] } });
+  const dueTwo = await createAndActivate({ name: "Due two", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.", rule: { trigger: "ONE_TIME", localDate: "2027-07-02", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"] } });
+  const dispatchNow = new Date("2027-07-02T14:01:00Z");
+  assert((await schedules.dispatchDueScheduledEmails({ now: dispatchNow, budgetMs: 0 })).length === 0, "a spent time budget starts no batch");
+  const limited = await schedules.dispatchDueScheduledEmails({ now: dispatchNow, limit: 1 });
+  assert(limited.length === 1 && limited[0]!.batchId === dueOne.scheduleId, "the limit runs one batch, the oldest first");
+  const rest = await schedules.dispatchDueScheduledEmails({ now: dispatchNow });
+  assert(rest.length === 1 && rest[0]!.batchId === dueTwo.scheduleId, "the other stayed due and runs next");
 
   // 13. Another event's schedule is not reachable by id.
   await refusal(() => schedules.getScheduledEmail(ids.other, scheduleId), "MESSAGE_NOT_FOUND", "reading another event's schedule");
