@@ -33,6 +33,7 @@ import {
   eventTimingChanged,
   formatInstantInZone,
   projectSchedule,
+  refusedYouthTargets,
   ruleFromColumns,
   ruleToColumns,
   scheduleReviewFingerprint,
@@ -42,6 +43,7 @@ import {
   scheduledEmailUpdateSchema,
   targetKey,
   type CurrentAudienceView,
+  type YouthCheckRegistration,
   type ScheduleExclusionCode,
   type ScheduleProjection,
   type ScheduleRule,
@@ -173,39 +175,56 @@ async function loadDeliveryMode(client: Client, eventId: string) {
 }
 
 /**
- * Independent youth check. A target reached only as an ATTENDEE is allowed only when an attendee of that registration
- * whose type is an adult type (minimum age 18 or more) holds that very address. Decided from the attendee type, never
- * from a birth date (ADR 0005 Addendum A), and separately from the audience builder's own rule, so a recipient is never
- * sent to on one rule's say-so alone, and a youth address collected later stays excluded. Returns the refused targets.
+ * Independent youth check, separate from the audience builder's own rule so a recipient is never sent to on one rule's
+ * say-so alone. Owner decision (#177): a youth's own address is written to only when an adult also uses it in that send (the
+ * adult registration contact, an adult attendee of the registration, a group billing or organization contact); if the only
+ * person behind the address is a minor, never. Ages come from the attendee type, never a birth date (ADR 0005 Addendum A).
+ * The rule itself is `refusedYouthTargets`. Returns the refused targets.
  */
 export async function findMinorTargets(
   client: Client,
   eventId: string,
   targets: ReadonlyArray<{ email: string; registrationId: string; roles: readonly string[] }>,
 ): Promise<Set<string>> {
-  const attendeeOnly = targets.filter((target) => target.roles.length > 0 && target.roles.every((role) => role === "ATTENDEE"));
-  const refused = new Set<string>();
-  if (attendeeOnly.length === 0) return refused;
-  const [types, attendees] = await Promise.all([
+  if (targets.length === 0) return new Set();
+  const [types, registrations] = await Promise.all([
     client.eventAttendeeType.findMany({ where: { eventId }, select: { code: true, minimumAge: true, maximumAge: true } }),
-    client.registrationAttendee.findMany({
-      where: { eventId, registrationId: { in: [...new Set(attendeeOnly.map((target) => target.registrationId))] } },
-      select: { registrationId: true, attendeeTypeDefinition: { select: { code: true } }, person: { select: { normalizedEmail: true } } },
+    client.registration.findMany({
+      where: { eventId, id: { in: [...new Set(targets.map((target) => target.registrationId))] } },
+      select: {
+        id: true,
+        accountHolderPersonId: true,
+        contactSnapshot: true,
+        accountHolderPerson: { select: { normalizedEmail: true } },
+        attendees: {
+          select: { personId: true, attendeeTypeDefinition: { select: { code: true } }, person: { select: { normalizedEmail: true } } },
+        },
+      },
     }),
   ]);
   const ageClass = new Map(types.map((type) => [type.code, classifyAttendeeType(type)] as const));
-  const adultAddresses = new Set<string>();
-  for (const attendee of attendees) {
-    const code = attendee.attendeeTypeDefinition?.code;
-    if (!code || ageClass.get(code) !== "ADULT") continue;
-    const address = normalizeAudienceEmail(attendee.person.normalizedEmail);
-    if (address) adultAddresses.add(targetKey(address, attendee.registrationId));
+  const byRegistration = new Map<string, YouthCheckRegistration>();
+  for (const registration of registrations) {
+    const snapshot = registration.contactSnapshot && typeof registration.contactSnapshot === "object" && !Array.isArray(registration.contactSnapshot)
+      ? registration.contactSnapshot as Record<string, unknown>
+      : {};
+    byRegistration.set(registration.id, {
+      registrationId: registration.id,
+      accountHolderPersonId: registration.accountHolderPersonId,
+      holderEmail: normalizeAudienceEmail(registration.accountHolderPerson.normalizedEmail),
+      snapshotEmail: normalizeAudienceEmail(typeof snapshot.email === "string" ? snapshot.email : ""),
+      attendees: registration.attendees.map((attendee) => {
+        const code = attendee.attendeeTypeDefinition?.code;
+        return {
+          personId: attendee.personId,
+          email: normalizeAudienceEmail(attendee.person.normalizedEmail),
+          // No type definition at all is unknown, which is never an adult.
+          age: (code ? ageClass.get(code) : undefined) ?? "UNKNOWN",
+        };
+      }),
+    });
   }
-  for (const target of attendeeOnly) {
-    const key = targetKey(target.email, target.registrationId);
-    if (!adultAddresses.has(key)) refused.add(key);
-  }
-  return refused;
+  return refusedYouthTargets(targets, byRegistration);
 }
 
 function builderExclusionCode(code: string): ScheduleExclusionCode | null {
@@ -579,7 +598,8 @@ export async function createScheduledEmail(
   const reuse = () => new MessagingError("IDEMPOTENCY_KEY_REUSED", "That schedule id was already used for a different schedule.");
   const existing = await prisma.scheduledEmailBatch.findUnique({ where: { id: input.scheduleId } });
   if (existing) {
-    if (existing.eventId !== eventId) throw reuse();
+    // Another event's schedule is never revealed: its id reads as not found here, like every other read of it.
+    if (existing.eventId !== eventId) throw new MessagingError("MESSAGE_NOT_FOUND", "That schedule is not on this event.");
     const queryHash = audienceQueryHash(normalizeAudienceQuery(queryForTemplate(input.templateKey, input.query)));
     if (!sameContent(existing, input, queryHash)) throw reuse();
     return { schedule: await toRecord(prisma, existing), replayed: true };
@@ -622,7 +642,8 @@ export async function createScheduledEmail(
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const raced = await prisma.scheduledEmailBatch.findUnique({ where: { id: input.scheduleId } });
-      if (raced && raced.eventId === eventId && sameContent(raced, input, review.audience.queryHash)) {
+      if (raced && raced.eventId !== eventId) throw new MessagingError("MESSAGE_NOT_FOUND", "That schedule is not on this event.");
+      if (raced && sameContent(raced, input, review.audience.queryHash)) {
         return { schedule: await toRecord(prisma, raced), replayed: true };
       }
       throw reuse();
@@ -853,7 +874,7 @@ export async function cancelScheduledEmail(eventId: string, actorUserId: string,
       throw stateError(`A ${row.status.toLowerCase()} schedule cannot be cancelled.`);
     }
     const cancelledMessages = await tx.messageOutbox.updateMany({
-      where: { status: "PENDING", scheduledEmailRecipient: { batchId: scheduleId } },
+      where: { status: "PENDING", OR: [{ scheduledEmailRecipient: { batchId: scheduleId } }, { metadata: { path: ["scheduledEmailBatchId"], equals: scheduleId } }] },
       data: { status: "CANCELLED", lockedAt: null, lockToken: null, lastError: "The schedule was cancelled before this was sent." },
     });
     const cancelledRecipients = await tx.scheduledEmailRecipient.updateMany({
@@ -950,16 +971,27 @@ export type ScheduledMessageObsolescence = { code: ScheduleExclusionCode; reason
  */
 export async function scheduledEmailObsoleteReason(messageId: string, now = new Date()): Promise<ScheduledMessageObsolescence | null> {
   const prisma = getPrisma();
+  const drop = (code: ScheduleExclusionCode) => ({ code, reason: SCHEDULE_EXCLUSION_LABELS[code] });
   const recipient = await prisma.scheduledEmailRecipient.findUnique({
     where: { outboxMessageId: messageId },
     include: { batch: true },
   });
-  if (!recipient) return null;
+  if (!recipient) {
+    // A message that says it belongs to a schedule but is not linked to an approved recipient is never sent: fail closed.
+    const message = await prisma.messageOutbox.findUnique({ where: { id: messageId }, select: { metadata: true } });
+    const claimed = message?.metadata && typeof message.metadata === "object" && !Array.isArray(message.metadata)
+      ? (message.metadata as Record<string, unknown>).scheduledEmailBatchId
+      : undefined;
+    if (typeof claimed !== "string" || !claimed) return null;
+    return drop("SCHEDULE_NOT_ACTIVE");
+  }
   const { batch } = recipient;
-  const drop = (code: ScheduleExclusionCode) => ({ code, reason: SCHEDULE_EXCLUSION_LABELS[code] });
   if (batch.status === "CANCELLED" || batch.status === "PAUSED" || batch.status === "FAILED" || batch.status === "SCHEDULED") {
     return drop("SCHEDULE_NOT_ACTIVE");
   }
+  // A message that waited in the queue past its window, or past the moment it counts back from, is dropped, not sent late.
+  if (now.getTime() - batch.sendAt.getTime() > SCHEDULED_EMAIL_MAX_LATE_MS) return drop("SCHEDULE_TOO_LATE");
+  if (batch.anchorAt && now.getTime() >= batch.anchorAt.getTime()) return drop("ANCHOR_PASSED");
   const permissions = await loadApproverPermissions(prisma, batch.activatedByUserId, batch.eventId);
   if (!permissions.includes(MANAGE)) return drop("APPROVER_NOT_PERMITTED");
 
@@ -1018,7 +1050,17 @@ export type ScheduledDispatchResult = {
   reason?: string;
 };
 
-async function releaseAndPause(prisma: PrismaClient, batch: BatchRow, claimToken: string, reason: string) {
+/**
+ * Pauses a claimed batch for a new review, releasing the claim. Only possible while nothing has been queued: once a message
+ * exists (a worker queued some, stopped, and another took over) a pause would let the batch be edited or approved again
+ * under messages already in the queue, so it is failed instead, which stops the rest and keeps what was sent.
+ */
+async function releaseAndPause(prisma: PrismaClient, batch: BatchRow, claimToken: string, reason: string): Promise<"paused" | "failed"> {
+  const started = await prisma.scheduledEmailRecipient.count({ where: { batchId: batch.id, status: "QUEUED" } });
+  if (started > 0) {
+    await failBatch(prisma, batch, claimToken, `${reason} Some messages had already been queued, so this schedule cannot be paused; the rest were cancelled. Create a new schedule if it is still wanted.`);
+    return "failed";
+  }
   const paused = await prisma.scheduledEmailBatch.updateMany({
     where: { id: batch.id, claimToken, status: "ACTIVE" },
     data: { status: "PAUSED", pausedAt: new Date(), pauseReason: reason, claimToken: null, claimedAt: null },
@@ -1036,6 +1078,7 @@ async function releaseAndPause(prisma: PrismaClient, batch: BatchRow, claimToken
       },
     });
   }
+  return "paused";
 }
 
 async function failBatch(prisma: PrismaClient, batch: BatchRow, claimToken: string, reason: string) {
@@ -1046,6 +1089,12 @@ async function failBatch(prisma: PrismaClient, batch: BatchRow, claimToken: stri
     });
     if (updated.count !== 1) return false;
     await tx.scheduledEmailRecipient.updateMany({ where: { batchId: batch.id, status: "PLANNED" }, data: { status: "CANCELLED" } });
+    // What is still waiting is stopped too; what was sent stays sent.
+    await tx.messageOutbox.updateMany({
+      where: { status: "PENDING", OR: [{ scheduledEmailRecipient: { batchId: batch.id } }, { metadata: { path: ["scheduledEmailBatchId"], equals: batch.id } }] },
+      data: { status: "CANCELLED", lockedAt: null, lockToken: null, lastError: "The schedule failed before this was sent." },
+    });
+    await tx.scheduledEmailRecipient.updateMany({ where: { batchId: batch.id, status: "QUEUED", message: { status: "CANCELLED" } }, data: { status: "CANCELLED" } });
     await tx.auditLog.create({
       data: {
         eventId: batch.eventId,
@@ -1094,8 +1143,8 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
   // 1. Gates. Each one stops the send; none of them sends anything on a guess.
   const permissions = await loadApproverPermissions(prisma, batch.activatedByUserId, batch.eventId);
   if (!permissions.includes(MANAGE)) {
-    await releaseAndPause(prisma, batch, claimToken, "The person who approved this schedule no longer has permission to send it. Someone with permission must review and approve it again.");
-    return { ...result, outcome: "paused", reason: "APPROVER_NOT_PERMITTED" };
+    const stopped = await releaseAndPause(prisma, batch, claimToken, "The person who approved this schedule no longer has permission to send it. Someone with permission must review and approve it again.");
+    return { ...result, outcome: stopped, reason: "APPROVER_NOT_PERMITTED" };
   }
   if (now.getTime() - batch.sendAt.getTime() > SCHEDULED_EMAIL_MAX_LATE_MS) {
     await failBatch(prisma, batch, claimToken, "The schedule was not sent within six hours of its time, so it was not sent at all. Create a new schedule if it is still wanted.");
@@ -1110,13 +1159,13 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
     stale = true;
   }
   if (stale) {
-    await releaseAndPause(prisma, batch, claimToken, "The event's time zone or dates changed after this was approved, so its send time is no longer the one that was reviewed. Review the new time and approve it again.");
-    return { ...result, outcome: "paused", reason: "EVENT_TIMING_CHANGED" };
+    const stopped = await releaseAndPause(prisma, batch, claimToken, "The event's time zone or dates changed after this was approved, so its send time is no longer the one that was reviewed. Review the new time and approve it again.");
+    return { ...result, outcome: stopped, reason: "EVENT_TIMING_CHANGED" };
   }
   const template = await loadTemplateSource(prisma, batch.eventId, batch.templateKey as ScheduledEmailTemplateKey).catch(() => null);
   if (!template || template.versionId !== batch.templateVersionId) {
-    await releaseAndPause(prisma, batch, claimToken, "The message template was published again after this was approved. Review the current wording and approve it again.");
-    return { ...result, outcome: "paused", reason: "TEMPLATE_CHANGED" };
+    const stopped = await releaseAndPause(prisma, batch, claimToken, "The message template was published again after this was approved. Review the current wording and approve it again.");
+    return { ...result, outcome: stopped, reason: "TEMPLATE_CHANGED" };
   }
 
   // 2. Re-evaluate every approved recipient against the audience as it is now.
@@ -1277,7 +1326,8 @@ export async function finalizeFinishedScheduledEmails(now = new Date()): Promise
 }
 
 /** Every approved batch that is due, oldest first. A failure in one batch is logged and never stops the others. */
-export async function dispatchDueScheduledEmails(options: { now?: Date; limit?: number } = {}): Promise<ScheduledDispatchResult[]> {
+export async function dispatchDueScheduledEmails(options: { now?: Date; limit?: number; budgetMs?: number } = {}): Promise<ScheduledDispatchResult[]> {
+  const startedAt = Date.now();
   const now = options.now ?? new Date();
   const prisma = getPrisma();
   const due = await prisma.scheduledEmailBatch.findMany({
@@ -1297,6 +1347,8 @@ export async function dispatchDueScheduledEmails(options: { now?: Date; limit?: 
   });
   const results: ScheduledDispatchResult[] = [];
   for (const { id } of due) {
+    // No new batch is started once the time budget is spent; it stays due for the next sweep.
+    if (options.budgetMs !== undefined && Date.now() - startedAt >= options.budgetMs) break;
     try {
       results.push(await runScheduledEmailBatch(id, { now }));
     } catch (error) {

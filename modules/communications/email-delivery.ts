@@ -69,6 +69,7 @@ import {
   type AnnouncementOptOutScope,
 } from "@/modules/communications/email-preferences";
 import { findAnnouncementOptOut, issueUnsubscribeToken } from "@/modules/communications/email-preferences-repository";
+import { isScheduledEmailMetadata } from "@/modules/communications/retry-failed-domain";
 import {
   createStableRegistrationAccessToken,
   revokeRegistrationAccessToken,
@@ -397,12 +398,6 @@ async function cancelIfLodgingStale(
   return true;
 }
 
-export function scheduledEmailBatchIdOf(metadata: unknown) {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
-  const value = (metadata as Record<string, unknown>).scheduledEmailBatchId;
-  return typeof value === "string" && value ? value : null;
-}
-
 /**
  * A scheduled email (#177) is checked again immediately before it goes out: the approved recipient may have been
  * cancelled, transferred, paid up, suppressed or turned out to be a minor since it was queued, or the schedule may have
@@ -414,7 +409,7 @@ async function cancelIfScheduledEmailObsolete(
   message: ClaimedMessage,
   at: Date,
 ) {
-  if (!scheduledEmailBatchIdOf(message.metadata)) return false;
+  if (!isScheduledEmailMetadata(message.metadata)) return false;
   let obsolete: { code: string; reason: string } | null;
   try {
     const scheduled = await import("@/modules/communications/scheduled-email-repository");
@@ -1028,7 +1023,6 @@ async function runDeliveryLoop(
     // An invoice email is sent only while its version is still FINALIZED (#168): one a revision replaced is cancelled, never sent.
     if (await cancelIfInvoiceReplaced(prisma, message)) continue;
     if (await cancelIfLodgingStale(prisma, message, now())) continue;
-    if (await cancelIfScheduledEmailObsolete(prisma, message, now())) continue;
     if (await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now())) continue;
     let preparedBody: PreparedEmailBody | null = null;
     try {

@@ -229,7 +229,7 @@ describe("sweeping the queue", () => {
 });
 
 describe("scheduled email batches in the sweep (#177)", () => {
-  it("runs due approved batches first, so what they queue is delivered by the same sweep", async () => {
+  it("runs due approved batches only after the core queues, with a small limit and a time budget", async () => {
     prismaFixture({ dueEvents: [{ eventId: "evt_a" }] });
     const order: string[] = [];
     dependencies.dispatchDueScheduledEmails.mockImplementation(async () => {
@@ -241,8 +241,8 @@ describe("scheduled email batches in the sweep (#177)", () => {
 
     const result = await sweepOutbox({ now });
 
-    expect(order).toEqual(["dispatch", "deliver"]);
-    expect(dependencies.dispatchDueScheduledEmails).toHaveBeenCalledWith({ now });
+    expect(order).toEqual(["deliver", "dispatch"]);
+    expect(dependencies.dispatchDueScheduledEmails).toHaveBeenCalledWith({ now, limit: 3, budgetMs: 60_000 });
     expect(result.scheduledEmails).toEqual({ due: 1, queued: 3, excluded: 1, paused: 0, failed: 0 });
     expect(dependencies.finalizeFinishedScheduledEmails).toHaveBeenCalledWith(now);
   });

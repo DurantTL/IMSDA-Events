@@ -9,6 +9,7 @@ import {
   decideRecipientEligibility,
   eventTimingChanged,
   projectSchedule,
+  refusedYouthTargets,
   scheduleReviewFingerprint,
   scheduleRuleSchema,
   scheduledEmailContentSchema,
@@ -16,6 +17,7 @@ import {
   wallTimeToInstant,
   zoneOffsetMs,
   type CurrentAudienceView,
+  type YouthCheckRegistration,
   type ScheduleRule,
 } from "@/modules/communications/scheduled-email-domain";
 
@@ -292,6 +294,81 @@ describe("re-evaluating a reviewed recipient at send time", () => {
 
   it("matches addresses regardless of case or padding", () => {
     expect(decideRecipientEligibility({ registrationId, email: "  PAT@Example.TEST ", roles: [] }, "EVENT_ANNOUNCEMENT", view())).toBeNull();
+  });
+});
+
+describe("a youth's address (owner decision, Oct 17)", () => {
+  const reg = (overrides: Partial<YouthCheckRegistration> = {}): YouthCheckRegistration => ({
+    registrationId: "reg-1",
+    accountHolderPersonId: "parent",
+    holderEmail: "family@example.test",
+    snapshotEmail: "family@example.test",
+    attendees: [
+      { personId: "parent", email: "family@example.test", age: "ADULT" },
+      { personId: "kid", email: "family@example.test", age: "MINOR" },
+    ],
+    ...overrides,
+  });
+  const run = (roles: string[], email: string, registration: YouthCheckRegistration) =>
+    refusedYouthTargets([{ email, registrationId: "reg-1", roles }], new Map([["reg-1", registration]]));
+  const key = (email: string) => targetKey(email, "reg-1");
+
+  it("a parent who shares the youth's address receives it, once, as the adult contact", () => {
+    expect(run(["REGISTRATION_CONTACT"], "family@example.test", reg()).size).toBe(0);
+  });
+
+  it("an adult attendee who shares the address with a youth attendee is allowed", () => {
+    const shared = reg({
+      accountHolderPersonId: "other",
+      holderEmail: "other@example.test",
+      snapshotEmail: "other@example.test",
+      attendees: [
+        { personId: "adult", email: "shared@example.test", age: "ADULT" },
+        { personId: "kid", email: "shared@example.test", age: "MINOR" },
+      ],
+    });
+    expect(run(["ATTENDEE"], "shared@example.test", shared).size).toBe(0);
+  });
+
+  it("a group billing contact or organization contact who shares it is allowed", () => {
+    const youthOnly = reg({ attendees: [{ personId: "kid", email: "leader@example.test", age: "MINOR" }], accountHolderPersonId: "x", holderEmail: "x@example.test", snapshotEmail: "x@example.test" });
+    expect(run(["GROUP_LEADER"], "leader@example.test", youthOnly).size).toBe(0);
+    expect(run(["ORGANIZATION_CONTACT"], "leader@example.test", youthOnly).size).toBe(0);
+  });
+
+  it("a youth who is their own registration contact through the account-holder fallback is never emailed", () => {
+    const own = reg({
+      accountHolderPersonId: "kid",
+      holderEmail: "kid@example.test",
+      snapshotEmail: "",
+      attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }],
+    });
+    expect([...run(["REGISTRATION_CONTACT"], "kid@example.test", own)]).toEqual([key("kid@example.test")]);
+    // The same when the typed contact address is the youth's own.
+    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", { ...own, snapshotEmail: "kid@example.test" }).size).toBe(1);
+    // An age-unknown attendee is treated as a minor.
+    expect(run(["REGISTRATION_CONTACT"], "kid@example.test", { ...own, attendees: [{ personId: "kid", email: "kid@example.test", age: "UNKNOWN" }] }).size).toBe(1);
+  });
+
+  it("a youth's own address with no adult behind it is refused, as an attendee or under a forged role", () => {
+    const youthOnly = reg({ attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }, { personId: "parent", email: "family@example.test", age: "ADULT" }] });
+    expect(run(["ATTENDEE"], "kid@example.test", youthOnly).size).toBe(1);
+    expect(run([], "kid@example.test", youthOnly).size).toBe(1);
+  });
+
+  it("a contact who typed their own address stays allowed even when the account holder is a youth attendee", () => {
+    const typed = reg({
+      accountHolderPersonId: "kid",
+      holderEmail: "kid@example.test",
+      snapshotEmail: "parent@example.test",
+      attendees: [{ personId: "kid", email: "kid@example.test", age: "MINOR" }],
+    });
+    expect(run(["REGISTRATION_CONTACT"], "parent@example.test", typed).size).toBe(0);
+  });
+
+  it("an address reached only as an attendee still needs an adult attendee holding it", () => {
+    expect(run(["ATTENDEE"], "nobody@example.test", reg()).size).toBe(1);
+    expect(run(["REGISTRATION_CONTACT", "ATTENDEE"], "nobody@example.test", reg()).size).toBe(0);
   });
 });
 

@@ -25,6 +25,7 @@ export type RetryFailedSkipReason =
   | "LINK_HEALTH_RECORD"
   | "LINK_CLUB_INVITE"
   | "BALANCE_REMINDER"
+  | "SCHEDULED_EMAIL"
   | "ACCESS_RECOVERY"
   | "TOO_OLD"
   | "ALREADY_QUEUED"
@@ -41,6 +42,7 @@ export const RETRY_FAILED_SKIP_LABELS: Record<RetryFailedSkipReason, string> = {
   LINK_HEALTH_RECORD: "Health record links are sent again from More, Health (the link belongs to the original message)",
   LINK_CLUB_INVITE: "New club application invites are sent again from Admin, Club applications (the link belongs to the original message)",
   BALANCE_REMINDER: "Send a fresh balance reminder instead (the amount may have changed)",
+  SCHEDULED_EMAIL: "A scheduled email is checked again before every send by its schedule, which owns retries; create a new schedule if it is still wanted",
   ACCESS_RECOVERY: "A recovery link expires; the registrant can ask for a new one",
   TOO_OLD: `Failed more than ${RETRY_FAILED_EVENT_SCOPE_DAYS} days ago; choose its batch to retry it`,
   ALREADY_QUEUED: "A copy in its retry chain is already queued or being sent",
@@ -108,6 +110,13 @@ export type FailedMessagesRetryResult = {
   replayed: boolean;
 };
 
+/** True for a message a scheduled email batch queued (#177), whatever its template. */
+export function isScheduledEmailMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
+  const value = (metadata as Record<string, unknown>).scheduledEmailBatchId;
+  return typeof value === "string" && value.length > 0;
+}
+
 const ACTIVE_RETRY_STATUSES = new Set(["PENDING", "PROCESSING"]);
 
 /**
@@ -130,6 +139,8 @@ export function classifyFailedMessage(input: {
   tooOld: boolean;
   registrationId: string | null;
   registrationStatus: string | null;
+  /** The message was queued by a scheduled email batch (#177): a copy would escape the schedule's checks and its cancel. */
+  scheduledEmail?: boolean;
   deliveryMode: string;
   senderEmailSnapshot: string | null;
   settingsSenderEmail: string | null;
@@ -137,6 +148,7 @@ export function classifyFailedMessage(input: {
   if (input.templateKey === "INVOICE_DELIVERY") return "INVOICE";
   const link = LINK_EMAIL_REASONS[input.templateKey];
   if (link) return link;
+  if (input.scheduledEmail) return "SCHEDULED_EMAIL";
   if (input.templateKey === "BALANCE_REMINDER") return "BALANCE_REMINDER";
   if (input.templateKey === "REGISTRATION_ACCESS_RECOVERY") return "ACCESS_RECOVERY";
   if (input.treeStatuses.some((status) => ACTIVE_RETRY_STATUSES.has(status))) return "ALREADY_QUEUED";

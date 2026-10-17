@@ -341,6 +341,8 @@ export const SCHEDULE_EXCLUSION_LABELS = {
   MINOR_RECIPIENT: "Youth are not sent scheduled email, so a minor's own address is never used",
   APPROVER_NOT_PERMITTED: "The person who approved this schedule no longer has permission to send it",
   SCHEDULE_NOT_ACTIVE: "The schedule was paused or cancelled before this was sent",
+  SCHEDULE_TOO_LATE: "It was not sent within six hours of its scheduled time, so it was not sent at all",
+  ANCHOR_PASSED: "The moment it was counting back from (registration close or event start) has passed",
   CONTACT_CHECK_FAILED: "Eligibility could not be confirmed, so nothing was sent",
 } as const;
 export type ScheduleExclusionCode = keyof typeof SCHEDULE_EXCLUSION_LABELS;
@@ -476,3 +478,59 @@ export const scheduledEmailActivateSchema = z.strictObject({
   expectedRevision: z.number().int().min(1),
   previewFingerprint: z.string().trim().length(64),
 });
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * Youth: when an address that is a minor's may still be written to.
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+export type YouthCheckRegistration = {
+  registrationId: string;
+  accountHolderPersonId: string;
+  /** Normalized; the account holder's own address. */
+  holderEmail: string;
+  /** Normalized; the address typed as the registration contact, or "" when the contact falls back to the account holder. */
+  snapshotEmail: string;
+  /** Age class comes from the attendee type only, never a birth date (ADR 0005 Addendum A). */
+  attendees: ReadonlyArray<{ personId: string; email: string; age: "ADULT" | "MINOR" | "UNKNOWN" }>;
+};
+
+/**
+ * Owner decision (#177, Oct 17, 2026): a youth's own address may receive a scheduled email only when an ADULT also uses that
+ * address in that send: the adult registration contact, an adult attendee of the same registration, or an adult group billing
+ * contact or organization contact. If the only person behind an address is a minor, it is never written to, for instance a
+ * youth who is their own registration contact through the account-holder fallback.
+ *
+ * An address is a youth's when it is the own address of a minor (or age-unknown) attendee of the registration, or the
+ * registration contact's address while the account holder is that minor attendee and nobody else's address was typed.
+ * Other addresses are unaffected, except that one reached only as an attendee needs an adult-type attendee holding it.
+ * Returns the refused targets. Pure.
+ */
+export function refusedYouthTargets(
+  targets: ReadonlyArray<{ email: string; registrationId: string; roles: readonly string[] }>,
+  registrations: ReadonlyMap<string, YouthCheckRegistration>,
+): Set<string> {
+  const refused = new Set<string>();
+  for (const target of targets) {
+    const email = target.email.trim().toLowerCase();
+    const registration = registrations.get(target.registrationId);
+    // Not on this event any more: the registration check names that, and nothing here may vouch for the address.
+    if (!registration) continue;
+    const key = targetKey(email, target.registrationId);
+    const holder = registration.attendees.find((attendee) => attendee.personId === registration.accountHolderPersonId);
+    const contactIsMinor = Boolean(holder && holder.age !== "ADULT")
+      && (registration.snapshotEmail === "" || registration.snapshotEmail === registration.holderEmail);
+    const contactEmail = registration.snapshotEmail || registration.holderEmail;
+    const youthAddresses = new Set(registration.attendees.filter((attendee) => attendee.age !== "ADULT" && attendee.email).map((attendee) => attendee.email));
+    if (contactIsMinor && contactEmail) youthAddresses.add(contactEmail);
+    const adultAttendeeHoldsIt = registration.attendees.some((attendee) => attendee.age === "ADULT" && attendee.email === email);
+    const adultRole = target.roles.some((role) => role === "GROUP_LEADER" || role === "ORGANIZATION_CONTACT")
+      || (target.roles.includes("REGISTRATION_CONTACT") && !contactIsMinor)
+      || (target.roles.includes("ATTENDEE") && adultAttendeeHoldsIt);
+    if (youthAddresses.has(email)) {
+      if (!adultRole) refused.add(key);
+      continue;
+    }
+    if (target.roles.length > 0 && target.roles.every((role) => role === "ATTENDEE") && !adultAttendeeHoldsIt) refused.add(key);
+  }
+  return refused;
+}

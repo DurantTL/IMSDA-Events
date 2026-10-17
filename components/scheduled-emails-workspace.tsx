@@ -148,7 +148,12 @@ export function ScheduledEmailsWorkspace({
       const result = await response.json().catch(() => ({})) as ApiResult;
       if (!response.ok) {
         // A review that moved is shown again, so the person approves what is true now, not what they read earlier.
-        if (result.review) setFormReview(result.review);
+        const moved = result.review;
+        if (moved) {
+          setFormReview(moved);
+          // The approval panel shows the changed review too, so the approver sees what is true now before approving again.
+          setApproval((current) => (current ? { ...current, review: moved } : current));
+        }
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The request could not be completed.");
       }
       return result;

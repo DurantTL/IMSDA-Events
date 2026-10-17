@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyFailedMessage,
+  isScheduledEmailMetadata,
   messageBatchKey,
   RETRY_FAILED_SKIP_LABELS,
   retryFailedIdempotencyKey,
@@ -37,6 +38,17 @@ describe("classifyFailedMessage", () => {
     for (const status of ["PENDING", "PROCESSING"]) {
       expect(classifyFailedMessage({ ...base, treeStatuses: [status, "SENT"] })).toBe("ALREADY_QUEUED");
     }
+  });
+
+  it("never retries a scheduled email (#177): its schedule owns retries, whatever the template", () => {
+    for (const templateKey of ["EVENT_ANNOUNCEMENT", "CUSTOM_MESSAGE", "BALANCE_REMINDER"]) {
+      expect(classifyFailedMessage({ ...base, templateKey, scheduledEmail: true })).toBe("SCHEDULED_EMAIL");
+    }
+    expect(RETRY_FAILED_SKIP_LABELS.SCHEDULED_EMAIL).toMatch(/schedule/);
+    expect(isScheduledEmailMetadata({ scheduledEmailBatchId: "batch-1" })).toBe(true);
+    expect(isScheduledEmailMetadata({ batchId: "batch-1" })).toBe(false);
+    expect(isScheduledEmailMetadata(null)).toBe(false);
+    expect(classifyFailedMessage({ ...base, scheduledEmail: false })).toBeNull();
   });
 
   it("retries only the newest failed message of a tree", () => {

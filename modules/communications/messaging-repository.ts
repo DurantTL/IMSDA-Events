@@ -22,7 +22,6 @@ import {
   ExternalEmailDeliveryError,
   nextAttemptRowNumber,
   processExternalEmailQueue,
-  scheduledEmailBatchIdOf,
   type ExternalEmailDeliveryDependencies,
 } from "@/modules/communications/email-delivery";
 import {
@@ -60,7 +59,7 @@ import {
 } from "@/modules/communications/club-assignment-audience";
 import { emptyClubAssignmentFields } from "@/modules/club-registrations/assignments";
 import { loadAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
-import { messageBatchKey, metadataAnnouncementId } from "@/modules/communications/retry-failed-domain";
+import { isScheduledEmailMetadata, messageBatchKey, metadataAnnouncementId } from "@/modules/communications/retry-failed-domain";
 import {
   messageRetryIdempotencyKey,
   messageRetryRequestFingerprint,
@@ -1046,9 +1045,11 @@ export async function publishMessageTemplateVersion(
   return getMessagingWorkspace(eventId);
 }
 
-async function captureOneMessageLocally(messageId: string, eventId?: string) {
+type ScheduledCheck = { obsolete: { code: import("@/modules/communications/scheduled-email-domain").ScheduleExclusionCode; reason: string } | null };
+
+async function captureOneMessageLocally(messageId: string, eventId?: string, scheduledCheck?: ScheduledCheck): Promise<boolean> {
   const prisma = getPrisma();
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const message = await tx.messageOutbox.findFirst({
       where: { id: messageId, ...(eventId ? { eventId } : {}) },
       select: {
@@ -1112,22 +1113,19 @@ async function captureOneMessageLocally(messageId: string, eventId?: string) {
     // A scheduled email (#177) is checked again right before it is captured, exactly as before a real send: a recipient
     // who was cancelled, transferred, paid up, suppressed or is a minor, or a schedule that was cancelled, is never captured.
     // If the check cannot be made the row stays PENDING for the next sweep.
-    if (scheduledEmailBatchIdOf(message.metadata)) {
-      try {
+    // The check itself runs outside this transaction (it reads through its own connection), so a scheduled message first
+    // leaves here asking for it, and comes back with the answer.
+    if (isScheduledEmailMetadata(message.metadata)) {
+      if (!scheduledCheck) return "SCHEDULED_CHECK" as const;
+      if (scheduledCheck.obsolete) {
         const scheduled = await import("@/modules/communications/scheduled-email-repository");
-        const obsolete = await scheduled.scheduledEmailObsoleteReason(message.id);
-        if (obsolete) {
-          await scheduled.cancelObsoleteScheduledMessage(tx, {
-            messageId: message.id,
-            eventId: message.eventId,
-            code: obsolete.code,
-            reason: obsolete.reason,
-            where: { status: "PENDING" },
-          });
-          return false;
-        }
-      } catch (error) {
-        logError("Unable to confirm a scheduled email was still wanted; it stays queued.", error);
+        await scheduled.cancelObsoleteScheduledMessage(tx, {
+          messageId: message.id,
+          eventId: message.eventId,
+          code: scheduledCheck.obsolete.code,
+          reason: scheduledCheck.obsolete.reason,
+          where: { status: "PENDING" },
+        });
         return false;
       }
     }
@@ -1167,6 +1165,16 @@ async function captureOneMessageLocally(messageId: string, eventId?: string) {
     });
     return true;
   });
+  if (result !== "SCHEDULED_CHECK") return result;
+  let obsolete: ScheduledCheck["obsolete"];
+  try {
+    const scheduled = await import("@/modules/communications/scheduled-email-repository");
+    obsolete = await scheduled.scheduledEmailObsoleteReason(messageId);
+  } catch (error) {
+    logError("Unable to confirm a scheduled email was still wanted; it stays queued.", error);
+    return false;
+  }
+  return captureOneMessageLocally(messageId, eventId, { obsolete });
 }
 
 export async function captureMessageIdsLocally(messageIds: string[]) {
@@ -2972,6 +2980,13 @@ export async function createMessageRetryCopy(
   },
 ) {
   const { source, settings, repairMissingSenderSnapshot } = input;
+  // A copy of a scheduled email would carry none of its schedule's checks and would not be stopped by its cancel (#177).
+  if (isScheduledEmailMetadata(source.metadata)) {
+    throw new MessagingError(
+      "MESSAGE_NOT_RETRYABLE",
+      "A scheduled email is checked again before every send by its schedule, which owns retries. Create a new schedule if it is still wanted.",
+    );
+  }
   const created = await tx.messageOutbox.create({
     data: {
       eventId: input.eventId,

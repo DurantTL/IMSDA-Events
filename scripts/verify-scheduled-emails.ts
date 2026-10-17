@@ -356,6 +356,18 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   const cancelAudit = await prisma.auditLog.findFirstOrThrow({ where: { eventId: ids.event, action: "SCHEDULED_EMAIL_CANCELLED", entityId: three.scheduleId } });
   assert((cancelAudit.metadata as { keptMessages: number }).keptMessages === 2, "the cancel audit says how many sent messages were kept");
 
+  // Owner decision (Oct 17): a youth's own address is written to only when an adult also uses it in that send.
+  //  s: the parent is the registration contact and typed the very address the youth attendee has on their own record.
+  //  t: the youth is their own registration contact (account holder, no typed contact address): only a minor is behind it.
+  //  (A person's address is unique, so an adult and a youth share an address only through the typed contact address; an adult
+  //  attendee or a group leader sharing one is covered by the pure rule's tests.)
+  const sParent = await person("SParent", email("share.parent"));
+  const sYouth = await person("SYouth", email("share.family"));
+  const sReg = await register("s", sParent, email("share.family"), "0.00", [{ person: sParent }, { person: sYouth, type: "YOUTH" }]);
+  const tYouth = await person("TYouth", email("youth.own"));
+  const tReg = await register("t", tYouth, "", "0.00", [{ person: tYouth, type: "YOUTH" }]);
+  void sReg; void tReg;
+
   // 10. Youth never receive these. The youth attendee's own address is excluded at review, at approval and at send time.
   const youthContent = { name: "Everyone", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic news", announcementBody: "Synthetic body.", rule: { trigger: "ONE_TIME", localDate: "2027-04-22", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT", "ATTENDEE"], search: "status=CONFIRMED" } };
   const youthReview = await schedules.previewScheduledEmail(ids.event, allPermissions, youthContent);
@@ -378,6 +390,11 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   assert(codeFor(email("z.adult")) === "MINOR_RECIPIENT", `an attendee who became a minor is dropped: ${codeFor(email("z.adult"))}`);
   assert(codeFor(email("youth")) === "MINOR_RECIPIENT", `a forged row for a minor's address is dropped: ${codeFor(email("youth"))}`);
   assert((await prisma.messageOutbox.count({ where: { recipientEmail: { in: [email("youth"), email("z.adult")] } } })) === 0, "no message was ever queued to a minor's address");
+  const fourAddresses = fourAfter.map((row) => row.recipientEmail);
+  assert(fourAddresses.filter((mail) => mail === email("share.family")).length === 1 && fourAfter.find((row) => row.recipientEmail === email("share.family"))!.status === "QUEUED", "a parent who shares the youth's address is approved and queued once");
+  assert(!fourAddresses.includes(email("youth.own")) && (await prisma.messageOutbox.count({ where: { recipientEmail: email("youth.own") } })) === 0, "a youth who is their own registration contact is never emailed");
+  assert((youthCodes.MINOR_RECIPIENT ?? 0) >= 2, "the youth who is their own contact is counted as excluded in the review");
+  assert((await prisma.messageOutbox.count({ where: { recipientEmail: email("share.family") } })) === 1, "the shared parent and youth address has exactly one message");
   // The pre-send check also refuses a youth address that reached the queue some other way.
   const forged = await prisma.messageOutbox.create({
     data: {
@@ -388,11 +405,10 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   });
   const forgedRecipient = await prisma.scheduledEmailRecipient.findFirstOrThrow({ where: { batchId: four.scheduleId, recipientEmail: email("youth") } });
   await prisma.scheduledEmailRecipient.update({ where: { id: forgedRecipient.id }, data: { status: "QUEUED", exclusionCode: null, outboxMessageId: forged.id } });
-  const receivedBeforeForged = stub.received.length;
   await processExternalEmailQueue(ids.event);
   assert(stub.received.every((payload) => payload.to[0] !== email("youth") && payload.to[0] !== email("z.adult")), "the provider never received a minor's address");
   const forgedAfter = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: forged.id } });
-  assert(forgedAfter.status === "CANCELLED" && stub.received.length >= receivedBeforeForged, "a queued message to a minor is cancelled right before the send");
+  assert(forgedAfter.status === "CANCELLED", "a queued message to a minor is cancelled right before the send");
   const youthAudit = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: { in: ["SCHEDULED_EMAIL_RECIPIENTS_DROPPED"] } } });
   assert(!JSON.stringify(youthAudit).includes("youth@"), "the audit trail holds no youth address");
 
@@ -439,9 +455,86 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   assert(nineRun.outcome === "failed" && (await stateOf(nine.scheduleId)).status === "FAILED" && (await outboxOf(nine.scheduleId)).length === 0, `a schedule seven hours late fails instead of sending: ${JSON.stringify(nineRun)}`);
   assert((await recipientsOf(nine.scheduleId)).every((row) => row.status === "CANCELLED"), "and its recipients are cancelled");
 
+  // 12b. A payment-filtered audience is checked against its filters again right before the send: the registrant pays after
+  //      the message was queued, so they no longer match "unpaid", and it is cancelled.
+  const filtered = await createAndActivate({
+    name: "Unpaid only", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic news", announcementBody: "Synthetic body.",
+    rule: { trigger: "ONE_TIME", localDate: "2027-04-23", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"], search: "payment=UNPAID,PARTIAL" },
+  });
+  const filteredRecipients = (await recipientsOf(filtered.scheduleId)).map((row) => row.recipientEmail);
+  assert(filteredRecipients.includes(email("a")) && filteredRecipients.includes(email("b")) && !filteredRecipients.includes(email("c")), `only unpaid registrations are approved: ${filteredRecipients.length}`);
+  await schedules.runScheduledEmailBatch(filtered.scheduleId, { now: new Date("2027-04-23T14:01:00Z") });
+  const filteredQueued = await outboxOf(filtered.scheduleId);
+  assert(filteredQueued.some((row) => row.recipientEmail === email("b") && row.status === "PENDING"), "b's announcement is queued");
+  await pay(reg.b!.id, "80.00");
+  const receivedBeforeFiltered = stub.received.length;
+  await processExternalEmailQueue(ids.event);
+  const sentToFiltered = stub.received.slice(receivedBeforeFiltered).map((payload) => payload.to[0]);
+  assert(!sentToFiltered.includes(email("b")) && sentToFiltered.includes(email("a")), `b paid after queueing and is not sent; a is: ${sentToFiltered}`);
+  const bFiltered = (await outboxOf(filtered.scheduleId)).find((row) => row.recipientEmail === email("b"))!;
+  assert(bFiltered.status === "CANCELLED", "b's message was cancelled by the pre-send check");
+  assert((await recipientsOf(filtered.scheduleId)).find((row) => row.recipientEmail === email("b"))!.exclusionCode === "NO_LONGER_MATCHES", "recorded as no longer matching the approved audience");
+
+  // 12c. A message that waited past its window, or past the moment it counts back from, is dropped, not sent late.
+  const closing0 = await createAndActivate({
+    name: "Late", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.",
+    rule: { trigger: "BEFORE_REGISTRATION_CLOSE", daysBefore: 0, localTime: "23:30" }, query: { roles: ["REGISTRATION_CONTACT"] },
+  });
+  const closingRow = await stateOf(closing0.scheduleId);
+  await schedules.runScheduledEmailBatch(closing0.scheduleId, { now: new Date(closingRow.sendAt.getTime() + 60_000) });
+  const closingMessage = (await outboxOf(closing0.scheduleId))[0]!;
+  assert((await schedules.scheduledEmailObsoleteReason(closingMessage.id, new Date(closingRow.sendAt.getTime() + 60_000))) === null, "on time, it is wanted");
+  const anchorPassed = await schedules.scheduledEmailObsoleteReason(closingMessage.id, new Date(closingRow.anchorAt!.getTime() + 60_000));
+  assert(anchorPassed?.code === "ANCHOR_PASSED", `after registration closed it is dropped: ${anchorPassed?.code}`);
+  const tooLate = await schedules.scheduledEmailObsoleteReason(closingMessage.id, new Date(closingRow.sendAt.getTime() + 7 * 3_600_000));
+  assert(tooLate?.code === "SCHEDULE_TOO_LATE", `seven hours after its time it is dropped: ${tooLate?.code}`);
+
+  // 12d. A scheduled message cannot be copied by a retry (a copy would escape its schedule's checks and its cancel).
+  const { createMessageRetryCopy } = await import("@/modules/communications/messaging-repository");
+  const copySource = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: closingMessage.id } });
+  await prisma.$transaction(async (tx) => {
+    await createMessageRetryCopy(tx, {
+      eventId: ids.event, source: copySource, settings: { deliveryMode: "EXTERNAL_EMAIL", senderName: "x", senderEmail: "events@example.test", replyToEmail: null },
+      repairMissingSenderSnapshot: false, idempotencyKey: `${P}-copy`, correlationId: randomUUID(), requestFingerprint: "f".repeat(64),
+    });
+  }).then(
+    () => { throw new Error("FAILED: a scheduled message was copied by a retry"); },
+    (error) => assert(error instanceof MessagingError && error.code === "MESSAGE_NOT_RETRYABLE", `a retry of a scheduled message is refused: ${String(error)}`),
+  );
+  assert((await prisma.messageOutbox.count({ where: { retryOfMessageId: closingMessage.id } })) === 0, "no copy exists");
+
+  // 12e. A worker that queued some messages and stopped is taken over; if a gate then fails, the batch fails instead of
+  //      pausing (a paused batch could be edited and approved again under messages already in the queue).
+  const takeover = await createAndActivate({
+    name: "Takeover", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.",
+    rule: { trigger: "ONE_TIME", localDate: "2027-05-14", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"] },
+  });
+  const takeoverNow = new Date("2027-05-14T14:01:00Z");
+  await schedules.runScheduledEmailBatch(takeover.scheduleId, { now: takeoverNow });
+  const takeoverRows = await recipientsOf(takeover.scheduleId);
+  const queuedBefore = takeoverRows.filter((row) => row.status === "QUEUED");
+  assert(queuedBefore.length >= 2, "some recipients were queued");
+  await prisma.scheduledEmailRecipient.update({ where: { id: queuedBefore[0]!.id }, data: { status: "PLANNED", outboxMessageId: null } });
+  await prisma.scheduledEmailBatch.update({ where: { id: takeover.scheduleId }, data: { claimedAt: new Date(takeoverNow.getTime() - 3_600_000) } });
+  const announcementTemplate = await prisma.eventMessageTemplate.findFirstOrThrow({ where: { eventId: ids.event, key: "EVENT_ANNOUNCEMENT" } });
+  await publishMessageTemplateVersion(ids.event, announcementTemplate.id, { subjectTemplate: "{{event_name}}: {{announcement_title}}", bodyTemplate: "{{announcement_body}} (synthetic, republished)", isEnabled: true }, ids.admin);
+  // Other approved batches that were never run (schedules 6 and 9 above) are due by now and fail as late; only this one is judged.
+  const takeoverRun = (await schedules.dispatchDueScheduledEmails({ now: takeoverNow })).filter((run) => run.batchId === takeover.scheduleId);
+  assert(takeoverRun.length === 1 && takeoverRun[0]!.outcome === "failed", `a gate after a takeover with queued messages fails the batch: ${JSON.stringify(takeoverRun)}`);
+  assert((await stateOf(takeover.scheduleId)).status === "FAILED", "it is FAILED, not PAUSED");
+  const takeoverMessages = await prisma.messageOutbox.findMany({ where: { metadata: { path: ["scheduledEmailBatchId"], equals: takeover.scheduleId } } });
+  assert(takeoverMessages.length >= 2 && takeoverMessages.every((row) => row.status === "CANCELLED"), "and every message of the batch that was still queued was cancelled, even one a crash left unlinked");
+  await refusal(() => schedules.activateScheduledEmail(ids.event, ids.admin, allPermissions, takeover.scheduleId, { expectedRevision: 1, previewFingerprint: "3".repeat(64) }), "SCHEDULE_STATE", "approving a failed batch");
+
   // 13. Another event's schedule is not reachable by id.
   await refusal(() => schedules.getScheduledEmail(ids.other, scheduleId), "MESSAGE_NOT_FOUND", "reading another event's schedule");
   await refusal(() => schedules.cancelScheduledEmail(ids.other, ids.admin, scheduleId), "MESSAGE_NOT_FOUND", "cancelling another event's schedule");
+  await refusal(() => schedules.pauseScheduledEmail(ids.other, ids.admin, two.scheduleId), "MESSAGE_NOT_FOUND", "pausing another event's schedule");
+  await refusal(() => schedules.reviewStoredScheduledEmail(ids.other, allPermissions, five.scheduleId), "MESSAGE_NOT_FOUND", "reviewing another event's schedule");
+  await refusal(() => schedules.activateScheduledEmail(ids.other, ids.admin, allPermissions, five.scheduleId, { expectedRevision: 2, previewFingerprint: "4".repeat(64) }), "MESSAGE_NOT_FOUND", "approving another event's schedule");
+  await refusal(() => schedules.updateScheduledEmail(ids.other, ids.admin, allPermissions, { scheduleId: five.scheduleId, expectedRevision: 2, previewFingerprint: "4".repeat(64), ...content() }), "MESSAGE_NOT_FOUND", "editing another event's schedule");
+  await refusal(() => schedules.createScheduledEmail(ids.other, ids.admin, allPermissions, { scheduleId, previewFingerprint: "4".repeat(64), ...content() }), "MESSAGE_NOT_FOUND", "reusing another event's schedule id");
+  assert((await stateOf(five.scheduleId)).status === "SCHEDULED" && (await stateOf(two.scheduleId)).status === "CANCELLED", "none of those touched the schedules");
 
   // 14. The list reports counts and states, and no address.
   const listed = await schedules.listScheduledEmails(ids.event);
