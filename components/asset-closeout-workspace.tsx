@@ -103,7 +103,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     <section className="panel form-stack">
       <h3>Issued, returned and outstanding</h3>
       {download("summary")}
-      <div className="table-wrap"><table role="table" className="report-table table-cards">
+      <div className="table-wrap"><table role="table" className="report-table table-cards table-cards-tablet">
         <caption className="sr-only">Units issued, returned, lost, damaged and still out, by kind</caption>
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Went out</th><th role="columnheader" scope="col">Returned</th><th role="columnheader" scope="col">Lost</th><th role="columnheader" scope="col">Damaged</th><th role="columnheader" scope="col">Withdrawn in error</th><th role="columnheader" scope="col">Replaced, unaccounted</th><th role="columnheader" scope="col">Still out</th><th role="columnheader" scope="col">Reconciles</th></tr></thead>
         <tbody role="rowgroup">{report.types.map((row) => <tr role="row" key={row.typeId}>

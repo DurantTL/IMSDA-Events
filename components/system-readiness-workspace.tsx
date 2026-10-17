@@ -120,8 +120,24 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
                 <li className={styles.row} key={item.key}>
                   <div className={styles.head}>
                     <p className={styles.title}>{item.title}</p>
-                    <span className={`${styles.badge} ${item.tick ? styles.ok : styles.unknown}`}>
-                      {!readiness.ticksAvailable ? "Could not read ticks" : item.tick ? "Ticked" : "Not ticked"}
+                    <span className={styles.headControls}>
+                      <span className={`${styles.badge} ${item.tick ? styles.ok : styles.unknown}`}>
+                        {!readiness.ticksAvailable ? "Could not read ticks" : item.tick ? "Ticked" : "Not ticked"}
+                      </span>
+                      {!isOpen && readiness.ticksAvailable ? (
+                        <button
+                          className={`secondary-button ${styles.tickButton}`}
+                          type="button"
+                          onClick={() => {
+                            setError("");
+                            setNotice("");
+                            setText("");
+                            setOpen({ key: item.key, mode: item.tick ? "untick" : "tick" });
+                          }}
+                        >
+                          {item.tick ? "Untick" : "Tick"}
+                        </button>
+                      ) : null}
                     </span>
                   </div>
                   <p className={styles.detail}>{item.detail}</p>
@@ -164,21 +180,6 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
                         </button>
                       </div>
                     </form>
-                  ) : readiness.ticksAvailable ? (
-                    <div className={styles.actions}>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={() => {
-                          setError("");
-                          setNotice("");
-                          setText("");
-                          setOpen({ key: item.key, mode: item.tick ? "untick" : "tick" });
-                        }}
-                      >
-                        {item.tick ? "Untick" : "Tick"}
-                      </button>
-                    </div>
                   ) : null}
                 </li>
               );

@@ -58,7 +58,17 @@ export function AccountSectionNav({
       const listBox = list.getBoundingClientRect();
       const currentBox = current.getBoundingClientRect();
       const offset = currentBox.left - listBox.left + list.scrollLeft;
-      list.scrollLeft = Math.max(0, offset - (list.clientWidth - currentBox.width) / 2);
+      const centred = Math.max(0, offset - (list.clientWidth - currentBox.width) / 2);
+      // Start the row on a tab's own edge, never partway through a word (#997): the first tab edge at or after the
+      // centred position that still leaves the current tab whole, else the last edge before it.
+      const stops = Array.from(list.children).map((child) => child.getBoundingClientRect().left - listBox.left + list.scrollLeft);
+      const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+      const fits = (stop: number) => stop <= offset + 1 && stop + list.clientWidth >= offset + currentBox.width - 1;
+      const after = stops.find((stop) => stop >= centred - 1 && stop <= maxScroll + 1 && fits(stop));
+      const before = [...stops].reverse().find((stop) => stop <= centred + 1 && stop <= maxScroll + 1 && fits(stop));
+      const start = after ?? before ?? centred;
+      // Leave room on the left for the scroll arrow, so it never sits over the first tab's name.
+      list.scrollLeft = start > 0 ? Math.max(0, start - 34) : 0;
     }
     const setFade = (name: "fadeStart" | "fadeEnd", on: boolean) => {
       const value = String(on);

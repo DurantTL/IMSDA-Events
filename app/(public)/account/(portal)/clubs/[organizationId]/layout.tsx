@@ -41,12 +41,12 @@ export default async function ClubLayout({
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
+      <section className="public-registration-hero public-manage-hero account-page-hero club-hero">
         <div>
           <p className="public-registration-eyebrow">
             {clubDirectorRoleLabels[access.club.role]} · Club year {clubYearFor(new Date())}
           </p>
-          <h1 translate="no">{access.club.name}</h1>
+          <h1 title={access.club.name} translate="no">{access.club.name}</h1>
           {access.club.sponsoringChurch && <p translate="no">{access.club.sponsoringChurch}</p>}
         </div>
       </section>

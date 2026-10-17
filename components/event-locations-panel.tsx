@@ -2,6 +2,7 @@
 
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
+import { ActionsMenu } from "@/components/actions-menu";
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, MapPin, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import type { ActiveAreaCoordinator, EventLocationRecord } from "@/modules/event-locations/repository";
 import { getLocationDateWarnings } from "@/modules/events/readiness";
@@ -175,7 +176,7 @@ export function EventLocationsPanel({
                   {" · "}{location.registrations} {location.registrations === 1 ? "registration" : "registrations"}
                 </small>
               </span>
-              <span className="event-location-actions">
+              <span className="event-location-actions row-actions">
                 <button aria-label={`Move ${location.name} up`} className="secondary-button" disabled={busy || index === 0} onClick={() => void move(index, -1)} type="button"><ArrowUp aria-hidden="true" size={14} /></button>
                 <button aria-label={`Move ${location.name} down`} className="secondary-button" disabled={busy || index === locations.length - 1} onClick={() => void move(index, 1)} type="button"><ArrowDown aria-hidden="true" size={14} /></button>
                 <button
@@ -184,28 +185,33 @@ export function EventLocationsPanel({
                   onClick={() => { setAdding(false); setEditingId(location.id); setDraft(draftFrom(location)); setError(""); setNotice(""); }}
                   type="button"
                 ><Pencil aria-hidden="true" size={14} /> Edit</button>
-                <button
-                  className="secondary-button"
-                  disabled={busy}
-                  onClick={() => void call(`${base}/${encodeURIComponent(location.id)}`, "PATCH", { isActive: !location.isActive }, location.isActive ? "Location deactivated." : "Location activated.")}
-                  type="button"
-                ><Power aria-hidden="true" size={14} /> {location.isActive ? "Deactivate" : "Activate"}</button>
-                <button
-                  className="secondary-button"
-                  disabled={busy || location.registrations > 0}
-                  onClick={() => {
-                    void askConfirm({
-                      title: `Delete ${location.name}`,
-                      body: <p>The location is removed from this event. This can&apos;t be undone.</p>,
-                      confirmLabel: `Delete ${location.name}`,
-                      destructive: true,
-                    }).then((confirmed) => {
-                      if (confirmed) void call(`${base}/${encodeURIComponent(location.id)}`, "DELETE", undefined, "Location deleted.");
-                    });
-                  }}
-                  title={location.registrations > 0 ? "Registrations use this location. Deactivate it instead." : undefined}
-                  type="button"
-                ><Trash2 aria-hidden="true" size={14} /> Delete</button>
+                <ActionsMenu ariaLabel={`More actions for ${location.name}`} label="More">
+                  <li>
+                    <button
+                      disabled={busy}
+                      onClick={() => void call(`${base}/${encodeURIComponent(location.id)}`, "PATCH", { isActive: !location.isActive }, location.isActive ? "Location deactivated." : "Location activated.")}
+                      type="button"
+                    ><Power aria-hidden="true" size={14} /> {location.isActive ? "Deactivate" : "Activate"}</button>
+                  </li>
+                  <li>
+                    <button
+                      className="actions-menu-danger"
+                      disabled={busy || location.registrations > 0}
+                      onClick={() => {
+                        void askConfirm({
+                          title: `Delete ${location.name}`,
+                          body: <p>The location is removed from this event. This can&apos;t be undone.</p>,
+                          confirmLabel: `Delete ${location.name}`,
+                          destructive: true,
+                        }).then((confirmed) => {
+                          if (confirmed) void call(`${base}/${encodeURIComponent(location.id)}`, "DELETE", undefined, "Location deleted.");
+                        });
+                      }}
+                      title={location.registrations > 0 ? "Registrations use this location. Deactivate it instead." : undefined}
+                      type="button"
+                    ><Trash2 aria-hidden="true" size={14} /> Delete</button>
+                  </li>
+                </ActionsMenu>
               </span>
             </li>
           ))}

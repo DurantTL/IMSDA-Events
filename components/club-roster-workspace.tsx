@@ -472,7 +472,7 @@ export function ClubRosterWorkspace({
                 : "Add regular members one at a time or import a CSV. You can add event-only guests when registering."}
           </EmptyState>
         ) : (
-          <div className="report-table-wrap">
+          <div className="report-table-wrap scroll-cue" data-scroll-cue>
             {/*
               One table for both sections (#435), not one per section: two
               separate tables size their columns independently, so the Staff

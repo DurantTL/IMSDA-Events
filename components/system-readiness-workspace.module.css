@@ -88,3 +88,23 @@
   width: 100%;
   min-width: 0;
 }
+
+/* The Tick button sits beside the status on the item's own line (#997), not as a full-width button under every item. */
+.headControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tickButton {
+  width: auto;
+  min-height: 36px;
+  padding-block: 4px;
+}
+
+@media (max-width: 640px) {
+  .tickButton {
+    min-height: 44px;
+  }
+}

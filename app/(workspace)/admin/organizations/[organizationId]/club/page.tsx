@@ -74,7 +74,7 @@ export default async function StaffOpenClubPage({
       <div className="page-intro">
         <div>
           <p className="eyebrow">Open club · view only</p>
-          <h2 translate="no">{club.name}</h2>
+          <h2 className="club-name-heading" title={club.name} translate="no">{club.name}</h2>
           <p>
             {club.parentOrganization ? <>Sponsored by <span translate="no">{club.parentOrganization.name}</span>. </> : null}
             {club.isActive ? "" : "This club is inactive. "}

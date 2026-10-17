@@ -30,6 +30,9 @@
  *  - squeezed text (#996): no visible text in a box narrower than about four characters, no text that wraps one
  *    character per line, and no ordinary word (6 to 15 letters) broken in the middle; only emails, codes and
  *    unbroken strings that cannot fit may break anywhere;
+ *  - table wider than its box (#997, tablet and desktop widths): a data table wider than the box around it is a finding. A table may
+ *    scroll sideways only when its box has `data-scroll-cue` and really draws an edge fade or shadow (the `.scroll-cue` class); a
+ *    box that clips it (overflow hidden) never qualifies;
  *  - sticky bars (#996): when a page opens, no sticky or fixed action bar (one holding a button) sits on top of text;
  *  - the shell's "Loading IMSDA Events…" fallback is waited out before anything is measured, and a page that never
  *    leaves it is a finding;
@@ -1546,6 +1549,38 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
     if (box && box.scrollWidth > box.clientWidth + 1) fitProblems.push(`${describe(table)} is ${box.scrollWidth}px wide in a ${box.clientWidth}px box`);
   }
 
+  // A data table is never wider than its box (#997). Where tables stay tables (tablet and desktop), a table that is wider than the
+  // box around it is a finding: it is clipped, or the person scrolls sideways without knowing. A table may scroll sideways only
+  // when its box opts in with `data-scroll-cue` AND really draws an edge fade or shadow (a gradient background, drawn by the
+  // `.scroll-cue` class). A box that clips (overflow hidden) can never opt in: the cut-off columns cannot be reached.
+  const wideTables: string[] = [];
+  if (!args.cards) {
+    for (const table of Array.from(document.querySelectorAll("table"))) {
+      if (!visible(table) || inHiddenTree(table)) continue;
+      let box: HTMLElement | null = null;
+      for (let node: HTMLElement | null = table.parentElement; node && node !== document.body; node = node.parentElement) {
+        if (getComputedStyle(node).overflowX !== "visible") { box = node; break; }
+      }
+      const tableRect = table.getBoundingClientRect();
+      if (!box) {
+        const parent = table.parentElement;
+        if (parent && tableRect.right > parent.getBoundingClientRect().right + 1) {
+          wideTables.push(`${describe(table)} is ${Math.round(tableRect.width)}px wide and sticks out of ${describe(parent)}`);
+        }
+        continue;
+      }
+      if (box.scrollWidth <= box.clientWidth + 1) continue;
+      const style = getComputedStyle(box);
+      const scrolls = /(auto|scroll)/.test(style.overflowX);
+      const optedIn = box.hasAttribute("data-scroll-cue");
+      const drawn = style.backgroundImage.includes("gradient");
+      const detail = `${describe(table)} is ${box.scrollWidth}px wide in a ${box.clientWidth}px box (${describe(box)})`;
+      if (!scrolls) wideTables.push(`${detail}: the box clips it, so the columns past the edge cannot be reached`);
+      else if (!optedIn) wideTables.push(`${detail}: it scrolls sideways with no scroll cue (add data-scroll-cue and the scroll-cue class) or it should fit`);
+      else if (!drawn) wideTables.push(`${detail}: data-scroll-cue is set but no edge fade or shadow is drawn`);
+    }
+  }
+
   // 4. Fixed and sticky bars.
   const bars: Array<{ el: Element; top: number; bottom: number; kind: string }> = [];
   for (const el of Array.from(document.body.querySelectorAll("*"))) {
@@ -1577,6 +1612,7 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
     cellProblems,
     pillProblems,
     fitProblems,
+    wideTables,
     barCount: bars.length,
   };
 }
@@ -2513,6 +2549,9 @@ function injectDefects() {
     '<div style="width:50px;font:14px sans-serif;overflow-wrap:anywhere">Pathfinder Registration</div>',
     '<div style="position:fixed;left:0;right:0;top:140px;height:60px;z-index:30;background:#ccc"><button type="button" style="min-height:44px">self-test bar action</button></div><p style="position:absolute;top:150px;left:0;margin:0">self-test paragraph under an action bar</p>',
     '<div class="shell-loading">Loading IMSDA Events…</div>',
+    // A table wider than its box (#997): one in a clipping box, one in a scrolling box that claims a scroll cue and draws none.
+    '<div style="width:300px;overflow:hidden"><table><tbody><tr><td><div style="width:900px">self-test clipped wide table</div></td></tr></tbody></table></div>',
+    '<div data-scroll-cue style="width:300px;overflow-x:auto"><table><tbody><tr><td><div style="width:900px">self-test cue claimed, none drawn</div></td></tr></tbody></table></div>',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");
@@ -2931,6 +2970,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   for (const problem of result.cellProblems) record("table-cell", spec.name, width, problem);
   for (const problem of result.pillProblems) record("honor-pill", spec.name, width, problem);
   for (const problem of result.fitProblems) record("table-too-wide", spec.name, width, problem);
+  for (const problem of result.wideTables) record("table-wider-than-box", spec.name, width, problem);
   const fields = await page.evaluate(fieldBoundaryInPage, { minRatio: fieldBoundaryRatio });
   fieldsChecked += fields.checked;
   for (const problem of fields.problems) record("field-boundary", spec.name, width, problem);

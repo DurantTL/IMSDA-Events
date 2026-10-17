@@ -115,7 +115,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         </div>
       </form>
 
-      <div className="table-scroll">
+      <div className="table-scroll scroll-cue" data-scroll-cue>
         {query.sort && <SortOrderNote>{sortOrderText(LISTING_COLUMNS.find((column) => column.key === query.sort)?.label.toLowerCase() ?? "default order", query.direction)}</SortOrderNote>}
         <table role="table" className="report-table table-cards attendee-listing-table">
           <caption className="sr-only">Attendees</caption>

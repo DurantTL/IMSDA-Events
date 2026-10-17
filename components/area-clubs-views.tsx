@@ -59,7 +59,7 @@ export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: Ar
   if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
   return (
     <div className="report-table-wrap">
-      <table role="table" className="report-table table-cards">
+      <table role="table" className="report-table table-cards table-cards-tablet">
         <caption className="sr-only">Club overview for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
@@ -99,7 +99,7 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clu
   if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
   const months = clubs[0]!.months.map((cell) => cell.month);
   return (
-    <div className="report-table-wrap club-reports-grid">
+    <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue>
       <table role="table" className="report-table table-cards">
         <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>
         <thead role="rowgroup">

@@ -150,7 +150,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
               />
             </label>
             <div className="report-table-wrap">
-              <table className="report-table table-cards" role="table">
+              <table className="report-table table-cards table-cards-corner" role="table">
                 <thead role="rowgroup">
                   <tr role="row">
                     <th role="columnheader" scope="col">Code</th>

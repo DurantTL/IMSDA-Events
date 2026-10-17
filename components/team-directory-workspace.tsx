@@ -198,7 +198,7 @@ export function TeamDirectoryWorkspace({
 
       <section className="panel">
         <div className="reminder-recipient-table-wrap">
-          <table role="table" className="reminder-recipient-table table-cards team-directory-table">
+          <table role="table" className="reminder-recipient-table table-cards table-cards-tablet team-directory-table">
             <caption>{directory.totalCount} account{directory.totalCount === 1 ? "" : "s"}</caption>
             <thead role="rowgroup">
               <tr role="row">

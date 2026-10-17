@@ -357,7 +357,7 @@ export function ClubHonorsWorkspace({
         ) : (
           <div className="report-table-wrap">
             <SortOrderNote>{sortOrderText(nameSortLabel, nameDirection)}</SortOrderNote>
-            <table aria-labelledby="club-honors-heading" className="report-table table-cards honors-table" data-fit-width role="table">
+            <table aria-labelledby="club-honors-heading" className="report-table table-cards table-cards-corner honors-table" data-fit-width role="table">
               <thead role="rowgroup">
                 <tr role="row">
                   <SortableHeader active className="honors-col-name" direction={nameDirection} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />

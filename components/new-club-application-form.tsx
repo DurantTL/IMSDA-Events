@@ -125,7 +125,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
     <form className="club-form-fill" onSubmit={(event) => void submit(event)}>
       <fieldset className="public-manage-card form-stack" disabled={saving}>
         <ClubFormSectionTitle>The club</ClubFormSectionTitle>
-        <div className="form-grid two-column">
+        <div className="form-grid two-column nca-grid">
           <label>
             Club name
             <input autoComplete="off" maxLength={120} onChange={(event) => set("clubName", event.target.value)} required value={values.clubName} />
@@ -161,7 +161,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
 
       <fieldset className="public-manage-card form-stack" disabled={saving}>
         <ClubFormSectionTitle>Elected Pathfinder leader (the club director)</ClubFormSectionTitle>
-        <div className="form-grid two-column">
+        <div className="form-grid two-column nca-grid">
           <label>
             Name
             <input autoComplete="name" maxLength={120} onChange={(event) => set("directorName", event.target.value)} required value={values.directorName} />
@@ -198,7 +198,7 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
 
       <fieldset className="public-manage-card form-stack" disabled={saving}>
         <ClubFormSectionTitle>Signatures (type your full name)</ClubFormSectionTitle>
-        <div className="form-grid two-column">
+        <div className="form-grid two-column nca-grid">
           <label>
             Church pastor
             <input autoComplete="off" maxLength={120} onChange={(event) => set("pastorSignature", event.target.value)} required value={values.pastorSignature} />
