@@ -22,6 +22,7 @@ import {
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getSystemAdminDashboard, getSystemHealth } from "@/modules/system-admin/repository";
 import type { SetupWarningKind } from "@/modules/system-admin/dashboard";
+import { ActionsMenu } from "@/components/actions-menu";
 import { ModuleRequestQueue } from "@/components/module-request-queue";
 import { formatRequestDate } from "@/modules/event-modules/request-domain";
 import { listPendingModuleRequests } from "@/modules/event-modules/requests";
@@ -186,35 +187,37 @@ export default async function SystemAdminPage({
         </div>
       </section>
 
-      <nav className={styles.tasks} aria-label="System management tasks">
-        {systemNavGroups.map((group) => {
-          const cards = group.items.map(({ href, label, description, icon: Icon }) => (
-            <Link className={styles.taskCard} href={href} key={href}>
-              <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
-              <span><strong>{label}</strong><small>{description}</small></span>
-            </Link>
-          ));
-          // Catalogs and settings start closed; a disclosure needs no script, so it also works before hydration.
-          return group.collapsedByDefault ? (
-            <details className={styles.taskGroup} key={group.key} data-testid={`task-group-${group.key}`}>
-              <summary><h2>{group.label}</h2><ChevronDown aria-hidden="true" size={16} /></summary>
-              <div className={styles.taskGrid}>{cards}</div>
-            </details>
-          ) : (
-            <section className={styles.taskGroup} key={group.key} aria-labelledby={`task-group-${group.key}`} data-testid={`task-group-${group.key}`}>
-              <h2 id={`task-group-${group.key}`}>{group.label}</h2>
-              <div className={styles.taskGrid}>{cards}</div>
-            </section>
-          );
-        })}
-      </nav>
-
       <section className={styles.metrics} aria-label="System summary">
         <article><span className={styles.metricIcon}><TentTree aria-hidden="true" size={20} /></span><strong>{dashboard.summary.currentEventCount}</strong><p>Current events</p><small>{dashboard.summary.publishedEventCount} published across {dashboard.summary.eventCount} total</small></article>
         <article><span className={styles.metricIcon}><UsersRound aria-hidden="true" size={20} /></span><strong>{dashboard.summary.attendeeCount}</strong><p>Expected attendees</p><small>{dashboard.summary.registrationCount} active registrations</small></article>
         <article className={dashboard.summary.operationalIssueCount > 0 ? styles.needsAttention : undefined}><span className={styles.metricIcon}><CircleAlert aria-hidden="true" size={20} /></span><strong>{dashboard.summary.operationalIssueCount}</strong><p>Operational exceptions</p><small>{dashboard.summary.unresolvedAlertCount} open system alerts · failed imports and email</small></article>
         <article><span className={styles.metricIcon}><ShieldCheck aria-hidden="true" size={20} /></span><strong>{dashboard.summary.activeUserCount}</strong><p>Active staff accounts</p><small>{dashboard.summary.pendingUserCount} pending · {dashboard.summary.systemAdminCount} system admins</small></article>
       </section>
+
+      <nav className={styles.tasks} aria-label="System management tasks">
+        {systemNavGroups.map((group) => {
+          const cards = group.items.map(({ href, label, description, icon: Icon }) => (
+            <Link className={styles.taskCard} href={href} key={href}>
+              <span className={styles.taskIcon}><Icon aria-hidden="true" size={18} /></span>
+              <span className={styles.taskText}><strong>{label}</strong><small>{description}</small></span>
+            </Link>
+          ));
+          // The grid is sized to the group's tile count so a short group never strands one tile (see the stylesheet).
+          const grid = <div className={styles.taskGrid} data-count={group.items.length}>{cards}</div>;
+          // Catalogs and settings start closed; a disclosure needs no script, so it also works before hydration.
+          return group.collapsedByDefault ? (
+            <details className={styles.taskGroup} key={group.key} data-testid={`task-group-${group.key}`}>
+              <summary><h2>{group.label}</h2><ChevronDown aria-hidden="true" size={16} /></summary>
+              {grid}
+            </details>
+          ) : (
+            <section className={styles.taskGroup} key={group.key} aria-labelledby={`task-group-${group.key}`} data-testid={`task-group-${group.key}`}>
+              <h2 id={`task-group-${group.key}`}>{group.label}</h2>
+              {grid}
+            </section>
+          );
+        })}
+      </nav>
 
       <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
         <div className={styles.sectionHeading}>
@@ -234,143 +237,137 @@ export default async function SystemAdminPage({
             }))} />}
       </section>
 
-      <div className={styles.dashboardGrid}>
-        <section className={styles.primaryColumn}>
-          <div className={styles.sectionHeading}>
-            <div><p className="eyebrow">Across all events</p><h2>Event operations</h2><p>Open the event workspace that owns the underlying record or exception.</p></div>
-            <span>{currentEvents.length} current</span>
-          </div>
+      <section className={styles.health} id="system-health" aria-labelledby="system-health-heading">
+        <div className={styles.sectionHeading}>
+          <div><p className="eyebrow">Live</p><h2 id="system-health-heading">System health</h2><p>The unattended jobs nobody watches until they stop. Read when this page loaded.</p></div>
+        </div>
+        <div className={styles.healthGrid}>
+          {healthRows.map(({ name, state, label, detail, icon: Icon, extra }) => (
+            <article key={name}>
+              <div className={styles.healthHead}>
+                <span className={styles.moduleIcon}><Icon aria-hidden="true" size={18} /></span>
+                <strong>{name}</strong>
+                <em className={healthClass[state]}>{label}</em>
+              </div>
+              <small>{detail}</small>
+              {extra}
+            </article>
+          ))}
+        </div>
+      </section>
 
-          <div className={styles.eventList}>
-            {currentEvents.map((event) => {
-              const query = `event=${encodeURIComponent(event.id)}`;
-              const when = countdown(event.timing, event.daysUntilStart);
-              return (
-                <article className={styles.eventCard} key={event.id}>
-                  <div className={styles.eventMain}>
-                    <div className={styles.eventTitle}>
-                      <span>
-                        <span className={`${styles.phase} ${event.registrationPhase === "OPEN" ? styles.phaseOpen : ""}`}>{phaseLabel(event.registrationPhase)}</span>
-                        {when && <span className={styles.countdown}>{when}</span>}
-                      </span>
-                      <h3>{event.name}</h3>
-                      <p>{dateRange(event.startsAt, event.endsAt, event.timezone)} · {event.location ?? "Location pending"}</p>
-                    </div>
-                    <Link className={styles.openEvent} href={`/overview?${query}`}>Open event <ArrowRight aria-hidden="true" size={15} /></Link>
-                  </div>
+      <section className={styles.primaryColumn}>
+        <div className={styles.sectionHeading}>
+          <div><p className="eyebrow">Across all events</p><h2>Event operations</h2><p>Open the event workspace that owns the underlying record or exception.</p></div>
+          <span>{currentEvents.length} current</span>
+        </div>
 
-                  <div className={styles.eventStats}>
-                    <span><strong>{event.activeRegistrationCount}</strong><small>Registrations</small></span>
-                    <span><strong>{event.attendeeCount}</strong><small>Attendees</small></span>
-                    <span><strong>{event.checkedInCount}</strong><small>Checked in</small></span>
-                    <span><strong>{event.waitingCount}</strong><small>Waitlisted</small></span>
-                    <span>
-                      <Link href={`/finance?${query}`} title="Money still owed on active registrations">
-                        <strong>{money(event.ledgerBalanceCents)}</strong><small>Outstanding balance</small>
-                      </Link>
+        <div className={styles.eventList}>
+          {currentEvents.map((event) => {
+            const query = `event=${encodeURIComponent(event.id)}`;
+            const when = countdown(event.timing, event.daysUntilStart);
+            return (
+              <article className={styles.eventCard} key={event.id}>
+                <div className={styles.eventMain}>
+                  <div className={styles.eventTitle}>
+                    <span className={styles.eventBadges}>
+                      <span className={`${styles.phase} ${event.registrationPhase === "OPEN" ? styles.phaseOpen : ""}`}>{phaseLabel(event.registrationPhase)}</span>
+                      {when && <span className={styles.countdown}>{when}</span>}
                     </span>
+                    <h3>{event.name}</h3>
+                    <p>{dateRange(event.startsAt, event.endsAt, event.timezone)} · {event.location ?? "Location pending"}</p>
                   </div>
-
-                  <div className={styles.eventFooter}>
-                    <div className={styles.eventWarnings}>
-                      {event.setupWarnings.length === 0
-                        ? <span className={styles.ready}><CheckCircle2 aria-hidden="true" size={14} /> No setup or delivery exceptions detected</span>
-                        : event.setupWarnings.map((warning) => (
-                          <Link
-                            className={warning.exception ? styles.exception : undefined}
-                            href={withEvent(warningHref[warning.kind], query)}
-                            key={warning.kind}
-                          >
-                            <CircleAlert aria-hidden="true" size={14} /> {warning.label}
-                          </Link>
-                        ))}
-                    </div>
-                    {/* Closed on a phone to keep the page short; always open on wider screens (see the stylesheet). */}
-                    <details className={styles.eventTools}>
-                      <summary>Event links<span className="sr-only"> for {event.name}</span> <ChevronDown aria-hidden="true" size={16} /></summary>
-                      <div className={styles.eventLinks}>
-                        <Link href={`/registration-builder?${query}`}>Form</Link>
-                        <Link href={withEvent(eventFeaturesItem.href, query)}>Features</Link>
-                        <Link href={`/finance/square-payments?${query}`}>Square matching</Link>
-                        <Link href={`/more/promo-codes?${query}`}>Promo codes</Link>
-                        <Link href={`/staff?${query}`}>Team</Link>
-                        <Link href={`/more/health?${query}`}>Health</Link>
-                        <Link href={`/more/event-settings?${query}`}>Settings</Link>
-                      </div>
-                    </details>
+                  <div className={styles.eventButtons}>
+                    <Link className={`primary-button ${styles.openEvent}`} href={`/overview?${query}`}>Open event <ArrowRight aria-hidden="true" size={15} /></Link>
+                    <ActionsMenu label="Event links" ariaLabel={`Event links for ${event.name}`}>
+                      <li><Link href={`/registration-builder?${query}`}>Form</Link></li>
+                      <li><Link href={withEvent(eventFeaturesItem.href, query)}>Features</Link></li>
+                      <li><Link href={`/finance/square-payments?${query}`}>Square matching</Link></li>
+                      <li><Link href={`/more/promo-codes?${query}`}>Promo codes</Link></li>
+                      <li><Link href={`/staff?${query}`}>Team</Link></li>
+                      <li><Link href={`/more/health?${query}`}>Health</Link></li>
+                      <li><Link href={`/more/event-settings?${query}`}>Settings</Link></li>
+                    </ActionsMenu>
                   </div>
-                </article>
-              );
-            })}
-            {currentEvents.length === 0 && (
-              <div className={styles.emptyState}>
-                <CalendarPlus aria-hidden="true" size={24} />
-                <strong>No current events</strong>
-                <p>Create the next event to begin registration setup.</p>
-              </div>
-            )}
-          </div>
+                </div>
 
-          {pastEvents.length > 0 && (
-            <details className={styles.pastEvents}>
-              <summary>{pastEvents.length} past {pastEvents.length === 1 ? "event" : "events"}</summary>
-              <div>
-                {pastEvents.map((event) => (
-                  <Link href={`/overview?event=${encodeURIComponent(event.id)}`} key={event.id}>
-                    <span><strong>{event.name}</strong><small>{dateRange(event.startsAt, event.endsAt, event.timezone)}</small></span>
-                    <ArrowRight aria-hidden="true" size={15} />
-                  </Link>
-                ))}
-              </div>
-            </details>
-          )}
-        </section>
-
-        <aside className={styles.sideColumn}>
-          <section className={styles.roadmap} id="system-health">
-            <div className={styles.sectionHeading}>
-              <div><p className="eyebrow">Live</p><h2>System health</h2><p>The unattended jobs nobody watches until they stop. Read when this page loaded.</p></div>
-            </div>
-            <div className={styles.moduleList}>
-              {healthRows.map(({ name, state, label, detail, icon: Icon, extra }) => (
-                <article key={name}>
-                  <span className={styles.moduleIcon}><Icon aria-hidden="true" size={18} /></span>
+                <div className={styles.eventStats}>
+                  <span><strong>{event.activeRegistrationCount}</strong><small>Registrations</small></span>
+                  <span><strong>{event.attendeeCount}</strong><small>Attendees</small></span>
+                  <span><strong>{event.checkedInCount}</strong><small>Checked in</small></span>
+                  <span><strong>{event.waitingCount}</strong><small>Waitlisted</small></span>
                   <span>
-                    <strong>{name}</strong>
-                    <small>{detail}</small>
-                    {extra}
+                    <Link href={`/finance?${query}`} title="Money still owed on active registrations">
+                      <strong>{money(event.ledgerBalanceCents)}</strong><small>Outstanding balance</small>
+                    </Link>
                   </span>
-                  <em className={healthClass[state]}>{label}</em>
-                </article>
+                </div>
+
+                <div className={styles.eventWarnings}>
+                  {event.setupWarnings.length === 0
+                    ? <span className={styles.ready}><CheckCircle2 aria-hidden="true" size={14} /> No setup or delivery exceptions detected</span>
+                    : event.setupWarnings.map((warning) => (
+                      <Link
+                        className={warning.exception ? styles.exception : undefined}
+                        href={withEvent(warningHref[warning.kind], query)}
+                        key={warning.kind}
+                      >
+                        <CircleAlert aria-hidden="true" size={14} /> {warning.label}
+                      </Link>
+                    ))}
+                </div>
+              </article>
+            );
+          })}
+          {currentEvents.length === 0 && (
+            <div className={styles.emptyState}>
+              <CalendarPlus aria-hidden="true" size={24} />
+              <strong>No current events</strong>
+              <p>Create the next event to begin registration setup.</p>
+            </div>
+          )}
+        </div>
+
+        {pastEvents.length > 0 && (
+          <details className={styles.pastEvents}>
+            <summary>{pastEvents.length} past {pastEvents.length === 1 ? "event" : "events"}</summary>
+            <div>
+              {pastEvents.map((event) => (
+                <Link href={`/overview?event=${encodeURIComponent(event.id)}`} key={event.id}>
+                  <span><strong>{event.name}</strong><small>{dateRange(event.startsAt, event.endsAt, event.timezone)}</small></span>
+                  <ArrowRight aria-hidden="true" size={15} />
+                </Link>
               ))}
             </div>
-          </section>
+          </details>
+        )}
+      </section>
 
-          <section className={styles.scope}>
-            <MapIcon aria-hidden="true" size={20} />
-            <div>
-              <strong>Build roadmap</strong>
-              <p>
-                What is being built next, and in what order, is kept in{" "}
-                <a href={ROADMAP_URL} rel="noreferrer" target="_blank">GitHub issue #98</a>.
-                This page only shows what is live.
-              </p>
-            </div>
-          </section>
+      <div className={styles.footerCards}>
+        <section className={styles.scope}>
+          <MapIcon aria-hidden="true" size={20} />
+          <div>
+            <strong>Build roadmap</strong>
+            <p>
+              What is being built next, and in what order, is kept in{" "}
+              <a href={ROADMAP_URL} rel="noreferrer" target="_blank">GitHub issue #98</a>.
+              This page only shows what is live.
+            </p>
+          </div>
+        </section>
 
-          <section className={styles.scope}>
-            <RefreshCw aria-hidden="true" size={20} />
-            <div>
-              <strong>System version</strong>
-              <p>
-                App v{packageInfo.version}
-                {release.sha ? ` · release ${release.sha.slice(0, 7)}` : " · release commit unknown"}
-                {release.buildId ? ` · build ${release.buildId}` : ""}
-              </p>
-              <p>Changes when this deployment last changed. Compare after a deploy to confirm it took.</p>
-            </div>
-          </section>
-        </aside>
+        <section className={styles.scope}>
+          <RefreshCw aria-hidden="true" size={20} />
+          <div>
+            <strong>System version</strong>
+            <p>
+              App v{packageInfo.version}
+              {release.sha ? ` · release ${release.sha.slice(0, 7)}` : " · release commit unknown"}
+              {release.buildId ? ` · build ${release.buildId}` : ""}
+            </p>
+            <p>Changes when this deployment last changed. Compare after a deploy to confirm it took.</p>
+          </div>
+        </section>
       </div>
     </section>
   );
