@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleAlert, FileText, RefreshCw, Save, Send, X } from "lucide-react";
 import {
   MAX_HONORS,
-  ON_TIME_POINTS,
   REPORT_CHANGE_REQUEST_EMAIL,
   pickedTotal,
   pointItems,
@@ -234,7 +233,7 @@ export function ClubReportForm({
           <p className={eyebrow}>{monthLabel}</p>
           <h2>{total} points</h2>
           <p className="field-help">
-            {onTime > 0 ? `Includes ${ON_TIME_POINTS} for submitting by ${dueLabel}.` : `Submitted after ${dueLabel}, so no on-time points.`}
+            {onTime > 0 ? `Includes ${onTime} for submitting by ${dueLabel}.` : `Submitted after ${dueLabel}, so no on-time points.`}
             {unanswered > 0 && !readOnly ? ` ${unanswered} item${unanswered === 1 ? "" : "s"} not answered yet (counted as 0).` : ""}
           </p>
         </div>
@@ -253,7 +252,57 @@ export function ClubReportForm({
 
   const { confirm: askConfirm, confirmDialog } = useConfirm();
 
-  const formBody = (
+  // A closed report (an Area Coordinator's view, or a club after the due date) is read, not edited: the answers as plain text, no disabled inputs (#996).
+  const answerText = (value: number | undefined) => (value === undefined ? "Not answered" : `${value}`);
+  const savedHonors = honors.filter((honor) => honor.name.trim() || honor.participants !== null);
+  const readOnlyBody = (
+    <>
+      {renderSummary(asDialog)}
+      <div className="inline-notice" role="status">
+        {readOnlyNote ?? (
+          <>
+            This report closed on {dueLabel}. You can&apos;t submit changes now — email{" "}
+            <a href={`mailto:${REPORT_CHANGE_REQUEST_EMAIL}`}>{REPORT_CHANGE_REQUEST_EMAIL}</a> to request a change.
+          </>
+        )}
+      </div>
+      <section className={`${card} club-report-readonly`} data-report-readonly="" aria-labelledby="club-report-readonly-facts">
+        <h3 className={eyebrow} id="club-report-readonly-facts">Club facts</h3>
+        <dl>
+          <div><dt>Meeting place</dt><dd>{report?.meetingPlace || "Not given"}</dd></div>
+          <div><dt>Meeting day and time</dt><dd>{report?.meetingSchedule || "Not given"}</dd></div>
+          <div><dt>Average attendance</dt><dd>{report?.averageAttendance ?? "Not given"}</dd></div>
+          <div><dt>Number of Pathfinders</dt><dd>{report?.pathfinderCount ?? "Not given"}</dd></div>
+          <div><dt>Number of TLTs</dt><dd>{report?.tltCount ?? "Not given"}</dd></div>
+          <div><dt>Number of staff</dt><dd>{report?.staffCount ?? "Not given"}</dd></div>
+          {report?.investitureDate && <div><dt>Investiture date</dt><dd>{report.investitureDate}</dd></div>}
+        </dl>
+      </section>
+      <section className={`${card} club-report-readonly`} data-report-readonly="" aria-labelledby="club-report-readonly-points">
+        <h3 className={eyebrow} id="club-report-readonly-points">Points</h3>
+        <dl>
+          <div><dt>Report submitted by {dueLabel}</dt><dd>{onTime}</dd></div>
+          {pointItems.map((item) => (
+            <div key={item.key}><dt>{item.label}</dt><dd>{answerText(points[item.key])}</dd></div>
+          ))}
+          <div><dt>Class levels worked on</dt><dd>{classLevels.length > 0 ? classLevels.map((level) => clubClassLevelLabels[level]).join(", ") : "None"}</dd></div>
+          <div>
+            <dt>Honors worked on</dt>
+            <dd>{savedHonors.length > 0 ? savedHonors.map((honor) => `${honor.name || "Unnamed honor"}${honor.participants === null ? "" : ` (${honor.participants} participating)`}`).join("; ") : "None listed"}</dd>
+          </div>
+        </dl>
+      </section>
+      <section className={`${card} club-report-readonly`} data-report-readonly="" aria-labelledby="club-report-readonly-signature">
+        <h3 className={eyebrow} id="club-report-readonly-signature">Signature</h3>
+        <dl>
+          <div><dt>Signed by</dt><dd>{report?.signatureName || "Not signed"}</dd></div>
+          <div><dt>Date</dt><dd>{report?.signedOn || "Not given"}</dd></div>
+        </dl>
+      </section>
+    </>
+  );
+
+  const formBody = readOnly ? readOnlyBody : (
     <>
       {renderSummary(asDialog)}
 

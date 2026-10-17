@@ -100,6 +100,28 @@ describe("badge print CSS (#717)", () => {
   });
 });
 
+describe("the vertical (ID sleeve) layout has a slot size to rotate into (#996)", () => {
+  it("defines --slot-w and --slot-h on every sheet, matching the sheet's own columns and rows", () => {
+    expect(css).toMatch(/\.badge-sheet-orientation-portrait \.badge-label-inner\s*\{[^}]*width:\s*var\(--slot-h\);[^}]*height:\s*var\(--slot-w\);/);
+    for (const id of badgeTemplateIds) {
+      const slot = css.match(new RegExp(`\\.badge-sheet-${id}\\s*\\{\\s*--slot-w:\\s*([\\d.]+)in;\\s*--slot-h:\\s*([\\d.]+)in;\\s*\\}`));
+      expect(slot, `${id} needs --slot-w and --slot-h`).not.toBeNull();
+      const sheet = css.match(new RegExp(`\\.badge-sheet-${id}\\s*\\{([^}]*grid-template-columns[^}]*)\\}`))?.[1] ?? "";
+      const column = sheet.match(/grid-template-columns:\s*repeat\(\d+,\s*([\d.]+)in\)/)?.[1];
+      const row = sheet.match(/grid-template-rows:\s*repeat\(\d+,\s*([\d.]+)in\)/)?.[1];
+      expect(Number(slot![1])).toBeCloseTo(Number(column), 3);
+      expect(Number(slot![2])).toBeCloseTo(Number(row), 3);
+    }
+  });
+});
+
+describe("a long name shrinks to fit in the vertical layout too (#996)", () => {
+  it("has no plain font-size rule that beats the shrink-to-fit rule for the rotated names", () => {
+    expect(css).not.toMatch(/\.badge-sheet-orientation-portrait \.badge-label-name strong(:first-child)? \{ font-size:/);
+    expect(css).toMatch(/\.badge-sheet-orientation-portrait \.badge-label-name strong\[style\]:first-child \{ --name-base: 17pt; \}/);
+  });
+});
+
 describe("badge names fit the label", () => {
   it("shrinks a long name to the label width instead of cutting it off, never above the chosen size", () => {
     expect(css).toMatch(/\.badge-label-inner\s*\{[^}]*container-type:\s*inline-size/);

@@ -95,10 +95,12 @@ describe("attendee sheet accessibility (#743)", () => {
 
 describe("sticky registration CTA (#743)", () => {
   it("marks the step bar and sticks it with the safe-area inset, last in the column, phone only", () => {
-    expect(form).toContain('className="public-registration-step-actions is-sticky-cta"');
+    expect(form).toContain('className={`public-registration-step-actions is-sticky-cta${actionBarPinned ? " is-pinned" : ""}`}');
     expect(block).toMatch(/@media screen and \(max-width: 768px\)/);
     expect(block).toMatch(/\.is-sticky-cta \{[^}]*width: calc\(100% \+ 24px\);[^}]*max-width: none;/);
-    expect(block).toMatch(/\.is-sticky-cta \{[^}]*position: sticky;[^}]*bottom: 0;[^}]*order: 99;/);
+    // #996: in the page flow after the content, and sticky once the reader has scrolled past the step heading.
+    expect(block).toMatch(/\.is-sticky-cta \{[^}]*position: static;[^}]*bottom: 0;[^}]*order: 99;/);
+    expect(block).toMatch(/\.is-sticky-cta\.is-pinned \{ position: sticky; \}/);
     expect(block).toContain("padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));");
     expect(block).toContain("scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px))");
   });

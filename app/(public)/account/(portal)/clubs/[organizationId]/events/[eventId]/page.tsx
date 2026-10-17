@@ -197,7 +197,7 @@ export default async function ClubEventRegistrationPage({
         <section className="public-manage-card">
           <div className="public-manage-card-heading">
             <p className="public-registration-eyebrow">Registered</p>
-            <h2><CheckCircle2 size={20} aria-hidden="true" /> {workspace.registration.teamName ? <><span translate="no">{workspace.registration.teamName}</span> is registered</> : "Your club is registered"}</h2>
+            <h2><CheckCircle2 size={20} aria-hidden="true" /> <span>{workspace.registration.teamName ? <><span translate="no">{workspace.registration.teamName}</span> is registered</> : "Your club is registered"}</span></h2>
           </div>
           <ClubHonorsNote eventId={eventId} organizationId={organizationId} />
           {classReadiness && (
@@ -252,9 +252,11 @@ export default async function ClubEventRegistrationPage({
             <div className="club-pass-card">
               <ClubPassQr eventId={eventId} organizationId={organizationId} teamKey={workspace.registration.teamKey} />
               <p className="field-help">
-                <QrCode aria-hidden="true" size={15} /> Show this at check-in
-                so staff can open your club&rsquo;s list. Confirmation{" "}
-                <strong translate="no">{workspace.registration.confirmationCode}</strong> works too.
+                <QrCode aria-hidden="true" size={15} />
+                <span>
+                  Show this at check-in so staff can open your club&rsquo;s list. Confirmation{" "}
+                  <strong translate="no">{workspace.registration.confirmationCode}</strong> works too.
+                </span>
               </p>
             </div>
           )}

@@ -5,7 +5,7 @@ import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { Download, ListPlus, Plus, Search, UsersRound } from "lucide-react";
+import { Download, ListPlus, Plus, Search, UsersRound, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { HonorCombobox } from "@/components/honor-combobox";
 import { HonorPillList } from "@/components/honor-pill-list";
@@ -402,7 +402,7 @@ export function ClubHonorsWorkspace({
                 <p className="public-registration-eyebrow">Several members</p>
                 <h2 id="honor-bulk-title">Add honors to several members</h2>
               </div>
-              <button aria-label="Close" className="icon-button modal-close-button" onClick={closeBulk} type="button">×</button>
+              <button aria-label="Close" className="icon-button modal-close-button" onClick={closeBulk} type="button"><X aria-hidden="true" size={18} /></button>
             </div>
             <div className="form-stack">
               {error && !confirmingBulk && <div className="inline-notice error" role="alert">{error}</div>}
@@ -504,7 +504,7 @@ export function ClubHonorsWorkspace({
                 <p className="public-registration-eyebrow">Honor history</p>
                 <h2 id="honor-history-title" translate="no">{historyFor.firstName} {historyFor.lastName}</h2>
               </div>
-              <button aria-label="Close" className="icon-button modal-close-button" onClick={closeHistory} type="button">×</button>
+              <button aria-label="Close" className="icon-button modal-close-button" onClick={closeHistory} type="button"><X aria-hidden="true" size={18} /></button>
             </div>
             {historyError ? (
               <div className="form-stack">
@@ -581,7 +581,7 @@ export function ClubHonorsWorkspace({
                 <p className="public-registration-eyebrow">Void honor entry</p>
                 <h2 id="honor-void-title">{voidTarget.honorName} · {memberHonorStatusLabels[voidTarget.status]}</h2>
               </div>
-              <button aria-label="Close" className="icon-button modal-close-button" onClick={closeVoid} type="button">×</button>
+              <button aria-label="Close" className="icon-button modal-close-button" onClick={closeVoid} type="button"><X aria-hidden="true" size={18} /></button>
             </div>
             <form className="form-stack" onSubmit={submitVoid}>
               <p>
