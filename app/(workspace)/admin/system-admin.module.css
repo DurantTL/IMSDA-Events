@@ -655,6 +655,17 @@ details.taskGroup[open] .taskGrid {
   }
 }
 
+/* #447: links in the event cards are 44px tap targets on a tablet and a phone (text sizes unchanged). */
+@media (max-width: 768px) {
+  .openEvent,
+  .eventWarnings a,
+  .eventStats a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
 /* ---- Phone ---- */
 @media (max-width: 700px) {
   .hero {
@@ -694,6 +705,11 @@ details.taskGroup[open] .taskGrid {
 
   .taskCard small {
     display: none;
+  }
+
+  /* The name is all a phone tile shows, so a long one wraps rather than being cut off. */
+  .taskCard strong {
+    -webkit-line-clamp: 3;
   }
 
   .taskIcon {
@@ -759,6 +775,7 @@ details.taskGroup[open] .taskGrid {
   }
 
   .eventButtons :global(.actions-menu-trigger) {
+    width: 100%;
     min-height: 44px;
   }
 

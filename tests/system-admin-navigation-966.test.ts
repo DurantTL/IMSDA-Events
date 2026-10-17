@@ -199,11 +199,16 @@ describe("/admin dashboard page", () => {
     expect(source).toContain("Open event <ArrowRight");
     const stylesheet = readFileSync(join(process.cwd(), "app/(workspace)/admin/system-admin.module.css"), "utf8");
     // On a phone the task cards drop their description and sit two to a row, so the page is much shorter.
-    expect(stylesheet).toMatch(/@media \(max-width: 700px\) \{[\s\S]*\.tasks \{[^}]*\}[\s\S]*?\.taskGrid,\s*\.taskGrid\[data-count\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    // The phone block is the last in the file, so these checks cannot match a rule in another media block.
+    const phone = stylesheet.slice(stylesheet.indexOf("@media (max-width: 700px) {"));
+    expect(phone.match(/@media/g)).toHaveLength(1);
+    expect(phone).toMatch(/\.taskGrid,\s*\.taskGrid\[data-count\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    expect(phone).toMatch(/\.eventButtons :global\(\.actions-menu-trigger\) \{\s*width: 100%;/);
+    // Links keep 44px tap targets on a tablet (#447).
+    expect(stylesheet).toMatch(/@media \(max-width: 768px\) \{\s*\.openEvent,\s*\.eventWarnings a,\s*\.eventStats a \{[^}]*min-height: 44px;/);
     expect(stylesheet).toMatch(/\.taskCard small \{\s*display: none;/);
     // Each event card drops its stat row on a phone (#987), and no later rule lays the row out again.
-    const hide = stylesheet.search(/@media \(max-width: 700px\) \{[\s\S]*?\.eventStats \{\s*display: none;/);
-    expect(hide).toBeGreaterThan(-1);
+    expect(phone).toMatch(/\.eventStats \{\s*display: none;/);
     expect(stylesheet.slice(stylesheet.lastIndexOf(".eventStats {"))).toMatch(/^\.eventStats \{\s*display: none;/);
   });
 
