@@ -384,7 +384,7 @@ export function BackgroundCheckReviewPanel() {
       )}
 
       <h3>Why isn&apos;t this person matched?</h3>
-      <form onSubmit={(event) => void runLookup(event)}>
+      <form className="filter-bar background-check-lookup-form" onSubmit={(event) => void runLookup(event)}>
         <label>
           <span className="sr-only">Name to look up</span>
           <input

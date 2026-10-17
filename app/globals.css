@@ -756,7 +756,8 @@ select:focus-visible {
 .page-intro h2,
 .checkin-hero h2,
 .section-heading h2,
-.panel h2 {
+.panel h2,
+.section-head h1 {
   margin: 0;
   color: var(--ink);
   font-weight: 700;
@@ -1075,6 +1076,7 @@ select:focus-visible {
 .section-heading { margin-bottom: 17px; }
 .section-heading h2,
 .panel h2 { font-size: 1.12rem; }
+.section-head h1 { font-size: 1.12rem; }
 
 .text-link {
   display: inline-flex;
@@ -2284,15 +2286,19 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .section-actions button:hover:not(:disabled),
 .field-actions button:hover:not(:disabled),
 .drag-handle:hover { border-color: #9dbbc7; background: var(--imsda-navy-soft); color: var(--imsda-navy); }
+/* Disabled reads as disabled by its flat grey fill and dashed edge, not by fading the label: an opacity of 0.35 left the label at
+   1.66:1 against its fill (the mobile layout audit holds a disabled button's label to 3:1). */
 .section-actions button:disabled,
-.field-actions button:disabled { cursor: not-allowed; opacity: 0.35; }
+.field-actions button:disabled,
+.drag-handle:disabled { border-style: dashed; background: #eef2f4; color: #5f7079; cursor: not-allowed; opacity: 1; }
 .section-actions button.danger,
 .field-actions button.danger { color: var(--coral); }
 .drag-handle { cursor: grab; }
 .drag-handle:active { cursor: grabbing; }
 .builder-section.dragging,
 .builder-field-card.dragging { border-color: var(--imsda-purple); opacity: 0.58; }
-.builder-fields { display: grid; padding: 0 12px; }
+/* One shrinkable column: a bare grid sizes its column to the widest field name and pushes the Actions menu out of the box. */
+.builder-fields { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 12px; }
 .builder-field-card { position: relative; border-bottom: 1px solid #e8eef0; background: white; }
 .builder-field-card:last-child { border-bottom: 0; }
 .field-module-row { display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 8px 0; }
@@ -2341,7 +2347,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .choice-description-editor > label > span { overflow-wrap: anywhere; color: var(--ink); font-size: max(var(--type-floor, 0px), 0.58rem); line-height: 1.4; text-transform: none; }
 .choice-description-editor textarea { min-height: 76px; }
 .money-input { display: flex; align-items: center; overflow: hidden; border: 1px solid var(--field-border); border-radius: 9px; background: #fbfcfd; }
-.money-input > b { padding-left: 8px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.62rem); }
+.money-input > b { padding: 0 6px 0 8px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.62rem); }
 .money-input > input { min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; }
 .field-settings .required-toggle { display: flex; align-items: center; align-self: end; flex-direction: row; padding: 7px 0; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.61rem); text-transform: none; }
 .required-toggle input { width: auto; accent-color: var(--imsda-purple); }
@@ -5370,7 +5376,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   background: var(--imsda-purple-soft);
   color: var(--imsda-purple);
 }
-.public-manage-help-card h2 { margin: 3px 0 7px; color: var(--ink); font-size: 1.03rem; }
+.public-manage-help-card h2 { margin: 3px 0 7px; color: var(--ink); font-size: 1.03rem; font-weight: 700; }
 .public-manage-help-card > p:not(.public-registration-eyebrow) {
   margin: 0;
   color: var(--muted);
@@ -7302,7 +7308,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .event-packet-sheet > header h1 { margin: 0; font-size: 1.45rem; }
 .event-packet-sheet > header > strong { border-radius: 999px; background: var(--imsda-navy-soft); padding: 7px 11px; font-size: max(var(--type-floor, 0px), 0.7rem); }
 .event-packet-sheet section { margin-top: 20px; }
-.event-packet-sheet section h2 { margin-bottom: 8px; font-size: max(var(--type-staff-floor, 0px), 0.83rem); }
+.event-packet-sheet section h2 { margin-bottom: 8px; font-size: max(var(--type-staff-floor, 0px), 0.83rem); font-weight: 700; }
 .event-packet-sheet table { width: 100%; border-collapse: collapse; font-size: max(var(--type-floor, 0px), 0.65rem); }
 .event-packet-sheet th,
 .event-packet-sheet td { border: 1px solid #dce5ea; padding: 7px 8px; text-align: left; vertical-align: top; }
@@ -8709,6 +8715,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .profile-account-actions .profile-back-links { margin: 0; }
 .profile-account-actions .secondary-button { min-height: 44px; }
 .profile-readonly-field { grid-column: 1 / -1; }
+.profile-readonly-field > .field-help { margin-top: 8px; }
+.background-check-lookup-form { margin-bottom: 12px; }
 .profile-readonly-field em { color: var(--muted); font-style: normal; font-weight: 400; }
 .profile-readonly-field input[readonly] { background: color-mix(in srgb, var(--muted) 10%, transparent); color: var(--muted); cursor: default; }
 .profile-details-form { display: grid; gap: 16px; }
@@ -11161,6 +11169,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .filter-bar-stack { display: grid; gap: 12px; }
 .filter-bar > label,
 .choice-filter-form.filter-bar > label,
+.filter-bar > .attendee-sort-phone > label,
 .filter-bar > .field-row {
   display: grid;
   gap: 6px;
@@ -11173,7 +11182,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 .filter-bar > label.checkbox-label,
 .choice-filter-form.filter-bar > label.checkbox-label { display: flex !important; flex: 0 0 auto; align-items: center; color: var(--ink) !important; font-weight: 500 !important; }
-.filter-bar > label :is(input:not([type="checkbox"], [type="radio"], [type="color"], [type="file"]), select) { width: 100%; max-width: 100%; }
+.filter-bar > label :is(input:not([type="checkbox"], [type="radio"], [type="color"], [type="file"]), select),
+.filter-bar > .attendee-sort-phone > label :is(input, select) { width: 100%; max-width: 100%; }
 .filter-group {
   display: flex;
   flex-wrap: wrap;
@@ -11199,7 +11209,16 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .choice-filter-form.filter-bar .attendee-sort-phone { display: none; }
 @media screen and (max-width: 600px) {
   .choice-filter-form.filter-bar .attendee-sort-phone { display: contents; }
-  .filter-bar > label { flex-basis: 100%; }
+  .filter-bar > label,
+  .filter-bar > .attendee-sort-phone > label { flex-basis: 100%; }
+}
+/* A field's focus outline reaches 4px past the field: a heading or help text right above or below it needs that room. */
+:is(h2, h3, h4) + :is(.filter-bar, .form-stack, .field-row) { margin-top: 10px; }
+/* A panel that is itself a form-stack (the issued-assets panels) already spaces its children with the grid gap: no extra default margins. */
+.panel.form-stack > :is(h2, h3, h4, p) { margin-block: 0; }
+/* The phone stack of .report-actions (440px and under) must win over .filter-bar's bottom alignment, so a field stretches full width. */
+@media (max-width: 440px) {
+  .report-actions.filter-bar { align-items: stretch; flex-direction: column; }
 }
 .calendar-filter-row.filter-bar { display: flex; }
 .calendar-filter-row.filter-bar > label { flex: 1 1 10rem; }

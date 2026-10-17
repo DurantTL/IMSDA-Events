@@ -584,6 +584,7 @@
   margin: 0 0 8px;
   color: var(--imsda-navy);
   font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .taskGroup summary {

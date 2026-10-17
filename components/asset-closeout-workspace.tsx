@@ -56,7 +56,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
   const deskHref = (attendeeId: string | null) => (attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
   const holder = (row: { holderLabel: string; deskAttendeeId: string | null }) => { const href = deskHref(row.deskAttendeeId); return href ? <a href={href}>{row.holderLabel}</a> : <>{row.holderLabel}</>; };
   const download = (section: string) => <p><a className="secondary-button report-download" href={csv(section)}>Download CSV</a></p>;
-  const issueTable = (title: string, rows: CloseoutRow[], section: string, empty: string) => <section className="panel">
+  const issueTable = (title: string, rows: CloseoutRow[], section: string, empty: string) => <section className="panel form-stack">
     <h3>{title} ({rows.length})</h3>
     {download(section)}
     {rows.length === 0 ? <p>{empty}</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
@@ -82,7 +82,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
     {report.truncated ? <p role="status">A list was cut short at its limit. Download the CSV and narrow the event before closing out.</p> : null}
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>{report.unresolvedCount === 0 ? "Nothing is unresolved" : `${report.unresolvedCount} unresolved`}</h3>
       {download("exceptions")}
       {report.exceptions.length === 0 ? <p>Every key and item is accounted for, every deposit is settled and no facility issue is open.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
@@ -100,7 +100,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       </table></div>}
     </section>
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Issued, returned and outstanding</h3>
       {download("summary")}
       <div className="table-wrap"><table role="table" className="report-table table-cards">
@@ -119,7 +119,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     {issueTable("Lost", report.lost, "lost", "Nothing was recorded lost.")}
     {issueTable("Returned damaged", report.damaged, "damaged", "Nothing came back damaged.")}
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Charges and waivers ({report.charges.length})</h3>
       {download("charges")}
       {report.charges.length === 0 ? <p>No charge has been recorded.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
@@ -137,7 +137,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       {canManageMoney ? null : <p>Waiving a charge needs finance or an event administrator.</p>}
     </section>
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Cash key deposits ({report.deposits.length})</h3>
       {download("deposits")}
       {report.deposits.length === 0 ? <p>No deposit has been recorded.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
@@ -151,7 +151,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       </table></div>}
     </section>
 
-    <section className="panel">
+    <section className="panel form-stack">
       <h3>Facility issues still open ({report.facility.length})</h3>
       {download("facility")}
       {report.facility.length === 0 ? <p>No facility issue is open.</p> : report.facility.map((issue) => <FacilityCard key={issue.id} issue={issue} staff={staff} canUpdate={canUpdateFacility} canConfigure={canConfigure} busy={busy} post={post} />)}
@@ -167,7 +167,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
 function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOST" | "DAMAGED" | "REPLACED"; onSubmit: (body: { action: "correct"; fate: string; reason: string } | { action: "write_off"; reason: string }) => Promise<void> }) {
   const [choice, setChoice] = useState(current === "REPLACED" ? "RETURNED" : "WRITE_OFF");
   const [reason, setReason] = useState("");
-  return <form onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }); }}>
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }); }}>
     <label>What happened <select value={choice} onChange={(event) => setChoice(event.target.value)}>
       <option value="RETURNED">{current === "LOST" ? "Found: it came back" : "It came back"}</option>
       <option value="LOST">Lost</option>
@@ -187,7 +187,7 @@ function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; de
   const [choice, setChoice] = useState("REVIEWED");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  return <form onSubmit={(event) => {
+  return <form className="form-stack" onSubmit={(event) => {
     event.preventDefault();
     if (reason.trim().length < 3) return;
     if (choice === "REFUND" && depositId) { const cents = Math.round(Number(amount) * 100); if (cents >= 1) void onRefund(depositId, cents, reason.trim()); } else void onReview(reason.trim());
@@ -204,7 +204,7 @@ function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; de
 
 function WaiveForm({ busy, onWaive }: { busy: boolean; onWaive: (reason: string) => Promise<void> }) {
   const [reason, setReason] = useState("");
-  return <form onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onWaive(reason.trim()); }}>
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onWaive(reason.trim()); }}>
     <label>Reason to waive <input value={reason} minLength={3} maxLength={500} required onChange={(event) => setReason(event.target.value)} /></label>
     <button className="secondary-button" type="submit" disabled={busy}>Waive</button>
   </form>;
@@ -224,12 +224,12 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
   const [lastNight, setLastNight] = useState("");
   const finishing = status === "RESOLVED" || status === "DISMISSED";
   const blocked = issue.block?.active ?? false;
-  return <article className="panel">
+  return <article className="panel form-stack">
     <h4>{issue.targetLabel}: {issue.title}</h4>
     <p>{issue.severity.toLowerCase()} severity, {issue.status === "OPEN" ? "open" : "in progress"}; reported {when(issue.reportedAt)}{issue.reportedByName ? ` by ${issue.reportedByName}` : ""}{issue.source === "CHECKOUT_INSPECTION" ? " at check-out" : ""}. {issue.assigneeName ? `Assigned to ${issue.assigneeName}.` : "Not assigned."}{issue.description ? ` ${issue.description}` : ""}</p>
     {issue.block ? <p role="status">{issue.block.active ? `Blocked (${holdKindLabels[issue.block.kind as keyof typeof holdKindLabels] ?? issue.block.kind}) ${issue.block.firstNight} to ${issue.block.lastNight}. People already placed were not moved.` : "Its block was released."}</p> : null}
     <details><summary>History ({issue.history.length})</summary><ul>{issue.history.map((entry, index) => <li key={index}>{when(entry.at)}: {entry.type.toLowerCase().replace("_", " ")}{entry.actorName ? ` by ${entry.actorName}` : ""}, {entry.status.toLowerCase().replace("_", " ")}, {entry.severity.toLowerCase()}{entry.note ? `: ${entry.note}` : ""}</li>)}</ul></details>
-    {canUpdate ? <form onSubmit={(event) => {
+    {canUpdate ? <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
       void post("facility", {
         action: "update", issueId: issue.id, ...(status !== issue.status ? { status } : {}), ...(severity !== issue.severity ? { severity } : {}),
@@ -243,7 +243,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
       {finishing ? <label>How it was resolved <input value={resolution} maxLength={500} required onChange={(event) => setResolution(event.target.value)} /></label> : null}
       <button className="secondary-button" type="submit" disabled={busy}>Save</button>
     </form> : null}
-    {canConfigure && issue.targetKind === "UNIT" && !blocked ? <form onSubmit={(event) => {
+    {canConfigure && issue.targetKind === "UNIT" && !blocked ? <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
       void post("facility", { action: "block", issueId: issue.id, block: { kind, reason: issue.title, firstNight, lastNight } }, "The room is blocked for those nights. Nobody already placed was moved.");
     }}>
