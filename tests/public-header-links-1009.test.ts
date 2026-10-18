@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }), unstable_rethrow: () => {} }));
 
 const mocks = vi.hoisted(() => ({
   getCurrentSession: vi.fn(),
@@ -116,6 +116,11 @@ describe("account header actions (#1009)", () => {
     expect(html).toContain('href="/admin"');
     expect(html).toContain("System management");
     expect(html).toContain("Sign out");
+  });
+
+  it("wires the mode to the button: a staff session's Sign out ends both sessions", () => {
+    expect(render({ hasStaffSession: true, isSystemAdmin: false }, "both")).toContain('data-sign-out="both"');
+    expect(render({ hasStaffSession: false, isSystemAdmin: false }, "attendee")).toContain('data-sign-out="attendee"');
   });
 
   it("shows no Sign out when the mode is none, but keeps the staff links", () => {

@@ -37,7 +37,7 @@ export function AttendeeSignOutButton({
   }
 
   return (
-    <button className={className} type="button" onClick={signOut} disabled={busy}>
+    <button className={className} data-sign-out={endStaffSession ? "both" : "attendee"} type="button" onClick={signOut} disabled={busy}>
       <LogOut aria-hidden="true" size={16} /> {busy ? "Signing out…" : label}
     </button>
   );
