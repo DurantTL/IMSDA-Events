@@ -179,7 +179,7 @@ async function queuePermissionRequest(
       "",
       ...input.people.map((person) => `- ${person.name} (${person.age})`),
       "",
-      "The team is registered. Please review and grant or decline permission:",
+      "The team is registered. Please review and approve or decline each person:",
       link,
       "",
       "IMSDA Events",
