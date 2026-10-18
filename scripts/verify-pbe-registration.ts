@@ -619,7 +619,7 @@ async function main() {
   assert(askedOnce.length === 1 && askedOnce[0]!.recipientEmail === `${P}-ac@example.test`.toLowerCase() && askedOnce[0]!.bodyTextSnapshot.includes("PbeTlt Eighteen (18)"), "the location's Area Coordinator is asked once, naming the person");
   assert(await prisma.auditLog.count({ where: { eventId, action: "CLUB_TEAM_PERMISSION_REQUESTED", entityId: flagRows[0]!.id, actorUserId: staffUserId } }) === 1, "the request is audited, with who acted");
   const pendingView = await club.getClubEventWorkspace(clubOf("e"), eventId, now, { teamKey: "flagged" });
-  assert(pendingView.registration?.permissionNotices.length === 1 && pendingView.registration.permissionNotices[0]!.text === "PbeTlt Eighteen is 18 or older. Team members 18 and over need permission from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.", "the director is told, in the agreed words, on the team page");
+  assert(pendingView.registration?.permissionNotices.length === 1 && pendingView.registration.permissionNotices[0]!.text === "PbeTlt Eighteen is 18 or older. Team members 18 and over need approval from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.", "the director is told, in the agreed words, on the team page");
   // Saving the team again with the same people asks nobody again.
   const editE = (teamKey: string, row: Awaited<ReturnType<typeof rowOf>>, selected: Array<[string, string]>) => ({
     clientRequestId: randomUUID(), expectedUpdatedAt: row.registration.updatedAt.toISOString(), selectedMemberIds: selected.map(([key]) => members.get(`e:${key}`)!),
@@ -642,7 +642,7 @@ async function main() {
   const grantAudit = await prisma.auditLog.findFirst({ where: { eventId, action: "CLUB_TEAM_PERMISSION_GRANTED", entityId: flagRows[0]!.id } });
   assert(grantAudit && JSON.stringify(grantAudit.metadata).includes(coordinatorId), "the decision is audited with who decided");
   const grantedView = await club.getClubEventWorkspace(clubOf("e"), eventId, now, { teamKey: "flagged" });
-  assert(grantedView.registration?.permissionNotices[0]?.text.includes("Permission granted"), "the director sees permission granted");
+  assert(grantedView.registration?.permissionNotices[0]?.text.includes("Approved by the Area Coordinator"), "the director sees the approval");
   const flaggedForm = await loadFilledTeamForm({ eventId, organizationId: clubOf("e"), teamKey: "flagged" });
   assert(flaggedForm?.model.filled?.members.some((name) => name === "PbeTlt Eighteen (AC permission: granted)"), "the printed form shows the permission as granted");
   assert(renderToStaticMarkup(createElement(TeamFormSheet, { model: flaggedForm!.model })).includes("AC permission: granted"), "and the rendered form carries it");
@@ -653,8 +653,8 @@ async function main() {
   await permissions.decideTeamPermission({ permissionId: secondFlag.id, decision: "DECLINED", actor: { userId: staffUserId }, scope: { eventId } });
   assert((await prisma.registrationAttendee.count({ where: { registrationId: second.registrationId } })) === 3, "a decline removes nobody");
   const declinedView = await club.getClubEventWorkspace(clubOf("e"), eventId, now, { teamKey: "second" });
-  assert(declinedView.registration?.permissionNotices[0]?.text.includes("declined permission"), "the director is shown the decline");
-  await expectCode(club.amendClubRegistration(clubOf("e"), eventId, actor, editE("second", second, [["tlt18b", "TLT"], ["u17b", "Pathfinder"], ["u17c", "Pathfinder"]]), now), "TEAM_RULES", "saving the team with the declined person still a team member is refused", ["declined permission for PbeTltB Eighteen"]);
+  assert(declinedView.registration?.permissionNotices[0]?.text.includes("did not approve"), "the director is shown the decline");
+  await expectCode(club.amendClubRegistration(clubOf("e"), eventId, actor, editE("second", second, [["tlt18b", "TLT"], ["u17b", "Pathfinder"], ["u17c", "Pathfinder"]]), now), "TEAM_RULES", "saving the team with the declined person still a team member is refused", ["did not approve PbeTltB Eighteen"]);
   await club.amendClubRegistration(clubOf("e"), eventId, actor, editE("second", await rowOf("e", "Second"), [["tlt18b", "Coach"], ["u17b", "Pathfinder"], ["u17c", "Pathfinder"]]), now);
   assert(await prisma.clubTeamMemberPermission.count({ where: { clubEventRegistrationId: second.id, active: true } }) === 0, "making the declined person a coach clears the flag (the decision is kept, inactive)");
   assert(await prisma.auditLog.count({ where: { eventId, action: "CLUB_TEAM_PERMISSION_CLEARED", entityId: secondFlag.id } }) === 1, "and audits that");
@@ -758,7 +758,7 @@ async function main() {
   currentUpdatedAt = (await prisma.registration.findUniqueOrThrow({ where: { id: soloAfter.registrationId } })).updatedAt;
   assert((attendeeOfPerson("y1") && ((await prisma.registrationAttendee.findUniqueOrThrow({ where: { id: attendeeOfPerson("y1").id } })).formResponses as { shirt_size?: string }).shirt_size === "M"), "a teammate's edit goes through although another team member's permission was declined");
   const ownEdit = await caught(selfService("tlt19"));
-  assert(ownEdit instanceof Error && (ownEdit as { code?: string }).code === "INVALID_ANSWER" && ownEdit.message.includes("declined permission for a team member on this team") && !ownEdit.message.includes("PbeFranTlt"), "the declined person's own edit is stopped, with a message that names nobody");
+  assert(ownEdit instanceof Error && (ownEdit as { code?: string }).code === "INVALID_ANSWER" && ownEdit.message.includes("did not approve a team member on this team") && !ownEdit.message.includes("PbeFranTlt"), "the declined person's own edit is stopped, with a message that names nobody");
   console.log("ok  a teammate's declined permission does not block someone else's own edit, but blocks the declined person's");
 
   // A staff-only confirmation: the same request from a club director's account is ignored, and the person-record match stays.

@@ -6,7 +6,7 @@ export const areaClubsNavItems: AccountNavItem[] = [
   { href: "/account/area-clubs/reports", label: "Monthly Records" },
   { href: "/account/area-clubs/points", label: "Points" },
   { href: "/account/area-clubs/events", label: "Club events" },
-  { href: "/account/area-clubs/team-permissions", label: "Team permissions" },
+  { href: "/account/area-clubs/team-permissions", label: "Team approvals" },
   { href: "/account/area-clubs/applications", label: "New clubs" },
 ];
 

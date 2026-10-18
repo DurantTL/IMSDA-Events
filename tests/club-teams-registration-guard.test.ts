@@ -118,7 +118,7 @@ describe("enforceTeamRegistrationRules (#809)", () => {
     mocks.syncTeamMemberPermissions.mockResolvedValue({ declined: [{ name: "Blake Two", tlt: false, attendeeId: "b" }], queuedMessageIds: [] });
     const people = [attendee("a", "Alex One", { age: 14 }), attendee("b", "Blake Two", { age: 18 })];
     const error = (await enforceTeamRegistrationRules(transaction({ attendees: people, roster: rosterOf("a", "b") }), "reg-1", { declineScope: "CHANGED_ONLY", changedAttendeeIds: new Set(["b"]) }).then(() => null, (caught: unknown) => caught)) as Error;
-    expect(error.message).toContain("declined permission for a team member on this team");
+    expect(error.message).toContain("did not approve a team member on this team");
     expect(error.message).not.toContain("Blake");
   });
 
