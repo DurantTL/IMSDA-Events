@@ -519,7 +519,9 @@ async function main() {
   const drilled = report.occupancyByUnit.flatMap((unit) => unit.nights.filter((entry) => entry.occupied > 0).map((entry) => entry.assignmentIds.length));
   assert(drilled.length > 0 && drilled.every((count) => count > 0), "every occupied unit-night drills to its assignments");
   assert(report.keyHandoff.length > 0 && report.keyHandoff.every((row) => row.arrival < row.departure && row.people > 0), "the key hand-off inputs list each room's arrival, departure and holder");
-  assert(!JSON.stringify(report).match(/@lodging\.example|555-0/), "no reports carry an email or a phone number");
+  // The planted phones are 555-02NN. Match them only as a whole number: a bare "555-0" also matched inside random ids
+  // (hex digits joined by hyphens), which failed this check at random.
+  assert(!JSON.stringify(report).match(/@lodging\.example|(?<![0-9a-f-])555-02\d\d(?![0-9a-f])/i), "no reports carry an email or a phone number");
   assert(report.rooming.some((group) => group.placeKey.startsWith("bucket:")), "the rooming list includes housing arranged elsewhere");
   assert(report.unassigned.length > 0 && report.unassigned.every((row) => row.kind === "UNASSIGNED") && report.unassigned.some((row) => row.title.includes(lonely.people[0]!.first)), "the unassigned report names someone who is not placed");
 
