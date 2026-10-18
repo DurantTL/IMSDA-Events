@@ -11999,3 +11999,16 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* An empty state's title can be an h2 or h4 where the page's outline needs it (#1004); it looks like the usual h3 one. */
 .empty-state > :is(h2, h4) { margin: 10px 0 3px; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.86rem); }
 @media screen { .empty-state > :is(h2, h4) { font-size: 1rem; } }
+
+/* Roster section headings (Staff, Members, …) stand out from the people rows, so it is easy to see where one
+   section ends and the next begins. The same band in every layout: table, phone cards and tablet cards. The tint is
+   translucent so a scrolling table's edge cue still shows through it. The navy edge is an inset shadow, not a border, so
+   the table keeps its row divider and a scrolling box never clips the edge; the rounding shows only in the card layouts. */
+.roster-section-row > th.roster-section-heading.roster-section-heading {
+  border-radius: 6px;
+  box-shadow: inset 4px 0 0 var(--imsda-navy);
+  background: rgba(0, 59, 92, 0.09);
+  padding: 9px 12px;
+  color: var(--imsda-navy);
+  font-weight: 800;
+}
