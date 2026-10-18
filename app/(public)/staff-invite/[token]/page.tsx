@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 type PageProps = { params: Promise<{ token: string }> };
 
 export const metadata: Metadata = {
-  title: "Your registration link",
+  title: "Staff invitation",
   robots: { index: false, follow: false },
 };
 
@@ -43,7 +43,7 @@ export default async function StaffInvitePage({ params }: PageProps) {
   const experience = await getInvitationExperience(token);
   if (experience.state === "UNAVAILABLE") {
     return (
-      <StateCard eyebrow="Registration link" heading="This link isn't available">
+      <StateCard eyebrow="Staff invitation" heading="This link isn't available">
         <p>{INVITATION_UNAVAILABLE_MESSAGE}</p>
       </StateCard>
     );

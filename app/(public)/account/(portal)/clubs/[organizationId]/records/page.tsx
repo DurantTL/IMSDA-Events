@@ -136,13 +136,13 @@ export default async function ClubRecordsPage({
                       : candidateLocked ? `Missing · was due ${candidateDue}` : `Due ${candidateDue}`}
                   </small>
                 </span>
-                <Link
-                  aria-current={candidate === month ? "page" : undefined}
-                  className={`${candidate === month ? "primary-button" : "secondary-button"} club-event-action`}
-                  href={`${recordsBase}?month=${candidate}`}
-                >
-                  {candidate === month ? "Viewing" : closed ? "View" : "Open"} <ArrowRight size={14} aria-hidden="true" />
-                </Link>
+                {candidate === month
+                  ? <span aria-current="page" className="count-badge records-viewing-badge">Viewing</span>
+                  : (
+                    <Link className="secondary-button club-event-action" href={`${recordsBase}?month=${candidate}`}>
+                      {closed ? "View" : "Open"} <ArrowRight size={14} aria-hidden="true" />
+                    </Link>
+                  )}
               </li>
             );
           })}

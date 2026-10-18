@@ -92,7 +92,12 @@ export function AttendeeRegistrationContactForm({
 
   return (
     <details className="public-manage-contact-card">
-      <summary>Update registration contact</summary>
+      <summary>
+        Update registration contact
+        <small className="public-manage-contact-current" translate="no">
+          {[`${contact.firstName} ${contact.lastName}`.trim(), contact.email].filter(Boolean).join(" · ")}
+        </small>
+      </summary>
       <form onSubmit={save}>
         <p>A fresh emailed code is required. It works only in this signed-in session.</p>
         <div className="public-manage-contact-grid">

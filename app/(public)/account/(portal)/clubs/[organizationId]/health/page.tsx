@@ -8,6 +8,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { clubLeaderHealthViewerFromAccess } from "@/modules/coordinator-health/access";
 import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { formatCalendarDate } from "@/modules/club-registrations/domain";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export default async function ClubHealthPage({
             {events.map((event) => (
               <li key={event.id}>
                 <a href={`${base}?event=${encodeURIComponent(event.id)}`}><strong>{event.name}</strong></a>
-                <small> available through {event.availableThrough}</small>
+                <small> available through {formatCalendarDate(event.availableThrough)}</small>
               </li>
             ))}
           </ul>
@@ -65,7 +66,7 @@ export default async function ClubHealthPage({
   return (
     <>
       <h2>{data.event.name}</h2>
-      <p className="inline-notice" role="status">Your club only. Available through {data.event.availableThrough}. This view is recorded.</p>
+      <p className="inline-notice" role="status">Your club only. Available through {formatCalendarDate(data.event.availableThrough)}. This view is recorded.</p>
       {sheet
         ? <PrintReportButton label="Print confidential sheet" />
         : <a className="secondary-button" href={`${base}?event=${encodeURIComponent(data.event.id)}&sheet=1`}>Open printable sheet</a>}
