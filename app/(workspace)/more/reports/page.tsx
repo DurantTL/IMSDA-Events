@@ -71,8 +71,8 @@ function CountFields({
             </div>
             <span>{displayCount(field.total)} total</span>
           </div>
-          <div className="report-table-wrap">
-            <table role="table" className="report-table table-cards">
+          <div className="report-table-wrap card-box">
+            <table role="table" className="report-table table-cards table-cards-compact">
               <caption className="sr-only">{field.label} counts</caption>
               <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Choice or quantity</th><th role="columnheader" scope="col">Count</th></tr></thead>
               <tbody role="rowgroup">
@@ -103,8 +103,8 @@ function SeminarFields({ fields }: { fields: OperationalSeminarField[] }) {
             </div>
             <span>{displayCount(field.totalInterest)} choices</span>
           </div>
-          <div className="report-table-wrap">
-            <table role="table" className="report-table seminar-table table-cards">
+          <div className="report-table-wrap card-box">
+            <table role="table" className="report-table seminar-table table-cards table-cards-compact">
               <caption className="sr-only">{field.label} ranked interest</caption>
               <thead role="rowgroup">
                 <tr role="row"><th role="columnheader" scope="col">Option</th><th role="columnheader" scope="col">1st</th><th role="columnheader" scope="col">2nd</th><th role="columnheader" scope="col">Total interest</th></tr>
@@ -280,8 +280,8 @@ export default async function OperationalReportsPage({
                     <div><h3>{group.label}</h3><p>{group.fieldLabel ? `Grouped by ${group.fieldLabel}` : "No group answer found"}</p></div>
                     <span>{group.attendees.length} {group.attendees.length === 1 ? "person" : "people"}</span>
                   </header>
-                  <div className="report-table-wrap">
-                    <table role="table" className="report-table roster-table table-cards">
+                  <div className="report-table-wrap card-box">
+                    <table role="table" className="report-table roster-table table-cards table-cards-compact">
                       <caption className="sr-only">Attendees in {group.label}</caption>
                       <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Type</th><th role="columnheader" scope="col">Registration</th><th role="columnheader" scope="col">Account holder</th></tr></thead>
                       <tbody role="rowgroup">
@@ -318,8 +318,8 @@ export default async function OperationalReportsPage({
                     <div><h3>{group.label}</h3><p>{/teen/i.test(group.label) ? "Teen Program roster" : "Attendee type"}</p></div>
                     <span>{group.attendees.length} {group.attendees.length === 1 ? "person" : "people"}</span>
                   </header>
-                  <div className="report-table-wrap">
-                    <table role="table" className="report-table roster-table table-cards">
+                  <div className="report-table-wrap card-box">
+                    <table role="table" className="report-table roster-table table-cards table-cards-compact">
                       <caption className="sr-only">{group.label} attendees</caption>
                       <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Group</th><th role="columnheader" scope="col">Registration</th><th role="columnheader" scope="col">Account holder</th></tr></thead>
                       <tbody role="rowgroup">
@@ -417,8 +417,8 @@ export default async function OperationalReportsPage({
           </header>
           {report.volunteerRoster.length === 0
             ? <EmptyReport>No one has said yes to a volunteer question yet.</EmptyReport>
-            : <div className="report-table-wrap">
-                <table role="table" className="report-table roster-table table-cards">
+            : <div className="report-table-wrap card-box">
+                <table role="table" className="report-table roster-table table-cards table-cards-compact">
                   <caption className="sr-only">Volunteers</caption>
                   <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Volunteer</th><th role="columnheader" scope="col">Answer</th><th role="columnheader" scope="col">Phone</th><th role="columnheader" scope="col">Group</th><th role="columnheader" scope="col">Registration</th></tr></thead>
                   <tbody role="rowgroup">

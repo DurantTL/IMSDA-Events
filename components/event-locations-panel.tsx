@@ -177,8 +177,8 @@ export function EventLocationsPanel({
                 </small>
               </span>
               <span className="event-location-actions row-actions">
-                <button aria-label={`Move ${location.name} up`} className="secondary-button" disabled={busy || index === 0} onClick={() => void move(index, -1)} type="button"><ArrowUp aria-hidden="true" size={14} /></button>
-                <button aria-label={`Move ${location.name} down`} className="secondary-button" disabled={busy || index === locations.length - 1} onClick={() => void move(index, 1)} type="button"><ArrowDown aria-hidden="true" size={14} /></button>
+                <button aria-label={`Move ${location.name} up`} className="secondary-button" title="Move up" disabled={busy || index === 0} onClick={() => void move(index, -1)} type="button"><ArrowUp aria-hidden="true" size={14} /></button>
+                <button aria-label={`Move ${location.name} down`} className="secondary-button" title="Move down" disabled={busy || index === locations.length - 1} onClick={() => void move(index, 1)} type="button"><ArrowDown aria-hidden="true" size={14} /></button>
                 <button
                   className="secondary-button"
                   disabled={busy}

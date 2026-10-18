@@ -129,7 +129,7 @@ describe("content block editor (#816)", () => {
     expect(moveSection(drafts, 0, 1)).toBe(drafts);
     const markup = render(true, [section("HERO", "Banner", { data: { assetId: "a1", alt: "x" } }), section("RICH_TEXT", "About")]);
     // Only the second block has move-up and move-down buttons (icon buttons named by their aria-label, #997).
-    expect((markup.match(/aria-label="Move section up: /g) ?? []).length).toBe(1);
-    expect((markup.match(/aria-label="Move section down: /g) ?? []).length).toBe(1);
+    expect((markup.match(/aria-label="Move section \d+ up: /g) ?? []).length).toBe(1);
+    expect((markup.match(/aria-label="Move section \d+ down: /g) ?? []).length).toBe(1);
   });
 });

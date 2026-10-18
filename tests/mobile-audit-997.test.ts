@@ -19,6 +19,8 @@ describe("#997 wide-table audit rule", () => {
   it("lets a table scroll only with an opted-in box that draws a gradient edge cue", () => {
     expect(script).toContain('box.hasAttribute("data-scroll-cue")');
     expect(script).toContain('style.backgroundImage.includes("gradient")');
+    expect(script).toContain('box.classList.contains("scroll-cue")');
+    expect(script).toContain("paint a solid background over the scroll cue");
     expect(script).toContain("the box clips it, so the columns past the edge cannot be reached");
   });
 
@@ -39,7 +41,10 @@ describe("#997 shared layout CSS", () => {
 
   it("lets the staff column fill the room beside the sidebar, up to a maximum", () => {
     expect(css).toContain(".workspace-content { max-width: 1600px; }");
-    expect(css).toContain("--sidebar-width: 224px;");
+    // The sidebar keeps its width; tables decide cards or scroll by their own box (a container query), not the viewport.
+    expect(css).not.toContain("--sidebar-width: 224px");
+    expect(css).toContain(".card-box { container-type: inline-size; }");
+    expect(css).toContain("@container (max-width: 760px)");
   });
 
   it("keeps ordinary words whole in cards: break-word, with anywhere only for emails and codes", () => {

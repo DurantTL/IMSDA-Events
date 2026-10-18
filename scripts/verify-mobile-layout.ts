@@ -1573,11 +1573,26 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
       const style = getComputedStyle(box);
       const scrolls = /(auto|scroll)/.test(style.overflowX);
       const optedIn = box.hasAttribute("data-scroll-cue");
-      const drawn = style.backgroundImage.includes("gradient");
+      // The shadow is the scroll-cue class's gradients, or a box that draws its own with both a scrolling and a local attachment.
+      const attachment = style.backgroundAttachment;
+      const drawn = style.backgroundImage.includes("gradient")
+        && (box.classList.contains("scroll-cue") || (attachment.includes("scroll") && attachment.includes("local")));
+      const alphaOf = (color: string) => {
+        const match = /rgba?\(([^)]+)\)/.exec(color);
+        if (!match) return 1;
+        const parts = match[1]!.split(/[ ,/]+/).filter(Boolean);
+        return parts.length >= 4 ? Number(parts[3]) : 1;
+      };
       const detail = `${describe(table)} is ${box.scrollWidth}px wide in a ${box.clientWidth}px box (${describe(box)})`;
       if (!scrolls) wideTables.push(`${detail}: the box clips it, so the columns past the edge cannot be reached`);
       else if (!optedIn) wideTables.push(`${detail}: it scrolls sideways with no scroll cue (add data-scroll-cue and the scroll-cue class) or it should fit`);
-      else if (!drawn) wideTables.push(`${detail}: data-scroll-cue is set but no edge fade or shadow is drawn`);
+      else if (!drawn) wideTables.push(`${detail}: data-scroll-cue is set but no edge fade or shadow is drawn (the box needs the scroll-cue class)`);
+      else {
+        // The shadow sits behind the table: a cell that paints a solid background over it hides it.
+        const covering = Array.from(table.querySelectorAll("tbody tr:nth-child(-n+5) > *, thead th"))
+          .filter((cell) => alphaOf(getComputedStyle(cell).backgroundColor) > 0.5);
+        if (covering.length > 0) wideTables.push(`${detail}: ${covering.length} cell(s) such as ${describe(covering[0]!)} paint a solid background over the scroll cue, so the shadow cannot show`);
+      }
     }
   }
 

@@ -21,6 +21,9 @@ export type AccountNavItem = {
   hideGroupLabel?: boolean;
 };
 
+/** Room kept clear on a scrolled edge of the tab row for its arrow button and fade (px); the CSS scroll-padding matches it. */
+const SCROLL_CLEARANCE = 46;
+
 export function isAccountNavItemActive(pathname: string, item: AccountNavItem) {
   if (pathname === item.href) return true;
   if (item.alsoMatchPrefix && pathname.startsWith(item.alsoMatchPrefix)) return true;
@@ -59,16 +62,22 @@ export function AccountSectionNav({
       const currentBox = current.getBoundingClientRect();
       const offset = currentBox.left - listBox.left + list.scrollLeft;
       const centred = Math.max(0, offset - (list.clientWidth - currentBox.width) / 2);
-      // Start the row on a tab's own edge, never partway through a word (#997): the first tab edge at or after the
-      // centred position that still leaves the current tab whole, else the last edge before it.
-      const stops = Array.from(list.children).map((child) => child.getBoundingClientRect().left - listBox.left + list.scrollLeft);
+      // Open the row on a tab's own edge, never partway through a word (#997), with the current tab whole and clear of the
+      // scroll arrows and fades on each side that has more tabs beyond it. Only tab edges (and the very start) are candidates.
       const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
-      const fits = (stop: number) => stop <= offset + 1 && stop + list.clientWidth >= offset + currentBox.width - 1;
-      const after = stops.find((stop) => stop >= centred - 1 && stop <= maxScroll + 1 && fits(stop));
-      const before = [...stops].reverse().find((stop) => stop <= centred + 1 && stop <= maxScroll + 1 && fits(stop));
-      const start = after ?? before ?? centred;
-      // Leave room on the left for the scroll arrow, so it never sits over the first tab's name.
-      list.scrollLeft = start > 0 ? Math.max(0, start - 34) : 0;
+      const stops = Array.from(list.children).map((child) => child.getBoundingClientRect().left - listBox.left + list.scrollLeft);
+      const candidates = [0, ...stops.map((stop) => stop - SCROLL_CLEARANCE)]
+        .map((position) => Math.min(Math.max(0, position), maxScroll));
+      const clear = (position: number) => {
+        const left = position > 1 ? SCROLL_CLEARANCE : 0;
+        const right = position + list.clientWidth < list.scrollWidth - 1 ? SCROLL_CLEARANCE : 0;
+        return offset >= position + left - 1 && offset + currentBox.width <= position + list.clientWidth - right + 1;
+      };
+      const wholeEdge = (position: number) => position === 0 || position === maxScroll || stops.some((stop) => Math.abs(stop - SCROLL_CLEARANCE - position) < 1);
+      const best = candidates
+        .filter((position) => clear(position) && wholeEdge(position))
+        .sort((x, y) => Math.abs(x - centred) - Math.abs(y - centred))[0];
+      list.scrollLeft = best ?? Math.min(maxScroll, Math.max(0, offset - SCROLL_CLEARANCE));
     }
     const setFade = (name: "fadeStart" | "fadeEnd", on: boolean) => {
       const value = String(on);
@@ -99,6 +108,14 @@ export function AccountSectionNav({
     };
   }, [pathname, items]);
 
+  // The arrows scroll the row by most of its width; the row then snaps to a tab edge.
+  const scrollTabs = (direction: 1 | -1) => {
+    const list = listRef.current;
+    if (!list) return;
+    const smooth = typeof window.matchMedia === "function" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    list.scrollBy({ left: direction * Math.max(120, list.clientWidth - 2 * SCROLL_CLEARANCE), behavior: smooth ? "smooth" : "auto" });
+  };
+
   const groupIdBase = useId();
   // Consecutive items sharing a group become one section; ungrouped items stay top level.
   const sections: Array<{ group?: string; items: AccountNavItem[] }> = [];
@@ -117,6 +134,13 @@ export function AccountSectionNav({
 
   return (
     <nav aria-label={label} className={`account-nav account-nav-${variant}`} ref={navRef}>
+      <button
+        aria-label="Scroll tabs left"
+        className="account-nav-arrow account-nav-arrow-start"
+        onClick={() => scrollTabs(-1)}
+        title="Scroll tabs left"
+        type="button"
+      ><span aria-hidden="true">{"\u2039"}</span></button>
       <ul ref={listRef}>
         {sections.map((section, index) =>
           section.group ? (
@@ -135,6 +159,13 @@ export function AccountSectionNav({
           ),
         )}
       </ul>
+      <button
+        aria-label="Scroll tabs right"
+        className="account-nav-arrow account-nav-arrow-end"
+        onClick={() => scrollTabs(1)}
+        title="Scroll tabs right"
+        type="button"
+      ><span aria-hidden="true">{"\u203A"}</span></button>
     </nav>
   );
 }

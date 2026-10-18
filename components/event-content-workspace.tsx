@@ -171,7 +171,7 @@ function LinksEditor({
                         })} />
                       )}
                     </label>
-                    <button aria-label={`Remove link ${linkIndex + 1}`} className="secondary-button icon-only" type="button" onClick={() => updateSection(index, {
+                    <button aria-label={`Remove link ${linkIndex + 1} from ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" title={`Remove link ${linkIndex + 1}`} type="button" onClick={() => updateSection(index, {
                       links: section.links.filter((_, position) => position !== linkIndex),
                     })}>
                       <Trash2 size={15} aria-hidden="true" />
@@ -220,7 +220,8 @@ function ItemsEditor({
           <button
             className="secondary-button icon-only"
             type="button"
-            aria-label={`Remove ${isSteps ? "step" : "item"} ${position + 1}`}
+            title={`Remove ${isSteps ? "step" : "item"} ${position + 1}`}
+            aria-label={`Remove ${isSteps ? "step" : "item"} ${position + 1} from ${section.title || kindLabels[section.kind]}`}
             onClick={() => updateSection(index, { items: items.filter((_, at) => at !== position) })}
           >
             <Trash2 size={15} aria-hidden="true" />
@@ -587,13 +588,14 @@ export function EventContentWorkspace({
               <div className="icon-button-row">
                 {section.kind !== "HERO" && (
                   <>
-                    <button aria-label={`Move section up: ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" type="button" onClick={() => move(index, -1)} disabled={!canMoveSection(sections, index, -1)}><ArrowUp aria-hidden="true" size={16} /></button>
-                    <button aria-label={`Move section down: ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" type="button" onClick={() => move(index, 1)} disabled={!canMoveSection(sections, index, 1)}><ArrowDown aria-hidden="true" size={16} /></button>
+                    <button aria-label={`Move section ${index + 1} up: ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" title="Move section up" type="button" onClick={() => move(index, -1)} disabled={!canMoveSection(sections, index, -1)}><ArrowUp aria-hidden="true" size={16} /></button>
+                    <button aria-label={`Move section ${index + 1} down: ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" title="Move section down" type="button" onClick={() => move(index, 1)} disabled={!canMoveSection(sections, index, 1)}><ArrowDown aria-hidden="true" size={16} /></button>
                   </>
                 )}
                 <button
-                  aria-label={`Remove section: ${section.title || kindLabels[section.kind]}`}
+                  aria-label={`Remove section ${index + 1}: ${section.title || kindLabels[section.kind]}`}
                   className="secondary-button icon-only"
+                  title="Remove section"
                   type="button"
                   onClick={() => setRemoveSectionIndex(index)}
                   disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}

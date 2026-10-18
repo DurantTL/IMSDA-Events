@@ -58,7 +58,7 @@ export function AreaClubSearch({ basePath, clubYear, query, sort, shown, total, 
 export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string }) {
   if (clubs.length === 0) return <p className="report-empty">{noClubsText(query)}</p>;
   return (
-    <div className="report-table-wrap">
+    <div className="report-table-wrap card-box">
       <table role="table" className="report-table table-cards table-cards-tablet">
         <caption className="sr-only">Club overview for {clubYear}</caption>
         <thead role="rowgroup">

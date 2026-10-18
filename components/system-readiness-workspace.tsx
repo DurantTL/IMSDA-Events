@@ -126,6 +126,7 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
                       </span>
                       {!isOpen && readiness.ticksAvailable ? (
                         <button
+                          aria-label={`${item.tick ? "Untick" : "Tick"}: ${item.title}`}
                           className={`secondary-button ${styles.tickButton}`}
                           type="button"
                           onClick={() => {

@@ -91,7 +91,7 @@ export function TagConfigurationWorkspace({
         >
           Tags are labels staff apply to registrations and attendees, such as VIP or Needs ride. Add one below and it appears on the registrations list.
         </EmptyState>
-      ) : <div className="table-wrap"><table className="editable-settings-table"><thead><tr><th>Color</th><th>Name</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>{tags.map((row) => <tr key={row.id}>
+      ) : <div className="table-wrap scroll-cue" data-scroll-cue><table className="editable-settings-table"><thead><tr><th>Color</th><th>Name</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>{tags.map((row) => <tr key={row.id}>
         <td data-label="Color"><input aria-label={`Color for ${row.name}`} type="color" value={row.color} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, color: event.target.value } : candidate))} /></td>
         <td data-label="Name"><input aria-label={`Name for ${row.name}`} value={row.name} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, name: event.target.value } : candidate))} /></td>
         <td data-label="Description"><input aria-label={`Description for ${row.name}`} value={row.description} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, description: event.target.value } : candidate))} /></td>

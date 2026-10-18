@@ -56,7 +56,7 @@ describe("tables that became phone cards (#447)", () => {
   });
 
   it("the club honors table is table-cards with labelled cells and the member as row header", () => {
-    expect(honors).toContain('className="report-table table-cards table-cards-corner honors-table" data-fit-width role="table"');
+    expect(honors).toContain('className="report-table table-cards table-cards-corner table-cards-compact honors-table" data-fit-width role="table"');
     expect(honors).toContain('cardCell("Current class")');
     expect(honors).toContain('cardCell("Honors")');
     expect(honors).toContain('<th role="rowheader" scope="row"><strong translate="no">');

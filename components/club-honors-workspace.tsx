@@ -355,9 +355,9 @@ export function ClubHonorsWorkspace({
         {emptyState === "NO_MEMBERS" || emptyState === "NO_MATCH" ? (
           <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
         ) : (
-          <div className="report-table-wrap">
+          <div className="report-table-wrap card-box">
             <SortOrderNote>{sortOrderText(nameSortLabel, nameDirection)}</SortOrderNote>
-            <table aria-labelledby="club-honors-heading" className="report-table table-cards table-cards-corner honors-table" data-fit-width role="table">
+            <table aria-labelledby="club-honors-heading" className="report-table table-cards table-cards-corner table-cards-compact honors-table" data-fit-width role="table">
               <thead role="rowgroup">
                 <tr role="row">
                   <SortableHeader active className="honors-col-name" direction={nameDirection} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />
