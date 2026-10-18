@@ -10960,10 +10960,11 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .honors-summary-text { display: grid; gap: 2px; min-width: 0; }
 .honors-summary-text small { color: var(--muted, #5a5a66); overflow-wrap: anywhere; }
 .honors-summary-view { min-height: 36px; white-space: nowrap; }
+.honors-summary-filter { color: var(--ink, inherit); font-weight: 600; }
 .honors-summary-none { color: var(--muted, #5a5a66); }
 @media (max-width: 600px) { .honors-summary-view { min-height: 44px; min-width: 44px; } }
-/* The Honors page table: fixed column widths from 601px up, so one long pill can never widen the table
-   (768-1024px included). The pill list fills its column and long names are cut inside their pill. */
+/* The Honors page table: fixed column widths from 601px up, so one long honor name or date can never widen the table
+   (768-1024px included). The Honors column holds a count summary and a View button. */
 .honors-table { min-width: 34rem; }
 @media screen and (min-width: 601px) {
   .honors-table { table-layout: fixed; width: 100%; }
