@@ -8335,7 +8335,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 }
 @media print {
   .account-nav, .account-portal .public-registration-header, .account-portal .account-page-hero,
-  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .tab-chips, .honor-seat-override { display: none !important; }
+  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .honor-roster-tabs, .team-level-tabs, .honor-seat-override { display: none !important; }
   .club-schedule { border: 0; box-shadow: none; padding: 0; }
   .honor-class-sheet { break-before: page; }
   .report-table td.honor-roster-box { border: 1px solid #555; }
@@ -11938,29 +11938,35 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (max-width: 768px) { .tab-chips > :is(a, button) { min-height: var(--touch-target, 44px); } }
 
 /* --- Stat tiles never leave one tile alone on a row (#1004) ---------------------
-   Tile grids change their column count as the screen narrows. Where a grid is two
-   across, an odd last tile spans the row; where it is three across, a last tile that
-   would sit alone does the same. Grids with four or eight tiles use four or two
-   columns, so they split evenly (Sterling Volunteers: 4, reports: 8). */
-@media (max-width: 1120px) {
+   Screen only: print keeps its own fixed five-column report row. Tile grids change their
+   column count as the screen narrows. Whatever the count, a last tile that would sit alone on
+   its row spans the row (the last child of a grid N columns wide is alone when it is child
+   Nk+1). Grids with four or eight tiles also pick four or two columns so they split evenly
+   (Sterling Volunteers: 4, reports: 8), and three tiles get three columns. */
+@media screen and (min-width: 1121px) {
+  .report-summary-grid:has(> :nth-child(4):last-child), .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .report-summary-grid:has(> :nth-child(3):last-child), .finance-summary:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Five across by default: 6 tiles would be 5 + 1, 11 would be 5 + 5 + 1. */
+  .report-summary-grid > :last-child:nth-child(5n + 1) { grid-column: 1 / -1; }
+  /* Four across: the metric grid and the finance summary. */
+  :is(.metric-grid, .finance-summary) > :last-child:nth-child(4n + 1) { grid-column: 1 / -1; }
+}
+@media screen and (max-width: 1120px) {
+  /* Two across. */
   :is(.metric-grid, .finance-summary) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .report-summary-grid:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .report-summary-grid > :nth-child(7):last-child { grid-column: 1 / -1; }
+  /* Three across (the default here): 7 tiles would be 3 + 3 + 1, 10 would be 3 + 3 + 3 + 1. A lone fourth tile is the 2 x 2 grid. */
+  .report-summary-grid > :last-child:nth-child(3n + 1):not(:nth-child(4)) { grid-column: 1 / -1; }
 }
-@media (max-width: 900px) {
+@media screen and (max-width: 900px) {
   .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 720px) {
+@media screen and (max-width: 720px) {
   .report-summary-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
-@media (max-width: 440px) {
+@media screen and (max-width: 440px) {
   .report-summary-grid > :last-child { grid-column: auto; }
-}
-@media (min-width: 1121px) {
-  .report-summary-grid:has(> :nth-child(4):last-child), .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .report-summary-grid:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .finance-summary:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* --- Roster cards: the actions sit in the card header (#1004) -------------------
@@ -11983,3 +11989,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-facts > ul { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--text-helper-min); font-weight: 600; }
 .public-event-facts > ul > li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .public-event-facts svg { flex: 0 0 auto; margin-top: 1px; color: var(--imsda-purple); }
+
+.public-event-facts > .public-event-facts-name { color: var(--imsda-navy); font-size: 1.1rem; font-weight: 800; }
+.auto-info-header > .auto-info-name { margin: 4px 0; color: var(--imsda-navy); font-size: 1.2rem; font-weight: 800; }
+
+/* An empty state's title can be an h2 or h4 where the page's outline needs it (#1004); it looks like the usual h3 one. */
+.empty-state > :is(h2, h4) { margin: 10px 0 3px; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.86rem); }
+@media screen { .empty-state > :is(h2, h4) { font-size: 1rem; } }

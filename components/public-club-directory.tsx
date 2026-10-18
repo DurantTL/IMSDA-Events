@@ -76,7 +76,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
       </label>
 
       {clubs.length === 0 ? (
-        <EmptyState className="empty-state panel" icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Check back soon.</EmptyState>
+        <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Check back soon.</EmptyState>
       ) : (
         <div className={styles.content}>
           {anyMappable && (
@@ -85,7 +85,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
 
           <ul className={styles.list}>
             {filtered.length === 0 ? (
-              <li><EmptyState className="empty-state panel" icon={<Search aria-hidden="true" size={26} />} title={`No clubs match “${query}”`}>Try a different town or ZIP.</EmptyState></li>
+              <li><EmptyState announce={false} className="empty-state panel" headingLevel={2} icon={<Search aria-hidden="true" size={26} />} title={`No clubs match “${query}”`}>Try a different town or ZIP.</EmptyState></li>
             ) : (
               filtered.map((club) => {
                 const isSelected = selectedId === club.id;

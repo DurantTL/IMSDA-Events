@@ -438,10 +438,13 @@ export function ClubOrderWorkspace({
               <button aria-describedby={disabledHintId(handedOutBlocked, "club-order-handed-out-hint")} className="primary-button" disabled={busy || handedOut.size === 0} onClick={markAlreadyHandedOut} type="button">
                 <CheckCircle2 aria-hidden="true" size={16} /> Already handed out{handedOut.size > 0 ? ` (${handedOut.size})` : ""}
               </button>
-              <button className="text-button" onClick={dismissPrompt} type="button">Not now</button>
             </div>
             <DisabledHint id="club-order-handed-out-hint" reason={handedOutBlocked} />
           </details>
+          {/* Outside the closed list, so the prompt can be dismissed without opening it. */}
+          <div className={styles.actions}>
+            <button className="text-button" onClick={dismissPrompt} type="button">Not now</button>
+          </div>
         </section>
       )}
 

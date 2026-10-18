@@ -39,7 +39,7 @@ export default async function ClubHealthPage({
     return (
       <>
         <p className="inline-notice" role="status">Confidential. Each event is available through its last day, and every time you open or print one it is recorded.</p>
-        {events.length === 0 ? <EmptyState className="empty-state panel" icon={<HeartPulse aria-hidden="true" size={26} />} title="No health information is open">No event your club registered for is open for health information.</EmptyState> : (
+        {events.length === 0 ? <EmptyState className="empty-state panel" headingLevel={2} icon={<HeartPulse aria-hidden="true" size={26} />} title="No health information is open">No event your club registered for is open for health information.</EmptyState> : (
           <ul className="account-overview-list">
             {events.map((event) => (
               <li key={event.id}>

@@ -98,7 +98,7 @@ export default async function HonorRostersPage({
         </p>
       </div>
 
-      <nav className="tab-chips" aria-label="Roster view">
+      <nav className="tab-chips honor-roster-tabs" aria-label="Roster view">
         <Link aria-current={view === "classes" ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}`}>Classes ({classRosters.length})</Link>
         <Link aria-current={view === "site" ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=site`}>Site roster ({siteRoster.totals.total})</Link>
         <Link aria-current={view === "clubs" ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>Club schedules ({data.clubs.length})</Link>
@@ -259,7 +259,7 @@ export default async function HonorRostersPage({
       {view === "clubs" && (
         <>
           {data.clubs.length > 1 && (
-            <nav className="tab-chips" aria-label="Choose club">
+            <nav className="tab-chips honor-roster-tabs" aria-label="Choose club">
               <Link aria-current={!query.club ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>All clubs</Link>
               {data.clubs.map((club) => (
                 <Link aria-current={query.club === club.id ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=clubs&club=${encodeURIComponent(club.id)}`} key={club.id}>

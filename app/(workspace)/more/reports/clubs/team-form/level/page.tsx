@@ -48,7 +48,7 @@ export default async function StaffLevelTeamFormsPage({ searchParams }: { search
           <PrintReportButton label="Print these forms" />
         </div>
       </div>
-      <nav className="tab-chips" aria-label="Level">
+      <nav className="tab-chips team-level-tabs" aria-label="Level">
         {TEAM_LEVELS.map((each) => (
           <Link aria-current={each === level ? "page" : undefined} href={`/more/reports/clubs/team-form/level?${query}&level=${each}`} key={each}>{teamLevelLabels[each]}</Link>
         ))}

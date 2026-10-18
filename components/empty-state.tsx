@@ -22,6 +22,8 @@ export function EmptyState({
   hint,
   actionClass = "primary-button",
   className = "empty-state",
+  headingLevel = 3,
+  announce = true,
 }: {
   icon?: ReactNode;
   title: string;
@@ -34,12 +36,17 @@ export function EmptyState({
   /** "secondary-button" when the page already has its one filled primary action. */
   actionClass?: "primary-button" | "secondary-button";
   className?: string;
+  /** The title's heading level; pass the one that follows the heading above it. Defaults to 3. */
+  headingLevel?: 2 | 3 | 4;
+  /** False when the empty state is just the visible result of a search or filter: no live region, so typing never re-announces it. */
+  announce?: boolean;
 }) {
+  const Heading = `h${headingLevel}` as const;
   const offered = emptyStateAction(canCreate, action);
   return (
-    <div className={className} role="status">
+    <div className={className} role={announce ? "status" : undefined}>
       {icon}
-      <h3>{title}</h3>
+      <Heading>{title}</Heading>
       {children && <p>{children}</p>}
       {offered && (offered.href
         ? <Link className={actionClass} href={offered.href}>{offered.label}</Link>

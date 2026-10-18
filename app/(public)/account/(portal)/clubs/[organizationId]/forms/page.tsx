@@ -111,7 +111,7 @@ export default async function ClubFormsPage({
           </form>
         )}
         {submissions.length === 0 ? (
-          <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>
+          <EmptyState className="empty-state panel" headingLevel={4} icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>
         ) : (
           <div className="report-table-wrap">
             <table className="report-table">

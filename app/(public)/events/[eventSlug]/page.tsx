@@ -29,7 +29,7 @@ import { TranslateHint } from "@/components/translate-hint";
 import { AutoEventHeader, AutoEventInfoCards } from "@/components/auto-event-info-cards";
 import { CLUB_REGISTRATION_CARD_NOTE } from "@/modules/club-registrations/entry-path";
 import { getAutoEventInfoCards } from "@/modules/event-info-cards/repository";
-import { contentBlocks } from "@/modules/events/content-schemas";
+import { contentBlocks, parseBlockData } from "@/modules/events/content-schemas";
 import { getPublicEventLanding } from "@/modules/events/public-repository";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +87,9 @@ export default async function PublicEventPage({
   );
   const canChooseForm = landing.lifecycle.ctaEnabled && hasForms;
   const heroSection = landing.contentSections.find((section) => section.kind === "HERO");
+  // The banner only counts when it can draw: invalid banner data renders nothing, so the page keeps its own h1 then.
+  const bannerShown = Boolean(heroSection && parseBlockData("HERO", heroSection.data));
+  const sameName = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toLowerCase() === b.trim().replace(/\s+/g, " ").toLowerCase();
   const assetUrl = (assetId: string) => publicEventAssetUrl(landing.event.slug, assetId);
   // Auto-built info cards (#651) are for club events only; every other event's
   // page renders exactly as before, without even reading the card data.
@@ -117,16 +120,18 @@ export default async function PublicEventPage({
       {/* The header banner (#816) comes first and owns the page's h1. With one, the event
           header below is a plain details row with no second title or hero (#1004); without
           a banner nothing changes. */}
-      {heroSection && <EventHeroBanner section={heroSection} assetUrl={assetUrl} />}
+      {heroSection && bannerShown && <EventHeroBanner section={heroSection} assetUrl={assetUrl} />}
       {autoCards ? (
         <AutoEventHeader
           header={autoCards.header}
           timeLabel={landing.event.timeLabel}
           introLine={landing.lifecycle.heroTagline}
-          titleHidden={Boolean(heroSection)}
+          titleMode={!bannerShown ? "h1" : sameName(heroSection!.title, autoCards.header.title) ? "hidden" : "text"}
         />
-      ) : heroSection ? (
+      ) : bannerShown ? (
         <section className="public-event-facts" aria-label="Event details">
+          {/* The banner's title is free text; when it is not the event's name, the name still appears once, as text. */}
+          {!sameName(heroSection!.title, landing.event.name) && <p className="public-event-facts-name">{landing.event.name}</p>}
           <p>{landing.lifecycle.heroTagline}</p>
           <ul>
             <li><CalendarDays size={17} aria-hidden="true" /> {landing.event.dateLabel}</li>
