@@ -7,7 +7,7 @@ import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
 import { BrandMark } from "@/components/brand-mark";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
+import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSignInRedirectPath, twoStepRedirectPath } from "@/modules/attendee-accounts/return-redirect";
@@ -90,7 +90,10 @@ export default async function AccountPortalLayout({ children }: { children: Reac
             <BrandMark />
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
-          <AccountHeaderActions contexts={workspaceContexts} showSignOut={Boolean(account) || !staffSession.user} />
+          <AccountHeaderActions
+            contexts={workspaceContexts}
+            signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
+          />
         </div>
       </header>
       <ActAsBanner acting={acting} inAccount />

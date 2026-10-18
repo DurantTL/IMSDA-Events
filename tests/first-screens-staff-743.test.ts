@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * builder's device hint and the Dashboard checklist. Synthetic data only.
  */
 vi.mock("server-only", () => ({}));
-vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: { id: "u1", globalRole: null } }) }));
+const staffUser = vi.hoisted(() => ({ current: { id: "u1", globalRole: null as string | null } }));
+vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: staffUser.current }) }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -315,5 +316,20 @@ describe("Dashboard setup checklist is gated by permission", () => {
     const html = await render(rolePermissions.FINANCE_MANAGER);
     expect(html).not.toContain("Set up this event");
     expect(mocks.getSetupChecklistFacts).not.toHaveBeenCalled();
+  });
+
+  it("shows the Staff tools card with System management to a system administrator only (#1009)", async () => {
+    staffUser.current = { id: "u1", globalRole: "SYSTEM_ADMIN" };
+    const admin = await render(eventPermissions);
+    expect(admin).toContain("Staff tools");
+    expect(admin).toContain('href="/admin"');
+    expect(admin).toContain("System management");
+    expect(admin).toContain("Event setup, accounts and platform settings");
+
+    staffUser.current = { id: "u1", globalRole: null };
+    const staff = await render(eventPermissions);
+    expect(staff).not.toContain("Staff tools");
+    expect(staff).not.toContain('href="/admin"');
+    expect(staff).not.toContain("System management");
   });
 });

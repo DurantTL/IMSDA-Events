@@ -149,7 +149,8 @@ Staff can explicitly switch from the staff shell into a real attendee session
 for their own matching account when the normalized staff email matches an
 active verified attendee account. The switch endpoint accepts no attendee ID,
 so it cannot select or impersonate another attendee. The staff session remains
-available through **Back to staff workspace**. Staff without a matching account
+available through **Staff workspace** (and **System management** for system
+administrators) in the My account header, next to **Sign out**, which ends both sessions. Staff without a matching account
 retain the read-only event preview.
 
 Google identities use the provider subject as the durable key. A verified

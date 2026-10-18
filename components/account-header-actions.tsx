@@ -1,20 +1,19 @@
 import Link from "next/link";
 import { LayoutDashboard, ShieldCheck } from "lucide-react";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
-import type { WorkspaceContext } from "@/modules/access/workspace-contexts";
+import type { AccountSignOutMode, WorkspaceContext } from "@/modules/access/workspace-contexts";
 
 /**
  * The right side of the My account header (#1009): the staff and system links
  * a browser with a live staff session may use (`otherWorkspaceContextsForAttendee`
- * decides which), next to Sign out, which stays whenever an attendee account is
- * shown. Links only; `/overview` and `/admin` check access themselves.
+ * decides which), next to Sign out (`accountSignOutMode` decides what it ends). Links only; `/overview` and `/admin` check access themselves.
  */
 export function AccountHeaderActions({
   contexts,
-  showSignOut,
+  signOut,
 }: {
   contexts: WorkspaceContext[];
-  showSignOut: boolean;
+  signOut: AccountSignOutMode;
 }) {
   return (
     <div className="public-header-links">
@@ -26,7 +25,7 @@ export function AccountHeaderActions({
           {" "}<span>{context.label}</span>
         </Link>
       ))}
-      {showSignOut && <AttendeeSignOutButton />}
+      {signOut !== "none" && <AttendeeSignOutButton endStaffSession={signOut === "both"} />}
     </div>
   );
 }

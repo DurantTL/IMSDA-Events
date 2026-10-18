@@ -16,7 +16,8 @@ vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled:
 import { AccountHeaderActions } from "@/components/account-header-actions";
 import { PublicHeaderLinks } from "@/components/public-header-links";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
-import { otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
+import { accountSignOutMode, otherWorkspaceContextsForAttendee, type AccountSignOutMode } from "@/modules/access/workspace-contexts";
+import { postAccountSignOut } from "@/modules/attendee-accounts/sign-out-requests";
 
 // Synthetic data only.
 const render = (props: Parameters<typeof PublicHeaderLinks>[0]) => renderToStaticMarkup(createElement(PublicHeaderLinks, props));
@@ -78,6 +79,13 @@ describe("PublicHeaderSessionLinks (#1009)", () => {
     expect(mocks.isUnifiedSignInEnabled).not.toHaveBeenCalled();
   });
 
+  it("any failure reading the sessions renders the signed-out header", async () => {
+    mocks.getCurrentSession.mockRejectedValue(new Error("database down"));
+    const out = await html();
+    expect(out).toContain('href="/account/sign-in"');
+    expect(out).toContain("Sign in");
+  });
+
   it("a staff session shows Staff workspace", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: null } });
     expect(await html()).toContain("Staff workspace");
@@ -85,28 +93,83 @@ describe("PublicHeaderSessionLinks (#1009)", () => {
 });
 
 describe("account header actions (#1009)", () => {
-  const render = (input: Parameters<typeof otherWorkspaceContextsForAttendee>[0], showSignOut = true) =>
-    renderToStaticMarkup(createElement(AccountHeaderActions, { contexts: otherWorkspaceContextsForAttendee(input), showSignOut }));
+  const render = (input: Parameters<typeof otherWorkspaceContextsForAttendee>[0], signOut: AccountSignOutMode) =>
+    renderToStaticMarkup(createElement(AccountHeaderActions, { contexts: otherWorkspaceContextsForAttendee(input), signOut }));
 
   it("attendee with no staff session: Sign out only", () => {
-    const html = render({ hasStaffSession: false, isSystemAdmin: true });
+    const html = render({ hasStaffSession: false, isSystemAdmin: true }, "attendee");
     expect(html).toContain("Sign out");
     expect(html).not.toContain("Staff workspace");
     expect(html).not.toContain("System management");
   });
 
   it("staff session: Staff workspace next to Sign out, no System management", () => {
-    const html = render({ hasStaffSession: true, isSystemAdmin: false });
+    const html = render({ hasStaffSession: true, isSystemAdmin: false }, "both");
     expect(html).toContain('href="/overview"');
     expect(html).toContain("Sign out");
     expect(html).not.toContain("System management");
   });
 
   it("system administrator: Staff workspace, System management and Sign out", () => {
-    const html = render({ hasStaffSession: true, isSystemAdmin: true });
+    const html = render({ hasStaffSession: true, isSystemAdmin: true }, "both");
     expect(html).toContain('href="/overview"');
     expect(html).toContain('href="/admin"');
     expect(html).toContain("System management");
     expect(html).toContain("Sign out");
+  });
+
+  it("shows no Sign out when the mode is none, but keeps the staff links", () => {
+    const html = render({ hasStaffSession: true, isSystemAdmin: false }, "none");
+    expect(html).toContain('href="/overview"');
+    expect(html).not.toContain("Sign out");
+  });
+});
+
+describe("what My account Sign out ends (#1009)", () => {
+  it("attendee session only: ends the attendee session", () => {
+    expect(accountSignOutMode({ hasAttendeeAccount: true, hasStaffSession: false, actingAsClubRole: false })).toBe("attendee");
+  });
+
+  it("attendee account reached through a staff session (via staff): ends both", () => {
+    expect(accountSignOutMode({ hasAttendeeAccount: true, hasStaffSession: true, actingAsClubRole: false })).toBe("both");
+  });
+
+  it("both sessions on the browser: ends both", () => {
+    expect(accountSignOutMode({ hasAttendeeAccount: true, hasStaffSession: true, actingAsClubRole: false })).toBe("both");
+  });
+
+  it("staff act-as with no attendee account: no Sign out", () => {
+    expect(accountSignOutMode({ hasAttendeeAccount: false, hasStaffSession: true, actingAsClubRole: true })).toBe("none");
+  });
+
+  it("staff act-as whose email matches an attendee account: still no Sign out", () => {
+    expect(accountSignOutMode({ hasAttendeeAccount: true, hasStaffSession: true, actingAsClubRole: true })).toBe("none");
+  });
+
+  it("nobody signed in: no Sign out", () => {
+    expect(accountSignOutMode({ hasAttendeeAccount: false, hasStaffSession: false, actingAsClubRole: false })).toBe("none");
+  });
+});
+
+describe("combined sign-out requests (#1009)", () => {
+  it("attendee only: calls only the attendee endpoint", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    await postAccountSignOut(false, send);
+    expect(send.mock.calls.map((call) => call[0])).toEqual(["/api/attendee/sign-out"]);
+  });
+
+  it("with a staff session: calls the attendee endpoint and the staff logout, both as POST", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    await postAccountSignOut(true, send);
+    expect(send.mock.calls).toEqual([
+      ["/api/attendee/sign-out", { method: "POST" }],
+      ["/api/auth/logout", { method: "POST" }],
+    ]);
+  });
+
+  it("a failing attendee request does not skip the staff logout", async () => {
+    const send = vi.fn().mockRejectedValueOnce(new Error("network")).mockResolvedValue(undefined);
+    await postAccountSignOut(true, send);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 });

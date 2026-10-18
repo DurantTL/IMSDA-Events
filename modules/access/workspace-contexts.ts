@@ -83,3 +83,24 @@ export function otherWorkspaceContextsForAttendee(input: {
     ? [STAFF_WORKSPACE_CONTEXT, SYSTEM_ADMIN_CONTEXT]
     : [STAFF_WORKSPACE_CONTEXT];
 }
+
+/**
+ * What the My account header's Sign out ends (#1009). The attendee account can
+ * be reached through a staff session (`getCurrentAttendee()` falls back to the
+ * staff user's matching attendee account), so ending only the attendee session
+ * would leave the person signed in. With a staff session Sign out ends both;
+ * without one it ends the attendee session, as before. While a staff "act as"
+ * is active there is no attendee sign-out at all (the staff workspace's own
+ * sign-out ends it).
+ */
+export type AccountSignOutMode = "none" | "attendee" | "both";
+
+export function accountSignOutMode(input: {
+  hasAttendeeAccount: boolean;
+  hasStaffSession: boolean;
+  actingAsClubRole: boolean;
+}): AccountSignOutMode {
+  if (input.actingAsClubRole || !input.hasAttendeeAccount) return "none";
+  return input.hasStaffSession ? "both" : "attendee";
+}
+
