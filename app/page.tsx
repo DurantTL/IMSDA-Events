@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, LayoutDashboard, MapPin, UserRound, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronRight, MapPin, UserRound, UsersRound } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { AgendaItem } from "@/components/calendar-agenda-item";
 import { StartAClubCallout } from "@/components/start-a-club-callout";
-import { getCurrentSession } from "@/modules/access/current-session";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, firstPerSeries } from "@/modules/calendar/domain";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
@@ -22,13 +22,12 @@ const upcomingLimit = 6;
 
 /**
  * The public front door (#373). Members, club leaders, and visitors start
- * here. Staff sign-in is deliberately not linked (decision 2026-09-23).
+ * here. The header offers Sign in (#1009).
  */
 export default async function Home() {
   const today = conferenceToday();
-  const [items, session, attendee] = await Promise.all([
+  const [items, attendee] = await Promise.all([
     listPublicCalendarItems(today, addDays(today, 365)),
-    getCurrentSession(),
     getCurrentAttendee(),
   ]);
   const upcoming = firstPerSeries(items).slice(0, upcomingLimit);
@@ -42,12 +41,7 @@ export default async function Home() {
             <BrandMark />
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
-          {/* Staff sign-in isn't linked from the public site; administrators use /login directly. */}
-          {session.user && (
-            <Link className="text-button" href="/overview">
-              <LayoutDashboard size={16} aria-hidden="true" /> <span>Staff workspace</span>
-            </Link>
-          )}
+          <div className="public-header-links"><PublicHeaderSessionLinks /></div>
         </div>
       </header>
 

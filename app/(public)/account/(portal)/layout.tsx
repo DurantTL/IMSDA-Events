@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AccountHeaderActions } from "@/components/account-header-actions";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
 import { AccountSectionNav, type AccountNavItem } from "@/components/account-section-nav";
 import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
-import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandMark } from "@/components/brand-mark";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
+import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSignInRedirectPath, twoStepRedirectPath } from "@/modules/attendee-accounts/return-redirect";
@@ -48,7 +48,11 @@ export default async function AccountPortalLayout({ children }: { children: Reac
   // The one other workspace this attendee identity may switch into (#108):
   // the staff workspace, only when this browser also carries a live staff
   // session — the same decision `app-shell.tsx` makes in the other direction.
-  const [workspaceContext] = otherWorkspaceContextsForAttendee({ hasStaffSession: Boolean(staffSession.user) });
+  // A system administrator's staff session also offers System management (#1009).
+  const workspaceContexts = otherWorkspaceContextsForAttendee({
+    hasStaffSession: Boolean(staffSession.user),
+    isSystemAdmin: staffSession.user?.globalRole === "SYSTEM_ADMIN",
+  });
   // Banner announcements are account-session only: a staff "act as" with no
   // attendee account (or a second step still pending) gets none. The banner
   // query starts as soon as the clubs load, alongside the coordinator check.
@@ -86,9 +90,10 @@ export default async function AccountPortalLayout({ children }: { children: Reac
             <BrandMark />
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
-          {workspaceContext
-            ? <Link className="text-button" href={workspaceContext.href}>Back to staff workspace</Link>
-            : <AttendeeSignOutButton />}
+          <AccountHeaderActions
+            contexts={workspaceContexts}
+            signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
+          />
         </div>
       </header>
       <ActAsBanner acting={acting} inAccount />

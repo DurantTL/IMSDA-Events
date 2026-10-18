@@ -15,6 +15,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { EventInfoCards } from "@/components/event-info-cards";
 import {
   EventContentBlocks,
@@ -285,11 +286,14 @@ export default async function PublicEventPage({
             <BrandMark />
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
-          {landing.links.detailsUrl && (
-            <a className="public-event-details-link" href={landing.links.detailsUrl}>
-              Back to full event details <ExternalLink size={15} aria-hidden="true" />
-            </a>
-          )}
+          <div className="public-header-links">
+            {landing.links.detailsUrl && (
+              <a className="public-event-details-link" href={landing.links.detailsUrl}>
+                Back to full event details <ExternalLink size={15} aria-hidden="true" />
+              </a>
+            )}
+            <PublicHeaderSessionLinks />
+          </div>
         </div>
       </header>
       <TranslateHint />

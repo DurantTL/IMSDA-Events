@@ -51,4 +51,21 @@ describe("otherWorkspaceContextsForAttendee", () => {
       { kind: "staff_workspace", href: "/overview", label: "Staff workspace" },
     ]);
   });
+
+  it("offers nothing without a staff session, even if the system administrator flag is passed", () => {
+    expect(otherWorkspaceContextsForAttendee({ hasStaffSession: false, isSystemAdmin: true })).toEqual([]);
+  });
+
+  it("offers only the staff workspace to a staff user who is not a system administrator", () => {
+    expect(otherWorkspaceContextsForAttendee({ hasStaffSession: true, isSystemAdmin: false })).toEqual([
+      { kind: "staff_workspace", href: "/overview", label: "Staff workspace" },
+    ]);
+  });
+
+  it("offers the staff workspace and System management to a system administrator", () => {
+    expect(otherWorkspaceContextsForAttendee({ hasStaffSession: true, isSystemAdmin: true })).toEqual([
+      { kind: "staff_workspace", href: "/overview", label: "Staff workspace" },
+      { kind: "system_admin", href: "/admin", label: "System management" },
+    ]);
+  });
 });

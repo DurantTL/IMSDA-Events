@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BackLink } from "@/components/back-link";
 import { BrandMark } from "@/components/brand-mark";
+import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicClubDirectory } from "@/components/public-club-directory";
 import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { listPublicClubs } from "@/modules/organizations/public-club-directory";
@@ -32,7 +33,10 @@ export default async function PublicClubsPage() {
             <BrandMark />
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
-          <BackLink href="/">Events home</BackLink>
+          <div className="public-header-links">
+            <BackLink href="/">Events home</BackLink>
+            <PublicHeaderSessionLinks />
+          </div>
         </div>
       </header>
 

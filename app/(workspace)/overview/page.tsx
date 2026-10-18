@@ -9,6 +9,7 @@ import {
   CircleDollarSign,
   Megaphone,
   ShieldAlert,
+  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
@@ -19,6 +20,8 @@ import { listEventBackgroundFlags } from "@/modules/background-checks/repository
 import { buildSetupChecklist } from "@/modules/events/setup-checklist";
 import { getSetupChecklistFacts } from "@/modules/events/setup-checklist-repository";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { getCurrentSession } from "@/modules/access/current-session";
+import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
 
 export const metadata: Metadata = { title: staffPageTitles.overview };
 
@@ -49,6 +52,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const requested = (await searchParams).event;
   const { event, permissions } = await resolveEventContext(requested);
   const canSeeSensitiveData = permissions.includes("VIEW_SENSITIVE_DATA");
+  // "Staff tools" (#1009): a link to System management for system administrators only. The link grants nothing; /admin checks again.
+  const systemAdminContext = otherWorkspaceContextsForStaff({
+    isSystemAdmin: (await getCurrentSession()).user?.globalRole === "SYSTEM_ADMIN",
+    attendeeAccountAvailable: false,
+  }).find((context) => context.kind === "system_admin");
   const canViewReports = permissions.includes("VIEW_REPORTS");
   // Setup steps only for viewers who can act on one (#743); everyone else never reads the counts.
   const canSetUp = permissions.includes("CONFIGURE_EVENT") || permissions.includes("MANAGE_FORMS");
@@ -134,6 +142,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         </div>
 
         <aside className="side-column">
+          {systemAdminContext && <section className="panel" aria-labelledby="staff-tools-heading"><div className="section-heading"><div><p className="eyebrow">Administration</p><h2 id="staff-tools-heading">Staff tools</h2></div></div><Link className="attention-row" href={systemAdminContext.href}><span className="attention-icon purple"><ShieldCheck aria-hidden="true" size={18} /></span><span><strong>{systemAdminContext.label}</strong><small>Event setup, accounts and platform settings</small></span><ArrowRight aria-hidden="true" size={16} /></Link></section>}
           {canSeeSensitiveData && <section className="panel attention-panel"><div className="section-heading"><div><p className="eyebrow"><NeedsAttention /></p><h2>Operations queue</h2></div></div>{permissions.includes("MANAGE_FINANCE") && metrics.isDeferredOrganizationBilling && <Link className="attention-row" href={`/finance/church-owed${query}`}><span className="attention-icon gold"><CircleDollarSign aria-hidden="true" size={18} /></span><span><strong>{money(metrics.churchBilledCents)} billed to churches</strong><small>Estimated · billed after the event, not paid online</small></span><ArrowRight aria-hidden="true" size={16} /></Link>}{permissions.includes("MANAGE_FINANCE") && !metrics.isDeferredOrganizationBilling && metrics.churchSponsoredCents > 0 && <Link className="attention-row" href={`/finance/church-owed${query}`}><span className="attention-icon gold"><CircleDollarSign aria-hidden="true" size={18} /></span><span><strong>{money(metrics.churchSponsoredCents)} billed to churches</strong><small>Church-sponsored promo codes · billed after the event, not paid online</small></span><ArrowRight aria-hidden="true" size={16} /></Link>}{permissions.includes("MANAGE_FINANCE") && !metrics.isDeferredOrganizationBilling && <Link className="attention-row" href={`/finance${query}&filter=BALANCE`}><span className="attention-icon gold"><CircleDollarSign aria-hidden="true" size={18} /></span><span><strong>{metrics.pendingPaymentCount} {metrics.pendingPaymentCount === 1 ? "balance" : "balances"} to review</strong><small>{money(metrics.outstandingCents)} outstanding</small></span><ArrowRight aria-hidden="true" size={16} /></Link>}{backgroundFlags && backgroundFlags.people.length > 0 && <Link className="attention-row" href={`/more/reports${query}#background-checks`}><span className="attention-icon coral"><ShieldAlert aria-hidden="true" size={18} /></span><span><strong>{backgroundFlags.people.length} {backgroundFlags.people.length === 1 ? "adult needs" : "adults need"} a current Sterling Volunteers record</strong><small>No current Sterling Volunteers record. Nothing is blocked.</small></span><ArrowRight aria-hidden="true" size={16} /></Link>}{permissions.includes("MANAGE_REGISTRATION") && <Link className="attention-row" href={`/people${query}&filter=DRAFT`}><span className="attention-icon purple"><UsersRound aria-hidden="true" size={18} /></span><span><strong>{incomplete} draft {incomplete === 1 ? "registration" : "registrations"}</strong><small>Complete attendee details</small></span><ArrowRight aria-hidden="true" size={16} /></Link>}</section>}
           {process.env.NODE_ENV !== "production" && <section className="panel safe-boundary"><p className="eyebrow">Development environment</p><h2>Local database</h2><p>This preview writes only to the local IMSDA Events database. External delivery and card charging require their separate test credentials.</p><span><CheckCircle2 aria-hidden="true" size={16} /> Production services stay isolated</span></section>}
         </aside>
