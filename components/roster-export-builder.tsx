@@ -12,6 +12,7 @@ import {
   type RosterExportColumnKey,
 } from "@/modules/club-rosters/export-columns";
 import type { RosterExportFormatRecord } from "@/modules/club-rosters/export-repository";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 type PreviewResponse = { headers?: string[]; rows?: string[][]; totalRows?: number; message?: string };
 type FormatsResponse = { formats?: RosterExportFormatRecord[]; format?: RosterExportFormatRecord; message?: string };
@@ -46,6 +47,9 @@ export function RosterExportBuilder({
   const [formats, setFormats] = useState(initialFormats);
   const [formatName, setFormatName] = useState("");
   const [busy, setBusy] = useState(false);
+  const saveBlocked = !formatName.trim()
+    ? "Type a name for the format to save it."
+    : columns.length === 0 ? "Choose at least one column to save a format." : null;
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -319,8 +323,9 @@ export function RosterExportBuilder({
             type="text"
             value={formatName}
           />
-          <button className="secondary-button" disabled={busy || !formatName.trim() || columns.length === 0} type="submit">Save format</button>
+          <button aria-describedby={disabledHintId(saveBlocked, "roster-export-save-hint")} className="secondary-button" disabled={busy || !formatName.trim() || columns.length === 0} type="submit">Save format</button>
         </div>
+        <DisabledHint id="roster-export-save-hint" reason={saveBlocked} />
       </form>
     </div>
   );

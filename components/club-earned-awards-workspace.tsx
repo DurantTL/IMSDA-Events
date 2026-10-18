@@ -12,6 +12,7 @@ import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
 import { effectiveChoice, makeSearchMatcher, matchesSearch, searchResultSummary } from "@/lib/search-match";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 export type ClubEarnedAwardsData = EarnedAwardsWorkspaceData;
 
@@ -328,6 +329,11 @@ export function ClubEarnedAwardsWorkspace({
   const knownSelected = data.members.filter((member) => selected.has(member.personId)).length;
   const hiddenSelected = knownSelected - selectedCount;
   const classCount = selectedCount;
+  const markClassBlocked = classCount === 0
+    ? (hiddenSelected > 0
+      ? "The members you ticked are hidden by the search or filter. Clear it, or tick a member who is shown."
+      : "Select at least one member in the table above.")
+    : !completedOn ? "Choose the date the class was completed." : null;
   const handCount = selectedCount;
   const entryCount = chosen.length * handCount;
   const tooMany = awardEntryTooLarge(handCount, chosen.length);
@@ -475,10 +481,11 @@ export function ClubEarnedAwardsWorkspace({
               <label htmlFor="earned-class-date">Completed on</label>
               <input className={styles.date} id="earned-class-date" onChange={(event) => setCompletedOn(event.target.value)} type="date" value={completedOn} />
             </span>
-            <button className="primary-button" disabled={busy || classCount === 0 || !completedOn} onClick={markClass} type="button">
+            <button aria-describedby={disabledHintId(markClassBlocked, "earned-class-hint")} className="primary-button" disabled={busy || classCount === 0 || !completedOn} onClick={markClass} type="button">
               <GraduationCap aria-hidden="true" size={16} /> {`Mark ${clubClassLevelLabels[classLevel]} completed${classCount > 0 ? ` (${classCount})` : ""}`}
             </button>
           </div>
+          <DisabledHint id="earned-class-hint" reason={markClassBlocked} />
         </section>
       )}
 

@@ -30,6 +30,10 @@
   --imsda-purple-soft: #f1eaf7;
   --imsda-gold: #f0b323;
   --imsda-gold-soft: #fff5d7;
+  /* Keyboard focus ring (#1003), WCAG 2.2 SC 1.4.11 (at least 3:1 against what it is drawn on): navy #003b5c is 11:1 on white
+     and 10:1 on the page paper; gold #f0b323 is 7.9:1 on navy-deep and 5.8:1 on navy, for the dark surfaces. */
+  --focus-ring: var(--imsda-navy);
+  --focus-ring-on-dark: var(--imsda-gold);
   --ink: #243640;
   --muted: #536872; /* #684: 4.97:1 on the tinted panel backgrounds, 5.85:1 on white */
   --line: #dce6ea;
@@ -435,9 +439,28 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(240, 179, 35, 0.55);
-  outline-offset: 3px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
+
+/* On the dark navy surfaces (sidebar, heroes, the registration submit card) the ring is gold. */
+:is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
+  :is(button, a, input, select, summary, [tabindex]):focus-visible {
+  outline-color: var(--focus-ring-on-dark);
+}
+
+/* A file chooser is a styled label around a visually hidden input (#1003): the ring goes on the label. */
+:is(.file-button, .club-import-upload, .file-drop):has(input[type="file"]:focus-visible) {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.file-button { position: relative; }
+.file-button:has(input[type="file"]:disabled),
+.club-import-upload:has(input[type="file"]:disabled) { cursor: not-allowed; opacity: 0.58; }
+
+/* The reason a button is disabled, shown right under it and named by its aria-describedby (#1003). */
+.disabled-hint { margin: 6px 0 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.7rem); line-height: 1.45; }
+.message-editor-file { display: grid; justify-items: start; gap: 6px; }
 
 .sr-only {
   position: absolute;
@@ -911,6 +934,17 @@ select:focus-visible {
   color: var(--imsda-navy);
   font-weight: 700;
 }
+
+/* The staff content area while a page streams in (#1003): the sidebar and header stay, only this shows. */
+.content-skeleton { display: grid; gap: 16px; padding-top: 8px; }
+.content-skeleton-bar { border-radius: 12px; background: linear-gradient(90deg, #e3ebee 0%, #eef3f5 50%, #e3ebee 100%); background-size: 200% 100%; animation: content-skeleton-shimmer 1.4s ease-in-out infinite; }
+.content-skeleton-title { width: min(320px, 70%); height: 34px; }
+.content-skeleton-line { width: min(520px, 100%); height: 16px; }
+.content-skeleton-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; }
+.content-skeleton-card { height: 96px; }
+.content-skeleton-panel { height: 280px; }
+@keyframes content-skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .content-skeleton-bar { animation: none; } }
 
 .icon-button,
 .avatar {
@@ -1928,6 +1962,10 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   padding: 34px 18px;
 }
 
+/* The phone body reserves room for the bottom tab bar (padding-bottom); the sign-in style pages have no tab bar, so that
+   strip showed the pale page colour under the dark background (#1003). */
+body:has(.auth-page) { padding-bottom: 0; }
+
 .auth-card {
   width: min(460px, 100%);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -2418,7 +2456,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .module-grid > button small { flex: 1; margin-top: 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.5rem); line-height: 1.4; }
 .module-grid > button b { margin-top: 7px; color: var(--imsda-purple); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.48rem); text-transform: uppercase; }
 .builder-preview { max-height: calc(100vh - 30px); overflow-y: auto; border-top: 4px solid var(--imsda-purple); }
-.builder-preview:focus { outline: 3px solid rgba(88, 44, 131, 0.16); outline-offset: 3px; }
+.builder-preview:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .live-preview-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: var(--green-soft); color: var(--green); padding: 5px 8px; font-size: max(var(--type-floor, 0px), 0.54rem); font-weight: 800; }
 .live-preview-badge > span { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(45, 132, 85, 0.12); }
 .preview-device { overflow: hidden; border: 1px solid #ccdbe1; border-radius: 15px; background: white; box-shadow: 0 12px 30px rgba(0, 59, 92, 0.08); }
@@ -3319,7 +3357,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   padding: 16px 18px;
 }
 
-.public-registration-error-summary:focus { outline: 3px solid rgba(169, 85, 73, 0.2); outline-offset: 3px; }
+.public-registration-error-summary:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .public-registration-error-summary strong { display: block; font-size: var(--text-helper-min); }
 .public-registration-error-summary ul { margin: 9px 0 0; padding-left: 20px; font-size: var(--text-helper-min); line-height: 1.8; }
 .public-registration-error-summary a { color: #71372f; font-weight: 700; }
@@ -3344,7 +3382,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   letter-spacing: -0.025em;
 }
 .public-registration-step-heading h2:focus-visible {
-  outline: 3px solid rgba(88, 44, 131, 0.17);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 5px;
 }
 .public-registration-step-heading > p:last-child {
@@ -3422,7 +3460,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   content: "";
 }
 .public-registration-attendee:focus {
-  outline: 3px solid rgba(88, 44, 131, 0.17);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .public-registration-attendee-heading {
@@ -5656,7 +5694,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .message-editor-toolbar button { display: inline-grid; min-width: 30px; height: 30px; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #43545c; cursor: pointer; padding: 0 7px; font: inherit; font-size: max(var(--type-body-floor, 0px), 0.56rem); font-weight: 800; }
 .message-editor-toolbar button:hover { border-color: #c5d5dc; background: #f5f8f9; color: var(--imsda-purple); }
 .message-editor-toolbar button:focus-visible,
-.message-editor-mode button:focus-visible { outline: 3px solid rgba(88, 44, 131, 0.2); outline-offset: 1px; }
+.message-editor-mode button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
 .message-editor-token-control { flex: 1 1 250px; justify-content: flex-end; }
 .message-editor-token-control label { display: block; }
 .message-editor-token-control select { max-width: 215px; height: 30px; border: 1px solid var(--field-border); border-radius: 7px; background: white; color: var(--ink); padding: 0 7px; font: inherit; font-size: max(var(--type-body-floor, 0px), 0.56rem); }
@@ -7002,7 +7040,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
   transform: translateY(-1px);
 }
 .public-event-resources a:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--imsda-purple) 38%, transparent);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
   border-color: var(--imsda-purple);
 }
@@ -7606,7 +7644,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .background-check-import-filters { margin: 12px 0; }
 .background-check-candidates { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .background-check-import-pager { align-items: center; justify-content: space-between; margin: 8px 0; }
-.club-import-upload { display: grid; justify-items: center; gap: 6px; padding: 36px 16px; border-style: dashed; cursor: pointer; text-align: center; transition: background-color 0.1s, border-color 0.1s; }
+.club-import-upload { position: relative; display: grid; justify-items: center; gap: 6px; padding: 36px 16px; border-style: dashed; cursor: pointer; text-align: center; transition: background-color 0.1s, border-color 0.1s; }
 .club-import-upload input { max-width: 100%; }
 .club-import-upload small { color: var(--muted); }
 .club-import-upload-dragging { background: var(--imsda-purple-soft); border-color: var(--imsda-purple); }
@@ -9058,6 +9096,14 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   outline: 2px solid var(--imsda-purple);
   outline-offset: 2px;
 }
+/* The same fields on the dark navy surfaces (the sidebar's event picker) get the gold ring (#1003); this has to match the
+   strength of the purple rule above and come after it. */
+:root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
+  :is(input, select, textarea):not(.searchable-select-control > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
+:root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
+  :is(.searchable-select-control, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
+  outline-color: var(--focus-ring-on-dark);
+}
 
 /* Registration form builder on phones (#685): a notice replaces it under 768px. */
 .builder-phone-notice { display: none; }
@@ -9945,7 +9991,7 @@ button[aria-busy="true"] { cursor: progress; }
 :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger, #8f3a30); box-shadow: 0 0 0 1px var(--danger, #8f3a30); }
 .public-registration-error-summary strong { display: flex; align-items: center; gap: 8px; }
 .form-error-summary { display: block; margin-bottom: 12px; padding: 12px 14px; border: 1px solid var(--danger-line, #e3b8b1); border-left: 5px solid var(--danger, #8f3a30); border-radius: 10px; background: var(--danger-soft, #fdf4f2); color: var(--ink); }
-.form-error-summary:focus { outline: 3px solid rgba(143, 58, 48, 0.3); outline-offset: 3px; }
+.form-error-summary:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .form-error-summary > strong { display: flex; align-items: center; gap: 8px; color: var(--danger, #8f3a30); }
 .form-error-summary ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
 .form-error-summary a { color: var(--danger, #8f3a30); font-weight: 700; }

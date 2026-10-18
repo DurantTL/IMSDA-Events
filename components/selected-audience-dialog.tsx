@@ -187,47 +187,50 @@ export function SelectedAudienceDialog({
           </div>
         ) : (
           <div className="detail-stack">
-            <label>
-              Message
-              <select
-                disabled={sending}
-                onChange={(changeEvent) => {
-                  setTemplateKey(changeEvent.target.value as SelectedAudienceTemplateKey);
-                  setPreview(null);
-                  setLoading(true);
-                }}
-                value={templateKey}
-              >
-                {selectedAudienceTemplateKeys.map((key) => (
-                  <option key={key} value={key}>{selectedAudienceTemplateLabels[key]}</option>
-                ))}
-              </select>
-            </label>
+            <div className="form-stack selected-audience-fields">
+              <label>
+                Message
+                <select
+                  disabled={sending}
+                  onChange={(changeEvent) => {
+                    setTemplateKey(changeEvent.target.value as SelectedAudienceTemplateKey);
+                    setPreview(null);
+                    setLoading(true);
+                  }}
+                  value={templateKey}
+                >
+                  {selectedAudienceTemplateKeys.map((key) => (
+                    <option key={key} value={key}>{selectedAudienceTemplateLabels[key]}</option>
+                  ))}
+                </select>
+              </label>
 
-            {templateKey === "EVENT_ANNOUNCEMENT" && (
-              <>
-                <label>
-                  Announcement title
-                  <input
-                    disabled={sending}
-                    maxLength={120}
-                    onChange={(changeEvent) => setAnnouncementTitle(changeEvent.target.value)}
-                    value={announcementTitle}
-                  />
-                </label>
-                <label>
-                  Announcement message
-                  <textarea
-                    disabled={sending}
-                    maxLength={4000}
-                    onChange={(changeEvent) => setAnnouncementBody(changeEvent.target.value)}
-                    rows={6}
-                    value={announcementBody}
-                  />
-                </label>
-                <p className="quiet-copy">Formatting: **bold**, *italic*, a blank line between paragraphs, - lists, [link text](https://…)</p>
-              </>
-            )}
+              {templateKey === "EVENT_ANNOUNCEMENT" && (
+                <>
+                  <label>
+                    Announcement title
+                    <input
+                      disabled={sending}
+                      maxLength={120}
+                      onChange={(changeEvent) => setAnnouncementTitle(changeEvent.target.value)}
+                      value={announcementTitle}
+                    />
+                  </label>
+                  <label>
+                    Announcement message
+                    <textarea
+                      aria-describedby="selected-audience-formatting-help"
+                      disabled={sending}
+                      maxLength={4000}
+                      onChange={(changeEvent) => setAnnouncementBody(changeEvent.target.value)}
+                      rows={6}
+                      value={announcementBody}
+                    />
+                  </label>
+                  <p className="field-help" id="selected-audience-formatting-help">Formatting: **bold**, *italic*, a blank line between paragraphs, - lists, [link text](https://…)</p>
+                </>
+              )}
+            </div>
 
             {loading ? (
               <p className="quiet-copy"><LoaderCircle aria-hidden="true" className="spin" size={15} /> Reviewing the selected registrations…</p>

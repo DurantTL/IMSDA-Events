@@ -175,7 +175,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
           <FileUp aria-hidden="true" size={26} />
           <strong>{busy ? "Reading…" : "Choose the export file"}</strong>
           <small>Fluent Forms → Entries → Export → JSON</small>
-          <input accept="application/json,.json" disabled={busy} onChange={readFile} type="file" />
+          <input accept="application/json,.json" className="sr-only" disabled={busy} onChange={readFile} type="file" />
         </label>
       )}
 

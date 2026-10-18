@@ -62,6 +62,7 @@ import {
   Braces,
   Code2,
   FileCode2,
+  FileUp,
   Heading1,
   Heading2,
   Heading3,
@@ -693,21 +694,25 @@ function EditorToolbar({ tokens, tokenLabels, imageLibrary, markChanged }: Edito
           Description (shown if the picture is blocked)
           <input value={imageAlt} maxLength={120} placeholder="Map of the retreat grounds" onChange={(event) => setImageAlt(event.target.value)} />
         </label>
-        <label>
-          Upload a picture
-          <input
-            type="file"
-            accept={MESSAGE_IMAGE_ACCEPT}
-            disabled={uploading}
-            onChange={(event) => {
-              const input = event.currentTarget;
-              const file = input.files?.[0];
-              input.value = "";
-              void uploadImage(file);
-            }}
-          />
-          <small>PNG, JPEG or WebP, {formatFileSize(MAX_INLINE_IMAGE_BYTES)} or smaller. Sent inside the email, so it shows without &quot;download pictures&quot;.</small>
-        </label>
+        <div className="message-editor-file">
+          <label className="secondary-button file-button">
+            <FileUp aria-hidden="true" size={16} /> {uploading ? "Uploading…" : "Upload a picture"}
+            <input
+              type="file"
+              className="sr-only"
+              aria-describedby="message-editor-image-help"
+              accept={MESSAGE_IMAGE_ACCEPT}
+              disabled={uploading}
+              onChange={(event) => {
+                const input = event.currentTarget;
+                const file = input.files?.[0];
+                input.value = "";
+                void uploadImage(file);
+              }}
+            />
+          </label>
+          <small id="message-editor-image-help">PNG, JPEG or WebP, {formatFileSize(MAX_INLINE_IMAGE_BYTES)} or smaller. Sent inside the email, so it shows without &quot;download pictures&quot;.</small>
+        </div>
         {uploading ? <p role="status">Uploading…</p> : null}
         {imageError ? <p className="form-error" role="alert">{imageError}</p> : null}
         {imageLibrary.images.length > 0 && (

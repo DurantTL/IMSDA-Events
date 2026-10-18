@@ -11,6 +11,7 @@ import { attendeeTypeLabel } from "@/modules/honors/class-picker-view";
 import { groupPickingAttendee, GROUP_LABEL } from "@/modules/group-registrations/domain";
 import { offeringsAtLocation, prunePicks, type PickingAttendee } from "@/modules/honors/registration-picks";
 import type { GroupRegistrationExperience } from "@/modules/group-registrations/repository";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 type Ready = GroupRegistrationExperience & {
   event: NonNullable<GroupRegistrationExperience["event"]>;
@@ -133,6 +134,8 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventS
   }, [hasClasses, honorsCatalog, definition, offerings, picks, locationId]);
 
   const blockedReason = useMemo(() => {
+    // An event with no locations skips the picker and submits with no location, so it is never blocked here
+    // (this value also stops the group form's submit).
     if (locations.length > 0 && !chosenLocation) return "Choose a location first.";
     return null;
   }, [locations.length, chosenLocation]);
@@ -158,6 +161,7 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventS
           <div className="club-registration-toolbar">
             <button
               className="primary-button"
+              aria-describedby={disabledHintId(blockedReason, "group-flow-continue-hint")}
               disabled={!chosenLocation}
               onClick={() => { remember({ locationId, picks }); setStarted(true); }}
               type="button"
@@ -165,6 +169,7 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventS
               Continue <ArrowRight aria-hidden="true" size={15} />
             </button>
           </div>
+          <DisabledHint id="group-flow-continue-hint" reason={blockedReason} />
         </section>
       </main>
     );

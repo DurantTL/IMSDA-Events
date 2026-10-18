@@ -83,7 +83,7 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
         <label className="club-import-upload">
           <FileUp aria-hidden="true" size={24} />
           <strong>{busy ? "Reading…" : "Choose the eAdventist organizations CSV"}</strong>
-          <input accept=".csv,text/csv" disabled={busy} onChange={readFile} type="file" />
+          <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={readFile} type="file" />
         </label>
       )}
       {preview && counts && (

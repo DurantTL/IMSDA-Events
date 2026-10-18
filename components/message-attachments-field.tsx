@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Paperclip, Trash2 } from "lucide-react";
+import { FileUp, Paperclip, Trash2 } from "lucide-react";
 import {
   attachmentSetIssue,
   formatFileSize,
@@ -99,10 +99,12 @@ export function MessageAttachmentsField({ eventId, files, onChange, help, disabl
       ) : (
         <p className="quiet-copy">No files attached.</p>
       )}
-      <label htmlFor={inputId}>
-        <span className="sr-only">Attach files</span>
+      <label className="secondary-button file-button" htmlFor={inputId}>
+        <FileUp aria-hidden="true" size={16} /> {uploading ? "Uploading…" : "Choose files to attach"}
         <input
           id={inputId}
+          className="sr-only"
+          aria-describedby={`${inputId}-help`}
           type="file"
           multiple
           accept={MESSAGE_FILE_ACCEPT}
@@ -115,7 +117,7 @@ export function MessageAttachmentsField({ eventId, files, onChange, help, disabl
           }}
         />
       </label>
-      <small>
+      <small id={`${inputId}-help`}>
         PDF, PNG, JPEG, WebP, Word, Excel or PowerPoint. Each file up to {formatFileSize(MAX_MESSAGE_FILE_BYTES)}. {help}
       </small>
       {uploading ? <p role="status">Uploading…</p> : null}
