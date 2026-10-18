@@ -11664,37 +11664,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 }
 
-/* Tab strips that scroll (#997): the row opens on a whole tab (account-section-nav.tsx), snaps to a tab edge when scrolled, fades
-   on each edge that has more tabs, and shows a real arrow button there (focusable, "Scroll tabs left/right"). The 46px scroll
-   padding matches the arrow's width, so a snapped tab never sits under the arrow or the fade. */
-.account-nav { position: relative; }
-.account-nav > ul { scroll-snap-type: x proximity; scroll-padding-inline: 46px; }
-.account-nav > ul > li { scroll-snap-align: start; }
-.account-nav-arrow {
-  position: absolute; top: 0; bottom: 0; z-index: 2; display: none; width: 44px; align-items: center; justify-content: center;
-  padding: 0; border: 0; background: transparent; color: var(--imsda-navy); cursor: pointer;
-}
-.account-nav-arrow > span {
-  display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #fff;
-  box-shadow: 0 0 0 1px var(--line), 0 1px 4px rgba(11, 43, 58, 0.18); font-size: 1.25rem; font-weight: 800; line-height: 1;
-}
-.account-nav-arrow:hover > span { background: var(--imsda-navy-soft); }
-.account-nav-arrow:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; border-radius: 12px; }
-.account-nav-arrow-start { left: 0; }
-.account-nav-arrow-end { right: 0; }
-.account-nav[data-fade-start="true"] > .account-nav-arrow-start,
-.account-nav[data-fade-end="true"] > .account-nav-arrow-end { display: flex; }
-
-/* A long club name (#997): on a phone the hero and the staff club page show it in a smaller size, at most two lines (the full
-   name is the title), instead of four lines of 28px that push everything else off the first screen. */
-@media (max-width: 580px) {
-  .account-page-hero.club-hero { padding: 14px 16px; }
-  .account-page-hero.club-hero h1, .club-name-heading {
-    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
-    font-size: 1.2rem; line-height: 1.25; overflow-wrap: anywhere;
-  }
-}
-
 /* The same cards for a table that only just overflows: its box is narrower than 600px (a compact table beside the staff sidebar at
    about 860-940px). Add `table-cards-compact` next to `table-cards`, and `card-box` on the wrapper. */
 @media screen and (min-width: 601px) {
@@ -11884,3 +11853,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media screen and (min-width: 601px) {
   .app-shell .roster-table td, .app-shell .roster-table th { white-space: normal; }
 }
+
+/* A card-box whose table is tablet or compact cards does not clip what pokes out of a card (a focus ring, a tooltip). These tables
+   fit their box whenever they are not cards (the thresholds sit above their widest layout, and the audit's table-wider-than-box
+   rule would flag one that did not), so they never need the sideways scroll; the roster and the wide grids keep their scroll cue. */
+.card-box:has(> table:is(.table-cards-tablet, .table-cards-compact)) { overflow: visible; }

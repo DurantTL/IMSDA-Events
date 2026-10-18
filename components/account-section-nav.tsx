@@ -21,6 +21,19 @@ export type AccountNavItem = {
   hideGroupLabel?: boolean;
 };
 
+export type ArrowFocusTarget = "start-arrow" | "end-arrow" | "first-tab" | "last-tab" | null;
+
+/**
+ * Where keyboard focus goes when the scroll arrow that has it is about to disappear (WCAG 2.4.3): an arrow hides when its edge is
+ * reached, and focus on a hidden control falls to the page. It moves to the opposite arrow when that one is showing, else to the
+ * tab at the edge that was reached. Null when the focused control stays visible (or is not an arrow).
+ */
+export function arrowFocusTarget({ focused, fadeStart, fadeEnd }: { focused: "start" | "end" | null; fadeStart: boolean; fadeEnd: boolean }): ArrowFocusTarget {
+  if (focused === "end" && !fadeEnd) return fadeStart ? "start-arrow" : "last-tab";
+  if (focused === "start" && !fadeStart) return fadeEnd ? "end-arrow" : "first-tab";
+  return null;
+}
+
 /** Room kept clear on a scrolled edge of the tab row for its arrow button and fade (px); the CSS scroll-padding matches it. */
 const SCROLL_CLEARANCE = 46;
 
@@ -83,9 +96,21 @@ export function AccountSectionNav({
       const value = String(on);
       if (nav.dataset[name] !== value) nav.dataset[name] = value;
     };
+    const startArrow = nav.querySelector<HTMLElement>(".account-nav-arrow-start");
+    const endArrow = nav.querySelector<HTMLElement>(".account-nav-arrow-end");
     const updateFades = () => {
-      setFade("fadeStart", list.scrollLeft > 1);
-      setFade("fadeEnd", list.scrollLeft + list.clientWidth < list.scrollWidth - 1);
+      const fadeStart = list.scrollLeft > 1;
+      const fadeEnd = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+      // Decide before an arrow is hidden: focus on a hidden control would fall to the page.
+      const active = document.activeElement;
+      const target = arrowFocusTarget({ focused: active === startArrow ? "start" : active === endArrow ? "end" : null, fadeStart, fadeEnd });
+      setFade("fadeStart", fadeStart);
+      setFade("fadeEnd", fadeEnd);
+      if (target) {
+        const tabs = Array.from(list.querySelectorAll<HTMLElement>("a"));
+        const next = target === "start-arrow" ? startArrow : target === "end-arrow" ? endArrow : target === "first-tab" ? tabs[0] : tabs[tabs.length - 1];
+        next?.focus({ preventScroll: true });
+      }
     };
     updateFades();
     list.addEventListener("scroll", updateFades, { passive: true });

@@ -1589,9 +1589,10 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
       else if (!drawn) wideTables.push(`${detail}: data-scroll-cue is set but no edge fade or shadow is drawn (the box needs the scroll-cue class)`);
       else {
         // The shadow sits behind the table: a cell that paints a solid background over it hides it.
-        const covering = Array.from(table.querySelectorAll("tbody tr:nth-child(-n+5) > *, thead th"))
+        // Cells, rows and row groups all count (an opaque row or footer would hide the cue just as a cell does).
+        const covering = [table, ...Array.from(table.querySelectorAll("thead, thead tr, thead th, tbody, tbody tr:nth-child(-n+5), tbody tr:nth-child(-n+5) > *, tfoot, tfoot tr, tfoot > tr > *"))]
           .filter((cell) => alphaOf(getComputedStyle(cell).backgroundColor) > 0.5);
-        if (covering.length > 0) wideTables.push(`${detail}: ${covering.length} cell(s) such as ${describe(covering[0]!)} paint a solid background over the scroll cue, so the shadow cannot show`);
+        if (covering.length > 0) wideTables.push(`${detail}: ${covering.length} element(s) (cells, rows or the table) such as ${describe(covering[0]!)} paint a solid background over the scroll cue, so the shadow cannot show`);
       }
     }
   }

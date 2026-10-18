@@ -47,6 +47,17 @@ describe("#997 shared layout CSS", () => {
     expect(css).toContain("@container (max-width: 760px)");
   });
 
+  it("has one copy of the tab-strip and long-name CSS, and does not clip a card-box that shows cards", () => {
+    expect(css.split("/* Tab strips that scroll (#997)")).toHaveLength(2);
+    expect(css.split("/* A long club name (#997)")).toHaveLength(2);
+    expect(css).toContain(".card-box:has(> table:is(.table-cards-tablet, .table-cards-compact)) { overflow: visible; }");
+  });
+
+  it("checks rows, row groups and footers for a solid background over the scroll cue", () => {
+    expect(script).toContain("tfoot > tr > *");
+    expect(script).toContain("thead tr");
+  });
+
   it("keeps ordinary words whole in cards: break-word, with anywhere only for emails and codes", () => {
     expect(css).toContain('.break-anywhere.break-anywhere, table td :is(code, a[href^="mailto:"], .team-email) { overflow-wrap: anywhere; }');
   });
