@@ -172,3 +172,13 @@ describe("focus ring cascade (#1003)", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("#1003 group flow with no locations", () => {
+  it("never blocks the group form's submit for an event with no locations (that value also stops submit)", () => {
+    const source = read("components/group-registration-flow.tsx");
+    const reason = source.slice(source.indexOf("const blockedReason = useMemo"), source.indexOf("}, [locations.length, chosenLocation]);"));
+    expect(reason).toContain('if (locations.length > 0 && !chosenLocation) return "Choose a location first.";');
+    expect(reason).not.toMatch(/locations\.length === 0\)\s*return/);
+    expect(source).toContain("useState(locations.length === 0)");
+  });
+});

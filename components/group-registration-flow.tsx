@@ -134,8 +134,9 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventS
   }, [hasClasses, honorsCatalog, definition, offerings, picks, locationId]);
 
   const blockedReason = useMemo(() => {
-    if (locations.length === 0) return "No locations are open for registration right now.";
-    if (!chosenLocation) return "Choose a location first.";
+    // An event with no locations skips the picker and submits with no location, so it is never blocked here
+    // (this value also stops the group form's submit).
+    if (locations.length > 0 && !chosenLocation) return "Choose a location first.";
     return null;
   }, [locations.length, chosenLocation]);
 
