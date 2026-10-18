@@ -51,6 +51,11 @@ export type NotificationDefinition = {
   sourceNote: string;
   /** The module file that sends it, for the tests and the next person to read. */
   sentFrom: string;
+  /**
+   * The files that read its switch. Each reads it BEFORE its transaction opens and passes the answer down to
+   * `sentFrom`, which is why these are not always the same file. Empty until the alert is built.
+   */
+  switchReadIn: readonly string[];
   /** False until the alert is built; it has a switch ready but nothing sends it yet. */
   built: boolean;
   /** Turning it off needs a warning and an in-page confirmation first. */
@@ -66,6 +71,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "event-list" },
     sourceNote: "Set on each event's Communications page.",
     sentFrom: "modules/communications/messaging-repository.ts",
+    switchReadIn: ["modules/forms/public-repository.ts"],
     built: true,
   },
   {
@@ -76,6 +82,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "event-list" },
     sourceNote: "Set on each event's Communications page.",
     sentFrom: "modules/general-link-registrations/repository.ts",
+    switchReadIn: ["modules/general-link-registrations/repository.ts"],
     built: true,
   },
   {
@@ -86,6 +93,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "event-list" },
     sourceNote: "Set on each event's Communications page.",
     sentFrom: "modules/staff-invitations/repository.ts",
+    switchReadIn: ["modules/staff-invitations/repository.ts"],
     built: true,
   },
   {
@@ -96,6 +104,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "platform-address", field: "newClubApplicationEmail" },
     sourceNote: "Edited on this page. Blank means no notice; applications still wait in the queue.",
     sentFrom: "modules/club-applications/email.ts",
+    switchReadIn: ["modules/club-applications/repository.ts"],
     built: true,
   },
   {
@@ -106,6 +115,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "platform-address", field: "securityAlertEmail" },
     sourceNote: "Edited on this page. Blank means only the account holder is told.",
     sentFrom: "modules/communications/lockout-email.ts",
+    switchReadIn: ["modules/communications/lockout-email.ts"],
     built: true,
     confirmBeforeOff: {
       title: "Turn off sign-in lockout alerts?",
@@ -120,6 +130,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "platform-address", field: "supportContact" },
     sourceNote: "Edited on this page. This address is also shown as the platform support contact.",
     sentFrom: "modules/event-modules/request-email.ts",
+    switchReadIn: ["modules/event-modules/requests.ts"],
     built: true,
   },
   {
@@ -130,6 +141,14 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "roles" },
     sourceNote: "Chosen by role: the Area Coordinator assigned to the location, otherwise the event's staff who manage registrations.",
     sentFrom: "modules/club-teams/permission-repository.ts",
+    switchReadIn: [
+      "modules/forms/public-repository.ts",
+      "modules/registrations/operations-repository.ts",
+      "modules/registrations/amendments-repository.ts",
+      "modules/attendee-accounts/registrations-repository.ts",
+      "modules/public-access/repository.ts",
+      "modules/club-transfers/repository.ts",
+    ],
     built: true,
   },
   {
@@ -140,6 +159,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "roles" },
     sourceNote: "Chosen by role: Area Coordinators and event admins.",
     sentFrom: "modules/event-locations/waitlist-digest.ts",
+    switchReadIn: ["modules/event-locations/waitlist-digest.ts"],
     built: true,
   },
   {
@@ -150,6 +170,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "roles" },
     sourceNote: "Chosen by role: the sending club's director and deputy.",
     sentFrom: "modules/club-transfers/repository.ts",
+    switchReadIn: ["modules/club-transfers/repository.ts"],
     built: true,
   },
   {
@@ -160,6 +181,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "roles" },
     sourceNote: "Chosen by role: both clubs' leaders. It is one notice that also goes to the member or guardian, so turning it off skips theirs too.",
     sentFrom: "modules/club-transfers/repository.ts",
+    switchReadIn: ["modules/club-transfers/repository.ts"],
     built: true,
   },
   {
@@ -170,6 +192,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "roles" },
     sourceNote: "Coming soon: recipients will be set for each form.",
     sentFrom: "not built yet",
+    switchReadIn: [],
     built: false,
   },
 ];

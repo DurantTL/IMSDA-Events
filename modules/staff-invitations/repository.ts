@@ -664,6 +664,8 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
   if (duplicate) {
     throw new StaffInvitationError("INVALID_PARTY", `${duplicate} is listed twice. List each person once.`);
   }
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyOffice = await isNotificationEnabled("STAFF_INVITATION_APPROVAL_DIGEST");
   let notices: string[] = [];
   const result = await serializable(async (tx) => {
     const invitation = await loadByToken(tx, token);
@@ -742,7 +744,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
         metadata: { invitationId: invitation.id, group: invitation.group, partySize: party.length, totalCents: 0 },
       },
     });
-    const staff = await isNotificationEnabled("STAFF_INVITATION_APPROVAL_DIGEST") ? await officeEmails(tx, event.id) : [];
+    const staff = notifyOffice ? await officeEmails(tx, event.id) : [];
     const waitingCount = await tx.staffInvitation.count({ where: { eventId: event.id, approval: "WAITING" } });
     const reviewUrl = `${baseUrl().replace(/\/+$/, "")}/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`;
     const window = officeDigestWindow(now);

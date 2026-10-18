@@ -122,7 +122,10 @@ describe("notifications routes: system administrators only (#1016)", () => {
     expect((await patch({ key: "NOT_A_KEY", enabled: false })).status).toBe(400);
     expect((await patch({ key: "NEW_CLUB_APPLICATION", enabled: "no" })).status).toBe(400);
     expect((await patch({ addresses: { securityAlertEmail: "not-an-address" } })).status).toBe(400);
-    expect((await patch({ addresses: { organizationName: "Hijack" } })).status).toBe(400);
+    expect((await patch({ addresses: { organizationName: "Hijack", supportContact: "", securityAlertEmail: "", newClubApplicationEmail: "" } })).status).toBe(400);
+    // An omitted key must not silently clear a saved address.
+    expect((await patch({ addresses: { securityAlertEmail: "security@imsda-events.test" } })).status).toBe(400);
+    expect((await patch({ addresses: { supportContact: "", securityAlertEmail: "" } })).status).toBe(400);
     expect(mocks.setNotificationEnabled).not.toHaveBeenCalled();
     expect(mocks.updatePlatformAddresses).not.toHaveBeenCalled();
   });

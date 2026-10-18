@@ -48,7 +48,19 @@ const switchBodySchema = z.object({
   confirmed: z.boolean().optional(),
 }).strict();
 
-const addressesBodySchema = z.object({ addresses: platformAddressesInputSchema }).strict();
+/**
+ * All three keys must be sent, blank to clear one. The address schema alone treats a missing key as blank, so a partial
+ * request (or a client that forgot one) would silently clear a saved address.
+ */
+const addressKeys = ["supportContact", "securityAlertEmail", "newClubApplicationEmail"] as const;
+const addressesBodySchema = z.object({
+  addresses: z.record(z.string(), z.unknown())
+    .refine(
+      (value) => addressKeys.every((key) => key in value),
+      "Send all three addresses; leave one blank to clear it.",
+    )
+    .pipe(platformAddressesInputSchema),
+}).strict();
 
 async function getHandler() {
   const user = await requireSystemAdmin();

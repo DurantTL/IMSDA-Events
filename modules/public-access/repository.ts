@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { createHmac, randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -1060,10 +1061,13 @@ export async function updatePublicTieredAttendeeAnswers(
   },
   now = new Date(),
 ) {
+  // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   const result = await getPrisma().$transaction(async (tx) => {
     const access = await loadActiveAccessRecord(tx, token, now);
     if (!access) return null;
     return updateTieredRegistrationAnswersWithClient(tx, {
+      notifyApprovers,
       registrationId: access.registration.id,
       clientRequestId: input.clientRequestId,
       expectedUpdatedAt: input.expectedUpdatedAt,

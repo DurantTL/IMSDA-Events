@@ -804,6 +804,8 @@ async function createPending(input: {
   typedPeople: Array<{ firstName: string; lastName: string }>;
   allowMultipleTeams: boolean;
 }): Promise<GeneralLinkConfirmation> {
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyStaff = await isNotificationEnabled("GROUP_REGISTRATION_APPROVAL_DIGEST");
   const prisma = getPrisma();
   const submissionId = randomUUID();
   const confirmationCode = pendingConfirmationCode(randomUUID().replaceAll("-", ""));
@@ -868,7 +870,7 @@ async function createPending(input: {
           },
         });
         // Staff get one digest per event per 15 minutes, with the count, never one email per team.
-        const staff = await isNotificationEnabled("GROUP_REGISTRATION_APPROVAL_DIGEST") ? await staffEmails(tx, input.event.id) : [];
+        const staff = notifyStaff ? await staffEmails(tx, input.event.id) : [];
         const waitingCount = await tx.generalLinkSubmission.count({ where: { eventId: input.event.id, status: "PENDING" } });
         const reviewUrl = `${getServerEnv().APP_BASE_URL.replace(/\/+$/, "")}/people/pending-teams?event=${encodeURIComponent(input.event.id)}`;
         const window = staffDigestWindow(input.now);

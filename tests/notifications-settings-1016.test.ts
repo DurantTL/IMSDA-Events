@@ -62,12 +62,17 @@ describe("isNotificationEnabled (#1016)", () => {
     expect(await isNotificationEnabled("EVENT_MODULE_REQUESTED")).toBe(true);
   });
 
-  it("is on when the read fails, logs it, and tries again for the next email", async () => {
+  it("is on when the read fails, logs it once, and does not ask again until the cache expires", async () => {
+    vi.useFakeTimers();
     const failing = { notificationSetting: { findMany: vi.fn().mockRejectedValue(new Error("connection lost")) } };
     database.getPrisma.mockReturnValue(failing);
     expect(await isNotificationEnabled("SIGN_IN_LOCKOUT_OFFICE_COPY")).toBe(true);
+    expect(await isNotificationEnabled("NEW_CLUB_APPLICATION")).toBe(true);
+    expect(await isNotificationEnabled("SIGN_IN_LOCKOUT_OFFICE_COPY")).toBe(true);
+    expect(failing.notificationSetting.findMany).toHaveBeenCalledTimes(1);
     expect(database.logError).toHaveBeenCalledTimes(1);
 
+    await vi.advanceTimersByTimeAsync(16_000);
     database.getPrisma.mockReturnValue(clientWith([{ key: "SIGN_IN_LOCKOUT_OFFICE_COPY", enabled: false }]).client);
     expect(await isNotificationEnabled("SIGN_IN_LOCKOUT_OFFICE_COPY")).toBe(false);
   });
@@ -82,12 +87,48 @@ describe("isNotificationEnabled (#1016)", () => {
     expect(await isNotificationEnabled("LOCATION_WAITLIST_DIGEST")).toBe(true);
   });
 
-  it("is on when the read hangs, so a slow database never holds an email up", async () => {
+  it("is on when the read hangs, and a hang is asked about once, not once per email", async () => {
     vi.useFakeTimers();
-    database.getPrisma.mockReturnValue({ notificationSetting: { findMany: vi.fn(() => new Promise(() => {})) } });
-    const pending = isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
+    const hanging = { notificationSetting: { findMany: vi.fn(() => new Promise(() => {})) } };
+    database.getPrisma.mockReturnValue(hanging);
+    const first = isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
+    const second = isNotificationEnabled("LOCATION_WAITLIST_DIGEST");
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(await pending).toBe(true);
+    expect(await first).toBe(true);
+    expect(await second).toBe(true);
+    expect(await isNotificationEnabled("TEAM_APPROVAL_REQUESTED")).toBe(true);
+    expect(hanging.notificationSetting.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one read between emails that arrive while it is running", async () => {
+    const { client } = clientWith([]);
+    database.getPrisma.mockReturnValue(client);
+    await Promise.all([
+      isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY"),
+      isNotificationEnabled("GROUP_REGISTRATION_APPROVAL_DIGEST"),
+      isNotificationEnabled("MEMBER_TRANSFER_STARTED"),
+    ]);
+    expect(client.notificationSetting.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let a read that began before a change overwrite the cache after it", async () => {
+    let release: (rows: Row[]) => void = () => undefined;
+    const slow = {
+      notificationSetting: {
+        findMany: vi.fn(() => new Promise<Row[]>((resolve) => { release = resolve; })),
+      },
+    };
+    database.getPrisma.mockReturnValue(slow);
+    const stale = isNotificationEnabled("NEW_CLUB_APPLICATION");
+    // The change is saved (and the cache reset) while the old read is still running...
+    resetNotificationSettingsCache();
+    // ...and the old read then returns the pre-change answer (still on).
+    release([]);
+    await stale;
+
+    // The next call must read again and see the change, not reuse the old answer.
+    database.getPrisma.mockReturnValue(clientWith([{ key: "NEW_CLUB_APPLICATION", enabled: false }]).client);
+    expect(await isNotificationEnabled("NEW_CLUB_APPLICATION")).toBe(false);
   });
 
   it("reads the table once for a burst of emails, and again after the cache expires", async () => {

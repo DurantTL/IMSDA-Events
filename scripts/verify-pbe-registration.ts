@@ -770,7 +770,7 @@ async function main() {
   const soloAfter = await prisma.clubEventRegistration.findFirstOrThrow({ where: { eventId: soloEventId }, include: { registration: { include: { attendees: true } } } });
   const attendeeOfPerson = (key: string) => soloAfter.registration.attendees.find((attendee) => attendee.personId === personOf.get(`f:${key}`)!)!;
   const selfService = async (key: string) => prisma.$transaction((tx) => updateTieredRegistrationAnswersWithClient(tx, {
-    registrationId: soloAfter.registrationId, clientRequestId: randomUUID(), expectedUpdatedAt: currentUpdatedAt.toISOString(),
+    notifyApprovers: true, registrationId: soloAfter.registrationId, clientRequestId: randomUUID(), expectedUpdatedAt: currentUpdatedAt.toISOString(),
     attendees: [{ attendeeId: attendeeOfPerson(key).id, responses: { shirt_size: "M" } }],
     now, audit: { action: "ATTENDEE_ANSWERS_UPDATED", summary: (code) => `Updated answers for ${code}.`, metadata: {} },
   }));

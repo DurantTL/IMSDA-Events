@@ -118,7 +118,12 @@ export async function enforceTeamRegistrationRules(
      */
     declineScope?: "ANY" | "CHANGED_ONLY";
     changedAttendeeIds?: ReadonlySet<string>;
-  } = {},
+    /**
+     * The "Team approval requested" switch (#1016), read by the caller before its transaction opens. Required, so a new
+     * caller cannot forget it. False still flags the person; it only skips the email.
+     */
+    notifyApprovers: boolean;
+  },
 ): Promise<{ queuedMessageIds: string[] }> {
   const team = await tx.clubEventRegistration.findUnique({
     where: { registrationId },
@@ -230,6 +235,7 @@ export async function enforceTeamRegistrationRules(
   const flags = await syncTeamMemberPermissions(tx, {
     eventId: team.eventId, clubEventRegistrationId: team.id, registrationId, people: flagCandidates,
     actor: { userId: options.actorUserId, accountId: options.actorAccountId },
+    notifyApprovers: options.notifyApprovers,
   });
   const scope = options.declineScope ?? "ANY";
   const blocking = scope === "ANY" ? flags.declined : flags.declined.filter((entry) => options.changedAttendeeIds?.has(entry.attendeeId));

@@ -365,6 +365,9 @@ async function main() {
     );
   } finally {
     await prisma.notificationSetting.deleteMany({ where: { key: "NEW_REGISTRATION_STAFF_COPY" } });
+    // The running app still holds "off" for up to 15 seconds. The next script in CI (test:public-roster) runs against the
+    // same app and expects the staff copy, so do not exit until the app has had time to read the row's removal.
+    await new Promise((resolve) => setTimeout(resolve, 16_000));
   }
 
   console.log(JSON.stringify({

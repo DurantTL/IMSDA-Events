@@ -1,6 +1,5 @@
 import "server-only";
 
-import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -44,7 +43,7 @@ const actorMetadata = (actor: PermissionActor) => (actor.accountId ? { actorAcco
  */
 export async function syncTeamMemberPermissions(
   tx: Tx,
-  input: { eventId: string; clubEventRegistrationId: string; registrationId: string; people: readonly PermissionCandidate[]; actor?: PermissionActor },
+  input: { eventId: string; clubEventRegistrationId: string; registrationId: string; people: readonly PermissionCandidate[]; actor?: PermissionActor; notifyApprovers: boolean },
 ): Promise<PermissionSyncResult> {
   const actor = input.actor ?? {};
   const needing = input.people.filter((person) => person.role === "MEMBER" && person.age !== null && person.age >= 18);
@@ -97,7 +96,7 @@ export async function syncTeamMemberPermissions(
     }
     if (row.status === "DECLINED") declined.push({ name: person.name, tlt: person.tlt === true, attendeeId: person.attendeeId });
   }
-  const queuedMessageIds = created.length > 0 ? await queuePermissionRequest(tx, { eventId: input.eventId, registrationId: input.registrationId, people: created }) : [];
+  const queuedMessageIds = created.length > 0 && input.notifyApprovers ? await queuePermissionRequest(tx, { eventId: input.eventId, registrationId: input.registrationId, people: created }) : [];
   return { declined, queuedMessageIds };
 }
 
@@ -126,8 +125,6 @@ async function queuePermissionRequest(
   tx: Tx,
   input: { eventId: string; registrationId: string; people: ReadonlyArray<PermissionCandidate & { rowId: string }> },
 ): Promise<string[]> {
-  // A system administrator can turn this alert off (#1016); the flagged people still wait for a decision.
-  if (!await isNotificationEnabled("TEAM_APPROVAL_REQUESTED")) return [];
   const registration = await tx.registration.findUnique({
     where: { id: input.registrationId },
     select: {

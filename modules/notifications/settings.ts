@@ -25,10 +25,15 @@ const READ_TIMEOUT_MS = 1_500;
 type Snapshot = { loadedAt: number; enabled: Map<string, boolean> };
 
 let snapshot: Snapshot | null = null;
+/** Bumped by every reset, so a read that began before a change never overwrites the cache after it. */
+let generation = 0;
+let inFlight: { generation: number; promise: Promise<Snapshot> } | null = null;
 
 /** Forgets what was read. Called after every change, and by tests. */
 export function resetNotificationSettingsCache() {
+  generation += 1;
   snapshot = null;
+  inFlight = null;
 }
 
 async function readRows(): Promise<Array<{ key: string; enabled: boolean }>> {
@@ -50,22 +55,45 @@ async function readWithTimeout(): Promise<Array<{ key: string; enabled: boolean 
 }
 
 /**
- * Whether an alert should be queued. One small read of the whole table (a
- * dozen rows at most), kept for a few seconds, so a busy site does not query
- * it per email. It deliberately uses the shared client and not the caller's
- * transaction: a failed query inside a Postgres transaction aborts the whole
- * transaction, and that would lose the registration this email belongs to.
+ * One read at a time, shared by every caller waiting for it. A failed or timed-out read is kept as "all on" for the
+ * same few seconds as a good one, so a database that is struggling is asked once per window and not once per email.
+ */
+function load(): Promise<Snapshot> {
+  if (inFlight && inFlight.generation === generation) return inFlight.promise;
+  const startedIn = generation;
+  const promise = (async (): Promise<Snapshot> => {
+    let loaded: Snapshot;
+    try {
+      const rows = await readWithTimeout();
+      loaded = { loadedAt: Date.now(), enabled: new Map(rows.map((row) => [row.key, row.enabled])) };
+    } catch (error) {
+      logError("Reading the notification switches failed; sending every alert.", error);
+      loaded = { loadedAt: Date.now(), enabled: new Map() };
+    }
+    // A change was saved while this read was running: its answer may be out of date, so it is not kept.
+    if (startedIn === generation) snapshot = loaded;
+    return loaded;
+  })();
+  inFlight = { generation: startedIn, promise };
+  void promise.finally(() => {
+    if (inFlight?.promise === promise) inFlight = null;
+  });
+  return promise;
+}
+
+/**
+ * Whether an alert should be queued. One small read of the whole table (a dozen rows at most), kept for a few seconds,
+ * so a busy site does not query it per email.
+ *
+ * Call it BEFORE a transaction opens and pass the answer in, never from inside a `$transaction` callback: a read there
+ * needs a second pool connection while the transaction holds one, which stalls every submission in a rush, and a failed
+ * query inside a Postgres transaction aborts the whole transaction.
  */
 export async function isNotificationEnabled(key: NotificationKey): Promise<boolean> {
   try {
-    const now = Date.now();
-    if (!snapshot || now - snapshot.loadedAt > CACHE_TTL_MS) {
-      const rows = await readWithTimeout();
-      snapshot = { loadedAt: now, enabled: new Map(rows.map((row) => [row.key, row.enabled])) };
-    }
-    return snapshot.enabled.get(key) ?? true;
+    const current = snapshot && Date.now() - snapshot.loadedAt <= CACHE_TTL_MS ? snapshot : await load();
+    return current.enabled.get(key) ?? true;
   } catch (error) {
-    // Not cached: the next email tries again. The alert goes out meanwhile.
     logError("Reading the notification switches failed; sending the alert.", error, { notificationKey: key });
     return true;
   }

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
@@ -277,6 +278,8 @@ export async function submitNewClubApplication(
   }
 
   const settings = await getPlatformSettings();
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyOffice = await isNotificationEnabled("NEW_CLUB_APPLICATION");
   const clubName = cleanName(input.clubName);
   const directorName = cleanName(input.directorName);
   const stored = attachment ? await writeAsset(ATTACHMENT_PARTITION, attachment.type, attachment.bytes) : null;
@@ -345,7 +348,7 @@ export async function submitNewClubApplication(
         clubName,
         churchName: churchName ?? cleanName(input.sponsoringChurchOther ?? ""),
         directorName,
-      });
+      }, notifyOffice);
       return { id: created.id, messageIds: queued };
     });
     await deliverApplicationEmails(messageIds);

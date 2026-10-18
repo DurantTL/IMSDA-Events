@@ -38,18 +38,15 @@ describe("notification catalog (#1016)", () => {
     expect(ready?.built).toBe(false);
   });
 
-  it("is wired into every built send site: the file names its key and checks the switch", () => {
+  it("is wired into every built send site: each reader names its key and reads the switch", () => {
     for (const entry of notificationCatalog.filter((candidate) => candidate.built)) {
-      const source = read(entry.sentFrom);
-      expect(source, `${entry.sentFrom} imports the helper`).toContain('from "@/modules/notifications/settings"');
-      expect(source, `${entry.sentFrom} checks ${entry.key}`).toMatch(
-        new RegExp(`isNotificationEnabled\\(\\s*(?:"${entry.key}"|templateKey)\\s*\\)`),
-      );
+      expect(entry.switchReadIn.length, `${entry.key} has a file that reads its switch`).toBeGreaterThan(0);
+      for (const file of entry.switchReadIn) {
+        const source = read(file);
+        expect(source, `${file} imports the helper`).toContain('from "@/modules/notifications/settings"');
+        expect(source, `${file} reads ${entry.key}`).toMatch(new RegExp(`isNotificationEnabled\\(\\s*"${entry.key}"\\s*\\)`));
+      }
     }
-    // The two transfer notices share one queueing function and pass their template key, which is the notification key.
-    const transfers = read("modules/club-transfers/repository.ts");
-    expect(transfers).toContain('"MEMBER_TRANSFER_STARTED"');
-    expect(transfers).toContain('"MEMBER_TRANSFER_COMPLETED"');
   });
 
   it("does not build the club form alert yet", () => {

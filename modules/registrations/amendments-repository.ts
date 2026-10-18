@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { partnerClubIssue, partnerClubProblem } from "@/modules/club-registrations/domain";
 import { enforceTeamRegistrationRules } from "@/modules/club-teams/registration-guard";
 import { deliverPermissionMessages } from "@/modules/club-teams/permission-repository";
@@ -1492,6 +1493,8 @@ export async function amendRegistration(
       attendees: input.attendees,
     },
   });
+  // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   const prisma = getPrisma();
   for (let attempt = 0; attempt < maxRetryAttempts; attempt += 1) {
     try {
@@ -1750,6 +1753,7 @@ export async function amendRegistration(
           ? new Set(input.attendees.flatMap((entry, index) => (entry.differentPerson ? committedAttendees[index]?.attendeeId ?? [] : [])))
           : undefined;
         permissionMessageIds.push(...(await enforceTeamRegistrationRules(tx, registrationId, {
+            notifyApprovers,
             // Staff only can confirm a name match as a different person; everyone else's flag is ignored.
             ...(actor.kind === "STAFF" ? { differentPersonAttendeeIds: differentPeople } : {}),
             ...(actor.kind === "STAFF" || actor.kind === "STAFF_ACTING_DIRECTOR" ? { actorUserId: actor.id } : {}),

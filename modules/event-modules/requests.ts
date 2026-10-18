@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import {
@@ -77,6 +78,8 @@ export async function createModuleRequest(
   const key: EventModuleKey = moduleKey;
   const reason = cleanReason(reasonInput, MODULE_REQUEST_REASON_MAX, "A reason");
   const officeEmail = await conferenceOfficeAddress();
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyOffice = await isNotificationEnabled("EVENT_MODULE_REQUESTED");
   const prisma = getPrisma();
   try {
     const { id, messageIds } = await prisma.$transaction(async (tx) => {
@@ -115,7 +118,7 @@ export async function createModuleRequest(
         eventName: event.name,
         requesterName: user.displayName || user.email,
         reason,
-      });
+      }, notifyOffice);
       return { id: created.id, messageIds: queued };
     });
     await deliverRequestEmails(messageIds);

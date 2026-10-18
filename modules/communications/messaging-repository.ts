@@ -1,6 +1,5 @@
 import "server-only";
 
-import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { MessagingError } from "@/modules/communications/messaging-error";
 
@@ -196,6 +195,8 @@ export type RegistrationMessageInput = {
    * visitor cannot become a link, an image or a token.
    */
   registrantNote?: string | null;
+  /** The "New public registration" switch (#1016), read before the transaction; false skips the staff copy only. */
+  staffCopyEnabled?: boolean;
 };
 
 export type QueuedRegistrationMessages = {
@@ -3621,9 +3622,8 @@ export async function enqueuePublicRegistrationMessages(
     name: registrantName,
   }];
   // The staff copy has its own switch (#1016); the registrant's confirmation above never does.
-  const staffCopyEnabled = settings.internalNotificationEmails.length > 0
-    && await isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY");
-  for (const email of staffCopyEnabled ? settings.internalNotificationEmails : []) {
+  // The caller reads the switch before its transaction opens (never a database read in here); omitted means on.
+  for (const email of input.staffCopyEnabled === false ? [] : settings.internalNotificationEmails) {
     recipients.push({
       templateKey: "INTERNAL_NEW_REGISTRATION",
       kind: "INTERNAL",

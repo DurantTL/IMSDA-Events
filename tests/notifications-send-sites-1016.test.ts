@@ -51,18 +51,17 @@ beforeEach(() => {
 describe("new club application notice (#1016)", () => {
   const input = { applicationId: "app-1", clubName: "Synthetic Club", churchName: "Synthetic Church", directorName: "Pat Example" };
 
-  it("queues the notice while its switch is on (or its row is missing, which reads as on)", async () => {
+  it("queues the notice while its switch is on", async () => {
     const client = outbox();
-    expect(await queueSubmittedEmail(client as never, "office@imsda-events.test", input)).toEqual(["message-1"]);
-    expect(mocks.isNotificationEnabled).toHaveBeenCalledWith("NEW_CLUB_APPLICATION");
+    expect(await queueSubmittedEmail(client as never, "office@imsda-events.test", input, true)).toEqual(["message-1"]);
     expect(client.messageOutbox.create).toHaveBeenCalledTimes(1);
   });
 
-  it("queues nothing while its switch is off", async () => {
-    mocks.isNotificationEnabled.mockResolvedValue(false);
+  it("queues nothing while its switch is off, and never reads the database itself (it runs inside a transaction)", async () => {
     const client = outbox();
-    expect(await queueSubmittedEmail(client as never, "office@imsda-events.test", input)).toEqual([]);
+    expect(await queueSubmittedEmail(client as never, "office@imsda-events.test", input, false)).toEqual([]);
     expect(client.messageOutbox.create).not.toHaveBeenCalled();
+    expect(mocks.isNotificationEnabled).not.toHaveBeenCalled();
   });
 });
 
@@ -71,15 +70,14 @@ describe("event feature request notice (#1016)", () => {
 
   it("queues the notice while its switch is on", async () => {
     const client = outbox();
-    expect(await queueRequestSubmittedEmail(client as never, "support@imsda-events.test", input)).toEqual(["message-1"]);
-    expect(mocks.isNotificationEnabled).toHaveBeenCalledWith("EVENT_MODULE_REQUESTED");
+    expect(await queueRequestSubmittedEmail(client as never, "support@imsda-events.test", input, true)).toEqual(["message-1"]);
   });
 
-  it("queues nothing while its switch is off", async () => {
-    mocks.isNotificationEnabled.mockResolvedValue(false);
+  it("queues nothing while its switch is off, and never reads the database itself", async () => {
     const client = outbox();
-    expect(await queueRequestSubmittedEmail(client as never, "support@imsda-events.test", input)).toEqual([]);
+    expect(await queueRequestSubmittedEmail(client as never, "support@imsda-events.test", input, false)).toEqual([]);
     expect(client.messageOutbox.create).not.toHaveBeenCalled();
+    expect(mocks.isNotificationEnabled).not.toHaveBeenCalled();
   });
 });
 
