@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -867,7 +868,7 @@ async function createPending(input: {
           },
         });
         // Staff get one digest per event per 15 minutes, with the count, never one email per team.
-        const staff = await staffEmails(tx, input.event.id);
+        const staff = await isNotificationEnabled("GROUP_REGISTRATION_APPROVAL_DIGEST") ? await staffEmails(tx, input.event.id) : [];
         const waitingCount = await tx.generalLinkSubmission.count({ where: { eventId: input.event.id, status: "PENDING" } });
         const reviewUrl = `${getServerEnv().APP_BASE_URL.replace(/\/+$/, "")}/people/pending-teams?event=${encodeURIComponent(input.event.id)}`;
         const window = staffDigestWindow(input.now);

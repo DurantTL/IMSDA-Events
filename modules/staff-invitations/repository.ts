@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
@@ -741,7 +742,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
         metadata: { invitationId: invitation.id, group: invitation.group, partySize: party.length, totalCents: 0 },
       },
     });
-    const staff = await officeEmails(tx, event.id);
+    const staff = await isNotificationEnabled("STAFF_INVITATION_APPROVAL_DIGEST") ? await officeEmails(tx, event.id) : [];
     const waitingCount = await tx.staffInvitation.count({ where: { eventId: event.id, approval: "WAITING" } });
     const reviewUrl = `${baseUrl().replace(/\/+$/, "")}/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`;
     const window = officeDigestWindow(now);

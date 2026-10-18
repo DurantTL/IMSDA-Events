@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { after } from "next/server";
@@ -195,7 +196,9 @@ async function enqueueLockoutEmails(client: DbClient, input: LockoutEmailInput) 
   const officePrefix = capKeyPrefix("office", input, accountId);
   const settings = await getPlatformSettings();
   const personDue = !await sentWithin(client, personPrefix, input.now, PERSON_EMAIL_WINDOW_MS);
+  // The office copy has its own switch (#1016). The account holder's email is never behind it.
   const officeDue = Boolean(settings.securityAlertEmail)
+    && await isNotificationEnabled("SIGN_IN_LOCKOUT_OFFICE_COPY")
     && !await sentWithin(client, officePrefix, input.now, OFFICE_ALERT_WINDOW_MS);
   if (!personDue && !officeDue) return [];
 

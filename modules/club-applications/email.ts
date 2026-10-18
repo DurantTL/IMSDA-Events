@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
@@ -95,6 +96,8 @@ export async function queueSubmittedEmail(client: Outbox, notifyEmail: string | 
     logInfo("A new club application arrived but no notification address is set in system settings.", { applicationId: input.applicationId });
     return [];
   }
+  // A system administrator can turn this alert off (#1016); the application still waits in the queue.
+  if (!await isNotificationEnabled("NEW_CLUB_APPLICATION")) return [];
   const from = await sender();
   if (!from) return [];
   const content = submittedEmailContent(input);

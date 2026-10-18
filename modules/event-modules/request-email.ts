@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
@@ -83,6 +84,8 @@ export async function queueRequestSubmittedEmail(client: Outbox, officeEmail: st
     logInfo("A module request was made but no conference office address is set in platform settings.", { requestId: input.requestId });
     return [];
   }
+  // A system administrator can turn this alert off (#1016); the request still waits for review.
+  if (!await isNotificationEnabled("EVENT_MODULE_REQUESTED")) return [];
   const from = await sender();
   if (!from) return [];
   const message = await client.messageOutbox.create({

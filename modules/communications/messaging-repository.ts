@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { MessagingError } from "@/modules/communications/messaging-error";
 
@@ -3619,7 +3620,10 @@ export async function enqueuePublicRegistrationMessages(
     email: input.identity.email.trim().toLowerCase(),
     name: registrantName,
   }];
-  for (const email of settings.internalNotificationEmails) {
+  // The staff copy has its own switch (#1016); the registrant's confirmation above never does.
+  const staffCopyEnabled = settings.internalNotificationEmails.length > 0
+    && await isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY");
+  for (const email of staffCopyEnabled ? settings.internalNotificationEmails : []) {
     recipients.push({
       templateKey: "INTERNAL_NEW_REGISTRATION",
       kind: "INTERNAL",

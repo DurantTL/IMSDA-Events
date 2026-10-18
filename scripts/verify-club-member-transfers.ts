@@ -385,6 +385,38 @@ async function main() {
   assert((await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: sam.id } })).status === "REMOVED", "overridden: the sending row is erased");
   console.log("ok  staff override of an unmatched request with a chosen member and a required note");
 
+  // 11. The two notices have their own switches (#1016): off, the transfer still works and nothing is queued; the
+  // switch rows this adds are removed again.
+  const { resetNotificationSettingsCache } = await import("../modules/notifications/settings");
+  const switchKeys = ["MEMBER_TRANSFER_STARTED", "MEMBER_TRANSFER_COMPLETED"];
+  const setSwitch = async (key: string, enabled: boolean) => {
+    await prisma.notificationSetting.upsert({ where: { key }, update: { enabled }, create: { key, enabled } });
+    resetNotificationSettingsCache();
+  };
+  try {
+    await addMember(clubs.a, "tess", "Tess", "Testperson", "director-c@xfer.example.test");
+    await setSwitch("MEMBER_TRANSFER_STARTED", false);
+    const quiet = await repo.requestTransfer(clubs.b, { fromOrganizationId: clubs.a, firstName: "Tess", lastName: "Testperson", reason: "Moving." }, directorB, later);
+    assert(quiet.messageIds.length === 0, "started switch off: no notice is queued");
+    assert(await prisma.messageOutbox.count({ where: { correlationId: quiet.transferId } }) === 0, "started switch off: nothing in the outbox");
+    assert((await prisma.memberTransfer.findUniqueOrThrow({ where: { id: quiet.transferId } })).status === "PENDING", "started switch off: the request still stands");
+
+    await setSwitch("MEMBER_TRANSFER_COMPLETED", false);
+    await repo.acceptTransfer(clubs.a, quiet.transferId, directorA, later);
+    assert((await prisma.memberTransfer.findUniqueOrThrow({ where: { id: quiet.transferId } })).status === "COMPLETED", "completed switch off: the transfer still completes");
+    assert(await prisma.messageOutbox.count({ where: { correlationId: quiet.transferId } }) === 0, "completed switch off: no notice is queued to anyone");
+
+    // On again (the row says on): the started notice is queued as before.
+    await addMember(clubs.a, "uma", "Uma", "Testperson");
+    await setSwitch("MEMBER_TRANSFER_STARTED", true);
+    const loud = await repo.requestTransfer(clubs.b, { fromOrganizationId: clubs.a, firstName: "Uma", lastName: "Testperson", reason: "Moving." }, directorB, later);
+    assert(loud.messageIds.length === 1, "started switch on: the sending club is told again");
+  } finally {
+    await prisma.notificationSetting.deleteMany({ where: { key: { in: switchKeys } } });
+    resetNotificationSettingsCache();
+  }
+  console.log("ok  transfer notices skip when their switch is off and send when it is on");
+
   await cleanup();
   console.log("club member transfer checks passed");
 }

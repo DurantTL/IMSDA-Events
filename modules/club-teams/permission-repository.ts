@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -125,6 +126,8 @@ async function queuePermissionRequest(
   tx: Tx,
   input: { eventId: string; registrationId: string; people: ReadonlyArray<PermissionCandidate & { rowId: string }> },
 ): Promise<string[]> {
+  // A system administrator can turn this alert off (#1016); the flagged people still wait for a decision.
+  if (!await isNotificationEnabled("TEAM_APPROVAL_REQUESTED")) return [];
   const registration = await tx.registration.findUnique({
     where: { id: input.registrationId },
     select: {

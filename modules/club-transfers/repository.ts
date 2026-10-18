@@ -1,4 +1,5 @@
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { checkLocationSeats } from "@/modules/event-locations/admission";
 import { promoteWaitlistAfterSeatsFreed } from "@/modules/registrations/lifecycle-repository";
 import { crossSitePickCount } from "@/modules/honors/locations";
@@ -278,6 +279,8 @@ async function queueTransferNotification(
   // where account email isn't configured (local dev). Never a bulk send:
   // one message per person party to this one transfer.
   if (!isAccountEmailConfigured()) return [];
+  // Each notice has its own switch (#1016); the template key is the notification key.
+  if (!await isNotificationEnabled(templateKey)) return [];
   const unique = dedupeNotificationRecipients(recipients.filter((recipient) => Boolean(recipient.email)));
   if (unique.length === 0) return [];
   const sender = getAccountEmailSender();

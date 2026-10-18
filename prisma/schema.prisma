@@ -787,6 +787,7 @@ model User {
   createdMessageVersions    MessageTemplateVersion[]  @relation("MessageTemplateVersionCreatedBy")
   createdPaymentInstructionVersions EventPaymentInstructionVersion[] @relation("PaymentInstructionVersionApprovedBy")
   platformSettingsUpdates   PlatformSettings[]        @relation("PlatformSettingsUpdatedBy")
+  notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
@@ -1521,6 +1522,19 @@ model PlatformSettings {
   updatedByUserId           String?
 
   updatedBy User? @relation("PlatformSettingsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
+/// One on/off switch per automatic staff alert (#1016). The alert's key lives in
+/// `modules/notifications/catalog.ts`. A missing row means ON, so nothing changes
+/// until someone turns an alert off.
+model NotificationSetting {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  enabled         Boolean  @default(true)
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+
+  updatedBy User? @relation("NotificationSettingUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 }
 
 model Event {

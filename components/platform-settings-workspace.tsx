@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
@@ -8,7 +9,6 @@ import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-set
 type Draft = {
   organizationName: string;
   logoUrl: string;
-  supportContact: string;
   publicWebsiteUrl: string;
   defaultTimezone: string;
   defaultSenderName: string;
@@ -16,8 +16,6 @@ type Draft = {
   defaultReplyToEmail: string;
   defaultAttendeeEditPolicy: "TIERED" | "VERIFY_EVERY_EDIT";
   passkeyRpId: string;
-  securityAlertEmail: string;
-  newClubApplicationEmail: string;
   invoiceHeaderDepartment: string;
   invoiceHeaderOrganization: string;
   invoiceHeaderAddress: string;
@@ -28,7 +26,6 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
   return {
     organizationName: settings.organizationName,
     logoUrl: settings.logoUrl ?? "",
-    supportContact: settings.supportContact ?? "",
     publicWebsiteUrl: settings.publicWebsiteUrl ?? "",
     defaultTimezone: settings.defaultTimezone,
     defaultSenderName: settings.defaultSenderName,
@@ -36,8 +33,6 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
     defaultReplyToEmail: settings.defaultReplyToEmail ?? "",
     defaultAttendeeEditPolicy: settings.defaultAttendeeEditPolicy,
     passkeyRpId: settings.passkeyRpId ?? "",
-    securityAlertEmail: settings.securityAlertEmail ?? "",
-    newClubApplicationEmail: settings.newClubApplicationEmail ?? "",
     invoiceHeaderDepartment: settings.invoiceHeaderDepartment ?? "",
     invoiceHeaderOrganization: settings.invoiceHeaderOrganization ?? "",
     invoiceHeaderAddress: settings.invoiceHeaderAddress ?? "",
@@ -114,11 +109,6 @@ export function PlatformSettingsWorkspace({
             <small>A link to an image already hosted somewhere you control. Leave blank for none.</small>
           </label>
           <label>Public website<input type="url" placeholder="https://imsda.org" {...field("publicWebsiteUrl")} /></label>
-          <label>
-            Support contact
-            <input type="email" placeholder="support@imsda.org" {...field("supportContact")} />
-            <small>Also receives event feature requests.</small>
-          </label>
         </section>
 
         <section className="panel">
@@ -141,35 +131,14 @@ export function PlatformSettingsWorkspace({
         <section className="panel">
           <div className="section-heading">
             <div>
-              <p className="eyebrow"><KeyRound aria-hidden="true" size={14} /> Sign-in security</p>
-              <h2>Lockout alerts</h2>
+              <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Alerts</p>
+              <h2>Alert addresses</h2>
             </div>
           </div>
-          <label>
-            Security alert email
-            <input type="email" placeholder="security@imsda.org" {...field("securityAlertEmail")} />
-            <small>
-              Gets a short alert whenever a staff, club leader, or attendee sign-in locks after too many wrong passwords
-              or wrong two-step codes, in addition to the account holder. Leave blank to notify only the account holder.
-            </small>
-          </label>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Clubs</p>
-              <h2>New club applications</h2>
-            </div>
-          </div>
-          <label>
-            New club application notifications
-            <input type="email" placeholder="youth-assistant@example.org" {...field("newClubApplicationEmail")} />
-            <small>
-              Gets a short notice (club name, church and director name, with a link) whenever someone applies to start a new club.
-              No phone, address or attachment is ever emailed. Leave blank to send no notice; applications still wait in the queue.
-            </small>
-          </label>
+          <p className="field-help">
+            The support contact, the security alert address and the new club application address are edited, with a switch for every
+            automatic alert, on <Link className="text-button" href="/admin/notifications">Notifications</Link>.
+          </p>
         </section>
 
         <section className="panel">

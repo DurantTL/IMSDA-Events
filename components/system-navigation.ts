@@ -20,6 +20,7 @@ import {
   UsersRound,
   BarChart3,
   KeyRound,
+  Bell,
 } from "lucide-react";
 
 /**
@@ -97,6 +98,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/master-award-rules", label: "Master Award rules", description: "What it takes to earn a Master Award.", icon: Trophy },
       { href: "/admin/calendar", label: "Public calendar", description: "The calendar visitors see.", icon: CalendarDays },
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
+      { href: "/admin/notifications", label: "Notifications", description: "Every automatic staff alert, who gets it, and an on/off switch.", icon: Bell },
       { href: "/admin/settings", label: "Platform settings", description: "Sign-in, email and payment settings.", icon: CloudCog },
       { href: "/admin/readiness", label: "System readiness", description: "Whether the platform is ready for an event.", icon: CheckCircle2 },
     ],
@@ -189,6 +191,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/calendar(\/|$)/, "Conference calendar"],
   [/^\/admin\/event-templates\/[^/]+(\/|$)/, "Edit event template"],
   [/^\/admin\/event-templates(\/|$)/, "Event templates"],
+  [/^\/admin\/notifications(\/|$)/, "Notifications"],
   [/^\/admin\/readiness(\/|$)/, "System readiness"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
   [/^\/admin\/team(\/|$)/, "Team"],

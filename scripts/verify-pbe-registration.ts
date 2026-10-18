@@ -171,6 +171,9 @@ async function main() {
   await addMember("e", "tlt18d", "eighteen", "YOUTH", "PbeTltD", "Eighteen");
   for (const key of ["u17g", "u17h"]) await addMember("e", key, "seventeen", "YOUTH", "PbeSeventeen", key.toUpperCase());
   await addMember("e", "coach1", "adult", "STAFF", "PbeCoach", "Seven");
+  // For the approval-request switch check (#1016).
+  await addMember("e", "tlt18s", "eighteen", "YOUTH", "PbeTltS", "Eighteen");
+  for (const key of ["u17s1", "u17s2"]) await addMember("e", key, "seventeen", "YOUTH", "PbeSeventeen", key.toUpperCase());
   for (let index = 1; index <= 10; index += 1) await addMember("f", `y${index}`, "youth", "YOUTH", "PbeFran", `Ff${index}`);
   // 19 on the solo event's day (born 2007-06-01), so a team member who needs the Area Coordinator's permission there.
   await addMember("f", "tlt19", "eighteen", "YOUTH", "PbeFranTlt", "Nineteen");
@@ -618,6 +621,24 @@ async function main() {
   const askedOnce = await outboxFor(flagged.registrationId);
   assert(askedOnce.length === 1 && askedOnce[0]!.recipientEmail === `${P}-ac@example.test`.toLowerCase() && askedOnce[0]!.bodyTextSnapshot.includes("PbeTlt Eighteen (18)"), "the location's Area Coordinator is asked once, naming the person");
   assert(await prisma.auditLog.count({ where: { eventId, action: "CLUB_TEAM_PERMISSION_REQUESTED", entityId: flagRows[0]!.id, actorUserId: staffUserId } }) === 1, "the request is audited, with who acted");
+  {
+    // The approval request has its own switch (#1016): off, the person is still flagged pending, nobody is emailed; the
+    // switch row is removed again.
+    const { resetNotificationSettingsCache } = await import("../modules/notifications/settings");
+    await prisma.notificationSetting.upsert({ where: { key: "TEAM_APPROVAL_REQUESTED" }, update: { enabled: false }, create: { key: "TEAM_APPROVAL_REQUESTED", enabled: false } });
+    resetNotificationSettingsCache();
+    try {
+      await submit("e", "Switched off", [eOf("tlt18s", "TLT"), eOf("u17s1", "Pathfinder"), eOf("u17s2", "Pathfinder")], iowa!.id);
+      const quiet = await rowOf("e", "Switched off");
+      const quietFlags = await prisma.clubTeamMemberPermission.findMany({ where: { clubEventRegistrationId: quiet.id } });
+      assert(quietFlags.length === 1 && quietFlags[0]!.status === "PENDING", "switch off: the 18-year-old is still flagged as pending");
+      assert((await outboxFor(quiet.registrationId)).length === 0, "switch off: nobody is emailed the approval request");
+    } finally {
+      await prisma.notificationSetting.deleteMany({ where: { key: "TEAM_APPROVAL_REQUESTED" } });
+      resetNotificationSettingsCache();
+    }
+    console.log("ok  the approval request skips while its switch is off; the flag still stands");
+  }
   const pendingView = await club.getClubEventWorkspace(clubOf("e"), eventId, now, { teamKey: "flagged" });
   assert(pendingView.registration?.permissionNotices.length === 1 && pendingView.registration.permissionNotices[0]!.text === "PbeTlt Eighteen is 18 or older. Team members 18 and over need approval from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.", "the director is told, in the agreed words, on the team page");
   // Saving the team again with the same people asks nobody again.
