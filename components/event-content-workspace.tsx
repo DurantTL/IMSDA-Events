@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { FileText, FileUp, Info, Link2, ListOrdered, Plus, Save, Sparkles, SquareCheck, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, FileUp, Info, Link2, ListOrdered, Plus, Save, Sparkles, SquareCheck, Trash2, X } from "lucide-react";
 import type { EventAssetRecord } from "@/modules/events/asset-repository";
 import type { EventContentSectionRecord } from "@/modules/events/content-repository";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -171,7 +171,7 @@ function LinksEditor({
                         })} />
                       )}
                     </label>
-                    <button className="secondary-button" type="button" onClick={() => updateSection(index, {
+                    <button aria-label={`Remove link ${linkIndex + 1} from ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" title={`Remove link ${linkIndex + 1}`} type="button" onClick={() => updateSection(index, {
                       links: section.links.filter((_, position) => position !== linkIndex),
                     })}>
                       <Trash2 size={15} aria-hidden="true" />
@@ -218,9 +218,10 @@ function ItemsEditor({
             </label>
           )}
           <button
-            className="secondary-button"
+            className="secondary-button icon-only"
             type="button"
-            aria-label={`Remove ${isSteps ? "step" : "item"} ${position + 1}`}
+            title={`Remove ${isSteps ? "step" : "item"} ${position + 1}`}
+            aria-label={`Remove ${isSteps ? "step" : "item"} ${position + 1} from ${section.title || kindLabels[section.kind]}`}
             onClick={() => updateSection(index, { items: items.filter((_, at) => at !== position) })}
           >
             <Trash2 size={15} aria-hidden="true" />
@@ -584,20 +585,22 @@ export function EventContentWorkspace({
                   {section.isPublished ? "" : " · draft"}
                 </p>
               </div>
-              <div className="form-actions">
+              <div className="icon-button-row">
                 {section.kind !== "HERO" && (
                   <>
-                    <button className="secondary-button" type="button" onClick={() => move(index, -1)} disabled={!canMoveSection(sections, index, -1)}>Up</button>
-                    <button className="secondary-button" type="button" onClick={() => move(index, 1)} disabled={!canMoveSection(sections, index, 1)}>Down</button>
+                    <button aria-label={`Move section ${index + 1} up: ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" title="Move section up" type="button" onClick={() => move(index, -1)} disabled={!canMoveSection(sections, index, -1)}><ArrowUp aria-hidden="true" size={16} /></button>
+                    <button aria-label={`Move section ${index + 1} down: ${section.title || kindLabels[section.kind]}`} className="secondary-button icon-only" title="Move section down" type="button" onClick={() => move(index, 1)} disabled={!canMoveSection(sections, index, 1)}><ArrowDown aria-hidden="true" size={16} /></button>
                   </>
                 )}
                 <button
-                  className="secondary-button"
+                  aria-label={`Remove section ${index + 1}: ${section.title || kindLabels[section.kind]}`}
+                  className="secondary-button icon-only"
+                  title="Remove section"
                   type="button"
                   onClick={() => setRemoveSectionIndex(index)}
                   disabled={section.kind === "CUSTOM_HTML" && !isSystemAdmin}
                 >
-                  <Trash2 size={15} aria-hidden="true" /> Remove
+                  <Trash2 size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>

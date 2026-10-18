@@ -6425,7 +6425,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 /* Avery name badge sheets */
 .badge-print-page { padding-bottom: 34px; }
 .badge-print-intro { flex-wrap: wrap; gap: 24px; }
-.badge-print-actions { flex: 0 0 auto; }
+.badge-print-actions { flex: 0 1 auto; flex-wrap: wrap; min-width: 0; max-width: 100%; }
 .badge-print-page .badge-print-tip { flex: 1 0 100%; max-width: none; margin: 0; }
 .badge-print-controls {
   display: grid;
@@ -7735,7 +7735,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .club-going-list small { margin-top: 2px; color: var(--muted); font-size: var(--text-helper-min); font-weight: 500; }
 .event-location-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .event-location-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; padding: 10px 12px; border: 1px solid var(--line, #d8dde6); border-radius: 8px; }
-.event-location-list li.is-inactive { opacity: 0.7; }
+.event-location-list li.is-inactive > span:first-child { opacity: 0.7; }
 .event-location-list li > span:first-child { display: grid; gap: 2px; }
 .event-location-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .location-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
@@ -7855,6 +7855,39 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .roster-card-table.roster-card-table-wide .roster-card-actions .secondary-button { min-width: 44px; min-height: 44px; }
   .roster-card-table.roster-card-table-wide .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
   .roster-card-table.roster-card-table-wide .roster-section-empty-row td { padding: 0 0 8px; }}
+
+/* #997: a roster table whose box is narrower than 640px (beside the staff sidebar below ~980px, or on a tablet) is labelled
+   cards: a grid of label-over-value fields, with the row's actions in the card's top-right corner. Wider than that the table
+   stays a table and scrolls with its scroll cue. The box (`.card-box`) decides, not the viewport. Honors Classes cards (#996)
+   are not in a `.card-box`, so they keep their own rules. */
+@media (min-width: 721px) {
+  @container (max-width: 640px) {
+    .roster-card-table, .roster-card-table tbody, .roster-card-table tr, .roster-card-table td, .roster-card-table th { display: block; width: 100%; box-sizing: border-box; }
+    .roster-card-table { min-width: 0; }
+    .roster-card-table thead { display: none; }
+    .roster-card-table tr:not(.roster-section-row):not(.roster-section-empty-row) {
+      position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); align-items: start; gap: 8px 16px;
+      margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    }
+    .roster-card-table td { border: 0; padding: 2px 0; }
+    .roster-card-table td[data-label] { display: block; font-size: max(var(--type-body-floor, 0px), 0.8rem); }
+    .roster-card-table td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 1px; color: var(--muted); font-weight: 600; font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.75rem); }
+    .roster-card-table td.roster-card-name[data-label] { grid-column: 1 / -1; min-height: 44px; margin-bottom: 0; padding-right: 11rem; font-size: 0.9rem; }
+    .roster-card-table .roster-card-name[data-label]::before { content: none; }
+    .roster-card-table td.roster-card-flags[data-label] { grid-column: span 2; }
+    .roster-card-table td.roster-honors-cell { position: absolute; top: 8px; right: 12px; display: flex; width: auto; padding: 0; }
+    .roster-card-table td.roster-honors-cell::before { content: none; }
+    .roster-card-table .roster-honors-cell .secondary-button { min-height: 44px; }
+    .roster-card-table td.roster-card-actions { position: absolute; top: 8px; right: 12px; display: flex; width: auto; justify-content: flex-end; gap: 8px; margin: 0; padding: 0; }
+    .roster-card-table td.roster-card-actions .honor-row-actions { gap: 8px; }
+    .roster-card-table td.roster-card-actions::before { content: none; }
+    /* With an Honors button already in the corner, the edit actions take the card's last row. */
+    .roster-card-table tr:has(.roster-honors-cell) td.roster-card-actions { position: static; grid-column: 1 / -1; }
+    .roster-card-table .roster-card-actions .secondary-button { min-width: 44px; min-height: 44px; }
+    .roster-card-table .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
+    .roster-card-table .roster-section-empty-row td { padding: 0 0 8px; }
+  }
+}
 
 /* Account and club pages (split into separate screens) */
 .account-nav { max-width: 1180px; margin: 18px auto 0; }
@@ -11335,8 +11368,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Finance list on a phone (#981): each registration is a card. The name and its sub-lines take the
    full width (a long unbroken name wraps instead of running under the total), and Total, Received
-   and Balance sit in a row of their own, each with its label. The header row is not needed. */
-@media screen and (max-width: 580px) {
+   and Balance sit in a row of their own, each with its label. The header row is not needed. The list's own width decides (#997),
+   so it is cards beside the staff sidebar at about 861px too, not squeezed into a six-column row. */
+.finance-list { container-type: inline-size; }
+@container (max-width: 600px) {
   .finance-row.finance-row-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 8px 10px; }
   .finance-row.finance-row-cards.finance-head { display: none; }
   .finance-row.finance-row-cards > span:first-child { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
@@ -11520,6 +11555,309 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (min-width: 721px) {
   .roster-card-table td.roster-card-name { min-width: 9.5rem; }
 }
+
+/* #997 UI recheck batch 2: layout patterns. */
+
+/* Wider staff content. The main column fills the room beside the sidebar; only a very wide monitor
+   stops it (1600px, centred). The sidebar keeps its width and its labels never wrap; the room comes from the
+   content side: smaller page padding from 801 to 1180px, and tables that turn into cards or scroll with a cue
+   when their own box is too narrow (a container query on the table's box, not on the viewport). */
+.workspace-content { max-width: 1600px; }
+@media screen and (min-width: 801px) and (max-width: 1180px) {
+  .workspace { padding-inline: 20px; }
+}
+/* A table box that decides its own layout by its own width (cards when narrow): the box is a size container. */
+.card-box { container-type: inline-size; }
+
+/* A table that still needs more room than its box scrolls sideways, and says so: a soft shadow on each
+   edge that has more to scroll to (the classic "scroll shadows": the gradients that scroll with the content
+   cover the shadows at the ends). The audit's `table-wider-than-box` rule only lets a table scroll when its
+   box has data-scroll-cue and this class (docs/RESPONSIVE.md). */
+@media screen and (min-width: 601px) {
+  .scroll-cue {
+    overflow-x: auto;
+    background:
+      linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center / 32px 100% no-repeat local,
+      linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center / 32px 100% no-repeat local,
+      linear-gradient(to right, rgba(11, 43, 58, 0.28), rgba(11, 43, 58, 0)) left center / 16px 100% no-repeat scroll,
+      linear-gradient(to left, rgba(11, 43, 58, 0.28), rgba(11, 43, 58, 0)) right center / 16px 100% no-repeat scroll;
+  }
+  /* The shadow is drawn behind the table, so the header tint and section rows are see-through enough to let it show. */
+  .scroll-cue thead th, .scroll-cue .roster-section-row th { background-color: rgba(246, 249, 250, 0.4); }
+}
+
+/* One row of actions: a compact row (never a wall of full-width buttons), with the shared Actions menu holding the rest.
+   Used in table rows and cards, on a phone and on a desktop alike. The menu opens over the content instead of pushing it,
+   and a table box that scrolls sideways stops clipping it while it is open. */
+.row-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; min-width: 0; }
+.row-actions .actions-menu { display: inline-block; width: auto; }
+.row-actions .actions-menu > summary.actions-menu-trigger { width: auto; min-height: 36px; padding: 6px 12px; white-space: nowrap; }
+.row-actions .actions-menu-list { position: absolute; top: calc(100% + 6px); right: 0; left: auto; min-width: min(15rem, 80vw); margin-top: 0; box-shadow: var(--shadow); }
+.row-actions .secondary-button { min-height: 36px; }
+@media (max-width: 640px) {
+  .row-actions { justify-content: flex-start; }
+  .row-actions .actions-menu > summary.actions-menu-trigger,
+  .row-actions .secondary-button { min-height: 44px; }
+  .row-actions .actions-menu-list { right: auto; left: 0; }
+  .row-actions > .secondary-button { min-width: 44px; }
+}
+/* A square icon button for a repeated row action (move up, move down, remove): its name is its aria-label. */
+.icon-button-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; }
+.icon-button-row .icon-button, .icon-button-row .secondary-button.icon-only { display: inline-flex; width: 36px; height: 36px; min-height: 36px; align-items: center; justify-content: center; padding: 0; }
+@media (max-width: 640px) {
+  .icon-button-row .icon-button, .icon-button-row .secondary-button.icon-only { width: 44px; height: 44px; min-height: 44px; }
+}
+:is(.report-table-wrap, .table-wrap, .table-scroll, .reminder-recipient-table-wrap):has(.actions-menu[open]) { overflow: visible; }
+
+/* Staff tables at tablet and small desktop widths (#997): they fit the box beside the sidebar. Tighter cell padding,
+   headers that wrap between words, and roster-style cells that wrap instead of holding one line. Words still never
+   break mid-word (only emails and codes may); a table with more columns than fit scrolls with a scroll cue. */
+@media screen and (min-width: 601px) and (max-width: 1180px) {
+  .app-shell .report-table th, .app-shell .report-table td { padding: 8px 6px; }
+  .app-shell .reminder-recipient-table th, .app-shell .reminder-recipient-table td { padding: 8px 8px; }
+  .app-shell .roster-table td, .app-shell .roster-table th { white-space: normal; }
+  .app-shell .report-table td:last-child { width: auto; }
+  .app-shell .team-directory-table :is(th, td) { padding: 8px 5px; }
+  .app-shell .team-directory-table th { white-space: normal; }
+  .app-shell .team-directory-table :is(th, td):first-child { padding-left: 8px; min-width: 7rem; }
+  .app-shell .team-directory-table :is(th, td):last-child { padding-right: 8px; }
+  .app-shell .team-directory-table td:nth-child(2) { min-width: 8rem; }
+  .app-shell .team-directory-table td:nth-child(5) { white-space: normal; }
+  .app-shell .team-directory-table td:nth-child(6) { min-width: 6rem; }
+  .app-shell .team-directory-table .team-account-actions .secondary-button { padding: 6px 7px; }
+}
+
+/* A table with more columns than its box can show is the same labelled cards when the box is narrower than 760px (#997): beside the
+   staff sidebar that is any viewport up to about 1100px, and 768px without it. The box decides (a container query on the
+   `.card-box` around the table), not the viewport, so there is no width where the table is squeezed or clipped. Add
+   `table-cards-tablet` next to `table-cards` and `card-box` on the wrapper. */
+@media screen and (min-width: 601px) {
+  @container (max-width: 760px) {
+  table.table-cards-tablet.table-cards-tablet,
+  table.table-cards-tablet.table-cards-tablet > tbody { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+  table.table-cards-tablet.table-cards-tablet > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere;
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid #eaf0f2;
+    font-size: max(var(--type-body-floor, 0px), 0.9rem); overflow-wrap: break-word; word-break: normal;
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 6.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-tablet > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 5.75rem; margin-left: -6.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[colspan] { padding-left: 0; }
+}
+}
+
+/* The same cards for a table that only just overflows: its box is narrower than 600px (a compact table beside the staff sidebar at
+   about 860-940px). Add `table-cards-compact` next to `table-cards`, and `card-box` on the wrapper. */
+@media screen and (min-width: 601px) {
+  @container (max-width: 600px) {
+  table.table-cards-compact.table-cards-compact,
+  table.table-cards-compact.table-cards-compact > tbody { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+  table.table-cards-compact.table-cards-compact > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  table.table-cards-compact.table-cards-compact > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-compact.table-cards-compact > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere;
+  }
+  table.table-cards-compact.table-cards-compact > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid #eaf0f2;
+    font-size: max(var(--type-body-floor, 0px), 0.9rem); overflow-wrap: break-word; word-break: normal;
+  }
+  table.table-cards-compact.table-cards-compact > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 6.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-compact > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 5.75rem; margin-left: -6.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  table.table-cards-compact.table-cards-compact > tbody > tr > td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+  table.table-cards-compact.table-cards-compact > tbody > tr > td[colspan] { padding-left: 0; }
+}
+}
+
+/* Tab strips that scroll (#997): the row opens on a whole tab (account-section-nav.tsx), snaps to a tab edge when scrolled, fades
+   on each edge that has more tabs, and shows a real arrow button there (focusable, "Scroll tabs left/right"). The 46px scroll
+   padding matches the arrow's width, so a snapped tab never sits under the arrow or the fade. */
+.account-nav { position: relative; }
+.account-nav > ul { scroll-snap-type: x proximity; scroll-padding-inline: 46px; }
+.account-nav > ul > li { scroll-snap-align: start; }
+.account-nav-arrow {
+  position: absolute; top: 0; bottom: 0; z-index: 2; display: none; width: 44px; align-items: center; justify-content: center;
+  padding: 0; border: 0; background: transparent; color: var(--imsda-navy); cursor: pointer;
+}
+.account-nav-arrow > span {
+  display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1px var(--line), 0 1px 4px rgba(11, 43, 58, 0.18); font-size: 1.25rem; font-weight: 800; line-height: 1;
+}
+.account-nav-arrow:hover > span { background: var(--imsda-navy-soft); }
+.account-nav-arrow:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; border-radius: 12px; }
+.account-nav-arrow-start { left: 0; }
+.account-nav-arrow-end { right: 0; }
+.account-nav[data-fade-start="true"] > .account-nav-arrow-start,
+.account-nav[data-fade-end="true"] > .account-nav-arrow-end { display: flex; }
+
+/* A long club name (#997): on a phone the hero and the staff club page show it in a smaller size, at most two lines (the full
+   name is the title), instead of four lines of 28px that push everything else off the first screen. */
+@media (max-width: 580px) {
+  .account-page-hero.club-hero { padding: 14px 16px; }
+  .account-page-hero.club-hero h1, .club-name-heading {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+    font-size: 1.2rem; line-height: 1.25; overflow-wrap: anywhere;
+  }
+}
+
+/* Navigation buttons above a page title (#997): one back link on its own line, then a row of compact chips that wrap, instead of
+   a full-width button for each link. */
+@media (max-width: 640px) {
+  .intro-actions:is(.club-admin-links, .report-actions) { flex-direction: row; flex-wrap: wrap; align-items: center; width: 100%; gap: 8px; }
+  .intro-actions:is(.club-admin-links, .report-actions) > :is(a, button, .actions-menu):not(.primary-button) { width: auto; flex: 0 1 auto; }
+  /* The back link is a plain text link on a row of its own, above the chips. */
+  .intro-actions.club-admin-links > .more-back-link { flex: 1 1 100%; justify-content: flex-start; min-height: 44px; border: 0; background: transparent; padding-inline: 0; }
+  .intro-actions.club-year-choice { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .intro-actions.club-year-choice > a { width: auto; flex: 1 1 auto; justify-content: center; }
+  .staff-page-actions > :is(a, button).secondary-button { width: auto; flex: 0 1 auto; }
+}
+
+/* Narrow text beside a button (#997): below 480px a row's button goes on its own line under the text, so the text keeps the
+   whole width instead of wrapping one word per line. The text needs about 12rem to stay beside the button, which a phone
+   does not have. */
+@media (max-width: 480px) {
+  .public-manage-club-list li { flex-wrap: wrap; }
+  .public-manage-club-list li > span:not(.status-chip) { flex: 1 1 12rem; min-width: 0; }
+  .public-manage-club-list li > :is(a, button):is(.primary-button, .secondary-button) { flex: 1 1 100%; justify-content: center; margin-left: 0; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  /* A heading with a button beside it (an event's name and its Kitchen report): the button drops under the text. */
+  .section-heading { flex-wrap: wrap; }
+  .section-heading > div:first-child { flex: 1 1 12rem; min-width: 0; }
+  .section-heading > :is(a, button):is(.secondary-button, .primary-button) { flex: 1 1 100%; justify-content: center; }
+}
+
+/* The map pin sits on the same line as "Location:" (#997 carry-over from #996), not on a line of its own above it. */
+.public-manage-card p.location-line > svg, .location-line > svg { display: inline-block; flex: none; margin-right: 4px; vertical-align: -2px; }
+
+/* Event content blocks (#997): each section's move and remove buttons are one compact icon row on the same line as its kind
+   (it was a full-width Up, Down and Remove stack on every section of a page of twenty), and a row's remove button is a
+   square icon at the end of its row. */
+.event-content-section > .message-delivery-toolbar { flex-direction: row; flex-wrap: nowrap; align-items: center; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+.event-content-section > .message-delivery-toolbar > div:first-child { min-width: 0; }
+.event-content-section > .message-delivery-toolbar .eyebrow { margin: 0; }
+.event-content-link-row > .secondary-button.icon-only { display: inline-flex; width: 36px; height: 36px; min-height: 36px; align-items: center; justify-content: center; justify-self: end; padding: 0; }
+@media (max-width: 640px) {
+  .event-content-link-row > .secondary-button.icon-only { width: 44px; height: 44px; min-height: 44px; }
+}
+
+/* A list of cards with one action each (#997): the action is a compact button in the card's top corner on the title's line, and the
+   short fields sit two to a row with their label above, so a card is about a third as tall as a stack with a full-width button.
+   Add `table-cards-corner` next to `table-cards` on a table whose rows have one action cell. */
+@media screen and (max-width: 600px) {
+  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; column-gap: 14px; }
+  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > th[scope="row"] { grid-column: 1 / -1; min-height: 44px; margin-bottom: 6px; padding-right: 8.25rem; }
+  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td[data-label] { display: block; padding-left: 0; }
+  table.table-cards.table-cards-corner > tbody > tr > td[data-label]::before { float: none; display: block; width: auto; margin: 0 0 1px; }
+  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td[data-label-long] { grid-column: 1 / -1; }
+  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td:not([data-label]) { position: absolute; top: 6px; right: 10px; display: flex; width: auto; padding: 0; }
+  table.table-cards-corner td:not([data-label]) > :is(button, a).secondary-button { width: auto; }
+}
+
+.row-actions > .secondary-button { width: auto; flex: 0 0 auto; }
+
+/* Event settings between 981 and 1180px (#997): the two columns used to end at very different heights (a short main column beside
+   readiness, sharing and the danger zone), and the main column's fields were squeezed to ~470px. The aside's panels are placed in
+   the grid directly: main and readiness side by side in the first row, then sharing and the danger zone side by side at equal
+   heights under both. */
+@media (min-width: 981px) and (max-width: 1180px) {
+  .event-settings-layout { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
+  .event-settings-side { display: contents; }
+  .event-settings-main { grid-column: 1; grid-row: 1; }
+  .event-settings-side > .event-readiness-panel { grid-column: 2; grid-row: 1; }
+  .event-settings-side > .event-sharing-panel { grid-column: 1; grid-row: 2; align-self: stretch; }
+  .event-settings-side > .event-delete-panel { grid-column: 2; grid-row: 2; align-self: stretch; }
+  .event-settings-layout > .event-savebar { grid-column: 1 / -1; grid-row: 3; }
+  .event-settings-side > .panel { align-content: start; }
+}
+
+/* Registration cards (#997): a long name or a list of attendees is cut at two lines (the whole card opens the full record), so the
+   cards in a row, and from row to row, stay within a few pixels of each other instead of ranging from 165 to 250px; the
+   name keeps clear of the select box. */
+@media screen and (min-width: 601px) {
+  .record-grid { grid-auto-rows: 1fr; }
+  .record-card-shell:has(.record-select) > .record-card { padding-right: 40px; }
+}
+.record-grid .record-copy > :is(strong, small) {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.record-grid .record-copy > small.record-date { -webkit-line-clamp: 1; line-clamp: 1; }
+
+/* Register a new club (#997): every row of the form is a real two-column row (the auto-fit grid made three columns at 1024px and left
+   a field alone on a row, with the email squeezed into a third of the card); the mailing address and board list stay full width. */
+.club-form-fill .form-grid.two-column.nca-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.club-form-fill .form-grid.two-column.nca-grid > :not(.club-form-field-wide) { max-width: none; }
+@media (max-width: 560px) {
+  .club-form-fill .form-grid.two-column.nca-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Registration builder header (#997): Save draft, Open public form and Publish version each stay on one line (they wrapped to two
+   lines in the ~445px editor column at 1024px) and the row wraps instead; a notice's link stays in its sentence. */
+.builder-editor-head .builder-actions { flex-wrap: wrap; justify-content: flex-start; }
+.builder-editor-head .builder-actions > :is(a, button) { flex: 0 0 auto; white-space: nowrap; }
+.builder-gate { display: block; }
+.builder-gate > svg { display: inline-block; margin-right: 6px; vertical-align: -3px; }
+
+/* Words break at word boundaries (#997): a card's cells wrap between words (word-break: normal), and only an email or a code may break
+   anywhere (it has no spaces to wrap at). A single word longer than the card still wraps rather than sticking out. */
+@media screen and (max-width: 600px) {
+  table.table-cards.table-cards > tbody > tr > :is(th, td) { overflow-wrap: break-word; word-break: normal; }
+}
+@media screen and (min-width: 601px) {
+  @container (max-width: 760px) {
+    :is(table.table-cards-tablet, table.table-cards-compact) > tbody > tr > :is(th, td) { overflow-wrap: break-word; word-break: normal; }
+  }
+}
+.break-anywhere.break-anywhere, table td :is(code, a[href^="mailto:"], .team-email) { overflow-wrap: anywhere; }
+
+/* A closed Actions menu draws nothing: its items are not laid out at all, so a table cell holding one is measured by its trigger only. */
+.actions-menu:not([open]) > .actions-menu-list { display: none; }
+
+/* The printed team form's field grids (#997): on screen as many columns as the sheet has room for (each field keeps room for a whole
+   word beside its label); the printed sheet keeps its three columns. */
+@media screen {
+  .team-form-grid, .team-form-members { grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); }
+}
+/* Roster-style report cells wrap at every desktop width, not only up to 1180px, so a wide tablet or desktop box is not outgrown. */
+@media screen and (min-width: 601px) {
+  .app-shell .roster-table td, .app-shell .roster-table th { white-space: normal; }
+}
+
+/* A card-box whose table is tablet or compact cards does not clip what pokes out of a card (a focus ring, a tooltip). These tables
+   fit their box whenever they are not cards (the thresholds sit above their widest layout, and the audit's table-wider-than-box
+   rule would flag one that did not), so they never need the sideways scroll; the roster and the wide grids keep their scroll cue. */
+.card-box:has(> table:is(.table-cards-tablet, .table-cards-compact)) { overflow: visible; }
 
 /* Popup close buttons: one look everywhere (Caleb, Oct 17). The × is navy on white; the button edge is at least
    3:1 against the dialog (WCAG 1.4.11), it never shrinks beside a long title, it is a 44px target on phones, and it

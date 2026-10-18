@@ -115,9 +115,9 @@ export default async function EventPacketsPage({
             </table>
           </section>}
 
-          {sections.attendeeChecklist && <section>
+          {sections.attendeeChecklist && <section className="card-box">
             <h2>Attendee checklist</h2>
-            <table className="table-cards" role="table">
+            <table className="table-cards table-cards-compact" role="table">
               <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Arrived</th><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Type</th>{sections.shirtSize && <th role="columnheader" scope="col">Shirt</th>}{sections.assignedSessions && <th role="columnheader" scope="col">Assigned sessions</th>}</tr></thead>
               <tbody role="rowgroup">{group.attendees.map((attendee) => (
                 <tr key={attendee.id} role="row">

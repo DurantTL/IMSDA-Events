@@ -3,6 +3,7 @@
 import { SortOrderNote } from "@/components/list-sort";
 import { useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Link2, LogOut, MailCheck, Mail, MapPinned, Search, ShieldOff } from "lucide-react";
+import { ActionsMenu } from "@/components/actions-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   HAND_LINK_NOTE_MAX,
@@ -270,7 +271,7 @@ export function AttendeeAccountsWorkspace({
                   <tr role="row" key={account.id}>
                     <td {...cardCell("Account")}>
                       <strong translate="no">{account.displayName || "—"}</strong><br />
-                      <small translate="no">{account.email}</small>
+                      <small className="break-anywhere" translate="no">{account.email}</small>
                       {account.disabled && <><br /><span className="status-chip coral">Disabled</span></>}
                     </td>
                     <td {...cardCell("Club roles")}>
@@ -287,96 +288,104 @@ export function AttendeeAccountsWorkspace({
                     </td>
                     <td {...cardCell("Last sign-in")}>{when(account.lastSignedInAt)}</td>
                     <td {...cardCell(null)}>
-                      <div className="team-account-actions">
-                        {(account.authenticatorOn || account.passkeyCount > 0) && (
-                          <button
-                            className="secondary-button"
-                            disabled={busy === account.id}
-                            onClick={() => openConfirm({
-                              account,
-                              body: { action: "reset-two-step" },
-                              title: `Reset two-step sign-in for ${account.email}?`,
-                              description: "Their authenticator and passkeys are removed and they're signed out.",
-                              confirmLabel: `Reset two-step for ${account.email}`,
-                              destructive: true,
-                            })}
-                            type="button"
-                          >
-                            <ShieldOff aria-hidden="true" size={14} /> Reset two-step
-                          </button>
-                        )}
-                        <button
-                          className="secondary-button"
-                          disabled={busy === account.id}
-                          onClick={() => openConfirm(account.areaCoordinator
-                            ? {
-                              account,
-                              body: { action: "area-coordinator", on: false },
-                              title: `Remove Area Coordinator from ${account.email}?`,
-                              description: "They'll no longer see other clubs.",
-                              confirmLabel: `Remove Area Coordinator from ${account.email}`,
-                              destructive: true,
-                            }
-                            : {
-                              account,
-                              body: { action: "area-coordinator", on: true },
-                              title: `Make ${account.email} an Area Coordinator?`,
-                              description: "They'll see every club, view only (ages, not birth dates), after a second sign-in step.",
-                              confirmLabel: `Make ${account.email} an Area Coordinator`,
-                              destructive: false,
-                            })}
-                          type="button"
-                        >
-                          <MapPinned aria-hidden="true" size={14} /> {account.areaCoordinator ? "Remove Area Coordinator" : "Make Area Coordinator"}
-                        </button>
-                        <button
-                          className="secondary-button"
-                          disabled={busy === account.id}
-                          onClick={() => openConfirm({
-                            account,
-                            body: { action: "sign-out" },
-                            title: `Sign ${account.email} out on every device?`,
-                            description: "This immediately ends every active session for this account.",
-                            confirmLabel: `Sign ${account.email} out everywhere`,
-                            destructive: true,
-                          })}
-                          type="button"
-                        >
-                          <LogOut aria-hidden="true" size={14} /> Sign out everywhere
-                        </button>
-                        <button
-                          className="secondary-button"
-                          disabled={busy === account.id}
-                          onClick={() => openForm({ kind: "change-email", account })}
-                          type="button"
-                        >
-                          <Mail aria-hidden="true" size={14} /> Change email
-                        </button>
-                        <button
-                          className="secondary-button"
-                          disabled={busy === account.id}
-                          onClick={() => openForm({ kind: account.linkedToStaff ? "unlink" : "link", account })}
-                          type="button"
-                        >
-                          <Link2 aria-hidden="true" size={14} /> {account.linkedToStaff ? "Unlink team sign-in" : "Link team sign-in"}
-                        </button>
-                        {!account.emailVerified && (
-                          <button
-                            className="secondary-button"
-                            disabled={busy === account.id}
-                            onClick={() => openConfirm({
-                              account,
-                              body: { action: "send-verification" },
-                              title: `Send a verification email to ${account.email}?`,
-                              description: "A six-digit code is emailed to this account's current address. The email counts as verified only when the person enters it. Nothing is marked verified here.",
-                              confirmLabel: "Send verification email",
-                              destructive: false,
-                            })}
-                            type="button"
-                          >
-                            <MailCheck aria-hidden="true" size={14} /> Send verification email
-                          </button>
-                        )}
+                      <div className="row-actions">
+                        <ActionsMenu ariaLabel={`Actions for ${account.email}`}>
+                          {(account.authenticatorOn || account.passkeyCount > 0) && (
+                            <li>
+                              <button
+                                disabled={busy === account.id}
+                                onClick={() => openConfirm({
+                                  account,
+                                  body: { action: "reset-two-step" },
+                                  title: `Reset two-step sign-in for ${account.email}?`,
+                                  description: "Their authenticator and passkeys are removed and they're signed out.",
+                                  confirmLabel: `Reset two-step for ${account.email}`,
+                                  destructive: true,
+                                })}
+                                type="button"
+                              >
+                                <ShieldOff aria-hidden="true" size={14} /> Reset two-step
+                              </button>
+                            </li>
+                          )}
+                          <li>
+                            <button
+                              disabled={busy === account.id}
+                              onClick={() => openConfirm(account.areaCoordinator
+                                ? {
+                                  account,
+                                  body: { action: "area-coordinator", on: false },
+                                  title: `Remove Area Coordinator from ${account.email}?`,
+                                  description: "They'll no longer see other clubs.",
+                                  confirmLabel: `Remove Area Coordinator from ${account.email}`,
+                                  destructive: true,
+                                }
+                                : {
+                                  account,
+                                  body: { action: "area-coordinator", on: true },
+                                  title: `Make ${account.email} an Area Coordinator?`,
+                                  description: "They'll see every club, view only (ages, not birth dates), after a second sign-in step.",
+                                  confirmLabel: `Make ${account.email} an Area Coordinator`,
+                                  destructive: false,
+                                })}
+                              type="button"
+                            >
+                              <MapPinned aria-hidden="true" size={14} /> {account.areaCoordinator ? "Remove Area Coordinator" : "Make Area Coordinator"}
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              disabled={busy === account.id}
+                              onClick={() => openConfirm({
+                                account,
+                                body: { action: "sign-out" },
+                                title: `Sign ${account.email} out on every device?`,
+                                description: "This immediately ends every active session for this account.",
+                                confirmLabel: `Sign ${account.email} out everywhere`,
+                                destructive: true,
+                              })}
+                              type="button"
+                            >
+                              <LogOut aria-hidden="true" size={14} /> Sign out everywhere
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              disabled={busy === account.id}
+                              onClick={() => openForm({ kind: "change-email", account })}
+                              type="button"
+                            >
+                              <Mail aria-hidden="true" size={14} /> Change email
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              disabled={busy === account.id}
+                              onClick={() => openForm({ kind: account.linkedToStaff ? "unlink" : "link", account })}
+                              type="button"
+                            >
+                              <Link2 aria-hidden="true" size={14} /> {account.linkedToStaff ? "Unlink team sign-in" : "Link team sign-in"}
+                            </button>
+                          </li>
+                          {!account.emailVerified && (
+                            <li>
+                              <button
+                                disabled={busy === account.id}
+                                onClick={() => openConfirm({
+                                  account,
+                                  body: { action: "send-verification" },
+                                  title: `Send a verification email to ${account.email}?`,
+                                  description: "A six-digit code is emailed to this account's current address. The email counts as verified only when the person enters it. Nothing is marked verified here.",
+                                  confirmLabel: "Send verification email",
+                                  destructive: false,
+                                })}
+                                type="button"
+                              >
+                                <MailCheck aria-hidden="true" size={14} /> Send verification email
+                              </button>
+                            </li>
+                          )}
+                        </ActionsMenu>
                       </div>
                     </td>
                   </tr>

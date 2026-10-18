@@ -59,7 +59,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
   const issueTable = (title: string, rows: CloseoutRow[], section: string, empty: string) => <section className="panel form-stack">
     <h3>{title} ({rows.length})</h3>
     {download(section)}
-    {rows.length === 0 ? <p>{empty}</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+    {rows.length === 0 ? <p>{empty}</p> : <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-compact">
       <caption className="sr-only">{title}</caption>
       <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Room</th><th role="columnheader" scope="col">Issued</th><th role="columnheader" scope="col">{section === "outstanding" ? "Expected back" : "Ended"}</th>{canManageMoney && section !== "outstanding" ? <th role="columnheader" scope="col">Correct</th> : null}</tr></thead>
       <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.id}>
@@ -85,7 +85,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     <section className="panel form-stack">
       <h3>{report.unresolvedCount === 0 ? "Nothing is unresolved" : `${report.unresolvedCount} unresolved`}</h3>
       {download("exceptions")}
-      {report.exceptions.length === 0 ? <p>Every key and item is accounted for, every deposit is settled and no facility issue is open.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+      {report.exceptions.length === 0 ? <p>Every key and item is accounted for, every deposit is settled and no facility issue is open.</p> : <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-compact">
         <caption className="sr-only">Unresolved items</caption>
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Exception</th><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Detail</th>{canManageMoney ? <th role="columnheader" scope="col">Resolve</th> : null}</tr></thead>
         <tbody role="rowgroup">{report.exceptions.map((row) => <tr role="row" key={`${row.code}:${row.refId}:${row.triggerId ?? ""}`}>
@@ -103,7 +103,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     <section className="panel form-stack">
       <h3>Issued, returned and outstanding</h3>
       {download("summary")}
-      <div className="table-wrap"><table role="table" className="report-table table-cards">
+      <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-tablet">
         <caption className="sr-only">Units issued, returned, lost, damaged and still out, by kind</caption>
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Went out</th><th role="columnheader" scope="col">Returned</th><th role="columnheader" scope="col">Lost</th><th role="columnheader" scope="col">Damaged</th><th role="columnheader" scope="col">Withdrawn in error</th><th role="columnheader" scope="col">Replaced, unaccounted</th><th role="columnheader" scope="col">Still out</th><th role="columnheader" scope="col">Reconciles</th></tr></thead>
         <tbody role="rowgroup">{report.types.map((row) => <tr role="row" key={row.typeId}>
@@ -122,7 +122,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     <section className="panel form-stack">
       <h3>Charges and waivers ({report.charges.length})</h3>
       {download("charges")}
-      {report.charges.length === 0 ? <p>No charge has been recorded.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+      {report.charges.length === 0 ? <p>No charge has been recorded.</p> : <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-compact">
         <caption className="sr-only">Charges and waivers</caption>
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Charge</th><th role="columnheader" scope="col">State</th><th role="columnheader" scope="col">Why</th>{canManageMoney ? <th role="columnheader" scope="col">Waive</th> : null}</tr></thead>
         <tbody role="rowgroup">{report.charges.map((row) => <tr role="row" key={row.entryId}>
@@ -140,7 +140,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     <section className="panel form-stack">
       <h3>Cash key deposits ({report.deposits.length})</h3>
       {download("deposits")}
-      {report.deposits.length === 0 ? <p>No deposit has been recorded.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+      {report.deposits.length === 0 ? <p>No deposit has been recorded.</p> : <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-compact">
         <caption className="sr-only">Cash key deposits</caption>
         <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Deposit</th><th role="columnheader" scope="col">State</th><th role="columnheader" scope="col">Items</th></tr></thead>
         <tbody role="rowgroup">{report.deposits.map((row) => <tr role="row" key={row.entryId}>

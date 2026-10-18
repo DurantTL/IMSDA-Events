@@ -149,8 +149,8 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
                 value={filter}
               />
             </label>
-            <div className="report-table-wrap">
-              <table className="report-table table-cards" role="table">
+            <div className="report-table-wrap card-box">
+              <table className="report-table table-cards table-cards-corner table-cards-compact" role="table">
                 <thead role="rowgroup">
                   <tr role="row">
                     <th role="columnheader" scope="col">Code</th>

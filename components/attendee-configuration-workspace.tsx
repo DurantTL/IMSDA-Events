@@ -111,7 +111,7 @@ export function AttendeeConfigurationWorkspace({
         >
           Attendee types, such as Adult or Youth, are what registrants choose and what prices attach to. Without one, nobody can be registered.
         </EmptyState>
-      ) : <div className="table-wrap"><table className="editable-settings-table"><thead><tr><th>Code</th><th>Label</th><th>Description</th><th>Sort order</th><th>Age band</th><th>Status</th><th>Actions</th></tr></thead><tbody>{types.map((row) => <tr key={row.id}>
+      ) : <div className="table-wrap scroll-cue" data-scroll-cue><table className="editable-settings-table"><thead><tr><th>Code</th><th>Label</th><th>Description</th><th>Sort order</th><th>Age band</th><th>Status</th><th>Actions</th></tr></thead><tbody>{types.map((row) => <tr key={row.id}>
         <td data-label="Code"><code>{row.code}</code></td>
         <td data-label="Label"><input aria-label={`Label for ${row.code}`} value={row.label} onChange={(event) => setTypes((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, label: event.target.value } : candidate))} /></td>
         <td data-label="Description"><input aria-label={`Description for ${row.code}`} value={row.description} onChange={(event) => setTypes((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, description: event.target.value } : candidate))} /></td>
@@ -123,7 +123,7 @@ export function AttendeeConfigurationWorkspace({
       {canCreate && <form className="form-stack inset-form" action={addType}><div className="form-grid two-column"><label>Permanent code<input id="attendee-type-code-input" name="code" required placeholder="ADULT" /></label><label>Display label<input name="label" required placeholder="Adult" /></label></div><label>Description<input name="description" /></label><div className="form-grid three-column"><label>Minimum age<input name="minimumAge" {...ageBandInputAttributes} type="number" /></label><label>Maximum age<input name="maximumAge" {...ageBandInputAttributes} type="number" /></label><label>Sort order<input name="sortOrder" defaultValue="0" type="number" /></label></div><button className="primary-button" disabled={saving} type="submit">Add attendee type</button></form>}
     </section>
     <section className="panel"><div className="section-heading"><div><h2>Categories, tracks, and departments</h2><p>Categories, tracks, and departments are independent of attendee type, and an attendee can have several of each. Codes and dimension are permanent once created.</p></div></div>
-      <div className="table-wrap"><table className="editable-settings-table"><thead><tr><th>Dimension</th><th>Code</th><th>Label</th><th>Description</th><th>Sort order</th><th>Status</th><th>Actions</th></tr></thead><tbody>{classifications.map((row) => <tr key={row.id}>
+      <div className="table-wrap scroll-cue" data-scroll-cue><table className="editable-settings-table"><thead><tr><th>Dimension</th><th>Code</th><th>Label</th><th>Description</th><th>Sort order</th><th>Status</th><th>Actions</th></tr></thead><tbody>{classifications.map((row) => <tr key={row.id}>
         <td data-label="Dimension">{row.kind.toLowerCase()}</td>
         <td data-label="Code"><code>{row.code}</code></td>
         <td data-label="Label"><input aria-label={`Label for ${row.code}`} value={row.label} onChange={(event) => setClassifications((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, label: event.target.value } : candidate))} /></td>

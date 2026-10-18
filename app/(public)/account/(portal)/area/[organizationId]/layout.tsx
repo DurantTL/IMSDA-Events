@@ -28,10 +28,10 @@ export default async function AreaClubLayout({
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
+      <section className="public-registration-hero public-manage-hero account-page-hero club-hero">
         <div>
           <p className="public-registration-eyebrow">Area Coordinator · view only</p>
-          <h1 translate="no">{club.name}</h1>
+          <h1 title={club.name} translate="no">{club.name}</h1>
           {club.parentOrganization && <p translate="no">{club.parentOrganization.name}</p>}
         </div>
       </section>

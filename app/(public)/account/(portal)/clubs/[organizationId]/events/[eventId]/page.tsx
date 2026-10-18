@@ -227,7 +227,7 @@ export default async function ClubEventRegistrationPage({
             )}
           </p>
           {workspace.registration.location && (
-            <p>
+            <p className="location-line">
               <MapPin aria-hidden="true" size={15} /> Location: <strong translate="no">{workspace.registration.location.name}</strong>
               {workspace.registration.location.address ? <> · <span translate="no">{workspace.registration.location.address}</span></> : ""}
               {" · "}{formatCalendarDate(workspace.registration.location.firstDay)}

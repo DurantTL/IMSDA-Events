@@ -17,6 +17,7 @@ event administrator and system administrator), visits the main pages at 360,
 | --- | --- | --- |
 | `horizontal-scroll` | `documentElement.scrollWidth <= innerWidth`; the elements sticking out are named | every width |
 | `table-scrolls-sideways` | a table needs sideways scrolling inside its wrapper: make it cards | 600 px and under |
+| `table-wider-than-box` | a data table is wider than the box around it (#997): it must fit, or scroll sideways in a box that has `data-scroll-cue` and the `scroll-cue` class (an edge shadow that shows which side has more); a box that clips never qualifies | 601 px and over |
 | `small-tap-target` | a button, form control, summary or stand-alone link under 44 px (a link inside a sentence is exempt) | 600 px and under |
 | `dialog-too-tall` | a dialog or sheet taller than the screen, or cut off at the top or bottom | every width |
 | `sticky-bar-covers-content` / `sticky-bar-size` | the last content is hidden under a fixed bar, or fixed bars take over a third of the screen | every width |
@@ -97,6 +98,23 @@ has scrolled past the heading or intro, see `usePinAfterScroll`), and `loading-s
 shell's "Loading IMSDA Events…" is waited out before measuring, and a page that never leaves
 it is a finding). The sign-in, recovery, calendar and club-directory pages and the
 invalid-link states are in `pages`.
+
+**Rules added in #997** (they run on every page): `table-wider-than-box` (601 px and over: a data table wider than
+its box is clipped or scrolls without any sign; it passes only when the box opts in with `data-scroll-cue` and really
+draws the edge shadow of the `.scroll-cue` class, with no cell painting a solid background over it). The staff column now
+fills the room beside the sidebar (smaller page padding from 801 to 1180 px, a 1600 px maximum on a very wide monitor; the
+sidebar keeps its width), so most tables fit; the attendee listing, the month-by-month club grids and the club roster
+still scroll, with the cue. A table that cannot fit its box turns into cards by the width of its own box (a container
+query on a `card-box` wrapper, not the viewport), so there is no viewport width where it is squeezed. Patterns:
+`table-cards-tablet` (cards when the box is under 760 px) and `table-cards-compact` (cards when it is under 600 px, for a
+table that only just overflows),
+`table-cards-corner` (one action per card sits in the card's corner, short fields two to a row), `row-actions` (one
+compact row with the shared Actions menu), `icon-button-row` (square icon buttons named by `aria-label`), and a back link
+plus a chip row above a title (`club-admin-links`, `report-actions`).
+
+Run the table rules at the widths where the staff column is narrowest, as well as the default four:
+`MOBILE_LAYOUT_WIDTHS=360,390,768,861,980,1024,1180,1280 npm run test:mobile-layout` (the default stays four widths, so the
+weekly run keeps inside its 30-minute limit).
 
 **Adding a page:** add a line to `pages` in the script. A page that needs data
 the script does not create gets that data in `seedSynthetic`. A button that

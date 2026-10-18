@@ -190,8 +190,8 @@ export function ClubDirectorsWorkspace({
             <p>Assign the club director so they can manage the roster.</p>
           </div>
         ) : (
-          <div className="report-table-wrap">
-          <table className="report-table table-cards" role="table">
+          <div className="report-table-wrap card-box">
+          <table className="report-table table-cards table-cards-tablet" role="table">
             <thead role="rowgroup">
               <tr role="row">
                 <th role="columnheader" scope="col">Person</th>

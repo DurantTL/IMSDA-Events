@@ -21,6 +21,22 @@ export type AccountNavItem = {
   hideGroupLabel?: boolean;
 };
 
+export type ArrowFocusTarget = "start-arrow" | "end-arrow" | "first-tab" | "last-tab" | null;
+
+/**
+ * Where keyboard focus goes when the scroll arrow that has it is about to disappear (WCAG 2.4.3): an arrow hides when its edge is
+ * reached, and focus on a hidden control falls to the page. It moves to the opposite arrow when that one is showing, else to the
+ * tab at the edge that was reached. Null when the focused control stays visible (or is not an arrow).
+ */
+export function arrowFocusTarget({ focused, fadeStart, fadeEnd }: { focused: "start" | "end" | null; fadeStart: boolean; fadeEnd: boolean }): ArrowFocusTarget {
+  if (focused === "end" && !fadeEnd) return fadeStart ? "start-arrow" : "last-tab";
+  if (focused === "start" && !fadeStart) return fadeEnd ? "end-arrow" : "first-tab";
+  return null;
+}
+
+/** Room kept clear on a scrolled edge of the tab row for its arrow button and fade (px); the CSS scroll-padding matches it. */
+const SCROLL_CLEARANCE = 46;
+
 export function isAccountNavItemActive(pathname: string, item: AccountNavItem) {
   if (pathname === item.href) return true;
   if (item.alsoMatchPrefix && pathname.startsWith(item.alsoMatchPrefix)) return true;
@@ -58,15 +74,43 @@ export function AccountSectionNav({
       const listBox = list.getBoundingClientRect();
       const currentBox = current.getBoundingClientRect();
       const offset = currentBox.left - listBox.left + list.scrollLeft;
-      list.scrollLeft = Math.max(0, offset - (list.clientWidth - currentBox.width) / 2);
+      const centred = Math.max(0, offset - (list.clientWidth - currentBox.width) / 2);
+      // Open the row on a tab's own edge, never partway through a word (#997), with the current tab whole and clear of the
+      // scroll arrows and fades on each side that has more tabs beyond it. Only tab edges (and the very start) are candidates.
+      const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+      const stops = Array.from(list.children).map((child) => child.getBoundingClientRect().left - listBox.left + list.scrollLeft);
+      const candidates = [0, ...stops.map((stop) => stop - SCROLL_CLEARANCE)]
+        .map((position) => Math.min(Math.max(0, position), maxScroll));
+      const clear = (position: number) => {
+        const left = position > 1 ? SCROLL_CLEARANCE : 0;
+        const right = position + list.clientWidth < list.scrollWidth - 1 ? SCROLL_CLEARANCE : 0;
+        return offset >= position + left - 1 && offset + currentBox.width <= position + list.clientWidth - right + 1;
+      };
+      const wholeEdge = (position: number) => position === 0 || position === maxScroll || stops.some((stop) => Math.abs(stop - SCROLL_CLEARANCE - position) < 1);
+      const best = candidates
+        .filter((position) => clear(position) && wholeEdge(position))
+        .sort((x, y) => Math.abs(x - centred) - Math.abs(y - centred))[0];
+      list.scrollLeft = best ?? Math.min(maxScroll, Math.max(0, offset - SCROLL_CLEARANCE));
     }
     const setFade = (name: "fadeStart" | "fadeEnd", on: boolean) => {
       const value = String(on);
       if (nav.dataset[name] !== value) nav.dataset[name] = value;
     };
+    const startArrow = nav.querySelector<HTMLElement>(".account-nav-arrow-start");
+    const endArrow = nav.querySelector<HTMLElement>(".account-nav-arrow-end");
     const updateFades = () => {
-      setFade("fadeStart", list.scrollLeft > 1);
-      setFade("fadeEnd", list.scrollLeft + list.clientWidth < list.scrollWidth - 1);
+      const fadeStart = list.scrollLeft > 1;
+      const fadeEnd = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+      // Decide before an arrow is hidden: focus on a hidden control would fall to the page.
+      const active = document.activeElement;
+      const target = arrowFocusTarget({ focused: active === startArrow ? "start" : active === endArrow ? "end" : null, fadeStart, fadeEnd });
+      setFade("fadeStart", fadeStart);
+      setFade("fadeEnd", fadeEnd);
+      if (target) {
+        const tabs = Array.from(list.querySelectorAll<HTMLElement>("a"));
+        const next = target === "start-arrow" ? startArrow : target === "end-arrow" ? endArrow : target === "first-tab" ? tabs[0] : tabs[tabs.length - 1];
+        next?.focus({ preventScroll: true });
+      }
     };
     updateFades();
     list.addEventListener("scroll", updateFades, { passive: true });
@@ -89,6 +133,14 @@ export function AccountSectionNav({
     };
   }, [pathname, items]);
 
+  // The arrows scroll the row by most of its width; the row then snaps to a tab edge.
+  const scrollTabs = (direction: 1 | -1) => {
+    const list = listRef.current;
+    if (!list) return;
+    const smooth = typeof window.matchMedia === "function" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    list.scrollBy({ left: direction * Math.max(120, list.clientWidth - 2 * SCROLL_CLEARANCE), behavior: smooth ? "smooth" : "auto" });
+  };
+
   const groupIdBase = useId();
   // Consecutive items sharing a group become one section; ungrouped items stay top level.
   const sections: Array<{ group?: string; items: AccountNavItem[] }> = [];
@@ -107,6 +159,13 @@ export function AccountSectionNav({
 
   return (
     <nav aria-label={label} className={`account-nav account-nav-${variant}`} ref={navRef}>
+      <button
+        aria-label="Scroll tabs left"
+        className="account-nav-arrow account-nav-arrow-start"
+        onClick={() => scrollTabs(-1)}
+        title="Scroll tabs left"
+        type="button"
+      ><span aria-hidden="true">{"\u2039"}</span></button>
       <ul ref={listRef}>
         {sections.map((section, index) =>
           section.group ? (
@@ -125,6 +184,13 @@ export function AccountSectionNav({
           ),
         )}
       </ul>
+      <button
+        aria-label="Scroll tabs right"
+        className="account-nav-arrow account-nav-arrow-end"
+        onClick={() => scrollTabs(1)}
+        title="Scroll tabs right"
+        type="button"
+      ><span aria-hidden="true">{"\u203A"}</span></button>
     </nav>
   );
 }
