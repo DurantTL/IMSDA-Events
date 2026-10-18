@@ -35,6 +35,8 @@ Camp Meeting and Spring Camporee form templates), and `npm run dev`.
 Run focused tests while editing. `npm run verify` is the canonical full check
 (lint, generated route types and TypeScript, tests, and production build);
 GitHub CI also migrates and seeds a clean PostgreSQL database.
+Run the mobile layout audit the same way: only the affected pages while
+iterating (`MOBILE_LAYOUT_ONLY=...`), then one full run before opening the PR.
 
 ## Build workflow
 
