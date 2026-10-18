@@ -8,7 +8,7 @@ import { useMemo, useRef, useState } from "react";
 import { Download, ListPlus, Plus, Search, UsersRound, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { HonorCombobox } from "@/components/honor-combobox";
-import { HonorPillList } from "@/components/honor-pill-list";
+import { HonorsSummaryCell, MemberHonorsViewDialog } from "@/components/honors-summary";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { bulkScopeSummary } from "@/lib/confirmation-copy";
 import { clubClassLevelLabels } from "@/modules/club-rosters/domain";
@@ -56,6 +56,8 @@ export function ClubHonorsWorkspace({
   readOnly = false,
   canVoid = false,
   staff = false,
+  initialHonorFilter = "",
+  initialStatusFilter = "",
 }: {
   organizationId: string;
   clubYear: string;
@@ -64,10 +66,13 @@ export function ClubHonorsWorkspace({
   readOnly?: boolean;
   canVoid?: boolean;
   staff?: boolean;
+  /** Start with the honor or status filter already chosen (the page's own filters, preset). */
+  initialHonorFilter?: string;
+  initialStatusFilter?: "" | "IN_PROGRESS" | "COMPLETED";
 }) {
   const [rows, setRows] = useState(initialRows);
-  const [honorFilter, setHonorFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [honorFilter, setHonorFilter] = useState(initialHonorFilter);
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [unitFilter, setUnitFilter] = useState("");
   const [nameSearch, setNameSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -83,6 +88,13 @@ export function ClubHonorsWorkspace({
   const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The "View" dialog (#1012) lists the person's honors, read from the rows already on the page.
+  const [viewing, setViewing] = useState<string | null>(null);
+  const viewingRow = viewing ? rows.find((row) => row.memberId === viewing) ?? null : null;
+  // A filter narrows a row's honors; the summary and the dialog always describe the whole person.
+  const honorsByMember = useMemo(() => new Map(rows.map((row) => [row.memberId, row.honors])), [rows]);
+  const fullHonors = (row: ClubHonorsRow) => honorsByMember.get(row.memberId) ?? row.honors;
+  const chosenHonor = honorFilter ? honorOptions.find((honor) => honor.id === honorFilter) : undefined;
   const [historyFor, setHistoryFor] = useState<ClubHonorsRow | null>(null);
   const [history, setHistory] = useState<HistoryResponse | null>(null);
   const [historyError, setHistoryError] = useState("");
@@ -372,7 +384,7 @@ export function ClubHonorsWorkspace({
                     <th role="rowheader" scope="row"><strong translate="no">{row.lastName}, {row.firstName}</strong></th>
                     <td {...cardCell("Current class")}>{row.classLevel ? clubClassLevelLabels[row.classLevel as keyof typeof clubClassLevelLabels] : "—"}</td>
                     <td {...cardCell("Honors")} className="honors-col-honors" data-label-long="">
-                      <HonorPillList honors={row.honors} showStatus />
+                      <HonorsSummaryCell honorFilter={chosenHonor ? { id: chosenHonor.id, name: chosenHonor.name } : null} honors={fullHonors(row)} onView={() => setViewing(row.memberId)} person={`${row.firstName} ${row.lastName}`} statusFilter={(statusFilter || null) as "IN_PROGRESS" | "COMPLETED" | null} />
                     </td>
                     <td {...cardCell(null)}>
                       <button aria-label={`${readOnly ? "View history for" : "Add or view honors for"} ${row.firstName} ${row.lastName}`} className="secondary-button honor-add-button" onClick={() => openHistory(row)} type="button">
@@ -393,6 +405,10 @@ export function ClubHonorsWorkspace({
         )}
 
       </section>
+
+      {viewingRow && (
+        <MemberHonorsViewDialog honors={viewingRow.honors} onClose={() => setViewing(null)} person={`${viewingRow.firstName} ${viewingRow.lastName}`} />
+      )}
 
       {bulkOpen && !readOnly && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !confirmingBulk) closeBulk(); }} role="presentation">

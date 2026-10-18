@@ -76,6 +76,13 @@ export function honorPillWindow<T>(items: readonly T[], expanded: boolean, limit
   };
 }
 
+/** The Honors page's per-person summary (#1012): the total and the completed / in-progress split. */
+export function honorSummaryCounts(honors: readonly { status: MemberHonorStatus }[]) {
+  const completed = honors.filter((honor) => honor.status === "COMPLETED").length;
+  const inProgress = honors.filter((honor) => honor.status === "IN_PROGRESS").length;
+  return { total: honors.length, completed, inProgress };
+}
+
 /** Filters the Honors page's people by a name search: case-insensitive, first and last name in any order (#790). */
 export function filterRowsByPersonName<T extends { firstName: string; lastName: string }>(rows: readonly T[], search: string): T[] {
   const matches = makeSearchMatcher(search);
