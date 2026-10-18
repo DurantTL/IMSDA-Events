@@ -181,6 +181,8 @@ describe("print and screen scope (#1004 review)", () => {
     for (const rule of [":nth-child(5n + 1)", ":nth-child(4n + 1)", ":nth-child(3n + 1):not(:nth-child(4))", ":nth-child(odd)"]) {
       expect(block).toContain(rule);
     }
+    // The three-across rule stops at 721px: below that the grid is two across, where 10 tiles must not span the last.
+    expect(block).toMatch(/@media screen and \(min-width: 721px\) and \(max-width: 1120px\) \{[^}]*:nth-child\(3n \+ 1\):not\(:nth-child\(4\)\)/);
   });
 });
 

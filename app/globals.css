@@ -11956,7 +11956,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   :is(.metric-grid, .finance-summary) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .report-summary-grid:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  /* Three across (the default here): 7 tiles would be 3 + 3 + 1, 10 would be 3 + 3 + 3 + 1. A lone fourth tile is the 2 x 2 grid. */
+}
+@media screen and (min-width: 721px) and (max-width: 1120px) {
+  /* Three across (the default here): 7 tiles would be 3 + 3 + 1, 10 would be 3 + 3 + 3 + 1. A lone fourth tile is the 2 x 2 grid.
+     Not at 720px and below, where the grid is two across and only an odd last tile is alone. */
   .report-summary-grid > :last-child:nth-child(3n + 1):not(:nth-child(4)) { grid-column: 1 / -1; }
 }
 @media screen and (max-width: 900px) {
