@@ -61,4 +61,11 @@ describe("#997 shared layout CSS", () => {
   it("keeps ordinary words whole in cards: break-word, with anywhere only for emails and codes", () => {
     expect(css).toContain('.break-anywhere.break-anywhere, table td :is(code, a[href^="mailto:"], .team-email) { overflow-wrap: anywhere; }');
   });
+
+  it("keeps the tighter tablet page padding on screen only, so it cannot undo the print rule's zero padding", () => {
+    // A print page is about 816px wide, inside 801-1180px: unscoped, the 20px padding widened the badge sheet and
+    // Chrome shrank the PDF to 97.6% (Badge print check).
+    expect(css).toMatch(/@media screen and \(min-width: 801px\) and \(max-width: 1180px\) \{\s*\.workspace \{ padding-inline: 20px; \}/);
+    expect(css).not.toMatch(/@media \(min-width: 801px\) and \(max-width: 1180px\) \{\s*\.workspace \{ padding-inline/);
+  });
 });

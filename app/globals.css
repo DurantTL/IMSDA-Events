@@ -11563,7 +11563,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
    content side: smaller page padding from 801 to 1180px, and tables that turn into cards or scroll with a cue
    when their own box is too narrow (a container query on the table's box, not on the viewport). */
 .workspace-content { max-width: 1600px; }
-@media (min-width: 801px) and (max-width: 1180px) {
+@media screen and (min-width: 801px) and (max-width: 1180px) {
   .workspace { padding-inline: 20px; }
 }
 /* A table box that decides its own layout by its own width (cards when narrow): the box is a size container. */
