@@ -57,6 +57,9 @@ describe("member honors view dialog", () => {
     expect(html).toContain("icon-button modal-close-button");
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-label="Honors for Pat Example"');
+    // Completion dates read the same as the summary line, never as a raw ISO date.
+    expect(html).toContain("March 1, 2026");
+    expect(html).not.toContain("2026-03-01");
   });
 });
 

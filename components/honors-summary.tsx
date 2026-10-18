@@ -92,7 +92,14 @@ export function MemberHonorsViewDialog({
   const [listScrolls, setListScrolls] = useState(false);
   useEffect(() => {
     const node = listRef.current;
-    setListScrolls(Boolean(node && node.scrollHeight > node.clientHeight + 1));
+    if (!node) return;
+    const measure = () => setListScrolls(node.scrollHeight > node.clientHeight + 1);
+    measure();
+    // Measure again when the list's box changes (a phone turned to portrait, a resized window).
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [honors]);
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} role="presentation">
@@ -113,7 +120,7 @@ export function MemberHonorsViewDialog({
                 <span>
                   <strong translate="no">{entry.honorName}</strong>
                   <small>
-                    <span className="member-honor-status">{memberHonorStatusLabels[entry.status]}</span>{entry.completionDate ? ` · ${entry.completionDate}` : ""}
+                    <span className="member-honor-status">{memberHonorStatusLabels[entry.status]}</span>{entry.completionDate ? ` · ${formatCalendarDate(entry.completionDate)}` : ""}
                   </small>
                 </span>
               </li>
