@@ -4,6 +4,7 @@ import { CalendarDays, ChevronRight, MapPin, UserRound, UsersRound } from "lucid
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { AgendaItem } from "@/components/calendar-agenda-item";
+import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, firstPerSeries } from "@/modules/calendar/domain";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
@@ -90,6 +91,8 @@ export default async function Home() {
             <ChevronRight size={18} aria-hidden="true" />
           </a>
         </nav>
+
+        <StartAClubCallout />
 
         <section aria-labelledby="home-upcoming-heading" className="calendar-agenda">
           <h2 id="home-upcoming-heading">Coming up</h2>

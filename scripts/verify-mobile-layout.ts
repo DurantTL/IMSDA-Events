@@ -191,6 +191,7 @@ const pages: PageSpec[] = [
   { name: "public-profile-sign-in", path: "/profile/sign-in", role: "visitor", signInPage: true },
   { name: "public-recover-registration", path: "/recover-registration", role: "visitor" },
   { name: "public-calendar", path: "/calendar", role: "visitor" },
+  { name: "public-home", path: "/", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /no longer active/i },
   { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /unsubscribe link didn.t work/i },

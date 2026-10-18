@@ -4,6 +4,7 @@ import { BackLink } from "@/components/back-link";
 import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicClubDirectory } from "@/components/public-club-directory";
+import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { listPublicClubs } from "@/modules/organizations/public-club-directory";
 
 export const dynamic = "force-dynamic";
@@ -44,11 +45,11 @@ export default async function PublicClubsPage() {
           <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>
           <h1>Find a club</h1>
           <p>Pathfinder and Adventurer clubs that have chosen to be listed publicly.</p>
-          <p><Link href="/clubs/register">Register a new club</Link>: applications are open all year.</p>
         </div>
       </section>
 
       <div className="calendar-layout">
+        <StartAClubCallout />
         <PublicClubDirectory clubs={clubs} />
       </div>
     </main>
