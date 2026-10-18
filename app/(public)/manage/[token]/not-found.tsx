@@ -1,4 +1,4 @@
-import { ArrowLeft, Link2Off } from "lucide-react";
+import { Link2Off, Mail } from "lucide-react";
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 
@@ -32,7 +32,7 @@ export default function PublicManageNotFound() {
           href="https://imsda.org/contact/"
           rel="noreferrer"
         >
-          <ArrowLeft size={16} aria-hidden="true" /> Contact IMSDA
+          <Mail size={16} aria-hidden="true" /> Contact IMSDA
         </a>
       </section>
     </main>

@@ -6,6 +6,7 @@ import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowl
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
 import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
+import { formatCalendarDate } from "@/modules/club-registrations/domain";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
               {events.map((event) => (
                 <li key={event.id}>
                   <a href={`/account/area/health?event=${encodeURIComponent(event.id)}`}><strong>{event.name}</strong></a>
-                  <small> available through {event.availableThrough}</small>
+                  <small> available through {formatCalendarDate(event.availableThrough)}</small>
                 </li>
               ))}
             </ul>
@@ -70,7 +71,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
       </section>
       <div className="account-page-body club-roster-stack">
         <BackLink href="/account/area/health">Back to events</BackLink>
-        <p className="inline-notice" role="status">Available through {data.event.availableThrough}, the last day of the event. This view is recorded.</p>
+        <p className="inline-notice" role="status">Available through {formatCalendarDate(data.event.availableThrough)}, the last day of the event. This view is recorded.</p>
         {sheet
           ? <PrintReportButton label="Print confidential sheet" />
           : <a className="secondary-button" href={`/account/area/health?event=${encodeURIComponent(data.event.id)}${query.club ? `&club=${encodeURIComponent(query.club)}` : ""}&sheet=1`}>Open printable sheet</a>}

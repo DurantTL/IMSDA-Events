@@ -193,7 +193,7 @@ const pages: PageSpec[] = [
   { name: "public-calendar", path: "/calendar", role: "visitor" },
   { name: "public-clubs", path: "/clubs", role: "visitor" },
   { name: "public-manage-invalid-link", path: `/manage/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /no longer active/i },
-  { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /couldn.t find that page/i },
+  { name: "public-unsubscribe-invalid-link", path: `/unsubscribe/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /unsubscribe link didn.t work/i },
   { name: "public-staff-invite-invalid-link", path: `/staff-invite/${P}-invalid-link-token-0123456789-abcdefghijklmnopqrstuvwxyz`, role: "visitor", allow404: true, expectText: /isn.t available/i },
   { name: "staff-select-event", path: "/select-event", role: "event-admin" },
   { name: "staff-archived-events", path: "/archived-events", role: "event-admin" },

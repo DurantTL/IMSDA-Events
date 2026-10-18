@@ -357,6 +357,10 @@ export type PublicRegistrationFormProps = {
      */
     teamName?: string | null;
     noCost?: boolean;
+    /** The event's team-size rule for team members (coaches do not count), read from the team settings; display only (#1005). */
+    teamLimits?: { min: number | null; max: number | null };
+    /** The general registration link's team flow: the roster step always reads "Team" (#1005). */
+    teamFlow?: boolean;
     submitLabel?: string;
     /** The location the group registers at, shown beside the price, with a way back to change it. */
     locationName?: string | null;
@@ -585,6 +589,10 @@ export function PublicRegistrationForm({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [website, setWebsite] = useState("");
   const [issues, setIssues] = useState<FormIssue[]>([]);
+  // "Needs attention" on a person's card is a display state (#1005): only once the director has tried to continue, or has
+  // started that person's details. Validation itself is unchanged and still blocks continuing.
+  const [continueAttempted, setContinueAttempted] = useState(false);
+  const [touchedAttendeeIds, setTouchedAttendeeIds] = useState<ReadonlySet<string>>(() => new Set());
   // "Responsible adult" (#131): only what the registrant changed; the rest is preselected below. Whatever is
   // selected when the form is submitted is the declaration.
   const [responsibleAdultPicks, setResponsibleAdultPicks] = useState<Record<string, string>>({});
@@ -770,6 +778,11 @@ export function PublicRegistrationForm({
           setActiveAttendeeId((current) => (
             draft.attendees.some((attendee) => attendee.clientId === current) ? current : draft.attendees[0]?.clientId ?? current
           ));
+          // A person restored with answers has been started, so an unfinished card reads "Needs attention" (#1005).
+          const started = draft.attendees
+            .filter((attendee) => Object.values(attendee.responses).some((value) => value !== undefined && value !== null && value !== "" && value !== false && !(Array.isArray(value) && value.length === 0)))
+            .map((attendee) => attendee.clientId);
+          if (started.length > 0) setTouchedAttendeeIds((current) => new Set([...current, ...started]));
         } else {
           setResponses((current) => ({ ...current, ...draft.responses } as FormResponses));
         }
@@ -1028,6 +1041,7 @@ export function PublicRegistrationForm({
       setCurrentStepId(targetStep.id);
     }
     const shownIssues = scopedIssues.length > 0 ? scopedIssues : nextIssues;
+    setContinueAttempted(true);
     setIssues(shownIssues);
     expandAttendeeCardsFor(shownIssues);
     setError(message);
@@ -1398,6 +1412,8 @@ export function PublicRegistrationForm({
     setDraftDirty(true);
     // Changed answers are a different submission, so never reuse the old key.
     setIdempotencyKey(null);
+    const touchedId = attendees[attendeeIndex]?.clientId;
+    if (touchedId) setTouchedAttendeeIds((current) => (current.has(touchedId) ? current : new Set(current).add(touchedId)));
     setAttendees((current) => current.map((attendee, index) => index === attendeeIndex ? {
       ...attendee,
       responses: pruneScopedResponses(
@@ -2303,6 +2319,22 @@ export function PublicRegistrationForm({
     // club registration's, where the roster itself is managed elsewhere and
     // add/move/remove are hidden.
     const canCollapse = roster.maxAttendees > 1;
+    // A team registration (#1005): the step says team, and its size is the team rule, not the roster's own cap.
+    const teamRoster = Boolean(club?.teamName || group?.teamName || group?.teamFlow);
+    const teamLimits = group?.teamLimits;
+    const rosterPeople = pluralAttendeeLabel(roster.attendeeLabel, roster.maxAttendees);
+    const teamSizeText = teamLimits
+      ? teamLimits.min !== null && teamLimits.max !== null
+        ? `A team has ${teamLimits.min} to ${teamLimits.max} team members.`
+        : teamLimits.min !== null
+          ? `A team has at least ${teamLimits.min} team ${teamLimits.min === 1 ? "member" : "members"}.`
+          : teamLimits.max !== null
+            ? `A team has up to ${teamLimits.max} team ${teamLimits.max === 1 ? "member" : "members"}.`
+            : null
+      : null;
+    const rosterCountSentence = teamRoster && teamSizeText
+      ? <>{teamSizeText} Add any coaches too; coaches do not count toward the team ({roster.maxAttendees} people at most). Each person’s details are kept separate.</>
+      : <>Add between {roster.minAttendees} and {roster.maxAttendees} {rosterPeople}. Each person’s details are kept separate.</>;
     const titleId = manageRoster
       ? "public_registration_roster_attendees_title"
       : "public_registration_roster_choices_title";
@@ -2315,7 +2347,7 @@ export function PublicRegistrationForm({
           <span>{sectionNumber}</span>
           <div>
             <p className="public-registration-eyebrow">
-              {manageRoster ? "Household or group" : "Per-attendee choices"}
+              {manageRoster ? (teamRoster ? "Team" : "Household or group") : "Per-attendee choices"}
             </p>
             <h2 id={titleId}>
               {manageRoster
@@ -2324,9 +2356,7 @@ export function PublicRegistrationForm({
             </h2>
             <p>
               {manageRoster
-                ? <>Add between {roster.minAttendees} and {roster.maxAttendees}{" "}
-                  {roster.attendeeLabel.toLowerCase()}
-                  {roster.maxAttendees === 1 ? "" : "s"}. Each person’s details are kept separate.</>
+                ? rosterCountSentence
                 : "Review the event options that apply separately to each attendee."}
             </p>
           </div>
@@ -2421,7 +2451,11 @@ export function PublicRegistrationForm({
                     </h3>
                     {collapsed && (
                       <small className="public-registration-attendee-summary">
-                        {statusComplete ? <StatusComplete /> : <NeedsAttention />}
+                        {statusComplete
+                          ? <StatusComplete />
+                          : club || continueAttempted || touchedAttendeeIds.has(attendee.clientId) || unresolvedCarryovers > 0
+                            ? <NeedsAttention />
+                            : <span className="status-pending">Details to fill in</span>}
                       </small>
                     )}
                     {collapsed && attention.length > 0 && (
@@ -2688,6 +2722,7 @@ export function PublicRegistrationForm({
           key: field.key,
           label: field.label,
           accepted: responses[field.key] === true,
+          optional: !field.required && field.type === "CHECKBOX",
         }];
       }
       if (field.scope === "REGISTRATION") {
@@ -2696,6 +2731,7 @@ export function PublicRegistrationForm({
           key: field.key,
           label: field.label,
           accepted: registrationResponses[field.key] === true,
+          optional: !field.required && field.type === "CHECKBOX",
         }];
       }
       return attendees.flatMap((attendee, attendeeIndex) => {
@@ -2705,6 +2741,7 @@ export function PublicRegistrationForm({
           key: `${attendee.clientId}_${field.key}`,
           label: `${attendeeName(attendee, attendeeIndex, roster.attendeeLabel)} — ${field.label}`,
           accepted: attendee.responses[field.key] === true,
+          optional: !field.required && field.type === "CHECKBOX",
         }];
       });
     });
@@ -2916,7 +2953,7 @@ export function PublicRegistrationForm({
             <ul className="public-registration-review-acknowledgements">
               {acknowledgements.map((acknowledgement) => (
                 <li
-                  className={acknowledgement.accepted ? "is-accepted" : ""}
+                  className={acknowledgement.accepted ? "is-accepted" : acknowledgement.optional ? "is-neutral" : ""}
                   key={acknowledgement.key}
                 >
                   {acknowledgement.accepted
@@ -2926,8 +2963,8 @@ export function PublicRegistrationForm({
                     <strong>{acknowledgement.label}</strong>
                     <small>
                       {acknowledgement.accepted
-                        ? "Accepted"
-                        : "Not accepted yet"}
+                        ? (acknowledgement.optional ? "Yes" : "Accepted")
+                        : (acknowledgement.optional ? "No" : "Not accepted yet")}
                     </small>
                   </span>
                 </li>

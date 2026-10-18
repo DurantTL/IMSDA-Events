@@ -60,8 +60,10 @@ describe("perPersonPrice", () => {
       { attendeeLabel: "Free One", amountCents: 0 },
       { attendeeLabel: "Free Two", amountCents: 0 },
     ]);
-    // Everyone free is a uniform $0, never dropped to "no price".
-    expect(roster([], { attendeeCount: 3 }).notice).toBe("$0 per person. Your church is billed after the event.");
+    // Everyone free is still a uniform $0 (never dropped to "no price"); it is said as "No cost to you" and keeps the church line (#1005).
+    const free = roster([], { attendeeCount: 3 });
+    expect(free.uniformAmountCents).toBe(0);
+    expect(free.notice).toBe("No cost to you. Your church is billed after the event.");
   });
 
   it("lists registration-level fees on their own, never adding them to a per-person price (S3)", () => {

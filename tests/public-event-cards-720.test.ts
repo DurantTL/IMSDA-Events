@@ -153,7 +153,9 @@ describe("public event cards are distinguishable (#720)", () => {
     expect(markup).toContain("Honors Weekend registration");
     expect(markup).toContain("Option 1 of 2");
     expect(markup).toContain("Option 2 of 2");
-    expect(markup).toContain("For club directors. Sign in with your club account");
+    // The card note that repeated the sign-in callout is gone (#1005); the callout above the options says it once.
+    expect(markup).not.toContain("For club directors. Sign in with your club account");
+    expect(markup.split("club-director-sign-in-notice").length - 1).toBe(1);
     vi.doUnmock("@/modules/events/public-repository");
     vi.resetModules();
   });
@@ -250,7 +252,7 @@ describe("club roster cards open club registration, not the anonymous form (#720
     ]);
   });
 
-  it("shows the club-directors note only on the portal card", async () => {
+  it("gives club directors one sign-in instruction: the callout, not a note on each card (#1005)", async () => {
     const { getPublicEventLanding } = await import("@/modules/events/public-repository");
     mocks.eventFindFirst.mockResolvedValue(eventRow([
       formRow("f1", "oldest", rosterDef(), "2027-01-01"),
@@ -261,7 +263,8 @@ describe("club roster cards open club registration, not the anonymous form (#720
     vi.resetModules();
     const { default: Page } = await import("@/app/(public)/events/[eventSlug]/page");
     const markup = renderToStaticMarkup(await Page({ params: Promise.resolve({ eventSlug: "honors-weekend-test" }) }));
-    expect(markup.split("For club directors. Sign in with your club account").length - 1).toBe(1);
+    expect(markup).not.toContain("For club directors. Sign in with your club account");
+    expect(markup.split("club-director-sign-in-notice").length - 1).toBe(1);
     vi.doUnmock("@/modules/events/public-repository");
     vi.resetModules();
   });
@@ -451,9 +454,12 @@ describe("public event page layout classes (#720)", () => {
   it("wraps every content section in one shared container", () => {
     const containerStart = page.indexOf('<div className="public-event-container">');
     expect(containerStart).toBeGreaterThan(0);
-    for (const marker of ["<EventInfoCards", "public-event-resources", "public-event-layout", "public-event-sidebar", "public-event-announcement-feed", "<AutoEventInfoCards"]) {
+    // The options layout (with its sidebar) is one block, placed in the container either first (club events) or in its usual place (#1005).
+    for (const marker of ["<EventInfoCards", "public-event-resources", "{autoCards && optionsLayout}", "{!autoCards && optionsLayout}", "public-event-announcement-feed", "<AutoEventInfoCards"]) {
       expect(page.indexOf(marker, containerStart)).toBeGreaterThan(containerStart);
     }
+    expect(page).toContain('const optionsLayout = (\n      <div className="public-event-layout">');
+    expect(page).toContain("public-event-sidebar");
   });
 
   it("gives the container a 1180px max width and 16px gutters, and zeroes the sections' own side margins", () => {
