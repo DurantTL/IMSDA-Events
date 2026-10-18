@@ -21,7 +21,7 @@ type ApiResult = {
 };
 
 type Props = {
-  history: Pick<History, "firstName" | "lastName" | "entries"> & Partial<Pick<History, "insigniaOnOrder">>;
+  history: Pick<History, "firstName" | "lastName" | "entries"> & Partial<Pick<History, "insigniaOnOrder" | "insigniaPending" | "activeThisClubYear">>;
   /** Only the club's roster roles edit (#1011); everyone else sees the list. */
   canEdit?: boolean;
   organizationId?: string;
@@ -55,8 +55,11 @@ export function MemberClassHistory({ history, canEdit = false, organizationId = 
   const [insigniaChoice, setInsigniaChoice] = useState<boolean | null>(null);
 
   const addable = classLevelsStillToAdd(history.entries);
-  const insigniaNeeded = insigniaChoice ?? (addDate ? insigniaNeededByDefault(addDate, now) : true);
+  // Insignia are only suggested for people active this club year, so the box starts off for anyone else.
+  const activeThisYear = history.activeThisClubYear ?? true;
+  const insigniaNeeded = insigniaChoice ?? (activeThisYear && (addDate ? insigniaNeededByDefault(addDate, now) : true));
   const onOrder = new Set(history.insigniaOnOrder ?? []);
+  const pending = new Set(history.insigniaPending ?? []);
 
   async function send(url: string, method: string, body?: unknown) {
     const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -92,7 +95,7 @@ export function MemberClassHistory({ history, canEdit = false, organizationId = 
     const level = addLevel;
     const ok = await act(async () => {
       await send(base, "POST", { classLevel: level, completedOn: addDate, needsInsignia: insigniaNeeded });
-      return `Added ${clubClassLevelLabels[level]}, completed ${dateLabel(addDate)}.${insigniaNeeded ? " Its insignia is suggested on Class tracking; nothing is ordered until you confirm." : ""}`;
+      return `Added ${clubClassLevelLabels[level]}, completed ${dateLabel(addDate)}.${insigniaNeeded ? " Its insignia is suggested on Class tracking; nothing is ordered until the club\u2019s director or deputy confirms." : ""}`;
     });
     if (ok) {
       setAddLevel("");
@@ -113,9 +116,18 @@ export function MemberClassHistory({ history, canEdit = false, organizationId = 
     const label = clubClassLevelLabels[level];
     const confirmed = await confirm({
       title: `Remove ${label} from ${history.firstName} ${history.lastName}'s class history?`,
-      body: onOrder.has(level)
-        ? <p>The {label} class is taken off this person&apos;s history. Its insignia is already on an order, so that order is not changed.</p>
-        : <p>The {label} class is taken off this person&apos;s history. If its insignia has not been ordered yet, it is removed from the needs list too.</p>,
+      body: (
+        <p>
+          The {label} class is taken off this person&apos;s history.
+          {pending.has(level) && onOrder.has(level)
+            ? " Part of its insignia is not ordered yet and is removed from the needs list; the part already on an order is not changed."
+            : onOrder.has(level)
+              ? " Its insignia is already on an order, so that order is not changed."
+              : pending.has(level)
+                ? " Its insignia has not been ordered yet, so it is removed from the needs list too."
+                : ""}
+        </p>
+      ),
       confirmLabel: `Remove ${label}`,
       destructive: true,
     });
@@ -227,9 +239,10 @@ export function MemberClassHistory({ history, canEdit = false, organizationId = 
                 This person still needs the insignia
               </label>
               <p className="field-help">
-                Ticked, the class&apos;s insignia is suggested on Class tracking, where you confirm what to order, as when you mark a class completed there.
+                Ticked, the class&apos;s insignia is suggested on Class tracking, where the club&apos;s director or deputy confirms what to order, as when a class is marked completed there.
                 Unticked, the class is recorded and no insignia is suggested. It starts unticked for a date before this club year.
               </p>
+              {!activeThisYear && <p className="field-help">Insignia suggestions are only made for people active this club year.</p>}
               <div className={styles.actions}>
                 <button className="primary-button" disabled={busy || !addLevel || !addDate} onClick={addClass} type="button">
                   <Plus aria-hidden="true" size={16} /> Add class

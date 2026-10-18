@@ -1,6 +1,6 @@
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { clubOrderApiError } from "@/modules/club-orders/api-errors";
+import { classHistoryApiError } from "@/modules/earned-awards/class-history-api-errors";
 import { requireClassHistoryEditAccess } from "@/modules/earned-awards/class-history-access";
 import { changeMemberClassCompletionDate, removeMemberClassCompletion } from "@/modules/earned-awards/order-source";
 import { changeMemberClassCompletionDateSchema, memberClassLevelParamSchema } from "@/modules/earned-awards/schemas";
@@ -18,7 +18,7 @@ async function patchHandler(request: Request, context: RouteContext) {
     const body = changeMemberClassCompletionDateSchema.parse(await request.json());
     return Response.json(await changeMemberClassCompletionDate(organizationId, personId, level, body.completedOn, actor));
   } catch (error) {
-    return clubOrderApiError(error, "Changing a class completed date");
+    return classHistoryApiError(error, "Changing a class completed date");
   }
 }
 
@@ -32,7 +32,7 @@ async function deleteHandler(request: Request, context: RouteContext) {
     const level = memberClassLevelParamSchema.parse(classLevel);
     return Response.json(await removeMemberClassCompletion(organizationId, personId, level, actor));
   } catch (error) {
-    return clubOrderApiError(error, "Removing a class from the class history");
+    return classHistoryApiError(error, "Removing a class from the class history");
   }
 }
 

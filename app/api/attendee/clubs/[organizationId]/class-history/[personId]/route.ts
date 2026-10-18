@@ -1,6 +1,6 @@
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { clubOrderApiError } from "@/modules/club-orders/api-errors";
+import { classHistoryApiError } from "@/modules/earned-awards/class-history-api-errors";
 import { requireClassHistoryEditAccess } from "@/modules/earned-awards/class-history-access";
 import { addMemberClassCompletion } from "@/modules/earned-awards/order-source";
 import { addMemberClassCompletionSchema } from "@/modules/earned-awards/schemas";
@@ -17,7 +17,7 @@ async function postHandler(request: Request, context: RouteContext) {
     const body = addMemberClassCompletionSchema.parse(await request.json());
     return Response.json(await addMemberClassCompletion(organizationId, personId, body, actor), { status: 201 });
   } catch (error) {
-    return clubOrderApiError(error, "Adding a class to the class history");
+    return classHistoryApiError(error, "Adding a class to the class history");
   }
 }
 

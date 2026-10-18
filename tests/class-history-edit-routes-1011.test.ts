@@ -161,8 +161,11 @@ describe("class history edit routes (#1011)", () => {
     expect((await POST(request("POST", addBody), ctx())).status).toBe(409);
     mocks.add.mockRejectedValue(new ClubOrderError("DATE_IN_FUTURE", "The completed date can't be in the future."));
     expect((await POST(request("POST", addBody), ctx())).status).toBe(400);
+    // Another club's person gets the page's own answer: 404.
     mocks.add.mockRejectedValue(new ClubOrderError("MEMBER_NOT_ON_ROSTER", "That person isn't on this club's roster."));
-    expect((await POST(request("POST", addBody), ctx())).status).toBe(409);
+    expect((await POST(request("POST", addBody), ctx())).status).toBe(404);
+    mocks.change.mockRejectedValue(new ClubOrderError("MEMBER_NOT_ON_ROSTER", "That person isn't on this club's roster."));
+    expect((await PATCH(request("PATCH", { completedOn: "2025-06-02" }), ctx())).status).toBe(404);
     mocks.remove.mockRejectedValue(new ClubOrderError("CLASS_NOT_COMPLETED", "Friend isn't recorded for this person."));
     expect((await DELETE(request("DELETE"), ctx())).status).toBe(404);
   });

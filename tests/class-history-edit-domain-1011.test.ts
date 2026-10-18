@@ -12,6 +12,8 @@ const state = vi.hoisted(() => ({
   needs: [] as Need[],
   roster: [] as Array<{ organizationId: string; personId: string; clubYear: string; status: string }>,
   audits: [] as Array<Record<string, unknown>>,
+  /** Which client each roster lookup ran on: the membership check must be on the transaction's. */
+  rosterCalls: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,20 +27,24 @@ vi.mock("@/lib/prisma", () => {
         const found = state.completions.find((row) => row.organizationId === key.organizationId && row.personId === key.personId && row.classLevel === key.classLevel);
         return found ? { ...found } : null;
       },
-      create: async ({ data }: { data: Omit<Completion, "id"> }) => { state.completions.push({ id: `c${state.completions.length + 1}`, ...data }); },
+      create: async ({ data }: { data: Omit<Completion, "id"> }) => {
+        const row = { id: `c${state.completions.length + 1}`, ...data };
+        state.completions.push(row);
+        return { id: row.id };
+      },
       update: async ({ where, data }: { where: { id: string }; data: Partial<Completion> }) => { Object.assign(state.completions.find((row) => row.id === where.id)!, data); },
       delete: async ({ where }: { where: { id: string } }) => { state.completions = state.completions.filter((row) => row.id !== where.id); },
     },
     clubOrderNeed: {
       findMany: async ({ where }: { where: { organizationId: string; personId: string; sourceId: { startsWith: string } } }) =>
         state.needs.filter((row) => row.organizationId === where.organizationId && row.personId === where.personId && row.sourceId.startsWith(where.sourceId.startsWith)),
-      updateMany: async ({ where, data }: { where: { sourceId: { startsWith: string }; status: string }; data: Partial<Need> }) => {
-        const rows = state.needs.filter((row) => row.sourceId.startsWith(where.sourceId.startsWith) && row.status === where.status);
+      updateMany: async ({ where, data }: { where: { organizationId: string; personId: string; sourceId: { startsWith: string }; status: string }; data: Partial<Need> }) => {
+        const rows = state.needs.filter((row) => row.organizationId === where.organizationId && row.personId === where.personId && row.sourceId.startsWith(where.sourceId.startsWith) && row.status === where.status);
         rows.forEach((row) => Object.assign(row, data));
         return { count: rows.length };
       },
-      deleteMany: async ({ where }: { where: { id: { in: string[] }; status: string; sourceType: string } }) => {
-        const gone = state.needs.filter((row) => where.id.in.includes(row.id) && row.status === where.status && row.sourceType === where.sourceType);
+      deleteMany: async ({ where }: { where: { id: { in: string[] }; organizationId: string; status: string; sourceType: string } }) => {
+        const gone = state.needs.filter((row) => where.id.in.includes(row.id) && row.organizationId === where.organizationId && row.status === where.status && row.sourceType === where.sourceType);
         state.needs = state.needs.filter((row) => !gone.includes(row));
         return { count: gone.length };
       },
@@ -50,14 +56,16 @@ vi.mock("@/lib/prisma", () => {
       && (!where.clubYear || row.clubYear === where.clubYear)
       && (!where.personId || (typeof where.personId === "string" ? row.personId === where.personId : where.personId.in.includes(row.personId)))
       && (!where.status || row.status !== where.status.not));
+  const rosterOn = (client: string) => ({
+    count: async ({ where }: { where: Parameters<typeof matchesRoster>[0] }) => { state.rosterCalls.push(client); return matchesRoster(where).length; },
+    findMany: async ({ where }: { where: Parameters<typeof matchesRoster>[0] }) => { state.rosterCalls.push(client); return matchesRoster(where); },
+  });
+  const txClient = { ...tx, clubRosterMember: rosterOn("tx") };
   return {
     getPrisma: () => ({
       ...tx,
-      $transaction: async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx),
-      clubRosterMember: {
-        count: async ({ where }: { where: Parameters<typeof matchesRoster>[0] }) => matchesRoster(where).length,
-        findMany: async ({ where }: { where: Parameters<typeof matchesRoster>[0] }) => matchesRoster(where),
-      },
+      $transaction: async (fn: (client: typeof txClient) => Promise<unknown>) => fn(txClient),
+      clubRosterMember: rosterOn("outside"),
     }),
   };
 });
@@ -79,6 +87,7 @@ beforeEach(() => {
   state.completions = [];
   state.needs = [];
   state.audits = [];
+  state.rosterCalls = [];
   state.roster = [{ organizationId: org, personId: person, clubYear: "2026-27", status: "ACTIVE" }];
 });
 
@@ -107,6 +116,7 @@ describe("addMemberClassCompletion", () => {
     expect(state.audits[0]).toMatchObject({
       action: "CLUB_CLASS_COMPLETION_ADDED",
       entityType: "MemberClassCompletion",
+      entityId: state.completions[0]!.id,
       metadata: { organizationId: org, personId: person, classLevel: "FRIEND", completedOn: "2025-06-01", insigniaNeeded: false, actorAttendeeAccountId: "account-1" },
     });
   });
@@ -217,5 +227,30 @@ describe("removeMemberClassCompletion", () => {
     await expect(removeMemberClassCompletion(org, "someone-else", "FRIEND", actor, now)).rejects.toMatchObject({ code: "MEMBER_NOT_ON_ROSTER" });
     expect(state.completions).toHaveLength(2);
     expect(state.audits).toHaveLength(0);
+  });
+});
+
+describe("the roster check and club scoping (#1011)", () => {
+  it("runs the roster membership check on the transaction client, never outside it", async () => {
+    await addMemberClassCompletion(org, person, { classLevel: "FRIEND", completedOn: "2025-06-01", needsInsignia: false }, actor, now);
+    await changeMemberClassCompletionDate(org, person, "FRIEND", "2025-06-02", actor, now);
+    await removeMemberClassCompletion(org, person, "FRIEND", actor, now);
+    expect(state.rosterCalls.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(state.rosterCalls)).toEqual(new Set(["tx"]));
+  });
+
+  it("leaves another club's completion and needs for the same person untouched", async () => {
+    state.roster.push({ organizationId: "club-2", personId: person, clubYear: "2026-27", status: "ACTIVE" });
+    state.completions = [
+      { id: "c1", organizationId: org, personId: person, classLevel: "FRIEND", completedOn: "2025-06-01", insigniaDismissedAt: null },
+      { id: "c2", organizationId: "club-2", personId: person, classLevel: "FRIEND", completedOn: "2024-06-01", insigniaDismissedAt: null },
+    ];
+    state.needs = [need("n1", "FRIEND", "strip", "NEEDED"), { ...need("n2", "FRIEND", "strip2", "NEEDED"), organizationId: "club-2" }];
+    await changeMemberClassCompletionDate(org, person, "FRIEND", "2025-05-01", actor, now);
+    expect(state.completions.find((row) => row.id === "c2")!.completedOn).toBe("2024-06-01");
+    expect(state.needs.find((row) => row.id === "n2")!.sourceDate).toBe("2025-06-01");
+    await removeMemberClassCompletion(org, person, "FRIEND", actor, now);
+    expect(state.completions.map((row) => row.id)).toEqual(["c2"]);
+    expect(state.needs.map((row) => row.id)).toEqual(["n2"]);
   });
 });
