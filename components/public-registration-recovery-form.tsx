@@ -107,7 +107,7 @@ export function PublicRegistrationRecoveryForm({
           />
         </label>
         <label>
-          Registration contact email
+          Registration contact email (to use with your code)
           <input
             autoComplete="email"
             maxLength={160}
@@ -128,7 +128,7 @@ export function PublicRegistrationRecoveryForm({
           Lost the code? Request a private link using only the registration contact email.
         </p>
         <label>
-          Registration contact email
+          Registration contact email (to get a link by email)
           <input
             autoComplete="email"
             maxLength={160}

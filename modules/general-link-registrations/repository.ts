@@ -292,7 +292,7 @@ export async function getGeneralLinkExperience(eventSlug: string, now = new Date
     problem,
     experience,
     locations: locations.map((location) => publicLocation(clubLocationView(event, location, seats.get(location.id) ?? 0, now))),
-    team: { named: teamSettings?.allowMultipleTeams === true },
+    team: { named: teamSettings?.allowMultipleTeams === true, minTeamMembers: teamSettings?.minTeamMembers ?? null, maxTeamMembers: teamSettings?.maxTeamMembers ?? null },
   };
 }
 

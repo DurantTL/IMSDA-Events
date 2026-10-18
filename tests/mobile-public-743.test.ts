@@ -33,7 +33,7 @@ describe("one active attendee at a time (#743)", () => {
     expect(form).not.toContain("collapsedAttendeeIds");
     expect(form).toContain("attendeeCardLayout({");
     expect(form).toContain('{collapsed ? "Edit" : "Done"}');
-    expect(form).toContain("{statusComplete ? <StatusComplete /> : <NeedsAttention />}");
+    expect(form).toMatch(/\{statusComplete\s*\? <StatusComplete \/>\s*: club \|\| continueAttempted[^\n]*\s*\? <NeedsAttention \/>/);
   });
 
   it("adding an attendee makes the new card the active one", () => {
@@ -189,7 +189,7 @@ describe("review fixes (#743)", () => {
     expect(cardStatusComplete(true, 1)).toBe(false);
     expect(cardStatusComplete(false, 0)).toBe(false);
     expect(form).toContain("cardStatusComplete(complete, unresolvedCarryovers)");
-    expect(form).toContain("{statusComplete ? <StatusComplete /> : <NeedsAttention />}");
+    expect(form).toMatch(/\{statusComplete\s*\? <StatusComplete \/>\s*: club \|\| continueAttempted[^\n]*\s*\? <NeedsAttention \/>/);
   });
 
   it("resets the sheet on step change, submit success and confirmation", () => {

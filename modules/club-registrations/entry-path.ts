@@ -11,7 +11,3 @@ export function clubRegistrationEntryPath(eventSlug: string) {
 /** What a visitor who holds no club role is told. */
 export const CLUB_REGISTRATION_NOT_A_DIRECTOR_MESSAGE =
   "This registration is for club directors, deputies, and registrars. Your account does not hold one of those roles for a club.";
-
-/** The note on a public event card that opens club registration. */
-export const CLUB_REGISTRATION_CARD_NOTE =
-  "For club directors. Sign in with your club account and we will bring you back to this registration.";

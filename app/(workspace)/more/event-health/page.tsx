@@ -8,6 +8,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveStaffHealthViewer } from "@/modules/coordinator-health/access";
 import { HealthViewError, healthAcknowledgmentOwed, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { resolveEventContext } from "@/modules/events/selection";
+import { formatCalendarDate } from "@/modules/club-registrations/domain";
 
 export const metadata: Metadata = {
   title: staffPageTitles.eventHealth,
@@ -52,7 +53,7 @@ export default async function EventHealthPage({
         <div>
           <p className="eyebrow">Confidential · read only</p>
           <h2>{data.event.name}: health information</h2>
-          <p>Available through {data.event.availableThrough}, the last day of the event. Every time this is opened or printed it is recorded.</p>
+          <p>Available through {formatCalendarDate(data.event.availableThrough)}, the last day of the event. Every time this is opened or printed it is recorded.</p>
         </div>
         <div className="intro-actions">
           {sheet
