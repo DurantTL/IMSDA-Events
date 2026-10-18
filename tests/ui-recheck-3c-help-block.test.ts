@@ -7,6 +7,8 @@ vi.mock("@/modules/events/public-repository", () => ({ getPublicEventLanding: mo
 vi.mock("@/modules/event-info-cards/repository", () => ({ getAutoEventInfoCards: mocks.getAutoEventInfoCards }));
 vi.mock("next/navigation", () => ({ notFound: vi.fn() }));
 vi.mock("server-only", () => ({}));
+// The header's session links read cookies and the database (#1009); they have their own tests.
+vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 
 import PublicEventPage from "@/app/(public)/events/[eventSlug]/page";
 

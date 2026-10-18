@@ -3109,6 +3109,17 @@ body:has(.auth-page) { padding-bottom: 0; }
   padding: 12px 24px;
 }
 
+/* Session links in the public site header (#1009): Sign in / Staff workspace / My account. */
+.public-header-links {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 14px;
+}
+.public-header-links .text-button { white-space: nowrap; }
+
 .public-registration-brand {
   display: flex;
   align-items: center;

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * builder's device hint and the Dashboard checklist. Synthetic data only.
  */
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: { id: "u1", globalRole: null } }) }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),

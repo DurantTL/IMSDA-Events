@@ -66,14 +66,20 @@ export function otherWorkspaceContextsForStaff(input: {
 }
 
 /**
- * The other workspace a signed-in **attendee** identity may switch into: the
- * staff workspace, only when this browser also carries a live staff session
- * (the reverse of the handoff above). An attendee with no staff session never
- * sees a staff option — there is nothing to ask a role for, only what is
- * already true of the two sessions on this browser.
+ * The other workspaces a signed-in **attendee** identity may switch into: the
+ * staff workspace, and for a system administrator also system management, but
+ * only when this browser also carries a live staff session (the reverse of the
+ * handoff above). An attendee with no staff session never sees either option:
+ * `isSystemAdmin` is ignored without one, so it can never offer System
+ * management on its own. These are links only; `/overview` and `/admin` keep
+ * their own server-side checks.
  */
 export function otherWorkspaceContextsForAttendee(input: {
   hasStaffSession: boolean;
+  isSystemAdmin?: boolean;
 }): WorkspaceContext[] {
-  return input.hasStaffSession ? [STAFF_WORKSPACE_CONTEXT] : [];
+  if (!input.hasStaffSession) return [];
+  return input.isSystemAdmin
+    ? [STAFF_WORKSPACE_CONTEXT, SYSTEM_ADMIN_CONTEXT]
+    : [STAFF_WORKSPACE_CONTEXT];
 }
