@@ -8181,6 +8181,24 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .home-action span { display: grid; gap: 3px; min-width: 0; }
 .home-action strong { font-size: 0.98rem; }
 .home-action small { overflow-wrap: anywhere; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.74rem); line-height: 1.4; }
+/* Start a new club call to action (#1014): shown on the home page and Find a club. */
+.start-a-club-callout {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px;
+  border: 1px solid var(--imsda-gold); border-radius: 16px; background: var(--imsda-gold-soft); padding: 18px 20px; color: var(--ink);
+}
+.start-a-club-icon { color: var(--imsda-navy); }
+.start-a-club-body { display: grid; gap: 4px; min-width: 0; }
+.start-a-club-body h2 { margin: 0; font-size: 1.15rem; }
+.start-a-club-body p { margin: 0; line-height: 1.45; }
+.start-a-club-button { min-height: 44px; padding: 10px 18px; text-decoration: none; white-space: nowrap; }
+@media (max-width: 760px) {
+  .start-a-club-callout { grid-template-columns: auto minmax(0, 1fr); padding: 16px; }
+  .start-a-club-button { grid-column: 1 / -1; width: 100%; white-space: normal; text-align: center; }
+}
+@media print {
+  .start-a-club-callout { display: none; }
+}
+.home-more a { display: inline-flex; align-items: center; min-height: 44px; }
 .home-more { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.82rem); font-weight: 700; }
 @media (max-width: 760px) {
   .home-actions { grid-template-columns: minmax(0, 1fr); }

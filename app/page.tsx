@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, ChevronRight, LayoutDashboard, MapPin, UserRound, UsersRound } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { AgendaItem } from "@/components/calendar-agenda-item";
+import { StartAClubCallout } from "@/components/start-a-club-callout";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, firstPerSeries } from "@/modules/calendar/domain";
@@ -96,6 +97,8 @@ export default async function Home() {
             <ChevronRight size={18} aria-hidden="true" />
           </a>
         </nav>
+
+        <StartAClubCallout />
 
         <section aria-labelledby="home-upcoming-heading" className="calendar-agenda">
           <h2 id="home-upcoming-heading">Coming up</h2>
