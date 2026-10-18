@@ -137,9 +137,9 @@ export default async function ClubRecordsPage({
                   </small>
                 </span>
                 {candidate === month
-                  ? <span aria-current="page" className="count-badge records-viewing-badge">Viewing</span>
+                  ? <span aria-current="page" className="count-badge">Viewing</span>
                   : (
-                    <Link className="secondary-button club-event-action" href={`${recordsBase}?month=${candidate}`}>
+                    <Link aria-label={`${closed ? "View" : "Open"} ${reportMonthLabel(candidate)}`} className="secondary-button club-event-action" href={`${recordsBase}?month=${candidate}`}>
                       {closed ? "View" : "Open"} <ArrowRight size={14} aria-hidden="true" />
                     </Link>
                   )}

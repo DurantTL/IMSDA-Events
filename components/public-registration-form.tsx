@@ -359,6 +359,8 @@ export type PublicRegistrationFormProps = {
     noCost?: boolean;
     /** The event's team-size rule for team members (coaches do not count), read from the team settings; display only (#1005). */
     teamLimits?: { min: number | null; max: number | null };
+    /** The general registration link's team flow: the roster step always reads "Team" (#1005). */
+    teamFlow?: boolean;
     submitLabel?: string;
     /** The location the group registers at, shown beside the price, with a way back to change it. */
     locationName?: string | null;
@@ -776,6 +778,11 @@ export function PublicRegistrationForm({
           setActiveAttendeeId((current) => (
             draft.attendees.some((attendee) => attendee.clientId === current) ? current : draft.attendees[0]?.clientId ?? current
           ));
+          // A person restored with answers has been started, so an unfinished card reads "Needs attention" (#1005).
+          const started = draft.attendees
+            .filter((attendee) => Object.values(attendee.responses).some((value) => value !== undefined && value !== null && value !== "" && value !== false && !(Array.isArray(value) && value.length === 0)))
+            .map((attendee) => attendee.clientId);
+          if (started.length > 0) setTouchedAttendeeIds((current) => new Set([...current, ...started]));
         } else {
           setResponses((current) => ({ ...current, ...draft.responses } as FormResponses));
         }
@@ -2313,11 +2320,20 @@ export function PublicRegistrationForm({
     // add/move/remove are hidden.
     const canCollapse = roster.maxAttendees > 1;
     // A team registration (#1005): the step says team, and its size is the team rule, not the roster's own cap.
-    const teamRoster = Boolean(club?.teamName || group?.teamName || group?.teamLimits);
+    const teamRoster = Boolean(club?.teamName || group?.teamName || group?.teamFlow);
     const teamLimits = group?.teamLimits;
     const rosterPeople = pluralAttendeeLabel(roster.attendeeLabel, roster.maxAttendees);
-    const rosterCountSentence = teamRoster && teamLimits && (teamLimits.min !== null || teamLimits.max !== null)
-      ? <>A team has {teamLimits.min ?? 1} to {teamLimits.max ?? "any number"} team members. Add any coaches too; coaches do not count toward the team ({roster.maxAttendees} people at most). Each person’s details are kept separate.</>
+    const teamSizeText = teamLimits
+      ? teamLimits.min !== null && teamLimits.max !== null
+        ? `A team has ${teamLimits.min} to ${teamLimits.max} team members.`
+        : teamLimits.min !== null
+          ? `A team has at least ${teamLimits.min} team ${teamLimits.min === 1 ? "member" : "members"}.`
+          : teamLimits.max !== null
+            ? `A team has up to ${teamLimits.max} team ${teamLimits.max === 1 ? "member" : "members"}.`
+            : null
+      : null;
+    const rosterCountSentence = teamRoster && teamSizeText
+      ? <>{teamSizeText} Add any coaches too; coaches do not count toward the team ({roster.maxAttendees} people at most). Each person’s details are kept separate.</>
       : <>Add between {roster.minAttendees} and {roster.maxAttendees} {rosterPeople}. Each person’s details are kept separate.</>;
     const titleId = manageRoster
       ? "public_registration_roster_attendees_title"

@@ -1,4 +1,4 @@
-import { LogIn, MailX } from "lucide-react";
+import { Mail, MailX } from "lucide-react";
 import Link from "next/link";
 import { BrandMark } from "@/components/brand-mark";
 
@@ -26,11 +26,12 @@ export default function UnsubscribeNotFound() {
           The link may be cut off, out of date, or no longer valid. Nothing was changed.
         </p>
         <p>
-          Open the unsubscribe link in the most recent email from IMSDA Events, or sign in to your account to manage your email.
+          To stop announcements, open the unsubscribe link in the most recent announcement email from IMSDA Events. If that
+          link does not work either, contact IMSDA and we will help.
         </p>
-        <Link className="primary-button" href="/account/sign-in">
-          <LogIn size={16} aria-hidden="true" /> Sign in to manage email preferences
-        </Link>
+        <a className="primary-button" href="https://imsda.org/contact/" rel="noreferrer">
+          <Mail size={16} aria-hidden="true" /> Contact IMSDA
+        </a>
       </section>
     </main>
   );

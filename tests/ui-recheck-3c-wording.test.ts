@@ -51,7 +51,7 @@ describe("the PBE public event page (item 2)", () => {
     expect(page).toContain("{!autoCards && optionsLayout}");
     expect(page.indexOf("{autoCards && optionsLayout}")).toBeLessThan(page.indexOf("<EventInfoCards"));
     expect(page).not.toContain("CLUB_REGISTRATION_CARD_NOTE");
-    expect(page).toContain("{!autoCards?.help && (");
+    expect(page).toContain("{!hideSidebarHelp && (");
     expect(page).not.toContain("use the email your club has on file");
   });
 
@@ -106,6 +106,26 @@ describe("the PBE team step (item 3)", () => {
     expect(markup).not.toContain("coachs");
   });
 
+  it("reads naturally when only one limit is set, and never invents a 1", () => {
+    expect(render(group({ teamLimits: { min: 3, max: null } }))).toContain("A team has at least 3 team members.");
+    expect(render(group({ teamLimits: { min: null, max: 7 } }))).toContain("A team has up to 7 team members.");
+    const none = render(group({ teamLimits: { min: null, max: null } }));
+    expect(none).toContain("Add between 2 and 20 team members or coaches.");
+    expect(none).not.toContain("1 to");
+  });
+
+  it("always reads Team in the general-link team flow, even with no team name or limits", () => {
+    const markup = render(group({ teamName: null, teamFlow: true }));
+    expect(markup).toContain(">Team</p>");
+    expect(markup).not.toContain("Household or group");
+    expect(read("components/general-link-registration-flow.tsx")).toContain("teamFlow: true");
+  });
+
+  it("restores 'started' people from a draft so unfinished cards read Needs attention", () => {
+    const source = read("components/public-registration-form.tsx");
+    expect(source).toContain("setTouchedAttendeeIds((current) => new Set([...current, ...started]))");
+  });
+
   it("without team limits, says the roster count with a correct plural", () => {
     const markup = render(group({ teamName: null }));
     expect(markup).toContain("Add between 2 and 20 team members or coaches.");
@@ -145,6 +165,20 @@ describe("account registrations (item 4)", () => {
     expect(withFee.notice).toBe("$0 per person. Your church is billed after the event.");
   });
 
+  it("shows the notice only when nothing is charged: any line above $0 keeps the real price, a negative promo line counts", () => {
+    const zero = "No cost to you. Your church is billed after the event.";
+    expect(perPersonPrice({ lineItems: [{ label: "Fee", amountCents: 0 }], roster: true, attendeeCount: 2 }).notice).toBe(zero);
+    expect(perPersonPrice({ lineItems: [{ label: "Fee", amountCents: 0 }, { label: "Promo", amountCents: -500 }], roster: true, attendeeCount: 2 }).notice).not.toBe(zero);
+    expect(perPersonPrice({ lineItems: [{ label: "Fee", amountCents: 0 }, { label: "Registration fee", amountCents: 1 }], roster: true, attendeeCount: 2 }).notice).not.toBe(zero);
+    expect(perPersonPrice({ lineItems: [{ label: "Fee", amountCents: 2500, attendeeIndex: 0 }], roster: true, attendeeCount: 1 }).notice).not.toBe(zero);
+  });
+
+  it("shows the last saved contact in the summary, not the live edit state", () => {
+    const source = read("components/attendee-registration-contact-form.tsx");
+    expect(source).toContain("savedContact.email");
+    expect(source).toContain("setSavedContact(payload.contact)");
+  });
+
   it("fills the registration contact box with the current contact", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeRegistrationContactForm, {
       registrationId: "reg-1",
@@ -158,8 +192,10 @@ describe("account registrations (item 4)", () => {
 describe("Monthly Records (item 5)", () => {
   it("makes the month being viewed a badge, not a link styled as an action", () => {
     const source = read("app/(public)/account/(portal)/clubs/[organizationId]/records/page.tsx");
-    expect(source).toContain('<span aria-current="page" className="count-badge records-viewing-badge">Viewing</span>');
+    expect(source).toContain('<span aria-current="page" className="count-badge">Viewing</span>');
     expect(source).not.toContain('"primary-button" : "secondary-button"');
+    expect(source).not.toContain("records-viewing-badge");
+    expect(source).toContain('aria-label={`${closed ? "View" : "Open"} ${reportMonthLabel(candidate)}`}');
   });
 });
 
@@ -183,7 +219,10 @@ describe("a bad unsubscribe link (item 8)", () => {
     const markup = renderToStaticMarkup(createElement(UnsubscribeNotFound));
     expect(markup).toContain("This unsubscribe link didn&#x27;t work");
     expect(markup).toContain("Nothing was changed.");
-    expect(markup).toContain('href="/account/sign-in"');
+    expect(markup).toContain("most recent announcement email");
+    expect(markup).toContain('href="https://imsda.org/contact/"');
+    expect(markup).not.toContain("/account/sign-in");
+    expect(markup).not.toMatch(/manage (your )?email|email preferences<\/a>/i);
     expect(markup).not.toMatch(/no (such )?(address|subscription)|not subscribed|unknown (address|email)|does not exist/i);
   });
 

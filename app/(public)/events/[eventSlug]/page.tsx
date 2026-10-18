@@ -96,6 +96,11 @@ export default async function PublicEventPage({
     ? await getAutoEventInfoCards(eventSlug)
     : null;
 
+  // A club event's auto "Need help?" card has only an email. The sidebar card stays unless it would add nothing: no support
+  // contact of its own (or the same one as the auto card) (#1005).
+  const supportContact = landing.event.supportContact?.trim() ?? "";
+  const hideSidebarHelp = Boolean(autoCards?.help)
+    && (supportContact === "" || supportContact.toLowerCase() === autoCards!.help!.email.trim().toLowerCase());
   // On a club event the options come first, right under the director notice; the cards, resources and blocks follow (#1005).
   const optionsLayout = (
       <div className="public-event-layout">
@@ -241,8 +246,8 @@ export default async function PublicEventPage({
             <p>{landing.lifecycle.availability.body}</p>
           </section>
 
-          {/* A club event's help is the "Need help?" card above; one help block per page (#1005). */}
-          {!autoCards?.help && (
+          {/* One help block per page when the auto card already carries the same contact (#1005). */}
+          {!hideSidebarHelp && (
           <section className="public-event-info-card public-event-help-card">
             <span className="public-event-side-icon purple"><CircleHelp size={20} aria-hidden="true" /></span>
             <p className="public-registration-eyebrow">Need help?</p>
