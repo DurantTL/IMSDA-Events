@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Download, Search } from "lucide-react";
+import { Download } from "lucide-react";
+import { AreaClubSearchForm } from "@/components/area-club-search-form";
 import {
   eventHeadcount,
   filterClubsByName,
@@ -37,22 +38,10 @@ const noClubsText = (query?: string) => (query ? `No club name matches “${quer
  * A club-name search for the area-coordinator tabs (#791). A plain GET form, so
  * it works without scripts and the address keeps the search; the year and sort
  * are carried along. The page filters on the server with `filterClubsByName`.
+ * The form itself is a small client component (#1013) so typing filters live.
  */
-export function AreaClubSearch({ basePath, clubYear, query, sort, shown, total, label = "Search clubs by name" }: { basePath: string; clubYear?: string; query: string; sort?: LeaderboardSort; shown: number; total: number; label?: string }) {
-  return (
-    <form action={basePath} className="area-club-search" method="get" role="search">
-      {clubYear && <input name="year" type="hidden" value={clubYear} />}
-      {sort && <input name="sort" type="hidden" value={sort} />}
-      <label className="search-field" htmlFor="area-club-search">
-        <Search aria-hidden="true" size={15} />
-        <span className="sr-only">{label}</span>
-        <input autoComplete="off" defaultValue={query} id="area-club-search" maxLength={80} name="q" placeholder={label} type="search" />
-      </label>
-      <button className="secondary-button" type="submit">Search</button>
-      {query && <Link className="text-button" href={clubYear ? `${basePath}?year=${encodeURIComponent(clubYear)}${sort ? `&sort=${sort}` : ""}` : basePath}>Clear</Link>}
-      <small aria-live="polite" role="status">{query ? `${shown} of ${total} clubs match` : ""}</small>
-    </form>
-  );
+export function AreaClubSearch({ label = "Search clubs by name", ...props }: { basePath: string; clubYear?: string; query: string; sort?: LeaderboardSort; shown: number; total: number; label?: string }) {
+  return <AreaClubSearchForm {...props} label={label} />;
 }
 
 export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string }) {
