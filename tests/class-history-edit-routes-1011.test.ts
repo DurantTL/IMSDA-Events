@@ -168,5 +168,7 @@ describe("class history edit routes (#1011)", () => {
     expect((await PATCH(request("PATCH", { completedOn: "2025-06-02" }), ctx())).status).toBe(404);
     mocks.remove.mockRejectedValue(new ClubOrderError("CLASS_NOT_COMPLETED", "Friend isn't recorded for this person."));
     expect((await DELETE(request("DELETE"), ctx())).status).toBe(404);
+    mocks.remove.mockRejectedValue(new ClubOrderError("MEMBER_NOT_ON_ROSTER", "That person isn't on this club's roster."));
+    expect((await DELETE(request("DELETE"), ctx())).status).toBe(404);
   });
 });

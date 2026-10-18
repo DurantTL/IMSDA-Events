@@ -60,7 +60,8 @@ vi.mock("@/lib/prisma", () => {
     count: async ({ where }: { where: Parameters<typeof matchesRoster>[0] }) => { state.rosterCalls.push(client); return matchesRoster(where).length; },
     findMany: async ({ where }: { where: Parameters<typeof matchesRoster>[0] }) => { state.rosterCalls.push(client); return matchesRoster(where); },
   });
-  const txClient = { ...tx, clubRosterMember: rosterOn("tx") };
+  // The club lock is the transaction's raw statement: logging it shows the membership check comes after it.
+  const txClient = { ...tx, $executeRaw: async () => { state.rosterCalls.push("lock"); return 1; }, clubRosterMember: rosterOn("tx") };
   return {
     getPrisma: () => ({
       ...tx,
@@ -235,8 +236,21 @@ describe("the roster check and club scoping (#1011)", () => {
     await addMemberClassCompletion(org, person, { classLevel: "FRIEND", completedOn: "2025-06-01", needsInsignia: false }, actor, now);
     await changeMemberClassCompletionDate(org, person, "FRIEND", "2025-06-02", actor, now);
     await removeMemberClassCompletion(org, person, "FRIEND", actor, now);
-    expect(state.rosterCalls.length).toBeGreaterThanOrEqual(6);
-    expect(new Set(state.rosterCalls)).toEqual(new Set(["tx"]));
+    expect(state.rosterCalls.filter((call) => call === "tx").length).toBeGreaterThanOrEqual(6);
+    expect(state.rosterCalls).not.toContain("outside");
+  });
+
+  it("takes the club lock before each membership check, so a roster removal cannot slip between them", async () => {
+    for (const run of [
+      () => addMemberClassCompletion(org, person, { classLevel: "FRIEND", completedOn: "2025-06-01", needsInsignia: false }, actor, now),
+      () => changeMemberClassCompletionDate(org, person, "FRIEND", "2025-06-02", actor, now),
+      () => removeMemberClassCompletion(org, person, "FRIEND", actor, now),
+    ]) {
+      state.rosterCalls = [];
+      await run();
+      expect(state.rosterCalls[0]).toBe("lock");
+      expect(state.rosterCalls.slice(1)).toContain("tx");
+    }
   });
 
   it("leaves another club's completion and needs for the same person untouched", async () => {
