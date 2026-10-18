@@ -7,15 +7,17 @@ const mocks = vi.hoisted(() => ({
   getRosterAccessStateForPage: vi.fn(),
   rosterFindMany: vi.fn(),
   completionFindMany: vi.fn(),
+  needFindMany: vi.fn(),
   notFound: vi.fn(() => { throw new Error("NOT_FOUND"); }),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn(), useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     clubRosterMember: { findMany: mocks.rosterFindMany },
     memberClassCompletion: { findMany: mocks.completionFindMany },
+    clubOrderNeed: { findMany: mocks.needFindMany },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
@@ -47,9 +49,14 @@ describe("buildClassHistory", () => {
   });
 });
 
+beforeEach(() => {
+  mocks.needFindMany.mockResolvedValue([]);
+});
+
 describe("loadMemberClassHistory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.needFindMany.mockResolvedValue([]);
     mocks.rosterFindMany.mockResolvedValue([
       { clubYear: "2026-27", classLevel: "COMPANION", status: "ACTIVE", person: { firstName: "Test", lastName: "Pathfinder" } },
     ]);
@@ -79,6 +86,7 @@ describe("loadMemberClassHistory", () => {
 describe("class history page access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.needFindMany.mockResolvedValue([]);
     mocks.rosterFindMany.mockResolvedValue([
       { clubYear: "2026-27", classLevel: "FRIEND", status: "ACTIVE", person: { firstName: "Test", lastName: "Pathfinder" } },
     ]);
@@ -99,7 +107,7 @@ describe("class history page access", () => {
   });
 
   it("shows the history for an open gate, and not found for a person off the roster", async () => {
-    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN", capabilities: { manageTeam: false } });
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN", capabilities: { roster: false, manageTeam: false } });
     const out = renderToStaticMarkup(await MemberClassHistoryPage(props) as ReactElement);
     expect(out).toContain("Class history");
     expect(out).toContain("Test Pathfinder");
@@ -107,6 +115,49 @@ describe("class history page access", () => {
     expect(out).toContain("In progress");
     mocks.rosterFindMany.mockResolvedValue([]);
     await expect(MemberClassHistoryPage(props)).rejects.toThrow("NOT_FOUND");
+  });
+});
+
+describe("class history page edit and read-only modes (#1011)", () => {
+  const props = { params: Promise.resolve({ organizationId: "club-1", personId: "person-1" }) };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.needFindMany.mockResolvedValue([]);
+    mocks.rosterFindMany.mockResolvedValue([
+      { clubYear: "2026-27", classLevel: "COMPANION", status: "ACTIVE", person: { firstName: "Test", lastName: "Pathfinder" } },
+    ]);
+    mocks.completionFindMany.mockResolvedValue([{ classLevel: "FRIEND", completedOn: "2025-05-20" }]);
+  });
+
+  it("shows the add form, change date and remove for someone with the roster role", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN", capabilities: { roster: true, manageTeam: false } });
+    const out = renderToStaticMarkup(await MemberClassHistoryPage(props) as ReactElement);
+    expect(out).toContain("Add a class");
+    expect(out).toContain("This person still needs the insignia");
+    expect(out).toContain("Change date");
+    expect(out).toContain("Remove");
+    // Friend is completed, so it is not offered; the in-progress Companion row has no actions of its own.
+    const options = [...out.matchAll(/<option value="([A-Z_]*)"/g)].map((match) => match[1]);
+    expect(options).toEqual(["", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]);
+    expect(out.match(/Change date/g)).toHaveLength(1);
+    expect(out).not.toContain("View only");
+  });
+
+  it("shows only the list, with no controls, to someone without it", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN", capabilities: { roster: false, manageTeam: false } });
+    const out = renderToStaticMarkup(await MemberClassHistoryPage(props) as ReactElement);
+    expect(out).toContain("View only");
+    expect(out).not.toContain("Add a class");
+    expect(out).not.toContain("Change date");
+    expect(out).not.toContain("Remove");
+    expect(out).not.toContain("<input");
+  });
+
+  it("flags a class whose insignia is already on an order", async () => {
+    mocks.needFindMany.mockResolvedValue([{ sourceId: "class:person-1:FRIEND:item-1" }, { sourceId: "class:person-1:FRIEND:item-2" }]);
+    const history = await loadMemberClassHistory("club-1", "person-1", now);
+    expect(history?.insigniaOnOrder).toEqual(["FRIEND"]);
+    expect(mocks.needFindMany.mock.calls[0]![0].where).toMatchObject({ organizationId: "club-1", sourceType: "AWARD", personId: "person-1", status: { not: "NEEDED" } });
   });
 });
 

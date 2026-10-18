@@ -49,7 +49,9 @@ export type ClubOrderActor = ClubSupplyStockActor;
 
 export type ClubOrderErrorCode = "NOTHING_TO_ORDER" | "BATCH_NOT_FOUND" | "ALREADY_RECEIVED" | "ORDER_CHANGED" | "NOT_ENOUGH_STOCK" | "ITEM_NOT_ORDERABLE" | "MEMBER_NOT_ON_ROSTER"
   // Earned awards (#532): a confirmation must match what was suggested or earned.
-  | "NOT_SUGGESTED" | "NOT_ELIGIBLE" | "RULE_HAS_NO_ITEM";
+  | "NOT_SUGGESTED" | "NOT_ELIGIBLE" | "RULE_HAS_NO_ITEM"
+  // A person's class history (#1011).
+  | "CLASS_ALREADY_COMPLETED" | "CLASS_NOT_COMPLETED" | "DATE_IN_FUTURE";
 
 export class ClubOrderError extends Error {
   constructor(public readonly code: ClubOrderErrorCode, message: string) {

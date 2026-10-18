@@ -1,4 +1,4 @@
-import { type ClubClassLevel, clubClassLevelLabels } from "@/modules/club-rosters/domain";
+import { type ClubClassLevel, clubClassLevelLabels, clubYearFor } from "@/modules/club-rosters/domain";
 import { type ClubSupplySection, normalizeClubSupplyName } from "@/modules/club-supplies/domain";
 
 /**
@@ -216,6 +216,23 @@ export function calendarDate(now: Date) {
 }
 
 // ---------------------------------------------------------------- class history
+
+/**
+ * The "This person still needs the insignia" checkbox's starting value when a
+ * class is added to a person's history (#1011): off for a class completed
+ * before the current club year began (September 1), on from then. The
+ * director can always change it.
+ */
+export function insigniaNeededByDefault(completedOn: string, now: Date) {
+  const clubYearStart = `${clubYearFor(now).slice(0, 4)}-09-01`;
+  return completedOn >= clubYearStart;
+}
+
+/** The classes a person has no completion for yet, in class order: what "Add a class" may offer. */
+export function classLevelsStillToAdd(entries: ReadonlyArray<ClassHistoryEntry>): ClubClassLevel[] {
+  const done = new Set(entries.filter((entry) => entry.status === "COMPLETED").map((entry) => entry.classLevel));
+  return (Object.keys(clubClassLevelLabels) as ClubClassLevel[]).filter((level) => !done.has(level));
+}
 
 export type ClassHistoryEntry = {
   classLevel: ClubClassLevel;

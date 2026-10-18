@@ -105,3 +105,16 @@ export const masterAwardRuleUpdateSchema = z
   .refine((value) => Object.keys(value).length > 0, "Nothing to change.");
 
 export type MasterAwardRuleUpdate = z.infer<typeof masterAwardRuleUpdateSchema>;
+
+const classLevelField = z.enum(clubClassLevels as [ClubClassLevel, ...ClubClassLevel[]]);
+
+/** Adding a class to one person's history (#1011). `needsInsignia` is the "This person still needs the insignia" checkbox. */
+export const addMemberClassCompletionSchema = z
+  .object({ classLevel: classLevelField, completedOn: calendarDate, needsInsignia: z.boolean() })
+  .strict();
+
+/** Changing the completed date of one recorded class (#1011). */
+export const changeMemberClassCompletionDateSchema = z.object({ completedOn: calendarDate }).strict();
+
+/** The class level in a class-history route's path (#1011). */
+export const memberClassLevelParamSchema = classLevelField;
