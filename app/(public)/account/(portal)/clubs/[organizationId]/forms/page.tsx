@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText, Printer } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { RevokeClubFormLinkButton, SendClubFormLink } from "@/components/club-forms-actions";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
@@ -71,7 +72,7 @@ export default async function ClubFormsPage({
       </section>
 
       {templates.length === 0 ? (
-        <p className="public-manage-empty">No forms are available yet. The conference turns each form on when it is needed.</p>
+        <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No forms are available yet">The conference turns each form on when it is needed.</EmptyState>
       ) : (
         templates.map((template) => (
           <section className="public-manage-card club-form-template" key={template.key}>
@@ -110,7 +111,7 @@ export default async function ClubFormsPage({
           </form>
         )}
         {submissions.length === 0 ? (
-          <p className="quiet-copy">No forms have been filled in yet.</p>
+          <EmptyState className="empty-state panel" headingLevel={4} icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>
         ) : (
           <div className="report-table-wrap">
             <table className="report-table">

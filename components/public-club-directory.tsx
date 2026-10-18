@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useId, useMemo, useState } from "react";
 import { MapPin, Search, UsersRound } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 import { locationKey } from "@/components/public-club-map-content";
 import styles from "./public-club-directory.module.css";
@@ -75,7 +76,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
       </label>
 
       {clubs.length === 0 ? (
-        <p className={styles.empty}>No clubs are listed publicly yet. Check back soon.</p>
+        <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Check back soon.</EmptyState>
       ) : (
         <div className={styles.content}>
           {anyMappable && (
@@ -84,7 +85,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
 
           <ul className={styles.list}>
             {filtered.length === 0 ? (
-              <li className={styles.empty}>No clubs match &ldquo;{query}&rdquo;.</li>
+              <li><EmptyState announce={false} className="empty-state panel" headingLevel={2} icon={<Search aria-hidden="true" size={26} />} title={`No clubs match “${query}”`}>Try a different town or ZIP.</EmptyState></li>
             ) : (
               filtered.map((club) => {
                 const isSelected = selectedId === club.id;

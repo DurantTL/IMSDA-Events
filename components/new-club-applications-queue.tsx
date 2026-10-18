@@ -203,9 +203,9 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
 
         {application.status === "PENDING" && canDecide && (
           open === null ? (
-            <div className="nca-actions">
-              <button className="primary-button" disabled={busy} onClick={() => { setMode({ id: application.id, kind: "approve" }); setMessage(null); }} type="button">Approve</button>
+            <div className="nca-actions button-pair">
               <button className="secondary-button" disabled={busy} onClick={() => { setMode({ id: application.id, kind: "decline" }); setReason(""); setMessage(null); }} type="button">Decline</button>
+              <button className="primary-button" disabled={busy} onClick={() => { setMode({ id: application.id, kind: "approve" }); setMessage(null); }} type="button">Approve</button>
             </div>
           ) : open === "approve" ? (
             <form
@@ -233,9 +233,9 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
                   </small>
                 </label>
               )}
-              <div className="nca-actions">
-                <button className="primary-button" disabled={busy || (application.church.needsChoice && !churchChoice)} type="submit">Approve and send invite</button>
+              <div className="nca-actions button-pair">
                 <button className="secondary-button" disabled={busy} onClick={() => setMode(null)} type="button">Cancel</button>
+                <button className="primary-button" disabled={busy || (application.church.needsChoice && !churchChoice)} type="submit">Approve and send invite</button>
               </div>
             </form>
           ) : (
@@ -250,9 +250,9 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
                 Reason (optional). The applicant is emailed this.
                 <textarea maxLength={DECLINE_REASON_MAX} onChange={(event) => setReason(event.target.value)} rows={3} value={reason} />
               </label>
-              <div className="nca-actions">
-                <button className="primary-button" disabled={busy} type="submit">Decline application</button>
+              <div className="nca-actions button-pair">
                 <button className="secondary-button" disabled={busy} onClick={() => setMode(null)} type="button">Cancel</button>
+                <button className="primary-button" disabled={busy} type="submit">Decline application</button>
               </div>
             </form>
           )

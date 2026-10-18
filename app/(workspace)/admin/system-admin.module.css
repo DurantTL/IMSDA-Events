@@ -666,6 +666,17 @@ details.taskGroup[open] .taskGrid {
   }
 }
 
+/* On a 390px phone two tiles share a row and the 28px icon took a quarter of each, squeezing the name; below 420px the tile is the name alone (#1004). */
+@media (max-width: 420px) {
+  .taskCard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .taskIcon {
+    display: none;
+  }
+}
+
 /* ---- Phone ---- */
 @media (max-width: 700px) {
   .hero {

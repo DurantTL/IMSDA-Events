@@ -43,7 +43,8 @@ describe("sign-in wording", () => {
 
   it("the profile chooser names both doors", async () => {
     const markup = renderToStaticMarkup(await ProfileSignInPage());
-    expect(markup).toContain("Account sign in (registrations and clubs)");
+    expect(markup).toContain("Account sign in");
+    expect(markup).toContain('class="button-pair"');
     expect(markup).toContain("Staff sign in");
   });
 });

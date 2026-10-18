@@ -50,6 +50,7 @@ describe("staff page names (#685)", () => {
   });
 
   it("names /more/* pages that are not nav items instead of 'More'", () => {
+    expect(staffSubpageTitle("/more/kitchen-report")).toBe("Kitchen report");
     expect(staffSubpageTitle("/more/honors")).toBe("Honors Weekend classes");
     expect(staffSubpageTitle("/more/honors/rosters")).toBe("Honors Weekend rosters");
     expect(staffSubpageTitle("/more/reports")).toBe("Operational reports");

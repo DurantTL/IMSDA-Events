@@ -8159,7 +8159,11 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .calendar-admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .calendar-admin-actions input { width: 150px; border: 1px solid var(--field-border); border-radius: 10px; padding: 8px 10px; font-size: max(var(--type-body-floor, 0px), 0.76rem); }
 .calendar-admin-actions .secondary-button { min-height: 40px; }
-.home-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+/* Four tiles: four across on a wide screen, two by two below that, never three and one (#1004). */
+.home-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1099px) {
+  .home-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .home-action {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 76px;
   border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 16px; color: var(--ink); text-decoration: none;
@@ -8331,7 +8335,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 }
 @media print {
   .account-nav, .account-portal .public-registration-header, .account-portal .account-page-hero,
-  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .honor-seat-override { display: none !important; }
+  .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .honor-roster-tabs, .team-level-tabs, .honor-seat-override { display: none !important; }
   .club-schedule { border: 0; box-shadow: none; padding: 0; }
   .honor-class-sheet { break-before: page; }
   .report-table td.honor-roster-box { border: 1px solid #555; }
@@ -10720,15 +10724,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   text-decoration: none;
 }
 .event-hero-button:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; }
-/* With a banner the banner owns the h1, so the event header's title is an h2. */
-.public-registration-hero h2.public-event-demoted-title,
-.auto-info-header h2.auto-info-demoted-title { margin: 4px 0 6px; }
-.public-registration-hero h2.public-event-demoted-title { max-width: 670px; color: white; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; letter-spacing: -0.035em; }
-.auto-info-header h2.auto-info-demoted-title { color: var(--imsda-navy); font-size: clamp(1.6rem, 6vw, 2.4rem); }
-@media (max-width: 600px) {
-  .public-registration-hero h2.public-event-demoted-title { font-size: 2rem; }
-}
-
 /* Photo with text */
 .event-block-image {
   display: grid;
@@ -11918,3 +11913,89 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
    button (#6f8794 is 3.8:1 on white and 4.3:1 on the dark dialog), with the theme's own fill and X colour. */
 .event-gallery-dialog .modal-close-button { border-color: #6f8794; border-radius: 12px; background: var(--block-bg); color: var(--block-accent); }
 .event-gallery-dialog .modal-close-button:hover:not(:disabled) { border-color: var(--block-accent); background: var(--block-soft); }
+
+/* --- Paired buttons (#1004) --------------------------------------------------
+   Two actions that belong together share one row at equal widths, the primary
+   on the right. A lone child, or a note under the pair, spans the full row. */
+.button-pair { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; align-items: stretch; }
+.button-pair > :is(.primary-button, .secondary-button) { width: 100%; justify-content: center; text-align: center; }
+.button-pair > :only-child, .button-pair > :not(.primary-button):not(.secondary-button) { grid-column: 1 / -1; }
+
+/* --- One tab-group style (#1004) ----------------------------------------------
+   A chip row for switching between views or filters. The selected chip is the one
+   with aria-current (links) or aria-pressed / aria-selected (buttons), so the
+   look and what assistive tech hears always agree. */
+.tab-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tab-chips > :is(a, button) {
+  display: inline-flex; align-items: center; justify-content: center; min-height: var(--target-desktop, 36px);
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card); padding: 6px 14px;
+  color: var(--ink); font-weight: 700; text-decoration: none; cursor: pointer;
+}
+.tab-chips > :is(a, button):hover { border-color: var(--imsda-purple); }
+.tab-chips > :is(a, button):is([aria-current]:not([aria-current="false"]), [aria-pressed="true"], [aria-selected="true"]) {
+  border-color: var(--imsda-purple); background: var(--imsda-purple-soft, #eee9f9); color: var(--imsda-purple);
+}
+@media (max-width: 768px) { .tab-chips > :is(a, button) { min-height: var(--touch-target, 44px); } }
+
+/* --- Stat tiles never leave one tile alone on a row (#1004) ---------------------
+   Screen only: print keeps its own fixed five-column report row. Tile grids change their
+   column count as the screen narrows. Whatever the count, a last tile that would sit alone on
+   its row spans the row (the last child of a grid N columns wide is alone when it is child
+   Nk+1). Grids with four or eight tiles also pick four or two columns so they split evenly
+   (Sterling Volunteers: 4, reports: 8), and three tiles get three columns. */
+@media screen and (min-width: 1121px) {
+  .report-summary-grid:has(> :nth-child(4):last-child), .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .report-summary-grid:has(> :nth-child(3):last-child), .finance-summary:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Five across by default: 6 tiles would be 5 + 1, 11 would be 5 + 5 + 1. */
+  .report-summary-grid > :last-child:nth-child(5n + 1) { grid-column: 1 / -1; }
+  /* Four across: the metric grid and the finance summary. */
+  :is(.metric-grid, .finance-summary) > :last-child:nth-child(4n + 1) { grid-column: 1 / -1; }
+}
+@media screen and (max-width: 1120px) {
+  /* Two across. */
+  :is(.metric-grid, .finance-summary) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .report-summary-grid:has(> :nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media screen and (min-width: 721px) and (max-width: 1120px) {
+  /* Three across (the default here): 7 tiles would be 3 + 3 + 1, 10 would be 3 + 3 + 3 + 1. A lone fourth tile is the 2 x 2 grid.
+     Not at 720px and below, where the grid is two across and only an odd last tile is alone. */
+  .report-summary-grid > :last-child:nth-child(3n + 1):not(:nth-child(4)) { grid-column: 1 / -1; }
+}
+@media screen and (max-width: 900px) {
+  .report-summary-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media screen and (max-width: 720px) {
+  .report-summary-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media screen and (max-width: 440px) {
+  .report-summary-grid > :last-child { grid-column: auto; }
+}
+
+/* --- Roster cards: the actions sit in the card header (#1004) -------------------
+   On a phone each person is a card. The name and the row's actions share the first line;
+   every other field takes its own full-width row underneath. */
+@media (max-width: 720px) {
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row):has(> td.roster-card-actions) {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start;
+  }
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td { grid-column: 1 / -1; }
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-name { grid-column: 1; grid-row: 1; min-height: 44px; margin-bottom: 6px; }
+  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-actions {
+    grid-column: 2; grid-row: 1; width: auto; max-width: 100%; margin: 0; padding: 0; flex-wrap: wrap; justify-content: flex-end;
+  }
+}
+
+/* With a header banner the page has one hero. The event's dates and place follow as a plain row, not a second hero (#1004). */
+.public-event-facts { display: grid; gap: 8px; margin: 14px 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 14px 16px; }
+.public-event-facts > p { margin: 0; color: var(--ink); font-weight: 600; }
+.public-event-facts > ul { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--text-helper-min); font-weight: 600; }
+.public-event-facts > ul > li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.public-event-facts svg { flex: 0 0 auto; margin-top: 1px; color: var(--imsda-purple); }
+
+.public-event-facts > .public-event-facts-name { color: var(--imsda-navy); font-size: 1.1rem; font-weight: 800; }
+.auto-info-header > .auto-info-name { margin: 4px 0; color: var(--imsda-navy); font-size: 1.2rem; font-weight: 800; }
+
+/* An empty state's title can be an h2 or h4 where the page's outline needs it (#1004); it looks like the usual h3 one. */
+.empty-state > :is(h2, h4) { margin: 10px 0 3px; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.86rem); }
+@media screen { .empty-state > :is(h2, h4) { font-size: 1rem; } }

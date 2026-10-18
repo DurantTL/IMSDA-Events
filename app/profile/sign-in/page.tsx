@@ -33,9 +33,11 @@ export default async function ProfileSignInPage() {
           <h1>Sign in first</h1>
           <p>Choose how you usually sign in to IMSDA Events.</p>
         </div>
-        <Link className="primary-button" href="/account/sign-in">Account sign in (registrations and clubs)</Link>
-        <p className="auth-divider"><span>or</span></p>
-        <Link className="secondary-button" href={`/login?next=${encodeURIComponent("/profile")}`}>Staff sign in</Link>
+        <p className="quiet-copy">Account sign in is for registrations and clubs. Staff sign in is for event staff.</p>
+        <div className="button-pair">
+          <Link className="secondary-button" href={`/login?next=${encodeURIComponent("/profile")}`}>Staff sign in</Link>
+          <Link className="primary-button" href="/account/sign-in">Account sign in</Link>
+        </div>
       </section>
     </main>
   );

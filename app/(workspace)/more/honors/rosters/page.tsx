@@ -98,10 +98,10 @@ export default async function HonorRostersPage({
         </p>
       </div>
 
-      <nav className="event-packet-selector" aria-label="Roster view">
-        <Link className={view === "classes" ? "active" : ""} href={`/more/honors/rosters?${eventQuery}`}>Classes ({classRosters.length})</Link>
-        <Link className={view === "site" ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=site`}>Site roster ({siteRoster.totals.total})</Link>
-        <Link className={view === "clubs" ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>Club schedules ({data.clubs.length})</Link>
+      <nav className="tab-chips honor-roster-tabs" aria-label="Roster view">
+        <Link aria-current={view === "classes" ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}`}>Classes ({classRosters.length})</Link>
+        <Link aria-current={view === "site" ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=site`}>Site roster ({siteRoster.totals.total})</Link>
+        <Link aria-current={view === "clubs" ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>Club schedules ({data.clubs.length})</Link>
       </nav>
 
       <LocationFilter
@@ -259,10 +259,10 @@ export default async function HonorRostersPage({
       {view === "clubs" && (
         <>
           {data.clubs.length > 1 && (
-            <nav className="event-packet-selector" aria-label="Choose club">
-              <Link className={!query.club ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>All clubs</Link>
+            <nav className="tab-chips honor-roster-tabs" aria-label="Choose club">
+              <Link aria-current={!query.club ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=clubs`}>All clubs</Link>
               {data.clubs.map((club) => (
-                <Link className={query.club === club.id ? "active" : ""} href={`/more/honors/rosters?${eventQuery}&view=clubs&club=${encodeURIComponent(club.id)}`} key={club.id}>
+                <Link aria-current={query.club === club.id ? "page" : undefined} href={`/more/honors/rosters?${eventQuery}&view=clubs&club=${encodeURIComponent(club.id)}`} key={club.id}>
                   {club.name}
                 </Link>
               ))}

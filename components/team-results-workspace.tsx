@@ -300,9 +300,9 @@ export function TeamResultsWorkspace({
           </p>
         </div>
       </div>
-      <nav className="team-level-tabs" aria-label="Level">
+      <nav className="team-level-tabs tab-chips" aria-label="Level">
         {TEAM_LEVELS.map((each) => (
-          <Link aria-current={each === level ? "page" : undefined} className={each === level ? "primary-button" : "secondary-button"} href={`/more/team-results?${eventQuery}&level=${each}`} key={each}>
+          <Link aria-current={each === level ? "page" : undefined} href={`/more/team-results?${eventQuery}&level=${each}`} key={each}>
             {teamLevelLabels[each]} ({teamsAtLevel(rows, each).length})
           </Link>
         ))}

@@ -22,7 +22,7 @@ import {
   clubRosterGenderLabels,
   clubRosterStatusLabels,
   defaultRosterRole,
-  missingRosterFields,
+  rosterRowMissingFields,
   rosterSectionOf,
 } from "@/modules/club-rosters/domain";
 import {
@@ -513,7 +513,9 @@ export function ClubRosterWorkspace({
                       </tr>
                     ) : (
                       section.people.map((member) => {
-                        const missing = missingRosterFields(member);
+                        // The birth-date banner above the table already counts an active person's missing birth date, so the row
+                        // names only what else is missing (#1004).
+                        const missing = rosterRowMissingFields(member);
                         return (
                           <tr id={`member-${member.id}`} key={member.id}>
                             <td className="roster-card-name" data-label="Name">

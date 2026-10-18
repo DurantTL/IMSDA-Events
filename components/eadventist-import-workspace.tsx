@@ -70,7 +70,7 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
       <div className="section-head">
         <div>
           <p className="eyebrow">Clubs and churches</p>
-          <h1 id="eadventist-import-title">Import organizations from eAdventist</h1>
+          <h2 id="eadventist-import-title">Import organizations from eAdventist</h2>
           <p className="field-help">
             Upload the organizations export (CSV). Nothing is saved until you review the list and choose Save. Records are matched by their
             eAdventist OrganizationID, so uploading a newer file updates them instead of adding copies. Whether a record is active is never changed by an

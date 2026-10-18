@@ -9,10 +9,13 @@ export function AutoEventHeader({
   header,
   timeLabel,
   introLine,
-  titleAsH2 = false,
+  titleMode = "h1",
 }: {
-  /** True when a header banner on the page owns the h1 (#816). */
-  titleAsH2?: boolean;
+  /**
+   * "h1" when no banner draws; "hidden" when a banner already shows this title; "text" when a banner draws with a
+   * different title, so the event's name still appears once, as plain text and not a second heading (#816, #1004).
+   */
+  titleMode?: "h1" | "hidden" | "text";
   header: EventInfoCards["header"];
   /** Time range line, e.g. "Friday, 4:00 PM CDT – Sunday, 12:00 PM CDT". */
   timeLabel?: string;
@@ -20,11 +23,9 @@ export function AutoEventHeader({
   introLine?: string;
 }) {
   return (
-    <section className="auto-info-header" aria-labelledby="auto-info-title">
+    <section className="auto-info-header" {...(titleMode === "h1" ? { "aria-labelledby": "auto-info-title" } : { "aria-label": "Event details" })}>
       <p className="public-registration-eyebrow">{header.eyebrow}</p>
-      {titleAsH2
-        ? <h2 id="auto-info-title" className="auto-info-demoted-title">{header.title}</h2>
-        : <h1 id="auto-info-title">{header.title}</h1>}
+      {titleMode === "h1" ? <h1 id="auto-info-title">{header.title}</h1> : titleMode === "text" ? <p className="auto-info-name">{header.title}</p> : null}
       {header.tagline && <p className="auto-info-tagline">{header.tagline}</p>}
       {header.meta && <p className="auto-info-meta">{header.meta}</p>}
       {timeLabel && <p className="auto-info-meta">{timeLabel}</p>}

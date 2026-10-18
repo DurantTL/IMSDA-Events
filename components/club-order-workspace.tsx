@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { AlertTriangle, CheckCircle2, Download, Eye, History, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
@@ -407,37 +407,44 @@ export function ClubOrderWorkspace({
         <section aria-labelledby="club-order-earlier" className={`${styles.block} ${styles.prompt}`}>
           <h3 id="club-order-earlier"><History aria-hidden="true" size={14} /> Honors that may already be handed out</h3>
           <p className={styles.promptCopy}>Mark the ones already handed out so they come off the list. Nothing is marked for you, and stock isn&apos;t changed.</p>
-          <div className={styles.actions}>
-            <button className="secondary-button" disabled={busy} onClick={() => toggleIn(setHandedOut, earlierIds, true)} type="button">Select all ({earlierIds.length})</button>
-            <span className={styles.dateSelect}>
-              <label htmlFor="club-order-before-date">Completed before</label>
-              <input className={styles.date} id="club-order-before-date" onChange={(event) => setBeforeDate(event.target.value)} type="date" value={beforeDate} />
-              <button className="secondary-button" disabled={busy || beforeDateIds.length === 0} onClick={() => toggleIn(setHandedOut, beforeDateIds, true)} type="button">
-                Select {beforeDate ? `(${beforeDateIds.length})` : ""}
+          {/* Closed until opened: a long list of completed honors would push the real order list off the screen (#1004). */}
+          <details className={styles.earlierDetails}>
+            <summary>Show the {earlier.length} {earlier.length === 1 ? "honor" : "honors"}</summary>
+            <div className={styles.actions}>
+              <button className="secondary-button" disabled={busy} onClick={() => toggleIn(setHandedOut, earlierIds, true)} type="button">Select all ({earlierIds.length})</button>
+              <span className={styles.dateSelect}>
+                <label htmlFor="club-order-before-date">Completed before</label>
+                <input className={styles.date} id="club-order-before-date" onChange={(event) => setBeforeDate(event.target.value)} type="date" value={beforeDate} />
+                <button className="secondary-button" disabled={busy || beforeDateIds.length === 0} onClick={() => toggleIn(setHandedOut, beforeDateIds, true)} type="button">
+                  Select {beforeDate ? `(${beforeDateIds.length})` : ""}
+                </button>
+              </span>
+            </div>
+            <ul className={styles.people}>
+              {earlier.map((need) => (
+                <li key={need.needId}>
+                  <label className={styles.check}>
+                    <input checked={handedOut.has(need.needId)} onChange={(event) => toggleIn(setHandedOut, [need.needId], event.target.checked)} type="checkbox" />
+                    <span>
+                      <span translate="no">{need.firstName} {need.lastName}</span>
+                      {" · "}<span translate="no">{need.itemName ?? need.sourceLabel}</span>
+                      {need.sourceDate && <small className={styles.muted}> · {need.sourceDate}</small>}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <div className={styles.actions}>
+              <button aria-describedby={disabledHintId(handedOutBlocked, "club-order-handed-out-hint")} className="primary-button" disabled={busy || handedOut.size === 0} onClick={markAlreadyHandedOut} type="button">
+                <CheckCircle2 aria-hidden="true" size={16} /> Already handed out{handedOut.size > 0 ? ` (${handedOut.size})` : ""}
               </button>
-            </span>
-          </div>
-          <ul className={styles.people}>
-            {earlier.map((need) => (
-              <li key={need.needId}>
-                <label className={styles.check}>
-                  <input checked={handedOut.has(need.needId)} onChange={(event) => toggleIn(setHandedOut, [need.needId], event.target.checked)} type="checkbox" />
-                  <span>
-                    <span translate="no">{need.firstName} {need.lastName}</span>
-                    {" · "}<span translate="no">{need.itemName ?? need.sourceLabel}</span>
-                    {need.sourceDate && <small className={styles.muted}> · {need.sourceDate}</small>}
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+            </div>
+            <DisabledHint id="club-order-handed-out-hint" reason={handedOutBlocked} />
+          </details>
+          {/* Outside the closed list, so the prompt can be dismissed without opening it. */}
           <div className={styles.actions}>
-            <button aria-describedby={disabledHintId(handedOutBlocked, "club-order-handed-out-hint")} className="primary-button" disabled={busy || handedOut.size === 0} onClick={markAlreadyHandedOut} type="button">
-              <CheckCircle2 aria-hidden="true" size={16} /> Already handed out{handedOut.size > 0 ? ` (${handedOut.size})` : ""}
-            </button>
             <button className="text-button" onClick={dismissPrompt} type="button">Not now</button>
           </div>
-          <DisabledHint id="club-order-handed-out-hint" reason={handedOutBlocked} />
         </section>
       )}
 
@@ -445,7 +452,7 @@ export function ClubOrderWorkspace({
         <h3>Your order list</h3>
         {unmatchedCount > 0 && (
           <p className={styles.flag} role="status">
-            <AlertTriangle aria-hidden="true" size={14} /> {unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.
+            <Info aria-hidden="true" size={14} /> {unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.
           </p>
         )}
         {onList.length === 0 ? (
