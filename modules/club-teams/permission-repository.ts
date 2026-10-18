@@ -175,7 +175,7 @@ async function queuePermissionRequest(
     const bodyText = [
       `Hello ${recipient.name.trim() || "there"},`,
       "",
-      `${label} is registered for ${registration.event.name}. Team members 18 and over need permission from the Area Coordinator, and these people are 18 or older on ${dateText}:`,
+      `${label} is registered for ${registration.event.name}. Team members 18 and over need approval from the Area Coordinator, and these people are 18 or older on ${dateText}:`,
       "",
       ...input.people.map((person) => `- ${person.name} (${person.age})`),
       "",
@@ -199,7 +199,7 @@ async function queuePermissionRequest(
         senderNameSnapshot: messageSettings.senderName,
         senderEmailSnapshot: messageSettings.senderEmail,
         replyToEmailSnapshot: messageSettings.replyToEmail,
-        subjectSnapshot: `Permission needed: team members 18 and over on ${label}`,
+        subjectSnapshot: `Approval needed: team members 18 and over on ${label}`,
         bodyTextSnapshot: bodyText,
         metadata: { trigger: "TEAM_PERMISSION_REQUEST", deliveryMode: messageSettings.deliveryMode, realDelivery: messageSettings.deliveryMode === "EXTERNAL_EMAIL", confirmationCode: registration.confirmationCode, people: input.people.length },
         idempotencyKey,

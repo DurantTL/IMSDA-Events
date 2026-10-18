@@ -38,7 +38,7 @@ import { searchResultSummary } from "@/lib/search-match";
 import { isAdultRosterPerson } from "@/modules/club-rosters/domain";
 import { EMERGENCY_CONTACT_TERM } from "@/modules/club-rosters/guardians-domain";
 import { areaClubPortalNavItems } from "@/modules/club-rosters/portal-nav";
-import { teamPermissionsIntro } from "@/modules/club-teams/permission-domain";
+import { ageLimitText, teamPermissionsIntro } from "@/modules/club-teams/permission-domain";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 
@@ -293,30 +293,71 @@ describe("6. Area Coordinators do not see club Orders", () => {
   });
 });
 
-describe("7. the Team permissions tab explains itself", () => {
-  it("says what the tab does and what each level allows, in plain words", () => {
+describe("7. the Team approvals tab explains itself (#918, #1015)", () => {
+  it("says what the tab is for, names PBE, lists the rules and what each level allows", () => {
+    expect(teamPermissionsIntro.summary).toContain("Pathfinder Bible Experience (PBE)");
     expect(teamPermissionsIntro.summary).toContain("18 or older");
-    expect(teamPermissionsIntro.summary).toContain("your permission");
+    expect(teamPermissionsIntro.summary).toContain("confirm they still qualify");
+    expect(teamPermissionsIntro.rules).toEqual(["An inducted Pathfinder or TLT, active and in good standing.", "Not graduated from high school."]);
+    expect(teamPermissionsIntro.ageRuleLead).toContain("maximum age");
+    expect(teamPermissionsIntro.coaches).toContain("registered as coaches");
+    expect(teamPermissionsIntro.coaches).toContain("don't need approval");
     expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Waiting for a decision", "Permission granted", "Declined"]);
     for (const level of teamPermissionsIntro.levels) expect(level.detail.length).toBeGreaterThan(30);
+    expect(teamPermissionsIntro.levels[0]!.detail).toContain("The team is registered while you decide");
     expect(teamPermissionsIntro.levels[2]!.detail).toContain("coach");
     expect(teamPermissionsIntro.footer).toContain("Grant or Decline");
   });
-  it("renders on the page above the list", async () => {
+  it("words an event's age limit from its settings", () => {
+    expect(ageLimitText({ maxMemberAge: 19, ageAsOf: "2026-01-01" })).toBe("19 or younger on January 1, 2026");
+    expect(ageLimitText({ maxMemberAge: 21, ageAsOf: "2027-03-15" })).toBe("21 or younger on March 15, 2027");
+    expect(ageLimitText({ maxMemberAge: null, ageAsOf: "2026-01-01" })).toContain("No maximum age is set");
+    expect(ageLimitText({ maxMemberAge: null, ageAsOf: null })).toBe("No maximum age is set for this event");
+  });
+  async function renderPage(rows: Array<{ eventId: string; eventName: string }>, settings: Record<string, { maxMemberAge: number | null; ageAsOf: string | null } | null>) {
     vi.resetModules();
     vi.doMock("server-only", () => ({}));
     vi.doMock("@/modules/organizations/area-coordinators", () => ({
       currentAreaCoordinatorViewerActive: async () => true,
       currentAreaCoordinator: async () => ({ id: "ac-1" }),
     }));
-    vi.doMock("@/modules/club-teams/permission-repository", () => ({ listCoordinatorTeamPermissions: async () => [] }));
+    vi.doMock("@/modules/club-teams/permission-repository", () => ({
+      listCoordinatorTeamPermissions: async () => rows.map((row, index) => ({
+        id: `p-${index}`, ...row, registrationId: "r", clubEventRegistrationId: "c", teamLabel: "Synthetic Club", locationName: null, name: `Sample Person ${index}`, age: 18, status: "PENDING", decidedAt: null, decidedBy: null,
+      })),
+    }));
+    vi.doMock("@/modules/club-teams/settings-repository", () => ({ getTeamSettings: async (eventId: string) => settings[eventId] ?? null }));
     const page = (await import("@/app/(public)/account/(portal)/area-clubs/team-permissions/page")).default;
-    const html = renderToStaticMarkup(await page());
+    return renderToStaticMarkup(await page());
+  }
+  it("renders on the page above the list, with the rules", async () => {
+    const html = await renderPage([], {});
+    expect(html).toContain("<h2>Team approvals</h2>");
+    expect(html).not.toContain("Team permissions");
     expect(html).toContain(teamPermissionsIntro.summary);
+    for (const rule of teamPermissionsIntro.rules) expect(html).toContain(rule);
+    expect(html).toContain(teamPermissionsIntro.coaches.replace(/'/g, "&#x27;"));
     for (const level of teamPermissionsIntro.levels) {
       expect(html).toContain(level.label);
       expect(html).toContain(level.detail.replace(/'/g, "&#x27;"));
     }
     expect(html.indexOf("Waiting for a decision")).toBeLessThan(html.indexOf("Team members 18 and over"));
+  });
+  it("shows the max age and as-of date from the event's settings once when every row shares an event", async () => {
+    const html = await renderPage(
+      [{ eventId: "e1", eventName: "Synthetic PBE" }, { eventId: "e1", eventName: "Synthetic PBE" }],
+      { e1: { maxMemberAge: 19, ageAsOf: "2026-01-01" } },
+    );
+    expect(html).toContain("19 or younger on January 1, 2026");
+    expect(html.match(/19 or younger on January 1, 2026/g)).toHaveLength(1);
+  });
+  it("lists each event's own limit when rows come from different events", async () => {
+    const html = await renderPage(
+      [{ eventId: "e1", eventName: "Synthetic PBE North" }, { eventId: "e2", eventName: "Synthetic PBE South" }],
+      { e1: { maxMemberAge: 19, ageAsOf: "2026-01-01" }, e2: { maxMemberAge: 20, ageAsOf: "2027-02-01" } },
+    );
+    expect(html).toContain("19 or younger on January 1, 2026");
+    expect(html).toContain("20 or younger on February 1, 2027");
+    expect(html).toContain("Age limit for each event");
   });
 });

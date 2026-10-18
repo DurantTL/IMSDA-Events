@@ -281,7 +281,7 @@ describe("the permission routes (#809)", () => {
 
 describe("permission wording (#809)", () => {
   it("says what Caleb's rule says, per status, and short for the form", () => {
-    expect(permissionPendingNotice("Alex One")).toBe("Alex One is 18 or older. Team members 18 and over need permission from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.");
+    expect(permissionPendingNotice("Alex One")).toBe("Alex One is 18 or older. Team members 18 and over need approval from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.");
     expect(permissionNotice("GRANTED", "Alex One")).toContain("Permission granted");
     expect(permissionNotice("DECLINED", "Alex One")).toContain("coach or remove them");
     expect(permissionNotice("DECLINED", "Alex One", true)).toContain("Remove them or replace them with another team member");

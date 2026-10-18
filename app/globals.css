@@ -11130,6 +11130,8 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 }
 
 /* Team permissions explanation (#918): a short definition list under the tab's heading. */
+.team-approval-rules { margin: 6px 0 10px; padding-left: 20px; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.team-approval-rules ul { margin: 4px 0 0; padding-left: 18px; }
 .team-permission-levels { display: grid; gap: 8px; margin: 10px 0; }
 .team-permission-levels > div { display: grid; gap: 2px; border-left: 3px solid var(--line); padding-left: 10px; }
 .team-permission-levels dt { color: var(--ink); font-weight: 800; }

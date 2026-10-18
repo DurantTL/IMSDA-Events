@@ -619,7 +619,7 @@ async function main() {
   assert(askedOnce.length === 1 && askedOnce[0]!.recipientEmail === `${P}-ac@example.test`.toLowerCase() && askedOnce[0]!.bodyTextSnapshot.includes("PbeTlt Eighteen (18)"), "the location's Area Coordinator is asked once, naming the person");
   assert(await prisma.auditLog.count({ where: { eventId, action: "CLUB_TEAM_PERMISSION_REQUESTED", entityId: flagRows[0]!.id, actorUserId: staffUserId } }) === 1, "the request is audited, with who acted");
   const pendingView = await club.getClubEventWorkspace(clubOf("e"), eventId, now, { teamKey: "flagged" });
-  assert(pendingView.registration?.permissionNotices.length === 1 && pendingView.registration.permissionNotices[0]!.text === "PbeTlt Eighteen is 18 or older. Team members 18 and over need permission from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.", "the director is told, in the agreed words, on the team page");
+  assert(pendingView.registration?.permissionNotices.length === 1 && pendingView.registration.permissionNotices[0]!.text === "PbeTlt Eighteen is 18 or older. Team members 18 and over need approval from the Area Coordinator. Your team is registered, and the Area Coordinator has been asked to review it.", "the director is told, in the agreed words, on the team page");
   // Saving the team again with the same people asks nobody again.
   const editE = (teamKey: string, row: Awaited<ReturnType<typeof rowOf>>, selected: Array<[string, string]>) => ({
     clientRequestId: randomUUID(), expectedUpdatedAt: row.registration.updatedAt.toISOString(), selectedMemberIds: selected.map(([key]) => members.get(`e:${key}`)!),

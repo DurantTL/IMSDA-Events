@@ -46,7 +46,7 @@ export function TeamPermissionPanel({ rows: initial, endpointBase, canDecide, sh
   return (
     <section className="public-manage-card team-permission-panel" aria-labelledby="team-permission-heading">
       <div className="public-manage-card-heading">
-        <p className="public-registration-eyebrow">Area Coordinator permission</p>
+        <p className="public-registration-eyebrow">Area Coordinator approval</p>
         <h2 id="team-permission-heading"><ShieldAlert size={20} aria-hidden="true" /> Team members 18 and over</h2>
       </div>
       {rows.length === 0 ? (
