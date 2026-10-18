@@ -30,15 +30,14 @@ export function LocationFilter({
     return text ? `${basePath}?${text}` : basePath;
   }
   return (
-    <nav aria-label="Filter by location" className="location-filter">
+    <nav aria-label="Filter by location" className="location-filter tab-chips">
       <span className="location-filter-label"><MapPin aria-hidden="true" size={14} /> Location</span>
-      <Link aria-current={selectedId === null ? "true" : undefined} className={selectedId === null ? "primary-button" : "secondary-button"} href={href(null)}>
+      <Link aria-current={selectedId === null ? "page" : undefined} href={href(null)}>
         All locations
       </Link>
       {locations.map((location) => (
         <Link
-          aria-current={selectedId === location.id ? "true" : undefined}
-          className={selectedId === location.id ? "primary-button" : "secondary-button"}
+          aria-current={selectedId === location.id ? "page" : undefined}
           href={href(location.id)}
           key={location.id}
         >

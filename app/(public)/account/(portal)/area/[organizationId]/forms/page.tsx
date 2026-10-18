@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FileText } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { getPrisma } from "@/lib/prisma";
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
 import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
@@ -31,7 +33,7 @@ export default async function AreaClubFormsPage({ params }: { params: Promise<{ 
         Health, conduct, physician, emergency-contact and birth-date answers show as Restricted. Forms the conference has since switched off stay listed.
       </p>
       {submissions.length === 0 ? (
-        <p className="quiet-copy">This club has no submitted forms.</p>
+        <EmptyState className="empty-state panel" icon={<FileText aria-hidden="true" size={26} />} title="No submitted forms">This club has not submitted any forms yet.</EmptyState>
       ) : (
         <div className="report-table-wrap">
           <table className="report-table">

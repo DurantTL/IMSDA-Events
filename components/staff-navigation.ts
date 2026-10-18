@@ -186,6 +186,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
+  ["/more/kitchen-report", "prefix", staffPageTitles.kitchenReport],
   ["/more/merchandise", "prefix", staffPageTitles.merchandise],
   ["/more/meals", "prefix", staffPageTitles.meals],
   ["/more/lodging/assignments", "prefix", staffPageTitles.lodgingAssignments],

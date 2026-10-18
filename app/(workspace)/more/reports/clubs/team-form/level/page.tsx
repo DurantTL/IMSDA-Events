@@ -44,13 +44,15 @@ export default async function StaffLevelTeamFormsPage({ searchParams }: { search
           </p>
         </div>
         <div className="intro-actions">
-          {TEAM_LEVELS.map((each) => (
-            <Link aria-current={each === level ? "page" : undefined} className={each === level ? "primary-button" : "secondary-button"} href={`/more/reports/clubs/team-form/level?${query}&level=${each}`} key={each}>{teamLevelLabels[each]}</Link>
-          ))}
           <Link className="secondary-button" href={`/more/team-results?${query}&level=${level}`}>Team results</Link>
           <PrintReportButton label="Print these forms" />
         </div>
       </div>
+      <nav className="tab-chips" aria-label="Level">
+        {TEAM_LEVELS.map((each) => (
+          <Link aria-current={each === level ? "page" : undefined} href={`/more/reports/clubs/team-form/level?${query}&level=${each}`} key={each}>{teamLevelLabels[each]}</Link>
+        ))}
+      </nav>
       {forms.length === 0 && <p className="quiet-copy">{level === "AREA" ? "No team is registered yet." : `No team has advanced to ${teamLevelLabels[level]} yet.`}</p>}
       {forms.map(({ id, form }) => (
         <div className="team-form-level-sheet" key={id}>

@@ -320,3 +320,12 @@ export function missingRosterFields(member: MissingFieldMember): string[] {
   if (!member.attendeeType) missing.push(rosterFieldLabels.attendeeType);
   return missing;
 }
+
+/**
+ * The missing fields a roster row flags. An active person's missing birth date is left out because the roster's
+ * birth-date notice already says it (#1004); an inactive person is not counted there, so theirs stays.
+ */
+export function rosterRowMissingFields(member: MissingFieldMember & { status?: string }): string[] {
+  const missing = missingRosterFields(member);
+  return member.status === "INACTIVE" ? missing : missing.filter((field) => field !== rosterFieldLabels.birthDate);
+}

@@ -114,23 +114,31 @@ export default async function PublicEventPage({
       {/* One container (#720): every section below shares this width and left
           edge at every viewport, with the same side gutters on a phone. */}
       <div className="public-event-container">
-      {/* The header banner (#816) comes first and owns the page's h1; the event
-          header below then drops to an h2. Without a banner nothing changes. */}
+      {/* The header banner (#816) comes first and owns the page's h1. With one, the event
+          header below is a plain details row with no second title or hero (#1004); without
+          a banner nothing changes. */}
       {heroSection && <EventHeroBanner section={heroSection} assetUrl={assetUrl} />}
       {autoCards ? (
         <AutoEventHeader
           header={autoCards.header}
           timeLabel={landing.event.timeLabel}
           introLine={landing.lifecycle.heroTagline}
-          titleAsH2={Boolean(heroSection)}
+          titleHidden={Boolean(heroSection)}
         />
+      ) : heroSection ? (
+        <section className="public-event-facts" aria-label="Event details">
+          <p>{landing.lifecycle.heroTagline}</p>
+          <ul>
+            <li><CalendarDays size={17} aria-hidden="true" /> {landing.event.dateLabel}</li>
+            <li><Clock3 size={17} aria-hidden="true" /> {landing.event.timeLabel}</li>
+            <li><MapPin size={17} aria-hidden="true" /> {landing.event.location ?? "Location details coming soon"}</li>
+          </ul>
+        </section>
       ) : (
         <section className="public-registration-hero public-event-hero">
           <div>
             <p className="public-registration-eyebrow">Iowa-Missouri Conference event</p>
-            {heroSection
-              ? <h2 className="public-event-demoted-title">{landing.event.name}</h2>
-              : <h1>{landing.event.name}</h1>}
+            <h1>{landing.event.name}</h1>
             <p>{landing.lifecycle.heroTagline}</p>
           </div>
           <div className="public-registration-event-details">

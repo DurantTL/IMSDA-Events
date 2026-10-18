@@ -12,7 +12,7 @@
   background: #fff;
   padding: 10px 14px;
   color: var(--muted);
-  max-width: 420px;
+  max-width: 760px;
 }
 
 .search input {
@@ -120,11 +120,6 @@
 .details dd {
   margin: 0;
   color: var(--ink);
-}
-
-.empty {
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .selectionNote {
