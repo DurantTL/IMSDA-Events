@@ -4,6 +4,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import styles from "@/components/club-orders.module.css";
 import { ORDER_LIST_SECTIONS, activeHelperLines, orderListSectionLabels } from "@/modules/club-orders/domain";
 import { listHelperLines, loadOrderExportHeader } from "@/modules/club-orders/repository";
+import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 
 export const metadata: Metadata = { title: "Printable order list" };
@@ -35,7 +36,7 @@ export default async function ClubOrderListPrintPage({ params }: { params: Promi
           <div><dt>Director</dt><dd translate="no">{header.directorName || "—"}</dd></div>
           <div><dt>Director email</dt><dd translate="no">{header.directorEmail || "—"}</dd></div>
           <div><dt>Director phone</dt><dd translate="no">{header.directorPhone || "—"}</dd></div>
-          <div><dt>Date</dt><dd>{header.date}</dd></div>
+          <div><dt>Date</dt><dd>{formatCalendarDate(header.date)}</dd></div>
         </dl>
         <p className="field-help">Available = in stock minus items set aside for someone.</p>
         {lines.length === 0 && <p className="quiet-copy">Nothing on the list.</p>}

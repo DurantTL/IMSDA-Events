@@ -6,6 +6,7 @@ import styles from "@/components/club-orders.module.css";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
 import { ORDER_LIST_SECTIONS, activeHelperLines, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
+import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import type { AwardableNeed, OrderBatchSummary, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { effectiveChoice, hasSearchText, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
@@ -124,7 +125,7 @@ function writeDismissed(organizationId: string) {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "America/Chicago" });
+  return new Date(value).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "America/Chicago" });
 }
 
 /**
@@ -428,7 +429,7 @@ export function ClubOrderWorkspace({
                     <span>
                       <span translate="no">{need.firstName} {need.lastName}</span>
                       {" · "}<span translate="no">{need.itemName ?? need.sourceLabel}</span>
-                      {need.sourceDate && <small className={styles.muted}> · {need.sourceDate}</small>}
+                      {need.sourceDate && <small className={styles.muted}> · {formatCalendarDate(need.sourceDate)}</small>}
                     </span>
                   </label>
                 </li>

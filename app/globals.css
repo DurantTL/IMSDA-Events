@@ -4105,6 +4105,13 @@ body:has(.auth-page) { padding-bottom: 0; }
   background: var(--green-soft);
   color: var(--green);
 }
+/* An optional box (the alternate) left unticked is a plain answer, not a missing one (#1005). */
+.public-registration-review-acknowledgements li.is-neutral {
+  background: #f3f6f8;
+  color: var(--muted);
+}
+.public-registration-review-acknowledgements li.is-neutral > span:first-child { border-color: #b7c0cc; }
+.status-pending { color: var(--muted); font-size: var(--text-helper-min); }
 
 .public-registration-submit-card {
   display: grid;
@@ -5323,6 +5330,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   top: 20px;
 }
 .public-manage-contact-card { display: grid; gap: 19px; border-top: 4px solid var(--imsda-purple); }
+.public-manage-contact-current { display: block; margin-top: 3px; color: var(--muted); font-size: var(--text-helper-min); font-weight: 400; overflow-wrap: anywhere; }
 .public-manage-contact-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -13,6 +13,9 @@
 
 export const CHURCH_BILLED_NOTICE = "Your church is billed after the event.";
 
+/** Every person is free and no fee is charged to the registration: "$0 per person" is said as what it means to the registrant (#1005). Still church-billed, so the church line stays. */
+export const ZERO_PER_PERSON_NOTICE = `No cost to you. ${CHURCH_BILLED_NOTICE}`;
+
 /** What a registrant is told when a team event costs nothing: there is no church bill to announce (#809). */
 export const NO_COST_NOTICE = "No cost.";
 
@@ -104,7 +107,9 @@ export function perPersonPrice(input: PerPersonPriceInput): PerPersonPrice {
   const first = people[0].amountCents;
   if (people.every((person) => person.amountCents === first)) {
     return {
-      notice: `${formatPerPersonAmount(first)} per person. ${CHURCH_BILLED_NOTICE}`,
+      notice: first === 0 && registrationLines.every((line) => line.amountCents === 0)
+        ? ZERO_PER_PERSON_NOTICE
+        : `${formatPerPersonAmount(first)} per person. ${CHURCH_BILLED_NOTICE}`,
       roster: true,
       attendeeLines: [],
       registrationLines,

@@ -18,6 +18,8 @@ export function AttendeeRegistrationContactForm({
   initialContact: Contact;
 }) {
   const [contact, setContact] = useState(initialContact);
+  // The summary shows the last saved contact, not what is being typed.
+  const [savedContact, setSavedContact] = useState(initialContact);
   const [code, setCode] = useState("");
   const [requesting, setRequesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -78,6 +80,7 @@ export function AttendeeRegistrationContactForm({
         throw new Error(payload?.message ?? "The contact details could not be saved.");
       }
       setContact(payload.contact);
+      setSavedContact(payload.contact);
       setCode("");
       setNotice({ tone: "saved", message: "Contact details saved. The code has been used." });
     } catch (error) {
@@ -92,7 +95,12 @@ export function AttendeeRegistrationContactForm({
 
   return (
     <details className="public-manage-contact-card">
-      <summary>Update registration contact</summary>
+      <summary>
+        Update registration contact
+        <small className="public-manage-contact-current" translate="no">
+          {[`${savedContact.firstName} ${savedContact.lastName}`.trim(), savedContact.email].filter(Boolean).join(" · ")}
+        </small>
+      </summary>
       <form onSubmit={save}>
         <p>A fresh emailed code is required. It works only in this signed-in session.</p>
         <div className="public-manage-contact-grid">

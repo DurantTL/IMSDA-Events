@@ -14,7 +14,6 @@ import { selectAccountBannerAnnouncements, type AccountBannerCandidate } from "@
 import { eventHubAnnouncementRecords } from "@/modules/attendee-accounts/event-hub-repository";
 import { buildPublicEventAnnouncementFeed } from "@/modules/events/public-domain";
 import { areaClubPortalNavItems, clubPortalNavItems, clubReporterNavItems } from "@/modules/club-rosters/portal-nav";
-import { CLUB_REGISTRATION_CARD_NOTE } from "@/modules/club-registrations/entry-path";
 
 const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
 
@@ -105,8 +104,7 @@ describe("club notice privacy across signed-out, attendee, director and coordina
     }
   });
 
-  it("the public club note appears on the public event page only, never in the portal", () => {
-    expect(CLUB_REGISTRATION_CARD_NOTE).toContain("For club directors");
+  it("the public event page gives club directors one sign-in instruction (the callout), and no club note reaches the portal (#1005)", () => {
     const users = [
       "app/(public)/events/[eventSlug]/page.tsx",
       "app/(public)/account/(portal)/layout.tsx",
@@ -115,9 +113,9 @@ describe("club notice privacy across signed-out, attendee, director and coordina
       "app/(public)/account/(portal)/area/[organizationId]/layout.tsx",
       "app/(public)/account/events/[eventSlug]/page.tsx",
     ];
-    expect(users.filter((file) => read(file).includes("CLUB_REGISTRATION_CARD_NOTE"))).toEqual(["app/(public)/events/[eventSlug]/page.tsx"]);
-    // It says to sign in; it names no club, person or amount.
-    expect(CLUB_REGISTRATION_CARD_NOTE).not.toMatch(/\$|@|club-\d/);
+    // The card note that repeated the callout is gone; nothing renders it anywhere.
+    expect(users.filter((file) => read(file).includes("CLUB_REGISTRATION_CARD_NOTE"))).toEqual([]);
+    expect(read("app/(public)/events/[eventSlug]/page.tsx")).toContain("ClubDirectorSignInNotice");
   });
 
   it("the coordinator's view-only notice lives only in the coordinator layout, and the director layout never shows it", () => {

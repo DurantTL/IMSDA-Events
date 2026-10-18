@@ -90,6 +90,8 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
         honorSelections: {},
         billingNotice: "There is no fee for this event.",
         noCost: true,
+        teamFlow: true,
+        ...(team.minTeamMembers !== null || team.maxTeamMembers !== null ? { teamLimits: { min: team.minTeamMembers, max: team.maxTeamMembers } } : {}),
         teamName: team.named ? teamName.trim() : null,
         submitLabel: "Submit team registration",
         blockedReason,
