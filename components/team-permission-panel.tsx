@@ -5,7 +5,7 @@ import { ShieldAlert } from "lucide-react";
 import type { PermissionDecision, PermissionStatus } from "@/modules/club-teams/permission-domain";
 import type { TeamPermissionRow } from "@/modules/club-teams/permission-repository";
 
-const statusText: Record<PermissionStatus, string> = { PENDING: "Waiting for a decision", GRANTED: "Permission granted", DECLINED: "Declined" };
+const statusText: Record<PermissionStatus, string> = { PENDING: "Waiting for a decision", GRANTED: "Approved", DECLINED: "Declined" };
 
 /**
  * Team members who are 18 or older on the age date and need the Area Coordinator's permission (#809). Pending ones come
@@ -53,7 +53,7 @@ export function TeamPermissionPanel({ rows: initial, endpointBase, canDecide, sh
         <p className="field-help">No team has a team member of 18 or older.</p>
       ) : (
         <>
-          {pending > 0 && <p className="inline-notice warning" role="status"><strong>{pending} {pending === 1 ? "person is" : "people are"} waiting for permission.</strong> The teams are registered either way.</p>}
+          {pending > 0 && <p className="inline-notice warning" role="status"><strong>{pending} {pending === 1 ? "person is" : "people are"} waiting for approval.</strong> The teams are registered either way.</p>}
           <ul className="team-permission-list">
             {rows.map((row) => (
               <li className={`team-permission-item team-permission-${row.status.toLowerCase()}`} key={row.id}>
@@ -69,7 +69,7 @@ export function TeamPermissionPanel({ rows: initial, endpointBase, canDecide, sh
                 </div>
                 {canDecide && (
                   <div className="team-permission-actions">
-                    <button className="secondary-button" disabled={busyId === row.id || row.status === "GRANTED"} onClick={() => void decide(row, "GRANTED")} type="button">Grant</button>
+                    <button className="secondary-button" disabled={busyId === row.id || row.status === "GRANTED"} onClick={() => void decide(row, "GRANTED")} type="button">Approve</button>
                     <button className="secondary-button" disabled={busyId === row.id || row.status === "DECLINED"} onClick={() => void decide(row, "DECLINED")} type="button">Decline</button>
                   </div>
                 )}
