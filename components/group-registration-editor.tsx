@@ -57,7 +57,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
   const goingCount = keptIds.length + newPeople.length;
   const continueBlocked = goingCount === 0
     ? "Keep or add at least one person to continue."
-    : ageKey === null ? "Staff have not set the age date for this event yet, so the group cannot continue." : null;
+    : ageKey === null ? "This event's form has no age question yet, so the group cannot continue. Contact the event team." : null;
 
   function toggleKept(attendeeId: string) {
     setKeptIds((current) => (current.includes(attendeeId) ? current.filter((id) => id !== attendeeId) : [...current, attendeeId]));

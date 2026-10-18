@@ -2456,7 +2456,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .module-grid > button small { flex: 1; margin-top: 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.5rem); line-height: 1.4; }
 .module-grid > button b { margin-top: 7px; color: var(--imsda-purple); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.48rem); text-transform: uppercase; }
 .builder-preview { max-height: calc(100vh - 30px); overflow-y: auto; border-top: 4px solid var(--imsda-purple); }
-.builder-preview:focus { outline: 3px solid rgba(88, 44, 131, 0.16); outline-offset: 3px; }
+.builder-preview:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .live-preview-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; background: var(--green-soft); color: var(--green); padding: 5px 8px; font-size: max(var(--type-floor, 0px), 0.54rem); font-weight: 800; }
 .live-preview-badge > span { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(45, 132, 85, 0.12); }
 .preview-device { overflow: hidden; border: 1px solid #ccdbe1; border-radius: 15px; background: white; box-shadow: 0 12px 30px rgba(0, 59, 92, 0.08); }
@@ -3357,7 +3357,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   padding: 16px 18px;
 }
 
-.public-registration-error-summary:focus { outline: 3px solid rgba(169, 85, 73, 0.2); outline-offset: 3px; }
+.public-registration-error-summary:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .public-registration-error-summary strong { display: block; font-size: var(--text-helper-min); }
 .public-registration-error-summary ul { margin: 9px 0 0; padding-left: 20px; font-size: var(--text-helper-min); line-height: 1.8; }
 .public-registration-error-summary a { color: #71372f; font-weight: 700; }
@@ -3382,7 +3382,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   letter-spacing: -0.025em;
 }
 .public-registration-step-heading h2:focus-visible {
-  outline: 3px solid rgba(88, 44, 131, 0.17);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 5px;
 }
 .public-registration-step-heading > p:last-child {
@@ -3460,7 +3460,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   content: "";
 }
 .public-registration-attendee:focus {
-  outline: 3px solid rgba(88, 44, 131, 0.17);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
 }
 .public-registration-attendee-heading {
@@ -5694,7 +5694,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .message-editor-toolbar button { display: inline-grid; min-width: 30px; height: 30px; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #43545c; cursor: pointer; padding: 0 7px; font: inherit; font-size: max(var(--type-body-floor, 0px), 0.56rem); font-weight: 800; }
 .message-editor-toolbar button:hover { border-color: #c5d5dc; background: #f5f8f9; color: var(--imsda-purple); }
 .message-editor-toolbar button:focus-visible,
-.message-editor-mode button:focus-visible { outline: 3px solid rgba(88, 44, 131, 0.2); outline-offset: 1px; }
+.message-editor-mode button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
 .message-editor-token-control { flex: 1 1 250px; justify-content: flex-end; }
 .message-editor-token-control label { display: block; }
 .message-editor-token-control select { max-width: 215px; height: 30px; border: 1px solid var(--field-border); border-radius: 7px; background: white; color: var(--ink); padding: 0 7px; font: inherit; font-size: max(var(--type-body-floor, 0px), 0.56rem); }
@@ -7040,7 +7040,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   transform: translateY(-1px);
 }
 .public-event-resources a:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--imsda-purple) 38%, transparent);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
   border-color: var(--imsda-purple);
 }
@@ -9096,6 +9096,14 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   outline: 2px solid var(--imsda-purple);
   outline-offset: 2px;
 }
+/* The same fields on the dark navy surfaces (the sidebar's event picker) get the gold ring (#1003); this has to match the
+   strength of the purple rule above and come after it. */
+:root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
+  :is(input, select, textarea):not(.searchable-select-control > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
+:root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
+  :is(.searchable-select-control, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
+  outline-color: var(--focus-ring-on-dark);
+}
 
 /* Registration form builder on phones (#685): a notice replaces it under 768px. */
 .builder-phone-notice { display: none; }
@@ -9983,7 +9991,7 @@ button[aria-busy="true"] { cursor: progress; }
 :is(input, select, textarea)[aria-invalid="true"] { border-color: var(--danger, #8f3a30); box-shadow: 0 0 0 1px var(--danger, #8f3a30); }
 .public-registration-error-summary strong { display: flex; align-items: center; gap: 8px; }
 .form-error-summary { display: block; margin-bottom: 12px; padding: 12px 14px; border: 1px solid var(--danger-line, #e3b8b1); border-left: 5px solid var(--danger, #8f3a30); border-radius: 10px; background: var(--danger-soft, #fdf4f2); color: var(--ink); }
-.form-error-summary:focus { outline: 3px solid rgba(143, 58, 48, 0.3); outline-offset: 3px; }
+.form-error-summary:focus { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .form-error-summary > strong { display: flex; align-items: center; gap: 8px; color: var(--danger, #8f3a30); }
 .form-error-summary ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
 .form-error-summary a { color: var(--danger, #8f3a30); font-weight: 700; }

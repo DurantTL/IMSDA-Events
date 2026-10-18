@@ -72,10 +72,28 @@ describe("disabled buttons say why (#1003)", () => {
   ];
   it.each(cases)("%s: the disabled button names its hint and the hint is rendered", (_label, file, id) => {
     const source = read(file);
+    if (id === "club-order-nothing") {
+      // A fixed hint that already existed: the disabled Export button names it, and it is rendered on the page.
+      expect(source).toMatch(/<button aria-describedby="club-order-nothing"[^>]*disabled[^>]*>[^<]*<Download[^>]*\/> Export list \(CSV\)<\/button>/);
+      expect(source).toContain('id="club-order-nothing"');
+      return;
+    }
     expect(source).toContain(`aria-describedby={disabledHintId(`);
-    expect(source).toContain(`"${id}"`);
-    // The id is used both on the button and on the hint element.
-    expect(source.split(id).length - 1).toBeGreaterThanOrEqual(2);
+    expect(source).toMatch(new RegExp(`aria-describedby=\\{disabledHintId\\(\\w+, "${id}"\\)\\}`));
+    expect(source).toContain(`<DisabledHint id="${id}"`);
+  });
+
+  it("renders a disabled button with aria-describedby and its hint, and neither when enabled", () => {
+    const render = (reason: string | null) => renderToStaticMarkup(createElement("div", null,
+      createElement("button", { "aria-describedby": disabledHintId(reason, "h"), disabled: reason !== null, type: "button" }, "Go"),
+      createElement(DisabledHint, { id: "h", reason })));
+    const blocked = render("Pick one first.");
+    expect(blocked).toContain('aria-describedby="h"');
+    expect(blocked).toContain("disabled");
+    expect(blocked).toContain('<p class="disabled-hint" id="h">Pick one first.</p>');
+    const open = render(null);
+    expect(open).not.toContain("aria-describedby");
+    expect(open).not.toContain("disabled-hint");
   });
 });
 
@@ -128,5 +146,29 @@ describe("auth pages on a phone (#1003)", () => {
     expect(css).toMatch(/body:has\(\.auth-page\) \{ padding-bottom: 0; \}/);
     // The padding it overrides is the phone rule that reserves room for the bottom tab bar.
     expect(css).toMatch(/@media \(max-width: 800px\) \{\s*body \{ padding-bottom: calc\(73px \+ env\(safe-area-inset-bottom\)\); \}/);
+  });
+});
+
+describe("focus ring cascade (#1003)", () => {
+  it("puts the gold dark-surface rule for form fields after, at the strength of, the purple field rule", () => {
+    const purple = css.indexOf(":root:root:root :is(input, select, textarea):not(");
+    const dark = css.indexOf(":root:root:root :is(.sidebar, .event-hero");
+    expect(purple).toBeGreaterThan(0);
+    expect(dark).toBeGreaterThan(purple);
+    const rule = css.slice(dark, css.indexOf("}", dark));
+    expect(rule).toContain(":is(input, select, textarea)");
+    expect(rule).toContain("outline-color: var(--focus-ring-on-dark)");
+  });
+
+  it("has no focus outline drawn in a translucent colour", () => {
+    const offenders: string[] = [];
+    for (const match of css.matchAll(/([^{}]*:focus(?:-visible|-within)?[^{}]*)\{([^{}]*)\}/g)) {
+      for (const declaration of match[2]!.matchAll(/outline(?:-color)?:\s*([^;]+)/g)) {
+        if (/rgba\([^)]*,\s*0?\.\d+\s*\)|rgba\([^)]*,\s*0\s*\)|color-mix\(/.test(declaration[1]!)) {
+          offenders.push(`${match[1]!.trim().replace(/\s+/g, " ")} { outline: ${declaration[1]!.trim()} }`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

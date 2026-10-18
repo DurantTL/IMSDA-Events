@@ -134,7 +134,8 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent }: { eventS
   }, [hasClasses, honorsCatalog, definition, offerings, picks, locationId]);
 
   const blockedReason = useMemo(() => {
-    if (locations.length > 0 && !chosenLocation) return "Choose a location first.";
+    if (locations.length === 0) return "No locations are open for registration right now.";
+    if (!chosenLocation) return "Choose a location first.";
     return null;
   }, [locations.length, chosenLocation]);
 

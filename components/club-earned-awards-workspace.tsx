@@ -330,7 +330,9 @@ export function ClubEarnedAwardsWorkspace({
   const hiddenSelected = knownSelected - selectedCount;
   const classCount = selectedCount;
   const markClassBlocked = classCount === 0
-    ? "Select at least one member in the table above."
+    ? (hiddenSelected > 0
+      ? "The members you ticked are hidden by the search or filter. Clear it, or tick a member who is shown."
+      : "Select at least one member in the table above.")
     : !completedOn ? "Choose the date the class was completed." : null;
   const handCount = selectedCount;
   const entryCount = chosen.length * handCount;
