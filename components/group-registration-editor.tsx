@@ -14,6 +14,7 @@ import {
 import { rosterOwnedResponses, rosterRolePrefill } from "@/modules/club-registrations/domain";
 import { groupSeatType, MAX_GROUP_ATTENDEES } from "@/modules/group-registrations/domain";
 import type { GroupRegistrationWorkspace } from "@/modules/group-registrations/repository";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 type Workspace = GroupRegistrationWorkspace & { experience: NonNullable<GroupRegistrationWorkspace["experience"]> };
 type NewPerson = { clientId: string; firstName: string; lastName: string; age: number };
@@ -54,6 +55,9 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
   }, [workspace.locations, workspace.registration.location]);
 
   const goingCount = keptIds.length + newPeople.length;
+  const continueBlocked = goingCount === 0
+    ? "Keep or add at least one person to continue."
+    : ageKey === null ? "Staff have not set the age date for this event yet, so the group cannot continue." : null;
 
   function toggleKept(attendeeId: string) {
     setKeptIds((current) => (current.includes(attendeeId) ? current.filter((id) => id !== attendeeId) : [...current, attendeeId]));
@@ -264,6 +268,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
           <X aria-hidden="true" size={15} /> Cancel
         </button>
         <button
+          aria-describedby={disabledHintId(continueBlocked, "group-editor-continue-hint")}
           className="primary-button"
           disabled={goingCount === 0 || ageKey === null}
           onClick={() => { setError(""); setStep("form"); }}
@@ -272,6 +277,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
           Continue with {goingCount} {goingCount === 1 ? "person" : "people"} <ArrowRight aria-hidden="true" size={15} />
         </button>
       </div>
+      <DisabledHint id="group-editor-continue-hint" reason={continueBlocked} />
     </section>
   );
 }

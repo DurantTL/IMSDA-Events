@@ -169,7 +169,7 @@ export function CsvImportDialog({
                 >
                   <FileUp aria-hidden="true" size={24} />
                   <strong>{busy ? "Reading…" : dragging ? "Drop the CSV file" : "Drag the CSV file here, or choose it"}</strong>
-                  <input accept=".csv,text/csv" disabled={busy} onChange={readFile} type="file" />
+                  <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={readFile} type="file" />
                 </label>
               </>
             )}

@@ -9,6 +9,7 @@ import { ORDER_LIST_SECTIONS, activeHelperLines, needsDatedBefore, orderListSect
 import type { AwardableNeed, OrderBatchSummary, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { effectiveChoice, hasSearchText, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 export type ClubOrderWorkspaceData = {
   helper: HelperLine[];
@@ -160,6 +161,7 @@ export function ClubOrderWorkspace({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [handedOut, setHandedOut] = useState<Set<string>>(new Set());
+  const handedOutBlocked = handedOut.size === 0 ? "Tick at least one item above that was already handed out." : null;
   const [beforeDate, setBeforeDate] = useState("");
   // Remembered per club on this device. The server snapshot is "not dismissed", so the first render matches the server.
   const promptDismissed = useSyncExternalStore(subscribeDismissed, () => readDismissed(organizationId), () => false);
@@ -430,11 +432,12 @@ export function ClubOrderWorkspace({
             ))}
           </ul>
           <div className={styles.actions}>
-            <button className="primary-button" disabled={busy || handedOut.size === 0} onClick={markAlreadyHandedOut} type="button">
+            <button aria-describedby={disabledHintId(handedOutBlocked, "club-order-handed-out-hint")} className="primary-button" disabled={busy || handedOut.size === 0} onClick={markAlreadyHandedOut} type="button">
               <CheckCircle2 aria-hidden="true" size={16} /> Already handed out{handedOut.size > 0 ? ` (${handedOut.size})` : ""}
             </button>
             <button className="text-button" onClick={dismissPrompt} type="button">Not now</button>
           </div>
+          <DisabledHint id="club-order-handed-out-hint" reason={handedOutBlocked} />
         </section>
       )}
 

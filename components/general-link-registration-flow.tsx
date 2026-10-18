@@ -8,6 +8,7 @@ import { ClubLocationPicker, locationUnavailableLabel } from "@/components/club-
 import { PublicRegistrationForm, type FormResponses } from "@/components/public-registration-form";
 import { TEAM_NAME_MAX } from "@/modules/club-teams/domain";
 import type { GeneralLinkExperience } from "@/modules/general-link-registrations/repository";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 type Ready = GeneralLinkExperience & { experience: NonNullable<GeneralLinkExperience["experience"]> };
 
@@ -67,10 +68,11 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
             </label>
           )}
           <div className="club-registration-toolbar">
-            <button className="primary-button" disabled={!canContinue} onClick={() => setStarted(true)} type="button">
+            <button aria-describedby={disabledHintId(blockedReason, "general-link-continue-hint")} className="primary-button" disabled={!canContinue} onClick={() => setStarted(true)} type="button">
               Continue <ArrowRight aria-hidden="true" size={15} />
             </button>
           </div>
+          <DisabledHint id="general-link-continue-hint" reason={blockedReason} />
         </section>
       </main>
     );

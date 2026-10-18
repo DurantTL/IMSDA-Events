@@ -538,6 +538,7 @@ export function EventContentWorkspace({
           <small>PDF, PNG, JPEG, or WebP, up to 25 MB.</small>
           <input
             type="file"
+            className="sr-only"
             accept="application/pdf,image/png,image/jpeg,image/webp"
             disabled={uploading}
             onChange={(event) => {

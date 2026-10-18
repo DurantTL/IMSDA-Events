@@ -30,6 +30,10 @@
   --imsda-purple-soft: #f1eaf7;
   --imsda-gold: #f0b323;
   --imsda-gold-soft: #fff5d7;
+  /* Keyboard focus ring (#1003), WCAG 2.2 SC 1.4.11 (at least 3:1 against what it is drawn on): navy #003b5c is 11:1 on white
+     and 10:1 on the page paper; gold #f0b323 is 7.9:1 on navy-deep and 5.8:1 on navy, for the dark surfaces. */
+  --focus-ring: var(--imsda-navy);
+  --focus-ring-on-dark: var(--imsda-gold);
   --ink: #243640;
   --muted: #536872; /* #684: 4.97:1 on the tinted panel backgrounds, 5.85:1 on white */
   --line: #dce6ea;
@@ -435,9 +439,28 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(240, 179, 35, 0.55);
-  outline-offset: 3px;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
+
+/* On the dark navy surfaces (sidebar, heroes, the registration submit card) the ring is gold. */
+:is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
+  :is(button, a, input, select, summary, [tabindex]):focus-visible {
+  outline-color: var(--focus-ring-on-dark);
+}
+
+/* A file chooser is a styled label around a visually hidden input (#1003): the ring goes on the label. */
+:is(.file-button, .club-import-upload, .file-drop):has(input[type="file"]:focus-visible) {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.file-button { position: relative; }
+.file-button:has(input[type="file"]:disabled),
+.club-import-upload:has(input[type="file"]:disabled) { cursor: not-allowed; opacity: 0.58; }
+
+/* The reason a button is disabled, shown right under it and named by its aria-describedby (#1003). */
+.disabled-hint { margin: 6px 0 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.7rem); line-height: 1.45; }
+.message-editor-file { display: grid; justify-items: start; gap: 6px; }
 
 .sr-only {
   position: absolute;
@@ -911,6 +934,17 @@ select:focus-visible {
   color: var(--imsda-navy);
   font-weight: 700;
 }
+
+/* The staff content area while a page streams in (#1003): the sidebar and header stay, only this shows. */
+.content-skeleton { display: grid; gap: 16px; padding-top: 8px; }
+.content-skeleton-bar { border-radius: 12px; background: linear-gradient(90deg, #e3ebee 0%, #eef3f5 50%, #e3ebee 100%); background-size: 200% 100%; animation: content-skeleton-shimmer 1.4s ease-in-out infinite; }
+.content-skeleton-title { width: min(320px, 70%); height: 34px; }
+.content-skeleton-line { width: min(520px, 100%); height: 16px; }
+.content-skeleton-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; }
+.content-skeleton-card { height: 96px; }
+.content-skeleton-panel { height: 280px; }
+@keyframes content-skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .content-skeleton-bar { animation: none; } }
 
 .icon-button,
 .avatar {
@@ -1927,6 +1961,10 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
     linear-gradient(145deg, var(--imsda-navy-deep), var(--imsda-navy));
   padding: 34px 18px;
 }
+
+/* The phone body reserves room for the bottom tab bar (padding-bottom); the sign-in style pages have no tab bar, so that
+   strip showed the pale page colour under the dark background (#1003). */
+body:has(.auth-page) { padding-bottom: 0; }
 
 .auth-card {
   width: min(460px, 100%);
@@ -7606,7 +7644,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 .background-check-import-filters { margin: 12px 0; }
 .background-check-candidates { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .background-check-import-pager { align-items: center; justify-content: space-between; margin: 8px 0; }
-.club-import-upload { display: grid; justify-items: center; gap: 6px; padding: 36px 16px; border-style: dashed; cursor: pointer; text-align: center; transition: background-color 0.1s, border-color 0.1s; }
+.club-import-upload { position: relative; display: grid; justify-items: center; gap: 6px; padding: 36px 16px; border-style: dashed; cursor: pointer; text-align: center; transition: background-color 0.1s, border-color 0.1s; }
 .club-import-upload input { max-width: 100%; }
 .club-import-upload small { color: var(--muted); }
 .club-import-upload-dragging { background: var(--imsda-purple-soft); border-color: var(--imsda-purple); }
