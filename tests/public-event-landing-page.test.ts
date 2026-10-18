@@ -17,6 +17,8 @@ vi.mock("next/navigation", () => ({
 }));
 // The page sanitizes custom HTML (#816) through a server-only module.
 vi.mock("server-only", () => ({}));
+// The header's session links read cookies and the database (#1009); they have their own tests.
+vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 
 import { describePublicEventLifecycle } from "@/modules/events/public-domain";
 import PublicEventPage from "@/app/(public)/events/[eventSlug]/page";

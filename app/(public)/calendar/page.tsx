@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, DoorClosed, List } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { AgendaItem } from "@/components/calendar-agenda-item";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
@@ -83,9 +84,12 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             <BrandMark />
             <span><strong>IMSDA</strong><small>Events</small></span>
           </Link>
-          <a className="text-button calendar-subscribe" href="#subscribe" aria-label="Subscribe to the calendar">
-            <CalendarPlus size={16} aria-hidden="true" /> <span>Subscribe</span>
-          </a>
+          <div className="public-header-links">
+            <a className="text-button calendar-subscribe" href="#subscribe" aria-label="Subscribe to the calendar">
+              <CalendarPlus size={16} aria-hidden="true" /> <span>Subscribe</span>
+            </a>
+            <PublicHeaderSessionLinks />
+          </div>
         </div>
       </header>
 

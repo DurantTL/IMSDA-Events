@@ -63,7 +63,7 @@ cannot be proved by a local test suite.
   and QR passes remain hidden in preview mode.
 - For a staff member with a matching active verified attendee account, use
   **My attendee account** and verify a real attendee session opens that
-  account’s registrations and community. Confirm **Back to staff workspace**
+  account’s registrations and community. Confirm **Staff workspace** in the My account header
   returns without another login and that no other attendee can be selected.
 - Enable the event community, review and save the conduct copy, then verify an
   actual attendee must accept it before posting. Exercise a post, reply,

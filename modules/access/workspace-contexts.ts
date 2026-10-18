@@ -66,14 +66,41 @@ export function otherWorkspaceContextsForStaff(input: {
 }
 
 /**
- * The other workspace a signed-in **attendee** identity may switch into: the
- * staff workspace, only when this browser also carries a live staff session
- * (the reverse of the handoff above). An attendee with no staff session never
- * sees a staff option — there is nothing to ask a role for, only what is
- * already true of the two sessions on this browser.
+ * The other workspaces a signed-in **attendee** identity may switch into: the
+ * staff workspace, and for a system administrator also system management, but
+ * only when this browser also carries a live staff session (the reverse of the
+ * handoff above). An attendee with no staff session never sees either option:
+ * `isSystemAdmin` is ignored without one, so it can never offer System
+ * management on its own. These are links only; `/overview` and `/admin` keep
+ * their own server-side checks.
  */
 export function otherWorkspaceContextsForAttendee(input: {
   hasStaffSession: boolean;
+  isSystemAdmin?: boolean;
 }): WorkspaceContext[] {
-  return input.hasStaffSession ? [STAFF_WORKSPACE_CONTEXT] : [];
+  if (!input.hasStaffSession) return [];
+  return input.isSystemAdmin
+    ? [STAFF_WORKSPACE_CONTEXT, SYSTEM_ADMIN_CONTEXT]
+    : [STAFF_WORKSPACE_CONTEXT];
 }
+
+/**
+ * What the My account header's Sign out ends (#1009). The attendee account can
+ * be reached through a staff session (`getCurrentAttendee()` falls back to the
+ * staff user's matching attendee account), so ending only the attendee session
+ * would leave the person signed in. With a staff session Sign out ends both;
+ * without one it ends the attendee session, as before. While a staff "act as"
+ * is active there is no attendee sign-out at all (the staff workspace's own
+ * sign-out ends it).
+ */
+export type AccountSignOutMode = "none" | "attendee" | "both";
+
+export function accountSignOutMode(input: {
+  hasAttendeeAccount: boolean;
+  hasStaffSession: boolean;
+  actingAsClubRole: boolean;
+}): AccountSignOutMode {
+  if (input.actingAsClubRole || !input.hasAttendeeAccount) return "none";
+  return input.hasStaffSession ? "both" : "attendee";
+}
+

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// The header's session links read cookies and the database (#1009); they have their own tests.
+vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 vi.mock("@/modules/organizations/public-club-directory", () => ({
   listPublicClubs: mocks.listPublicClubs,
 }));
