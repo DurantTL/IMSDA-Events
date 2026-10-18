@@ -11,7 +11,7 @@ describe("roster section heading highlight", () => {
 
   it("draws a tinted band with a navy edge", () => {
     expect(start).toBeGreaterThan(-1);
-    expect(rule).toContain("border-left: 4px solid var(--imsda-navy);");
+    expect(rule).toContain("box-shadow: inset 4px 0 0 var(--imsda-navy);");
     expect(rule).toMatch(/background: rgba\(0, 59, 92, 0\.\d+\);/);
   });
 
