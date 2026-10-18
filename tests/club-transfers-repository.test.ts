@@ -15,8 +15,10 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   isAccountEmailConfigured: vi.fn(),
   getAccountEmailSender: vi.fn(),
+  isNotificationEnabled: vi.fn(),
 }));
 
+vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: mocks.isNotificationEnabled }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
@@ -89,6 +91,7 @@ beforeEach(() => {
   db = scriptedDatabase();
   mocks.getPrisma.mockReturnValue(db);
   mocks.isAccountEmailConfigured.mockReturnValue(true);
+  mocks.isNotificationEnabled.mockResolvedValue(true);
   mocks.getAccountEmailSender.mockReturnValue({ name: "IMSDA Events", address: "events@example.test", replyTo: null });
   db.organization.findFirst.mockResolvedValue({ id: "club-a", name: "Club A" });
   db.organization.findUniqueOrThrow.mockImplementation(async ({ where }: { where: { id: string } }) => ({ name: where.id === "club-a" ? "Club A" : "Club B" }));
@@ -257,6 +260,51 @@ describe("completing a transfer", () => {
     expect(order).toEqual(["erase", "create"]);
     // Nothing about registrations moves here; the member's open registrations are only looked up to queue.
     expect(db.registrationAttendee.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("the transfer notices' switches (#1016)", () => {
+  const completeSetup = () => {
+    db.memberTransfer.findUnique.mockResolvedValue(pendingTransfer);
+    db.memberTransfer.updateMany.mockResolvedValue({ count: 1 });
+    db.memberTransfer.findFirst.mockResolvedValue(null);
+    db.clubRosterMember.findUnique.mockResolvedValue({
+      id: "row-ada", organizationId: "club-a", clubYear: "2026-27", personId: "person-ada", attendeeType: "YOUTH", role: "Pathfinder",
+      classLevel: "FRIEND", reportedAge: null, gender: "FEMALE", sealedBirthDate: "v1.sealed", willingToDrive: false, status: "ACTIVE",
+    });
+    db.clubRosterMember.findFirst.mockResolvedValue(null);
+    db.clubRosterMember.create.mockResolvedValue({ id: "row-new" });
+    db.registrationAttendee.findMany.mockResolvedValue([]);
+    db.memberTransferRegistrationMove.findMany.mockResolvedValue([]);
+    db.clubDirectorGrant.findMany.mockResolvedValue([leaderGrant("account-x", "x@example.test"), leaderGrant("account-c", "c@example.test")]);
+  };
+
+  it("queues the completion notice while the COMPLETED switch is on", async () => {
+    completeSetup();
+    await acceptTransfer("club-a", "transfer-1", directorA, now);
+    const { data } = db.messageOutbox.createManyAndReturn.mock.calls[0]![0] as { data: Array<{ templateKey: string }> };
+    expect(data.length).toBeGreaterThan(0);
+    expect(data.every((row) => row.templateKey === "MEMBER_TRANSFER_COMPLETED")).toBe(true);
+    expect(mocks.isNotificationEnabled).toHaveBeenCalledWith("MEMBER_TRANSFER_COMPLETED");
+  });
+
+  it("completes the transfer but queues no completion notice while the COMPLETED switch is off", async () => {
+    completeSetup();
+    mocks.isNotificationEnabled.mockImplementation(async (key: string) => key !== "MEMBER_TRANSFER_COMPLETED");
+    await acceptTransfer("club-a", "transfer-1", directorA, now);
+    expect(db.memberTransfer.updateMany).toHaveBeenCalled();
+    expect(db.clubRosterMember.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ organizationId: "club-b", personId: "person-ada" }) }));
+    expect(db.messageOutbox.createManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it("queues no started notice while the STARTED switch is off, and the request still stands", async () => {
+    db.person.findUnique.mockResolvedValue({ firstName: "Ada", lastName: "Testperson" });
+    db.clubDirectorGrant.findMany.mockResolvedValue([leaderGrant("account-a", "a@example.test")]);
+    mocks.isNotificationEnabled.mockImplementation(async (key: string) => key !== "MEMBER_TRANSFER_STARTED");
+    const result = await requestTransfer("club-b", request, directorB, now);
+    expect(result.messageIds).toEqual([]);
+    expect(db.memberTransfer.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "PENDING" }) }));
+    expect(db.messageOutbox.createManyAndReturn).not.toHaveBeenCalled();
   });
 });
 

@@ -75,9 +75,10 @@ function load(): Promise<Snapshot> {
     return loaded;
   })();
   inFlight = { generation: startedIn, promise };
-  void promise.finally(() => {
+  const clear = () => {
     if (inFlight?.promise === promise) inFlight = null;
-  });
+  };
+  promise.then(clear, clear);
   return promise;
 }
 

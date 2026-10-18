@@ -82,6 +82,17 @@ describe("flagging team members of 18 or older (#809)", () => {
     expect(result).toEqual({ declined: [], queuedMessageIds: ["msg-ac@example.test"] });
   });
 
+  it("with the approval alert switched off (#1016) still flags the person and audits it, and only skips the email", async () => {
+    const tx = database();
+    const result = await syncTeamMemberPermissions(tx as never, { ...input([person("a", "Alex One", 18), person("b", "Blake Two", 14)]), notifyApprovers: false });
+    expect(tx.clubTeamMemberPermission.create).toHaveBeenCalledTimes(1);
+    expect(tx.clubTeamMemberPermission.create.mock.calls[0]![0].data).toMatchObject({ registrationAttendeeId: "a", ageOnAgeDate: 18, eventId: "event-1" });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_PERMISSION_REQUESTED" }), tx);
+    expect(tx.messageOutbox.upsert).not.toHaveBeenCalled();
+    expect(tx.registration.findUnique).not.toHaveBeenCalled();
+    expect(result).toEqual({ declined: [], queuedMessageIds: [] });
+  });
+
   it("does not flag a 17-year-old or a coach, whatever their age", async () => {
     const tx = database();
     const result = await run(tx, [person("a", "Alex One", 17), person("b", "Coach Two", 40, "COACH"), person("c", "Casey Three", null)]);

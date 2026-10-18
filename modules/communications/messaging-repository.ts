@@ -196,7 +196,7 @@ export type RegistrationMessageInput = {
    */
   registrantNote?: string | null;
   /** The "New public registration" switch (#1016), read before the transaction; false skips the staff copy only. */
-  staffCopyEnabled?: boolean;
+  staffCopyEnabled: boolean;
 };
 
 export type QueuedRegistrationMessages = {
@@ -3622,8 +3622,8 @@ export async function enqueuePublicRegistrationMessages(
     name: registrantName,
   }];
   // The staff copy has its own switch (#1016); the registrant's confirmation above never does.
-  // The caller reads the switch before its transaction opens (never a database read in here); omitted means on.
-  for (const email of input.staffCopyEnabled === false ? [] : settings.internalNotificationEmails) {
+  // The caller reads the switch before its transaction opens (never a database read in here). Required: leaving it out must not mean on.
+  for (const email of input.staffCopyEnabled ? settings.internalNotificationEmails : []) {
     recipients.push({
       templateKey: "INTERNAL_NEW_REGISTRATION",
       kind: "INTERNAL",
