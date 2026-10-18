@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); }, notFound: vi.fn(), usePathname: () => "/" }));
+vi.mock("next/navigation", () => ({ redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); }, notFound: vi.fn(), usePathname: () => "/", useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
 vi.mock("@/modules/reporting/director-exports-repository", () => ({
   loadHonorsExport: mocks.loadHonorsExport,
