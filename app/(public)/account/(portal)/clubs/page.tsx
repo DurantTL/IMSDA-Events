@@ -61,7 +61,7 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
           <section className="public-manage-card">
             <p className="field-help">Every active club. Clubs you don&apos;t run open view only, with ages instead of birth dates.</p>
             <AreaClubSearch basePath="/account/clubs" label="Search by club, church or city" query={query} shown={allClubs.length} total={everyClub.length} />
-            {allClubs.length === 0 && <p className="public-manage-empty" role="status">{query ? `No club, church or city matches “${query}”.` : "No active clubs yet."}</p>}
+            {allClubs.length === 0 && <p className="public-manage-empty">{query ? `No club, church or city matches “${query}”.` : "No active clubs yet."}</p>}
             <ul className="public-manage-club-list">
               {allClubs.map((club) => {
                 const mine = own.get(club.organizationId);

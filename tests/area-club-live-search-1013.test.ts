@@ -47,3 +47,19 @@ describe("AreaClubSearch markup (#1013)", () => {
     expect(html).toContain('href="/account/area-clubs/points?year=2026&amp;sort=points"');
   });
 });
+
+describe("one announcement per search (#1013 review)", () => {
+  it("leaves the club list's empty text out of the live region, so only the search status speaks", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = readFileSync("app/(public)/account/(portal)/clubs/page.tsx", "utf8");
+    expect(page).toContain('<p className="public-manage-empty">{query ? `No club, church or city matches');
+    expect(page).not.toMatch(/public-manage-empty" role="status">\{query \?/);
+  });
+
+  it("clears a pending search when Clear is clicked", async () => {
+    const { readFileSync } = await import("node:fs");
+    const form = readFileSync("components/area-club-search-form.tsx", "utf8");
+    expect(form).toMatch(/>Clear<\/Link>/);
+    expect(form).toMatch(/onClick=\{\(\) => \{ if \(timer\.current\) clearTimeout\(timer\.current\); \}\}>Clear<\/Link>/);
+  });
+});
