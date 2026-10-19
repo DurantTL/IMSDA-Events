@@ -1063,7 +1063,11 @@ async function prepareAmendment(
   const roleField = definition.sections.flatMap((section) => section.fields).find((field) => (
     field.key === ROLE_FIELD_KEY && field.optionSource !== "ATTENDEE_TYPES" && field.options.includes(MEMBER_ROLE_ANSWER)
   ));
-  if (roleField && input.attendees.some((attendee) => !attendee.attendeeId)) {
+  // Only on an event with team rules (PBE): another club form that drops its roster role (Honors Weekend) keeps asking.
+  const teamEvent = roleField && input.attendees.some((attendee) => !attendee.attendeeId)
+    ? await tx.eventTeamSettings.findUnique({ where: { eventId: registration.eventId }, select: { eventId: true } })
+    : null;
+  if (teamEvent) {
     const currentVersion = await tx.registrationFormVersion.findFirst({
       where: { formId: registration.publicFormSubmission.formVersion.form.id, status: "PUBLISHED" },
       select: { definition: true },
