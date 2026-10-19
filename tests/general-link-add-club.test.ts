@@ -56,8 +56,8 @@ describe("the PBE form offers a club that is not listed (#1031)", () => {
 // Near-duplicate suggestions
 // ---------------------------------------------------------------------------------------------
 
-const club = (id: string, name: string, sponsorId: string | null, city: string | null = null, state: string | null = "XX"): SimilarClubCandidate => ({
-  id, name, sponsorId, sponsorName: sponsorId ? `Church ${sponsorId}` : null, city, state,
+const club = (id: string, name: string, sponsorId: string | null, city: string | null = null, state: string | null = "XX", isActive = true): SimilarClubCandidate => ({
+  id, name, isActive, sponsorId, sponsorName: sponsorId ? `Church ${sponsorId}` : null, city, state,
 });
 
 describe("close-name matches from the directory", () => {
@@ -93,13 +93,45 @@ describe("close-name matches from the directory", () => {
     expect(similarClubMatches("Albia Pathfinders", { sponsorId: null, city: null, state: null }, many)).toHaveLength(8);
   });
 
-  it("never allows the same club twice at one church, and wants a word that similar ones were checked", () => {
-    const same = similarClubMatches("Albia Pathfinders", { sponsorId: "ch1", city: null, state: null }, directory);
-    expect(addClubBlock(same, true)?.code).toBe("CLUB_EXISTS");
+  it("never allows the same name twice, at any church, even when staff have checked the similar ones", () => {
+    const sameChurch = similarClubMatches("Albia Pathfinders", { sponsorId: "ch1", city: null, state: null }, directory);
+    expect(addClubBlock(sameChurch, true)?.code).toBe("CLUB_EXISTS");
+    const otherChurch = similarClubMatches("Albia Pathfinders", { sponsorId: "ch9", city: null, state: null }, directory);
+    expect(otherChurch[0]).toMatchObject({ id: "c1", kind: "SAME_NAME", sameSponsor: false });
+    const block = addClubBlock(otherChurch, true);
+    expect(block?.code).toBe("CLUB_EXISTS");
+    expect(block?.message).toMatch(/name that tells the two apart/);
+    // An inactive club of that name is not in the club menu, so it is a warning, not a wall.
+    const inactive = [club("x1", "Albia Pathfinders", "ch1", "Albia", "XX", false)];
+    expect(addClubBlock(similarClubMatches("Albia Pathfinders", { sponsorId: "ch9", city: null, state: null }, inactive), true)).toBeNull();
+    expect(addClubBlock(similarClubMatches("Albia Pathfinders", { sponsorId: "ch9", city: null, state: null }, inactive), false)?.code).toBe("SIMILAR_CLUBS");
+  });
+
+  it("wants a word that similar ones were checked", () => {
     const similar = similarClubMatches("Albia Pathfinder Club", { sponsorId: "ch9", city: null, state: null }, directory);
     expect(addClubBlock(similar, false)?.code).toBe("SIMILAR_CLUBS");
     expect(addClubBlock(similar, true)).toBeNull();
     expect(addClubBlock([], false)).toBeNull();
+  });
+
+  it("always lists the chosen church's clubs, whatever the name, active or not", () => {
+    const churchClubs = [club("k1", "Eagle Ridge", "ch7", "Zion"), club("k2", "Old Guard", "ch7", "Zion", "XX", false), club("k3", "Elsewhere Club", "ch8")];
+    const matches = similarClubMatches("Brand New Voyagers", { sponsorId: "ch7", city: "Zion", state: "XX" }, churchClubs);
+    expect(matches.map((match) => match.id)).toEqual(["k1", "k2"]);
+    expect(matches[1]).toMatchObject({ isActive: false, kind: "SIMILAR_NAME", sameSponsor: true });
+    // A name of nothing but filler words matches no one by name, but still meets the church's own clubs.
+    expect(clubNameKey("Pathfinder Club")).toBe("");
+    expect(similarClubMatches("Pathfinder Club", { sponsorId: "ch7", city: null, state: null }, churchClubs).map((match) => match.id)).toEqual(["k1", "k2"]);
+    expect(similarClubMatches("Pathfinder Club", { sponsorId: null, city: null, state: null }, churchClubs)).toEqual([]);
+    expect(addClubBlock(matches, false)?.code).toBe("SIMILAR_CLUBS");
+  });
+
+  it("writes Mt/Mount, St/Saint and 1st/First one way", () => {
+    expect(clubNameKey("Mt. Pleasant Pathfinders")).toBe(clubNameKey("Mount Pleasant SDA Club"));
+    expect(clubNameKey("St Paul Club")).toBe(clubNameKey("Saint Paul"));
+    expect(clubNameKey("1st Church Eagles")).toBe(clubNameKey("First Eagles"));
+    const [match] = similarClubMatches("Mt Pleasant", { sponsorId: "ch9", city: null, state: null }, [club("m1", "Mount Pleasant Pathfinders", "ch1")]);
+    expect(match).toMatchObject({ id: "m1", kind: "SIMILAR_NAME" });
   });
 });
 
@@ -198,20 +230,22 @@ describe("POST .../teams/[submissionId]/similar-clubs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.rejectCrossOriginRequest.mockReturnValue(null);
-    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1" } });
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.similarClubsFor.mockResolvedValue([{ id: "c1", name: "Synthetic Club" }]);
   });
 
-  it("needs MANAGE_REGISTRATION and answers the matches", async () => {
-    mocks.requirePermission.mockResolvedValue({ user: { id: "staff-1" } });
+  it("answers the matches to a system administrator who may confirm teams", async () => {
+    mocks.requirePermission.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });
     const response = await postSimilar(json({ clubName: "Synthetic Clubb", sponsoringChurchId: "church-1" }), context);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ matches: [{ id: "c1", name: "Synthetic Club" }] });
     expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_REGISTRATION", mocks.findActiveMembership);
-    expect(mocks.similarClubsFor).toHaveBeenCalledWith({ clubName: "Synthetic Clubb", sponsoringChurchId: "church-1" });
+    expect(mocks.similarClubsFor).toHaveBeenCalledWith("event-1", "sub-1", { clubName: "Synthetic Clubb", sponsoringChurchId: "church-1" });
   });
 
-  it("is denied without the permission", async () => {
+  it("is denied to registration staff who are not system administrators, and without the permission", async () => {
+    mocks.requirePermission.mockResolvedValue({ user: { id: "staff-1", globalRole: null } });
+    expect((await postSimilar(json({ clubName: "Synthetic Club" }), context)).status).toBe(403);
     mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("You do not have access to this event."));
     expect((await postSimilar(json({ clubName: "Synthetic Club" }), context)).status).toBe(403);
     expect(mocks.similarClubsFor).not.toHaveBeenCalled();

@@ -276,20 +276,22 @@ export async function createOrganization(
   return listOrganizations();
 }
 
-/** Active clubs with their sponsoring church and its town: what the duplicate check compares a typed name against. */
+/** Every club (inactive ones marked) with its sponsoring church and its town: what the duplicate check compares a typed name against. */
 export async function listSimilarClubCandidates(client: Pick<Prisma.TransactionClient, "organization"> = getPrisma()): Promise<SimilarClubCandidate[]> {
   const clubs = await client.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: { type: "CLUB" },
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: {
       id: true,
       name: true,
+      isActive: true,
       parentOrganization: { select: { id: true, name: true, churchLocation: { select: { city: true, state: true } } } },
     },
   });
   return clubs.map((club) => ({
     id: club.id,
     name: club.name,
+    isActive: club.isActive,
     sponsorId: club.parentOrganization?.id ?? null,
     sponsorName: club.parentOrganization?.name ?? null,
     city: club.parentOrganization?.churchLocation?.city || null,

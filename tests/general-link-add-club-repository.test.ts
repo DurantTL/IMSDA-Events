@@ -26,7 +26,7 @@ function freshState(): State {
       ["church-2", { id: "church-2", type: "CHURCH", name: "Synthetic Church Two", isActive: true, parentOrganizationId: null }],
       ["church-off", { id: "church-off", type: "CHURCH", name: "Closed Church", isActive: false, parentOrganizationId: null }],
       ["club-near", { id: "club-near", type: "CLUB", name: "Riverbend Pathfinders", isActive: true, parentOrganizationId: "church-2" }],
-      ["club-same", { id: "club-same", type: "CLUB", name: "Eagle Ridge Pathfinders", isActive: true, parentOrganizationId: "church-1" }],
+      ["club-same", { id: "club-same", type: "CLUB", name: "Eagle Ridge Pathfinders", isActive: true, parentOrganizationId: "church-2" }],
     ]),
     audits: [],
     registrations: new Map(),
@@ -48,8 +48,8 @@ function makeTx() {
         const org = state.orgs.get(where.id);
         return org && org.isActive && ["CHURCH", "COMPANY", "GROUP"].includes(org.type) ? { id: org.id, churchLocation: { city: "Synthville", state: "XX" } } : null;
       },
-      findMany: async () => [...state.orgs.values()].filter((org) => org.type === "CLUB" && org.isActive).map((org) => ({
-        id: org.id, name: org.name, parentOrganization: org.parentOrganizationId ? { id: org.parentOrganizationId, name: state.orgs.get(org.parentOrganizationId)!.name, churchLocation: null } : null,
+      findMany: async () => [...state.orgs.values()].filter((org) => org.type === "CLUB").map((org) => ({
+        id: org.id, name: org.name, isActive: org.isActive, parentOrganization: org.parentOrganizationId ? { id: org.parentOrganizationId, name: state.orgs.get(org.parentOrganizationId)!.name, churchLocation: null } : null,
       })),
       create: async ({ data }: { data: Org }) => {
         state.orgs.set(data.id, { ...data });
@@ -71,7 +71,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     generalLinkSubmission: {
-      findFirst: async () => ({
+      findFirst: async ({ where }: { where: { id: string; status?: string } }) => (where.id !== "sub-1" || (where.status && where.status !== mocks.state.submission.status) ? null : {
         id: "sub-1", status: mocks.state.submission.status, organizationId: mocks.state.submission.organizationId, registrationId: mocks.state.submission.registrationId,
         suggestedOrganizationId: null, idempotencyKey: "key-1", teamName: "Bible Bees", teamKey: "bible bees", locationId: null, createdAt: new Date("2026-10-19T12:00:00Z"),
         directorEmail: "director@example.test", directorName: "Synthetic Director", confirmationCode: "PBE-TEST",
@@ -79,7 +79,10 @@ vi.mock("@/lib/prisma", () => ({
         organization: mocks.state.submission.organizationId ? { name: mocks.state.orgs.get(mocks.state.submission.organizationId)?.name ?? "" } : null,
         event: { slug: "pbe-2027", name: "Synthetic PBE" },
       }),
-      findUnique: async () => ({ status: mocks.state.submission.status, organizationId: mocks.state.submission.organizationId, registrationId: mocks.state.submission.registrationId }),
+      findUnique: async () => ({
+        status: mocks.state.submission.status, organizationId: mocks.state.submission.organizationId, registrationId: mocks.state.submission.registrationId,
+        organization: mocks.state.submission.organizationId ? { name: mocks.state.orgs.get(mocks.state.submission.organizationId)?.name ?? "" } : null,
+      }),
     },
     organization: makeTx().organization,
   }),
@@ -163,10 +166,16 @@ describe("add a club and confirm the team in one step", () => {
     expect(mocks.state.submission.organizationId).toBe(id);
   });
 
-  it("refuses to add the same club twice at one church, even when staff have checked the similar ones", async () => {
+  it("refuses a name that is already a club, at the same church or another, even when staff have checked the similar ones", async () => {
     await expect(run({ ...add, clubName: "Eagle Ridge Pathfinders", acknowledgeSimilar: true })).rejects.toMatchObject({ code: "CLUB_EXISTS" });
+    await expect(run({ ...add, clubName: "  eagle ridge   PATHFINDERS", sponsoringChurchId: "church-2", acknowledgeSimilar: true })).rejects.toMatchObject({ code: "CLUB_EXISTS" });
     expect(clubs()).toHaveLength(2);
     expect(mocks.state.submission.status).toBe("PENDING");
+  });
+
+  it("wants the church's other clubs checked first, even when the name is nothing like them", async () => {
+    await expect(run({ ...add, clubName: "Brand New Voyagers", sponsoringChurchId: "church-2" })).rejects.toMatchObject({ code: "SIMILAR_CLUBS" });
+    expect(clubs()).toHaveLength(2);
   });
 
   it("wants similar names checked first, then goes ahead once staff say none is the club", async () => {
@@ -192,15 +201,31 @@ describe("add a club and confirm the team in one step", () => {
 });
 
 describe("the close-name suggestions staff see before adding", () => {
-  it("lists directory clubs close to the typed name, the same church first", async () => {
-    const matches = await similarClubsFor({ clubName: "Eagle Ridge Pathfinder", sponsoringChurchId: "church-1" });
-    expect(matches.map((match) => match.id)).toEqual(["club-same"]);
-    expect(matches[0]).toMatchObject({ sameSponsor: true });
+  const similar = (clubName: string, sponsoringChurchId: string | null, submissionId = "sub-1") => similarClubsFor("event-1", submissionId, { clubName, sponsoringChurchId });
+
+  it("lists directory clubs close to the typed name, and every club of the chosen church", async () => {
+    const matches = await similar("Eagle Ridge Pathfinder", "church-2");
+    expect(matches.map((match) => match.id).sort()).toEqual(["club-near", "club-same"]);
+    expect(matches.every((match) => match.sameSponsor)).toBe(true);
+    // A church with no clubs of its own lists none; the name alone still finds the close one elsewhere.
+    expect((await similar("Eagle Ridge Pathfinder", "church-1")).map((match) => match.id)).toEqual(["club-same"]);
   });
 
-  it("finds a close name at another church, and nothing for a short or unrelated name", async () => {
-    expect((await similarClubsFor({ clubName: "Riverbend Pathfinder Club", sponsoringChurchId: null })).map((match) => match.id)).toEqual(["club-near"]);
-    expect(await similarClubsFor({ clubName: "x", sponsoringChurchId: null })).toEqual([]);
-    expect(await similarClubsFor({ clubName: "Entirely Different Voyagers", sponsoringChurchId: "church-1" })).toEqual([]);
+  it("marks inactive clubs and finds a close name with no church chosen", async () => {
+    mocks.state.orgs.set("club-off", { id: "club-off", type: "CLUB", name: "Retired Voyagers", isActive: false, parentOrganizationId: "church-1" });
+    const matches = await similar("Anything", "church-1");
+    expect(matches).toEqual([expect.objectContaining({ id: "club-off", isActive: false })]);
+    expect((await similar("Riverbend Pathfinder Club", null)).map((match) => match.id)).toEqual(["club-near"]);
+  });
+
+  it("finds nothing for a short or unrelated name", async () => {
+    expect(await similar("x", null)).toEqual([]);
+    expect(await similar("Entirely Different Voyagers", "church-1")).toEqual([]);
+  });
+
+  it("is only for a team still waiting in this event", async () => {
+    await expect(similar("Anything", null, "other-submission")).rejects.toMatchObject({ code: "SUBMISSION_NOT_FOUND" });
+    await run();
+    await expect(similar("Anything", null)).rejects.toMatchObject({ code: "SUBMISSION_NOT_FOUND" });
   });
 });

@@ -1046,14 +1046,17 @@ export function cleanNewClubName(value: string) {
 }
 
 /**
- * The directory clubs a typed name could be, for staff to check before adding a new one (MANAGE_REGISTRATION, checked by the
- * route). Names and towns of directory clubs only; nothing from the waiting team.
+ * The directory clubs a typed name could be, for staff to check before adding a new one (the route checks the permission).
+ * Only for a team that is still waiting in this event: anything else is SUBMISSION_NOT_FOUND. Names and towns of directory clubs
+ * only; nothing from the waiting team.
  */
-export async function similarClubsFor(input: { clubName: string; sponsoringChurchId: string | null }) {
-  const name = input.clubName.normalize("NFKC").replace(/\s+/g, " ").trim();
-  if (name.length < 2) return [];
+export async function similarClubsFor(eventId: string, submissionId: string, input: { clubName: string; sponsoringChurchId: string | null }) {
   const prisma = getPrisma();
+  const waiting = await prisma.generalLinkSubmission.findFirst({ where: { id: submissionId, eventId, status: "PENDING" }, select: { id: true } });
+  if (!waiting) throw new GeneralLinkError("SUBMISSION_NOT_FOUND", "That team could not be found.");
+  const name = input.clubName.normalize("NFKC").replace(/\s+/g, " ").trim();
   const place = input.sponsoringChurchId ? await sponsorPlace(prisma, input.sponsoringChurchId) : null;
+  if (name.length < 2 && !place) return [];
   return similarClubMatches(name, place ?? { sponsorId: null, city: null, state: null }, await listSimilarClubCandidates(prisma));
 }
 
@@ -1286,19 +1289,19 @@ export async function resolvePendingTeam(
     }
     // A second staff member, or a retry, reached the same transaction. Whatever stopped this attempt (the winner's own rows
     // can trip the one-team rule on a retry), the row says what happened: if it is no longer waiting, someone else decided it.
-    const now = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true } });
+    const now = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true, organization: { select: { name: true } } } });
     if (now && now.status !== "PENDING") {
-      if (now.status === "CONFIRMED" && now.organizationId === club.id) return { status: "CONFIRMED", alreadyDone: true, registrationId: now.registrationId, clubName: club.name };
+      if (now.status === "CONFIRMED" && now.organizationId === club.id) return { status: "CONFIRMED", alreadyDone: true, registrationId: now.registrationId, clubName: now.organization?.name ?? club.name };
       throw new GeneralLinkError("ALREADY_RESOLVED", "That team was already handled by someone else.");
     }
     throw error;
   }
   // A replay (a lost response on the first click, or the same click twice) commits nothing new: the row says what happened.
-  const done = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true } });
+  const done = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true, organization: { select: { name: true } } } });
   if (done?.status !== "CONFIRMED" || done.organizationId !== club.id) {
     throw new GeneralLinkError("ALREADY_RESOLVED", "That team was already handled by someone else.");
   }
-  return { status: "CONFIRMED", alreadyDone: !attachedHere, registrationId: done.registrationId, clubName: club.name };
+  return { status: "CONFIRMED", alreadyDone: !attachedHere, registrationId: done.registrationId, clubName: done.organization?.name ?? club.name };
 }
 
 // ---------------------------------------------------------------------------------------------
