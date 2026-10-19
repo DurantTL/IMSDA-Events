@@ -332,6 +332,25 @@ const pages: PageSpec[] = [
   staff("year-end-reports", "/admin/clubs/reports/year-end", "system-admin"),
   staff("church-import", "/admin/organizations/import", "system-admin"),
   staff("club-import", "/admin/clubs/import", "system-admin"),
+  // The club-list JSON preview (#1038): new and unmatched rows, a check note, every card opened.
+  {
+    ...staff("club-import-list-preview", "/admin/clubs/import", "system-admin"),
+    prepare: async (page) => {
+      const clubs = Array.from({ length: 4 }, (_, index) => ({
+        name: `Invented Hollow ${index + 1} Pathfinders with a long club name to wrap on a phone`,
+        type: "CLUB",
+        isActive: index !== 3,
+        sponsoringChurch: null,
+        churchSearchHint: index % 2 ? "Nowhere Town" : "Church",
+        state: index === 2 ? "IA" : null,
+        namesOnSheet: { "2025-2026": `Invented Hollow ${index + 1} Club` },
+        checkNote: "Check the spelling of this invented club name against the sheet.",
+      }));
+      await page.locator('input[type="file"]').setInputFiles({ name: "club-list.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ clubs })) });
+      await page.getByText(/clubs? found/).waitFor();
+      await page.evaluate(() => document.querySelectorAll("details.club-import-club").forEach((element) => { (element as HTMLDetailsElement).open = true; }));
+    },
+  },
   staff("club-directors", `/admin/organizations/${clubA}/directors`, "system-admin"),
   // The block editor with one of each kind, as a system administrator (custom HTML is editable).
   staff("event-content-blocks", `/more/event-content?event=${blocksEventId}`, "system-admin"),
