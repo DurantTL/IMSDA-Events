@@ -1021,7 +1021,8 @@ describe("team rules on submit (#809)", () => {
 
   it("records each person's role on the attendee, so coaches can be listed later", async () => {
     const tx = fixture();
-    rules(tx, { minTeamMembers: 1, maxMemberAge: null });
+    // With no role question on the form (#1044) the oldest-age rule still makes the staff member (over 19) a coach.
+    rules(tx, { minTeamMembers: 1 });
     await submit(people("member:m1", "member:m2"), clubTeam("Bible Bees"));
     const roles = tx.registrationAttendee.create.mock.calls.map(([call]) => call.data.profileSnapshot?.teamRole);
     expect(roles).toEqual(["MEMBER", "COACH"]);
