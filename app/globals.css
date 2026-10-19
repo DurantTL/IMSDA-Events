@@ -5661,7 +5661,6 @@ body:has(.auth-page) { padding-bottom: 0; }
   .public-registration-progress li > button > span { width: 1.583em; height: 1.583em; font-size: var(--text-badge); }
   .public-registration-progress li:has(> button) { min-width: 44px; }
   .public-registration-progress li > button { min-width: 44px; gap: 4px; padding: 0 2px; justify-content: center; }
-  .public-registration-progress li.is-current > button { justify-content: flex-start; }
   .public-registration-progress li > small { font-size: var(--text-helper-min); }
   /* #996: a step that is not the current one has room for its number only (its label was an ellipsis in a ~25px box).
      The label stays for screen readers, and "Step N of M" above names the current step. */

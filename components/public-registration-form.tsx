@@ -99,7 +99,12 @@ import {
 import {
   formatPublicRegistrationAnswer,
   clickableSteps,
+  errorMarkedStepIds,
+  furthestReachedIndex,
   getPublicRegistrationStepPlan,
+  issueBelongsToPlanStep,
+  withVisitedStep,
+  withoutServerIssuesForStep,
   type PublicRegistrationStep,
   type PublicRegistrationStepId,
 } from "@/modules/forms/public-registration-steps";
@@ -979,8 +984,9 @@ export function PublicRegistrationForm({
     setIdempotencyKey(null);
     setAccountChoice("without");
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
-    setFurthestStepIndex(0);
-    setErrorStepIds([]);
+    setVisitedStepIds([]);
+    setServerIssues([]);
+    setContinueAttempted(false);
     setDraftNotice(null);
   }
   const currentStepIndex = Math.max(
@@ -989,12 +995,14 @@ export function PublicRegistrationForm({
   );
   const currentStep = registrationSteps[currentStepIndex]!;
   // Furthest step reached (#1042): steps up to it become buttons in the step list.
-  const [furthestStepIndex, setFurthestStepIndex] = useState(0);
-  // Steps with errors from the last Submit or Continue, from the full issue list rather than the scoped one shown.
-  const [errorStepIds, setErrorStepIds] = useState<string[]>([]);
+  // Tracked by step id, so a section appearing or going away cannot shift which steps are reachable.
+  const [visitedStepIds, setVisitedStepIds] = useState<string[]>([]);
+  // Issues the server returned and the person has not got past yet; client issues are recomputed live.
+  const [serverIssues, setServerIssues] = useState<FormIssue[]>([]);
+  const currentStepKey = currentStep.id;
   useEffect(() => {
-    setFurthestStepIndex((furthest) => Math.max(furthest, currentStepIndex));
-  }, [currentStepIndex]);
+    setVisitedStepIds((visited) => withVisitedStep(visited, currentStepKey));
+  }, [currentStepKey]);
   const attendeeSections = useMemo(
     () => definition.sections.map((section) => ({
       ...section,
@@ -1052,9 +1060,6 @@ export function PublicRegistrationForm({
       setCurrentStepId(targetStep.id);
     }
     const shownIssues = scopedIssues.length > 0 ? scopedIssues : nextIssues;
-    setErrorStepIds(registrationSteps
-      .filter((step) => nextIssues.some((issue) => issueBelongsToStep(issue, step)))
-      .map((step) => step.id));
     setContinueAttempted(true);
     setIssues(shownIssues);
     expandAttendeeCardsFor(shownIssues);
@@ -1315,11 +1320,7 @@ export function PublicRegistrationForm({
   }
 
   function issueBelongsToStep(issue: FormIssue, step: PublicRegistrationStep) {
-    if (issue.key === "attendees" || issue.path === "attendees") {
-      return step.managesAttendees;
-    }
-    if (issue.key === "lodging") return step.isLodging === true;
-    return step.fieldKeys.includes(issue.key);
+    return issueBelongsToPlanStep(issue, step);
   }
 
   function continueRegistration() {
@@ -1334,6 +1335,7 @@ export function PublicRegistrationForm({
       );
       return;
     }
+    setServerIssues((current) => withoutServerIssuesForStep(current, currentStep));
     const nextStep = registrationSteps[currentStepIndex + 1];
     if (nextStep) goToStep(nextStep);
   }
@@ -3107,6 +3109,7 @@ export function PublicRegistrationForm({
       return;
     }
     const clientIssues = allClientIssues();
+    setServerIssues([]);
     if (clientIssues.length > 0) {
       showIssues(
         clientIssues,
@@ -3123,7 +3126,10 @@ export function PublicRegistrationForm({
       try {
         const outcome = await club.submitEdit(attendees);
         if (outcome.ok) club.onSubmitted?.();
-        else showIssues(outcome.issues, outcome.message, stepForIssue(outcome.issues[0]) ?? currentStep);
+        else {
+          setServerIssues(outcome.issues);
+          showIssues(outcome.issues, outcome.message, stepForIssue(outcome.issues[0]) ?? currentStep);
+        }
       } catch {
         setError("We could not reach the registration service. Your answers are still here; please try again.");
         window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
@@ -3187,6 +3193,7 @@ export function PublicRegistrationForm({
           setPromoCodeQuote(null);
           setPromoCodeNotice(promoIssue.message);
         }
+        setServerIssues(nextIssues);
         showIssues(
           nextIssues,
           result.message ?? "We could not complete the registration. Review the form and try again.",
@@ -3231,9 +3238,19 @@ export function PublicRegistrationForm({
     setIdempotencyKey(null);
     setAccountChoice("without");
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
+    setVisitedStepIds([]);
+    setServerIssues([]);
+    setContinueAttempted(false);
     window.imsdaEmbedScrollTop?.();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  const errorStepIds = errorMarkedStepIds(registrationSteps, {
+    attempted: continueAttempted,
+    clientIssues: continueAttempted ? allClientIssues() : [],
+    serverIssues,
+    furthestIndex: furthestReachedIndex(registrationSteps, visitedStepIds, currentStepIndex),
+  });
 
   if (confirmation && club) {
     return (
@@ -3451,12 +3468,13 @@ export function PublicRegistrationForm({
               />
             </div>
             <ol>
-              {clickableSteps(registrationSteps, furthestStepIndex, currentStepIndex, errorStepIds).map((item) => {
+              {clickableSteps(registrationSteps, visitedStepIds, currentStepIndex, errorStepIds).map((item) => {
                 const inner = (
                   <>
                     <span>{item.index + 1}</span>
                     <small>{item.step.shortLabel}</small>
                     {item.hasErrors && <i className="public-registration-step-warning" aria-hidden="true">!</i>}
+                    {item.hasErrors && !item.clickable && <span className="sr-only">, has errors</span>}
                   </>
                 );
                 return (
