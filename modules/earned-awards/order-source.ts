@@ -205,20 +205,26 @@ export async function recordAwardNeeds(
 export async function removeAwardNeeds(organizationId: string, needIds: readonly string[], actor: ClubOrderActor) {
   return getPrisma().$transaction(async (tx) => {
     await lockClubOrders(tx, organizationId);
-    const removed = await tx.clubOrderNeed.deleteMany({
-      where: { id: { in: [...needIds] }, organizationId, sourceType: "AWARD", status: "NEEDED" },
-    });
-    if (removed.count === 0) return { removed: 0 };
+    const removed = await deletePendingAwardNeeds(tx, organizationId, needIds);
+    if (removed === 0) return { removed: 0 };
     const who = auditActorFields(actor);
     await writeAuditLog({
       ...who.actorFields,
       action: "CLUB_AWARD_NEEDS_REMOVED",
       entityType: "ClubOrderNeed",
-      summary: `Removed ${removed.count} not-yet-ordered earned item${removed.count === 1 ? "" : "s"}.`,
-      metadata: { organizationId, needCount: removed.count, ...who.metadata },
+      summary: `Removed ${removed} not-yet-ordered earned item${removed === 1 ? "" : "s"}.`,
+      metadata: { organizationId, needCount: removed, ...who.metadata },
     }, tx);
-    return { removed: removed.count };
+    return { removed };
   });
+}
+
+/** The guarded delete behind `removeAwardNeeds` (#532), shared with removing a class completion (#1011). Caller holds the club's lock. */
+async function deletePendingAwardNeeds(tx: Db, organizationId: string, needIds: readonly string[]) {
+  const removed = await tx.clubOrderNeed.deleteMany({
+    where: { id: { in: [...needIds] }, organizationId, sourceType: "AWARD", status: "NEEDED" },
+  });
+  return removed.count;
 }
 
 // ---------------------------------------------------------------- class insignia
@@ -257,6 +263,149 @@ export async function recordClassCompletions(
       }, tx);
     }
     return { created: created.count, skipped };
+  });
+}
+
+// ---------------------------------------------------------------- one person's class history (#1011)
+
+/**
+ * The person must be on this club's roster (any year, not removed) and not
+ * have moved to another club, the same rule `loadMemberClassHistory` shows the
+ * page under, so another club's member can never be changed. Always called
+ * inside the club's order lock, on the transaction client, so a roster removal
+ * (which takes the same lock and erases completions) cannot slip in between.
+ */
+async function requireHistoryMember(db: Db, organizationId: string, personId: string, now: Date) {
+  const [rows, moved] = await Promise.all([
+    db.clubRosterMember.count({ where: { organizationId, personId, status: { not: "REMOVED" } } }),
+    personIdsMovedToOtherClubs(organizationId, [personId], now, db),
+  ]);
+  if (rows === 0 || moved.has(personId)) {
+    throw new ClubOrderError("MEMBER_NOT_ON_ROSTER", "That person isn't on this club's roster.");
+  }
+}
+
+function requireNotFuture(completedOn: string, now: Date) {
+  if (completedOn > calendarDate(now)) {
+    throw new ClubOrderError("DATE_IN_FUTURE", "The completed date can't be in the future.");
+  }
+}
+
+/** Class insignia needs of one person and class: the ones keyed `class:<person>:<level>:<item>`. */
+const classNeedWhere = (organizationId: string, personId: string, classLevel: ClubClassLevel) => ({
+  organizationId,
+  sourceType: "AWARD" as const,
+  personId,
+  sourceId: { startsWith: `class:${personId}:${classLevel}:` },
+});
+
+/**
+ * Adds one class to a person's history (#1011). `needsInsignia` ticked leaves
+ * the completion exactly as Class tracking does (the class's insignia set is
+ * suggested and only a confirmation orders it); unticked records it with the
+ * insignia already dismissed. A class already recorded is refused.
+ */
+export async function addMemberClassCompletion(
+  organizationId: string,
+  personId: string,
+  input: { classLevel: ClubClassLevel; completedOn: string; needsInsignia: boolean },
+  actor: ClubOrderActor,
+  now = new Date(),
+) {
+  requireNotFuture(input.completedOn, now);
+  return getPrisma().$transaction(async (tx) => {
+    await lockClubOrders(tx, organizationId);
+    await requireHistoryMember(tx, organizationId, personId, now);
+    const key = { organizationId_personId_classLevel: { organizationId, personId, classLevel: input.classLevel } };
+    if (await tx.memberClassCompletion.findUnique({ where: key, select: { id: true } })) {
+      throw new ClubOrderError("CLASS_ALREADY_COMPLETED", `${classLabel(input.classLevel)} is already recorded for this person.`);
+    }
+    const created = await tx.memberClassCompletion.create({
+      data: { organizationId, personId, classLevel: input.classLevel, completedOn: input.completedOn, insigniaDismissedAt: input.needsInsignia ? null : now },
+      select: { id: true },
+    });
+    const who = auditActorFields(actor);
+    await writeAuditLog({
+      ...who.actorFields,
+      action: "CLUB_CLASS_COMPLETION_ADDED",
+      entityType: "MemberClassCompletion",
+      entityId: created.id,
+      summary: `Added the ${clubClassLevelLabels[input.classLevel]} class to a member's class history.`,
+      metadata: { organizationId, personId, classLevel: input.classLevel, completedOn: input.completedOn, insigniaNeeded: input.needsInsignia, ...who.metadata },
+    }, tx);
+    return { classLevel: input.classLevel, completedOn: input.completedOn, insigniaNeeded: input.needsInsignia };
+  });
+}
+
+/** Changes a recorded class's completed date (#1011). A not-yet-ordered insignia need takes the new date, so it keeps its oldest-first place. */
+export async function changeMemberClassCompletionDate(
+  organizationId: string,
+  personId: string,
+  classLevel: ClubClassLevel,
+  completedOn: string,
+  actor: ClubOrderActor,
+  now = new Date(),
+) {
+  requireNotFuture(completedOn, now);
+  return getPrisma().$transaction(async (tx) => {
+    await lockClubOrders(tx, organizationId);
+    await requireHistoryMember(tx, organizationId, personId, now);
+    const existing = await tx.memberClassCompletion.findUnique({
+      where: { organizationId_personId_classLevel: { organizationId, personId, classLevel } },
+      select: { id: true, completedOn: true },
+    });
+    if (!existing) throw new ClubOrderError("CLASS_NOT_COMPLETED", `${classLabel(classLevel)} isn't recorded for this person.`);
+    if (existing.completedOn === completedOn) return { classLevel, completedOn, changed: false };
+    await tx.memberClassCompletion.update({ where: { id: existing.id }, data: { completedOn } });
+    await tx.clubOrderNeed.updateMany({ where: { ...classNeedWhere(organizationId, personId, classLevel), status: "NEEDED" }, data: { sourceDate: completedOn } });
+    const who = auditActorFields(actor);
+    await writeAuditLog({
+      ...who.actorFields,
+      action: "CLUB_CLASS_COMPLETION_DATE_CHANGED",
+      entityType: "MemberClassCompletion",
+      entityId: existing.id,
+      summary: `Changed the completed date of the ${clubClassLevelLabels[classLevel]} class in a member's class history.`,
+      metadata: { organizationId, personId, classLevel, oldCompletedOn: existing.completedOn, newCompletedOn: completedOn, ...who.metadata },
+    }, tx);
+    return { classLevel, completedOn, changed: true };
+  });
+}
+
+/**
+ * Removes a recorded class from a person's history (#1011). Always allowed. A
+ * class insignia need still NEEDED goes with it (the same guarded delete as
+ * `removeAwardNeeds`); one already on an order, received or awarded is left
+ * untouched, and the count comes back so the page can say so.
+ */
+export async function removeMemberClassCompletion(
+  organizationId: string,
+  personId: string,
+  classLevel: ClubClassLevel,
+  actor: ClubOrderActor,
+  now = new Date(),
+) {
+  return getPrisma().$transaction(async (tx) => {
+    await lockClubOrders(tx, organizationId);
+    await requireHistoryMember(tx, organizationId, personId, now);
+    const existing = await tx.memberClassCompletion.findUnique({
+      where: { organizationId_personId_classLevel: { organizationId, personId, classLevel } },
+      select: { id: true, completedOn: true },
+    });
+    if (!existing) throw new ClubOrderError("CLASS_NOT_COMPLETED", `${classLabel(classLevel)} isn't recorded for this person.`);
+    const needs = await tx.clubOrderNeed.findMany({ where: classNeedWhere(organizationId, personId, classLevel), select: { id: true, status: true } });
+    const removedNeeds = await deletePendingAwardNeeds(tx, organizationId, needs.filter((need) => need.status === "NEEDED").map((need) => need.id));
+    const keptOrderedNeeds = needs.filter((need) => need.status !== "NEEDED").length;
+    await tx.memberClassCompletion.delete({ where: { id: existing.id } });
+    const who = auditActorFields(actor);
+    await writeAuditLog({
+      ...who.actorFields,
+      action: "CLUB_CLASS_COMPLETION_REMOVED",
+      entityType: "MemberClassCompletion",
+      entityId: existing.id,
+      summary: `Removed the ${clubClassLevelLabels[classLevel]} class from a member's class history.`,
+      metadata: { organizationId, personId, classLevel, completedOn: existing.completedOn, removedPendingNeeds: removedNeeds, keptOrderedNeeds, ...who.metadata },
+    }, tx);
+    return { classLevel, removedPendingNeeds: removedNeeds, keptOrderedNeeds };
   });
 }
 
@@ -931,10 +1080,10 @@ export async function loadEarnedAwardsWorkspace(
  * removed in a different club. A person who is also still a current,
  * non-removed member of this club has not moved away from it. Reads only.
  */
-export async function personIdsMovedToOtherClubs(organizationId: string, personIds: readonly string[], now = new Date()): Promise<Set<string>> {
+export async function personIdsMovedToOtherClubs(organizationId: string, personIds: readonly string[], now = new Date(), db: Db = getPrisma()): Promise<Set<string>> {
   const ids = [...new Set(personIds)];
   if (ids.length === 0) return new Set();
-  const rows = await getPrisma().clubRosterMember.findMany({
+  const rows = await db.clubRosterMember.findMany({
     where: { clubYear: clubYearFor(now), status: { not: "REMOVED" }, personId: { in: ids } },
     select: { organizationId: true, personId: true },
   });
@@ -942,7 +1091,20 @@ export async function personIdsMovedToOtherClubs(organizationId: string, personI
   return new Set(rows.flatMap((row) => (row.personId && row.organizationId !== organizationId && !here.has(row.personId) ? [row.personId] : [])));
 }
 
-export type MemberClassHistory = { personId: string; firstName: string; lastName: string; entries: ClassHistoryEntry[] };
+const levelsOf = (needs: ReadonlyArray<{ sourceId: string }>) => [...new Set(needs.map((need) => need.sourceId.split(":")[2] as ClubClassLevel))];
+
+export type MemberClassHistory = {
+  personId: string;
+  firstName: string;
+  lastName: string;
+  entries: ClassHistoryEntry[];
+  /** Classes whose insignia is already on an order (or received, or awarded): removing the class leaves that order alone (#1011). */
+  insigniaOnOrder: ClubClassLevel[];
+  /** Classes with an insignia item still NEEDED: removing the class removes it too (#1011). */
+  insigniaPending: ClubClassLevel[];
+  /** Active on this club's roster this club year: only then are insignia suggested (#1011). */
+  activeThisClubYear: boolean;
+};
 
 /**
  * One member's class history (#791): recorded completions and the current
@@ -952,7 +1114,7 @@ export type MemberClassHistory = { personId: string; firstName: string; lastName
  */
 export async function loadMemberClassHistory(organizationId: string, personId: string, now = new Date()): Promise<MemberClassHistory | null> {
   const prisma = getPrisma();
-  const [rosterRows, completions, moved] = await Promise.all([
+  const [rosterRows, completions, moved, classNeeds] = await Promise.all([
     prisma.clubRosterMember.findMany({
       where: { organizationId, personId, status: { not: "REMOVED" } },
       orderBy: { clubYear: "desc" },
@@ -960,6 +1122,10 @@ export async function loadMemberClassHistory(organizationId: string, personId: s
     }),
     prisma.memberClassCompletion.findMany({ where: { organizationId, personId }, select: { classLevel: true, completedOn: true } }),
     personIdsMovedToOtherClubs(organizationId, [personId], now),
+    prisma.clubOrderNeed.findMany({
+      where: { organizationId, sourceType: "AWARD", personId, sourceId: { startsWith: `class:${personId}:` } },
+      select: { sourceId: true, status: true },
+    }),
   ]);
   const person = rosterRows[0]?.person;
   if (!person) return null;
@@ -971,5 +1137,8 @@ export async function loadMemberClassHistory(organizationId: string, personId: s
     firstName: person.firstName,
     lastName: person.lastName,
     entries: buildClassHistory(completions, current?.classLevel ?? null),
+    insigniaOnOrder: levelsOf(classNeeds.filter((need) => need.status !== "NEEDED")),
+    insigniaPending: levelsOf(classNeeds.filter((need) => need.status === "NEEDED")),
+    activeThisClubYear: Boolean(current),
   };
 }

@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * One member's class history (#791): class completions and the class they are
- * working on, read-only. It opens on the same gate as the Class tracking page
+ * working on. Someone with the roster role can also add, re-date and remove
+ * completed classes (#1011); the routes enforce that again server-side. It opens on the same gate as the Class tracking page
  * (`getRosterAccessStateForPage`), and only for someone on this club's roster.
  */
 export default async function MemberClassHistoryPage({ params }: { params: Promise<{ organizationId: string; personId: string }> }) {
@@ -22,7 +23,13 @@ export default async function MemberClassHistoryPage({ params }: { params: Promi
   return (
     <>
       <BackLink href={`/account/clubs/${organizationId}/class-tracking`}>Back to class tracking</BackLink>
-      <MemberClassHistory history={history} />
+      <MemberClassHistory
+        canEdit={access.capabilities.roster}
+        history={history}
+        nowIso={new Date().toISOString()}
+        organizationId={organizationId}
+        personId={personId}
+      />
     </>
   );
 }

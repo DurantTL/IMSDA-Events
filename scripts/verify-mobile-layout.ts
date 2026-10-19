@@ -746,6 +746,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.newClubApplication.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.newClubApplicationInvite.deleteMany({ where: { id: { startsWith: `${P}_` } } }),
     prisma.clubOrderNeed.deleteMany({ where: { OR: [orgs, { personId: { startsWith: `${P}_` } }] } }),
+    prisma.memberClassCompletion.deleteMany({ where: { OR: [orgs, { personId: { startsWith: `${P}_` } }] } }),
     prisma.memberHonorEntry.deleteMany({ where: { OR: [orgs, { personId: { startsWith: `${P}_` } }] } }),
     prisma.honor.deleteMany({ where: { code: { startsWith: `${P}-honor-` } } }),
     prisma.registrationAttendee.deleteMany({ where: { registrationId: { startsWith: `${P}_reg_` } } }),
@@ -877,6 +878,14 @@ async function seedSynthetic(prisma: PrismaClient) {
           source: "DIRECTOR",
         },
       });
+      // One recorded class on the first person's history, so the class history page shows its Change date and Remove controls (#1011).
+      if (index === 0) {
+        await prisma.memberClassCompletion.upsert({
+          where: { organizationId_personId_classLevel: { organizationId: clubId, personId: person.id, classLevel: "COMPANION" } },
+          update: {},
+          create: { organizationId: clubId, personId: person.id, classLevel: "COMPANION", completedOn: "2025-06-07", insigniaDismissedAt: new Date("2025-06-08T12:00:00Z") },
+        });
+      }
     }
   }
 
