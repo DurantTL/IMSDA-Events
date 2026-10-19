@@ -12,6 +12,9 @@
  *   two racing submissions make exactly one registration;
  * - approval is a batch: it confirms the registration, queues its confirmation, covers every person's meals under the
  *   conference-paid plan without charging anyone, and skips what is no longer waiting; a decline cancels the registration;
+ * - the event's own attendee questions on the link form (never priced, meal or lodging ones; required ones enforced), per-service
+ *   conference-paid meal counts for approved people only, and re-inviting a declined person (a new link, the old one dead, the
+ *   declined registration untouched) (#1027);
  * - the table's own constraints, and the deletion of an event that has invitations.
  * Uses fictitious rows it creates and removes itself.
  *
@@ -287,6 +290,143 @@ async function main() {
   assert(stale.decided === 0 && stale.skipped === 1, "a registration no longer waiting is skipped");
   assert((await repo.listApprovals(eventId)).counts.WAITING === 0 && (await repo.listApprovals(eventId)).counts.APPROVED === 2, "nothing waits, and two are approved");
 
+  // ---- The event's own questions on the link form, per-service meal counts, and re-inviting (#1027) ------------------------
+  const field = (key: string, extra: Record<string, unknown> = {}) => ({ id: `fld-${key}`, key, label: key.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase()), helpText: "", type: "TEXT", scope: "ATTENDEE", required: false, options: [], ...extra });
+  const eventForm = await prisma.registrationForm.create({ data: { eventId, createdByUserId: userId, name: "Synthetic event form", slug: "synthetic-form", status: "PUBLISHED" } });
+  await prisma.registrationFormVersion.create({
+    data: {
+      formId: eventForm.id, createdByUserId: userId, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(),
+      definition: {
+        title: "Synthetic event form", description: "", confirmationMessage: "Thanks, synthetic.",
+        sections: [
+          { id: "people", title: "People", description: "", fields: [
+            field("first_name", { required: true }), field("last_name", { required: true }),
+            field("shirt_size", { type: "SELECT", options: ["Small", "Medium", "Large"], required: true }),
+            field("hobby"),
+            field("workshop_fee", { type: "SELECT", options: ["Yes", "No"], choicePricesCents: { Yes: 500 } }),
+            field("meal_choice", { type: "RADIO", options: ["Regular", "Vegetarian"], required: true }),
+            field("lodging_choice", { type: "RADIO", options: ["Dorm", "Cabin"], required: true }),
+          ] },
+          { id: "extras", title: "Extras", description: "", fields: [field("church_name", { scope: "REGISTRATION", required: true })] },
+        ],
+      },
+    },
+  });
+  const csv2 = `email,group\n${email("ivy")},Pastor\n${email("jon")},Volunteer\n${email("kay")},Volunteer`;
+  const preview2 = await repo.previewInvitationImport(eventId, { csv: csv2, defaultGroup: null });
+  await repo.confirmInvitationImport(eventId, userId, { csv: csv2, defaultGroup: null, digest: preview2.digest });
+  const tokenOf = async (key: string) => invitationToken(await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email(key), supersededAt: null } }));
+  const ivyToken = await tokenOf("ivy");
+  const jonToken = await tokenOf("jon");
+  const kayToken = await tokenOf("kay");
+  const opened2 = await repo.getInvitationExperience(ivyToken);
+  assert(opened2.state === "OPEN" && opened2.questions.map((question) => question.key).join() === "shirt_size,hobby", `the link form asks the event's attendee questions, but not priced, meal, lodging or registration-level ones (${opened2.state === "OPEN" ? opened2.questions.map((question) => question.key).join() : ""})`);
+  const regsBefore = await prisma.registration.count({ where: { eventId } });
+  const ivyParty = { firstName: "Ivy", lastName: surname, spouse: { firstName: "Ian", lastName: surname } };
+  await expectCode(repo.submitInvitationRegistration(ivyToken, { ...ivyParty, answers: [{ hobby: "Birdwatching" }, { shirt_size: "Large" }] }), "INVALID_ANSWERS", "a required event question left blank for the invited person");
+  await expectCode(repo.submitInvitationRegistration(ivyToken, { ...ivyParty, answers: [{ shirt_size: "Large" }] }), "INVALID_ANSWERS", "a required event question left blank for the spouse");
+  await expectCode(repo.submitInvitationRegistration(ivyToken, { ...ivyParty, answers: [{ shirt_size: "Huge" }, { shirt_size: "Large" }] }), "INVALID_ANSWERS", "an answer that is not a configured choice");
+  await expectCode(repo.submitInvitationRegistration(ivyToken, { ...ivyParty }), "INVALID_ANSWERS", "no answers at all when a question is required");
+  assert((await prisma.registration.count({ where: { eventId } })) === regsBefore && (await repo.getInvitationExperience(ivyToken)).state === "OPEN", "refused answers create no registration and leave the link usable");
+  await repo.submitInvitationRegistration(ivyToken, {
+    ...ivyParty,
+    answers: [
+      { shirt_size: "Large", hobby: "Birdwatching", lodging_choice: "Cabin", meal_choice: "Vegetarian", workshop_fee: "Yes", meal_coverage: "Not covered", church_name: "Synthetic church" },
+      { shirt_size: "Small" },
+    ],
+  });
+  const ivyReg = await prisma.registration.findFirstOrThrow({ where: { eventId, accountHolderPerson: { normalizedEmail: email("ivy") } }, include: { attendees: { orderBy: { position: "asc" } } } });
+  assert(ivyReg.attendees.length === 2 && ivyReg.attendees.every((attendee) => (attendee.formResponses as Record<string, unknown>).meal_coverage === "Covered (staff)"), "everyone stays 'Covered (staff)', whatever the request said");
+  const sameEntries = (left: unknown, right: unknown) => JSON.stringify(Object.entries(left as object).sort()) === JSON.stringify(Object.entries(right as object).sort());
+  assert(sameEntries(ivyReg.attendees[0].formResponses, { shirt_size: "Large", hobby: "Birdwatching", meal_coverage: "Covered (staff)" })
+    && sameEntries(ivyReg.attendees[1].formResponses, { shirt_size: "Small", meal_coverage: "Covered (staff)" }), `each person's own answers are saved, and a priced, meal, lodging or registration-level answer is dropped (${JSON.stringify(ivyReg.attendees.map((attendee) => attendee.formResponses))})`);
+  assert(Number(ivyReg.totalAmount) === 0 && ivyReg.status === "DRAFT", "still $0 and waiting");
+  await repo.submitInvitationRegistration(jonToken, { firstName: "Jon", lastName: surname, answers: [{ shirt_size: "Medium" }] });
+  await repo.submitInvitationRegistration(kayToken, { firstName: "Kay", lastName: surname, answers: [{ shirt_size: "Medium" }] });
+  const queue2 = await repo.listApprovals(eventId);
+  const queueId = (key: string) => queue2.rows.find((entry) => entry.email === email(key))!.id;
+
+  // Meal counts by service: waiting and declined people are never counted.
+  const { loadStaffMealServiceCounts } = await import("../modules/meals/staff-coverage");
+  const { loadKitchenReport } = await import("../modules/registrations/kitchen-report-loader");
+  const { kitchenReportCsv } = await import("../modules/registrations/kitchen-report");
+  const { mealTicketSummaryCsv } = await import("../modules/meals/view-repository");
+  const beforeApproval = await loadStaffMealServiceCounts(eventId);
+  assert(beforeApproval.length > 0 && beforeApproval.every((entry) => entry.counts.STAFF === 6 && entry.counts.PASTOR === 0 && entry.counts.VOLUNTEER === 0), `only Ada's four and Dee's two are counted while three others wait or were declined (${JSON.stringify(beforeApproval[0]?.counts)})`);
+  await repo.approveRegistrations(eventId, userId, [queueId("ivy")]);
+  await repo.declineRegistrations(eventId, userId, [queueId("jon")]);
+  const afterApproval = await loadStaffMealServiceCounts(eventId);
+  assert(afterApproval.length === beforeApproval.length && afterApproval.every((entry) => entry.counts.STAFF === 6 && entry.counts.PASTOR === 2 && entry.counts.VOLUNTEER === 0 && entry.total === 8), `an approved pastor's party of two is counted at every service, a declined volunteer and a waiting one are not (${JSON.stringify(afterApproval[0]?.counts)})`);
+  const adaServices = new Set((await prisma.eventMealSelection.findMany({ where: { registrationId: registration.id, status: "ACTIVE" }, select: { serviceId: true } })).map((row) => row.serviceId));
+  assert(afterApproval.every((entry) => adaServices.has(entry.serviceId)) && afterApproval.length === adaServices.size, "the counts come from the conference-paid plan's own selections, one row per service it covers");
+  const report = await loadKitchenReport(eventId);
+  assert(report.conferenceMealServices.length === afterApproval.length, "the kitchen report carries the same per-service counts");
+  const reportCsv = kitchenReportCsv(report);
+  assert(reportCsv.includes("Conference-paid meals by service") && reportCsv.includes('"Service date","Service","Meal","Staff","Pastor","Volunteer","Total"') && !reportCsv.includes(surname) && !reportCsv.includes("REG-"), "the kitchen report CSV has the table and no names or codes");
+  const summaryCsv = await mealTicketSummaryCsv(eventId);
+  assert(summaryCsv.includes("Conference-paid meals by service") && summaryCsv.includes(`"${afterApproval[0].serviceDate}","${afterApproval[0].serviceName}","${afterApproval[0].mealLabel}","6","2","0","8"`), "the meal ticket summary has the same table");
+  await prisma.registration.update({ where: { id: ivyReg.id }, data: { status: "CANCELLED", cancelledAt: new Date() } });
+  assert((await loadStaffMealServiceCounts(eventId)).every((entry) => entry.counts.PASTOR === 0), "a cancelled registration is no longer counted");
+  await prisma.registration.update({ where: { id: ivyReg.id }, data: { status: "CONFIRMED", cancelledAt: null } });
+
+  // Re-inviting: a declined person, and a waiting registration cancelled by hand.
+  const jonRow = await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email("jon") } });
+  const jonReg = await prisma.registration.findFirstOrThrow({ where: { id: jonRow.registrationId! } });
+  assert(jonRow.approval === "DECLINED" && jonReg.status === "CANCELLED", "Jon was declined");
+  const listed = await repo.listInvitations(eventId);
+  assert(listed.rows.find((entry) => entry.id === jonRow.id)?.reinvitable === true && listed.rows.find((entry) => entry.email === email("kay"))?.reinvitable === false, "only the declined person can be re-invited");
+  await expectCode(repo.reinviteInvitation(eventId, userId, queueId("kay")), "NOT_REINVITABLE", "re-inviting someone still waiting");
+  await expectCode(repo.reinviteInvitation(eventId, userId, queueId("ivy")), "NOT_REINVITABLE", "re-inviting someone approved");
+  await expectCode(repo.reinviteInvitation(clubEventId, userId, jonRow.id), "EVENT_NOT_SUPPORTED", "re-inviting in a club event");
+  await expectCode(repo.reinviteInvitation(eventId, userId, "no-such-invitation"), "INVITATION_NOT_FOUND", "re-inviting an invitation that does not exist");
+  const outboxBefore2 = await prisma.messageOutbox.count({ where: { eventId } });
+  const reinvited = await repo.reinviteInvitation(eventId, userId, jonRow.id);
+  assert((await prisma.messageOutbox.count({ where: { eventId } })) === outboxBefore2, "re-inviting emails nobody");
+  const jonOld = await prisma.staffInvitation.findUniqueOrThrow({ where: { id: jonRow.id } });
+  const jonNew = await prisma.staffInvitation.findUniqueOrThrow({ where: { id: reinvited.invitationId } });
+  assert(jonOld.supersededAt !== null && jonOld.approval === "DECLINED" && jonOld.registrationId === jonReg.id, "the old invitation stays as history, still declined, still tied to its registration");
+  assert((await prisma.registration.findUniqueOrThrow({ where: { id: jonReg.id } })).status === "CANCELLED", "the declined registration is untouched");
+  assert(jonNew.id !== jonOld.id && jonNew.email === email("jon") && jonNew.group === "VOLUNTEER" && jonNew.registrationId === null && jonNew.approval === null && jonNew.sentAt === null && jonNew.supersededAt === null, "the new invitation is a fresh, unsent one for the same person and group");
+  assert((await repo.getInvitationExperience(jonToken)).state === "UNAVAILABLE", "the old link no longer opens");
+  await expectCode(repo.submitInvitationRegistration(jonToken, { firstName: "Jon", lastName: surname, answers: [{ shirt_size: "Medium" }] }), "INVITATION_UNAVAILABLE", "registering through the old link");
+  const jonNewToken = invitationToken(jonNew);
+  assert(jonNewToken !== jonToken && (await repo.getInvitationExperience(jonNewToken)).state === "OPEN", "the new link works");
+  const after = await repo.listInvitations(eventId);
+  assert(after.rows.filter((entry) => entry.email === email("jon")).length === 1 && after.rows.find((entry) => entry.email === email("jon"))?.status === "NOT_SENT", "the list shows Jon once, as not sent");
+  await expectCode(repo.reinviteInvitation(eventId, userId, jonRow.id), "NOT_REINVITABLE", "re-inviting the same declined invitation twice");
+  await expectCode(repo.reissueInvitation(eventId, userId, jonRow.id), "NOT_REISSUABLE", "reissuing a superseded invitation");
+  assert((await repo.previewInvitationImport(eventId, { csv: `email\n${email("jon")}`, defaultGroup: "STAFF" })).counts.ALREADY_INVITED === 1, "an import still sees Jon as already invited");
+  const audit = await prisma.auditLog.findFirstOrThrow({ where: { eventId, action: "STAFF_INVITATION_REINVITED" } });
+  assert(sameEntries(audit.metadata, { invitationId: jonNew.id, previousInvitationId: jonOld.id, previousRegistrationId: jonReg.id }) && !JSON.stringify(audit).includes(email("jon")), "the re-invite is audited with ids only");
+  // The same preview-then-Send step as any other invitation, and only then is anything queued.
+  const jonPreview = await repo.previewInvitationSend(eventId, [jonNew.id]);
+  assert(jonPreview.willSend === 1 && !JSON.stringify(jonPreview).includes(jonNewToken), "the new invitation previews like any other, with a placeholder instead of a link");
+  assert((await repo.previewInvitationSend(eventId, [jonOld.id])).willSend === 0, "the superseded invitation can't be sent");
+  const jonSent = await repo.sendInvitations(eventId, userId, { ids: [jonNew.id], digest: jonPreview.digest });
+  const jonMail = await prisma.messageOutbox.findFirstOrThrow({ where: { eventId, recipientEmail: email("jon"), subjectSnapshot: { contains: "personal registration link" } } });
+  assert(jonSent.queued === 1 && jonMail.bodyTextSnapshot.includes(jonNewToken) && !jonMail.bodyTextSnapshot.includes(jonToken), "Send queues the new link and never the old one");
+  // He registers again through the new link; the old registration stays cancelled and can't be brought back.
+  await repo.submitInvitationRegistration(jonNewToken, { firstName: "Jon", lastName: surname, answers: [{ shirt_size: "Medium" }] });
+  const jonRegs = await prisma.registration.findMany({ where: { eventId, accountHolderPerson: { normalizedEmail: email("jon") } }, orderBy: { createdAt: "asc" } });
+  assert(jonRegs.length === 2 && jonRegs[0].id === jonReg.id && jonRegs[0].status === "CANCELLED" && jonRegs[1].status === "DRAFT", "the old registration stays as history, and the new one waits for approval");
+  const stillBlocked = await caught(reactivateRegistration(eventId, jonReg.id, userId, "Try to bring back"));
+  assert(stillBlocked && (stillBlocked as { code?: string }).code === "INVALID_REGISTRATION_TRANSITION", "the old declined registration still can't be reactivated");
+  assert((await repo.listApprovals(eventId)).counts.WAITING === 2 && (await repo.listApprovals(eventId)).counts.DECLINED >= 3, "the approval list shows the new waiting registration and keeps the declined one");
+  // A waiting registration cancelled from People is re-invitable too (Eve, above).
+  const eveRow = await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email("eve"), supersededAt: null } });
+  const eveNew = await repo.reinviteInvitation(eventId, userId, eveRow.id);
+  assert((await repo.getInvitationExperience(eveToken)).state === "UNAVAILABLE" && (await repo.getInvitationExperience(invitationToken(await prisma.staffInvitation.findUniqueOrThrow({ where: { id: eveNew.invitationId } })))).state === "OPEN", "a person whose waiting registration was cancelled gets a new link, and the old one is dead");
+  // Two racing re-invites make exactly one new invitation.
+  const kayReg = await prisma.registration.findFirstOrThrow({ where: { eventId, accountHolderPerson: { normalizedEmail: email("kay") } } });
+  await cancelRegistration(eventId, kayReg.id, userId, "Cancelled from People");
+  const kayRow = await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email("kay"), supersededAt: null } });
+  const raced = await Promise.allSettled([repo.reinviteInvitation(eventId, userId, kayRow.id), repo.reinviteInvitation(eventId, userId, kayRow.id)]);
+  assert(raced.filter((result) => result.status === "fulfilled").length === 1 && (await prisma.staffInvitation.count({ where: { eventId, email: email("kay"), supersededAt: null } })) === 1, `exactly one of two racing re-invites works (${raced.map((result) => result.status).join()})`);
+  // The table: one live invitation per address, a superseded one only after a decline.
+  assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("jon"), group: "STAFF" } })), "a second live invitation for one address is still refused");
+  assert(await caught(prisma.staffInvitation.update({ where: { id: jonNew.id }, data: { supersededAt: new Date() } })), "an invitation that was never declined can't be marked superseded");
+  console.log("ok  event questions, per-service meal counts and re-invite (#1027)");
+
   // The registrant's own lodging paths are closed for a staff registration, the $0 direct save and the priced change request alike.
   const { saveLodgingRequest, changeRegistrantRoommates } = await import("../modules/lodging/preferences-service");
   const { applyRegistrantWaitlistAction } = await import("../modules/lodging/waitlist-service");
@@ -305,7 +445,7 @@ async function main() {
   // A digest the worker already took is not refreshed: the next registration gets a digest for the next window.
   await prisma.messageOutbox.updateMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" }, data: { status: "SENT", sentAt: new Date() } });
   const digestsBefore = await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } });
-  await repo.submitInvitationRegistration(gusToken2, { firstName: "Gus", lastName: surname, dependants: [{ firstName: "Pip", lastName: surname, age: 3 }] });
+  await repo.submitInvitationRegistration(gusToken2, { firstName: "Gus", lastName: surname, dependants: [{ firstName: "Pip", lastName: surname, age: 3 }], answers: [{ shirt_size: "Small" }, { shirt_size: "Small" }] });
   const laterDigests = await prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL", status: "PENDING" } });
   assert(laterDigests.length === 1 && (await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } })) === digestsBefore + 1 && laterDigests[0].idempotencyKey.includes(":next") && laterDigests[0].availableAt.getTime() > Date.now(), "a registration after a digest went out is named in a digest for the next window");
   // The office digest has its own switch (#1016): off, a registration in a new window sends the office nothing, while the
@@ -322,7 +462,7 @@ async function main() {
     try {
       const officeBefore = await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } });
       const registrantBefore = await prisma.messageOutbox.count({ where: { eventId, recipientEmail: email("hal") } });
-      await repo.submitInvitationRegistration(halToken, { firstName: "Hal", lastName: surname });
+      await repo.submitInvitationRegistration(halToken, { firstName: "Hal", lastName: surname, answers: [{ shirt_size: "Small" }] });
       assert(await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } }) === officeBefore, "switch off: the office gets no digest");
       assert(await prisma.messageOutbox.count({ where: { eventId, recipientEmail: email("hal") } }) === registrantBefore + 1, "switch off: the registrant's own notice is still queued");
     } finally {

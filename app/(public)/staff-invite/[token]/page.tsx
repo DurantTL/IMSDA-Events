@@ -55,5 +55,5 @@ export default async function StaffInvitePage({ params }: PageProps) {
       </StateCard>
     );
   }
-  return <StaffInvitationRegistration event={experience.event} person={experience.person} token={token} />;
+  return <StaffInvitationRegistration event={experience.event} person={experience.person} questions={experience.questions} token={token} />;
 }

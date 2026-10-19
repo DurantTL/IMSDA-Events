@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { StaffInvitationQuestions, type StaffAnswers } from "@/components/staff-invitation-questions";
+import type { StaffQuestion } from "@/modules/staff-invitations/event-questions";
 import { COVERAGE_SENTENCE, FAMILY_MAX_DEPENDANT_AGE, FAMILY_MAX_DEPENDANTS, NAME_MAX } from "@/modules/staff-invitations/domain";
 
 type Child = { key: number; firstName: string; lastName: string; age: string };
@@ -12,6 +14,8 @@ type Props = {
   token: string;
   event: { name: string; slug: string; startsOn: string; endsOn: string; supportContact: string | null };
   person: { firstName: string; lastName: string; email: string; groupLabel: string };
+  /** The event's own attendee questions, asked of everyone in the party. Never priced, meal or lodging ones. */
+  questions: StaffQuestion[];
 };
 
 /**
@@ -19,7 +23,7 @@ type Props = {
  * age 18. It asks nothing about price or meals, because there is no charge and the conference covers every meal. The server
  * decides everything (the link, the family rule, the group); this only guides, and shows each problem it is told about.
  */
-export function StaffInvitationRegistration({ token, event, person }: Props) {
+export function StaffInvitationRegistration({ token, event, person, questions }: Props) {
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName);
   const [phone, setPhone] = useState("");
@@ -31,6 +35,9 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
   const [needsHousing, setNeedsHousing] = useState(false);
   const [housingNote, setHousingNote] = useState("");
   const [website, setWebsite] = useState("");
+  const [primaryAnswers, setPrimaryAnswers] = useState<StaffAnswers>({});
+  const [spouseAnswers, setSpouseAnswers] = useState<StaffAnswers>({});
+  const [childAnswers, setChildAnswers] = useState<Record<number, StaffAnswers>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<{ confirmationCode: string; message: string } | null>(null);
@@ -48,7 +55,10 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
     submitEvent.preventDefault();
     setError("");
     const dependants = [];
+    const answers: StaffAnswers[] = questions.length > 0 ? [primaryAnswers] : [];
+    if (questions.length > 0 && hasSpouse) answers.push(spouseAnswers);
     for (const child of children) {
+      if (questions.length > 0) answers.push(childAnswers[child.key] ?? {});
       const age = Number(child.age);
       if (child.age.trim() === "" || !Number.isInteger(age) || age < 0) {
         setError("Enter each child's age as a whole number.");
@@ -73,6 +83,7 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
           dependants,
           needsHousing,
           housingNote,
+          ...(questions.length > 0 ? { answers } : {}),
           website,
         }),
       });
@@ -117,11 +128,12 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
   return (
     <main className="public-registration-page">
       {header}
-      <form className="public-manage-card form-stack" onSubmit={(formEvent) => void submit(formEvent)}>
+      <form className="public-manage-card form-stack staff-invite-form" onSubmit={(formEvent) => void submit(formEvent)}>
         <p className="public-registration-eyebrow">{event.name} · {person.groupLabel} registration</p>
         <h1>Register for {event.name}</h1>
         <p>{event.startsOn === event.endsOn ? event.startsOn : `${event.startsOn} to ${event.endsOn}`}</p>
         <p>{COVERAGE_SENTENCE} There is nothing to pay, and every meal is covered, so you won&rsquo;t be asked to choose any.</p>
+        {questions.length > 0 && <p className="field-help">We also ask the event&rsquo;s own questions for each person in your registration.</p>}
         <p className="field-help">The event office reviews every registration before it is confirmed. Housing is assigned later by the office.</p>
 
         <fieldset className="form-stack">
@@ -134,6 +146,9 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
             <label>Email<input disabled readOnly type="email" value={person.email} /></label>
             <label>Phone (optional)<input autoComplete="tel" maxLength={40} onChange={(changeEvent) => setPhone(changeEvent.target.value)} type="tel" value={phone} /></label>
           </div>
+          {questions.length > 0 && (
+            <StaffInvitationQuestions answers={primaryAnswers} idPrefix="you" onChange={setPrimaryAnswers} questions={questions} />
+          )}
         </fieldset>
 
         <fieldset className="form-stack">
@@ -147,9 +162,13 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
               <label>Spouse last name<input maxLength={NAME_MAX} onChange={(changeEvent) => setSpouseLast(changeEvent.target.value)} required value={spouseLast} /></label>
             </div>
           )}
+          {hasSpouse && questions.length > 0 && (
+            <StaffInvitationQuestions answers={spouseAnswers} idPrefix="spouse" onChange={setSpouseAnswers} questions={questions} />
+          )}
           <p className="field-help">Children and dependants up to age {FAMILY_MAX_DEPENDANT_AGE} on the first day of the event.</p>
           {children.map((child, index) => (
-            <div className="staff-invite-child" key={child.key}>
+            <div className="form-stack" key={child.key}>
+            <div className="staff-invite-child">
               <label>Child {index + 1} first name<input maxLength={NAME_MAX} onChange={(changeEvent) => updateChild(child.key, { firstName: changeEvent.target.value })} required value={child.firstName} /></label>
               <label>Last name<input maxLength={NAME_MAX} onChange={(changeEvent) => updateChild(child.key, { lastName: changeEvent.target.value })} required value={child.lastName} /></label>
               <label>
@@ -159,6 +178,15 @@ export function StaffInvitationRegistration({ token, event, person }: Props) {
               <button className="text-button" onClick={() => setChildren((current) => current.filter((entry) => entry.key !== child.key))} type="button">
                 <Trash2 aria-hidden="true" size={14} /> Remove child {index + 1}
               </button>
+            </div>
+            {questions.length > 0 && (
+              <StaffInvitationQuestions
+                answers={childAnswers[child.key] ?? {}}
+                idPrefix={`child-${child.key}`}
+                onChange={(next) => setChildAnswers((current) => ({ ...current, [child.key]: next }))}
+                questions={questions}
+              />
+            )}
             </div>
           ))}
           {children.length < FAMILY_MAX_DEPENDANTS && (

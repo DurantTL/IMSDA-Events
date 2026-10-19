@@ -10,8 +10,10 @@ import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { calendarDateInEventTimeZone, hasEventEnded } from "@/modules/events/lifecycle";
+import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { entitleAttendeeToPlan } from "@/modules/meals/selection-repository";
 import { cancelRegistration } from "@/modules/registrations/lifecycle-repository";
+import { checkPartyAnswers, staffEventQuestions, toStaffQuestion, type StaffQuestion } from "@/modules/staff-invitations/event-questions";
 import { classifyInvitationRows, InvitationCsvError, parseInvitationCsv, usableEmails } from "@/modules/staff-invitations/csv";
 import {
   approvedEmail,
@@ -19,7 +21,9 @@ import {
   duplicatePartyName,
   INVITATION_RECEIVED_MESSAGE,
   INVITATION_STATUSES,
+  INVITATION_UNAVAILABLE_MESSAGE,
   invitationEmail,
+  invitationReinvitable,
   invitationRegistrationSchema,
   invitationStatus,
   invitationUrl,
@@ -49,6 +53,8 @@ export type StaffInvitationErrorCode =
   | "INVITATION_UNAVAILABLE"
   | "INVITATION_USED"
   | "NOT_REISSUABLE"
+  | "NOT_REINVITABLE"
+  | "INVALID_ANSWERS"
   | "NOTHING_TO_SEND"
   | "SEND_COUNT_CHANGED"
   | "INVALID_PARTY"
@@ -75,6 +81,7 @@ export function staffInvitationErrorStatus(code: StaffInvitationErrorCode) {
     case "PREVIEW_CHANGED":
     case "SEND_COUNT_CHANGED":
     case "NOT_REISSUABLE":
+    case "NOT_REINVITABLE":
     case "MEAL_PLAN_REQUIRED":
       return 409;
     case "REQUEST_TOO_LARGE":
@@ -135,7 +142,7 @@ async function requireEvent(client: Tx | ReturnType<typeof getPrisma>, eventId: 
 async function existingEmails(client: Tx | ReturnType<typeof getPrisma>, eventId: string, emails: readonly string[]): Promise<ExistingEmails> {
   if (emails.length === 0) return { invited: new Set(), registered: new Set() };
   const [invited, people] = await Promise.all([
-    client.staffInvitation.findMany({ where: { eventId, email: { in: [...emails] } }, select: { email: true } }),
+    client.staffInvitation.findMany({ where: { eventId, supersededAt: null, email: { in: [...emails] } }, select: { email: true } }),
     client.person.findMany({
       where: {
         normalizedEmail: { in: [...emails] },
@@ -236,6 +243,7 @@ const listSelect = {
   revokedAt: true,
   registeredAt: true,
   approval: true,
+  supersededAt: true,
   registrationId: true,
   createdAt: true,
   registration: { select: { confirmationCode: true, status: true } },
@@ -257,6 +265,8 @@ export type InvitationListRow = {
   usable: boolean;
   /** A revoked link that nobody used can be reissued, and so can one that has not been used. */
   reissuable: boolean;
+  /** The registration was declined (or cancelled while it waited): the office can re-invite the person with a new link (#1027). */
+  reinvitable: boolean;
   /** Why delivery failed, when it did. */
   deliveryNote: string | null;
 };
@@ -266,7 +276,8 @@ const LIST_LIMIT = 2000;
 export async function listInvitations(eventId: string) {
   await requireEvent(getPrisma(), eventId);
   const rows = await getPrisma().staffInvitation.findMany({
-    where: { eventId },
+    // A person who was re-invited is listed once, by the new invitation; the old one stays in the approval list as history.
+    where: { eventId, supersededAt: null },
     orderBy: [{ group: "asc" }, { lastName: "asc" }, { firstName: "asc" }, { email: "asc" }],
     take: LIST_LIMIT,
     select: listSelect,
@@ -286,6 +297,7 @@ export async function listInvitations(eventId: string) {
       confirmationCode: row.registration?.confirmationCode ?? null,
       usable: invitationUsable(row),
       reissuable: !row.registeredAt,
+      reinvitable: invitationReinvitable(row),
       deliveryNote: status === "DELIVERY_FAILED" ? (row.lastMessage?.lastError?.slice(0, 200) ?? "The email did not reach this address.") : null,
     };
   });
@@ -355,7 +367,7 @@ export async function reissueInvitation(eventId: string, actorUserId: string, in
   await requireEvent(getPrisma(), eventId);
   const updated = await getPrisma().$transaction(async (tx) => {
     const guarded = await tx.staffInvitation.updateMany({
-      where: { id: invitationId, eventId, registeredAt: null },
+      where: { id: invitationId, eventId, registeredAt: null, supersededAt: null },
       data: { linkVersion: { increment: 1 }, revokedAt: null, sentAt: null, lastMessageId: null },
     });
     if (guarded.count === 0) {
@@ -378,6 +390,52 @@ export async function reissueInvitation(eventId: string, actorUserId: string, in
     return tx.staffInvitation.findUniqueOrThrow({ where: { id: invitationId } });
   });
   return { url: invitationUrl(baseUrl(), invitationToken(updated)) };
+}
+
+/**
+ * Re-invites a person whose registration was declined, or cancelled while it waited (#1027). The person gets a NEW invitation
+ * (a new single-use link, "not sent" until the office previews and sends it like any other) and the old one is marked superseded,
+ * so its link never opens again. The declined registration is not touched: it stays cancelled, as history, still tied to the old
+ * invitation so its group label and the rules about staff registrations keep applying to it. Nothing is emailed here.
+ */
+export async function reinviteInvitation(eventId: string, actorUserId: string, invitationId: string, now = new Date()) {
+  await requireEvent(getPrisma(), eventId);
+  return serializable(async (tx) => {
+    const previous = await tx.staffInvitation.findFirst({ where: { id: invitationId, eventId } });
+    if (!previous) throw new StaffInvitationError("INVITATION_NOT_FOUND", "That invitation could not be found.");
+    if (!invitationReinvitable(previous)) {
+      throw new StaffInvitationError("NOT_REINVITABLE", "Only a person whose registration was declined can be re-invited, and only once. If they were already re-invited, find their new invitation in the list.");
+    }
+    // The decision says declined; the registration must agree, or a live registration would be left beside a second link.
+    const registration = previous.registrationId
+      ? await tx.registration.findFirst({ where: { id: previous.registrationId, eventId }, select: { status: true } })
+      : null;
+    if (registration && registration.status !== "CANCELLED") {
+      throw new StaffInvitationError("NOT_REINVITABLE", "That registration is still active, so the person can't be re-invited.");
+    }
+    const guarded = await tx.staffInvitation.updateMany({
+      where: { id: previous.id, eventId, approval: "DECLINED", supersededAt: null },
+      data: { supersededAt: now },
+    });
+    if (guarded.count === 0) throw new StaffInvitationError("NOT_REINVITABLE", "That person was already re-invited. Find their new invitation in the list.");
+    const created = await tx.staffInvitation.create({
+      data: { eventId, email: previous.email, firstName: previous.firstName, lastName: previous.lastName, group: previous.group, createdByUserId: actorUserId },
+      select: { id: true },
+    });
+    await tx.auditLog.create({
+      data: {
+        eventId,
+        actorUserId,
+        action: "STAFF_INVITATION_REINVITED",
+        entityType: "StaffInvitation",
+        entityId: created.id,
+        correlationId: randomUUID(),
+        summary: "Re-invited a person whose registration was declined. A new personal link was made; the old one no longer works. Nothing was sent.",
+        metadata: { invitationId: created.id, previousInvitationId: previous.id, previousRegistrationId: previous.registrationId },
+      },
+    });
+    return { invitationId: created.id };
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -609,12 +667,31 @@ async function deliverAfterCommit(messageIds: readonly string[]) {
 
 type LoadedInvitation = Prisma.StaffInvitationGetPayload<{ include: { event: { select: typeof eventSelect } } }>;
 
+/**
+ * The event's published registration form, whose attendee questions the link form asks (#1027). With more than one published form
+ * the oldest is used. An event with no published form has no extra questions; a form that no longer parses is treated the same
+ * (the link form never fails because of the form builder).
+ */
+async function loadEventFormDefinition(client: Tx | ReturnType<typeof getPrisma>, eventId: string): Promise<{ versionId: string; definition: RegistrationFormDefinition } | null> {
+  const form = await client.registrationForm.findFirst({
+    where: { eventId, status: "PUBLISHED", versions: { some: { status: "PUBLISHED" } } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { versions: { where: { status: "PUBLISHED" }, orderBy: { versionNumber: "desc" }, take: 1, select: { id: true, definition: true } } },
+  });
+  const version = form?.versions[0];
+  if (!version) return null;
+  const parsed = registrationFormDefinitionSchema.safeParse(version.definition);
+  return parsed.success ? { versionId: version.id, definition: parsed.data } : null;
+}
+
 /** The invitation a token names when the token is genuine for its current version, else null. Never says why not. */
 async function loadByToken(client: Tx | ReturnType<typeof getPrisma>, token: string): Promise<LoadedInvitation | null> {
   const id = invitationIdFromToken(token);
   if (!id) return null;
   const invitation = await client.staffInvitation.findUnique({ where: { id }, include: { event: { select: eventSelect } } });
   if (!invitation || !invitationTokenMatches(token, invitation)) return null;
+  // A person who was re-invited has a new link; the old one never opens again, whatever it was used for.
+  if (invitation.supersededAt) return null;
   return invitation;
 }
 
@@ -630,6 +707,8 @@ export type InvitationExperience =
       state: "OPEN";
       event: { name: string; slug: string; startsOn: string; endsOn: string; timezone: string; supportContact: string | null };
       person: { firstName: string; lastName: string; email: string; groupLabel: string };
+      /** The event's own attendee questions to ask each person in the party (#1027): never priced, meal or lodging ones. */
+      questions: StaffQuestion[];
     };
 
 /** What the page behind a link shows. Any link that doesn't work says the same thing, so a link can't be probed. */
@@ -648,6 +727,7 @@ export async function getInvitationExperience(token: string, now = new Date()): 
       supportContact: invitation.event.supportContact,
     },
     person: { firstName: invitation.firstName, lastName: invitation.lastName, email: invitation.email, groupLabel: STAFF_INVITATION_GROUP_LABEL[invitation.group] },
+    questions: staffEventQuestions((await loadEventFormDefinition(getPrisma(), invitation.eventId))?.definition ?? null).map(toStaffQuestion),
   };
 }
 
@@ -666,11 +746,20 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
   }
   // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
   const notifyOffice = await isNotificationEnabled("STAFF_INVITATION_APPROVAL_DIGEST");
+  // The event's own questions are checked against its form as it is now, on the server; what the page showed decides nothing.
+  const forLink = await loadByToken(getPrisma(), token);
+  if (!forLink || forLink.revokedAt || forLink.registeredAt) {
+    throw new StaffInvitationError(forLink?.registeredAt ? "INVITATION_USED" : "INVITATION_UNAVAILABLE", forLink?.registeredAt ? "This link has already been used to register." : INVITATION_UNAVAILABLE_MESSAGE);
+  }
+  const eventForm = await loadEventFormDefinition(getPrisma(), forLink.eventId);
+  if (input.answers.length > party.length) throw new StaffInvitationError("INVALID_PARTY", "There are more answer sets than people in the registration.");
+  const checked = checkPartyAnswers(eventForm?.definition ?? null, input.answers, party.length);
+  if (checked.problems.length > 0) throw new StaffInvitationError("INVALID_ANSWERS", checked.problems.slice(0, 5).join(" "));
   let notices: string[] = [];
   const result = await serializable(async (tx) => {
     const invitation = await loadByToken(tx, token);
     if (!invitation || invitation.revokedAt || !eventAcceptsInvitationRegistration(invitation.event, now)) {
-      throw new StaffInvitationError("INVITATION_UNAVAILABLE", "This link isn't available. It may have been replaced or turned off. Contact the event office if you think that is a mistake.");
+      throw new StaffInvitationError("INVITATION_UNAVAILABLE", INVITATION_UNAVAILABLE_MESSAGE);
     }
     if (invitation.registeredAt) {
       throw new StaffInvitationError("INVITATION_USED", "This link has already been used to register.");
@@ -715,10 +804,12 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
             staffInvitationId: invitation.id,
             staffGroup: invitation.group,
             partyRole: member.role,
+            ...(eventForm ? { formVersionId: eventForm.versionId } : {}),
             ...(member.age !== null ? { ageOnEventDate: member.age, ageAsOf: eventStartDate } : {}),
           },
-          // Covered people pick no meal tickets: the conference pays for every meal.
-          formResponses: { meal_coverage: COVERED_MEAL_ANSWER },
+          // The event's own questions come first, so nothing a person sent can replace the meal coverage: the conference pays for
+          // every meal, and nobody picks a ticket.
+          formResponses: { ...checked.answers[position], meal_coverage: COVERED_MEAL_ANSWER },
         },
       });
     }
@@ -741,7 +832,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
         entityId: registration.id,
         correlationId: randomUUID(),
         summary: `Registration ${confirmationCode} was made through a personal ${STAFF_INVITATION_GROUP_LABEL[invitation.group].toLowerCase()} link and is waiting for approval.`,
-        metadata: { invitationId: invitation.id, group: invitation.group, partySize: party.length, totalCents: 0 },
+        metadata: { invitationId: invitation.id, group: invitation.group, partySize: party.length, totalCents: 0, ...(eventForm ? { formVersionId: eventForm.versionId } : {}) },
       },
     });
     const staff = notifyOffice ? await officeEmails(tx, event.id) : [];

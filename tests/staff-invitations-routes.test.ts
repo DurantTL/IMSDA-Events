@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
     revokeInvitations: vi.fn(),
     copyInvitationLink: vi.fn(),
     reissueInvitation: vi.fn(),
+    reinviteInvitation: vi.fn(),
     listApprovals: vi.fn(),
     approveRegistrations: vi.fn(),
     declineRegistrations: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock("@/modules/staff-invitations/repository", () => ({
   revokeInvitations: mocks.revokeInvitations,
   copyInvitationLink: mocks.copyInvitationLink,
   reissueInvitation: mocks.reissueInvitation,
+  reinviteInvitation: mocks.reinviteInvitation,
   listApprovals: mocks.listApprovals,
   approveRegistrations: mocks.approveRegistrations,
   declineRegistrations: mocks.declineRegistrations,
@@ -180,6 +182,21 @@ describe("the staff routes (#804)", () => {
     expect(await (await ONE(post("/o", { action: "reissue" }), one)).json()).toEqual({ result: { url: "https://events.imsda.test/staff-invite/u" } });
     expect((await ONE(post("/o", { action: "send" }), one)).status).toBe(400);
     expect(mocks.copyInvitationLink).toHaveBeenCalledWith("event-1", "user-1", "inv-1");
+  });
+
+  it("re-invite one person with MANAGE_REGISTRATION, make no email, and refuse everyone else (#1027)", async () => {
+    mocks.reinviteInvitation.mockResolvedValue({ invitationId: "inv-2" });
+    const response = await ONE(post("/o", { action: "reinvite" }), one);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ result: { invitationId: "inv-2" } });
+    expect(mocks.requirePermission.mock.calls[0][2]).toBe("MANAGE_REGISTRATION");
+    expect(mocks.reinviteInvitation).toHaveBeenCalledWith("event-1", "user-1", "inv-1");
+    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("No."));
+    expect((await ONE(post("/o", { action: "reinvite" }), one)).status).toBe(403);
+    expect(mocks.reinviteInvitation).toHaveBeenCalledTimes(1);
+    mocks.requirePermission.mockResolvedValue({ user: { id: "user-1" } });
+    mocks.reinviteInvitation.mockRejectedValue(new mocks.StaffInvitationError("NOT_REINVITABLE", "Only a person whose registration was declined can be re-invited."));
+    expect((await ONE(post("/o", { action: "reinvite" }), one)).status).toBe(400);
   });
 
   it("approve or decline in one batch, and nothing else", async () => {
