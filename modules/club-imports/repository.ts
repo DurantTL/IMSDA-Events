@@ -164,7 +164,7 @@ async function importListedClub(item: ClubImportItem, actorUserId: string): Prom
       // Two confirms of the same club at once would both see "no club" and both create one. Serialize on each
       // name (sorted, so two requests never lock in opposite orders), then look.
       for (const name of [...names].sort()) {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`club-list-import:${name}`}, 0))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`club-list-import:${name}`}, 0))`;
       }
       // The #1031 near-duplicate check plugs in here; until then, exact normalized names. The own name wins.
       const ownName = normalizeOrganizationName(item.clubName);

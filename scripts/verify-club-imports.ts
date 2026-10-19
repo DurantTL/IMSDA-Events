@@ -273,10 +273,10 @@ async function main() {
     assert(await prisma.person.count() === peopleBeforeList && await prisma.clubRosterMember.count({ where: { organization: { name: listName } } }) === 0, "a list import adds no people and no roster");
     assert(await prisma.externalIdentity.count({ where: { organization: { name: listName } } }) === 0, "a list import writes no import record or roster year");
     assert(await prisma.clubInvite.count({ where: { organization: { name: listName } } }) === 0, "a list import creates no invites");
-    const [again] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(await listDrafts())).clubs, admin.id, now);
-    assert(again.status === "ALREADY_IMPORTED" && await prisma.organization.count({ where: { type: "CLUB", name: listName } }) === 1, "confirming a fresh preview again creates nothing new");
+    const [listAgain] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(await listDrafts())).clubs, admin.id, now);
+    assert(listAgain.status === "ALREADY_IMPORTED" && await prisma.organization.count({ where: { type: "CLUB", name: listName } }) === 1, "confirming a fresh preview listAgain creates nothing new");
 
-    console.log("club imports verified: wrong-year import moved to 2026-27 (48 rows, Person count unchanged, 0 left in 2025-26), re-upload reports 2026-27, conflicting moves refused, second registration refused with next steps, Keep both and Jr. handled");
+    console.log("club imports verified: wrong-year import moved to 2026-27 (48 rows, Person count unchanged, 0 left in 2025-26), re-upload reports 2026-27, conflicting moves refused, second registration refused with next steps, Keep both and Jr. handled, club-list import makes one club under two confirms at once");
   } finally {
     await cleanup(admin.id);
     await prisma.$disconnect();

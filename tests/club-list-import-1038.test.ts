@@ -51,7 +51,7 @@ const client = {
       return Promise.resolve({});
     },
   },
-  $queryRaw: (...args: unknown[]) => { mocks.calls.push("lock"); mocks.queryRaw(...args); return Promise.resolve([]); },
+  $executeRaw: (...args: unknown[]) => { mocks.calls.push("lock"); mocks.queryRaw(...args); return Promise.resolve([]); },
   externalIdentity: { findMany: mocks.identityFindMany, findUnique: () => Promise.resolve(null), create: mocks.identityCreate },
   clubRosterMember: { findMany: () => Promise.resolve([]), create: mocks.rosterCreate },
   person: { create: mocks.personCreate },
