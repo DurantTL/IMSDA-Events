@@ -12,6 +12,7 @@ import { loadEventFeatureFacts } from "@/modules/event-features/repository";
 import { buildFeatureRows } from "@/modules/event-features/model";
 import { moduleState } from "@/modules/event-modules/service";
 import { getEventSettings } from "@/modules/events/repository";
+import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getGeneralLinkSettings } from "@/modules/general-link-registrations/repository";
 
@@ -31,6 +32,10 @@ export const metadata: Metadata = { title: staffPageTitles.eventFeatures };
 export default async function EventFeaturesPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
   const { event, permissions, user } = await resolveEventContext(requested);
+  // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
+  if (!permissions.includes("VIEW_EVENT")) {
+    return <AccessRestricted title="Event features are restricted" detail="Your event role does not include this page." />;
+  }
   const { allowed: clubOversight, clubEvent } = await resolveClubOversight(event.id);
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   const eventQuery = `?event=${event.id}`;

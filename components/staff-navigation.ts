@@ -28,7 +28,7 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
-import type { EventPermission } from "@/modules/access/permissions";
+import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth, operationalHealthEntryPermissions } from "@/modules/operations/access";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
@@ -72,6 +72,10 @@ export type NavigationItem = {
   icon: LucideIcon;
   requiredPermission?: EventPermission;
   requiredAnyPermissions?: readonly EventPermission[];
+  /** Hidden from a viewer who holds this permission (the kitchen counts item is for staff who do not have the event view, #1029). */
+  hiddenWithPermission?: EventPermission;
+  /** Hidden from a viewer who holds `has` but lacks `lacks` (kitchen staff without the event view have no dashboard, #1029). */
+  hiddenWhenHoldingWithout?: { has: EventPermission; lacks: EventPermission };
   /** The sidebar section the item is listed in; an item without one is not a sidebar item (#964). */
   sidebar?: SidebarSection;
   /**
@@ -112,6 +116,7 @@ export const staffPageTitles = {
   registrations: "Registrations",
   attendeeList: "Attendee list",
   kitchenReport: "Kitchen report",
+  kitchenCounts: "Kitchen counts",
   imports: "Imports",
   team: "Team",
   payments: "Payments",
@@ -186,6 +191,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
+  ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report", "prefix", staffPageTitles.kitchenReport],
   ["/more/merchandise", "prefix", staffPageTitles.merchandise],
   ["/more/meals", "prefix", staffPageTitles.meals],
@@ -217,7 +223,10 @@ export const systemNavigation: NavigationItem = {
 };
 
 export const navigation: readonly NavigationItem[] = [
-  { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, sidebar: "daily" },
+  // The dashboard page needs the event view permission; kitchen staff (#1029) hold only the kitchen counts one and see no dashboard item.
+  { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, hiddenWhenHoldingWithout: { has: "MANAGE_KITCHEN_COUNTS", lacks: "VIEW_EVENT" }, sidebar: "daily" },
+  // Kitchen staff's one page (#1029). Staff who also have the event view reach it from the kitchen report instead.
+  { href: kitchenCountsPath, label: staffPageTitles.kitchenCounts, icon: UtensilsCrossed, requiredPermission: "MANAGE_KITCHEN_COUNTS", hiddenWithPermission: "VIEW_EVENT", sidebar: "daily" },
   { href: "/check-in", label: staffPageTitles.checkIn, icon: CheckCircle2, requiredPermission: "MANAGE_CHECK_IN", sidebar: "daily" },
   { href: "/people", label: staffPageTitles.registrations, icon: UsersRound, requiredPermission: "VIEW_SENSITIVE_DATA", sidebar: "daily" },
   { href: "/finance", label: staffPageTitles.payments, icon: WalletCards, requiredPermission: "MANAGE_FINANCE", sidebar: "daily" },
@@ -340,9 +349,12 @@ export function orderedMobileTabs(visibleItems: readonly NavigationItem[]): Navi
 }
 
 export function matchesVisibility(
-  item: Pick<NavigationItem, "requiredPermission" | "requiredAnyPermissions">,
+  item: Pick<NavigationItem, "requiredPermission" | "requiredAnyPermissions"> & Pick<NavigationItem, "hiddenWithPermission" | "hiddenWhenHoldingWithout">,
   selectedPermissions: ReadonlySet<EventPermission>,
 ) {
+  if (item.hiddenWithPermission && selectedPermissions.has(item.hiddenWithPermission)) return false;
+  const hold = item.hiddenWhenHoldingWithout;
+  if (hold && selectedPermissions.has(hold.has) && !selectedPermissions.has(hold.lacks)) return false;
   if (item.requiredPermission && !selectedPermissions.has(item.requiredPermission)) return false;
   if (
     item.requiredAnyPermissions
@@ -371,6 +383,7 @@ export function requiredPermissionFor(href: string): EventPermission | undefined
  */
 export const mobileNavigationOrder = [
   "/overview",
+  kitchenCountsPath,
   "/people",
   "/check-in",
   "/finance",
@@ -401,6 +414,7 @@ export function mobileActiveTabHref(currentHref: string, pathname?: string): str
  */
 export const mobileNavigationLabels: Readonly<Record<string, string>> = {
   "/overview": "Home",
+  [kitchenCountsPath]: "Kitchen",
   "/people": "People",
   "/check-in": "Check-in",
   // Short so six equal tabs fit at 360px; the tab carries aria-label/title "Payments".

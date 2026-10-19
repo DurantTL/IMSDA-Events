@@ -18,7 +18,7 @@ const serviceKeyPattern = /^(\d{4}-\d{2}-\d{2}|any):(BREAKFAST|LUNCH|SUPPER)$/;
 export default async function ScannerImportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-  const { event, permissions } = await resolveEventContext(first(params.event));
+  const { event, permissions } = await resolveEventContext(first(params.event), { allowWithoutEventView: true });
   if (!permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="Scanner results are restricted" detail="Your event role does not include access to reports." />;
   }

@@ -800,6 +800,14 @@ export async function cancelRegistration(
   actorUserId: string,
   reason = "",
   now = new Date(),
+  options: {
+    /**
+     * The payment wording of the cancellation message (#171). A cancellation carried out from an approved request sends its
+     * email at once, in words that do not say nothing was refunded while a refund is on its way. A waitlist removal notice
+     * is unaffected.
+     */
+    cancellationNote?: string;
+  } = {},
 ): Promise<CancelRegistrationResult> {
   const result = await runSerializable(async (tx) => {
     const event = await loadEvent(tx, eventId);
@@ -889,6 +897,7 @@ export async function cancelRegistration(
     const cancellationMessage = await (wasWaitlisted
       ? enqueueWaitlistRemovedMessage
       : enqueueRegistrationCancelledMessage)(tx, {
+      ...(options.cancellationNote && !wasWaitlisted ? { cancellationNote: options.cancellationNote } : {}),
       eventId,
       registrationId: registration.id,
       correlationId,

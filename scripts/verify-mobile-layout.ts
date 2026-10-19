@@ -156,7 +156,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "director" | "area" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -273,6 +273,10 @@ const pages: PageSpec[] = [
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
+  // Kitchen counts (#1029): the phone entry forms and the per-service table, with a long note and a correction in the history.
+  staff("kitchen-counts", "/more/kitchen-report/counts"),
+  // The same page as a Kitchen staff user (#1029): no event view, so the sidebar and phone tabs show only Kitchen counts.
+  staff("kitchen-counts-as-kitchen-staff", "/more/kitchen-report/counts", "kitchen"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -672,7 +676,7 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
       await tx.eventMembership.create({ data: { eventId: cancelEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
       await tx.registrationForm.create({ data: { id: formId, eventId: cancelEventId, createdByUserId: admin.id, name: "Cancellation form", slug: `${P}-cancel-form` } });
       await tx.registrationFormVersion.create({
-        data: { id: formVersionId, formId, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: { title: "Check", description: "", confirmationMessage: "Received.", sections: [] } },
+        data: { id: formVersionId, formId, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: { title: "Check", description: "", confirmationMessage: "Received.", sections: [{ id: `${P}_contact`, title: "Contact", description: "", fields: [{ id: `${P}_email`, key: "email", label: "Email", helpText: "", type: "EMAIL", scope: "REGISTRATION", required: false, options: [] }] }] } },
       });
       // The director's own person row (the audit's accounts make one), so this is their registration, not a second person.
       const holder = await tx.person.findUnique({ where: { normalizedEmail: `${P}.director@example.test` } })
@@ -729,10 +733,46 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
   }
   const first = await prisma.cancellationRequest.findFirstOrThrow({ where: { eventId: cancelEventId, status: "INFORMATION_NEEDED" }, select: { id: true } });
   const issued = await createRegistrationAccessToken({ registrationId });
+
+  // Approved requests (#171): one waiting to be carried out, one approved for attendees only, one already carried out.
+  const execution = await import("../modules/cancellation-execution/repository");
+  const approvedIds: Record<string, string> = {};
+  for (const [code, label] of [["MOBCAN2", "carry-out"], ["MOBCAN3", "carried-out"]] as const) {
+    const id = `${P}_reg_${label}`;
+    if (!(await prisma.registration.findUnique({ where: { id }, select: { id: true } }))) {
+      const holderData = { id: `${P}_person_${label}_holder`, firstName: "Casey", lastName: `Mobilecheck-${label}`, normalizedEmail: `${P}.${label}@example.test` };
+      const holder = await prisma.person.upsert({ where: { id: holderData.id }, update: {}, create: holderData });
+      await prisma.registration.create({
+        data: { id, eventId: cancelEventId, accountHolderPersonId: holder.id, confirmationCode: code, totalAmount: 200, status: "CONFIRMED", submittedAt: new Date(), contactSnapshot: { firstName: "Casey", lastName: `Mobilecheck-${label}`, email: `${P}.${label}@example.test`, phone: "" } },
+      });
+      await prisma.registrationAttendee.create({
+        data: { id: `${P}_${label}_attendee`, eventId: cancelEventId, registrationId: id, personId: holder.id, attendeeType: "ADULT", position: 0, profileSnapshot: { firstName: "Casey", lastName: `Mobilecheck-${label}` } },
+      });
+      await prisma.publicRegistrationSubmission.create({
+        data: {
+          eventId: cancelEventId, formVersionId, registrationId: id, idempotencyKey: `${P}_${label}_idem`, requestHash: "hash", responses: {},
+          pricingSnapshot: { currency: "USD", subtotalCents: 20_000, processingFeeCents: 0, totalCents: 20_000, lineItems: [{ key: "attendees.0.registration_fee", label: "Registration, Casey", amountCents: 20_000, attendeeIndex: 0 }] },
+        },
+      });
+      await prisma.payment.create({ data: { eventId: cancelEventId, registrationId: id, amount: 200, status: "SUCCEEDED", method: "CHECK", receivedAt: new Date() } });
+      const asked = await requests.submitCancellationRequest({ registrationId: id, eventId: cancelEventId }, { via: "MANAGE_LINK" }, {
+        action: "submit", selection: { scope: "FULL_REGISTRATION" }, reason: "A schedule conflict.", contactMethod: "EMAIL", idempotencyKey: `${P}-cancel-key-${label}`, expectedRefundCents: 19_000,
+      });
+      await requests.reviewCancellationRequest(cancelEventId, asked.request.id, { userId: admin.id }, { action: "APPROVE", reason: "Within the policy." });
+    }
+    approvedIds[label] = (await prisma.cancellationRequest.findFirstOrThrow({ where: { registrationId: id }, select: { id: true } })).id;
+  }
+  const done = await prisma.cancellationExecution.findUnique({ where: { requestId: approvedIds["carried-out"]! }, select: { id: true } });
+  if (!done) await execution.carryOutCancellation(cancelEventId, approvedIds["carried-out"]!, { userId: admin.id }, { confirm: true, method: "OFFLINE" });
+  const second = await prisma.cancellationRequest.findFirstOrThrow({ where: { registrationId, scope: "ATTENDEE", status: { in: ["REQUESTED", "APPROVED"] } }, select: { id: true, status: true } });
+  if (second.status === "REQUESTED") await requests.reviewCancellationRequest(cancelEventId, second.id, { userId: admin.id }, { action: "APPROVE", reason: "Within the policy." });
   return [
     { name: "cancellation-manage-link", path: issued.managePath, role: "visitor", expectText: /Ask to cancel/ },
     { name: "cancellation-staff-queue", path: `/finance/cancellation-requests?event=${cancelEventId}`, role: "event-admin", expectText: /Cancellation requests/ },
     { name: "cancellation-staff-detail", path: `/finance/cancellation-requests?event=${cancelEventId}&request=${first.id}`, role: "event-admin", expectText: /Your decision/ },
+    { name: "cancellation-staff-carry-out", path: `/finance/cancellation-requests?event=${cancelEventId}&status=APPROVED&request=${approvedIds["carry-out"]}`, role: "event-admin", expectText: /How is the refund made/ },
+    { name: "cancellation-staff-carried-out", path: `/finance/cancellation-requests?event=${cancelEventId}&status=APPROVED&request=${approvedIds["carried-out"]}`, role: "event-admin", expectText: /Completed/ },
+    { name: "cancellation-staff-attendees-approved", path: `/finance/cancellation-requests?event=${cancelEventId}&status=APPROVED&request=${second.id}`, role: "event-admin", expectText: /Carry out/ },
   ];
 }
 
@@ -1015,6 +1055,10 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.facilityIssue.deleteMany({ where: { id: mine } }),
     prisma.assetIssuanceHistory.deleteMany({ where: { issuanceId: mine } }),
     prisma.assetIssuance.deleteMany({ where: { id: mine } }),
+    prisma.eventMealKitchenCount.deleteMany({ where: { id: mine } }),
+    prisma.userSession.deleteMany({ where: { userId: mine } }),
+    prisma.eventMembership.deleteMany({ where: { userId: mine } }),
+    prisma.user.deleteMany({ where: { id: mine } }),
     prisma.issuedAsset.deleteMany({ where: { id: mine } }),
     prisma.issuedAssetType.deleteMany({ where: { id: mine } }),
     prisma.attendeeSession.deleteMany({ where: { accountId: { in: accountIds } } }),
@@ -1299,6 +1343,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
   await seedIssuedAssets(prisma);
+  await seedKitchenCounts(prisma);
   await seedDeadlines(prisma);
   await seedCalendarEventPairs(prisma);
 }
@@ -1368,6 +1413,30 @@ async function seedDeadlines(prisma: PrismaClient) {
  * a facility issue, so the check-out panel and the closeout have every kind of row to lay out. Inserted directly, the
  * way the services write them (an issuance always comes with its history row). Idempotent.
  */
+/** Kitchen counts (#1029): two services with entries, one corrected, and a long note, so the entry cards and the table have content. */
+async function seedKitchenCounts(prisma: PrismaClient) {
+  const user = await prisma.user.findFirst({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  if (!user) return;
+  // A Kitchen staff account on this event (#1029) for the audit page that opens the counts page as that role.
+  const kitchen = await prisma.user.upsert({
+    where: { email: `${P}.kitchen@example.test` }, update: {},
+    create: { id: `${P}_user_kitchen`, email: `${P}.kitchen@example.test`, displayName: "Kim Mobilecheck-Kitchen" },
+  });
+  await prisma.eventMembership.upsert({
+    where: { eventId_userId: { eventId, userId: kitchen.id } }, update: { role: "KITCHEN_STAFF", status: "ACTIVE" },
+    create: { eventId, userId: kitchen.id, role: "KITCHEN_STAFF", status: "ACTIVE" },
+  });
+  // A session is only valid for an account with a credential row; this one can never sign in with a password.
+  await prisma.authCredential.upsert({ where: { userId: kitchen.id }, update: {}, create: { userId: kitchen.id, passwordHash: "mobilecheck-never-a-real-hash" } });
+  if (await prisma.eventMealKitchenCount.findUnique({ where: { id: `${P}_kc_1` }, select: { id: true } })) return;
+  const base = { eventId, enteredByUserId: user.id };
+  const longNote = "Second pan held back for the late serving line, then split between the vegetarian and the gluten-free lines";
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_1`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "PREPARED", quantity: 120, note: "First count" } });
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_2`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "PREPARED", quantity: 126, note: longNote, supersedesId: `${P}_kc_1` } });
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_3`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "WASTED", quantity: 4 } });
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_4`, serviceDate: "", mealType: "SUPPER", kind: "DONATED", quantity: 12, note: "Sent to the shelter" } });
+}
+
 async function seedIssuedAssets(prisma: PrismaClient) {
   const typeId = `${P}_asset_type`;
   if (await prisma.issuedAssetType.findUnique({ where: { id: typeId } })) return;
@@ -1577,7 +1646,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
       tokens.attendee.push(session.token);
       return { name: attendeeSession.ATTENDEE_SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
     }
-    const email = role === "system-admin" ? "system@imsda-events.test" : "admin@imsda-events.test";
+    const email = role === "system-admin" ? "system@imsda-events.test" : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error(`The seeded account ${email} is missing. Run \`npm run db:seed\` first.`);
     const session = await staffSession.createDatabaseSession(user.id, null);
@@ -1587,6 +1656,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const cookies: Record<SignedInRole, { name: string; value: string; expires: number }> = {
     "event-admin": await cookie("event-admin"),
     "system-admin": await cookie("system-admin"),
+    kitchen: await cookie("kitchen"),
     director: await cookie("director"),
     area: await cookie("area"),
   };
@@ -3754,7 +3824,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "area", "event-admin", "system-admin"] as Role[]) {
+      for (const role of ["visitor", "director", "area", "event-admin", "system-admin", "kitchen"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({
