@@ -273,6 +273,8 @@ const pages: PageSpec[] = [
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
+  // Kitchen counts (#1029): the phone entry forms and the per-service table, with a long note and a correction in the history.
+  staff("kitchen-counts", "/more/kitchen-report/counts"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -998,6 +1000,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.facilityIssue.deleteMany({ where: { id: mine } }),
     prisma.assetIssuanceHistory.deleteMany({ where: { issuanceId: mine } }),
     prisma.assetIssuance.deleteMany({ where: { id: mine } }),
+    prisma.eventMealKitchenCount.deleteMany({ where: { id: mine } }),
     prisma.issuedAsset.deleteMany({ where: { id: mine } }),
     prisma.issuedAssetType.deleteMany({ where: { id: mine } }),
     prisma.attendeeSession.deleteMany({ where: { accountId: { in: accountIds } } }),
@@ -1282,6 +1285,7 @@ async function seedSynthetic(prisma: PrismaClient) {
   await seedMultiHonorClass(prisma);
   await seedLauncherModule(prisma);
   await seedIssuedAssets(prisma);
+  await seedKitchenCounts(prisma);
   await seedDeadlines(prisma);
   await seedCalendarEventPairs(prisma);
 }
@@ -1351,6 +1355,19 @@ async function seedDeadlines(prisma: PrismaClient) {
  * a facility issue, so the check-out panel and the closeout have every kind of row to lay out. Inserted directly, the
  * way the services write them (an issuance always comes with its history row). Idempotent.
  */
+/** Kitchen counts (#1029): two services with entries, one corrected, and a long note, so the entry cards and the table have content. */
+async function seedKitchenCounts(prisma: PrismaClient) {
+  if (await prisma.eventMealKitchenCount.findUnique({ where: { id: `${P}_kc_1` }, select: { id: true } })) return;
+  const user = await prisma.user.findFirst({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  if (!user) return;
+  const base = { eventId, enteredByUserId: user.id };
+  const longNote = "Second pan held back for the late serving line, then split between the vegetarian and the gluten-free lines";
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_1`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "PREPARED", quantity: 120, note: "First count" } });
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_2`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "PREPARED", quantity: 126, note: longNote, supersedesId: `${P}_kc_1` } });
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_3`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "WASTED", quantity: 4 } });
+  await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_4`, serviceDate: "", mealType: "SUPPER", kind: "DONATED", quantity: 12, note: "Sent to the shelter" } });
+}
+
 async function seedIssuedAssets(prisma: PrismaClient) {
   const typeId = `${P}_asset_type`;
   if (await prisma.issuedAssetType.findUnique({ where: { id: typeId } })) return;
