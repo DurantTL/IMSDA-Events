@@ -35,6 +35,7 @@ import { SidebarToggle } from "@/components/sidebar-toggle";
 import { createEventHrefFor, isSystemWorkspacePath, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
 import { MoreLauncher } from "@/components/more-launcher";
+import { AdminAttentionBell } from "@/components/admin-attention-bell";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
 import type { EventPermission } from "@/modules/access/permissions";
 import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
@@ -480,6 +481,7 @@ export function AppShell({
                 </Link>
               )}
             <span className="staff-pill">Staff mode</span>
+            {isSystemAdmin && <AdminAttentionBell />}
             <StaffAccountMenu
               attendeePreviewHref={attendeePreviewHref}
               canSwitchToAttendee={canSwitchToAttendee}
