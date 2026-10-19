@@ -111,9 +111,9 @@
     },
     {
       "key": "pbe_registration",
-      "sha256": "3d232dbea254bba537173a560d3a4d2ed553b5b6fc5056213070da70f1f2e56c",
+      "sha256": "3bd1bb44a646f512e317c51fff0d675ef81fa53f4e4aab6133e0d954761ce5e9",
       "sections": 4,
-      "fields": 23
+      "fields": 21
     },
     {
       "key": "blank_form",
