@@ -169,9 +169,11 @@ execution complete. Its audit entry holds ids and amounts only; the note stays o
 
 ## Email
 
-No new template. The registrant gets the existing refund notice (#277) per completed refund, and one registration-cancelled message
-for a whole registration, queued when the execution completes (not when the registration is cancelled, so it never says nothing
-was refunded just before a refund). It states what was done and carries no amount.
+No new template, and nothing waits for a later press. The registrant gets the existing registration-cancelled email at once, with the
+cancellation, in neutral words (cancelled; any refund is handled separately and they are notified when one completes; no amount, and
+no "we did not refund" sentence). Each refund sends the existing refund notice (#277) from its own committed row when it completes
+(the manual path at once, a Square refund when Square's webhook confirms it). A waitlisted registration gets the waitlist-removal
+notice only. A refund settled outside this tool sends nothing, and no email promises a notice that will not come.
 
 ## Running it
 

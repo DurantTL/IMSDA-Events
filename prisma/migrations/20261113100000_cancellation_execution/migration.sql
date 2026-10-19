@@ -217,6 +217,7 @@ BEGIN
   IF OLD."resolvedAt" IS NOT NULL AND (
     NEW."resolvedAt" IS DISTINCT FROM OLD."resolvedAt"
     OR NEW."resolvedByUserId" IS DISTINCT FROM OLD."resolvedByUserId"
+    OR NEW."resolvedByNameSnapshot" IS DISTINCT FROM OLD."resolvedByNameSnapshot"
     OR NEW."resolutionNote" IS DISTINCT FROM OLD."resolutionNote"
     OR NEW."status" <> 'FAILED'
   ) THEN

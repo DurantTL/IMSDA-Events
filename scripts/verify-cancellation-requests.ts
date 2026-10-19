@@ -514,7 +514,7 @@ async function main() {
       const mails = await base.messageOutbox.findMany({ where: { registrationId: open.registrationId, templateKey: { in: ["REFUND_NOTICE", "REGISTRATION_CANCELLED"] } } });
       assert(mails.every((mail) => !mail.bodyTextSnapshot.includes(SECRET_REASON) && !mail.bodyTextSnapshot.includes("Approved to carry out.")), "no email carries a reason");
       const cancelledMail = mails.find((mail) => mail.templateKey === "REGISTRATION_CANCELLED")!;
-      assert(cancelledMail.bodyTextSnapshot.includes("has been carried out and your registration is cancelled") && !cancelledMail.bodyTextSnapshot.includes("did not automatically refund"), "the one cancellation email says what was done, never that nothing was refunded");
+      assert(cancelledMail.bodyTextSnapshot.includes("Your registration has been cancelled at your request") && !cancelledMail.bodyTextSnapshot.includes("did not automatically refund") && !cancelledMail.bodyTextSnapshot.includes("you receive a separate refund notice"), "the one cancellation email is neutral about money: never that nothing was refunded, never a promise of a notice");
       const audits = await base.auditLog.findMany({ where: { OR: [{ entityType: { startsWith: "CancellationExecution" } }, { action: "REFUND_RECORDED", eventId }] } });
       assert(audits.length >= 5 && audits.every((entry) => !stable(entry).includes(SECRET_REASON) && !stable(entry).includes("Request Check Finance") && !stable(entry).includes("Approved to carry out.")), "audit entries hold ids and amounts only");
       const requestRow = await base.cancellationRequest.findUniqueOrThrow({ where: { id: openRequestId } });
@@ -611,14 +611,14 @@ async function main() {
       const leg = await base.cancellationExecutionRefund.findFirstOrThrow({ where: { executionId: first.id } });
       assert(refund.status === "PENDING" && refund.idempotencyKey === leg.idempotencyKey && refund.externalReference === leg.providerRefundId && square.calls[0].key === leg.idempotencyKey, "a pending refund row with the leg's key and Square's refund id");
       assert(await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "no refund notice until Square confirms");
-      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 0, "no cancellation email while the refund is with Square");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "the cancellation email goes with the cancellation, not with a later press");
       const checked = await carry(eventId, requestId);
       assert(callCount() === 1 && checked.status === "PROCESSOR_PENDING", "checking the status does not ask Square for another refund");
       // Square's own confirmation arrives through the existing refund webhook, which marks the refund done.
       await base.refund.update({ where: { id: refund.id }, data: { status: "SUCCEEDED" } });
       const finished = await carry(eventId, requestId);
       assert(finished.status === "COMPLETED" && finished.legs[0].status === "DONE" && callCount() === 1, "once Square confirms, it is completed without another request");
-      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "the one cancellation email goes out when the refund has settled");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "and no second cancellation email follows when the refund settles");
       assert(!(await base.messageOutbox.findFirstOrThrow({ where: { registrationId: reg.registrationId, templateKey: "REGISTRATION_CANCELLED" } })).bodyTextSnapshot.includes("did not automatically refund"), "and it does not say nothing was refunded");
       assert((await rejects(() => carry(eventId, requestId, "OFFLINE")))?.code === "METHOD_FIXED", "the method cannot change once started");
       assert((await refundRows(reg.registrationId)).length === 1, "one refund in all");
@@ -679,7 +679,7 @@ async function main() {
       assert((await base.registration.findUniqueOrThrow({ where: { id: reg.registrationId } })).status === "CANCELLED", "the cancellation stands");
       const [row] = await refundRows(reg.registrationId);
       assert(row.status === "FAILED", "the declined refund is recorded as failed");
-      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 0 && await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "no final message while a refund needs a person");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1 && await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "the cancellation email was sent once with the cancellation; no refund notice for a refund that did not happen");
       const before = callCount();
       await carry(eventId, requestId);
       assert(callCount() === before, "pressing again does not resend a declined refund");
@@ -687,13 +687,15 @@ async function main() {
       const done = await execution.resolveOutsideTool(eventId, requestId, { userId: staffTwoId }, { confirm: true, note: "Customer was refunded by check from the office." }, { now });
       assert(done.status === "COMPLETED" && done.legs[0].resolved && done.legs[0].resolutionNote?.includes("by check"), "recording it completes the execution");
       assert((await refundRows(reg.registrationId)).length === 1 && callCount() === before, "resolving made no refund and called no processor");
-      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1 && await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "the one final message goes out, with no refund notice for a refund that never happened");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1 && await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "resolving sends nothing more: no second cancellation email, no refund notice for a refund that never happened");
       const audit = await base.auditLog.findFirstOrThrow({ where: { action: "CANCELLATION_REFUND_RESOLVED_OUTSIDE_TOOL", metadata: { path: ["requestId"], equals: requestId } } });
       assert(audit.actorUserId === staffTwoId && !stable(audit).includes("by check") && (audit.metadata as { moneyMoved?: boolean }).moneyMoved === false, "the audit entry names the person and holds ids and amounts only");
       assert((await rejects(() => execution.resolveOutsideTool(eventId, requestId, { userId: staffId }, { confirm: true, note: "Again by hand." })))?.code === "NOTHING_TO_RESOLVE", "there is nothing left to resolve");
       const legRow = await base.cancellationExecutionRefund.findFirstOrThrow({ where: { executionId: done.id } });
       const rewrite = await rejects(() => base.$executeRaw`UPDATE "CancellationExecutionRefund" SET "resolutionNote" = 'Edited' WHERE "id" = ${legRow.id}`);
       assert(rewrite && /resolved cancellation refund cannot be changed/.test(String(rewrite.message)), "a resolution cannot be rewritten");
+      const renamed = await rejects(() => base.$executeRaw`UPDATE "CancellationExecutionRefund" SET "resolvedByNameSnapshot" = 'Someone Else' WHERE "id" = ${legRow.id}`);
+      assert(renamed && /resolved cancellation refund cannot be changed/.test(String(renamed.message)), "the resolver's recorded name cannot be rewritten");
       const doneLeg = await base.cancellationExecutionRefund.findFirstOrThrow({ where: { execution: { requestId: openRequestId } } });
       const noNote = await rejects(() => base.$executeRaw`UPDATE "CancellationExecutionRefund" SET "resolvedAt" = now(), "resolvedByUserId" = ${staffId} WHERE "id" = ${doneLeg.id}`);
       assert(noNote && /resolution_is_named/.test(String(noNote.message)), "the database refuses a resolution with no note, name or failed refund");
@@ -712,7 +714,18 @@ async function main() {
       assert(failed.status === "FAILED" && failed.legs[0].failureCode === "PROVIDER_FAILED" && !failed.canContinue && failed.canResolve, "a failed refund after cancelling waits for a person");
       assert(callCount() === before, "it is not sent again");
       const done = await execution.resolveOutsideTool(eventId, requestId, { userId: staffId }, { confirm: true, note: "Handled in the Square dashboard." }, { now });
-      assert(done.status === "COMPLETED" && await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "recording it completes the execution and sends the one final message");
+      assert(done.status === "COMPLETED" && await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "recording it completes the execution without a second cancellation email");
+    }
+    // A waitlisted registration gets the waitlist notice only; no cancellation email.
+    {
+      const reg = await createRegistration({ waitlisted: true });
+      const requestId = await ask(reg, { scope: "FULL_REGISTRATION" }, 0);
+      await approve(eventId, requestId);
+      const done = await carry(eventId, requestId);
+      assert(done.status === "COMPLETED" && done.legs.length === 0, "a waitlisted registration with nothing to refund completes");
+      assert(await mailCount(reg.registrationId, "WAITLIST_REMOVED") === 1 && await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 0, "it gets the waitlist-removal notice only");
+      await carry(eventId, requestId);
+      assert(await mailCount(reg.registrationId, "WAITLIST_REMOVED") === 1, "repeating sends nothing more");
     }
     // Two approved requests on one registration, pressed at the same moment: one execution, one set of refunds.
     {

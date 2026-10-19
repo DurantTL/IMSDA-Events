@@ -802,11 +802,11 @@ export async function cancelRegistration(
   now = new Date(),
   options: {
     /**
-     * Leaves the cancellation message to the caller (#171): a cancellation carried out from an approved request sends one
-     * message after its refunds settle, not one that says nothing was refunded seconds before the refund. A waitlist
-     * removal notice is still sent.
+     * The payment wording of the cancellation message (#171). A cancellation carried out from an approved request sends its
+     * email at once, in words that do not say nothing was refunded while a refund is on its way. A waitlist removal notice
+     * is unaffected.
      */
-    holdCancellationMessage?: boolean;
+    cancellationNote?: string;
   } = {},
 ): Promise<CancelRegistrationResult> {
   const result = await runSerializable(async (tx) => {
@@ -894,11 +894,10 @@ export async function cancelRegistration(
         paymentHistoryPreserved: true,
       },
     });
-    const cancellationMessage = options.holdCancellationMessage && !wasWaitlisted
-      ? { pendingMessageIds: [] as string[] }
-      : await (wasWaitlisted
+    const cancellationMessage = await (wasWaitlisted
       ? enqueueWaitlistRemovedMessage
       : enqueueRegistrationCancelledMessage)(tx, {
+      ...(options.cancellationNote && !wasWaitlisted ? { cancellationNote: options.cancellationNote } : {}),
       eventId,
       registrationId: registration.id,
       correlationId,

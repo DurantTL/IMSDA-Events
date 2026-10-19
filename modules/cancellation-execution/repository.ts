@@ -33,7 +33,6 @@ import type {
 import { diffRegistrationState, registrationStateOf, type RegistrationStateSnapshot, type RequestConflict } from "@/modules/cancellation-requests/domain";
 import { stateFingerprint } from "@/modules/cancellation-requests/fingerprint";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
-import { enqueueRegistrationCancelledMessage } from "@/modules/communications/transactional-messages";
 import { PaymentOperationError, recordRefund } from "@/modules/payments/repository";
 import { createSquareRefund, SquareAdapterError } from "@/modules/payments/square-adapter";
 import { getSquareConfiguration, type SquareRuntimeConfiguration } from "@/modules/payments/square-config";
@@ -685,8 +684,9 @@ async function runCancellation(execution: ExecutionRow, user: { id: string; disp
     // Cancelling is done once. A registration that is already cancelled (this step ran before, or a person did it) is done.
     if (registration.status === "CANCELLED") return markCancelled(execution, user, registration.cancelledAt ?? now, { alreadyCancelled: true });
     try {
-      // The cancellation email is held: one message is sent when the refunds settle (see `settle`).
-      const result = await cancelRegistration(execution.eventId, execution.registrationId, user.id, "Cancelled at the registrant's request.", now, { holdCancellationMessage: true });
+      // The cancellation email goes out now, from the committed cancellation, in words that promise nothing about a refund
+      // notice (refund notices are sent by the refunds themselves, when they complete). It is never sent a second time.
+      const result = await cancelRegistration(execution.eventId, execution.registrationId, user.id, "Cancelled at the registrant's request.", now, { cancellationNote: cancelledMessageNote });
       await markCancelled(execution, user, now, { alreadyCancelled: false, autoPromotedRegistrationId: result.autoPromotedRegistration?.id ?? null });
       await deliver(result.pendingMessageIds, "Cancellation");
     } catch (error) {
@@ -742,13 +742,12 @@ async function runSteps(execution: ExecutionRow, user: { id: string; displayName
   if (settled.refunds.every((leg) => stepOf(leg.status) === "DONE")) await runCancellation(settled, user, deps, now);
 }
 
-/** What the registrant is told once a whole-registration cancellation has settled: what was done, no amounts. */
-const finalMessageNote = "Your approved cancellation request has been carried out and your registration is cancelled. If a refund was approved, you receive a separate refund notice when it is complete. Contact the event team with any questions.";
+/** What the cancellation email says about money for a cancellation carried out from an approved request: no amounts, no promise. */
+const cancelledMessageNote = "Your registration has been cancelled at your request. Any refund is handled separately by the event team, and you are notified when a refund is completed. Contact the event team with any questions.";
 
 /**
- * Saves the status the steps add up to, and writes one audit entry when it changed. When a whole-registration execution
- * completes, its one cancellation message is queued in the same transaction (idempotent per execution), so it is sent only
- * from facts that are committed. Returns the execution and the messages to deliver after commit.
+ * Saves the status the steps add up to, and writes one audit entry when it changed. Emails are not sent from here: the
+ * cancellation email goes with the cancellation and each refund notice with its refund, so nothing depends on a later press.
  */
 async function settle(requestId: string, user: { id: string }, now: Date) {
   const db = getPrisma();
@@ -763,14 +762,13 @@ async function settle(requestId: string, user: { id: string }, now: Date) {
   const failure = current.cancelStatus === "FAILED"
     ? current.cancelFailureCode
     : current.refunds.find((leg) => leg.status === "FAILED" && !leg.resolvedAt)?.failureCode ?? null;
-  let pendingMessageIds: string[] = [];
   if (status !== current.status || (failure ?? null) !== (current.lastFailureCode ?? null)) {
-    pendingMessageIds = await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       await tx.cancellationExecution.update({
         where: { id: current.id },
         data: { status, lastFailureCode: failure, completedAt: status === "COMPLETED" ? current.completedAt ?? now : null },
       });
-      if (status === current.status) return [] as string[];
+      if (status === current.status) return;
       await writeAuditLog({
         eventId: current.eventId,
         actorUserId: user.id,
@@ -780,19 +778,8 @@ async function settle(requestId: string, user: { id: string }, now: Date) {
         summary: status === "COMPLETED" ? "An approved cancellation was carried out." : status === "FAILED" ? "Carrying out an approved cancellation needs attention." : "The status of carrying out an approved cancellation changed.",
         metadata: { requestId: current.requestId, executionId: current.id, registrationId: current.registrationId, fromStatus: current.status, toStatus: status, approvedRefundCents: current.approvedRefundCents, failureCode: failure },
       }, tx);
-      if (status !== "COMPLETED" || current.scope !== "FULL_REGISTRATION") return [] as string[];
-      const queued = await enqueueRegistrationCancelledMessage(tx, {
-        eventId: current.eventId,
-        registrationId: current.registrationId,
-        correlationId: crypto.randomUUID(),
-        transitionKey: `cancellation-execution:${current.id}`,
-        cancellationNote: finalMessageNote,
-        metadata: { source: "CANCELLATION_EXECUTION", executionId: current.id },
-      });
-      return queued.pendingMessageIds;
     }, { timeout: 20_000 });
   }
-  await deliver(pendingMessageIds, "Cancellation status");
   return loadExecution(db, requestId);
 }
 
