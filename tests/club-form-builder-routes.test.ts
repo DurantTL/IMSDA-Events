@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   discardClubFormDraft: vi.fn(),
   publishClubFormDraft: vi.fn(),
   setClubFormTemplateEnabled: vi.fn(),
+  setClubFormAlertRecipients: vi.fn(),
   runClubFormTemplateSync: vi.fn(),
 }));
 
@@ -22,7 +23,7 @@ vi.mock("@/modules/club-forms/builder", () => ({
   discardClubFormDraft: mocks.discardClubFormDraft,
   publishClubFormDraft: mocks.publishClubFormDraft,
 }));
-vi.mock("@/modules/club-forms/templates", () => ({ setClubFormTemplateEnabled: mocks.setClubFormTemplateEnabled, runClubFormTemplateSync: mocks.runClubFormTemplateSync }));
+vi.mock("@/modules/club-forms/templates", () => ({ setClubFormTemplateEnabled: mocks.setClubFormTemplateEnabled, setClubFormAlertRecipients: mocks.setClubFormAlertRecipients, runClubFormTemplateSync: mocks.runClubFormTemplateSync }));
 vi.mock("@/modules/club-rosters/access", () => ({
   RosterAccessError: class RosterAccessError extends Error {
     constructor(public readonly code: string, public readonly status: number, message: string) {
@@ -37,6 +38,7 @@ vi.mock("@/modules/club-rosters/api-errors", () => ({
 
 import { PATCH as TOGGLE } from "@/app/api/admin/club-forms/[templateKey]/route";
 import { DELETE as DISCARD, PUT as SAVE } from "@/app/api/admin/club-forms/[templateKey]/draft/route";
+import { PUT as ALERTS } from "@/app/api/admin/club-forms/[templateKey]/alerts/route";
 import { POST as PUBLISH } from "@/app/api/admin/club-forms/[templateKey]/publish/route";
 import { POST as CREATE } from "@/app/api/admin/club-forms/route";
 import { POST as SYNC } from "@/app/api/admin/club-forms/sync/route";
@@ -55,6 +57,7 @@ const routes: Array<{ name: string; call: () => Promise<Response>; service: () =
   { name: "publish", call: () => PUBLISH(json({ baseVersion: 1 }), key), service: () => mocks.publishClubFormDraft },
   { name: "sync templates", call: () => SYNC(json({})), service: () => mocks.runClubFormTemplateSync },
   { name: "enable", call: () => TOGGLE(json({ enabled: true }, "PATCH"), key), service: () => mocks.setClubFormTemplateEnabled },
+  { name: "set alert recipients (#1017)", call: () => ALERTS(json({ emails: ["office@imsda-events.test"] }, "PUT"), key), service: () => mocks.setClubFormAlertRecipients },
 ];
 
 beforeEach(() => {
@@ -66,6 +69,7 @@ beforeEach(() => {
   mocks.discardClubFormDraft.mockResolvedValue({ key: "synthetic_form", version: 1 });
   mocks.publishClubFormDraft.mockResolvedValue({ key: "synthetic_form", version: 2 });
   mocks.setClubFormTemplateEnabled.mockResolvedValue({ key: "synthetic_form", enabled: true });
+  mocks.setClubFormAlertRecipients.mockResolvedValue({ key: "synthetic_form", emails: ["office@imsda-events.test"] });
   mocks.runClubFormTemplateSync.mockResolvedValue({ results: [], counts: { updated: 0, created: 0, skipped: 0, unchanged: 0, refused: 0, staleDrafts: 0 } });
 });
 
