@@ -35,6 +35,8 @@ import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { evaluateLocationPhase, locationLifecycleSource } from "@/modules/event-locations/domain";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
+import { createOrganizationInTransaction, listSimilarClubCandidates, sponsorPlace } from "@/modules/organizations/repository";
+import { addClubBlock, shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
 import { preparePublicRegistration, type PublicRegistrationInput } from "@/modules/forms/public-domain";
 import { attendeePromoCodeField, promoCodeField } from "@/modules/promo-codes/domain";
 import {
@@ -89,7 +91,9 @@ export class GeneralLinkError extends Error {
       | "REASON_REQUIRED"
       | "LINK_NOT_AVAILABLE"
       | "FORM_CHANGED"
-      | "TOO_MANY_PENDING",
+      | "TOO_MANY_PENDING"
+      | "CLUB_EXISTS"
+      | "SIMILAR_CLUBS",
     message: string,
   ) {
     super(message);
@@ -1026,7 +1030,64 @@ export async function resolvedTeamCounts(eventId: string) {
 
 export type ResolveTeamInput =
   | { action: "CONFIRM" | "REASSIGN"; organizationId: string }
+  | { action: "ADD_CLUB"; clubName: string; sponsoringChurchId: string; acknowledgeSimilar?: boolean }
   | { action: "REJECT"; reason: string };
+
+/** The id of the club staff add for a waiting team: derived from the submission, so a retry or a double click finds the same club. */
+export function addedClubId(submissionId: string) {
+  return `club_gls_${submissionId}`;
+}
+
+/** The name staff typed for a new club: spacing collapsed, 2 to 160 characters (the directory's own limits). */
+export function cleanNewClubName(value: string) {
+  const name = value.normalize("NFKC").replace(/\s+/g, " ").trim();
+  if (name.length < 2 || name.length > 160) throw new GeneralLinkError("CLUB_INVALID", "Enter the club's name, 2 to 160 characters.");
+  return name;
+}
+
+/**
+ * The directory clubs a typed name could be, for staff to check before adding a new one (the route checks the permission).
+ * Only for a team that is still waiting in this event: anything else is SUBMISSION_NOT_FOUND. Names and towns of directory clubs
+ * only; nothing from the waiting team.
+ */
+export async function similarClubsFor(eventId: string, submissionId: string, input: { clubName: string; sponsoringChurchId: string | null }) {
+  const prisma = getPrisma();
+  const waiting = await prisma.generalLinkSubmission.findFirst({ where: { id: submissionId, eventId, status: "PENDING" }, select: { id: true } });
+  if (!waiting) throw new GeneralLinkError("SUBMISSION_NOT_FOUND", "That team could not be found.");
+  const name = input.clubName.normalize("NFKC").replace(/\s+/g, " ").trim();
+  const place = input.sponsoringChurchId ? await sponsorPlace(prisma, input.sponsoringChurchId) : null;
+  if (name.length < 2 && !place) return [];
+  return shownMatches(similarClubMatches(name, place ?? { sponsorId: null, city: null, state: null }, await listSimilarClubCandidates(prisma)));
+}
+
+/**
+ * Adds the club inside the confirming transaction (#1031), by the directory's own create rule: an active sponsoring church or
+ * company, the same audit entry (ids only), and the duplicate check, run here in the same Serializable transaction so two staff
+ * members adding the same club race to one row. Does nothing when the club is already there: the retry of a transaction that
+ * committed, or the second click.
+ */
+async function addClubInTransaction(tx: Tx, input: {
+  id: string; name: string; sponsoringChurchId: string; acknowledgeSimilar: boolean; eventId: string; submissionId: string; actorUserId: string;
+}) {
+  if (await tx.organization.findUnique({ where: { id: input.id }, select: { id: true } })) return;
+  const place = await sponsorPlace(tx, input.sponsoringChurchId);
+  if (!place) throw new GeneralLinkError("CLUB_INVALID", "Choose an active church or company from the list.");
+  const block = addClubBlock(similarClubMatches(input.name, place, await listSimilarClubCandidates(tx)), input.acknowledgeSimilar);
+  if (block) throw new GeneralLinkError(block.code, block.message);
+  await createOrganizationInTransaction(
+    tx,
+    { type: "CLUB", name: input.name, parentOrganizationId: input.sponsoringChurchId, isActive: true },
+    input.actorUserId,
+    {
+      id: input.id,
+      audit: {
+        eventId: input.eventId,
+        summary: "Staff added a club to the directory for a team registered through the general link.",
+        metadata: { generalLinkSubmissionId: input.submissionId },
+      },
+    },
+  );
+}
 
 /**
  * One staff action on a waiting team (MANAGE_REGISTRATION, checked by the route):
@@ -1034,6 +1095,10 @@ export type ResolveTeamInput =
  *   director typed and the club's own name in the club question. The row turns CONFIRMED in the same transaction, so a second
  *   click, a second staff member, or a retry can never create a second registration. REASSIGN to the club the director
  *   picked is recorded as a confirmation.
+ * - ADD_CLUB (#1031) does the same for a club that is not in the directory: the club is created by the directory's own rule inside
+ *   the same transaction that creates the registration, so either both exist or neither does. Its id comes from the submission,
+ *   so a double click, a second staff member or a retry finds the one club. System administrators only (the directory's rule for
+ *   creating a club), checked by the route.
  * - REJECT needs a reason, removes the typed answers, and tells the director.
  * Safe under concurrency: the first transaction to move the row out of PENDING wins; the others answer ALREADY_RESOLVED, or,
  * when they asked for the very same outcome, see it done.
@@ -1113,8 +1178,11 @@ export async function resolvePendingTeam(
     return { status: "REJECTED", alreadyDone: false, registrationId: null, clubName: null };
   }
 
-  // Attaching to a club.
-  const club = await prisma.organization.findFirst({ where: { id: action.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true } });
+  // Attaching to a club, or to the club staff add now.
+  const adding = action.action === "ADD_CLUB";
+  const club = adding
+    ? { id: addedClubId(row.id), name: cleanNewClubName(action.clubName) }
+    : await prisma.organization.findFirst({ where: { id: action.organizationId, type: "CLUB", isActive: true }, select: { id: true, name: true } });
   if (!club) throw new GeneralLinkError("CLUB_INVALID", "Choose an active club from the list.");
   if (row.status === "CONFIRMED") {
     if (row.organizationId === club.id) return { status: "CONFIRMED", alreadyDone: true, registrationId: row.registrationId, clubName: row.organization?.name ?? club.name };
@@ -1129,6 +1197,12 @@ export async function resolvePendingTeam(
   if (!experience) throw new GeneralLinkError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
   const stored = row.payload as { responses?: Record<string, unknown>; attendees?: Array<{ clientId: string; responses: Record<string, unknown> }> };
   const resolution = row.suggestedOrganizationId === club.id ? "STAFF_CONFIRMED" as const : "STAFF_REASSIGNED" as const;
+  const clubPreparer = clubContext({
+    organizationId: club.id,
+    team: row.teamKey !== NO_TEAM_KEY ? { name: row.teamName, key: row.teamKey } : null,
+    locationId: row.locationId,
+    seed: row.idempotencyKey,
+  });
   // Acknowledgment evidence (#150) records the wording the director was shown. Staff confirm against the current form, so when
   // the form changed after the team was received, its acknowledgment answers were for other wording and are dropped here.
   const storedVersionId = (row.payload as { versionId?: unknown }).versionId;
@@ -1153,13 +1227,16 @@ export async function resolvePendingTeam(
       // As of the day the director submitted: a team received before the deadline is not refused because staff confirmed it after.
       row.createdAt,
       {
-        ...clubContext({
-          organizationId: club.id,
-          team: row.teamKey !== NO_TEAM_KEY ? { name: row.teamName, key: row.teamKey } : null,
-          locationId: row.locationId,
-          seed: row.idempotencyKey,
-        }),
-        auditMetadata: { generalLinkSubmissionId: row.id, matchBasis: "STAFF" },
+        ...clubPreparer,
+        // A club staff add exists only if the registration does: it is created first thing in the registration's transaction, before
+        // the club question is validated against the directory.
+        ...(action.action === "ADD_CLUB" ? {
+          beforeValidation: (tx: Tx) => addClubInTransaction(tx, {
+            id: club.id, name: club.name, sponsoringChurchId: action.sponsoringChurchId, acknowledgeSimilar: action.acknowledgeSimilar === true,
+            eventId, submissionId: row.id, actorUserId,
+          }),
+        } : {}),
+        auditMetadata: { generalLinkSubmissionId: row.id, matchBasis: "STAFF", ...(adding ? { clubAdded: true } : {}) },
         auditActorUserId: actorUserId,
         // This submission's own waiting name is released by this very confirmation; every other waiting name stays reserved.
         confirmsPendingSubmissionId: row.id,
@@ -1179,19 +1256,22 @@ export async function resolvePendingTeam(
             data: {
               eventId,
               actorUserId,
-              action: resolution === "STAFF_CONFIRMED" ? "GENERAL_LINK_TEAM_CONFIRMED" : "GENERAL_LINK_TEAM_REASSIGNED",
+              action: adding ? "GENERAL_LINK_TEAM_CLUB_ADDED" : resolution === "STAFF_CONFIRMED" ? "GENERAL_LINK_TEAM_CONFIRMED" : "GENERAL_LINK_TEAM_REASSIGNED",
               entityType: "GeneralLinkSubmission",
               entityId: row.id,
               correlationId: randomUUID(),
-              summary: resolution === "STAFF_CONFIRMED"
-                ? "Staff confirmed the club of a team registered through the general link."
-                : "Staff attached a team registered through the general link to a different club than the one picked.",
+              summary: adding
+                ? "Staff added a club to the directory and confirmed a team registered through the general link with it."
+                : resolution === "STAFF_CONFIRMED"
+                  ? "Staff confirmed the club of a team registered through the general link."
+                  : "Staff attached a team registered through the general link to a different club than the one picked.",
               metadata: {
                 generalLinkSubmissionId: row.id,
                 registrationId: created.registrationId,
                 organizationId: club.id,
                 suggestedOrganizationId: row.suggestedOrganizationId,
                 resolution,
+                ...(adding ? { organizationCreated: true } : {}),
               },
             },
           });
@@ -1207,19 +1287,19 @@ export async function resolvePendingTeam(
     }
     // A second staff member, or a retry, reached the same transaction. Whatever stopped this attempt (the winner's own rows
     // can trip the one-team rule on a retry), the row says what happened: if it is no longer waiting, someone else decided it.
-    const now = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true } });
+    const now = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true, organization: { select: { name: true } } } });
     if (now && now.status !== "PENDING") {
-      if (now.status === "CONFIRMED" && now.organizationId === club.id) return { status: "CONFIRMED", alreadyDone: true, registrationId: now.registrationId, clubName: club.name };
+      if (now.status === "CONFIRMED" && now.organizationId === club.id) return { status: "CONFIRMED", alreadyDone: true, registrationId: now.registrationId, clubName: now.organization?.name ?? club.name };
       throw new GeneralLinkError("ALREADY_RESOLVED", "That team was already handled by someone else.");
     }
     throw error;
   }
   // A replay (a lost response on the first click, or the same click twice) commits nothing new: the row says what happened.
-  const done = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true } });
+  const done = await prisma.generalLinkSubmission.findUnique({ where: { id: row.id }, select: { status: true, organizationId: true, registrationId: true, organization: { select: { name: true } } } });
   if (done?.status !== "CONFIRMED" || done.organizationId !== club.id) {
     throw new GeneralLinkError("ALREADY_RESOLVED", "That team was already handled by someone else.");
   }
-  return { status: "CONFIRMED", alreadyDone: !attachedHere, registrationId: done.registrationId, clubName: club.name };
+  return { status: "CONFIRMED", alreadyDone: !attachedHere, registrationId: done.registrationId, clubName: done.organization?.name ?? club.name };
 }
 
 // ---------------------------------------------------------------------------------------------

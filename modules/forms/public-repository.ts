@@ -150,6 +150,12 @@ export type ClubSubmissionContext = {
   auditMetadata?: Record<string, string | number | boolean | null>;
   /** The staff user behind this submission for the audit entry when staff confirmed a waiting team (#931); never an act-as. */
   auditActorUserId?: string;
+  /**
+   * Runs first thing inside this transaction, before the form's directory options are read and the answers are validated (#1031):
+   * a club staff add for a waiting team must exist for the club question to accept its name. Runs again, harmlessly, when the
+   * transaction is retried; it must do nothing when its work is already done.
+   */
+  beforeValidation?: (tx: Prisma.TransactionClient) => Promise<void>;
   prepareAttendees: (
     tx: Prisma.TransactionClient,
     args: {
@@ -752,6 +758,7 @@ async function createPublicRegistrationTransaction(
     throw new PublicRegistrationError("FORM_VERSION_CHANGED", "This form was updated while it was open. Refresh the page before submitting.");
   }
 
+  if (club?.beforeValidation) await club.beforeValidation(tx);
   // Read through the transaction, so the directory the answers are validated
   // against is the same snapshot the registration is written in (#482).
   const hydratedDefinition = await hydrateFormOptions(definitionFromJson(version.definition), {

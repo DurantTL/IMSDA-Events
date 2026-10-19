@@ -374,6 +374,8 @@ function pbePages(team: { registrationId: string; teamKey: string }): PageSpec[]
     { name: "pbe-club-portal-team-form-blank", path: `${portal}/team-form/blank`, role: "director" },
     pbeStaff("registrations", "/people"),
     { ...pbeStaff("pending-teams", "/people/pending-teams"), flow: "pending-teams" },
+    // A system administrator also sees "Add this club to the directory" on a team whose club is not listed (#1031).
+    { ...staff("pbe-pending-teams-admin", `/people/pending-teams?event=${pbeEventId}`, "system-admin"), flow: "pending-teams" },
     pbeStaff("team-results", "/more/team-results"),
     pbeStaff("team-form-report", "/more/reports/clubs/team-form"),
     pbeStaff("team-form-registration", `/more/reports/clubs/team-form/${team.registrationId}`),
@@ -586,7 +588,7 @@ async function seedPbeEvent(prisma: PrismaClient) {
     clientId: `c${`${first}${last}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12)}`,
     responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
   });
-  const submit = async (teamName: string, clubName: string, email: string, key: string, location: string) => {
+  const submit = async (teamName: string, clubName: string, email: string, key: string, location: string, extraResponses: Record<string, unknown> = {}) => {
     if (await prisma.generalLinkSubmission.findFirst({ where: { eventId: pbeEventId, teamName } })) return;
     await submitGeneralLinkRegistration(pbeEventSlug, {
       versionId, idempotencyKey: key,
@@ -594,6 +596,7 @@ async function seedPbeEvent(prisma: PrismaClient) {
         club_name: clubName, director_name: "Dana Mobilecheck-Directorsson", email, phone: "515-555-0100",
         coordinator_name: "Casey Mobilecheck-Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
         coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true, photo_video_release: "Yes",
+        ...extraResponses,
       },
       attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, "Pathfinder", true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Coach", 40, "Coach")],
       website: "",
@@ -602,6 +605,8 @@ async function seedPbeEvent(prisma: PrismaClient) {
   // Matched: the account email is club A's director on file. Waiting: an email that matches nobody, naming club B.
   await submit(pbeTeamName, `Mobilecheck ${longName}`, `${P}.director@example.test`, `${P}-pbe-matched-key-0001`, locations[0]!.id);
   await submit("Mobilecheck Sword Drillers of the Riverside Valley", "Mobilecheck Eagles Club", `${P}.unmatched.director-with-a-long-address@example.test`, `${P}-pbe-pending-key-0002`, locations[1]!.id);
+  // Waiting, club not in the directory (#1031): "Not listed" and the name the director typed, for staff to add.
+  await submit("Mobilecheck Lantern Bearers", "Not listed", `${P}.unlisted.director@example.test`, `${P}-pbe-unlisted-key-0003`, locations[0]!.id, { club_name_other: "Mobilecheck Lantern Pathfinders" });
   return prisma.clubEventRegistration.findFirstOrThrow({ where: { eventId: pbeEventId, organizationId: clubA }, select: { registrationId: true, teamKey: true } });
 }
 
@@ -3162,6 +3167,14 @@ async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, 
     await page.locator(".pending-team-reject:visible").first().click({ timeout: 5000 });
     await page.waitForTimeout(200);
     await auditState(page, name, width, `${prefix}-reject-open`);
+    // The add-club form (#1031), for a role that sees its button: open it and choose a church so the similar-clubs check runs.
+    const addClub = page.locator("button:has-text('Add this club to the directory'):visible").first();
+    if (await addClub.count() > 0) {
+      await addClub.click({ timeout: 5000 });
+      await page.locator(".pending-team-add-club select").first().selectOption({ index: 1 });
+      await page.waitForTimeout(600);
+      await auditState(page, `${spec.name} (add club form open)`, width, `${prefix}-add-club-open`);
+    }
   } catch (error) {
     record("audit-failed", name, width, (error as Error).message.split("\n")[0] ?? "failed");
   }

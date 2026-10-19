@@ -64,6 +64,25 @@ export function generalLinkClubOtherKey(definition: RegistrationFormDefinition, 
   ))?.key ?? null;
 }
 
+/** The line under the club menu on the public general link form (#1031). */
+export const GENERAL_LINK_NOT_LISTED_HELP = "Club not listed? Choose 'Not listed' and type your club's name. We'll add it.";
+
+/**
+ * The form as the general link shows it: the club question carries the "Not listed" line, unless the form words its own or has no
+ * "Not listed" name field to type into (then the line would promise something the form cannot take).
+ */
+export function generalLinkDisplayDefinition<T extends RegistrationFormDefinition>(definition: T): T {
+  const clubKey = generalLinkClubFieldKey(definition);
+  if (!clubKey || generalLinkClubOtherKey(definition, clubKey) === null) return definition;
+  return {
+    ...definition,
+    sections: definition.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => (field.key === clubKey && !field.helpText ? { ...field, helpText: GENERAL_LINK_NOT_LISTED_HELP } : field)),
+    })),
+  };
+}
+
 /** Why a form can't be used through the general link, or null. */
 export function generalLinkFormProblem(definition: RegistrationFormDefinition): string | null {
   const base = clubFormProblem(definition);
