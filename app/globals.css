@@ -12073,5 +12073,5 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Meals served against tickets sold (#1028): the payer split sits under each figure. */
 .kitchen-meals-served .served-split { display: block; margin-top: 2px; }
-.kitchen-meals-served tfoot th, .kitchen-meals-served tfoot td { font-weight: 700; }
+.kitchen-meals-served .served-total > * { border-top: 2px solid var(--line, #d6dee2); }
 .scanner-import-review { overflow-wrap: anywhere; }

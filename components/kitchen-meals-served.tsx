@@ -47,26 +47,25 @@ export function KitchenMealsServed({
       ) : (
         <>
           {!anyImport && <p className="inline-notice" role="status">No scanner results have been imported yet, so nothing shows as served.</p>}
-          <div className="report-table-wrap"><table className="report-table report-table-auto">
-            <thead><tr><th scope="col">Service</th><th scope="col">Sold</th><th scope="col">Served</th><th scope="col">Not used</th></tr></thead>
-            <tbody>
+          <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards">
+            <caption className="sr-only">Meals sold, served and not used, by service</caption>
+            <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Service</th><th role="columnheader" scope="col">Sold</th><th role="columnheader" scope="col">Served</th><th role="columnheader" scope="col">Not used</th></tr></thead>
+            <tbody role="rowgroup">
               {report.rows.map((row) => (
-                <tr key={row.key}>
-                  <th scope="row"><Link href={drillHref(row.key)}>{row.label}<span className="sr-only"> ticket details</span></Link></th>
-                  <td><Figure figures={row.sold} /></td>
-                  <td><Figure figures={row.served} /></td>
-                  <td><Figure figures={row.notUsed} /></td>
+                <tr key={row.key} role="row">
+                  <th role="rowheader" scope="row"><Link href={drillHref(row.key)}>{row.label}<span className="sr-only"> ticket details</span></Link></th>
+                  <td role="cell" data-label="Sold"><Figure figures={row.sold} /></td>
+                  <td role="cell" data-label="Served"><Figure figures={row.served} /></td>
+                  <td role="cell" data-label="Not used"><Figure figures={row.notUsed} /></td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row">{report.totals.label}</th>
-                <td><Figure figures={report.totals.sold} /></td>
-                <td><Figure figures={report.totals.served} /></td>
-                <td><Figure figures={report.totals.notUsed} /></td>
+              <tr role="row" className="served-total">
+                <th role="rowheader" scope="row">{report.totals.label}</th>
+                <td role="cell" data-label="Sold"><Figure figures={report.totals.sold} /></td>
+                <td role="cell" data-label="Served"><Figure figures={report.totals.served} /></td>
+                <td role="cell" data-label="Not used"><Figure figures={report.totals.notUsed} /></td>
               </tr>
-            </tfoot>
+            </tbody>
           </table></div>
         </>
       )}
