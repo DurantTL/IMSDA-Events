@@ -186,26 +186,26 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
               {visible.map((row) => (
                 <tr key={row.id}>
                   <td>
-                    {(row.approval === "WAITING" || (row.approval === "APPROVED" && row.peopleWithoutMeals > 0)) && <input aria-label={`Select ${row.confirmationCode}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" />}
+                    {(row.approval === "WAITING" || (row.approval === "APPROVED" && row.peopleWithoutMeals > 0)) && <label className="staff-invite-select"><input aria-label={`Select ${row.confirmationCode}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></label>}
                   </td>
-                  <td>
+                  <td data-label="Registration">
                     <strong>{row.name || row.email}</strong>
                     <br /><span className="field-help">{row.confirmationCode} · {row.email}</span>
                     <br /><span className="field-help">Registered {row.registeredAt.slice(0, 16).replace("T", " ")} UTC</span>
                   </td>
-                  <td>{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>
-                  <td>
+                  <td data-label="Group">{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>
+                  <td data-label="Party">
                     <ul className="staff-invite-party">
                       {row.party.map((person, index) => (
                         <li key={`${row.id}-${index}`}>{person.name} <span className="field-help">({roleLabel[person.role] ?? person.role}{person.age !== null ? `, age ${person.age}` : ""})</span></li>
                       ))}
                     </ul>
                   </td>
-                  <td>
+                  <td data-label="Housing request">
                     {row.needsHousing === null ? "—" : row.needsHousing ? "Needs on-site housing" : "No housing needed"}
                     {row.housingNote && <><br /><span className="field-help">{row.housingNote}</span></>}
                   </td>
-                  <td>
+                  <td data-label="State">
                     <span className={`status-chip ${row.approval === "APPROVED" ? "green" : row.approval === "DECLINED" ? "coral" : "gold"}`}>{row.approval === "WAITING" ? "Waiting for approval" : row.approval === "APPROVED" ? "Approved" : "Declined"}</span>
                     {row.peopleWithoutMeals > 0 && <><br /><span className="field-help">{row.peopleWithoutMeals} without meal coverage</span></>}
                   </td>
