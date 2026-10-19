@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { FileUp } from "lucide-react";
 import type { ScannerImportResult, ScannerPreview } from "@/modules/meals/scanner-import-repository";
 
@@ -14,6 +14,7 @@ const sourceText = { SHEET: "Google Sheet (CSV download)", TRANSACTIONS: "Scanne
  */
 export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ScannerPreview | null>(null);
   const [accepted, setAccepted] = useState<Set<number>>(new Set());
@@ -71,13 +72,16 @@ export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
     try {
       const { result } = await post("confirm");
       const parts = [
-        `${result?.redeemed ?? 0} meal${result?.redeemed === 1 ? "" : "s"} recorded as served`,
+        `${result?.redeemed ?? 0} meal${result?.redeemed === 1 ? "" : "s"} recorded as served (including any put back)`,
         ...(result?.unredeemed ? [`${result.unredeemed} corrected to not served`] : []),
+        ...(result?.reredeemed ? [`${result.reredeemed} put back as served`] : []),
         ...(result?.review ? [`${result.review} row${result.review === 1 ? "" : "s"} left for review (not saved)`] : []),
       ];
       setDone(`${parts.join(", ")}.`);
       setPreview(null);
       setFile(null);
+      // Clear the chosen file without remounting the input, so keyboard focus stays where it is.
+      if (inputRef.current) inputRef.current.value = "";
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That could not be done. Nothing was saved.");
@@ -115,7 +119,7 @@ export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
       </div>
       <label>
         CSV file
-        <input accept=".csv,text/csv" key={file ? file.name : "none"} onChange={chooseFile} type="file" />
+        <input accept=".csv,text/csv" onChange={chooseFile} ref={inputRef} type="file" />
         {file && <span className="field-help">{file.name}</span>}
       </label>
       <div className="intro-actions">
@@ -124,16 +128,21 @@ export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
         </button>
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      {done && <div className="inline-notice" role="status">{done}</div>}
-      {preview && (
-        <div className="form-stack" aria-label="Import preview">
-          <p role="status">
-            <strong>{sourceText[preview.source]}</strong>, {preview.rowCount} row{preview.rowCount === 1 ? "" : "s"}.{" "}
+      {/* Always mounted, so a screen reader announces the result when its text appears. */}
+      <div role="status">
+        {done && <div className="inline-notice">{done}</div>}
+        {preview && (
+          <p>
+            <strong>{sourceText[preview.source]}</strong>, {preview.rowCount} row{preview.rowCount === 1 ? "" : "s"}, <strong>{preview.matched}</strong> matched to a ticket.{" "}
             <strong>{preview.counts.newRedemptions}</strong> new meal{preview.counts.newRedemptions === 1 ? "" : "s"} served.{" "}
             {preview.counts.unchanged} already recorded or unchanged
             {preview.source === "SHEET" ? `, ${preview.counts.notRedeemed} not redeemed` : `, ${preview.counts.notSuccess} not successful scans (ignored)`}.{" "}
-            {preview.counts.conflicts} un-redeem conflict{preview.counts.conflicts === 1 ? "" : "s"}. {preview.counts.review} row{preview.counts.review === 1 ? "" : "s"} for review.
+            {preview.counts.conflicts} conflict{preview.counts.conflicts === 1 ? "" : "s"}. {preview.counts.review} row{preview.counts.review === 1 ? "" : "s"} for review.
           </p>
+        )}
+      </div>
+      {preview && (
+        <div className="form-stack">
 
           {preview.otherSourceHasRedemptions && (
             <div className="form-stack">
@@ -150,27 +159,30 @@ export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
 
           {preview.conflicts.length > 0 && (
             <div className="form-stack">
-              <h4>Un-redeem conflicts</h4>
+              <h4>Conflicts</h4>
               <p className="field-help">
-                These tickets are recorded as served, but this file shows them as not redeemed. Nothing changes unless you accept. A correction is
-                added as a new record; the earlier one stays.
+                Un-redeem: recorded as served, but this file shows the ticket as not redeemed. Put back: an earlier correction un-redeemed it, and this
+                file shows it served. Nothing changes unless you accept. A correction is a new record; the earlier ones stay.
+                {!preview.canAcceptUnredeem && " Accepting an un-redeem lowers the served counts and needs finance access, which you do not have."}
               </p>
               <div className="report-table-wrap"><table className="report-table report-table-auto">
-                <thead><tr><th scope="col">Accept</th><th scope="col">Ticket</th><th scope="col">Row</th><th scope="col">Recorded as served</th></tr></thead>
+                <thead><tr><th scope="col">Accept</th><th scope="col">Ticket</th><th scope="col">Row</th><th scope="col">Change</th><th scope="col">Served</th></tr></thead>
                 <tbody>
                   {preview.conflicts.map((row) => (
                     <tr key={row.ticketNumber}>
                       <td>
                         <input
-                          aria-label={`Accept the un-redeem of ${row.ticketId}`}
+                          aria-label={`Accept: ${row.kind === "UNREDEEM" ? "un-redeem" : "put back as served"} ${row.ticketId}`}
                           checked={accepted.has(row.ticketNumber)}
+                          disabled={row.kind === "UNREDEEM" && !preview.canAcceptUnredeem}
                           onChange={(changeEvent) => toggleConflict(row.ticketNumber, changeEvent.target.checked)}
                           type="checkbox"
                         />
                       </td>
                       <td>{row.ticketId}</td>
                       <td>{row.line}</td>
-                      <td>{new Date(row.servedAt).toLocaleString("en-US")}</td>
+                      <td>{row.kind === "UNREDEEM" ? "Un-redeem" : "Put back as served"}</td>
+                      <td>{row.servedAtLabel}</td>
                     </tr>
                   ))}
                 </tbody>

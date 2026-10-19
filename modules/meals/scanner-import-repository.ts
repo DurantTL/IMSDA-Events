@@ -3,11 +3,12 @@ import "server-only";
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { getPrisma } from "@/lib/prisma";
+import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { mealTicketId, scannerMealTypes } from "@/modules/meals/domain";
 import { MealError } from "@/modules/meals/errors";
 import {
-  SCANNER_IMPORT_MAX_BYTES, SCANNER_PREVIEW_ROWS_SHOWN, parseScannerFile, planScannerImport, reviewReasonLabels, sha256Hex, sheetTicketNumbers,
+  SCANNER_IMPORT_MAX_BYTES, SCANNER_PREVIEW_ROWS_SHOWN, eventLocalDateTime, parseScannerFile, planScannerImport, reviewReasonLabels, sha256Hex, sheetTicketNumbers,
   type ImportTicket, type ParsedScannerFile, type PlanInput, type ReviewReason, type ReviewRow, type ScannerPlan, type ScannerSource,
 } from "@/modules/meals/scanner-import";
 import { buildServedReport, servedDrillDown, type ServedTicket } from "@/modules/meals/served-report";
@@ -64,18 +65,21 @@ async function loadRedemptionState(db: Db, eventId: string) {
     select: { ticketId: true, kind: true, sourceKey: true, occurredAt: true, batch: { select: { source: true } } },
   });
   const served = new Map<string, { sourceKey: string; occurredAt: Date }>();
+  const unredeemed = new Map<string, string>();
   const existingKeys = new Set<string>();
   const existingSources = new Set<ScannerSource>();
   for (const event of events) {
     existingKeys.add(event.sourceKey);
     if (event.kind === "REDEEMED") {
       served.set(event.ticketId, { sourceKey: event.sourceKey, occurredAt: event.occurredAt });
+      unredeemed.delete(event.ticketId);
       existingSources.add(event.batch.source);
     } else {
       served.delete(event.ticketId);
+      unredeemed.set(event.ticketId, event.sourceKey);
     }
   }
-  return { served, existingKeys, existingSources };
+  return { served, unredeemed, existingKeys, existingSources };
 }
 
 async function loadPlanInput(db: Db, eventId: string, file: ParsedScannerFile, fileSha256: string): Promise<PlanInput> {
@@ -93,7 +97,7 @@ async function loadPlanInput(db: Db, eventId: string, file: ParsedScannerFile, f
     file, fileSha256, timeZone: event.timezone, tickets,
     inactiveNumbers: new Set(inEvent.map((row) => row.number)),
     otherEventNumbers: new Set(elsewhere.map((row) => row.number)),
-    served: state.served, existingKeys: state.existingKeys, existingSources: state.existingSources,
+    served: state.served, unredeemed: state.unredeemed, existingKeys: state.existingKeys, existingSources: state.existingSources,
   };
 }
 
@@ -107,12 +111,14 @@ export type ScannerPreview = {
   reviewReasons: Array<{ reason: ReviewReason; label: string; count: number }>;
   review: ReviewRow[];
   reviewShown: number;
-  conflicts: Array<{ ticketNumber: number; ticketId: string; line: number; servedAt: string }>;
+  conflicts: Array<{ kind: "UNREDEEM" | "REREDEEM"; ticketNumber: number; ticketId: string; line: number; servedAt: string; servedAtLabel: string }>;
+  /** Accepting an un-redeem lowers the served counts, so it needs finance access; the screen disables those boxes without it. */
+  canAcceptUnredeem: boolean;
   otherSourceHasRedemptions: boolean;
   digest: string;
 };
 
-function toPreview(plan: ScannerPlan, fileName: string): ScannerPreview {
+function toPreview(plan: ScannerPlan, fileName: string, timeZone: string, canAcceptUnredeem: boolean): ScannerPreview {
   const matched = plan.counts.newRedemptions + plan.counts.unchanged + plan.counts.conflicts + plan.counts.notRedeemed;
   return {
     source: plan.source,
@@ -125,7 +131,11 @@ function toPreview(plan: ScannerPlan, fileName: string): ScannerPreview {
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
     review: plan.review.slice(0, SCANNER_PREVIEW_ROWS_SHOWN),
     reviewShown: Math.min(plan.review.length, SCANNER_PREVIEW_ROWS_SHOWN),
-    conflicts: plan.conflicts.map((row) => ({ ticketNumber: row.ticketNumber, ticketId: mealTicketId(row.ticketNumber), line: row.line, servedAt: row.servedAt })),
+    conflicts: plan.conflicts.map((row) => ({
+      kind: row.kind, ticketNumber: row.ticketNumber, ticketId: mealTicketId(row.ticketNumber), line: row.line, servedAt: row.servedAt,
+      servedAtLabel: eventLocalDateTime(new Date(row.servedAt), timeZone),
+    })),
+    canAcceptUnredeem,
     otherSourceHasRedemptions: plan.otherSourceHasRedemptions,
     digest: plan.digest,
   };
@@ -143,16 +153,17 @@ function readFile(text: string) {
 }
 
 /** Reads and plans the file against the event. Writes nothing. */
-export async function previewScannerImport(eventId: string, fileName: string, text: string): Promise<ScannerPreview> {
+export async function previewScannerImport(eventId: string, fileName: string, text: string, canAcceptUnredeem = false): Promise<ScannerPreview> {
   const { file, fileSha256 } = readFile(text);
-  const plan = planScannerImport(await loadPlanInput(getPrisma(), eventId, file, fileSha256));
-  return toPreview(plan, cleanFileName(fileName));
+  const input = await loadPlanInput(getPrisma(), eventId, file, fileSha256);
+  return toPreview(planScannerImport(input), cleanFileName(fileName), input.timeZone, canAcceptUnredeem);
 }
 
 export type ScannerImportResult = {
   batchId: string | null;
   redeemed: number;
   unredeemed: number;
+  reredeemed: number;
   unchanged: number;
   review: number;
   conflictsIgnored: number;
@@ -171,6 +182,8 @@ export async function confirmScannerImport(input: {
   digest: string;
   acceptUnredeem: readonly number[];
   acknowledgeOtherSource: boolean;
+  /** The caller also holds MANAGE_FINANCE. Recording new redemptions needs only report access; accepting an un-redeem needs this. */
+  canAcceptUnredeem: boolean;
 }): Promise<ScannerImportResult> {
   const { file, fileSha256 } = readFile(input.text);
   return getPrisma().$transaction(async (tx) => {
@@ -186,33 +199,51 @@ export async function confirmScannerImport(input: {
     if ([...accepted].some((number) => !conflictNumbers.has(number))) {
       throw new MealError("INVALID", "You accepted an un-redeem that is not in the preview.");
     }
-    const unredeems = plan.conflicts.filter((row) => accepted.has(row.ticketNumber));
+    const corrections = plan.conflicts.filter((row) => accepted.has(row.ticketNumber));
+    const unredeems = corrections.filter((row) => row.kind === "UNREDEEM");
+    const reredeems = corrections.filter((row) => row.kind === "REREDEEM");
+    if (unredeems.length > 0 && !input.canAcceptUnredeem) {
+      throw new AccessDeniedError("Accepting an un-redeem lowers the served counts and needs finance access.", 403, "PERMISSION_DENIED");
+    }
     const result: ScannerImportResult = {
-      batchId: null, redeemed: plan.redemptions.length, unredeemed: unredeems.length, unchanged: plan.counts.unchanged,
-      review: plan.counts.review, conflictsIgnored: plan.conflicts.length - unredeems.length,
+      batchId: null, redeemed: plan.redemptions.length + reredeems.length, unredeemed: unredeems.length, reredeemed: reredeems.length,
+      unchanged: plan.counts.unchanged, review: plan.counts.review, conflictsIgnored: plan.conflicts.length - corrections.length,
     };
-    if (plan.redemptions.length === 0 && unredeems.length === 0) return result;
+    if (result.redeemed === 0 && unredeems.length === 0) return result;
 
     const batch = await tx.eventMealImportBatch.create({
       data: {
         eventId: input.eventId, uploadedByUserId: input.userId, source: plan.source, fileName: cleanFileName(input.fileName), fileSha256,
-        rowCount: plan.rowCount, redeemedCount: plan.redemptions.length, unredeemedCount: unredeems.length, reviewCount: plan.counts.review,
+        rowCount: plan.rowCount, redeemedCount: result.redeemed, unredeemedCount: unredeems.length, reviewCount: plan.counts.review,
       },
       select: { id: true },
     });
     const correctedAt = new Date();
-    await tx.eventMealRedemption.createMany({
-      data: [
-        ...plan.redemptions.map((row) => ({
-          eventId: input.eventId, ticketId: row.ticketId, batchId: batch.id, kind: "REDEEMED" as const,
-          occurredAt: new Date(row.occurredAt), redeemedByText: row.redeemedByText, sourceKey: row.sourceKey,
-        })),
-        ...unredeems.map((row) => ({
-          eventId: input.eventId, ticketId: row.ticketId, batchId: batch.id, kind: "UNREDEEMED" as const,
-          occurredAt: correctedAt, redeemedByText: null, sourceKey: row.sourceKey,
-        })),
-      ],
-    });
+    try {
+      await tx.eventMealRedemption.createMany({
+        data: [
+          ...plan.redemptions.map((row) => ({
+            eventId: input.eventId, ticketId: row.ticketId, batchId: batch.id, kind: "REDEEMED" as const,
+            occurredAt: new Date(row.occurredAt), redeemedByText: row.redeemedByText, sourceKey: row.sourceKey,
+          })),
+          ...reredeems.map((row) => ({
+            eventId: input.eventId, ticketId: row.ticketId, batchId: batch.id, kind: "REDEEMED" as const,
+            occurredAt: new Date(row.servedAt), redeemedByText: row.redeemedByText, sourceKey: row.sourceKey,
+          })),
+          ...unredeems.map((row) => ({
+            eventId: input.eventId, ticketId: row.ticketId, batchId: batch.id, kind: "UNREDEEMED" as const,
+            occurredAt: correctedAt, redeemedByText: null, sourceKey: row.sourceKey,
+          })),
+        ],
+      });
+    } catch (error) {
+      // A unique violation means another upload recorded one of these rows first. Say so without passing the database's
+      // message (which names the key) on to a log or a response.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new MealError("CONFLICT", "Another import recorded some of these rows first. Nothing was saved. Preview the file again.");
+      }
+      throw error;
+    }
     // Ids and counts only: no ticket holder, guest name, registration code or row content.
     await writeAuditLog({
       eventId: input.eventId,
@@ -220,9 +251,9 @@ export async function confirmScannerImport(input: {
       action: "meals.scanner_import",
       entityType: "EventMealImportBatch",
       entityId: batch.id,
-      summary: `Imported café scanner results: ${plan.redemptions.length} served, ${unredeems.length} corrected, ${plan.counts.review} for review.`,
+      summary: `Imported café scanner results: ${result.redeemed} served, ${unredeems.length} corrected, ${plan.counts.review} for review.`,
       metadata: {
-        source: plan.source, rows: plan.rowCount, redeemed: plan.redemptions.length, unredeemed: unredeems.length,
+        source: plan.source, rows: plan.rowCount, redeemed: result.redeemed, unredeemed: unredeems.length, reredeemed: reredeems.length,
         unchanged: plan.counts.unchanged, review: plan.counts.review, conflictsIgnored: result.conflictsIgnored,
       },
     }, tx);
@@ -241,6 +272,21 @@ async function loadServedInputs(eventId: string) {
   const sold: ServedTicket[] = tickets.map((ticket) => ({
     id: ticket.id, number: ticket.number, mealType: ticket.mealType, serviceDate: ticket.serviceDate, payer: ticket.payer,
   }));
+  // A meal that was served stays served when its ticket is cancelled afterwards: it counts as served (not as sold).
+  const activeIds = new Set(tickets.map((ticket) => ticket.id));
+  const goneIds = [...served.keys()].filter((id) => !activeIds.has(id));
+  if (goneIds.length > 0) {
+    const gone = await prisma.eventMealTicket.findMany({
+      where: { eventId, id: { in: goneIds } },
+      select: { id: true, number: true, selection: { select: { mealType: true, payer: true, service: { select: { serviceDate: true } } } } },
+    });
+    for (const ticket of gone) {
+      sold.push({
+        id: ticket.id, number: ticket.number, mealType: ticket.selection.mealType, serviceDate: ticket.selection.service?.serviceDate ?? "",
+        payer: ticket.selection.payer, cancelled: true,
+      });
+    }
+  }
   return { timeZone: event?.timezone ?? "America/Chicago", sold, served, anyImport: state.existingKeys.size > 0 };
 }
 

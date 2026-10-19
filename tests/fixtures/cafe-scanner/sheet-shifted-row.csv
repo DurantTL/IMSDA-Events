@@ -1,0 +1,3 @@
+ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes
+MT-00002,SYN-AAA1,Alex Example,lunch,,,adult,8,yes,2026-10-16T01:30:00.000Z,Blake Sample,
+MT-00001,SYN-AAA1,Alex Example,lunch,,,adult,8,yes,2026-10-15T17:05:09.000Z,Alex Example,

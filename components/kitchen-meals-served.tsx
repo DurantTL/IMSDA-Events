@@ -55,14 +55,14 @@ export function KitchenMealsServed({
                 <tr key={row.key} role="row">
                   <th role="rowheader" scope="row"><Link href={drillHref(row.key)}>{row.label}<span className="sr-only"> ticket details</span></Link></th>
                   <td role="cell" data-label="Sold"><Figure figures={row.sold} /></td>
-                  <td role="cell" data-label="Served"><Figure figures={row.served} /></td>
+                  <td role="cell" data-label="Served"><Figure figures={row.served} />{row.servedOnCancelled.total > 0 && <span className="field-help served-split">includes {row.servedOnCancelled.total} on cancelled tickets</span>}</td>
                   <td role="cell" data-label="Not used"><Figure figures={row.notUsed} /></td>
                 </tr>
               ))}
               <tr role="row" className="served-total">
                 <th role="rowheader" scope="row">{report.totals.label}</th>
                 <td role="cell" data-label="Sold"><Figure figures={report.totals.sold} /></td>
-                <td role="cell" data-label="Served"><Figure figures={report.totals.served} /></td>
+                <td role="cell" data-label="Served"><Figure figures={report.totals.served} />{report.totals.servedOnCancelled.total > 0 && <span className="field-help served-split">includes {report.totals.servedOnCancelled.total} on cancelled tickets</span>}</td>
                 <td role="cell" data-label="Not used"><Figure figures={report.totals.notUsed} /></td>
               </tr>
             </tbody>

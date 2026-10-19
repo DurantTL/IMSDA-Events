@@ -61,7 +61,7 @@ export default async function ScannerImportPage({ searchParams }: { searchParams
                 <tr key={row.ticketId}>
                   <th scope="row">{row.ticketId}</th>
                   <td>{row.payer === "CONFERENCE" ? "Conference" : "Attendee"}</td>
-                  <td>{row.served ? "Served" : "Not used"}</td>
+                  <td>{row.served ? (row.cancelled ? "Served (ticket since cancelled)" : "Served") : "Not used"}</td>
                   <td>{row.servedOn || "—"}</td>
                 </tr>
               ))}

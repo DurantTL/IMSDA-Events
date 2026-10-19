@@ -46,6 +46,8 @@ export type ScannerTransactionRow = {
   scannedValue: string;
   mealType: string;
   result: string;
+  stationName: string;
+  /** The guest the scanner served (`entitlementPersonName`). Blank is never filled in from the person columns. */
   guestName: string;
 };
 export type ParsedScannerFile =
@@ -101,18 +103,15 @@ export function parseScannerFile(text: string): ParsedScannerFile {
     if (missing.length > 0) throw new MealError("INVALID", `The transactions file is missing these columns: ${missing.join(", ")}.`);
     return {
       source: "TRANSACTIONS",
-      rows: body.map((row, position) => {
-        const named = stripFormulaGuard(cell(row, "entitlementpersonname"));
-        const composed = `${stripFormulaGuard(cell(row, "person.firstname"))} ${stripFormulaGuard(cell(row, "person.lastname"))}`.trim();
-        return {
-          line: position + 2,
-          timestamp: cell(row, "timestamp"),
-          scannedValue: cell(row, "scannedvalue"),
-          mealType: cell(row, "mealtype"),
-          result: cell(row, "result"),
-          guestName: named || composed,
-        };
-      }),
+      rows: body.map((row, position) => ({
+        line: position + 2,
+        timestamp: cell(row, "timestamp"),
+        scannedValue: cell(row, "scannedvalue"),
+        mealType: cell(row, "mealtype"),
+        result: cell(row, "result"),
+        stationName: cell(row, "stationname"),
+        guestName: stripFormulaGuard(cell(row, "entitlementpersonname")),
+      })),
     };
   }
   throw new MealError("INVALID", "This is not a café scanner file. Use the Google Sheet downloaded as CSV (it has a ticket_id column) or the scanner's transactions.csv.");
@@ -159,47 +158,27 @@ export function eventLocalDate(date: Date, timeZone: string) {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** The instant a wall-clock time in the event's time zone means. */
-function zonedWallTime(parts: { year: number; month: number; day: number; hour: number; minute: number; second: number }, timeZone: string) {
-  const wanted = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-  let guess = wanted;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const seen = zoneParts(new Date(guess), timeZone);
-    const asUtc = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, seen.second);
-    guess += wanted - asUtc;
-  }
-  return new Date(guess);
+/** A time for people, in the event's time zone (never the viewer's or the server's). */
+export function eventLocalDateTime(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
-const wallIso = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/;
-const wallUs = /^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2})(?::(\d{2}))?(?: ?([AP]M))?$/i;
 
 /**
- * The time the scanner wrote. It writes an ISO instant (`2026-10-15T18:30:00.000Z`); Google Sheets may turn that into a
- * date-time it shows without a zone (`10/15/2026 13:30:00`), which is read in the event's time zone. Null when it is neither.
+ * The time the scanner wrote: an ISO instant with a zone (`2026-10-15T18:30:00.000Z`). A time without a zone (what Google
+ * Sheets shows when it turns the text into a date-time) is refused, not guessed at: the sheet's zone is unknown. Null then.
  */
-export function parseScannerInstant(value: string, timeZone: string): Date | null {
+export function parseScannerInstant(value: string): Date | null {
   const text = value.trim();
-  if (isoInstant.test(text)) {
-    const date = new Date(text);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  let match = wallIso.exec(text);
-  let parts: { year: number; month: number; day: number; hour: number; minute: number; second: number } | null = null;
-  if (match) {
-    parts = { year: +match[1]!, month: +match[2]!, day: +match[3]!, hour: +match[4]!, minute: +match[5]!, second: +(match[6] ?? 0) };
-  } else if ((match = wallUs.exec(text))) {
-    let hour = +match[4]!;
-    const meridiem = match[7]?.toUpperCase();
-    if (meridiem === "PM" && hour < 12) hour += 12;
-    if (meridiem === "AM" && hour === 12) hour = 0;
-    parts = { year: +match[3]!, month: +match[1]!, day: +match[2]!, hour, minute: +match[5]!, second: +(match[6] ?? 0) };
-  }
-  if (!parts || parts.month < 1 || parts.month > 12 || parts.day < 1 || parts.day > 31 || parts.hour > 23 || parts.minute > 59 || parts.second > 59) return null;
-  const date = zonedWallTime(parts, timeZone);
-  const back = zoneParts(date, timeZone);
-  return back.year === parts.year && back.month === parts.month && back.day === parts.day ? date : null;
+  if (!isoInstant.test(text)) return null;
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** The instant cut to whole UTC seconds (`2026-10-15T18:30:00Z`): what a redemption key uses, so a re-saved copy that lost the milliseconds matches the raw export. */
+export function utcSecond(date: Date) {
+  return `${new Date(Math.floor(date.getTime() / 1000) * 1000).toISOString().slice(0, 19)}Z`;
 }
 
 // ---------------------------------------------------------------------------
@@ -251,13 +230,17 @@ export type PlannedRedemption = {
   sourceKey: string;
 };
 export type PlannedConflict = {
+  /** UNREDEEM: the file shows a served ticket as not redeemed. REREDEEM: the file shows a ticket served again after an accepted un-redeem. */
+  kind: "UNREDEEM" | "REREDEEM";
   line: number;
   ticketId: string;
   ticketNumber: number;
-  /** When the ticket is currently recorded as served. */
+  /** UNREDEEM: when the ticket is recorded as served. REREDEEM: when the file says it was served. */
   servedAt: string;
-  /** The key the un-redeem correction would carry: one per recorded redemption, so accepting twice is impossible. */
+  /** The key the correction would carry: one per recorded event, so accepting twice is impossible. */
   sourceKey: string;
+  /** REREDEEM only: the scanner's `redeemed_by` text for the new redemption. */
+  redeemedByText: string | null;
 };
 export type ReviewRow = {
   line: number;
@@ -306,6 +289,8 @@ export type PlanInput = {
   otherEventNumbers: ReadonlySet<number>;
   /** Tickets whose latest event is REDEEMED, with that event's key and time. */
   served: ReadonlyMap<string, { sourceKey: string; occurredAt: Date }>;
+  /** Tickets whose latest event is UNREDEEMED, with that event's key. */
+  unredeemed: ReadonlyMap<string, string>;
   /** Every redemption key already stored for the event. */
   existingKeys: ReadonlySet<string>;
   /** The file kinds that already hold REDEEMED events for the event. */
@@ -313,7 +298,7 @@ export type PlanInput = {
 };
 
 const ticketNumberPattern = /^MT-(\d{5,})$/i;
-const SUMMARY_LIMIT = 80;
+const SUMMARY_LIMIT = 140;
 const clip = (value: string) => (value.length > SUMMARY_LIMIT ? `${value.slice(0, SUMMARY_LIMIT)}...` : value);
 const BY_LIMIT = 120;
 
@@ -343,7 +328,7 @@ export function planScannerImport(input: PlanInput): ScannerPlan {
     source: input.file.source,
     file: input.fileSha256,
     redemptions: redemptions.map((row) => [row.ticketId, row.sourceKey, row.occurredAt]),
-    conflicts: conflicts.map((row) => [row.ticketId, row.sourceKey]),
+    conflicts: conflicts.map((row) => [row.ticketId, row.sourceKey, row.kind]),
     otherSourceHasRedemptions,
   })).digest("hex");
   return {
@@ -389,6 +374,12 @@ function planSheet(input: PlanInput, rows: readonly ScannerSheetRow[], sinks: Si
       sinks.toReview(row.line, "MISMATCH", `${label}: the registration or meal does not match ticket ${mealTicketId(number)}`);
       continue;
     }
+    // The scanner writes back by row position, and `redeemed_by` is the guest it actually served. A row that has moved
+    // away from its ticket names someone other than its own guest_name.
+    if (row.redeemedBy.trim() !== "" && normalizeName(row.redeemedBy) !== normalizeName(row.guestName)) {
+      sinks.toReview(row.line, "MISMATCH", `${label}: served as "${row.redeemedBy}", not this ticket's guest (the row may have moved)`);
+      continue;
+    }
     if (seen.has(ticket.id)) {
       sinks.toReview(row.line, "DUPLICATE_ROW", `${label}: ${mealTicketId(number)} appears more than once`);
       continue;
@@ -400,21 +391,36 @@ function planSheet(input: PlanInput, rows: readonly ScannerSheetRow[], sinks: Si
       if (current) {
         sinks.counts.conflicts += 1;
         sinks.conflicts.push({
-          line: row.line, ticketId: ticket.id, ticketNumber: number, servedAt: current.occurredAt.toISOString(), sourceKey: `unredeem:${current.sourceKey}`,
+          kind: "UNREDEEM", line: row.line, ticketId: ticket.id, ticketNumber: number, servedAt: current.occurredAt.toISOString(),
+          sourceKey: `unredeem:${current.sourceKey}`, redeemedByText: null,
         });
       } else {
         sinks.counts.notRedeemed += 1;
       }
       continue;
     }
-    const at = parseScannerInstant(row.redeemedAt, input.timeZone);
+    const at = parseScannerInstant(row.redeemedAt);
     if (!at) {
-      sinks.toReview(row.line, "INVALID_ROW", `${label}: redeemed is yes but redeemed_at is not a time we can read`);
+      sinks.toReview(row.line, "INVALID_ROW", `${label}: redeemed is yes but redeemed_at is not an ISO time with a zone (for example 2026-10-15T18:30:00.000Z)`);
       continue;
     }
-    const sourceKey = `sheet:${mealTicketId(number)}:${at.toISOString()}`;
-    if (input.existingKeys.has(sourceKey) || current) {
+    const sourceKey = `sheet:${mealTicketId(number)}:${utcSecond(at)}`;
+    if (current) {
       sinks.counts.unchanged += 1;
+      continue;
+    }
+    if (input.existingKeys.has(sourceKey)) {
+      // This exact redemption was imported before and a correction has since undone it. Offer to put it back; never do it silently.
+      const lastUnredeem = input.unredeemed.get(ticket.id);
+      if (lastUnredeem) {
+        sinks.counts.conflicts += 1;
+        sinks.conflicts.push({
+          kind: "REREDEEM", line: row.line, ticketId: ticket.id, ticketNumber: number, servedAt: at.toISOString(),
+          sourceKey: `reredeem:${lastUnredeem}`, redeemedByText: row.redeemedBy ? row.redeemedBy.slice(0, BY_LIMIT) : null,
+        });
+      } else {
+        sinks.counts.unchanged += 1;
+      }
       continue;
     }
     sinks.counts.newRedemptions += 1;
@@ -437,7 +443,7 @@ function planTransactions(input: PlanInput, rows: readonly ScannerTransactionRow
 
   // Oldest scan first, so which row claims a ticket never depends on the order the scanner exported them in.
   const ordered = rows
-    .map((row) => ({ row, at: parseScannerInstant(row.timestamp, input.timeZone) }))
+    .map((row) => ({ row, at: parseScannerInstant(row.timestamp) }))
     .sort((a, b) => (a.at?.getTime() ?? 0) - (b.at?.getTime() ?? 0) || a.row.line - b.row.line);
 
   for (const { row, at } of ordered) {
@@ -448,11 +454,13 @@ function planTransactions(input: PlanInput, rows: readonly ScannerTransactionRow
     const meal = scannerMealType(row.mealType);
     const label = `${row.scannedValue} ${row.guestName} ${row.mealType.toLowerCase()}`.trim();
     if (!meal || !(scannerMealTypes as readonly string[]).includes(meal) || !at || !row.scannedValue || !row.guestName) {
-      sinks.toReview(row.line, "INVALID_ROW", `${label}: the meal, time, registration or name is missing or not understood`);
+      sinks.toReview(row.line, "INVALID_ROW", `${label}: the meal, time, registration or guest name (entitlementPersonName) is missing or not understood`);
       continue;
     }
     const name = normalizeName(row.guestName);
-    const baseKey = `tx:${at.toISOString()}:${row.scannedValue.trim().toUpperCase()}:${meal}:${name}`;
+    // The key is stored forever: the registration and the guest are hashed into it, never written out.
+    const who = sha256Hex(`${row.scannedValue.trim().toUpperCase()}|${name}`);
+    const baseKey = `tx:${utcSecond(at)}:${meal}:${who}`;
     const repeat = sourceKeys.get(baseKey) ?? 0;
     sourceKeys.set(baseKey, repeat + 1);
     const sourceKey = repeat === 0 ? baseKey : `${baseKey}#${repeat + 1}`;
@@ -483,7 +491,8 @@ function planTransactions(input: PlanInput, rows: readonly ScannerTransactionRow
     sinks.counts.newRedemptions += 1;
     sinks.redemptions.push({
       line: row.line, ticketId: ticket.id, ticketNumber: ticket.number, occurredAt: at.toISOString(),
-      redeemedByText: row.guestName.slice(0, BY_LIMIT), sourceKey,
+      // The station that scanned it, never the guest: a transactions file has no `redeemed_by`.
+      redeemedByText: row.stationName ? row.stationName.slice(0, BY_LIMIT) : null, sourceKey,
     });
   }
 }
