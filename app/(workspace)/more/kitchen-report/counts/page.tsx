@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: staffPageTitles.kitchenCounts };
 export default async function KitchenCountsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const requested = Array.isArray(params.event) ? params.event[0] : params.event;
-  const { event, permissions } = await resolveEventContext(requested, { allowKitchenCountsOnly: true });
+  const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   const canEnter = permissions.includes("MANAGE_KITCHEN_COUNTS");
   if (!canEnter && !permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="Kitchen counts are restricted" detail="Your event role does not include kitchen counts." />;

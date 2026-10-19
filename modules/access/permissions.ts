@@ -60,11 +60,12 @@ export const rolePermissions: Record<EventRole, readonly EventPermission[]> = {
 };
 
 /**
- * Whether the permissions are the kitchen's alone (#1029): MANAGE_KITCHEN_COUNTS and nothing else. Such a viewer may open
- * the kitchen counts page and nothing else in the event workspace, so every other page sends them there.
+ * Whether the permissions are a kitchen viewer's without the event view (#1029): MANAGE_KITCHEN_COUNTS and no
+ * VIEW_EVENT. Without VIEW_EVENT the dashboard and the registration search are closed, so the viewer's home is the
+ * kitchen counts page, and any workspace page that does not open on a permission of its own sends them there.
  */
-export function holdsKitchenCountsOnly(permissions: readonly EventPermission[]): boolean {
-  return permissions.length > 0 && permissions.every((permission) => permission === "MANAGE_KITCHEN_COUNTS");
+export function isKitchenWithoutEventView(permissions: readonly EventPermission[]): boolean {
+  return permissions.includes("MANAGE_KITCHEN_COUNTS") && !permissions.includes("VIEW_EVENT");
 }
 
 export const kitchenCountsPath = "/more/kitchen-report/counts";

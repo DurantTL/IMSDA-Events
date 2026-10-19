@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
 export default async function KitchenReportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const requestedEvent = Array.isArray(params.event) ? params.event[0] : params.event;
-  const { event, permissions } = await resolveEventContext(requestedEvent);
+  const { event, permissions } = await resolveEventContext(requestedEvent, { allowWithoutEventView: true });
   // Kitchen staff hold no report access: their page is the counts page, which holds no registration data (#1029).
   if (!permissions.includes("VIEW_REPORTS") && permissions.includes("MANAGE_KITCHEN_COUNTS")) {
     redirect(`/more/kitchen-report/counts?event=${encodeURIComponent(event.id)}`);
