@@ -90,7 +90,8 @@ export function CancellationRequestsWorkspace({
         )}
       </section>
 
-      {detail && <RequestDetail detail={detail} eventId={eventId} timezone={timezone} />}
+      {/* Keyed by request, so a reason, an acknowledgement or a message typed for one request never carries over to another. */}
+      {detail && <RequestDetail detail={detail} eventId={eventId} key={detail.id} timezone={timezone} />}
     </section>
   );
 }
@@ -104,6 +105,13 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const changes = detail.conflicts.filter((conflict) => conflict.severity === "CHANGE");
   const needsText = (action: string) => action === "REQUEST_INFORMATION" || action === "APPROVE" || action === "DECLINE";
+  /** Why a button is off, in words, so nobody has to guess (and a screen reader hears it). */
+  const whyOff = (action: string) => {
+    if (needsText(action) && text.trim().length < 3) return "Write a reason or note of at least 3 characters first.";
+    if (action === "APPROVE" && changes.length > 0 && !acknowledge) return "Confirm you have reviewed the changes above to approve.";
+    return null;
+  };
+  const offReasons = [...new Set(detail.actions.map(whyOff).filter((reason): reason is string => Boolean(reason)))];
 
   async function act(event: FormEvent<HTMLFormElement>, action: StaffRequestDetail["actions"][number]) {
     event.preventDefault();
@@ -191,11 +199,14 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
         <p><strong>{detail.statusLabel} by <span translate="no">{detail.decision.byName}</span></strong> on {when(detail.decision.at, timezone)}: {detail.decision.reason}{detail.decision.withChanges ? " (decided after acknowledging changes to the registration)" : ""}</p>
       )}
 
-      {message && (
-        <p className={message.kind === "error" ? "form-error" : "cancel-request-message is-ok"} role={message.kind === "error" ? "alert" : "status"}>
-          {message.kind === "error" ? <AlertCircle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />} {message.text}
-        </p>
-      )}
+      {/* Always mounted, so a change of its content is announced. */}
+      <div aria-atomic="true" aria-live="polite" id={`${id}-message`}>
+        {message && (
+          <p className={message.kind === "error" ? "form-error" : "cancel-request-message is-ok"}>
+            {message.kind === "error" ? <AlertCircle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />} {message.text}
+          </p>
+        )}
+      </div>
 
       {canAct && (
         <div className="cancel-request-actions">
@@ -210,12 +221,14 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
               <span>I have reviewed the changes above and still want to approve.</span>
             </label>
           )}
+          {offReasons.length > 0 && <p className="field-help" id={`${id}-why`}>{offReasons.join(" ")}</p>}
           <div className="cancel-request-buttons">
             {detail.actions.map((action) => (
               <form key={action} onSubmit={(event) => act(event, action)}>
                 <button
                   className={action === "APPROVE" ? "primary-button" : "secondary-button"}
-                  disabled={busy !== null || (needsText(action) && text.trim().length < 3) || (action === "APPROVE" && changes.length > 0 && !acknowledge)}
+                  aria-describedby={whyOff(action) ? `${id}-why` : undefined}
+                  disabled={busy !== null || whyOff(action) !== null}
                   type="submit"
                 >
                   {busy === action ? "Saving…" : action === "START_REVIEW" ? "Start review" : action === "REQUEST_INFORMATION" ? "Ask for information" : action === "APPROVE" ? "Approve (records the decision only)" : "Decline"}

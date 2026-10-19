@@ -56,11 +56,22 @@ export async function registrantView(target: RequestTarget) {
   return privateJson({ view: await getRegistrantRequestView(target) });
 }
 
+const tooLarge = () => privateJson({ error: "REQUEST_TOO_LARGE", message: "The request is too large." }, { status: 413 });
+
+/**
+ * The request body as text, or a 413 response. The declared length is checked before anything is read, then the real
+ * length after, like the other private-link routes.
+ */
+export async function readBoundedBody(request: Request): Promise<{ body: string } | { response: Response }> {
+  if (Number(request.headers.get("content-length") ?? 0) > maximumRequestBodyBytes) return { response: tooLarge() };
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > maximumRequestBodyBytes) return { response: tooLarge() };
+  return { body };
+}
+
 /** preview, submit or withdraw for one authorized registration. */
 export async function registrantAction(target: RequestTarget, actor: RegistrantActor, rawBody: string) {
-  if (new TextEncoder().encode(rawBody).byteLength > maximumRequestBodyBytes) {
-    return privateJson({ error: "REQUEST_TOO_LARGE", message: "The request is too large." }, { status: 413 });
-  }
+  if (new TextEncoder().encode(rawBody).byteLength > maximumRequestBodyBytes) return tooLarge();
   const input = registrantActionSchema.parse(JSON.parse(rawBody));
   if (input.action === "preview") {
     return privateJson({ proposal: await previewRegistrantRequest(target, input.selection) });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Undo2 } from "lucide-react";
 import type { RegistrantProposal } from "@/modules/cancellation-requests/domain";
 import type { RegistrantRequestSummary, RegistrantRequestView } from "@/modules/cancellation-requests/views";
@@ -52,7 +52,9 @@ export function CancellationRequestPanel({
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
   const [busy, setBusy] = useState<"preview" | "submit" | "withdraw" | null>(null);
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  const [confirmingWithdraw, setConfirmingWithdraw] = useState<string | null>(null);
   const idempotencyKey = useRef(newKey());
+  const messageRef = useRef<HTMLDivElement>(null);
   const Heading = headingLevel === 2 ? "h2" : "h3";
 
   const selection = {
@@ -60,9 +62,21 @@ export function CancellationRequestPanel({
     ...(scope === "ATTENDEE" ? { attendeeIds } : {}),
     ...(scope === "COMPONENT" ? { chargeIds } : {}),
   };
+  const submitWhyOff = reason.trim().length < 3
+    ? "Tell the event team why you are asking (at least 3 characters) to send your request."
+    : replace && replace.length > 0 && !replaceConfirmed
+      ? "Tick the box above to replace your open request, or withdraw it first."
+      : null;
   const selectionReady = scope === "FULL_REGISTRATION" || (scope === "ATTENDEE" && attendeeIds.length > 0) || (scope === "COMPONENT" && chargeIds.length > 0);
 
+  // An error is announced, and focus moves to it, because the send button it belongs to can be far below the top of the panel.
+  useEffect(() => {
+    if (message?.kind === "error") messageRef.current?.focus();
+  }, [message]);
+
+  /** The choice changed: what was shown no longer applies, and a request made from the new choice is a new request. */
   function resetProposal() {
+    idempotencyKey.current = newKey();
     setProposal(null);
     setReplace(null);
     setReplaceConfirmed(false);
@@ -177,11 +191,14 @@ export function CancellationRequestPanel({
         </p>
       </div>
 
-      {message && (
-        <p className={message.kind === "error" ? "form-error cancel-request-message" : "cancel-request-message is-ok"} role={message.kind === "error" ? "alert" : "status"}>
-          {message.kind === "error" ? <AlertCircle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />} {message.text}
-        </p>
-      )}
+      {/* Always mounted, so a change of its content is announced. */}
+      <div aria-atomic="true" aria-live="polite" ref={messageRef} tabIndex={-1}>
+        {message && (
+          <p className={message.kind === "error" ? "form-error cancel-request-message" : "cancel-request-message is-ok"}>
+            {message.kind === "error" ? <AlertCircle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />} {message.text}
+          </p>
+        )}
+      </div>
 
       {view.requests.length > 0 && (
         <ul className="cancel-request-list" aria-label="Your cancellation requests">
@@ -204,10 +221,25 @@ export function CancellationRequestPanel({
                   <li key={`${step.status}-${index}`}>{step.label}, {when(step.at)}</li>
                 ))}
               </ol>
-              {request.canWithdraw && (
-                <button className="secondary-button" disabled={busy !== null} onClick={() => withdraw(request)} type="button">
+              {request.canWithdraw && confirmingWithdraw !== request.id && (
+                <button
+                  aria-label={`Withdraw the ${request.statusLabel.toLowerCase()} request from ${when(request.createdAt)}`}
+                  className="secondary-button"
+                  disabled={busy !== null}
+                  onClick={() => setConfirmingWithdraw(request.id)}
+                  type="button"
+                >
                   <Undo2 size={16} aria-hidden="true" /> Withdraw this request
                 </button>
+              )}
+              {request.canWithdraw && confirmingWithdraw === request.id && (
+                <div className="cancel-request-confirm" role="group" aria-label={`Confirm withdrawing the request from ${when(request.createdAt)}`}>
+                  <p>Withdraw this request? Your registration will not be changed.</p>
+                  <button className="primary-button" disabled={busy !== null} onClick={async () => { await withdraw(request); setConfirmingWithdraw(null); }} type="button">
+                    {busy === "withdraw" ? "Withdrawing…" : "Yes, withdraw it"}
+                  </button>
+                  <button className="secondary-button" disabled={busy !== null} onClick={() => setConfirmingWithdraw(null)} type="button">Keep it</button>
+                </div>
               )}
             </li>
           ))}
@@ -258,9 +290,10 @@ export function CancellationRequestPanel({
             </fieldset>
           )}
 
-          <button className="secondary-button" disabled={!selectionReady || busy !== null} onClick={showOutcome} type="button">
+          <button aria-describedby={selectionReady ? undefined : `${uid}-choose-why`} className="secondary-button" disabled={!selectionReady || busy !== null} onClick={showOutcome} type="button">
             {busy === "preview" ? "Calculating…" : "Show the proposed outcome"}
           </button>
+          {!selectionReady && <p className="field-help" id={`${uid}-choose-why`}>{scope === "ATTENDEE" ? "Choose at least one attendee to see the proposed outcome." : "Choose at least one item to see the proposed outcome."}</p>}
 
           {proposal && proposal.status === "CALCULATED" && (
             <div className="cancel-request-outcome" aria-live="polite">
@@ -300,7 +333,8 @@ export function CancellationRequestPanel({
                 </label>
               )}
 
-              <button className="primary-button" disabled={busy !== null || reason.trim().length < 3 || (Boolean(replace?.length) && !replaceConfirmed)} type="submit">
+              {submitWhyOff && <p className="field-help" id={`${uid}-submit-why`}>{submitWhyOff}</p>}
+              <button aria-describedby={submitWhyOff ? `${uid}-submit-why` : undefined} className="primary-button" disabled={busy !== null || submitWhyOff !== null} type="submit">
                 {busy === "submit" ? "Sending…" : "Send request for review"}
               </button>
             </div>

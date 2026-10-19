@@ -112,3 +112,34 @@ CREATE TRIGGER "CancellationRequestEvent_immutable"
 BEFORE UPDATE OR DELETE ON "CancellationRequestEvent"
 FOR EACH ROW
 EXECUTE FUNCTION "reject_cancellation_policy_mutation"();
+
+-- A request that is approved, declined, withdrawn or superseded is final: no UPDATE changes it again, so a recorded
+-- decision (who, why, when) cannot be rewritten by any code path or by hand. Deletes are not blocked, so deleting an
+-- event still removes its requests.
+CREATE FUNCTION "reject_decided_cancellation_request_change"()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD."status" IN ('APPROVED', 'DECLINED', 'WITHDRAWN', 'SUPERSEDED') THEN
+    RAISE EXCEPTION 'A % cancellation request is final and cannot be changed', OLD."status";
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "CancellationRequest_final_once_decided"
+BEFORE UPDATE ON "CancellationRequest"
+FOR EACH ROW
+EXECUTE FUNCTION "reject_decided_cancellation_request_change"();
+
+-- The timeline cannot record an approval or a denial that was not made by a named staff member with a note (the reason).
+ALTER TABLE "CancellationRequestEvent" ADD CONSTRAINT "CancellationRequestEvent_decision_by_named_staff"
+  CHECK (
+    "toStatus" NOT IN ('APPROVED', 'DECLINED')
+    OR (
+      "actorKind" = 'STAFF'
+      AND "actorUserId" IS NOT NULL
+      AND length(btrim(coalesce("note", ''))) > 0
+    )
+  );

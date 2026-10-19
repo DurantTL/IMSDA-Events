@@ -1,5 +1,5 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { privateJson, registrantAction, registrantView, requestError } from "@/modules/cancellation-requests/api";
+import { privateJson, readBoundedBody, registrantAction, registrantView, requestError } from "@/modules/cancellation-requests/api";
 import { authorizeRegistrationAccessToken } from "@/modules/public-access/repository";
 import { applyRateLimitHeaders, type RateLimitOutcome } from "@/modules/rate-limit/domain";
 import { checkPublicManageRateLimit } from "@/modules/rate-limit/service";
@@ -51,10 +51,12 @@ async function postHandler(request: Request, context: Context) {
     if (!rateLimit.allowed) return limited(rateLimit);
     const access = await authorizeRegistrationAccessToken(token);
     if (!access) return unavailable(rateLimit);
+    const read = await readBoundedBody(request);
+    if ("response" in read) return applyRateLimitHeaders(read.response, rateLimit);
     const response = await registrantAction(
       { registrationId: access.registrationId, eventId: access.eventId },
       { via: "MANAGE_LINK" },
-      await request.text(),
+      read.body,
     );
     return applyRateLimitHeaders(response, rateLimit);
   } catch (error) {

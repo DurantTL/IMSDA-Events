@@ -125,6 +125,14 @@ describe("the private manage link", () => {
     expect(mocks.service.submitCancellationRequest).not.toHaveBeenCalled();
   });
 
+  it("refuses a declared length over the cap before reading the body", async () => {
+    const declared = new Request("https://events.imsda.test/api/test", { method: "POST", headers: { "content-type": "application/json", origin, "content-length": "9000" }, body: JSON.stringify(submit) });
+    const text = vi.spyOn(declared, "text");
+    expect((await managePost(declared, context())).status).toBe(413);
+    expect(text).not.toHaveBeenCalled();
+    expect(mocks.service.submitCancellationRequest).not.toHaveBeenCalled();
+  });
+
   it("is rate limited per link", async () => {
     mocks.rateLimit.mockResolvedValue({ allowed: false, decisions: [] });
     expect((await managePost(post(submit), context())).status).toBe(429);
@@ -182,6 +190,23 @@ describe("the signed-in portal", () => {
       { via: "ATTENDEE_PORTAL", accountId: "account-1" },
       expect.objectContaining({ action: "submit" }),
     );
+  });
+
+  it("is rate limited per registration, with the manage link's limiter", async () => {
+    mocks.rateLimit.mockResolvedValue({ allowed: false, decisions: [] });
+    expect((await portalPost(post(submit), context())).status).toBe(429);
+    expect((await portalGet(get(), context())).status).toBe(429);
+    expect(mocks.rateLimit).toHaveBeenCalledWith(expect.anything(), "account:reg-own", "update");
+    expect(mocks.rateLimit).toHaveBeenCalledWith(expect.anything(), "account:reg-own", "read");
+    expect(mocks.service.submitCancellationRequest).not.toHaveBeenCalled();
+    expect(mocks.service.getRegistrantRequestView).not.toHaveBeenCalled();
+  });
+
+  it("refuses a declared length over the cap before reading the body", async () => {
+    const declared = new Request("https://events.imsda.test/api/test", { method: "POST", headers: { "content-type": "application/json", origin, "content-length": "9000" }, body: JSON.stringify(submit) });
+    const text = vi.spyOn(declared, "text");
+    expect((await portalPost(declared, context())).status).toBe(413);
+    expect(text).not.toHaveBeenCalled();
   });
 
   it("rejects a cross-origin post", async () => {

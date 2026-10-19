@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 
 import {
   enqueueAttendeeSubstitutedMessage,
+  enqueueCancellationRequestMessage,
   enqueueEventAnnouncementMessage,
   enqueuePaymentReceiptMessage,
   enqueueRegistrationCancelledMessage,
@@ -762,5 +763,24 @@ describe("waitlist messages for a club at an event location (#599)", () => {
     const { tx, upsert } = atLocation(null);
     await enqueueWaitlistJoinedMessage(tx as never, { eventId: "event-1", registrationId: "registration-1", correlationId: "c-4", transitionKey: "waitlist:plain" });
     expect(queuedMessage(upsert).create.bodyTextSnapshot).toContain("Camp Heritage");
+  });
+});
+
+describe("cancellation request notices (#170)", () => {
+  const base = { eventId: "event-1", registrationId: "registration-1", requestId: "req-1", kind: "UPDATED" as const, status: "INFORMATION_NEEDED", statusLabel: "Information needed", statusDetail: "The event team needs a little more information." };
+
+  it("emails a repeated status once per timeline step, and a retried step only once", async () => {
+    const { tx, upsert } = transactionFixture();
+    await enqueueCancellationRequestMessage(tx as never, { ...base, stepId: "step-1" });
+    await enqueueCancellationRequestMessage(tx as never, { ...base, status: "UNDER_REVIEW", statusLabel: "Under review", stepId: "step-2" });
+    await enqueueCancellationRequestMessage(tx as never, { ...base, stepId: "step-3" });
+    await enqueueCancellationRequestMessage(tx as never, { ...base, stepId: "step-3" });
+    const keys = upsert.mock.calls.map((call) => (call[0] as CapturedOutboxUpsert).where.idempotencyKey);
+    expect(new Set(keys.slice(0, 3)).size).toBe(3);
+    expect(keys[3]).toBe(keys[2]);
+    const message = (upsert.mock.calls[0]![0] as CapturedOutboxUpsert).create;
+    expect(message.templateKey).toBe("CANCELLATION_REQUEST_UPDATED");
+    expect(message.bodyTextSnapshot).toContain("Information needed");
+    expect(message.bodyTextSnapshot).not.toMatch(/\$\s?\d/);
   });
 });

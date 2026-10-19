@@ -56,6 +56,16 @@ describe("cancellation requests migration (#170)", () => {
     expect(migration).toContain('EXECUTE FUNCTION "reject_cancellation_policy_mutation"()');
   });
 
+  it("makes a decided, withdrawn or superseded request final, and a decision on the timeline staff-only with a reason", () => {
+    expect(migration).toContain('BEFORE UPDATE ON "CancellationRequest"');
+    expect(migration).toContain("OLD.\"status\" IN ('APPROVED', 'DECLINED', 'WITHDRAWN', 'SUPERSEDED')");
+    // Only UPDATE is refused, so deleting an event still removes its requests.
+    expect(migration).not.toMatch(/BEFORE UPDATE OR DELETE ON "CancellationRequest"\n/);
+    expect(migration).toContain('ADD CONSTRAINT "CancellationRequestEvent_decision_by_named_staff"');
+    expect(migration).toContain('"actorKind" = \'STAFF\'');
+    expect(migration).toContain('"actorUserId" IS NOT NULL');
+  });
+
   it("is removed with its event, timeline first", () => {
     const source = read("modules/events/deletion-repository.ts");
     const timeline = source.indexOf("cancellationRequestEvent.deleteMany");
@@ -149,6 +159,18 @@ describe("the request panel (#170)", () => {
     expect(markup).not.toContain("Send request for review");
   });
 
+  it("keeps the staff queue's detail from carrying state to another request, and says why a button is off", () => {
+    const source = read("components/cancellation-requests-workspace.tsx");
+    expect(source).toMatch(/<RequestDetail[^>]*key=\{detail\.id\}/);
+    expect(source).toContain("aria-describedby={whyOff(action) ? `${id}-why` : undefined}");
+    expect(source).toMatch(/aria-live="polite"[^>]*id=\{`\$\{id\}-message`\}/);
+    const panel = read("components/cancellation-request-panel.tsx");
+    // A changed choice is a new request: the key is renewed in the one place every choice change goes through.
+    expect(panel).toMatch(/function resetProposal\(\) \{\s*idempotencyKey\.current = newKey\(\);/);
+    expect(panel).toContain("aria-describedby={submitWhyOff ?");
+    expect(panel).toContain("Withdraw this request? Your registration will not be changed.");
+  });
+
   it("shows an unavailable reason instead of a form", () => {
     const markup = renderToStaticMarkup(createElement(CancellationRequestPanel, { endpoint: "/api/test", initialView: { ...base, available: false, unavailableReason: "Cancellations go through the event team." } }));
     expect(markup).toContain("Cancellations go through the event team.");
@@ -166,7 +188,11 @@ describe("the request panel (#170)", () => {
     expect(open).toContain("Information needed");
     expect(open).toContain("Please send the travel dates.");
     expect(open).toContain("Withdraw this request");
+    // Each withdraw button has its own name, so two requests are not both just "Withdraw this request".
+    expect(open).toContain('aria-label="Withdraw the information needed request from May 1, 2026"');
     expect(open).toContain("This is not a decision");
+    // The message region is mounted before anything is said in it.
+    expect(open).toMatch(/aria-live="polite"/);
     const closed = renderToStaticMarkup(createElement(CancellationRequestPanel, { endpoint: "/api/test", initialView: { ...base, requests: [{ ...request, status: "DECLINED", statusLabel: "Declined", canWithdraw: false, registrantNote: null }] } }));
     expect(closed).toContain("Declined");
     expect(closed).not.toContain("Withdraw this request");

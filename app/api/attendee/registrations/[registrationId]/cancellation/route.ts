@@ -2,7 +2,9 @@ import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { authorizeAttendeeRegistration } from "@/modules/attendee-accounts/registrations-repository";
-import { privateJson, registrantAction, registrantView, requestError } from "@/modules/cancellation-requests/api";
+import { privateJson, readBoundedBody, registrantAction, registrantView, requestError } from "@/modules/cancellation-requests/api";
+import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
+import { checkPublicManageRateLimit } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
@@ -30,11 +32,22 @@ async function authorize(context: Context) {
   return { ok: true as const, target: { registrationId: authorized.registrationId, eventId: authorized.eventId }, accountId: account.id };
 }
 
-async function getHandler(_request: Request, context: Context) {
+/** The manage link's limiter, keyed by the signed-in account's registration instead of a token. */
+async function limited(request: Request, registrationId: string, operation: "read" | "update") {
+  const rateLimit = await checkPublicManageRateLimit(request, `account:${registrationId}`, operation);
+  return rateLimit.allowed ? { rateLimit, response: null } : {
+    rateLimit,
+    response: applyRateLimitHeaders(privateJson({ error: "RATE_LIMITED", message: "Too many requests. Try again later." }, { status: 429 }), rateLimit),
+  };
+}
+
+async function getHandler(request: Request, context: Context) {
   try {
     const access = await authorize(context);
     if (!access.ok) return access.response;
-    return await registrantView(access.target);
+    const limit = await limited(request, access.target.registrationId, "read");
+    if (limit.response) return limit.response;
+    return applyRateLimitHeaders(await registrantView(access.target), limit.rateLimit);
   } catch (error) {
     return requestError(error, "Loading cancellation requests");
   }
@@ -46,7 +59,11 @@ async function postHandler(request: Request, context: Context) {
   try {
     const access = await authorize(context);
     if (!access.ok) return access.response;
-    return await registrantAction(access.target, { via: "ATTENDEE_PORTAL", accountId: access.accountId }, await request.text());
+    const limit = await limited(request, access.target.registrationId, "update");
+    if (limit.response) return limit.response;
+    const read = await readBoundedBody(request);
+    if ("response" in read) return applyRateLimitHeaders(read.response, limit.rateLimit);
+    return applyRateLimitHeaders(await registrantAction(access.target, { via: "ATTENDEE_PORTAL", accountId: access.accountId }, read.body), limit.rateLimit);
   } catch (error) {
     return requestError(error, "Saving a cancellation request");
   }

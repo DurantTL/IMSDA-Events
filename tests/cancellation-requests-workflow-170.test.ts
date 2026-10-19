@@ -38,7 +38,8 @@ const world = vi.hoisted(() => ({
   nextId: 1,
 }));
 
-const GUARDED = new Set(["payment", "refund", "registrationAttendee", "registrationOperation", "capacityReservation", "waitlistEntry"]);
+// Real Prisma model names: touching any of them fails the test that did it.
+const GUARDED = new Set(["payment", "refund", "registrationAttendee", "registrationOperation", "registrationCapacityReservation", "registrationWaitlistEntry", "registrationAdjustment", "merchandiseOrder"]);
 
 function id(prefix: string) {
   world.nextId += 1;
@@ -107,7 +108,9 @@ const fakeDb = {
   cancellationRequestEvent: {
     create: async ({ data }: { data: Record<string, unknown> }) => {
       world.writes.push("cancellationRequestEvent.create");
-      world.events.push({ ...data, id: id("evt"), createdAt: new Date(world.now.getTime() + world.events.length) });
+      const row = { ...data, id: id("evt"), createdAt: new Date(world.now.getTime() + world.events.length) };
+      world.events.push(row);
+      return { id: row.id };
     },
   },
   registration: {
@@ -527,7 +530,10 @@ describe("staff review (#170)", () => {
 
   it("approving moves no money and cancels nothing: no Payment, Refund, Registration or capacity is touched", async () => {
     const { request } = await submit();
+    const writesBeforeApprove = world.writes.length;
     await reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "APPROVE", reason: "Within the policy." }, world.now);
+    // Only what approving itself wrote: the status change, the timeline step and the status email.
+    expect(world.writes.slice(writesBeforeApprove)).toEqual(["cancellationRequest.updateMany", "cancellationRequestEvent.create", "messageOutbox.enqueue"]);
     // The fake database throws on any access to a payment, refund, attendee, operation, capacity or waitlist model and on
     // any registration write, so reaching this line already proves it; the write log makes it explicit.
     expect(world.writes.filter((write) => /^(payment|refund|registration|registrationAttendee|registrationOperation|capacityReservation|waitlistEntry)/.test(write))).toEqual([]);
@@ -545,7 +551,44 @@ describe("staff review (#170)", () => {
   });
 });
 
+describe("a status that repeats (#170)", () => {
+  it("is emailed for each timeline step, each with its own step id", async () => {
+    const { request } = await submit();
+    const act = (action: Record<string, unknown>) => reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, action as never, world.now);
+    await act({ action: "REQUEST_INFORMATION", registrantNote: "First question." });
+    await act({ action: "START_REVIEW" });
+    await act({ action: "REQUEST_INFORMATION", registrantNote: "Second question." });
+    const updates = world.emails.filter((email) => email.kind === "UPDATED");
+    expect(updates.map((email) => email.status)).toEqual(["INFORMATION_NEEDED", "UNDER_REVIEW", "INFORMATION_NEEDED"]);
+    expect(new Set(updates.map((email) => email.stepId)).size).toBe(3);
+    expect(updates.map((email) => email.stepId)).toEqual(world.events.filter((event) => event.toStatus !== "REQUESTED").map((event) => event.id));
+  });
+});
+
 describe("a registration that changed after the request (#170)", () => {
+  it("treats only elapsed time as a note, which needs no acknowledgement", async () => {
+    const { request } = await submit();
+    world.now = new Date("2026-06-10T15:00:00.000Z");
+    const detail = await getCancellationRequestDetail("event-1", request.id, world.now);
+    const outcome = detail!.conflicts.find((conflict) => conflict.code === "OUTCOME_CHANGED");
+    expect(outcome).toMatchObject({ severity: "NOTE" });
+    expect(outcome!.message).toMatch(/Time has passed/);
+    expect(detail!.conflicts.filter((conflict) => conflict.severity === "CHANGE")).toEqual([]);
+    await reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "APPROVE", reason: "Asked in time." }, world.now);
+    expect(world.requests[0]).toMatchObject({ status: "APPROVED", decidedWithChanges: false });
+  });
+
+  it("decides from the registration as it is at the moment of the decision", async () => {
+    const { request } = await submit();
+    // The registration changes after the request and before the decision: the check inside the decision sees it.
+    world.paid = 5_000;
+    await expect(reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "APPROVE", reason: "Yes." }, world.now)).rejects.toMatchObject({ code: "CHANGES_NOT_ACKNOWLEDGED" });
+    expect(world.requests[0].status).toBe("REQUESTED");
+    world.paid = 20_000;
+    await reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "APPROVE", reason: "Yes." }, world.now);
+    expect(world.requests[0]).toMatchObject({ status: "APPROVED", decidedWithChanges: false });
+  });
+
   it("shows what changed to staff, and asks for an acknowledgement before approving", async () => {
     const { request } = await submit();
     world.paid = 15_000;
@@ -634,7 +677,7 @@ describe("audit entries and emails carry ids only (#170)", () => {
     const { request } = await submit();
     await reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "DECLINE", reason: "private-decision-reason-text" }, world.now);
     for (const email of world.emails) {
-      expect(Object.keys(email).sort()).toEqual(["eventId", "kind", "registrationId", "requestId", "status", "statusDetail", "statusLabel"]);
+      expect(Object.keys(email).sort()).toEqual(["eventId", "kind", "registrationId", "requestId", "status", "statusDetail", "statusLabel", "stepId"]);
     }
   });
 });

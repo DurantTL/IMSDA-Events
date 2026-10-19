@@ -321,7 +321,8 @@ type TransitionInput = {
 /** Appends the timeline step, the audit entry (ids only) and the status email for one change. */
 async function recordStep(input: TransitionInput) {
   const { tx, request } = input;
-  await tx.cancellationRequestEvent.create({
+  const step = await tx.cancellationRequestEvent.create({
+    select: { id: true },
     data: {
       eventId: request.eventId,
       requestId: request.id,
@@ -359,6 +360,7 @@ async function recordStep(input: TransitionInput) {
     eventId: request.eventId,
     registrationId: request.registrationId,
     requestId: request.id,
+    stepId: step.id,
     kind: input.email,
     status: input.to,
     statusLabel: requestStatusLabels[input.to],
@@ -602,7 +604,11 @@ async function conflictsFor(
   try {
     const { facts } = await loadRegistrationFacts(request.eventId, request.registrationId, now);
     registrationStatus = facts.registration?.status ?? "UNKNOWN";
-    conflicts.push(...diffRegistrationState(recorded, registrationStateOf(facts)));
+    const currentState = registrationStateOf(facts);
+    const stateDiff = diffRegistrationState(recorded, currentState);
+    conflicts.push(...stateDiff);
+    // The registration itself is as it was when the request was made: any difference in outcome is only time passing.
+    const registrationUnchanged = stateFingerprint(recorded) === stateFingerprint(currentState);
     const current = await previewCancellation(request.eventId, selectionRequest(request.registrationId, toSelection(request)) as PreviewRequest, now);
     if (current.result.status !== "CALCULATED") {
       conflicts.push({
@@ -614,8 +620,10 @@ async function conflictsFor(
       if (current.result.money.refundCents !== request.proposedRefundCents) {
         conflicts.push({
           code: "OUTCOME_CHANGED",
-          severity: "CHANGE",
-          message: `Today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`,
+          severity: registrationUnchanged ? "NOTE" : "CHANGE",
+          message: registrationUnchanged
+            ? `Time has passed since the request. The registration is unchanged, but today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`
+            : `Today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`,
         });
       }
       if (request.policyVersion !== null && current.result.policy && current.result.policy.version !== request.policyVersion) {
@@ -729,35 +737,30 @@ export async function reviewCancellationRequest(eventId: string, requestId: stri
       : action.action === "APPROVE" ? "APPROVED" : "DECLINED";
   const isDecision = action.action === "APPROVE" || action.action === "DECLINE";
 
-  // Read what changed first, outside the transaction: an approval over a changed registration must be acknowledged.
-  let changed = false;
-  if (action.action === "APPROVE") {
-    const row = await db.cancellationRequest.findFirst({
-      where: { id: requestId, eventId },
-      select: { id: true, eventId: true, registrationId: true, scope: true, attendeeIds: true, chargeIds: true, policyVersion: true, proposedRefundCents: true, registrationState: true },
-    });
-    if (!row) throw new CancellationRequestError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
-    const { conflicts } = await conflictsFor(row, now);
-    changed = hasChangeConflict(conflicts);
-    if (changed && !action.acknowledgeChanges) {
-      throw new CancellationRequestError(
-        "CHANGES_NOT_ACKNOWLEDGED",
-        "The registration changed since this request was made. Review the changes and confirm you have, then approve.",
-        { conflicts },
-      );
-    }
-  }
-
   const pending = await db.$transaction(async (tx) => {
     const request = await tx.cancellationRequest.findFirst({
       where: { id: requestId, eventId },
-      select: { id: true, eventId: true, registrationId: true, calculationId: true, policyVersion: true, scope: true, status: true },
+      select: { id: true, eventId: true, registrationId: true, calculationId: true, policyVersion: true, scope: true, status: true, attendeeIds: true, chargeIds: true, proposedRefundCents: true, registrationState: true },
     });
     if (!request) throw new CancellationRequestError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
     await lockRegistration(tx, request.registrationId);
     const from = asStatus(request.status);
     if (!canTransition(from, target, "STAFF")) {
       throw new CancellationRequestError("INVALID_TRANSITION", `A request that is ${requestStatusLabels[from].toLowerCase()} cannot be moved to ${requestStatusLabels[target].toLowerCase()}.`);
+    }
+    // What changed, read after the lock and just before deciding, so the acknowledgement and `decidedWithChanges` describe
+    // the registration at the moment of the decision. An approval over a changed registration must be acknowledged.
+    let changed = false;
+    if (action.action === "APPROVE") {
+      const { conflicts } = await conflictsFor(request, now);
+      changed = hasChangeConflict(conflicts);
+      if (changed && !action.acknowledgeChanges) {
+        throw new CancellationRequestError(
+          "CHANGES_NOT_ACKNOWLEDGED",
+          "The registration changed since this request was made. Review the changes and confirm you have, then approve.",
+          { conflicts },
+        );
+      }
     }
     const moved = await tx.cancellationRequest.updateMany({
       // Compare-and-set on the status read above, so two reviewers cannot both decide.
@@ -789,7 +792,7 @@ export async function reviewCancellationRequest(eventId: string, requestId: stri
       extraAudit: isDecision ? { decidedWithChanges: changed } : undefined,
       email: "UPDATED",
     });
-  });
+  }, { timeout: 20_000 });
   await deliverAfterCommit(pending);
   return { requestId, status: target };
 }

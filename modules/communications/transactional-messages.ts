@@ -895,6 +895,8 @@ export function enqueueCancellationRequestMessage(
     eventId: string;
     registrationId: string;
     requestId: string;
+    /** The timeline step this message is for, so a status that repeats (information needed twice) is emailed each time. */
+    stepId: string;
     kind: "RECEIVED" | "UPDATED";
     status: string;
     statusLabel: string;
@@ -907,9 +909,9 @@ export function enqueueCancellationRequestMessage(
     registrationId: input.registrationId,
     templateKey: input.kind === "RECEIVED" ? "CANCELLATION_REQUEST_RECEIVED" : "CANCELLATION_REQUEST_UPDATED",
     correlationId: input.correlationId ?? randomUUID(),
-    transitionKey: `cancellation-request:${input.requestId}:${input.status}`,
+    transitionKey: `cancellation-request:${input.requestId}:${input.stepId}`,
     requestStatus: { label: input.statusLabel, detail: input.statusDetail },
-    metadata: { requestId: input.requestId, status: input.status },
+    metadata: { requestId: input.requestId, stepId: input.stepId, status: input.status },
   });
 }
 

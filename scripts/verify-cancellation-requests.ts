@@ -131,6 +131,17 @@ async function moneyAndRegistrationState(registrationId: string) {
   return stable({ registration, attendees, payments, refunds, adjustments, reservations });
 }
 
+/** Every registration, waitlist entry, operation and capacity reservation of the whole event, so "nothing else changed" covers other registrations too. */
+async function eventWideState() {
+  const [registrations, waitlist, operations, reservations] = await Promise.all([
+    base.registration.findMany({ where: { eventId }, orderBy: { id: "asc" } }),
+    base.registrationWaitlistEntry.findMany({ where: { eventId }, orderBy: { id: "asc" } }),
+    base.registrationOperation.findMany({ where: { eventId }, orderBy: { id: "asc" } }),
+    base.registrationCapacityReservation.findMany({ where: { eventId }, orderBy: { id: "asc" } }),
+  ]);
+  return stable({ registrations, waitlist, operations, reservations });
+}
+
 async function rejects(run: () => Promise<unknown>) {
   try {
     await run();
@@ -282,10 +293,33 @@ async function main() {
     assert(unacknowledged?.code === "CHANGES_NOT_ACKNOWLEDGED", "an approval over a changed registration needs an acknowledgement");
 
     const stateBeforeDecision = await moneyAndRegistrationState(registration.registrationId);
+    const eventStateBeforeDecision = await eventWideState();
     await requests.reviewCancellationRequest(eventId, current.id, { userId: staffId }, { action: "APPROVE", reason: "Within the policy.", acknowledgeChanges: true }, now);
     const approved = await base.cancellationRequest.findUniqueOrThrow({ where: { id: current.id } });
     assert(approved.status === "APPROVED" && approved.decidedByUserId === staffId && approved.decidedByNameSnapshot === "Request Check Finance" && approved.decisionReason === "Within the policy." && approved.decidedWithChanges, "the approval records the named person, the reason and the acknowledgement");
     assert((await moneyAndRegistrationState(registration.registrationId)) === stateBeforeDecision, "approving changed no registration, attendee, payment, refund, adjustment or capacity record");
+    assert((await eventWideState()) === eventStateBeforeDecision, "approving changed no registration, waitlist entry, registration operation or capacity reservation anywhere in the event");
+
+    // A decided request is final in the database, and so is what the timeline says about the decision.
+    const rewrite = await rejects(() => base.cancellationRequest.updateMany({ where: { id: current.id }, data: { decisionReason: "Rewritten." } }));
+    assert(rewrite && /final and cannot be changed/.test(String(rewrite.message)), "the database refuses any change to an approved request");
+    const reopen = await rejects(() => base.$executeRaw`UPDATE "CancellationRequest" SET "status" = 'REQUESTED' WHERE "id" = ${current.id}`);
+    assert(reopen && /final and cannot be changed/.test(String(reopen.message)), "the database refuses to reopen a decided request");
+    const decisionStep = (overrides: Record<string, unknown>) => base.cancellationRequestEvent.create({
+      data: { eventId, requestId: current.id, toStatus: "APPROVED", actorKind: "STAFF", actorUserId: staffId, actorNameSnapshot: "Named", note: "A reason.", ...overrides } as never,
+    });
+    for (const [label, overrides] of [
+      ["by the registrant", { actorKind: "REGISTRANT" }],
+      ["by the system", { actorKind: "SYSTEM" }],
+      ["with no named person", { actorUserId: null }],
+      ["with no reason", { note: "  " }],
+      ["with a null reason", { note: null }],
+    ] as const) {
+      const refused = await rejects(() => decisionStep(overrides));
+      assert(refused && /decision_by_named_staff/.test(String(refused.message)), `the timeline refuses an approval ${label}`);
+    }
+    const refusedDecline = await rejects(() => decisionStep({ toStatus: "DECLINED", actorKind: "SYSTEM" }));
+    assert(refusedDecline && /decision_by_named_staff/.test(String(refusedDecline.message)), "the timeline refuses a denial by the system");
     const second = await rejects(() => requests.reviewCancellationRequest(eventId, current.id, { userId: staffTwoId }, { action: "DECLINE", reason: "Too late." }, now));
     assert(second?.code === "INVALID_TRANSITION", "a decided request cannot be decided again");
     const withdrawn = await rejects(() => requests.withdrawCancellationRequest(target, current.id, now));
@@ -297,6 +331,21 @@ async function main() {
     assert(audits.length >= 6 && audits.every((entry) => !stable(entry).includes(SECRET_REASON) && !stable(entry).includes("Within the policy.")), "audit entries hold ids only");
   }
   console.log("ok: staff review is named and reasoned, shows conflicts and capacity, and approving changes nothing else");
+
+  // ---- A status that repeats is emailed again. ----
+  {
+    const repeat = await createRegistration();
+    const repeatTarget = { registrationId: repeat.registrationId, eventId };
+    const asked = await requests.submitCancellationRequest(repeatTarget, { via: "MANAGE_LINK" }, input(), now);
+    const act = (action: Record<string, unknown>) => requests.reviewCancellationRequest(eventId, asked.request.id, { userId: staffId }, action as never, now);
+    await act({ action: "REQUEST_INFORMATION", registrantNote: "First question." });
+    await act({ action: "START_REVIEW" });
+    await act({ action: "REQUEST_INFORMATION", registrantNote: "Second question." });
+    const updates = await base.messageOutbox.findMany({ where: { registrationId: repeat.registrationId, templateKey: "CANCELLATION_REQUEST_UPDATED" } });
+    const labels = updates.map((message) => (message.metadata as { status?: string }).status).sort();
+    assert(labels.join() === "INFORMATION_NEEDED,INFORMATION_NEEDED,UNDER_REVIEW", `each step is emailed, including the repeated status, got ${labels.join()}`);
+  }
+  console.log("ok: a repeated status is emailed each time");
 
   // ---- Decline, withdraw, and a request after the deadline. ----
   {

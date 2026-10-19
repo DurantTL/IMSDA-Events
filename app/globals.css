@@ -4604,6 +4604,9 @@ body:has(.auth-page) { padding-bottom: 0; }
 .cancel-request-message { display: flex; align-items: flex-start; gap: 7px; }
 .cancel-request-message.is-ok { color: var(--imsda-navy); }
 .cancel-request-message svg { flex: none; margin-top: 2px; }
+.cancel-request-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cancel-request-confirm p { flex: 1 1 100%; }
+.cancel-request-panel [aria-live]:focus { outline: 2px solid var(--imsda-navy); outline-offset: 2px; }
 .cancel-requests-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .cancel-requests-filters a { min-height: 44px; }
 .cancel-requests-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -5511,7 +5514,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   gap: 6px;
   /* A thumb-sized target (#170 audit): the link used to be the height of its text. */
   min-height: 44px;
-  margin-top: 6px;
+  margin-top: 14px;
   color: var(--imsda-purple);
   font-size: var(--text-helper-min);
   font-weight: 900;
