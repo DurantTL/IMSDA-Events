@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { SearchableSelect } from "@/components/searchable-select";
 import {
   filterSearchableChoices,
+  nounFromLabel,
   PICKER_SEARCH_ATTRIBUTES,
   pickerViewportBox,
   resultCountLabel,
@@ -38,6 +39,18 @@ describe("full-screen phone picker (#1046)", () => {
     expect(resultCountLabel(1)).toBe("1 choice");
     expect(resultCountLabel(0)).toBe("No matching choices");
     expect(select).toMatch(/role="status" aria-live="polite">\{countText\}/);
+  });
+
+  it("derives the announced noun from the field label, and names the trigger as a combobox", () => {
+    expect(nounFromLabel("Pathfinder club")).toEqual({ singular: "pathfinder club", plural: "pathfinder clubs" });
+    expect(nounFromLabel("Church")?.plural).toBe("churches");
+    expect(nounFromLabel("Country")?.plural).toBe("countries");
+    expect(nounFromLabel(undefined)).toBeUndefined();
+    expect(select).toMatch(/role="combobox"\s+aria-haspopup="dialog"[\s\S]*?aria-required=\{required \|\| undefined\}\s+aria-invalid=\{invalid \|\| undefined\}/);
+    expect(select).toContain("pushOpenDialog()");
+    expect(select).toContain("removeOpenDialog(dialogToken)");
+    expect(select).toContain("aria-label={`Clear ${label");
+    expect(css).toContain(".searchable-select-control > button:not(.searchable-select-trigger):hover");
   });
 
   it("gives the search box attributes iOS respects and no contact words", () => {

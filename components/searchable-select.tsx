@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Search, X } from "lucide-react";
+import { pushOpenDialog, removeOpenDialog } from "@/components/use-accessible-dialog";
 import { makeBackgroundInert, usePhoneViewport } from "@/components/use-attendee-sheet";
 import {
   filterSearchableChoices,
+  nounFromLabel,
   PICKER_SEARCH_ATTRIBUTES,
   pickerViewportBox,
   resultCountLabel,
@@ -70,7 +72,7 @@ function PhonePicker({
   const selected = options.find((option) => option.value === value);
   const selectedLabel = selected?.label ?? value;
   const filteredOptions = useMemo(() => filterSearchableChoices(options, query), [options, query]);
-  const countText = resultCountLabel(filteredOptions.length, noun);
+  const countText = resultCountLabel(filteredOptions.length, noun ?? nounFromLabel(label));
 
   function openPicker() {
     // The search always starts empty, even when a value is already chosen.
@@ -99,6 +101,8 @@ function PhonePicker({
     if (!open || !dialog) return;
     const hadSheetClass = document.documentElement.classList.contains("has-attendee-sheet");
     const restoreInert = makeBackgroundInert(dialog);
+    // Register as the top dialog so an attendee sheet's own Tab trap steps aside.
+    const dialogToken = pushOpenDialog();
     searchRef.current?.focus({ preventScroll: true });
     const viewport = window.visualViewport;
     function fit() {
@@ -113,6 +117,7 @@ function PhonePicker({
     return () => {
       viewport?.removeEventListener("resize", fit);
       viewport?.removeEventListener("scroll", fit);
+      removeOpenDialog(dialogToken);
       restoreInert();
       // An attendee sheet under this picker still needs the page locked.
       if (hadSheetClass) document.documentElement.classList.add("has-attendee-sheet");
@@ -152,10 +157,13 @@ function PhonePicker({
           ref={triggerRef}
           type="button"
           className="searchable-select-trigger"
+          role="combobox"
           aria-haspopup="dialog"
           aria-expanded={open}
+          aria-controls={listId}
+          aria-required={required || undefined}
+          aria-invalid={invalid || undefined}
           data-required={required || undefined}
-          data-invalid={invalid || undefined}
           aria-describedby={describedBy}
           onClick={openPicker}
         >
@@ -165,7 +173,12 @@ function PhonePicker({
           <ChevronDown size={16} aria-hidden="true" />
         </button>
         {value ? (
-          <button type="button" className="searchable-select-clear" aria-label="Clear selection" onClick={() => onChange("")}>
+          <button type="button" className="searchable-select-clear" aria-label={`Clear ${label ?? "selection"}`}
+            onClick={() => {
+              onChange("");
+              triggerRef.current?.focus({ preventScroll: true });
+            }}
+          >
             <X size={15} aria-hidden="true" />
           </button>
         ) : null}

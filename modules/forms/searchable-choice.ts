@@ -58,3 +58,13 @@ export function trappedTabIndex(index: number, count: number, backwards: boolean
   if (!backwards && index === count - 1) return 0;
   return null;
 }
+
+/** "Pathfinder club" becomes { singular: "pathfinder club", plural: "pathfinder clubs" } for the announced count. */
+export function nounFromLabel(label: string | undefined): { singular: string; plural: string } | undefined {
+  const singular = label?.trim().toLocaleLowerCase();
+  if (!singular) return undefined;
+  const plural = /(s|x|ch|sh)$/.test(singular)
+    ? `${singular}es`
+    : /[^aeiou]y$/.test(singular) ? `${singular.slice(0, -1)}ies` : `${singular}s`;
+  return { singular, plural };
+}

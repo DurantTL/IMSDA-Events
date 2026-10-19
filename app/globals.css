@@ -3698,7 +3698,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   cursor: pointer;
   padding: 0;
 }
-.searchable-select-control > button:hover { background: var(--imsda-purple-soft); color: var(--imsda-purple); }
+.searchable-select-control > button:not(.searchable-select-trigger):hover { background: var(--imsda-purple-soft); color: var(--imsda-purple); }
 .public-registration-field-invalid .searchable-select-control {
   border-color: var(--coral);
   box-shadow: 0 0 0 1px var(--coral);
