@@ -71,6 +71,7 @@ export function AttendeeRegistrationAnswersForm({
   const [notice, setNotice] = useState("");
   // Inline checks (#855): an old stored value that fails is flagged but never blocks the save.
   const [attempted, setAttempted] = useState(false);
+  const [missingIds, setMissingIds] = useState<string[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const numberRules = { min: 0, max: 100000 };
   const storedAnswer = (attendeeId: string, key: string) => saved.find((attendee) => attendee.attendeeId === attendeeId)?.responses[key];
@@ -109,6 +110,23 @@ export function AttendeeRegistrationAnswersForm({
     )));
     if (blocked) {
       setError("Check the highlighted answers and try again.");
+      return;
+    }
+    // A phone's picker is a button, which has no native required check: look for a cleared required list here.
+    const missing = attendees.flatMap((attendee) => fields
+      .filter((field) => (
+        field.required
+        && !readOnly
+        && !(attendee.lockedFieldKeys ?? []).includes(field.key)
+        && fieldIsVisible(field, attendee.responses)
+        && !["CHECKBOX", "MULTISELECT", "RANKED_CHOICE", "NUMBER", "ADDRESS"].includes(field.type)
+        && (typeof attendee.responses[field.key] !== "string" || attendee.responses[field.key] === "")
+      ))
+      .map((field) => `${attendee.attendeeId}_${field.id}`));
+    setMissingIds(missing);
+    if (missing.length > 0) {
+      setError("Choose an option for each highlighted list and try again.");
+      document.getElementById(missing[0])?.focus();
       return;
     }
     setSaving(true);
@@ -302,7 +320,11 @@ export function AttendeeRegistrationAnswersForm({
                     <input readOnly value={typeof value === "string" ? value : ""} />
                   ) : <SearchableSelect
                     id={`${attendee.attendeeId}_${field.id}`}
+                    sheet
+                    label={field.label}
                     required={field.required}
+                    invalid={missingIds.includes(`${attendee.attendeeId}_${field.id}`) && value === ""}
+                    describedBy={missingIds.includes(`${attendee.attendeeId}_${field.id}`) && value === "" ? `${attendee.attendeeId}_${field.id}_missing` : undefined}
                     value={typeof value === "string" ? value : ""}
                     placeholder={`Search ${field.label.toLocaleLowerCase()}…`}
                     options={field.options.map((option) => ({
@@ -315,6 +337,9 @@ export function AttendeeRegistrationAnswersForm({
                       nextValue,
                     )}
                   />}
+                  {missingIds.includes(`${attendee.attendeeId}_${field.id}`) && value === "" && (
+                    <small className="form-error" id={`${attendee.attendeeId}_${field.id}_missing`}>Choose an option for {field.label}.</small>
+                  )}
                   {field.helpText && <small>{field.helpText}</small>}
                   {locked && <small>Contact the event team to change this selection.</small>}
                 </div>

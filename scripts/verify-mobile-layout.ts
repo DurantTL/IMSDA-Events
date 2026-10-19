@@ -3187,6 +3187,18 @@ async function fillRequiredStep(page: Page, email: string) {
     await page.waitForTimeout(200);
     await page.locator('[role="listbox"] [role="option"]:visible').first().click();
   }
+  // A phone shows each searchable select as a trigger that opens a full-screen picker (#1046).
+  const triggers = content.locator('button.searchable-select-trigger[data-required="true"]:visible');
+  for (let index = 0; index < (await triggers.count()); index += 1) {
+    const trigger = triggers.nth(index);
+    if (!(await trigger.locator("span.is-placeholder").count())) continue;
+    await trigger.click();
+    const search = page.getByRole("dialog").getByRole("combobox");
+    await search.fill("Mobilecheck Eagles");
+    await page.waitForTimeout(200);
+    await page.getByRole("dialog").getByRole("option").first().click();
+    await page.getByRole("dialog").waitFor({ state: "detached" });
+  }
   const fields = content.locator("input[required]:not([role=combobox]):visible, textarea[required]:visible");
   for (let index = 0; index < (await fields.count()); index += 1) {
     const field = fields.nth(index);
@@ -3208,6 +3220,59 @@ async function fillRequiredStep(page: Page, email: string) {
     if (groups.has(group)) continue;
     groups.add(group);
     if (!(await content.locator(`input[type=radio][name="${group}"]:checked`).count())) await radio.check({ force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * The phone picker (#1046), opened on the first searchable list on the step with a letter typed: it must cover the whole
+ * window (nothing of the page behind shows), end where the window ends (a phone's window ends at the keyboard), have a
+ * 44px Close, and give back the previous value and the focus on Escape. Does nothing off a phone or when the step has no
+ * searchable list.
+ */
+async function auditPhonePicker(page: Page, label: string, width: number, shotPath: string) {
+  const trigger = page.locator("button.searchable-select-trigger:visible").first();
+  if ((await trigger.count()) === 0) return;
+  const before = await trigger.innerText();
+  try {
+    await trigger.scrollIntoViewIfNeeded({ timeout: 3000 });
+    await trigger.click({ timeout: 3000 });
+    const dialog = page.getByRole("dialog");
+    await dialog.waitFor({ timeout: 3000 });
+    const search = dialog.getByRole("combobox");
+    if ((await search.inputValue()) !== "") record("phone-picker", label, width, "the search box did not start empty");
+    if (!(await search.evaluate((el: HTMLElement) => el === document.activeElement))) record("phone-picker", label, width, "the search box did not take focus");
+    await search.pressSequentially("a");
+    await page.waitForTimeout(200);
+    const result = await page.evaluate(() => {
+      const picker = document.querySelector<HTMLElement>(".searchable-select-picker");
+      if (!picker) return { problems: ["no picker is open"] };
+      const problems: string[] = [];
+      const box = picker.getBoundingClientRect();
+      if (Math.abs(box.left) > 0.5 || Math.abs(box.right - window.innerWidth) > 0.5) problems.push(`the picker is ${Math.round(box.width)}px wide in a ${window.innerWidth}px window`);
+      if (Math.abs(box.top) > 0.5 || Math.abs(box.bottom - window.innerHeight) > 0.5) problems.push(`the picker spans ${Math.round(box.top)}..${Math.round(box.bottom)}px in a ${window.innerHeight}px window`);
+      for (const [x, y] of [[2, 2], [window.innerWidth - 3, 2], [2, window.innerHeight - 3], [window.innerWidth - 3, window.innerHeight - 3], [window.innerWidth / 2, window.innerHeight / 2]]) {
+        const top = document.elementFromPoint(x, y);
+        if (!top || !picker.contains(top)) problems.push(`the page shows through at ${Math.round(x)},${Math.round(y)}`);
+      }
+      const listBox = picker.querySelector<HTMLElement>('[role="listbox"]')?.getBoundingClientRect();
+      if (!listBox || Math.abs(listBox.bottom - window.innerHeight) > 1) problems.push(`the list ends at ${Math.round(listBox?.bottom ?? 0)}px, not at the bottom of the ${window.innerHeight}px window`);
+      const close = picker.querySelector<HTMLElement>(".searchable-select-picker-close")?.getBoundingClientRect();
+      if (!close || close.height < 43.5 || close.width < 43.5) problems.push(`Close is ${Math.round(close?.width ?? 0)}x${Math.round(close?.height ?? 0)}px`);
+      const options = Array.from(picker.querySelectorAll<HTMLElement>('[role="option"]'));
+      const small = options.filter((option) => option.getBoundingClientRect().height < 43.5).length;
+      if (small) problems.push(`${small} options are shorter than 44px`);
+      if (options.length === 0) problems.push("typing a letter left no options");
+      if (document.documentElement.scrollWidth > window.innerWidth) problems.push("the page behind scrolls sideways");
+      return { problems };
+    });
+    for (const problem of result.problems) record("phone-picker", label, width, problem);
+    if (takeShots) await page.screenshot({ path: `${shotPath}.jpg`, type: "jpeg", quality: 60 }).catch(() => undefined);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached", timeout: 3000 });
+    if ((await trigger.innerText()) !== before) record("phone-picker", label, width, "Escape changed the value");
+    if (!(await trigger.evaluate((el: HTMLElement) => el === document.activeElement))) record("phone-picker", label, width, "focus did not return to the field after Escape");
+  } catch (error) {
+    record("phone-picker", label, width, (error as Error).message.split("\n")[0]);
   }
 }
 
@@ -3247,6 +3312,7 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
         if ((await done.count()) > 0) await done.first().click({ timeout: 5000 });
         await page.waitForTimeout(250);
       }
+      await auditPhonePicker(page, name(`${heading}, searchable list open`), width, shot(`${heading}-picker`));
       await fillRequiredStep(page, email);
       await page.click("button.is-continue");
       await page.waitForTimeout(450);

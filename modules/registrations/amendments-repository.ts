@@ -3,6 +3,7 @@ import "server-only";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { partnerClubIssue, partnerClubProblem } from "@/modules/club-registrations/domain";
 import { enforceTeamRegistrationRules } from "@/modules/club-teams/registration-guard";
+import { ROLE_FIELD_KEY, formAsksRole } from "@/modules/club-teams/rules";
 import { deliverPermissionMessages } from "@/modules/club-teams/permission-repository";
 import { checkLocationSeats } from "@/modules/event-locations/admission";
 import { LODGING_LINE_KEY } from "@/modules/lodging/pricing";
@@ -51,6 +52,9 @@ import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
+
+/** The role answer that maps to a team member (#1050). */
+const MEMBER_ROLE_ANSWER = "Pathfinder";
 
 /**
  * Who is amending. A staff user amends any registration through the staff
@@ -1052,6 +1056,34 @@ async function prepareAmendment(
   });
   input = held.input;
   const acknowledgmentKeys = held.keys;
+  // #1050: a team registered on an older form version asks the role (`attendee_type`); once the current published form
+  // dropped that question, nobody can answer it for a person added now. That person gets the answer that maps to a
+  // team member ("Pathfinder"); the age rule (`teamRoleFor`) still makes anyone over the age limit a coach. People already
+  // on the registration keep their stored answers, and a registration on the current version is untouched.
+  const roleField = definition.sections.flatMap((section) => section.fields).find((field) => (
+    field.key === ROLE_FIELD_KEY && field.optionSource !== "ATTENDEE_TYPES" && field.options.includes(MEMBER_ROLE_ANSWER)
+  ));
+  // Only on an event with team rules (PBE): another club form that drops its roster role (Honors Weekend) keeps asking.
+  const teamEvent = roleField && input.attendees.some((attendee) => !attendee.attendeeId)
+    ? await tx.eventTeamSettings.findUnique({ where: { eventId: registration.eventId }, select: { eventId: true } })
+    : null;
+  if (teamEvent) {
+    const currentVersion = await tx.registrationFormVersion.findFirst({
+      where: { formId: registration.publicFormSubmission.formVersion.form.id, status: "PUBLISHED" },
+      select: { definition: true },
+    });
+    const currentDefinition = currentVersion ? registrationFormDefinitionSchema.safeParse(currentVersion.definition) : null;
+    if (currentDefinition?.success && !formAsksRole(currentDefinition.data)) {
+      input = {
+        ...input,
+        attendees: input.attendees.map((attendee) => (
+          attendee.attendeeId || typeof attendee.responses[ROLE_FIELD_KEY] === "string" && attendee.responses[ROLE_FIELD_KEY].trim() !== ""
+            ? attendee
+            : { ...attendee, responses: { ...attendee.responses, [ROLE_FIELD_KEY]: MEMBER_ROLE_ANSWER } }
+        )),
+      };
+    }
+  }
   assertAmendmentAttendeeTypeSelections(
     definition,
     input.attendees,

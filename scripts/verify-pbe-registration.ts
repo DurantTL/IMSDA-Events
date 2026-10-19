@@ -883,6 +883,31 @@ async function main() {
   const keptAttendees = await prisma.registrationAttendee.findMany({ where: { registrationId: oldRow.registrationId } });
   assert(keptAttendees.length === 2 && keptAttendees.every((attendee) => (attendee.formResponses as { attendee_type?: string }).attendee_type === "Pathfinder"), "an amendment of a team from the older form keeps its role answers and is not asked for a role");
   console.log("ok  a team registered on the older form is amended without the role question, keeping its older answers");
+
+  // 18. The director (here staff acting as the director, the same engine path as the staff amendment) adds a new person to
+  // the old-form team after the form dropped the role question (#1050). The save succeeds; the new person gets the member
+  // answer and counts as a member, the existing people keep their stored answers, and anyone over the age limit is a coach.
+  const keepOldWith = async (selected: string[]) => {
+    const row = await rowOf("g", "Old Form Team");
+    return {
+      clientRequestId: randomUUID(), expectedUpdatedAt: row.registration.updatedAt.toISOString(), selectedMemberIds: selected.map((key) => members.get(`g:${key}`)!),
+      keptGuestIds: [] as string[], keptOffRosterAttendeeIds: [] as string[], newGuests: [] as never[],
+      attendeeResponses: Object.fromEntries(selected.map((key) => [clientId("g", key), {}])),
+      teamKey: "old form team",
+    };
+  };
+  await club.amendClubRegistration(clubOf("g"), eventId, actor, await keepOldWith(["old1", "old2", "old3"]), now);
+  const afterAdd = await prisma.registrationAttendee.findMany({ where: { registrationId: oldRow.registrationId } });
+  const newcomer = afterAdd.find((attendee) => attendee.personId === personOf.get("g:old3"))!;
+  assert(afterAdd.length === 3, "the new person was newcomer to the old-form team");
+  assert((newcomer.formResponses as { attendee_type?: string }).attendee_type === "Pathfinder", "the new person on an old-form team gets the Pathfinder answer");
+  assert((newcomer.profileSnapshot as { teamRole?: string }).teamRole === "MEMBER", "the new person counts as a member");
+  assert(afterAdd.filter((attendee) => attendee.id !== newcomer.id).every((attendee) => (attendee.formResponses as { attendee_type?: string }).attendee_type === "Pathfinder"), "existing people keep their stored answers");
+  await addMember("g", "oldadult", "adult", "YOUTH", "PbeOld", "Adult");
+  await club.amendClubRegistration(clubOf("g"), eventId, actor, await keepOldWith(["old1", "old2", "old3", "oldadult"]), now);
+  const adultRow = (await prisma.registrationAttendee.findMany({ where: { registrationId: oldRow.registrationId } })).find((attendee) => attendee.personId === personOf.get("g:oldadult"))!;
+  assert((adultRow.profileSnapshot as { teamRole?: string }).teamRole === "COACH", "a new person over the age limit is still a coach on an old-form team");
+  console.log("ok  a person added to a team on the older form gets the member answer and counts as a member; the age rule still applies");
 }
 
 main()
