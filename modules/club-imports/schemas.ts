@@ -9,6 +9,8 @@ export const clubImportItemSchema = z.object({
   sourceKey: z.string().trim().regex(/^(form-\d+|club-list):[A-Za-z0-9_-]{1,40}$/),
   /** Club-list only: the club's older names; an existing club is found by any of them. */
   matchNames: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
+  /** Club-list only: the existing club the preview matched (or the administrator picked), or null for none. Confirm refuses when the directory now says something else. */
+  existingClubId: z.string().trim().max(40).nullable().default(null),
   /** Club-list only: a new club is created active or not. */
   isActive: z.boolean().default(true),
   /** Club-list only: change an existing club's church to `churchId` (the "update church" tick). */
@@ -40,7 +42,10 @@ export const clubImportItemSchema = z.object({
 
 export const clubImportConfirmSchema = z.object({
   clubs: z.array(clubImportItemSchema).min(1, "Choose at least one club to import.").max(500),
-}).strict();
+}).strict().refine((payload) => payload.clubs.length <= 400 || payload.clubs.every((club) => club.kind === "CLUB_LIST"), {
+  message: "Import at most 400 form 89 registrations at a time. A club list may have up to 500 clubs.",
+  path: ["clubs"],
+});
 
 const clubYear = z.string().regex(/^\d{4}-\d{2}$/, "Choose a valid club year.");
 

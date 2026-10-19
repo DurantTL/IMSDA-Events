@@ -371,6 +371,20 @@ export function clubMatchNames(clubName: string, namesOnSheet: string[]) {
   return [...new Set([clubName, ...namesOnSheet].map(normalizeOrganizationName).filter(Boolean))];
 }
 
+const STATE_NAMES: Record<string, string> = { iowa: "IA", missouri: "MO" };
+
+/**
+ * "IA", "ia", "Iowa" or "Missouri." to IA or MO; null for anything else.
+ * `Organization.state` is the eAdventist export's raw StreetState text (up to
+ * 40 characters), so a church may hold a code or the full name.
+ */
+export function stateCode(value: string | null | undefined) {
+  const folded = (value ?? "").normalize("NFKC").trim().replace(/[.\s]+$/g, "").toLowerCase();
+  if (!folded) return null;
+  if (folded === "ia" || folded === "mo") return folded.toUpperCase();
+  return STATE_NAMES[folded] ?? null;
+}
+
 export type ChurchSuggestionInput = { id: string; name: string; city?: string | null; state?: string | null };
 export type ChurchSuggestion = {
   /** Preselected when there is exactly one best match (or the file named a sponsor). */
@@ -391,7 +405,12 @@ export function suggestChurches(hint: string, state: string | null, churches: Ch
   if (givenId && churches.some((church) => church.id === givenId)) return { churchId: givenId, candidateIds: [givenId], status: "GIVEN" };
   const wanted = churchStem(hint);
   if (!wanted) return { churchId: null, candidateIds: [], status: "NONE" };
-  const inState = churches.filter((church) => !state || !church.state || church.state.trim().toUpperCase() === state);
+  // A church with no state, or one that is neither Iowa nor Missouri, is kept: its record may simply be incomplete.
+  const wantedState = stateCode(state);
+  const inState = churches.filter((church) => {
+    const code = stateCode(church.state);
+    return !wantedState || !code || code === wantedState;
+  });
   const town = (church: ChurchSuggestionInput) => churchStem(church.city ?? "");
   const tiers: ChurchSuggestionInput[][] = [
     inState.filter((church) => churchStem(church.name) === wanted),

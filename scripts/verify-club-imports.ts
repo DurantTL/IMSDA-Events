@@ -257,6 +257,25 @@ async function main() {
     assert(underSchool.status === "FAILED" && /no longer available/.test(underSchool.message), `a school is refused as a sponsor (${underSchool.message})`);
     assert(!(await prisma.organization.findFirst({ where: { name: `${stamp} School Pathfinders` } })), "no club was created under the school");
 
+    // The club-list JSON (#1038): a club only, and two confirms at once make exactly one.
+    const { parseClubListExport } = await import("../modules/club-imports/domain");
+    const listChurch = await prisma.organization.create({ data: { type: "CHURCH", name: `${stamp} Listville SDA Church`, normalizedName: `${stamp} listville sda church`, city: `${stamp}Listville`, state: "Iowa" }, select: { id: true } });
+    const listName = `${stamp} Listville Pathfinders`;
+    const listDrafts = async () => (await annotateImportDrafts(parseClubListExport({ clubs: [{ name: listName, type: "CLUB", churchSearchHint: `${stamp}Listville`, state: "IA", namesOnSheet: { old: `${stamp} Listville Club` } }] }, now).drafts))
+      .drafts.map((draft) => ({ ...draft, include: true }));
+    const listPreview = await listDrafts();
+    assert(listPreview[0]!.churchId === listChurch.id && listPreview[0]!.existingClub === null, "the list row suggests its church, and the club is new");
+    const listItems = clubImportConfirmSchema.parse(confirmPayload(listPreview)).clubs;
+    const peopleBeforeList = await prisma.person.count();
+    const racing = await Promise.all([importClubs(listItems, admin.id, now), importClubs(listItems, admin.id, now)]);
+    assert(await prisma.organization.count({ where: { type: "CLUB", name: listName } }) === 1, "two confirms at once create exactly one club");
+    assert(racing.flat().filter((result) => result.status === "IMPORTED").length === 1, "exactly one of the two confirms created it");
+    assert(await prisma.person.count() === peopleBeforeList && await prisma.clubRosterMember.count({ where: { organization: { name: listName } } }) === 0, "a list import adds no people and no roster");
+    assert(await prisma.externalIdentity.count({ where: { organization: { name: listName } } }) === 0, "a list import writes no import record or roster year");
+    assert(await prisma.clubInvite.count({ where: { organization: { name: listName } } }) === 0, "a list import creates no invites");
+    const [again] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(await listDrafts())).clubs, admin.id, now);
+    assert(again.status === "ALREADY_IMPORTED" && await prisma.organization.count({ where: { type: "CLUB", name: listName } }) === 1, "confirming a fresh preview again creates nothing new");
+
     console.log("club imports verified: wrong-year import moved to 2026-27 (48 rows, Person count unchanged, 0 left in 2025-26), re-upload reports 2026-27, conflicting moves refused, second registration refused with next steps, Keep both and Jr. handled");
   } finally {
     await cleanup(admin.id);

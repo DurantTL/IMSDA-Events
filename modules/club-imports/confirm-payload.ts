@@ -11,6 +11,8 @@ export type PreviewDraft = {
   namesOnSheet?: string[];
   isActive?: boolean;
   updateChurch?: boolean;
+  /** The existing club the preview matched or the administrator picked. */
+  existingClub?: { id: string; sponsorId: string | null } | null;
   sourceKey: string;
   entryId: string;
   clubYear: string;
@@ -35,7 +37,7 @@ export function confirmPayload(drafts: PreviewDraft[]) {
   return {
     clubs: drafts.filter((draft) => draft.include).map((draft) => ({
       ...(draft.kind === "CLUB_LIST"
-        ? { kind: "CLUB_LIST" as const, matchNames: draft.namesOnSheet ?? [], isActive: draft.isActive ?? true, updateChurch: Boolean(draft.updateChurch && draft.churchId) }
+        ? { kind: "CLUB_LIST" as const, matchNames: draft.namesOnSheet ?? [], isActive: draft.isActive ?? true, existingClubId: draft.existingClub?.id ?? null, updateChurch: Boolean(draft.updateChurch && draft.churchId && draft.existingClub && draft.churchId !== draft.existingClub.sponsorId) }
         : {}),
       sourceKey: draft.sourceKey,
       entryId: draft.entryId,

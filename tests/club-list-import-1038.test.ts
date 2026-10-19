@@ -16,18 +16,33 @@ const mocks = vi.hoisted(() => ({
   rosterCreate: vi.fn(),
   personCreate: vi.fn(),
   inviteCreate: vi.fn(),
+  queryRaw: vi.fn(),
+  identityFindMany: vi.fn(),
+  calls: [] as string[],
+  seq: 0,
 }));
 
 const orgs = () => mocks.orgs as Org[];
+const byCreated = (a: Org, b: Org) => (a.createdAt!.getTime() - b.createdAt!.getTime()) || a.id.localeCompare(b.id);
 
 const client = {
   organization: {
-    findMany: ({ where }: { where: { type: unknown } }) => Promise.resolve(orgs().filter((org) => (typeof where.type === "string" ? org.type === where.type : (where.type as { in: string[] }).in.includes(org.type)) && (typeof where.type === "string" || org.isActive))),
-    findFirst: ({ where }: { where: { type: string; normalizedName: { in: string[] } } }) =>
-      Promise.resolve(orgs().find((org) => org.type === where.type && where.normalizedName.in.includes(org.normalizedName)) ?? null),
+    findMany: ({ where }: { where: { type: unknown; normalizedName?: { in: string[] } } }) => {
+      mocks.calls.push("org.findMany");
+      return Promise.resolve(orgs()
+        .filter((org) => (typeof where.type === "string" ? org.type === where.type : (where.type as { in: string[] }).in.includes(org.type)) && (typeof where.type === "string" || org.isActive))
+        .filter((org) => !where.normalizedName || where.normalizedName.in.includes(org.normalizedName))
+        .sort(byCreated));
+    },
+    findFirst: ({ where }: { where: { type: string; normalizedName: string | { in: string[] } } }) => {
+      mocks.calls.push("org.findFirst");
+      const wanted = typeof where.normalizedName === "string" ? [where.normalizedName] : where.normalizedName.in;
+      // Like the real query with orderBy createdAt, id: the oldest match.
+      return Promise.resolve(orgs().filter((org) => org.type === where.type && wanted.includes(org.normalizedName)).sort(byCreated)[0] ?? null);
+    },
     findUnique: ({ where }: { where: { id: string } }) => Promise.resolve(orgs().find((org) => org.id === where.id) ?? null),
     create: ({ data }: { data: Partial<Org> }) => {
-      const created = { id: `club-${orgs().length + 1}`, isActive: true, parentOrganizationId: null, ...data } as Org;
+      const created = { id: `club-${orgs().length + 1}`, isActive: true, parentOrganizationId: null, createdAt: new Date(++mocks.seq), ...data } as Org;
       mocks.orgs.push(created);
       return Promise.resolve(created);
     },
@@ -36,7 +51,8 @@ const client = {
       return Promise.resolve({});
     },
   },
-  externalIdentity: { findMany: () => Promise.resolve([]), findUnique: () => Promise.resolve(null), create: mocks.identityCreate },
+  $queryRaw: (...args: unknown[]) => { mocks.calls.push("lock"); mocks.queryRaw(...args); return Promise.resolve([]); },
+  externalIdentity: { findMany: mocks.identityFindMany, findUnique: () => Promise.resolve(null), create: mocks.identityCreate },
   clubRosterMember: { findMany: () => Promise.resolve([]), create: mocks.rosterCreate },
   person: { create: mocks.personCreate },
   clubInvite: { findFirst: () => Promise.resolve(null), create: mocks.inviteCreate },
@@ -57,12 +73,13 @@ import { AccessDeniedError } from "@/modules/access/authorization";
 import { confirmPayload, type PreviewDraft } from "@/modules/club-imports/confirm-payload";
 import { ClubImportParseError, clubMatchNames, parseClubImportFile, parseClubListExport, suggestChurches } from "@/modules/club-imports/domain";
 import { annotateImportDrafts, importClubs } from "@/modules/club-imports/repository";
+import { stateCode } from "@/modules/club-imports/domain";
 import { clubImportConfirmSchema } from "@/modules/club-imports/schemas";
 
 const now = new Date("2026-10-19T15:00:00Z");
 
 const org = (id: string, type: string, name: string, extra: Partial<Org> = {}): Org => ({
-  id, type, name, normalizedName: name.toLowerCase(), parentOrganizationId: null, isActive: true, city: null, state: null, ...extra,
+  id, type, name, normalizedName: name.toLowerCase(), parentOrganizationId: null, isActive: true, city: null, state: null, createdAt: new Date(++mocks.seq), ...extra,
 });
 
 const club = (overrides: Record<string, unknown> = {}) => ({
@@ -80,6 +97,8 @@ const club = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.orgs.length = 0;
+  mocks.calls.length = 0;
+  mocks.identityFindMany.mockResolvedValue([]);
   mocks.orgs.push(
     org("church-1", "CHURCH", "Sample Hollow SDA Church", { city: "Sample Hollow", state: "IA" }),
     org("church-2", "CHURCH", "Pretend Ridge SDA Church", { city: "Pretend Ridge", state: "MO" }),
@@ -135,12 +154,27 @@ describe("church suggestion", () => {
     expect(suggestChurches("Pretend Ridge", null, churches)).toMatchObject({ status: "ONE", churchId: "c" });
   });
 
-  it("matches the town when no name matches, and says pick one for several", () => {
+  it("matches the town when no name matches", () => {
     expect(suggestChurches("Elsewhere", null, churches)).toMatchObject({ status: "ONE", churchId: "b" });
-    const several = suggestChurches("Sample Hollow", null, churches);
-    expect(several).toMatchObject({ status: "ONE", churchId: "a" });
     expect(suggestChurches("Hollow Fellowship", null, churches)).toMatchObject({ status: "ONE", churchId: "b" });
+  });
+
+  it("says pick one when several churches match in the best tier", () => {
+    const twins = [...churches, { id: "e", name: "Sample Hollow Church", city: "Sample Hollow", state: "MO" }];
+    // "Sample Hollow SDA Church" and "Sample Hollow Church" have the same stem.
+    expect(suggestChurches("Sample Hollow", null, twins)).toMatchObject({ status: "SEVERAL", churchId: null, candidateIds: ["a", "e", "b"] });
+    // A word that is only part of several names is also several.
     expect(suggestChurches("Sample", null, churches)).toMatchObject({ status: "SEVERAL", churchId: null, candidateIds: ["a", "b"] });
+    // The state narrows the twins to one.
+    expect(suggestChurches("Sample Hollow", "IA", twins)).toMatchObject({ status: "ONE", churchId: "a" });
+  });
+
+  it("reads state codes and full names, as the eAdventist import stores them", () => {
+    expect(["IA", "ia", "Iowa", " Iowa. ", "MO", "Missouri"].map(stateCode)).toEqual(["IA", "IA", "IA", "IA", "MO", "MO"]);
+    expect(stateCode("Nebraska")).toBeNull();
+    expect(stateCode(null)).toBeNull();
+    const spelled = [{ id: "i", name: "Sample Hollow SDA Church", city: "X", state: "Iowa" }, { id: "m", name: "Sample Hollow Church", city: "Y", state: "Missouri" }];
+    expect(suggestChurches("Sample Hollow", "MO", spelled)).toMatchObject({ status: "ONE", churchId: "m" });
   });
 
   it("narrows by state", () => {
@@ -198,7 +232,11 @@ describe("confirm", () => {
     const payload = clubImportConfirmSchema.parse(confirmPayload(await preview([club()])));
     await importClubs(payload.clubs, "admin-1", now);
     const [second] = await importClubs(payload.clubs, "admin-1", now);
-    expect(second).toMatchObject({ status: "ALREADY_IMPORTED" });
+    // The same payload again: the club now exists, which the preview did not know. Nothing new is made.
+    expect(second).toMatchObject({ status: "FAILED" });
+    expect(second.message).toMatch(/preview the file again/);
+    const [fresh] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(await preview([club()]))).clubs, "admin-1", now);
+    expect(fresh).toMatchObject({ status: "ALREADY_IMPORTED" });
     expect(orgs().filter((o) => o.type === "CLUB")).toHaveLength(1);
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
   });
@@ -266,6 +304,117 @@ describe("system administrators only", () => {
     expect(await response.json()).toMatchObject({ drafts: [{ kind: "CLUB_LIST", churchId: "church-1", existingClub: null }], skipped: 0 });
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
     expect(orgs().filter((o) => o.type === "CLUB")).toHaveLength(0);
+  });
+});
+
+describe("review fixes (#1038)", () => {
+  const draftsFor = async (list: unknown[]) => {
+    const annotated = await annotateImportDrafts(parseClubListExport({ clubs: list }, now).drafts);
+    return annotated.drafts.map((draft) => ({ ...draft, include: true }) as unknown as PreviewDraft);
+  };
+
+  it("never gives a list row an 'already imported' state from a form 89 identity with the same number", async () => {
+    mocks.identityFindMany.mockResolvedValue([{ externalId: "1", providerScope: "form-89:2026-27", organization: { id: "club-x", name: "Unrelated Club" } }]);
+    const annotated = await annotateImportDrafts(parseClubListExport({ clubs: [club()] }, now).drafts);
+    expect(annotated.drafts[0]!.importedYears).toEqual({});
+    // Form 89 entries are still looked up; a list-only file asks for none.
+    expect(mocks.identityFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { provider: "FLUENT_FORMS", externalId: { in: [] } } }));
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { ClubImportWorkspace } = await import("@/components/club-import-workspace");
+    const html = renderToStaticMarkup(createElement(ClubImportWorkspace, { initialPreview: { drafts: annotated.drafts, churches: annotated.churches, clubYearChoices: [], skipped: 0 } }));
+    expect(html).not.toContain("Already imported");
+    expect(html).not.toContain(">Imported<");
+  });
+
+  it("takes the club's own name over an older name", async () => {
+    mocks.orgs.push(org("club-older-name", "CLUB", "Sample Hollow Pathfinder Club"), org("club-own", "CLUB", "Sample Hollow Pathfinders"));
+    const [draft] = (await annotateImportDrafts(parseClubListExport({ clubs: [club()] }, now).drafts)).drafts;
+    expect(draft!.existingClub?.id).toBe("club-own");
+    expect(draft!.ambiguousClubs).toEqual([]);
+  });
+
+  it("marks a row ambiguous when its older names match more than one club, and makes the administrator pick", async () => {
+    mocks.orgs.push(org("club-a", "CLUB", "Sample Hollow Pathfinder Club"), org("club-b", "CLUB", "Sample Hollow Club"));
+    const list = [club({ namesOnSheet: { a: "Sample Hollow Pathfinder Club", b: "Sample Hollow Club" } })];
+    const drafts = await draftsFor(list);
+    const draft = drafts[0] as unknown as { existingClub: unknown; ambiguousClubs: Array<{ id: string }> };
+    expect(draft.existingClub).toBeNull();
+    expect(draft.ambiguousClubs.map((candidate) => candidate.id)).toEqual(["club-a", "club-b"]);
+
+    // Unpicked: confirm refuses, creating and changing nothing.
+    const [refused] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(drafts)).clubs, "admin-1", now);
+    expect(refused).toMatchObject({ status: "FAILED" });
+    expect(refused.message).toMatch(/more than one club/i);
+    expect(orgs().filter((o) => o.type === "CLUB")).toHaveLength(2);
+
+    // Picked: that club is linked.
+    const picked = drafts.map((d) => ({ ...d, existingClub: (d as unknown as { ambiguousClubs: Array<{ id: string; sponsorId: string | null }> }).ambiguousClubs[1]! }));
+    const [linked] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(picked)).clubs, "admin-1", now);
+    expect(linked).toMatchObject({ status: "ALREADY_IMPORTED", organizationId: "club-b" });
+  });
+
+  it("refuses when the directory resolves to a different club than the preview showed", async () => {
+    const drafts = await draftsFor([club()]);
+    expect(confirmPayload(drafts).clubs[0]).toMatchObject({ existingClubId: null });
+    // A club with that name appears after the preview.
+    mocks.orgs.push(org("club-late", "CLUB", "Sample Hollow Pathfinders", { parentOrganizationId: "church-2" }));
+    const [result] = await importClubs(clubImportConfirmSchema.parse(confirmPayload(drafts)).clubs, "admin-1", now);
+    expect(result).toMatchObject({ status: "FAILED", organizationId: null });
+    expect(result.message).toMatch(/preview the file again/);
+    expect(orgs().filter((o) => o.type === "CLUB")).toHaveLength(1);
+
+    // And a previewed match that is gone or different is refused too.
+    const stale = confirmPayload(drafts).clubs.map((c) => ({ ...c, existingClubId: "club-gone" }));
+    const [gone] = await importClubs(clubImportConfirmSchema.parse({ clubs: stale }).clubs, "admin-1", now);
+    expect(gone.status).toBe("FAILED");
+  });
+
+  it("takes the advisory lock for every matched name, sorted, before looking for the club", async () => {
+    const drafts = await draftsFor([club({ namesOnSheet: { a: "Zeta Old Name", b: "Alpha Old Name" } })]);
+    mocks.calls.length = 0;
+    await importClubs(clubImportConfirmSchema.parse(confirmPayload(drafts)).clubs, "admin-1", now);
+    expect(mocks.calls.slice(0, 5)).toEqual(["lock", "lock", "lock", "org.findFirst", "org.findMany"]);
+    const keys = mocks.queryRaw.mock.calls.map(([, key]) => key);
+    expect(keys).toEqual(["club-list-import:alpha old name", "club-list-import:sample hollow pathfinders", "club-list-import:zeta old name"]);
+  });
+
+  it("clears 'update church' unless an existing club has a different church", async () => {
+    mocks.orgs.push(org("club-old", "CLUB", "Sample Hollow Pathfinders", { parentOrganizationId: "church-1" }));
+    const [same] = await draftsFor([club()]);
+    // The row's church equals the club's sponsor: the tick is ignored.
+    expect(confirmPayload([{ ...same!, updateChurch: true }]).clubs[0]).toMatchObject({ updateChurch: false });
+    // A renamed row has no existing club any more: a hidden tick is ignored.
+    expect(confirmPayload([{ ...same!, existingClub: null, churchId: "church-2", updateChurch: true }]).clubs[0]).toMatchObject({ updateChurch: false });
+    expect(confirmPayload([{ ...same!, churchId: "church-2", updateChurch: true }]).clubs[0]).toMatchObject({ updateChurch: true });
+  });
+
+  it("audits a church change with the previous and new church ids only", async () => {
+    mocks.orgs.push(org("club-old", "CLUB", "Sample Hollow Pathfinders", { parentOrganizationId: "church-2" }));
+    const drafts = (await draftsFor([club()])).map((d) => ({ ...d, updateChurch: true }));
+    await importClubs(clubImportConfirmSchema.parse(confirmPayload(drafts)).clubs, "admin-1", now);
+    expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).toMatchObject({ churchUpdated: true, previousParentOrganizationId: "church-2", parentOrganizationId: "church-1" });
+  });
+
+  it("allows 500 club-list rows but only 400 form 89 rows", () => {
+    const row = (kind: "CLUB_LIST" | "REGISTRATION", n: number) => ({ kind, sourceKey: kind === "CLUB_LIST" ? `club-list:${n}` : `form-89:${n}`, entryId: String(n), clubYear: "2026-27", clubName: "Sample Hollow Pathfinders", churchId: "church-1", newChurchName: "", invites: [], people: [] });
+    expect(clubImportConfirmSchema.safeParse({ clubs: Array.from({ length: 500 }, (_, n) => row("CLUB_LIST", n)) }).success).toBe(true);
+    expect(clubImportConfirmSchema.safeParse({ clubs: Array.from({ length: 401 }, (_, n) => row("REGISTRATION", n)) }).success).toBe(false);
+    expect(clubImportConfirmSchema.safeParse({ clubs: Array.from({ length: 400 }, (_, n) => row("REGISTRATION", n)) }).success).toBe(true);
+    expect(clubImportConfirmSchema.safeParse({ clubs: [...Array.from({ length: 400 }, (_, n) => row("CLUB_LIST", n)), row("REGISTRATION", 1)] }).success).toBe(false);
+  });
+
+  it("renders accessible church controls and list-only result text", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { ClubImportWorkspace } = await import("@/components/club-import-workspace");
+    mocks.orgs.push(org("club-old", "CLUB", "Sample Hollow Pathfinders", { parentOrganizationId: "church-2" }));
+    const annotated = await annotateImportDrafts(parseClubListExport({ clubs: [club({ churchSearchHint: "Nowhere" })] }, now).drafts);
+    const html = renderToStaticMarkup(createElement(ClubImportWorkspace, { initialPreview: { drafts: annotated.drafts, churches: annotated.churches, clubYearChoices: [], skipped: 0 } }));
+    expect(html).not.toContain('role="status"');
+    expect(html).toMatch(/<select aria-describedby="club-import-church-note-0"(?![^>]*required)/);
+    expect(html).toContain('value="__none__" selected');
+    expect(html).not.toContain("Choose a church or company");
   });
 });
 

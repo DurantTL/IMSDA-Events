@@ -16,6 +16,8 @@ type ApiError = { message?: string; issues?: Array<{ message?: string; path?: Ar
 export type ClubImportPreview = { drafts: AnnotatedImportDraft[]; churches?: Church[]; clubYearChoices?: string[]; skipped?: number };
 
 const NEW_CHURCH = "__new__";
+/** "No church" on a club-list row: a real option value, mapped to no church. */
+const NO_CHURCH = "__none__";
 
 /** Already imported for the club year chosen in the preview (#541). */
 function importedFor(draft: Pick<AnnotatedImportDraft, "importedYears" | "clubYear">) {
@@ -35,6 +37,7 @@ function draftProblems(draft: Draft) {
   // A club-list row (#1038) is only the club. A new club with no church is left out and listed in the result, so it never blocks the import.
   if (draft.kind === "CLUB_LIST") {
     if (draft.clubName.trim().length < 2) problems.push("Give the club a name.");
+    if (!draft.existingClub && draft.ambiguousClubs.length > 1) problems.push("More than one club in the directory matches this name. Pick which one it is.");
     return problems;
   }
   const earlier = earlierImportNotice(draft.importedYears, draft.clubYear);
@@ -57,7 +60,8 @@ function draftProblems(draft: Draft) {
  */
 export function loadPreviewDrafts(drafts: AnnotatedImportDraft[]): Draft[] {
   return drafts.map((draft) => {
-    const loaded = { ...draft, include: !earlierImportNotice(draft.importedYears, draft.clubYear), expanded: false };
+    // A club-list row has no earlier import to point at (its number is not a form 89 entry).
+    const loaded = { ...draft, include: draft.kind === "CLUB_LIST" || !earlierImportNotice(draft.importedYears, draft.clubYear), expanded: false };
     // Open the cards that need attention; the rest stay folded until clicked.
     return { ...loaded, expanded: !loaded.include || draftProblems(loaded).length > 0 };
   });
@@ -165,7 +169,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
               <li key={result.sourceKey}>
                 {result.status === "IMPORTED" ? <CheckCircle2 aria-hidden="true" size={16} /> : <CircleAlert aria-hidden="true" size={16} />}
                 <span>
-                  <strong translate="no">{result.clubName}</strong> ({result.clubYear}): {result.message}
+                  <strong translate="no">{result.clubName}</strong>{result.kind === "CLUB_LIST" ? "" : ` (${result.clubYear})`}: {result.message}
                   {result.status === "IMPORTED" && result.kind !== "CLUB_LIST" && ` ${result.membersAdded} added to the roster, ${result.membersSkipped} skipped; ${result.invitesCreated} invite${result.invitesCreated === 1 ? "" : "s"} waiting.`}
                   {result.organizationId && result.status !== "FAILED" && result.kind === "CLUB_LIST" && (
                     <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}`}>Open the club</a>.</>
@@ -187,7 +191,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
           {leftOut.length > 0 && (
             <p className="field-help">Skipped by you, nothing created: {leftOut.map((name, index) => <span key={`${name}-${index}`}>{index ? ", " : ""}<span translate="no">{name}</span></span>)}.</p>
           )}
-          <p className="field-help club-import-next">Next: <a href="/admin/clubs/invites">review and send the club invites</a>.</p>
+          {results.some((result) => result.kind !== "CLUB_LIST") && <p className="field-help club-import-next">Next: <a href="/admin/clubs/invites">review and send the club invites</a>.</p>}
         </section>
       )}
 
@@ -218,8 +222,8 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
 
           {drafts.map((draft, index) => {
             const problems = draftProblems(draft);
-            const earlier = earlierImportNotice(draft.importedYears, draft.clubYear);
             const isList = draft.kind === "CLUB_LIST";
+            const earlier = isList ? null : earlierImportNotice(draft.importedYears, draft.clubYear);
             const duplicates = inFileDuplicateKeys(draft.people);
             const matched = churches.filter((church) => draft.churchSuggestion?.candidateIds.includes(church.id));
             const others = churches.filter((church) => !draft.churchSuggestion?.candidateIds.includes(church.id));
@@ -228,7 +232,8 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
               : draft.churchSuggestion?.status === "SEVERAL" ? `Several churches match "${draft.churchHint}": pick one.`
               : "No match, pick a church.";
             const unkeptDuplicates = draft.people.filter((person) => duplicates.has(person.key) && !person.keepBoth).length;
-            const churchValue = draft.churchId ?? (draft.newChurchName ? NEW_CHURCH : "");
+            const churchValue = draft.churchId ?? (draft.newChurchName ? NEW_CHURCH : isList ? NO_CHURCH : "");
+            const noteId = `club-import-church-note-${index}`;
             return (
               <details
                 className="panel club-import-club"
@@ -265,7 +270,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     {submissionYearNote(draft) && <small className="club-import-year-note">{submissionYearNote(draft)}</small>}
                   </span>
                   {problems.length > 0 && draft.include && <span className="status-chip coral">Needs a fix</span>}
-                  {importedFor(draft) && <span className="status-chip gold">Imported</span>}
+                  {!isList && importedFor(draft) && <span className="status-chip gold">Imported</span>}
                 </summary>
 
                 {problems.length > 0 && (
@@ -284,26 +289,27 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     Club name
                     <input
                       maxLength={120}
-                      onChange={(event) => update(index, (d) => ({ ...d, clubName: event.target.value, existingClub: null }))}
+                      onChange={(event) => update(index, (d) => ({ ...d, clubName: event.target.value, existingClub: null, ambiguousClubs: [], namesOnSheet: [], updateChurch: false }))}
                       value={draft.clubName}
                     />
                   </label>
                   <label>
                     Sponsoring church or company{draft.churchName ? ` (form: ${draft.churchName})` : ""}{isList && draft.churchHint ? ` (list: ${draft.churchHint})` : ""}
                     <select
-                      required
+                      aria-describedby={isList ? noteId : undefined}
+                      required={!isList}
                       onChange={(event) => {
                         const value = event.target.value;
                         update(index, (d) => ({
                           ...d,
-                          churchId: value && value !== NEW_CHURCH ? value : null,
+                          churchId: value && value !== NEW_CHURCH && value !== NO_CHURCH ? value : null,
                           newChurchName: value === NEW_CHURCH ? (d.newChurchName || d.churchName) : "",
                         }));
                       }}
                       value={churchValue}
                     >
-                      <option disabled value="">Choose a church or company</option>
-                      {isList && <option value="">No church</option>}
+                      {!isList && <option disabled value="">Choose a church or company</option>}
+                      {isList && <option value={NO_CHURCH}>No church</option>}
                       {!isList && (draft.newChurchName || draft.churchName) && (
                         <option value={NEW_CHURCH}>Create church: {draft.newChurchName || draft.churchName}</option>
                       )}
@@ -320,10 +326,28 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                       {!isList && churches.map((church) => <option key={church.id} value={church.id}>{church.type !== "CHURCH" && churchStem(church.name) === churchStem(draft.churchName) ? `Use existing ${church.type === "GROUP" ? "group" : "company"}: ${church.name}` : sponsorOptionLabel(church)}</option>)}
                     </select>
                   </label>
-                  {isList && <p className="field-help" role="status">{churchNote}</p>}
+                  {isList && <p className="field-help" id={noteId}>{churchNote}</p>}
+                  {isList && draft.ambiguousClubs.length > 1 && (
+                    <label>
+                      Which club is this?
+                      <select
+                        onChange={(event) => update(index, (d) => ({ ...d, existingClub: d.ambiguousClubs.find((candidate) => candidate.id === event.target.value) ?? null, updateChurch: false }))}
+                        value={draft.existingClub?.id ?? ""}
+                      >
+                        <option value="">Choose the club</option>
+                        {draft.ambiguousClubs.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                      </select>
+                    </label>
+                  )}
                   {isList && draft.existingClub && draft.churchId && draft.churchId !== draft.existingClub.sponsorId && (
-                    <label className="checkbox-label">
-                      <input checked={Boolean(draft.updateChurch)} onChange={(event) => update(index, (d) => ({ ...d, updateChurch: event.target.checked }))} type="checkbox" />
+                    <label className="checkbox-label" style={{ minHeight: 44 }}>
+                      <input
+                        aria-label={`Update church of the existing club ${draft.existingClub.name}`}
+                        checked={Boolean(draft.updateChurch)}
+                        onChange={(event) => update(index, (d) => ({ ...d, updateChurch: event.target.checked }))}
+                        style={{ width: 24, height: 24 }}
+                        type="checkbox"
+                      />
                       Update church of the existing club
                     </label>
                   )}
