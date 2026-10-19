@@ -2986,6 +2986,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   }
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
   await page.waitForTimeout(150);
+  if (spec.prepare) await spec.prepare(page, width);
 
   if (selfTest) await page.evaluate(injectDefects);
   const touch = width <= touchMaxWidth;

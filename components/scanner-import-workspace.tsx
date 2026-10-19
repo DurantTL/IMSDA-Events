@@ -165,24 +165,27 @@ export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
                 file shows it served. Nothing changes unless you accept. A correction is a new record; the earlier ones stay.
                 {!preview.canAcceptUnredeem && " Accepting an un-redeem lowers the served counts and needs finance access, which you do not have."}
               </p>
-              <div className="report-table-wrap"><table className="report-table report-table-auto">
-                <thead><tr><th scope="col">Accept</th><th scope="col">Ticket</th><th scope="col">Row</th><th scope="col">Change</th><th scope="col">Served</th></tr></thead>
-                <tbody>
+              <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards">
+                <caption className="sr-only">Conflicts between this file and the recorded results</caption>
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Ticket</th><th role="columnheader" scope="col">Accept</th><th role="columnheader" scope="col">Row</th><th role="columnheader" scope="col">Change</th><th role="columnheader" scope="col">Served</th></tr></thead>
+                <tbody role="rowgroup">
                   {preview.conflicts.map((row) => (
-                    <tr key={row.ticketNumber}>
-                      <td>
-                        <input
-                          aria-label={`Accept: ${row.kind === "UNREDEEM" ? "un-redeem" : "put back as served"} ${row.ticketId}`}
-                          checked={accepted.has(row.ticketNumber)}
-                          disabled={row.kind === "UNREDEEM" && !preview.canAcceptUnredeem}
-                          onChange={(changeEvent) => toggleConflict(row.ticketNumber, changeEvent.target.checked)}
-                          type="checkbox"
-                        />
+                    <tr key={row.ticketNumber} role="row">
+                      <th role="rowheader" scope="row">{row.ticketId}</th>
+                      <td role="cell" data-label="Accept">
+                        <label className="checkbox-row">
+                          <input
+                            checked={accepted.has(row.ticketNumber)}
+                            disabled={row.kind === "UNREDEEM" && !preview.canAcceptUnredeem}
+                            onChange={(changeEvent) => toggleConflict(row.ticketNumber, changeEvent.target.checked)}
+                            type="checkbox"
+                          />
+                          <span>{row.kind === "UNREDEEM" ? "Un-redeem" : "Put back"}<span className="sr-only"> {row.ticketId}</span></span>
+                        </label>
                       </td>
-                      <td>{row.ticketId}</td>
-                      <td>{row.line}</td>
-                      <td>{row.kind === "UNREDEEM" ? "Un-redeem" : "Put back as served"}</td>
-                      <td>{row.servedAtLabel}</td>
+                      <td role="cell" data-label="Row">{row.line}</td>
+                      <td role="cell" data-label="Change">{row.kind === "UNREDEEM" ? "Un-redeem" : "Put back as served"}</td>
+                      <td role="cell" data-label="Served">{row.servedAtLabel}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -197,14 +200,15 @@ export function ScannerImportWorkspace({ eventId }: { eventId: string }) {
                 These rows were not matched to exactly one ticket, so nothing is saved for them. Fix the ticket or the scanner data and import again.
                 {" "}{preview.reviewReasons.map((entry) => `${entry.count} ${entry.label.toLowerCase()}`).join(" · ")}
               </p>
-              <div className="report-table-wrap"><table className="report-table report-table-auto scanner-import-review">
-                <thead><tr><th scope="col">Row</th><th scope="col">Why</th><th scope="col">Detail</th></tr></thead>
-                <tbody>
+              <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards scanner-import-review">
+                <caption className="sr-only">Rows left for review</caption>
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Row</th><th role="columnheader" scope="col">Why</th><th role="columnheader" scope="col">Detail</th></tr></thead>
+                <tbody role="rowgroup">
                   {preview.review.map((row) => (
-                    <tr key={row.line}>
-                      <td>{row.line}</td>
-                      <td>{preview.reviewReasons.find((entry) => entry.reason === row.reason)?.label ?? row.reason}</td>
-                      <td>{row.summary}</td>
+                    <tr key={row.line} role="row">
+                      <th role="rowheader" scope="row">Row {row.line}</th>
+                      <td role="cell" data-label="Why">{preview.reviewReasons.find((entry) => entry.reason === row.reason)?.label ?? row.reason}</td>
+                      <td role="cell" data-label="Detail">{row.summary}</td>
                     </tr>
                   ))}
                 </tbody>
