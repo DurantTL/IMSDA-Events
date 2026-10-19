@@ -54,6 +54,7 @@
     "test:acknowledgments": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-acknowledgments.ts",
     "test:square-hosted-link": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-square-hosted-link.ts",
     "test:cancellation-policy": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-cancellation-policy.ts",
+    "test:cancellation-requests": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-cancellation-requests.ts",
     "test:reservation-deposit": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-reservation-deposit.ts",
     "test:scholarship-funds": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-scholarship-funds.ts",
     "test:invoices": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-invoices.ts",

@@ -59,3 +59,76 @@ Capacity: SUBMITTED and CONFIRMED registrations hold seats; cancelling a WAITLIS
 place and frees no capacity. Component scope is limited to meal, lodging, merchandise, registration and other charges
 with an amount above $0 (never fees, tax or adjustments). Adjustment reasons are free text and are not copied into
 calculations. Known limit: a time zone that skips local midnight on a DST day resolves to a fixed nearby instant.
+
+# Cancellation requests (slice 2, #170)
+
+A registrant asks; staff decide. **Nothing in this slice cancels a registration, refunds money, issues credit, releases a
+seat or promotes anyone from a waitlist.** Approving records a decision by a named person with a reason; carrying it out
+is slice 3 (#171) and a human. Owner: `modules/cancellation-requests/`.
+
+## Where a registrant asks
+
+- The private manage link, `/manage/[token]`, through `/api/public/manage/[token]/cancellation`.
+- The signed-in attendee portal, `/account/registrations`, through `/api/attendee/registrations/[registrationId]/cancellation`
+  (signed in as an attendee, second step passed, and the account's verified address owns the registration).
+
+Both reach the same workflow. The registration and event come from the token or the account, never from the request body,
+and the body cannot name a status, an actor or a clock. A first-night no-show is a staff fact and is never taken from a
+registrant. Requests are offered only for an active registration the contact pays for; a church- or group-billed
+registration is handled by the event team, so no refund is shown to its registrant.
+
+Scope is the whole registration, one or more attendees, or individual components, only when the policy version in effect
+allows it (components also need at least one supported charge). Choosing every attendee is evaluated, and keyed, as the
+whole registration.
+
+## What happens
+
+1. The registrant picks a scope and sees the proposed outcome from the #169 calculator (a read-only preview).
+2. They give a reason and a contact method and send. The server calculates again, and if the refund differs from the one
+   they were shown nothing is saved and the new outcome is shown. Otherwise the calculation is appended (the same record
+   `recordCancellationCalculation` writes) and the request is saved with it, in one transaction: policy version and id,
+   the calculation id, the proposed refund and kept amounts, and the registration state (ids and amounts only) with a
+   fingerprint of it.
+3. A request after the last deadline is accepted for review, with the after-deadline terms shown and recorded.
+4. Staff move it: start review, ask for information (what to provide shows on the registrant's page, never in email),
+   approve or decline (a reason is required, and the database refuses a decided row without a named person, a time and a
+   reason). Only a staff member can approve or decline; the registrant can only withdraw, and the system can only mark an
+   older request superseded when the registrant chose to replace it. There is no automated or bulk approval.
+
+Statuses: requested, under review, information needed, approved, declined, withdrawn, superseded. A request that is
+approved, declined, withdrawn or superseded is final.
+
+## Duplicates and overlaps
+
+- A repeated submit with the same request key returns the same request.
+- The same scope while one is open returns the open request.
+- A request that overlaps a different open one (the whole registration overlaps everything; attendees overlap when they
+  share one; an attendee and a component are treated as overlapping) is refused unless the registrant explicitly chose to
+  replace it, in which case the older request becomes SUPERSEDED, with its own timeline step and email.
+- Registration-level locking and a partial unique index settle two taps or two tabs.
+
+## Staff queue
+
+Finance, "Cancellation requests" (`/finance/cancellation-requests`), `MANAGE_FINANCE` on the event, like the rules page and
+the API (`/api/events/[eventId]/cancellation-requests`). A request id from another event is "not found". Detail shows the
+registrant's reason, the proposal they saw (from the recorded calculation, never recalculated), conflicts, capacity and
+waitlist effects (from the calculation, with the event's current waitlist count), other open requests on the registration,
+the timeline and the decision. Conflicts are recomputed from the registration's state now: status, attendees, charges,
+paid money and deposit against the recorded state, whether the request can still be calculated, whether today's outcome
+differs from the one shown, and a newer policy version. If the registration changed, an approval needs the decider to
+acknowledge it (declining does not); the decision records that it was made with changes.
+
+## Email and audit
+
+Two event template keys, `CANCELLATION_REQUEST_RECEIVED` and `CANCELLATION_REQUEST_UPDATED`, go through the versioned
+outbox with fixed wording and two tokens (`request_status`, `request_status_detail`). They reveal only the status and what
+happens next: never the reason, an amount, the outcome or a staff note. No staff alert is sent, so nothing is added to the
+notification catalog. Every step writes an audit entry with ids and states only (request, registration, calculation,
+policy version, scope, from and to status, actor kind), never the reason, a name or an amount.
+
+## Data
+
+`CancellationRequest` (the row's status moves) and `CancellationRequestEvent` (the timeline, append-only like a
+calculation), additive migration `20261109110000_cancellation_requests`. A request cites its calculation by foreign key and
+its registration by id only, so history outlives the registration. Deleting an event removes the timeline, the requests and
+then the calculations. Real-database check: `npm run test:cancellation-requests`.

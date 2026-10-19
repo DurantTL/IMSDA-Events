@@ -253,6 +253,9 @@ jobs:
       # Real-database check of cancellation policy slice 1 (#169): versioned per-event rules (sequential and parallel-safe, never in the past, immutable in the database), the version in effect chosen by time with recorded calculations that never change, the Camp Meeting rule against a real registration (exact deadline boundary in the event time zone, full refund minus the $10 fee before it, forfeited deposit after it or on a first-night no-show, one attendee removed with the deposit left on the registration), previews that read only their own event, and no registration, payment, refund, adjustment or merchandise row changed by any calculation.
       - run: npm run test:cancellation-policy
 
+      # Real-database check of cancellation requests (#170): a request saves its recorded calculation, policy version and timeline together; duplicate, overlapping and parallel submissions leave one open request per scope; the database refuses a decision without a named person and a reason and any timeline change; approving changes no registration, attendee, payment, refund or capacity row; status emails never carry the reason; deleting an event removes its requests.
+      - run: npm run test:cancellation-requests
+
       # Real-database check of invoice delivery (#168): one stored, hash-checked PDF per finalized version, sends with the exact recipients and the same attachment on every resend, superseded versions refused, bounce and suppression recorded, append-only AR postings and payments (partial, void, overpaid, carried across a revision), statements scoped to the event, a formula-safe treasurer CSV, and no audit row holding an address or a contact name.
       - run: npm run test:invoice-delivery
 

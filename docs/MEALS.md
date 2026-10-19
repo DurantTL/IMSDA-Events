@@ -181,6 +181,50 @@ scanner's format exactly, one row per ticket (a selection of quantity 3 is three
 (the ticket id there is the selection id). A ticket bought as a quantity names the registration's contact (no attendee);
 `Service date` is empty when the ticket is good for any service of that meal. Walk-up orders are not listed.
 
+## Café scanner results and meals served (#1028)
+
+Staff with `VIEW_REPORTS` upload and record results; accepting an un-redeem (it lowers the served counts) also needs `MANAGE_FINANCE`. They bring the café scanner's results back on **More > Kitchen report > Import scanner results**
+(`/more/kitchen-report/scanner-import`). Two files are accepted (Caleb, Oct 19, 2026):
+
+- **The Google Sheet downloaded as CSV (preferred).** It is the meal tickets export with the scanner's `redeemed`,
+  `redeemed_at` and `redeemed_by` filled in. A row matches its ticket by the exact `ticket_id`; it must also agree with the
+  ticket's `reg_id` and meal, or it goes to the review list. The scanner writes back by row position, and `redeemed_by` is
+  the guest it actually served: a row whose `redeemed_by` is filled in and is not its own `guest_name` is a mismatch and goes
+  to review too (that is how a row that moved away from its ticket shows up; a row with a blank `redeemed_by` has nothing to
+  compare and relies on `reg_id` and meal alone). `redeemed_at` must be the scanner's ISO time with a zone
+  (`2026-10-15T18:30:00.000Z`); a time without a zone (what Sheets shows if it converts the text) goes to review rather than
+  being read in a guessed time zone.
+- **The scanner's `transactions.csv` (fallback).** It has no ticket id. A `SUCCESS` row is matched by `scannedValue`
+  (the `reg_id`), guest name (`entitlementPersonName`, which must be filled in: the person columns are never used instead), meal (`DINNER` is supper) and the **event-local** date of `timestamp`.
+  A ticket good on any day matches any date; a pinned ticket must match its day. Tickets of one selection are
+  interchangeable (a scan takes the lowest unused number). A row matching no ticket, only already-used tickets, or more
+  than one kind of ticket (different payer, day or age group) is listed for review and never saved. Other results are ignored.
+
+**Preview, then confirm.** The preview (`POST .../meals/scanner-import`, `step=preview`) saves nothing: it shows matched rows,
+matched rows, new meals served, rows already recorded, conflicts and the review list (unknown ticket, ticket of another event,
+cancelled ticket, mismatch, no match, ambiguous, unreadable). The confirm step sends the file again with the preview's
+`digest`; the server plans it again inside a serializable transaction and saves only if the digest is the same, so a changed
+file or changed records means "preview again". Files are capped at 2 MB and 20,000 rows.
+
+**Storage.** `EventMealRedemption` is append-only (trigger; deleted only with the event). A ticket's state is its latest
+event, `REDEEMED` or `UNREDEEMED`. Each event records the ticket, when, the scanner's `redeemed_by` text (a sheet only; a
+transactions row records its station name, never the guest), the
+`EventMealImportBatch` (source, file name, SHA-256, counts, uploader id) and a `sourceKey` unique per event
+(`sheet:<MT id>:<UTC second>`, `tx:<UTC second>:<meal>:<sha256 of reg and name>` plus `#n` for the n-th identical scan in a
+file, `unredeem:<key>`, `reredeem:<unredeem key>`), so importing the same row again adds nothing. Times in keys are cut to
+whole UTC seconds, so a copy that lost its milliseconds matches the raw export, and keys hold no name or registration code.
+An un-redeem shown by a later sheet is a **conflict**: nothing changes unless staff accept it, and then it is a new
+`UNREDEEMED` event. If a later sheet shows a ticket served again after an accepted un-redeem, that is a second kind of
+conflict ("put back as served"), accepted the same way, as a new `REDEEMED` event. If the event already holds results from the other file kind, staff must acknowledge that a meal could be
+counted twice (a transactions row has no ticket id). The audit entry (`meals.scanner_import`) holds ids and counts only.
+Review rows are shown in the preview and are not stored.
+
+**Report.** The kitchen report's "Meals served against tickets sold" section (and `exports/meals-served`, counts only,
+formula-safe) shows, per service (date and meal, or "any day" for form tickets), tickets sold, served and not used, each split
+paying vs conference-paid. Each service drills down to ticket ids without names. Sold counts active tickets of submitted or
+confirmed registrations. Served comes from the redemption records whatever the ticket's status now, so a meal eaten on a
+ticket that was cancelled afterwards stays served, is shown as "includes N on cancelled tickets", and is not counted as sold.
+
 ## Dietary categories and protected detail
 
 A selection may carry only the configured, non-medical categories in `mealDietaryCategories` (vegetarian, vegan,

@@ -117,6 +117,10 @@ const pbeEventId = `${P}_pbe_event`;
 const pbeEventSlug = `${P}-pbe-bible-experience`;
 const pbeTeamName = "Mobilecheck Bible Bees";
 const pbeDraftKey = "0123456789abcdef0123456789abcdef";
+// An attendee-pay event with a cancellation policy, one registration of two people (the director's own email, so the portal lists it
+// and the private link opens it), and requests in several states: the registrant's panel and the staff queue (#170).
+const cancelEventId = `${P}_cancel_event`;
+const cancelEventSlug = `${P}-cancel-weekend`;
 // A general event with personal staff invitation links (#804, #1027): the invite list in every status, and a link form that also
 // asks the event's own attendee questions.
 const staffInviteEventId = `${P}_staffinv_event`;
@@ -268,6 +272,7 @@ const pages: PageSpec[] = [
   staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
+  staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -388,6 +393,8 @@ function pbePages(team: { registrationId: string; teamKey: string }): PageSpec[]
     { name: "pbe-club-portal-team-form-blank", path: `${portal}/team-form/blank`, role: "director" },
     pbeStaff("registrations", "/people"),
     { ...pbeStaff("pending-teams", "/people/pending-teams"), flow: "pending-teams" },
+    // A system administrator also sees "Add this club to the directory" on a team whose club is not listed (#1031).
+    { ...staff("pbe-pending-teams-admin", `/people/pending-teams?event=${pbeEventId}`, "system-admin"), flow: "pending-teams" },
     pbeStaff("team-results", "/more/team-results"),
     pbeStaff("team-form-report", "/more/reports/clubs/team-form"),
     pbeStaff("team-form-registration", `/more/reports/clubs/team-form/${team.registrationId}`),
@@ -600,7 +607,7 @@ async function seedPbeEvent(prisma: PrismaClient) {
     clientId: `c${`${first}${last}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12)}`,
     responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
   });
-  const submit = async (teamName: string, clubName: string, email: string, key: string, location: string) => {
+  const submit = async (teamName: string, clubName: string, email: string, key: string, location: string, extraResponses: Record<string, unknown> = {}) => {
     if (await prisma.generalLinkSubmission.findFirst({ where: { eventId: pbeEventId, teamName } })) return;
     await submitGeneralLinkRegistration(pbeEventSlug, {
       versionId, idempotencyKey: key,
@@ -608,6 +615,7 @@ async function seedPbeEvent(prisma: PrismaClient) {
         club_name: clubName, director_name: "Dana Mobilecheck-Directorsson", email, phone: "515-555-0100",
         coordinator_name: "Casey Mobilecheck-Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
         coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true, photo_video_release: "Yes",
+        ...extraResponses,
       },
       attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, "Pathfinder", true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Coach", 40, "Coach")],
       website: "",
@@ -616,7 +624,110 @@ async function seedPbeEvent(prisma: PrismaClient) {
   // Matched: the account email is club A's director on file. Waiting: an email that matches nobody, naming club B.
   await submit(pbeTeamName, `Mobilecheck ${longName}`, `${P}.director@example.test`, `${P}-pbe-matched-key-0001`, locations[0]!.id);
   await submit("Mobilecheck Sword Drillers of the Riverside Valley", "Mobilecheck Eagles Club", `${P}.unmatched.director-with-a-long-address@example.test`, `${P}-pbe-pending-key-0002`, locations[1]!.id);
+  // Waiting, club not in the directory (#1031): "Not listed" and the name the director typed, for staff to add.
+  await submit("Mobilecheck Lantern Bearers", "Not listed", `${P}.unlisted.director@example.test`, `${P}-pbe-unlisted-key-0003`, locations[0]!.id, { club_name_other: "Mobilecheck Lantern Pathfinders" });
   return prisma.clubEventRegistration.findFirstOrThrow({ where: { eventId: pbeEventId, organizationId: clubA }, select: { registrationId: true, teamKey: true } });
+}
+
+/**
+ * A registration the director can ask to cancel from the portal and the private link, with requests already in several states (#170).
+ * Idempotent. Everything is made through the real repository functions, so the pages show what a registrant and a finance manager see.
+ */
+async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> {
+  const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
+  const { createPolicyVersion } = await import("../modules/cancellation-policy/repository");
+  const { createRegistrationAccessToken } = await import("../modules/public-access/repository");
+  const requests = await import("../modules/cancellation-requests/repository");
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  const today = calendarDateIn(new Date());
+  const registrationId = `${P}_reg_cancel`;
+  const formId = `${P}_cancel_form`;
+  const formVersionId = `${P}_cancel_form_version`;
+  if (!(await prisma.event.findUnique({ where: { id: cancelEventId }, select: { id: true } }))) {
+    await prisma.$transaction(async (tx) => {
+      await tx.event.create({
+        data: {
+          id: cancelEventId, slug: cancelEventSlug, name: "Mobilecheck Cancellation Weekend",
+          startsAt: new Date(`${addDays(today, 90)}T15:00:00Z`), endsAt: new Date(`${addDays(today, 92)}T18:00:00Z`), timezone: "America/Chicago",
+          isPublished: true, billingMode: "ATTENDEE_PAY",
+        },
+      });
+      await tx.eventMembership.create({ data: { eventId: cancelEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+      await tx.registrationForm.create({ data: { id: formId, eventId: cancelEventId, createdByUserId: admin.id, name: "Cancellation form", slug: `${P}-cancel-form` } });
+      await tx.registrationFormVersion.create({
+        data: { id: formVersionId, formId, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: { title: "Check", description: "", confirmationMessage: "Received.", sections: [] } },
+      });
+      // The director's own person row (the audit's accounts make one), so this is their registration, not a second person.
+      const holder = await tx.person.findUnique({ where: { normalizedEmail: `${P}.director@example.test` } })
+        ?? await tx.person.create({ data: { id: `${P}_person_cancel_holder`, firstName: "Dana", lastName: "Mobilecheck-Directorsson", normalizedEmail: `${P}.director@example.test` } });
+      await tx.registration.create({
+        data: {
+          id: registrationId, eventId: cancelEventId, accountHolderPersonId: holder.id, confirmationCode: "MOBCAN1", totalAmount: 400, status: "CONFIRMED", submittedAt: new Date(),
+          contactSnapshot: { firstName: "Dana", lastName: "Mobilecheck-Directorsson", email: `${P}.director@example.test`, phone: "" },
+        },
+      });
+      for (const [index, name] of ["Alexandria Longnamington-Smythe", "Bo Kim"].entries()) {
+        const person = await tx.person.create({ data: { id: `${P}_person_cancel_${index}`, firstName: name.split(" ")[0]!, lastName: name.split(" ").slice(1).join(" "), normalizedEmail: `${P}.cancel.${index}@example.test` } });
+        await tx.registrationAttendee.create({
+          data: { id: `${P}_cancel_attendee_${index}`, eventId: cancelEventId, registrationId, personId: person.id, attendeeType: "ADULT", position: index, profileSnapshot: { firstName: person.firstName, lastName: person.lastName } },
+        });
+      }
+      await tx.publicRegistrationSubmission.create({
+        data: {
+          eventId: cancelEventId, formVersionId, registrationId, idempotencyKey: `${P}_cancel_idem`, requestHash: "hash", responses: {},
+          pricingSnapshot: {
+            currency: "USD", subtotalCents: 40_000, processingFeeCents: 0, totalCents: 40_000,
+            lineItems: [
+              { key: "attendees.0.registration_fee", label: "Registration, Alexandria", amountCents: 20_000, attendeeIndex: 0 },
+              { key: "attendees.1.registration_fee", label: "Registration, Bo", amountCents: 20_000, attendeeIndex: 1 },
+            ],
+          },
+        },
+      });
+      await tx.payment.create({ data: { eventId: cancelEventId, registrationId, amount: 400, status: "SUCCEEDED", method: "CHECK", receivedAt: new Date() } });
+    });
+    await createPolicyVersion(cancelEventId, admin.id, {
+      rules: {
+        windows: [{ id: "before-deadline", label: "Before the deadline", endsOn: addDays(today, 30), terms: { refund: { kind: "FULL" }, flatWithholdCents: 1000, flatWithholdLabel: "Processing fee", depositTreatment: "REFUND", creditAllowed: false } }],
+        afterWindows: { label: "After the deadline", terms: { refund: { kind: "NONE" }, flatWithholdCents: 0, flatWithholdLabel: "Processing fee", depositTreatment: "FORFEIT", creditAllowed: false } },
+        noShow: null, allowedScopes: ["FULL_REGISTRATION", "ATTENDEE"], supportedComponents: { categories: [], fieldKeys: [] }, classifications: [],
+        nonrefundable: { categories: [], fieldKeys: [] }, cardFeeTreatment: "REFUNDABLE",
+      },
+    });
+  }
+  const target = { registrationId, eventId: cancelEventId };
+  if ((await prisma.cancellationRequest.count({ where: { eventId: cancelEventId } })) === 0) {
+    const attendees = await prisma.registrationAttendee.findMany({ where: { registrationId }, orderBy: { position: "asc" }, select: { id: true } });
+    const longReason = "We have a family emergency and cannot travel, so we would like to cancel Alexandria's place and keep Bo's. ".repeat(3).trim();
+    const send = (key: string, scope: "FULL_REGISTRATION" | "ATTENDEE", attendeeId?: string, expectedRefundCents = 39_000) => ({
+      action: "submit" as const,
+      selection: scope === "ATTENDEE" ? { scope, attendeeIds: [attendeeId!] } : { scope },
+      reason: longReason, contactMethod: "EMAIL" as const, idempotencyKey: `${P}-cancel-key-${key}`, expectedRefundCents,
+    });
+    const whole = await requests.submitCancellationRequest(target, { via: "MANAGE_LINK" }, send("whole", "FULL_REGISTRATION"));
+    await requests.withdrawCancellationRequest(target, whole.request.id);
+    const first = await requests.submitCancellationRequest(target, { via: "MANAGE_LINK" }, send("one", "ATTENDEE", attendees[0]!.id, 19_000));
+    await requests.reviewCancellationRequest(cancelEventId, first.request.id, { userId: admin.id }, { action: "REQUEST_INFORMATION", registrantNote: "Please send the date you need to cancel by and whether Bo is still coming. ".repeat(2).trim() });
+    await requests.submitCancellationRequest(target, { via: "MANAGE_LINK" }, send("two", "ATTENDEE", attendees[1]!.id, 19_000));
+  }
+  const first = await prisma.cancellationRequest.findFirstOrThrow({ where: { eventId: cancelEventId, status: "INFORMATION_NEEDED" }, select: { id: true } });
+  const issued = await createRegistrationAccessToken({ registrationId });
+  return [
+    { name: "cancellation-manage-link", path: issued.managePath, role: "visitor", expectText: /Ask to cancel/ },
+    { name: "cancellation-staff-queue", path: `/finance/cancellation-requests?event=${cancelEventId}`, role: "event-admin", expectText: /Cancellation requests/ },
+    { name: "cancellation-staff-detail", path: `/finance/cancellation-requests?event=${cancelEventId}&request=${first.id}`, role: "event-admin", expectText: /Your decision/ },
+  ];
+}
+
+/** Removes the cancellation event and what hangs off it (requests, their timeline, calculations, the registration and its people). */
+async function cleanupCancellationEvent(prisma: PrismaClient) {
+  if (!(await prisma.event.findUnique({ where: { id: cancelEventId }, select: { id: true } }))) return;
+  const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
+  await prisma.auditLog.deleteMany({ where: { eventId: cancelEventId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`;
+    await removeEventOwnedRows(tx, cancelEventId);
+  }, { timeout: 30_000 });
 }
 
 /**
@@ -877,6 +988,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   const mine = { startsWith: `${P}_` };
   // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
+  await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
   await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
@@ -3074,6 +3186,14 @@ async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, 
     await page.locator(".pending-team-reject:visible").first().click({ timeout: 5000 });
     await page.waitForTimeout(200);
     await auditState(page, name, width, `${prefix}-reject-open`);
+    // The add-club form (#1031), for a role that sees its button: open it and choose a church so the similar-clubs check runs.
+    const addClub = page.locator("button:has-text('Add this club to the directory'):visible").first();
+    if (await addClub.count() > 0) {
+      await addClub.click({ timeout: 5000 });
+      await page.locator(".pending-team-add-club select").first().selectOption({ index: 1 });
+      await page.waitForTimeout(600);
+      await auditState(page, `${spec.name} (add club form open)`, width, `${prefix}-add-club-open`);
+    }
   } catch (error) {
     record("audit-failed", name, width, (error as Error).message.split("\n")[0] ?? "failed");
   }
@@ -3131,6 +3251,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   }
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
   await page.waitForTimeout(150);
+  if (spec.prepare) await spec.prepare(page, width);
 
   if (selfTest) await page.evaluate(injectDefects);
   const touch = width <= touchMaxWidth;
@@ -3608,6 +3729,7 @@ async function main() {
     seeded = true;
     await seedSynthetic(prisma);
     pages.push(...pbePages(await seedPbeEvent(prisma)));
+    pages.push(...await seedCancellationEvent(prisma));
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);

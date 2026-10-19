@@ -98,6 +98,8 @@ async function cleanup() {
   await prisma.clubRosterMember.deleteMany({ where: { organizationId: { startsWith: `${P}_` } } });
   await prisma.clubDirectorGrant.deleteMany({ where: { organizationId: { startsWith: `${P}_club_` } } });
   await prisma.organization.deleteMany({ where: { id: { startsWith: `${P}_club_` } } });
+  await prisma.auditLog.deleteMany({ where: { entityType: "Organization", entityId: { startsWith: "club_gls_" } } });
+  await prisma.organization.deleteMany({ where: { id: { startsWith: "club_gls_" }, parentOrganizationId: churchId } });
   await prisma.organization.deleteMany({ where: { id: churchId } });
   await prisma.person.deleteMany({ where: { id: { startsWith: `${P}_` } } });
   await prisma.person.deleteMany({ where: { normalizedEmail: { contains: P.slice(3) } } });
@@ -387,6 +389,27 @@ async function main() {
   const reused = await submit(youth("Rej"), "Waiting wrong club", { club_name: clubName("c"), email: emailOf("regc") });
   assert(await kind(reused) === "PENDING", "a rejected team's name can be used again");
   console.log("ok  staff reject a team with a reason: audited with ids only, the typed answers removed, the name freed");
+
+  // 9b. Add a club that is not in the directory and confirm the team (#1031): two concurrent calls make one club and one registration.
+  const unlisted = await submit(youth("Add"), "Unlisted Lanterns", { club_name: "Not listed", club_name_other: "Gl Lantern Voyagers", email: emailOf("dira") });
+  assert(await kind(unlisted) === "PENDING", "a team whose club is not listed waits");
+  const unlistedRow = await submissionOf("Unlisted Lanterns");
+  const registrationsBeforeAdd = await registrationCount();
+  const addAction = { action: "ADD_CLUB" as const, clubName: "Gl Lantern Voyagers", sponsoringChurchId: churchId, acknowledgeSimilar: true };
+  const added = await Promise.allSettled([
+    link.resolvePendingTeam(eventId, unlistedRow.id, staffUserId, addAction),
+    link.resolvePendingTeam(eventId, unlistedRow.id, otherStaffId, addAction),
+  ]);
+  const addedOk = added.filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof link.resolvePendingTeam>>> => result.status === "fulfilled");
+  assert(addedOk.length >= 1 && addedOk.some((result) => !result.value.alreadyDone), `at least one concurrent add succeeds, got ${JSON.stringify(added.map((result) => result.status === "fulfilled" ? result.value.status : (result.reason as Error).message))}`);
+  const newClubId = link.addedClubId(unlistedRow.id);
+  assert((await prisma.organization.count({ where: { id: newClubId } })) === 1 && (await prisma.organization.count({ where: { name: "Gl Lantern Voyagers", parentOrganizationId: churchId } })) === 1, "exactly one club was created, under the chosen church");
+  assert((await prisma.clubEventRegistration.count({ where: { eventId, organizationId: newClubId } })) === 1 && await registrationCount() === registrationsBeforeAdd + 1, "exactly one registration was created");
+  const addedRow = await prisma.generalLinkSubmission.findUniqueOrThrow({ where: { id: unlistedRow.id } });
+  assert(addedRow.status === "CONFIRMED" && addedRow.organizationId === newClubId && addedRow.payload === null, "the team is confirmed against the new club");
+  assert((await prisma.auditLog.count({ where: { eventId, action: "ORGANIZATION_CREATED", entityId: newClubId } })) === 1 && (await prisma.auditLog.count({ where: { eventId, action: "GENERAL_LINK_TEAM_CLUB_ADDED", entityId: unlistedRow.id } })) === 1, "the club creation and the confirmation are each audited once");
+  assert((await link.resolvePendingTeam(eventId, unlistedRow.id, otherStaffId, addAction)).alreadyDone && (await prisma.organization.count({ where: { id: newClubId } })) === 1, "sending it once more changes nothing");
+  console.log("ok  staff add a club that was not listed: concurrent calls make one club and one registration");
 
   // 10. Two teams from one club through the same link.
   const second = await submit(youth("Two"), "Sword Drill", { email: emailOf("dira") }, iowa!.id);

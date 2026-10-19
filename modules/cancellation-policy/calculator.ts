@@ -224,6 +224,15 @@ function isSupportedComponent(entry: ChargeEntry, category: ChargeCategory, rule
   return (supported.categories as readonly ChargeCategory[]).includes(category) || (entry.fieldKey !== null && supported.fieldKeys.includes(entry.fieldKey));
 }
 
+/**
+ * The charges a registrant may cancel on their own under these rules: supported by the policy, above $0 and not a fixed
+ * key or item charge. The same test the calculator applies, so a request screen offers exactly what it will accept.
+ */
+export function cancellableComponents(charges: readonly ChargeEntry[], rules: CancellationRules): ChargeEntry[] {
+  if (!rules.allowedScopes.includes("COMPONENT")) return [];
+  return charges.filter((entry) => entry.amountCents > 0 && isSupportedComponent(entry, effectiveCategory(entry, rules), rules));
+}
+
 function refundPercent(terms: CancellationTerms) {
   if (terms.refund.kind === "FULL") return 100;
   if (terms.refund.kind === "NONE") return 0;

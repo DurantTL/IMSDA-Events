@@ -70,7 +70,7 @@ function sqlLiteral(source: string) {
   return escaped ? inner.replaceAll("\\n", "\n") : inner;
 }
 describe("message templates", () => {
-  it("ships twenty-two valid plaintext defaults and one blank custom message", () => {
+  it("ships twenty-four valid plaintext defaults and one blank custom message", () => {
     expect(MESSAGE_TEMPLATE_KEYS).toEqual([
       "REGISTRATION_CONFIRMATION_PAID",
       "REGISTRATION_CONFIRMATION_UNPAID",
@@ -94,9 +94,11 @@ describe("message templates", () => {
       "REGISTRATION_ACCESS_RECOVERY",
       "EVENT_ANNOUNCEMENT",
       "CLUB_ASSIGNMENTS",
+      "CANCELLATION_REQUEST_RECEIVED",
+      "CANCELLATION_REQUEST_UPDATED",
       "CUSTOM_MESSAGE",
     ]);
-    expect(DEFAULT_MESSAGE_TEMPLATE_LIST).toHaveLength(23);
+    expect(DEFAULT_MESSAGE_TEMPLATE_LIST).toHaveLength(25);
 
     // The custom message starts blank (#850): it is not a default anyone could send, and publishing needs both fields.
     expect(DEFAULT_MESSAGE_TEMPLATES.CUSTOM_MESSAGE).toMatchObject({ name: "Custom message", subject: "", body: "" });

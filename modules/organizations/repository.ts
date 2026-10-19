@@ -14,6 +14,7 @@ import {
   normalizeOrganizationName,
 } from "@/modules/organizations/domain";
 import { organizationSearchWhere } from "@/modules/organizations/search";
+import type { NewClubPlace, SimilarClubCandidate } from "@/modules/organizations/similar-clubs";
 import type {
   CreateOrganizationInput,
   ExternalIdentityInput,
@@ -224,39 +225,103 @@ export async function listSponsorOptions() {
   });
 }
 
+/**
+ * The directory's one create rule (#1031 reuses it): the kind and sponsor checks, the normalized name, and the audit entry, in
+ * the caller's transaction. A club needs an active sponsoring church or company. `options.id` fixes the new row's id (so a retry
+ * can find it), and `options.audit` adds ids and flags to the audit entry; never names of people.
+ */
+export async function createOrganizationInTransaction(
+  tx: Prisma.TransactionClient,
+  input: CreateOrganizationInput,
+  actorUserId: string,
+  options: { id?: string; audit?: { eventId?: string; summary?: string; metadata?: Record<string, string | number | boolean | null> } } = {},
+) {
+  await validateParentOrganization(
+    tx,
+    input.type,
+    input.parentOrganizationId,
+  );
+  const organization = await tx.organization.create({
+    data: {
+      ...(options.id ? { id: options.id } : {}),
+      type: input.type,
+      name: input.name,
+      normalizedName: normalizeOrganizationName(input.name),
+      parentOrganizationId: input.parentOrganizationId,
+      isActive: input.isActive,
+    },
+  });
+  await writeAuditLog({
+    actorUserId,
+    ...(options.audit?.eventId ? { eventId: options.audit.eventId } : {}),
+    action: "ORGANIZATION_CREATED",
+    entityType: "Organization",
+    entityId: organization.id,
+    summary: options.audit?.summary ?? `Created ${organization.type.toLocaleLowerCase("en-US")} ${organization.name}.`,
+    metadata: {
+      type: organization.type,
+      parentOrganizationId: organization.parentOrganizationId,
+      ...(options.audit?.metadata ?? {}),
+    },
+  }, tx);
+  return organization;
+}
+
 export async function createOrganization(
   input: CreateOrganizationInput,
   actorUserId: string,
 ) {
   const prisma = getPrisma();
-  await prisma.$transaction(async (tx) => {
-    await validateParentOrganization(
-      tx,
-      input.type,
-      input.parentOrganizationId,
-    );
-    const organization = await tx.organization.create({
-      data: {
-        type: input.type,
-        name: input.name,
-        normalizedName: normalizeOrganizationName(input.name),
-        parentOrganizationId: input.parentOrganizationId,
-        isActive: input.isActive,
-      },
-    });
-    await writeAuditLog({
-      actorUserId,
-      action: "ORGANIZATION_CREATED",
-      entityType: "Organization",
-      entityId: organization.id,
-      summary: `Created ${organization.type.toLocaleLowerCase("en-US")} ${organization.name}.`,
-      metadata: {
-        type: organization.type,
-        parentOrganizationId: organization.parentOrganizationId,
-      },
-    }, tx);
-  });
+  await prisma.$transaction((tx) => createOrganizationInTransaction(tx, input, actorUserId));
   return listOrganizations();
+}
+
+/** Every club (inactive ones marked) with its sponsoring church and its town: what the duplicate check compares a typed name against. */
+export async function listSimilarClubCandidates(client: Pick<Prisma.TransactionClient, "organization"> = getPrisma()): Promise<SimilarClubCandidate[]> {
+  const clubs = await client.organization.findMany({
+    where: { type: "CLUB" },
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      parentOrganization: { select: { id: true, name: true, churchLocation: { select: { city: true, state: true } } } },
+    },
+  });
+  return clubs.map((club) => ({
+    id: club.id,
+    name: club.name,
+    isActive: club.isActive,
+    sponsorId: club.parentOrganization?.id ?? null,
+    sponsorName: club.parentOrganization?.name ?? null,
+    city: club.parentOrganization?.churchLocation?.city || null,
+    state: club.parentOrganization?.churchLocation?.state || null,
+  }));
+}
+
+/** The active churches and companies a new club can be sponsored by, with their town so staff can tell same-named ones apart. */
+export async function listClubSponsorChoices() {
+  const sponsors = await getPrisma().organization.findMany({
+    where: { type: { in: [...SPONSOR_ORGANIZATION_TYPES] }, isActive: true },
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+    select: { id: true, name: true, type: true, churchLocation: { select: { city: true, state: true } } },
+  });
+  return sponsors.map((sponsor) => ({
+    id: sponsor.id,
+    name: sponsor.name,
+    type: sponsor.type,
+    city: sponsor.churchLocation?.city ?? "",
+    state: sponsor.churchLocation?.state ?? "",
+  }));
+}
+
+/** Where a new club's sponsor is, for the duplicate check. Null when the sponsor is not an active church or company. */
+export async function sponsorPlace(client: Pick<Prisma.TransactionClient, "organization">, sponsorId: string): Promise<NewClubPlace | null> {
+  const sponsor = await client.organization.findFirst({
+    where: { id: sponsorId, type: { in: [...SPONSOR_ORGANIZATION_TYPES] }, isActive: true },
+    select: { id: true, churchLocation: { select: { city: true, state: true } } },
+  });
+  return sponsor ? { sponsorId: sponsor.id, city: sponsor.churchLocation?.city || null, state: sponsor.churchLocation?.state || null } : null;
 }
 
 export async function updateOrganization(

@@ -280,6 +280,8 @@ function contextFor(fixture: EventFixture, registration: RegistrationFixture): M
     checkin_qr_url: `https://events.example.test/manage/${registration.confirmationCode.toLowerCase()}`,
     checkin_qr_image: `https://events.example.test/manage/${registration.confirmationCode.toLowerCase()}/qr.png`,
     club_assignments_block: "- **Campsite:** Field C, site 12\n- **Duty:** Flag raising / lowering — Friday morning\n- **Activity:** Campfire singing",
+    request_status: "Under review",
+    request_status_detail: "The event team is reviewing your request. Nothing has been cancelled, refunded or changed yet.",
   };
 }
 

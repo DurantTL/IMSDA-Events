@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { KitchenMealsServed } from "@/components/kitchen-meals-served";
 import { KitchenReportView } from "@/components/kitchen-report-view";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
+import { loadServedReport } from "@/modules/meals/scanner-import-repository";
 import { loadKitchenReport } from "@/modules/registrations/kitchen-report-loader";
 
 export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
@@ -15,6 +17,19 @@ export default async function KitchenReportPage({ searchParams }: { searchParams
   if (!permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="The kitchen report is restricted" detail="Your event role does not include access to reports." />;
   }
-  const report = await loadKitchenReport(event.id);
-  return <KitchenReportView eventName={event.name} report={report} csvHref={`/api/events/${encodeURIComponent(event.id)}/exports/kitchen`} />;
+  const [report, served] = await Promise.all([loadKitchenReport(event.id), loadServedReport(event.id)]);
+  const eventQuery = `event=${encodeURIComponent(event.id)}`;
+  return (
+    <div className="page-stack">
+      <KitchenReportView eventName={event.name} report={report} csvHref={`/api/events/${encodeURIComponent(event.id)}/exports/kitchen`} />
+      {/* Meals served against tickets sold (#1028): its own section and component, apart from the report above. */}
+      <KitchenMealsServed
+        report={served}
+        anyImport={served.anyImport}
+        importHref={`/more/kitchen-report/scanner-import?${eventQuery}`}
+        csvHref={`/api/events/${encodeURIComponent(event.id)}/exports/meals-served`}
+        drillHref={(key) => `/more/kitchen-report/scanner-import?${eventQuery}&service=${encodeURIComponent(key)}#ticket-details`}
+      />
+    </div>
+  );
 }

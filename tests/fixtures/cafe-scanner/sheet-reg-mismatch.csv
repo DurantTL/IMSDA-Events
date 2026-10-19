@@ -1,0 +1,5 @@
+ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes
+MT-00005,SYN-ZZZ9,Drew Ambiguous,lunch,,,adult,8,yes,2026-10-15T18:20:00.000Z,Drew Ambiguous,
+MT-00003,SYN-AAA1,Blake Sample,breakfast,thu,2026-10-15,adult,8,yes,2026-10-16T01:30:00.000Z,Blake Sample,
+MT-00001,SYN-AAA1,Alex Example,lunch,,,adult,8,yes,not a time,Alex Example,
+MT-00007,SYN-CCC3,Eli Quiet,supper,,,adult,8,yes,10/15/2026 20:15:00,Eli Quiet,
