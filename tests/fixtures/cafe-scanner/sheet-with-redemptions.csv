@@ -1,0 +1,10 @@
+ticket_id,reg_id,guest_name,meal_type,meal_day,meal_date,ticket_type,price,redeemed,redeemed_at,redeemed_by,notes
+MT-00001,SYN-AAA1,Alex Example,lunch,,,adult,8,yes,2026-10-15T17:05:09.000Z,Alex Example,
+MT-00002,SYN-AAA1,Alex Example,lunch,,,adult,8,no,,,
+MT-00003,SYN-AAA1,Blake Sample,supper,thu,2026-10-15,adult,8,yes,2026-10-16T01:30:00.000Z,Blake Sample,
+MT-00004,SYN-BBB2,'=Casey Formula,breakfast,thu,2026-10-15,adult,0,yes,2026-10-15T13:00:00.000Z,'=Casey Formula,
+MT-00005,SYN-BBB2,Drew Ambiguous,lunch,,,adult,8,no,,,
+MT-00006,SYN-BBB2,Drew Ambiguous,lunch,thu,2026-10-15,adult,0,no,,,
+MT-00007,SYN-CCC3,Eli Quiet,supper,,,adult,8,yes,2026-10-16T01:15:00.000Z,Eli Quiet,
+MT-00099,SYN-AAA1,Ghost Ticket,lunch,,,adult,8,yes,2026-10-15T18:00:00.000Z,Ghost Ticket,
+MT-77777,SYN-ZZZ9,Other Event,lunch,,,adult,8,yes,2026-10-15T18:00:00.000Z,Other Event,

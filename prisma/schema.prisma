@@ -1752,6 +1752,8 @@ model Event {
   mealPrices                          EventMealPrice[]
   mealSelections                      EventMealSelection[]
   mealTickets                         EventMealTicket[]
+  mealImportBatches                   EventMealImportBatch[]
+  mealRedemptions                     EventMealRedemption[]
   mealSelectionChanges                EventMealSelectionChange[]
   mealLedgerEntries                   EventMealLedgerEntry[]
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
@@ -9180,11 +9182,70 @@ model EventMealTicket {
   cancelledAt DateTime?
   createdAt   DateTime  @default(now())
 
-  event     Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  selection EventMealSelection @relation(fields: [selectionId], references: [id], onDelete: Cascade)
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  selection   EventMealSelection    @relation(fields: [selectionId], references: [id], onDelete: Cascade)
+  redemptions EventMealRedemption[]
 
   @@unique([eventId, number])
   @@index([selectionId, cancelledAt])
+}
+
+enum MealScannerSource {
+  /// The Google Sheet the café scanner syncs with, downloaded as CSV: our own export with redeemed columns filled in.
+  SHEET
+  /// The scanner's own `transactions.csv` (no ticket id; matched by registration, guest, meal and local date).
+  TRANSACTIONS
+}
+
+enum MealRedemptionKind {
+  REDEEMED
+  /// A correction: staff accepted a later file that showed the ticket as not redeemed.
+  UNREDEEMED
+}
+
+/// One accepted upload of café scanner results (#1028). Append-only; only a confirmed upload that adds events makes one.
+/// Holds ids and counts, never file content or names.
+model EventMealImportBatch {
+  id               String            @id @default(cuid())
+  eventId          String
+  uploadedByUserId String
+  source           MealScannerSource
+  fileName         String
+  fileSha256       String
+  rowCount         Int
+  redeemedCount    Int
+  unredeemedCount  Int
+  reviewCount      Int
+  createdAt        DateTime          @default(now())
+
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  redemptions EventMealRedemption[]
+
+  @@index([eventId, createdAt])
+}
+
+/// Append-only record that a café ticket was served (REDEEMED) or that staff corrected that (UNREDEEMED). A ticket's
+/// current state is its latest event. `sourceKey` is unique per event, so importing the same row again adds nothing.
+model EventMealRedemption {
+  id             String             @id @default(cuid())
+  eventId        String
+  ticketId       String
+  batchId        String
+  kind           MealRedemptionKind
+  /// When the scanner served the meal (UNREDEEMED: when staff accepted the correction).
+  occurredAt     DateTime
+  /// The scanner's own `redeemed_by` text, as it wrote it.
+  redeemedByText String?
+  sourceKey      String
+  createdAt      DateTime           @default(now())
+
+  event  Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticket EventMealTicket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  batch  EventMealImportBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, sourceKey])
+  @@index([ticketId, createdAt])
+  @@index([batchId])
 }
 
 /// Never holds a row (#920). A public registration submission locks this table (`LOCK TABLE ... IN EXCLUSIVE MODE`) as the

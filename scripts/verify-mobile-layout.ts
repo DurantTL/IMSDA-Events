@@ -268,6 +268,7 @@ const pages: PageSpec[] = [
   staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
+  staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -3110,6 +3111,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   }
   await page.evaluate(() => document.fonts.ready).catch(() => undefined);
   await page.waitForTimeout(150);
+  if (spec.prepare) await spec.prepare(page, width);
 
   if (selfTest) await page.evaluate(injectDefects);
   const touch = width <= touchMaxWidth;
