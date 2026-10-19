@@ -925,8 +925,8 @@ export const formTemplates: FormTemplate[] = [
           templateField("pbe_member_age", "attendee_age", "Age", "NUMBER", true, [], { scope: "ATTENDEE", helpText: "Counted on the date set for this event, not the event day." }),
           templateField("pbe_member_alternate", "alternate", "Alternate team member", "CHECKBOX", false, [], { scope: "ATTENDEE", placeholder: "This team member is the alternate.", helpText: "At most one team member is the alternate. If a team member is absent, they can still go on to the next level if the team qualifies." }),
         ] },
-        { id: "pbe_confirmation", title: "Director confirmation & release", description: `A checked box replaces the signature. Photo and video release (a notice, no answer needed): ${PBE_RELEASE_NOTICE}`, fields: [
-          templateField("pbe_confirm", "director_confirmation", "Director confirmation", "CHECKBOX", true, [], { placeholder: "I confirm this about every team member.", helpText: "Every team member is an inducted Pathfinder/TLT in good standing, has not graduated from high school, and is within the event's age limit on the age date shown in the team rules." }),
+        { id: "pbe_confirmation", title: "Director confirmation & release", description: `Photo and video release (a notice, no answer needed): ${PBE_RELEASE_NOTICE}`, fields: [
+          templateField("pbe_confirm", "director_confirmation", "Director confirmation", "CHECKBOX", true, [], { placeholder: "I confirm this about every team member.", helpText: "Every team member is an inducted Pathfinder in good standing, has not graduated from high school, and is within the event's age limit on the age date shown in the team rules." }),
         ] },
       ],
     },
