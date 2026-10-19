@@ -98,6 +98,7 @@ import {
 } from "@/modules/forms/attendee-roster-csv";
 import {
   formatPublicRegistrationAnswer,
+  clickableSteps,
   getPublicRegistrationStepPlan,
   type PublicRegistrationStep,
   type PublicRegistrationStepId,
@@ -978,6 +979,8 @@ export function PublicRegistrationForm({
     setIdempotencyKey(null);
     setAccountChoice("without");
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
+    setFurthestStepIndex(0);
+    setErrorStepIds([]);
     setDraftNotice(null);
   }
   const currentStepIndex = Math.max(
@@ -985,6 +988,13 @@ export function PublicRegistrationForm({
     0,
   );
   const currentStep = registrationSteps[currentStepIndex]!;
+  // Furthest step reached (#1042): steps up to it become buttons in the step list.
+  const [furthestStepIndex, setFurthestStepIndex] = useState(0);
+  // Steps with errors from the last Submit or Continue, from the full issue list rather than the scoped one shown.
+  const [errorStepIds, setErrorStepIds] = useState<string[]>([]);
+  useEffect(() => {
+    setFurthestStepIndex((furthest) => Math.max(furthest, currentStepIndex));
+  }, [currentStepIndex]);
   const attendeeSections = useMemo(
     () => definition.sections.map((section) => ({
       ...section,
@@ -1042,6 +1052,9 @@ export function PublicRegistrationForm({
       setCurrentStepId(targetStep.id);
     }
     const shownIssues = scopedIssues.length > 0 ? scopedIssues : nextIssues;
+    setErrorStepIds(registrationSteps
+      .filter((step) => nextIssues.some((issue) => issueBelongsToStep(issue, step)))
+      .map((step) => step.id));
     setContinueAttempted(true);
     setIssues(shownIssues);
     expandAttendeeCardsFor(shownIssues);
@@ -1457,6 +1470,12 @@ export function PublicRegistrationForm({
   // Always handled here (#738) so focus doesn't depend on hash navigation.
   function followIssueLink(clickEvent: ReactMouseEvent<HTMLAnchorElement>, issue: FormIssue, targetId: string) {
     clickEvent.preventDefault();
+    // The field only renders while its step is showing (#1042). Keep the issues so it still shows its error.
+    const issueStep = stepForIssue(issue);
+    if (issueStep && issueStep.id !== currentStep.id) {
+      setSheetOpen(false);
+      setCurrentStepId(issueStep.id);
+    }
     const attendee = attendeeForIssue(issue);
     expandAttendeeCardsFor([issue]);
     if (attendee && isPhone && rosterEnabled && roster.maxAttendees > 1) setSheetOpen(true);
@@ -3432,22 +3451,31 @@ export function PublicRegistrationForm({
               />
             </div>
             <ol>
-              {registrationSteps.map((step, stepIndex) => (
-                <li
-                  className={
-                    stepIndex === currentStepIndex
-                      ? "is-current"
-                      : stepIndex < currentStepIndex
-                        ? "is-complete"
-                        : ""
-                  }
-                  aria-current={stepIndex === currentStepIndex ? "step" : undefined}
-                  key={step.id}
-                >
-                  <span>{stepIndex + 1}</span>
-                  <small>{step.shortLabel}</small>
-                </li>
-              ))}
+              {clickableSteps(registrationSteps, furthestStepIndex, currentStepIndex, errorStepIds).map((item) => {
+                const inner = (
+                  <>
+                    <span>{item.index + 1}</span>
+                    <small>{item.step.shortLabel}</small>
+                    {item.hasErrors && <i className="public-registration-step-warning" aria-hidden="true">!</i>}
+                  </>
+                );
+                return (
+                  <li
+                    className={
+                      (item.isCurrent ? "is-current" : item.isComplete ? "is-complete" : "")
+                      + (item.hasErrors ? " has-errors" : "")
+                    }
+                    aria-current={item.isCurrent ? "step" : undefined}
+                    key={item.step.id}
+                  >
+                    {item.clickable ? (
+                      <button type="button" aria-label={item.label} onClick={() => goToStep(item.step)}>
+                        {inner}
+                      </button>
+                    ) : inner}
+                  </li>
+                );
+              })}
             </ol>
           </section>
 

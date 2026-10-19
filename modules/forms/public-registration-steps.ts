@@ -155,3 +155,45 @@ export function formatPublicRegistrationAnswer(
   if (isPlainAddressObject(value)) return formatAddressDisplay(value) || null;
   return null;
 }
+
+export type ClickableStep = {
+  step: PublicRegistrationStep;
+  index: number;
+  isCurrent: boolean;
+  isComplete: boolean;
+  /** Reached before (and not the one showing): the step list renders it as a button. */
+  clickable: boolean;
+  hasErrors: boolean;
+  /** Accessible name for the button, e.g. "Go to step 2: Team members, has errors". */
+  label: string;
+};
+
+/**
+ * What the step list at the top of the public form shows for each step.
+ * Steps up to the furthest one reached are clickable (except the current step);
+ * later steps stay plain. `errorStepIds` come from the full issue list of the
+ * last submit or continue, so a step with errors is flagged even when another
+ * step is showing.
+ */
+export function clickableSteps(
+  steps: PublicRegistrationStep[],
+  furthestIndex: number,
+  currentIndex: number,
+  errorStepIds: ReadonlySet<string> | readonly string[] = [],
+): ClickableStep[] {
+  const errors = new Set(errorStepIds);
+  const furthest = Math.max(furthestIndex, currentIndex);
+  return steps.map((step, index) => {
+    const hasErrors = errors.has(step.id);
+    const isCurrent = index === currentIndex;
+    return {
+      step,
+      index,
+      isCurrent,
+      isComplete: index < currentIndex,
+      clickable: !isCurrent && index <= furthest,
+      hasErrors,
+      label: `Go to step ${index + 1}: ${step.shortLabel}${hasErrors ? ", has errors" : ""}`,
+    };
+  });
+}
