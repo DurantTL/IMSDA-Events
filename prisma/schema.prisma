@@ -9534,7 +9534,7 @@ enum StaffInvitationApproval {
 model StaffInvitation {
   id              String                   @id @default(cuid())
   eventId         String
-  /// The invited address, normalized (trimmed, lowercase). One invitation per address per event.
+  /// The invited address, normalized (trimmed, lowercase). One live (not superseded) invitation per address per event.
   email           String
   firstName       String                   @default("")
   lastName        String                   @default("")
@@ -9557,6 +9557,9 @@ model StaffInvitation {
   /// What the invited person said about housing when registering: whether they need on-site housing, and a short note.
   needsHousing    Boolean?
   housingNote     String                   @default("")
+  /// Set when the office re-invited this person after a decline (#1027): a new invitation row carries the address from then on, and
+  /// this one stays as history with its declined registration. A superseded link never opens.
+  supersededAt    DateTime?
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
@@ -9566,7 +9569,8 @@ model StaffInvitation {
   createdBy    User?          @relation("StaffInvitationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   decidedBy    User?          @relation("StaffInvitationDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
 
-  @@unique([eventId, email])
+  /// The migration adds a partial unique index: one invitation per address per event among those not superseded.
+  @@index([eventId, email])
   @@index([eventId, group])
   @@index([eventId, approval])
   @@index([lastMessageId])

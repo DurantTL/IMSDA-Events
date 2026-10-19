@@ -34,6 +34,7 @@ vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.
 vi.mock("@/modules/meals/scanner-import-repository", () => ({
   loadServedReport: vi.fn(async () => ({ rows: [], totals: { label: "All services", sold: { paying: 0, conference: 0, total: 0 }, served: { paying: 0, conference: 0, total: 0 }, notUsed: { paying: 0, conference: 0, total: 0 } }, anyServed: false, anyImport: false })),
 }));
+vi.mock("@/modules/meals/staff-coverage", () => ({ loadStaffMealServiceCounts: vi.fn(async () => []) }));
 
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { GET as staffCsv } from "@/app/api/events/[eventId]/exports/kitchen/route";

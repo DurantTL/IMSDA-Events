@@ -104,6 +104,9 @@ jobs:
           echo "The app did not start:" && cat app.log && exit 1
       - name: Check phone layouts
         env:
+          # The audit signs its own private links (the staff invitation form), so it needs the
+          # same fictitious secret the app was started with, or the app refuses the link.
+          MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
           MOBILE_LAYOUT_BROWSER: /usr/bin/google-chrome
           MOBILE_LAYOUT_OUT_DIR: ${{ runner.temp }}/mobile-layout
         run: npm run test:mobile-layout

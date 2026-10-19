@@ -136,6 +136,14 @@ export const INVITATION_STATUS_LABEL: Record<InvitationStatus, string> = {
 const FAILED_MESSAGE_STATUSES = new Set(["FAILED", "SUPPRESSED", "CANCELLED"]);
 const FAILED_PROVIDER_STATUSES = new Set(["BOUNCED", "FAILED", "COMPLAINED", "SUPPRESSED"]);
 
+/**
+ * Whether the office can re-invite this person (#1027): their registration was declined (or was cancelled while it waited, which
+ * settles the invitation as declined), and nobody has already re-invited them. Re-inviting makes a new invitation with a new link.
+ */
+export function invitationReinvitable(input: { approval: "WAITING" | "APPROVED" | "DECLINED" | null; supersededAt: Date | string | null }) {
+  return input.approval === "DECLINED" && !input.supersededAt;
+}
+
 export type InvitationStatusInput = {
   revokedAt: Date | string | null;
   registeredAt: Date | string | null;
@@ -192,6 +200,11 @@ export const invitationRegistrationSchema = z.object({
   }).strict()).max(FAMILY_MAX_DEPENDANTS, `List at most ${FAMILY_MAX_DEPENDANTS} children.`).default([]),
   needsHousing: z.boolean().default(false),
   housingNote: z.string().trim().max(500, "Keep the note under 500 characters.").default(""),
+  /**
+   * The event's own attendee questions (#1027), one set of answers per person in the party, in party order (the invited person,
+   * the spouse, then each child). The server decides which questions exist and drops everything else; see `event-questions.ts`.
+   */
+  answers: z.array(z.record(z.string().max(60), z.unknown())).max(2 + FAMILY_MAX_DEPENDANTS, "Too many answer sets.").default([]),
   /** A honeypot, like the public form's: a person leaves it empty. */
   website: z.literal("").optional(),
 }).strict();

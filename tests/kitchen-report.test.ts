@@ -84,7 +84,7 @@ describe("kitchen report (#787)", () => {
     for (const text of [JSON.stringify(report), csv]) {
       expect(text).not.toMatch(/SYNTH-|Surname|Family|holder-|example\.test|5550100|Holder|Guest|at-/);
     }
-    expect(Object.keys(report).sort()).toEqual(["conferenceCovered", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
+    expect(Object.keys(report).sort()).toEqual(["conferenceCovered", "conferenceMealServices", "meals", "needs", "peopleWithNeeds", "totalPeople"]);
     for (const need of report.needs) expect(Object.keys(need).sort()).toEqual(["answer", "count"]);
   });
 

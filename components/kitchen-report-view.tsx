@@ -44,6 +44,24 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
         </section>
       )}
 
+      {report.conferenceMealServices.length > 0 && (
+        <section className="panel" aria-label="Conference-paid meals by service">
+          <h3>Conference-paid meals by service</h3>
+          <p className="field-help">How many approved staff, pastor and volunteer people the conference-paid meal plan covers at each meal. Registrations waiting for approval and declined ones are never counted.</p>
+          <div className="report-table-wrap"><table className="report-table report-table-auto">
+            <thead><tr><th scope="col">Service</th><th scope="col">Staff</th><th scope="col">Pastor</th><th scope="col">Volunteer</th><th scope="col">Total</th></tr></thead>
+            <tbody>
+              {report.conferenceMealServices.map((entry) => (
+                <tr key={entry.serviceId}>
+                  <th scope="row">{entry.serviceName}<br /><span className="field-help">{entry.serviceDate} · {entry.mealLabel}</span></th>
+                  <td>{entry.counts.STAFF}</td><td>{entry.counts.PASTOR}</td><td>{entry.counts.VOLUNTEER}</td><td>{entry.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </section>
+      )}
+
       <section className="panel" aria-label="Dietary needs">
         <h3>Dietary needs</h3>
         <p className="field-help">People with any dietary need: <strong>{report.peopleWithNeeds}</strong>. One person can give more than one answer.</p>
