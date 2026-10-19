@@ -8,6 +8,7 @@ import { ClubLocationPicker, locationUnavailableLabel } from "@/components/club-
 import { PublicRegistrationForm, type FormResponses } from "@/components/public-registration-form";
 import { TEAM_NAME_MAX } from "@/modules/club-teams/domain";
 import type { GeneralLinkExperience } from "@/modules/general-link-registrations/repository";
+import { generalLinkDisplayDefinition } from "@/modules/general-link-registrations/domain";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 type Ready = GeneralLinkExperience & { experience: NonNullable<GeneralLinkExperience["experience"]> };
@@ -83,7 +84,7 @@ export function GeneralLinkRegistrationFlow({ eventSlug, ready, topContent }: { 
       choiceUsage={experience.choiceUsage}
       event={experience.event}
       // Drafts are kept apart from the ordinary form of the same event.
-      form={{ ...experience.form, slug: `${experience.form.slug}:general` }}
+      form={{ ...experience.form, definition: generalLinkDisplayDefinition(experience.form.definition), slug: `${experience.form.slug}:general` }}
       group={{
         submitUrl: `/api/public/events/${encodeURIComponent(eventSlug)}/general-registrations`,
         locationId,

@@ -11524,6 +11524,16 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .pending-team-club select { width: 100%; max-width: 100%; }
 .pending-team-actions { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; width: auto; gap: 10px; }
 .pending-team-actions > button { min-height: 44px; }
+.pending-team-add-club { border-top: 1px solid var(--line); padding-top: 14px; }
+.pending-team-add-club label { display: grid; gap: 6px; }
+.pending-team-add-club :is(input[type="text"], select) { width: 100%; max-width: 100%; min-width: 0; }
+.pending-team-add-club .checkbox-label { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; }
+.pending-team-matches { display: grid; gap: 8px; min-width: 0; }
+.pending-team-matches p { margin: 0; }
+.pending-team-matches ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.pending-team-matches li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; }
+.pending-team-matches li > span { flex: 1 1 14rem; min-width: 0; }
+.pending-team-matches li > button { min-height: 44px; }
 .pending-team-reject { border-color: #e3c3be; color: #8f3a30; }
 @media (max-width: 600px) { .pending-team-actions > button { flex: 1 1 100%; } }
 

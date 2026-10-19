@@ -2,11 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CheckCircle2, Users, XCircle } from "lucide-react";
+import { CheckCircle2, Plus, Users, XCircle } from "lucide-react";
 import { pendingTeamButtons } from "@/modules/general-link-registrations/review-actions";
 import type { PendingTeamMemberView, PendingTeamView } from "@/modules/general-link-registrations/repository";
+import type { SimilarClub } from "@/modules/organizations/similar-clubs";
 
 type Club = { id: string; name: string };
+/** A church or company a new club can be sponsored by, with its town so same-named ones can be told apart. */
+export type SponsorChoice = { id: string; name: string; city: string; state: string };
+
+function sponsorLabel(sponsor: SponsorChoice) {
+  const town = [sponsor.city, sponsor.state].filter(Boolean).join(", ");
+  return town ? `${sponsor.name} (${town})` : sponsor.name;
+}
 
 function personLabel(person: PendingTeamMemberView) {
   const name = `${person.firstName} ${person.lastName}`.trim() || "(no name)";
@@ -22,12 +30,106 @@ function submittedAt(value: string, timeZone: string) {
 
 type Action =
   | { action: "CONFIRM" | "REASSIGN"; organizationId: string }
+  | { action: "ADD_CLUB"; clubName: string; sponsoringChurchId: string; acknowledgeSimilar: boolean }
   | { action: "REJECT"; reason: string };
 
-function TeamRow({ eventId, team, clubs, timeZone }: { eventId: string; team: PendingTeamView; clubs: Club[]; timeZone: string }) {
+/**
+ * Add the club the director typed to the directory and confirm the team in one step (#1031). The name starts as what the director
+ * typed; staff correct it and choose the sponsoring church. Close names already in the directory are listed first, so a team
+ * that belongs to one of them is attached to it instead of making a duplicate.
+ */
+function AddClubForm({ eventId, team, sponsors, busy, onSend }: {
+  eventId: string; team: PendingTeamView; sponsors: SponsorChoice[]; busy: boolean; onSend: (body: Action) => Promise<void>;
+}) {
+  const [name, setName] = useState(team.clubNameAsEntered);
+  const [sponsorId, setSponsorId] = useState("");
+  const [matches, setMatches] = useState<SimilarClub[]>([]);
+  const [checkedFor, setCheckedFor] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [problem, setProblem] = useState("");
+  const key = `${name.trim()}|${sponsorId}`;
+
+  async function check(nextName: string, nextSponsor: string) {
+    const nextKey = `${nextName.trim()}|${nextSponsor}`;
+    setAcknowledged(false);
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/general-link/teams/${encodeURIComponent(team.id)}/similar-clubs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubName: nextName, sponsoringChurchId: nextSponsor || null }),
+      });
+      const result = await response.json().catch(() => ({})) as { matches?: SimilarClub[]; message?: string };
+      if (!response.ok) {
+        setProblem(result.message ?? "We couldn't check the directory for similar clubs.");
+        setMatches([]);
+        setCheckedFor(null);
+        return;
+      }
+      setProblem("");
+      setMatches(result.matches ?? []);
+      setCheckedFor(nextKey);
+    } catch {
+      setProblem("We couldn't reach the server to check for similar clubs.");
+      setCheckedFor(null);
+    }
+  }
+
+  const checked = checkedFor === key;
+  const ready = name.trim().length >= 2 && sponsorId !== "" && checked && (matches.length === 0 || acknowledged);
+  return (
+    <div className="form-stack pending-team-add-club" role="group" aria-label="Add this club to the directory">
+      <label>
+        Club name
+        <input disabled={busy} maxLength={160} onBlur={() => void check(name, sponsorId)} onChange={(event) => setName(event.target.value)} type="text" value={name} />
+      </label>
+      <label>
+        Sponsoring church or company
+        <select disabled={busy} onChange={(event) => { setSponsorId(event.target.value); void check(name, event.target.value); }} value={sponsorId}>
+          <option value="">Choose a church…</option>
+          {sponsors.map((sponsor) => <option key={sponsor.id} value={sponsor.id}>{sponsorLabel(sponsor)}</option>)}
+        </select>
+        <small className="field-help">Every club in the directory belongs to a church or company; its town tells same-named ones apart.</small>
+      </label>
+      {problem && <div className="inline-notice error" role="alert">{problem}</div>}
+      {matches.length > 0 && (
+        <div className="pending-team-matches" role="region" aria-label="Clubs already in the directory with a similar name">
+          <p className="field-help"><strong>Already in the directory.</strong> If the team belongs to one of these, attach it instead of adding a duplicate.</p>
+          <ul>
+            {matches.map((match) => (
+              <li key={match.id}>
+                <span>
+                  <strong translate="no">{match.name}</strong>
+                  {" "}<small>({match.kind === "SAME_NAME" ? "same name" : "close name"}{match.sponsorName ? ` · ${match.sponsorName}` : ""}{match.city ? `, ${match.city}` : ""}{match.sameSponsor ? " · same church" : match.sameArea ? " · same town" : ""})</small>
+                </span>
+                <button className="secondary-button" disabled={busy} onClick={() => void onSend({ action: "REASSIGN", organizationId: match.id })} type="button">Attach to this club</button>
+              </li>
+            ))}
+          </ul>
+          <label className="checkbox-label">
+            <input checked={acknowledged} disabled={busy} onChange={(event) => setAcknowledged(event.target.checked)} type="checkbox" />
+            None of these is the club. Add a new one.
+          </label>
+        </div>
+      )}
+      <div className="intro-actions pending-team-actions">
+        <button
+          className="primary-button"
+          disabled={busy || !ready}
+          onClick={() => void onSend({ action: "ADD_CLUB", clubName: name, sponsoringChurchId: sponsorId, acknowledgeSimilar: acknowledged })}
+          type="button"
+        >
+          <Plus aria-hidden="true" size={16} /> Add club and confirm team
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TeamRow({ eventId, team, clubs, sponsors, canAddClub, timeZone }: { eventId: string; team: PendingTeamView; clubs: Club[]; sponsors: SponsorChoice[]; canAddClub: boolean; timeZone: string }) {
   const router = useRouter();
   const [choice, setChoice] = useState(team.suggestedClub?.id ?? team.emailClubs[0]?.id ?? "");
   const [rejecting, setRejecting] = useState(false);
+  const [addingClub, setAddingClub] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,7 +151,11 @@ function TeamRow({ eventId, team, clubs, timeZone }: { eventId: string; team: Pe
         if (response.status === 409) router.refresh();
         return;
       }
-      setDone(result.result?.status === "REJECTED" ? "Rejected. The director was told." : `Attached to ${result.result?.clubName ?? "the club"}.`);
+      setDone(result.result?.status === "REJECTED"
+        ? "Rejected. The director was told."
+        : body.action === "ADD_CLUB"
+          ? `Added ${result.result?.clubName ?? "the club"} to the directory and attached the team.`
+          : `Attached to ${result.result?.clubName ?? "the club"}.`);
       router.refresh();
     } catch {
       setError("We couldn't reach the server. Nothing was changed.");
@@ -119,8 +225,15 @@ function TeamRow({ eventId, team, clubs, timeZone }: { eventId: string; team: Pe
                 {suggested ? `Attach to ${chosenName}` : "Attach to this club"}
               </button>
             )}
+            {!suggested && canAddClub && (
+              <button aria-expanded={addingClub} className="secondary-button" disabled={busy} onClick={() => setAddingClub((open) => !open)} type="button"><Plus aria-hidden="true" size={16} /> Add this club to the directory</button>
+            )}
             <button aria-expanded={rejecting} className="secondary-button pending-team-reject" disabled={busy} onClick={() => setRejecting((open) => !open)} type="button"><XCircle aria-hidden="true" size={16} /> Reject</button>
           </div>
+          {!suggested && !canAddClub && (
+            <p className="field-help">This club is not in the directory. A system administrator can add it and confirm the team in one step.</p>
+          )}
+          {addingClub && !suggested && canAddClub && <AddClubForm busy={busy} eventId={eventId} onSend={send} sponsors={sponsors} team={team} />}
           {rejecting && (
             <div className="form-stack">
               <label>
@@ -139,10 +252,12 @@ function TeamRow({ eventId, team, clubs, timeZone }: { eventId: string; team: Pe
 }
 
 /** The waiting teams (#931), each with one-click confirm of the club the director picked, a club menu to change it, and reject. */
-export function PendingTeamsReview({ eventId, teams, clubs, timeZone = "UTC" }: { eventId: string; teams: PendingTeamView[]; clubs: Club[]; timeZone?: string }) {
+export function PendingTeamsReview({ eventId, teams, clubs, sponsors = [], canAddClub = false, timeZone = "UTC" }: {
+  eventId: string; teams: PendingTeamView[]; clubs: Club[]; sponsors?: SponsorChoice[]; canAddClub?: boolean; timeZone?: string;
+}) {
   return (
     <div className="page-stack" aria-label="Teams waiting for a club">
-      {teams.map((team) => <TeamRow clubs={clubs} eventId={eventId} key={team.id} team={team} timeZone={timeZone} />)}
+      {teams.map((team) => <TeamRow canAddClub={canAddClub} clubs={clubs} eventId={eventId} key={team.id} sponsors={sponsors} team={team} timeZone={timeZone} />)}
     </div>
   );
 }

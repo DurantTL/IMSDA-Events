@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { PendingTeamsReview } from "@/components/pending-teams-review";
+import { listClubSponsorChoices } from "@/modules/organizations/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listAttachableClubs, listPendingTeams, resolvedTeamCounts } from "@/modules/general-link-registrations/repository";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = { title: "Teams waiting for a club" };
 
 export default async function PendingTeamsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
       <AccessRestricted
@@ -18,7 +19,14 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
       />
     );
   }
-  const [teams, clubs, counts] = await Promise.all([listPendingTeams(event.id), listAttachableClubs(), resolvedTeamCounts(event.id)]);
+  // Adding a club to the directory is the directory's own rule: system administrators (#1031).
+  const canAddClub = user.globalRole === "SYSTEM_ADMIN";
+  const [teams, clubs, counts, sponsors] = await Promise.all([
+    listPendingTeams(event.id),
+    listAttachableClubs(),
+    resolvedTeamCounts(event.id),
+    canAddClub ? listClubSponsorChoices() : Promise.resolve([]),
+  ]);
 
   return (
     <section className="page-stack">
@@ -28,7 +36,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
           <h2>Teams waiting for a club</h2>
           <p>
             These teams registered through the general link for {event.name}, but the director&rsquo;s email did not match the club
-            they picked. Check the members and contact, then confirm the club, choose another, or reject the team.
+            they picked. Check the members and contact, then confirm the club, choose another, add a club that is not in the directory, or reject the team.
           </p>
           <p className="field-help">
             Until then a team is in no registration, invoice or check-in list. Handle these names as you would a club roster; a
@@ -44,7 +52,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
           <p>Every team registered through the link is attached to a club.</p>
         </section>
       ) : (
-        <PendingTeamsReview clubs={clubs} eventId={event.id} teams={teams} timeZone={event.timezone} />
+        <PendingTeamsReview canAddClub={canAddClub} clubs={clubs} eventId={event.id} sponsors={sponsors} teams={teams} timeZone={event.timezone} />
       )}
     </section>
   );
