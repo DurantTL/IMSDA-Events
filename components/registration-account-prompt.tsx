@@ -1,4 +1,5 @@
 import { ExternalLink, UserRoundPlus } from "lucide-react";
+import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 
 function accountPath(
   path: "/account/sign-up" | "/account/sign-in",
@@ -54,6 +55,7 @@ export function RegistrationAccountPrompt({
             </p>
           </>
         )}
+        <AccountComingSoonNotice />
         <div className="public-registration-account-actions">
           <a {...externalNavigation} href={accountPath("/account/sign-up", email, returnTo)}>
             Create account <ExternalLink size={15} aria-hidden="true" />

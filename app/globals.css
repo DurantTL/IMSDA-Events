@@ -1547,6 +1547,8 @@ select:focus-visible {
 @media (max-width: 800px) { .act-as-banner-shell { margin-left: 0; } }
 /* On the account side the banner joins the same 1180px column as the tabs, hero and page body (#722). */
 .act-as-banner-account { max-width: 1180px; margin: 12px auto 0; }
+.account-coming-soon-notice { margin: 0; line-height: 1.5; }
+.auth-card > .account-coming-soon-notice { margin-bottom: 14px; }
 .inline-notice.error { border-color: #e9c7c2; background: #fff1ef; color: var(--coral); }
 .check-in-scanner-modal { width: min(760px, 100%); }
 .check-in-scanner-description {
@@ -3872,7 +3874,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   font-weight: 800;
 }
 .public-registration-review-account { grid-column: 1 / -1; }
-.public-registration-review-account > p:not(.public-registration-eyebrow) {
+.public-registration-review-account > p:not(.public-registration-eyebrow):not(.inline-notice) {
   margin: 8px 0 0;
   color: var(--muted);
   font-size: var(--text-helper-min);
@@ -9174,7 +9176,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 /* Group registration "not available yet" state (#688): keeps the page gutter. */
 .public-group-state { box-sizing: border-box; width: min(640px, calc(100% - 32px)); margin: 32px auto 48px; }
 .public-group-flow-card { box-sizing: border-box; width: min(720px, calc(100% - 32px)); margin: 24px auto; }
-.public-group-state h1 { margin: 4px 0 10px; color: var(--ink); font-size: 1.65rem; line-height: 1.2; }
+.public-group-state h1, .staff-invite-form h1 { margin: 4px 0 10px; color: var(--ink); font-size: 1.65rem; line-height: 1.2; }
 .public-group-state .public-event-not-found-link { min-height: 44px; margin-top: 0; }
 
 /* Next-step link inside an empty state (#688): a 44px tap target. */
@@ -11192,6 +11194,20 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .staff-invite-table td:last-child { width: auto; }
 .staff-invite-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .staff-invite-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.staff-invite-filters label { display: grid; gap: 6px; }
+.staff-invite-select { display: inline-flex; align-items: center; justify-content: center; }
+/* On a phone each row is a card: the label above each value, a full-size tap target for the checkbox (#1027). */
+@media (max-width: 640px) {
+  .staff-invite-select { min-width: 44px; min-height: 44px; }
+  .staff-invite-table, .staff-invite-table tbody, .staff-invite-table tr, .staff-invite-table td { display: block; width: 100%; box-sizing: border-box; }
+  .staff-invite-table { min-width: 0; }
+  .staff-invite-table thead { display: none; }
+  .staff-invite-table tr { margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .staff-invite-table td, .staff-invite-table td:first-child, .staff-invite-table td:last-child { width: 100%; border: 0; padding: 4px 0; }
+  .staff-invite-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-weight: 600; font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.8rem); }
+  .staff-invite-table td { overflow-wrap: anywhere; }
+  .staff-invite-table td:empty { display: none; }
+}
 .staff-invite-preview { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); overflow-wrap: anywhere; }
 .staff-invite-preview pre { white-space: pre-wrap; margin: 0; font: inherit; }
 .staff-invite-party { margin: 0; padding-left: 18px; }

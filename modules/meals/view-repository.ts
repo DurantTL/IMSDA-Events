@@ -10,6 +10,8 @@ import {
   mealPriceDrift, mealTicketCsvHeader, mealTicketCsvRow, scannerMealTypes, scannerTicketCsvHeader, scannerTicketCsvRows,
   type MealTicketRow, type ScannerTicket,
 } from "@/modules/meals/domain";
+import { loadStaffMealServiceCounts } from "@/modules/meals/staff-coverage";
+import { staffMealServiceCsvRows } from "@/modules/meals/staff-coverage-domain";
 import { repairEventTickets, selectionsMissingTickets } from "@/modules/meals/ticket-repository";
 import { toCsv } from "@/modules/reporting/csv";
 
@@ -148,7 +150,14 @@ export async function loadMealTicketRows(eventId: string): Promise<MealTicketRow
 /** The per-selection summary CSV (one row per selection with a quantity): the export #905 first shipped. */
 export async function mealTicketSummaryCsv(eventId: string) {
   const rows = await loadMealTicketRows(eventId);
-  return toCsv([[...mealTicketCsvHeader], ...rows.map(mealTicketCsvRow)]);
+  // Below the ticket rows, a second small table (#1027): how many approved staff, pastor and volunteer people the conference-paid
+  // plan covers at each service, by group. Left out entirely when nobody is covered, so an event without staff keeps its exact file.
+  const covered = staffMealServiceCsvRows(await loadStaffMealServiceCounts(eventId));
+  return toCsv([
+    [...mealTicketCsvHeader],
+    ...rows.map(mealTicketCsvRow),
+    ...(covered.length > 0 ? [[], ["Conference-paid meals by service (approved staff, pastor and volunteer people)"], ...covered] : []),
+  ]);
 }
 
 /**
