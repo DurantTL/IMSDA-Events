@@ -5,6 +5,7 @@ import {
   buildAttendeeListingRows,
   mealTotals,
 } from "@/modules/registrations/attendee-listing";
+import { staffMealServiceCsvRows, type StaffMealServiceCount } from "@/modules/meals/staff-coverage-domain";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import { toCsv } from "@/modules/reporting/csv";
 
@@ -33,6 +34,11 @@ export type KitchenReport = {
    * the conference, and none of them chose a meal ticket. A count per group, groups with nobody left out; no names.
    */
   conferenceCovered: Array<{ group: string; count: number }>;
+  /**
+   * For each meal service, how many approved staff, pastor and volunteer people the conference-paid plan covers, by group (#1027).
+   * Loaded from the meals module's own selections; empty when there are none (or for a report built without them).
+   */
+  conferenceMealServices: StaffMealServiceCount[];
 };
 
 /** Trim, lowercase and collapse whitespace: the key answers are grouped by. */
@@ -40,7 +46,7 @@ export function normalizeNeed(answer: string): string {
   return answer.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-export function buildKitchenReport(registrations: readonly RegistrationRecord[]): KitchenReport {
+export function buildKitchenReport(registrations: readonly RegistrationRecord[], conferenceMealServices: readonly StaffMealServiceCount[] = []): KitchenReport {
   const confirmed = registrations.filter((registration) => KITCHEN_REPORT_STATUSES.includes(registration.status as never));
   // Full answer text is needed to count it; it is reduced to anonymous counts below and never returned per row.
   const rows = buildAttendeeListingRows(confirmed, { showDietaryDetails: true });
@@ -78,6 +84,7 @@ export function buildKitchenReport(registrations: readonly RegistrationRecord[])
     peopleWithNeeds,
     totalPeople: rows.length,
     conferenceCovered,
+    conferenceMealServices: [...conferenceMealServices],
   };
 }
 
@@ -92,6 +99,9 @@ export function kitchenReportCsv(report: KitchenReport): string {
     ["People with any dietary need", report.peopleWithNeeds],
     ...(report.conferenceCovered.length > 0
       ? [[], ["Meals covered by the conference", "Count"], ...report.conferenceCovered.map((entry) => [entry.group, entry.count])]
+      : []),
+    ...(report.conferenceMealServices.length > 0
+      ? [[], ["Conference-paid meals by service (approved staff, pastor and volunteer people)"], ...staffMealServiceCsvRows(report.conferenceMealServices)]
       : []),
   ];
   return ATTENDEE_LISTING_BOM + toCsv(table);

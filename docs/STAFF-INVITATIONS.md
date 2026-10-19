@@ -55,6 +55,18 @@ registrations that come back wait for the office to approve them in one batch. T
 - It is written in one transaction that also uses the link up, so two clicks make one registration. The registrant gets a receipt,
   and the event's internal notification addresses get one digest per 15 minutes.
 - The registration carries the invitation's group on every attendee's profile (`staffGroup`).
+- **The event's own questions (#1027).** The link form also asks the attendee-level questions of the event's published
+  registration form (the oldest published form if there are several), for every person in the party, in the form's order.
+  `modules/staff-invitations/event-questions.ts` decides which are asked, on the server. Left out: priced questions (a price, a
+  choice price, a late price, a credit, an automatic fee), meal questions (the meal ticket quantity fields and anything about a
+  meal, which stay `Covered (staff)`), lodging questions (housing, rooms, nights, roommates, campsites, which stay blocked for
+  staff) and limited-places choices, health-type or sensitive questions (medical data never travels through a personal link),
+  registration-level questions, recorded acknowledgments, addresses, directory lists, and what the page already knows (name, age,
+  attendee type). A question that only applies when a left-out question is answered a certain way is left out too.
+  Required questions are enforced on the server for every person; an answer to a question that is not asked is dropped, so a
+  crafted request can't write a priced, meal or lodging answer, or replace `meal_coverage`. Answers are saved on each attendee's
+  `formResponses`, with the form version id in the profile snapshot and the audit row. An event with no published form asks
+  nothing extra.
 
 **Approval** (`/people/staff-invitations/approvals`)
 
@@ -80,6 +92,27 @@ registrations that come back wait for the office to approve them in one batch. T
   filter.
 - Attendee listing: a Group column (also in the CSV).
 - Kitchen report: a count per group of people whose meals the conference covers, no names.
+- **Meal counts by service (#1027).** The kitchen report (page and CSV) and the meal ticket summary CSV also show, for each meal
+  service, how many approved staff, pastor and volunteer people the conference-paid plan covers, split by group. The count is read
+  from the meals module's own selections (`modules/meals/staff-coverage.ts`): active conference-paid selections at an active
+  service, on a submitted or confirmed registration whose invitation is approved, one count per person. A waiting registration
+  (a draft with no selections) or a declined one (cancelled) is never counted, and there is no second table of counts. The
+  section is left out when nobody is covered, so an event without staff keeps the same files as before.
+
+**Re-inviting after a decline (#1027)**
+
+- On the invite list, a person whose registration was declined, or cancelled while it waited (which settles the invitation as
+  declined), has a **Re-invite** action (`MANAGE_REGISTRATION`, like copy and reissue). It makes a NEW invitation for the same
+  address and group (a new id, so a new single-use link, "not sent") and marks the old one superseded; a superseded link never
+  opens again. Nothing is emailed: the office selects the new invitation and uses the same preview and Send step as any other
+  (`MANAGE_COMMUNICATIONS`).
+- The old declined registration is not touched. It stays cancelled as history, still tied to the old invitation, so its group
+  label and the staff rules (no lodging requests, no reactivation) keep applying to it, and it still shows in the approval list.
+  The invite list shows the person once, by the new invitation. A person can be re-invited once per decline.
+- Audited as `STAFF_INVITATION_REINVITED` with ids only (the new and old invitation, the old registration).
+- Database: additive migration `20261109100000_staff_invitation_reinvite` adds `supersededAt` and replaces the plain
+  one-invitation-per-address key with a partial unique index over invitations that are not superseded, plus a check that only a
+  declined invitation can be superseded.
 
 ## Not built yet (follow-up slices)
 
@@ -88,9 +121,5 @@ registrations that come back wait for the office to approve them in one batch. T
   records "needs housing" and a note, which the approval list shows; there is no lodging step on the link yet, and the lodging
   assignment screens do not label these people. The off-site placement itself already exists (the Hotel, Airbnb, Home, Offsite
   and Other buckets of #200), so nothing new is needed there.
-- **Exact kitchen counts from meals.** The kitchen report counts people by group; counts of meals per service come from the meals
-  module and the café scan (#916), not from this report.
-- **Event-specific questions.** The link uses its own short form (people, housing note). The event's published registration form
-  is not used, so questions such as shirt sizes are not asked.
-- **Re-inviting after a decline**, and a bulk "retry meal coverage" button for an approval whose meal entitlement failed (the
-  Meals screen can entitle a person by hand).
+- **Headcount capacity.** Whether approved staff count toward the event's overall headcount capacity waits on an owner decision
+  (tracked on #804). Today they do, once approved.

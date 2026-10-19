@@ -1,13 +1,15 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { loadStaffMealServiceCounts } from "@/modules/meals/staff-coverage";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 import { listRegistrations } from "@/modules/registrations/repository";
 import { KITCHEN_REPORT_STATUSES, buildKitchenReport, type KitchenReport } from "@/modules/registrations/kitchen-report";
 
 /** The whole-event report for an event the caller has already been authorized for. */
 export async function loadKitchenReport(eventId: string): Promise<KitchenReport> {
-  return buildKitchenReport(await listRegistrations(eventId, { statuses: KITCHEN_REPORT_STATUSES }));
+  const registrations = await listRegistrations(eventId, { statuses: KITCHEN_REPORT_STATUSES });
+  return buildKitchenReport(registrations, await loadStaffMealServiceCounts(eventId));
 }
 
 /**

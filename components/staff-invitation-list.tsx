@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Ban, Copy, MailPlus, RefreshCw } from "lucide-react";
+import { Ban, Copy, MailPlus, RefreshCw, UserPlus } from "lucide-react";
 import {
   INVITATION_STATUSES,
   INVITATION_STATUS_LABEL,
@@ -136,6 +136,13 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
     setNotice(`${result.result?.revoked ?? 0} link${result.result?.revoked === 1 ? "" : "s"} revoked${result.result?.skipped ? `, ${result.result.skipped} skipped (already used or revoked)` : ""}.`);
     setConfirmingRevoke(false);
     setSelected(new Set());
+    router.refresh();
+  });
+
+  // Re-invite makes a new invitation (a new link, "not sent"); it never emails anyone. The office then selects it and uses Send.
+  const reinvite = (id: string) => run(async () => {
+    await call(`/${encodeURIComponent(id)}`, { action: "reinvite" });
+    setNotice("A new invitation was made with a new link, and the old link no longer works. Nothing was emailed: select the new invitation and use Send or resend to email it.");
     router.refresh();
   });
 
@@ -276,13 +283,13 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
             <tbody>
               {visible.map((row) => (
                 <tr key={row.id}>
-                  <td><input aria-label={`Select ${row.email}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></td>
-                  <td>
+                  <td><label className="staff-invite-select"><input aria-label={`Select ${row.email}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></label></td>
+                  <td data-label="Person">
                     <strong>{`${row.firstName} ${row.lastName}`.trim() || row.email}</strong>
                     {(row.firstName || row.lastName) && <><br /><span className="field-help">{row.email}</span></>}
                   </td>
-                  <td>{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>
-                  <td>
+                  <td data-label="Group">{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>
+                  <td data-label="Status">
                     <span className={`status-chip ${tone(row.status)}`}>{INVITATION_STATUS_LABEL[row.status]}</span>
                     {row.sentAt && row.status !== "REGISTERED" && row.status !== "APPROVED" && row.status !== "DECLINED" && (
                       <><br /><span className="field-help">Sent {row.sendCount > 1 ? `${row.sendCount} times, last ` : ""}{row.sentAt.slice(0, 16).replace("T", " ")} UTC</span></>
@@ -290,10 +297,13 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
                     {row.deliveryNote && <><br /><span className="field-help">{row.deliveryNote}</span></>}
                     {row.confirmationCode && <><br /><span className="field-help">{row.confirmationCode}</span></>}
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     <div className="staff-invite-actions">
                       {row.usable && (
                         <button className="text-button" disabled={busy} onClick={() => void showLink(row.id, "copy")} type="button"><Copy aria-hidden="true" size={14} /> Copy link</button>
+                      )}
+                      {row.reinvitable && (
+                        <button className="text-button" disabled={busy} onClick={() => void reinvite(row.id)} type="button"><UserPlus aria-hidden="true" size={14} /> Re-invite</button>
                       )}
                       {row.reissuable && (
                         <button className="text-button" disabled={busy} onClick={() => void showLink(row.id, "reissue")} type="button"><RefreshCw aria-hidden="true" size={14} /> Reissue</button>

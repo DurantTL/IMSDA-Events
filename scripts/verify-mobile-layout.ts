@@ -121,6 +121,11 @@ const pbeDraftKey = "0123456789abcdef0123456789abcdef";
 // and the private link opens it), and requests in several states: the registrant's panel and the staff queue (#170).
 const cancelEventId = `${P}_cancel_event`;
 const cancelEventSlug = `${P}-cancel-weekend`;
+// A general event with personal staff invitation links (#804, #1027): the invite list in every status, and a link form that also
+// asks the event's own attendee questions.
+const staffInviteEventId = `${P}_staffinv_event`;
+const staffInviteEventSlug = `${P}-staff-invitations`;
+const staffInviteEmail = (key: string) => `${P}.staffinv.${key}@example.test`;
 const churchA = `${P}_church_a`;
 const churchB = `${P}_church_b`;
 const reportMonth = "2026-09";
@@ -334,7 +339,25 @@ const pages: PageSpec[] = [
   staff("club-directors", `/admin/organizations/${clubA}/directors`, "system-admin"),
   // The block editor with one of each kind, as a system administrator (custom HTML is editable).
   staff("event-content-blocks", `/more/event-content?event=${blocksEventId}`, "system-admin"),
+  // Personal staff invitations (#804, #1027): the invite list (every status, with Re-invite on the declined person) and the
+  // approval list. The link form itself is added once the open link's token exists (see staffInvitePages).
+  staff("staff-invitations", `/people/staff-invitations?event=${staffInviteEventId}`),
+  staff("staff-invitation-approvals", `/people/staff-invitations/approvals?event=${staffInviteEventId}`),
 ];
+
+/** The public link form of one not-yet-used invitation: with a spouse and a child added, so every person's event questions show. */
+function staffInvitePages(openToken: string): PageSpec[] {
+  return [{
+    name: "public-staff-invite-form",
+    path: `/staff-invite/${openToken}`,
+    role: "visitor",
+    expectText: /Register for/i,
+    prepare: async (page) => {
+      await page.getByLabel("My spouse is coming").check();
+      await page.getByRole("button", { name: /Add a child/i }).click();
+    },
+  }];
+}
 
 /** Every page a PBE user touches (the pages that need a row's id are built once the event is seeded). */
 function pbePages(team: { registrationId: string; teamKey: string }): PageSpec[] {
@@ -682,6 +705,107 @@ async function cleanupCancellationEvent(prisma: PrismaClient) {
   }, { timeout: 30_000 });
 }
 
+/**
+ * A published general event with a published form (attendee questions: a required choice, a multiple choice, a long label, a
+ * note, a ticked box that reveals a note, plus a meal and a lodging question that must NOT be asked) and six personal staff
+ * invitations in every list status, made through the real repository functions: not sent (the open link the form page uses), sent,
+ * waiting, approved, declined (so Re-invite shows) and revoked. Idempotent. Returns the open link's token.
+ */
+async function seedStaffInviteEvent(prisma: PrismaClient) {
+  const { addDays, calendarDateIn } = await import("../modules/calendar/domain");
+  const repo = await import("../modules/staff-invitations/repository");
+  const { invitationToken } = await import("../modules/staff-invitations/link");
+  const today = calendarDateIn(new Date());
+  const startsOn = addDays(today, 60);
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  if (!(await prisma.event.findUnique({ where: { id: staffInviteEventId }, select: { id: true } }))) {
+    const field = (key: string, extra: Record<string, unknown> = {}) => ({ id: `fld-${key}`, key, label: key.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase()), helpText: "", type: "TEXT", scope: "ATTENDEE", required: false, options: [], ...extra });
+    const form = await prisma.$transaction(async (tx) => {
+      await tx.event.create({
+        data: {
+          id: staffInviteEventId, slug: staffInviteEventSlug, name: "Mobilecheck Staff Weekend",
+          startsAt: new Date(`${startsOn}T15:00:00Z`), endsAt: new Date(`${addDays(startsOn, 3)}T20:00:00Z`), timezone: "America/Chicago", isPublished: true,
+        },
+      });
+      await tx.eventMembership.create({ data: { eventId: staffInviteEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
+      return tx.registrationForm.create({ data: { eventId: staffInviteEventId, createdByUserId: admin.id, name: "Mobilecheck staff form", slug: "mobilecheck-staff", status: "PUBLISHED" } });
+    });
+    await prisma.registrationFormVersion.create({
+      data: {
+        formId: form.id, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(),
+        definition: {
+          title: "Mobilecheck staff form", description: "", confirmationMessage: "Thanks, synthetic.",
+          sections: [{
+            id: "people", title: "People", description: "",
+            fields: [
+              field("first_name", { required: true }), field("last_name", { required: true }),
+              field("shirt_size", { type: "SELECT", options: ["Small", "Medium", "Large", "Extra large"], required: true, label: "Which convention shirt size would this person like to receive for the weekend?" }),
+              field("ministry_areas", { type: "MULTISELECT", options: ["Music", "Kitchen", "Grounds", "Welcome desk"], minSelections: 1, maxSelections: 2, required: true, label: "Where would this person like to help?" }),
+              field("preferred_name", { helpText: "What we should print on a name badge, if different." }),
+              field("rides_in_van", { type: "CHECKBOX", label: "Riding in the church van" }),
+              field("van_seat_notes", { type: "LONG_TEXT", conditional: { fieldKey: "rides_in_van", operator: "EQUALS", value: "true" } }),
+              field("meal_choice", { type: "RADIO", options: ["Regular", "Vegetarian"], required: true }),
+              field("lodging_choice", { type: "RADIO", options: ["Dorm", "Cabin"], required: true }),
+            ],
+          }],
+        },
+      },
+    });
+    const { ensureEventMessagingDefaults } = await import("../modules/communications/messaging-repository");
+    await ensureEventMessagingDefaults(staffInviteEventId);
+    const csv = [
+      "email,first name,last name,group",
+      `${staffInviteEmail("open")},Octavia-Bartholomew,Mobilecheck-Longname-Synthetic,Staff`,
+      `${staffInviteEmail("sent")},Pat,Mobilecheck-Pastor,Pastor`,
+      `${staffInviteEmail("waiting")},Wendy,Mobilecheck-Waiting,Volunteer`,
+      `${staffInviteEmail("approved")},Alex,Mobilecheck-Approved,Staff`,
+      `${staffInviteEmail("declined")},Dana,Mobilecheck-Declined,Volunteer`,
+      `${staffInviteEmail("revoked")},Rory,Mobilecheck-Revoked,Staff`,
+    ].join("\n");
+    const preview = await repo.previewInvitationImport(staffInviteEventId, { csv, defaultGroup: null });
+    await repo.confirmInvitationImport(staffInviteEventId, admin.id, { csv, defaultGroup: null, digest: preview.digest });
+    const row = (key: string) => prisma.staffInvitation.findFirstOrThrow({ where: { eventId: staffInviteEventId, email: staffInviteEmail(key), supersededAt: null } });
+    const answers = (people: number) => Array.from({ length: people }, () => ({ shirt_size: "Medium", ministry_areas: ["Music"] }));
+    const register = async (key: string, first: string, withChild: boolean) => repo.submitInvitationRegistration(invitationToken(await row(key)), {
+      firstName: first, lastName: `Mobilecheck-${key}`, spouse: { firstName: "Sam", lastName: `Mobilecheck-${key}` },
+      dependants: withChild ? [{ firstName: "Kit", lastName: `Mobilecheck-${key}`, age: 7 }] : [], answers: answers(withChild ? 3 : 2),
+    });
+    const sentRow = await row("sent");
+    const sendPreview = await repo.previewInvitationSend(staffInviteEventId, [sentRow.id]);
+    await repo.sendInvitations(staffInviteEventId, admin.id, { ids: [sentRow.id], digest: sendPreview.digest });
+    await register("waiting", "Wendy", true);
+    await register("approved", "Alex", false);
+    await register("declined", "Dana", false);
+    await repo.approveRegistrations(staffInviteEventId, admin.id, [(await row("approved")).id], { withoutMealCoverage: true });
+    await repo.declineRegistrations(staffInviteEventId, admin.id, [(await row("declined")).id]);
+    await repo.revokeInvitations(staffInviteEventId, admin.id, [(await row("revoked")).id]);
+  }
+  const open = await prisma.staffInvitation.findFirstOrThrow({ where: { eventId: staffInviteEventId, email: staffInviteEmail("open"), supersededAt: null } });
+  return invitationToken(open);
+}
+
+/** Removes everything seedStaffInviteEvent made, children before parents (the registrations, mail and audit rows the repository wrote). */
+async function cleanupStaffInviteEvent(prisma: PrismaClient) {
+  const exists = await prisma.event.findUnique({ where: { id: staffInviteEventId }, select: { id: true } });
+  if (!exists) return;
+  const registrations = await prisma.registration.findMany({ where: { eventId: staffInviteEventId }, select: { id: true, accountHolderPersonId: true, attendees: { select: { personId: true } } } });
+  const registrationIds = registrations.map((row) => row.id);
+  const personIds = [...new Set(registrations.flatMap((row) => [row.accountHolderPersonId, ...row.attendees.map((attendee) => attendee.personId)]).filter((id): id is string => Boolean(id)))];
+  await prisma.$transaction([
+    prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
+    prisma.messageOutbox.deleteMany({ where: { OR: [{ eventId: staffInviteEventId }, { registrationId: { in: registrationIds } }] } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" DISABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.registrationOperation.deleteMany({ where: { eventId: staffInviteEventId } }),
+    prisma.$executeRawUnsafe('ALTER TABLE "RegistrationOperation" ENABLE TRIGGER "RegistrationOperation_immutable"'),
+    prisma.auditLog.deleteMany({ where: { eventId: staffInviteEventId } }),
+    prisma.staffInvitation.deleteMany({ where: { eventId: staffInviteEventId } }),
+    prisma.registrationAttendee.deleteMany({ where: { eventId: staffInviteEventId } }),
+    prisma.registration.deleteMany({ where: { eventId: staffInviteEventId } }),
+    prisma.event.deleteMany({ where: { id: staffInviteEventId } }),
+    prisma.person.deleteMany({ where: { OR: [{ id: { in: personIds } }, { normalizedEmail: { startsWith: `${P}.staffinv.` } }] } }),
+  ]);
+}
+
 /** Removes everything seedPbeEvent made, children before parents, including what the link code wrote (registrations, people, mail, audit). */
 async function cleanupPbeEvent(prisma: PrismaClient) {
   const exists = await prisma.event.findUnique({ where: { id: pbeEventId }, select: { id: true } });
@@ -840,6 +964,7 @@ async function cleanupSynthetic(prisma: PrismaClient) {
   // The PBE event goes first; a failure there is reported and must not stop the rest of the cleanup.
   await cleanupPbeEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic PBE event: ${error.message}`));
   await cleanupCancellationEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic cancellation event: ${error.message}`));
+  await cleanupStaffInviteEvent(prisma).catch((error: Error) => console.error(`Could not remove the synthetic staff invitation event: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.assetDepositCover.deleteMany({ where: { issuanceId: mine } }),
@@ -3569,6 +3694,7 @@ async function main() {
     await seedSynthetic(prisma);
     pages.push(...pbePages(await seedPbeEvent(prisma)));
     pages.push(...await seedCancellationEvent(prisma));
+    pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
     browser = await chromium.launch({
