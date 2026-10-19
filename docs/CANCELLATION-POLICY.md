@@ -129,6 +129,6 @@ policy version, scope, from and to status, actor kind), never the reason, a name
 ## Data
 
 `CancellationRequest` (the row's status moves) and `CancellationRequestEvent` (the timeline, append-only like a
-calculation), additive migration `20261109100000_cancellation_requests`. A request cites its calculation by foreign key and
+calculation), additive migration `20261109110000_cancellation_requests`. A request cites its calculation by foreign key and
 its registration by id only, so history outlives the registration. Deleting an event removes the timeline, the requests and
 then the calculations. Real-database check: `npm run test:cancellation-requests`.

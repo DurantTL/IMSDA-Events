@@ -18,7 +18,7 @@ import type { RegistrantRequestView } from "@/modules/cancellation-requests/view
 
 const root = path.join(__dirname, "..");
 const migrationsDir = path.join(root, "prisma", "migrations");
-const folder = "20261109100000_cancellation_requests";
+const folder = "20261109110000_cancellation_requests";
 const migration = readFileSync(path.join(migrationsDir, folder, "migration.sql"), "utf8");
 const slice1 = "20261108100000";
 
