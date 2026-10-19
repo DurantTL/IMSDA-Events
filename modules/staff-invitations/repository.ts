@@ -753,7 +753,9 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
   }
   const eventForm = await loadEventFormDefinition(getPrisma(), forLink.eventId);
   if (input.answers.length > party.length) throw new StaffInvitationError("INVALID_PARTY", "There are more answer sets than people in the registration.");
-  const checked = checkPartyAnswers(eventForm?.definition ?? null, input.answers, party.length);
+  let childNumber = 0;
+  const roles = party.map((member) => (member.role === "PRIMARY" ? "You" : member.role === "SPOUSE" ? "Spouse" : `Child ${(childNumber += 1)}`));
+  const checked = checkPartyAnswers(eventForm?.definition ?? null, input.answers, party.length, roles);
   if (checked.problems.length > 0) throw new StaffInvitationError("INVALID_ANSWERS", checked.problems.slice(0, 5).join(" "));
   let notices: string[] = [];
   const result = await serializable(async (tx) => {

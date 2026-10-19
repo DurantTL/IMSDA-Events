@@ -1,5 +1,5 @@
-import { isFieldVisible, validateTestResponses, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
-import { isFieldSensitive, sectionTitleLookup } from "@/modules/forms/field-flags";
+import { isBirthDateField, isFieldVisible, validateTestResponses, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { isFieldSensitive, isHealthTypeField, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { mealTicketBinding } from "@/modules/meals/domain";
 
 /**
@@ -29,7 +29,7 @@ const TYPE_KEYS: ReadonlySet<string> = new Set(["attendee_type", "guest_type"]);
 /** Words that make a question about eating a meal (the conference covers every meal). */
 const MEAL_PATTERN = /(^|[^a-z])(meals?|breakfasts?|lunch(es)?|suppers?|dinners?)([^a-z]|$)/i;
 /** Words that make a question about where someone sleeps. Staff are housed by the office, never by a link. */
-const LODGING_PATTERN = /(hous(e|ing)|lodg(e|ing)|dorms?|dormitor(y|ies)|cabins?|camp[\s_-]?sites?|campers?|\brv\b|tents?|trailers?|roommates?|bunks?|\bbeds?\b|\bnights?\b|accommodations?|first[\s_-]?floor|rooming)/i;
+const LODGING_PATTERN = /\b(hous(e|ing)|lodg(e|ing)|dorms?|dormitor(y|ies)|cabins?|camp[\s_-]?sites?|campers?|\brv\b|tents?|trailers?|roommates?|bunks?|\bbeds?\b|\bnights?\b|accommodations?|first[\s_-]?floor|rooming)\b/i;
 
 function priced(field: RegistrationFormField) {
   return field.type === "CALCULATED"
@@ -50,7 +50,8 @@ export function staffQuestionExclusion(field: RegistrationFormField, sectionTitl
   if (NAME_KEYS.has(field.key) || AGE_KEYS.has(field.key) || TYPE_KEYS.has(field.key) || field.optionSource === "ATTENDEE_TYPES") return "already-known";
   // An address answer is a structured object, and a directory-sourced list (churches, clubs) is read from the directory, not the form.
   if (field.type === "ACKNOWLEDGMENT" || field.type === "ADDRESS" || field.autoDate || field.optionSource) return "unsupported";
-  if (isFieldSensitive(field, { sectionTitle })) return "sensitive";
+  // An explicit "not sensitive" flag can only ever add exclusions here: health-type wording and birth dates stay off the form.
+  if (isHealthTypeField(field, sectionTitle) || isFieldSensitive(field, { sectionTitle }) || isBirthDateField(field)) return "sensitive";
   return null;
 }
 
@@ -117,7 +118,13 @@ export type PartyAnswerResult = {
  * the field types and the choices. Answers to anything not asked (including a priced, meal or lodging question) are dropped, so a
  * crafted request can't write them. Never trusts what the page decided was visible.
  */
-export function checkPartyAnswers(definition: RegistrationFormDefinition | null, sent: ReadonlyArray<Record<string, unknown>>, partySize: number): PartyAnswerResult {
+export function checkPartyAnswers(
+  definition: RegistrationFormDefinition | null,
+  sent: ReadonlyArray<Record<string, unknown>>,
+  partySize: number,
+  /** Who each answer set is for, in party order ("You", "Spouse", "Child 1"), so a problem names the person. */
+  roles: readonly string[] = [],
+): PartyAnswerResult {
   const questions = staffEventQuestions(definition);
   if (!definition || questions.length === 0) return { answers: Array.from({ length: partySize }, () => ({})), problems: [] };
   const asked = new Set(questions.map((field) => field.key));
@@ -131,7 +138,7 @@ export function checkPartyAnswers(definition: RegistrationFormDefinition | null,
       if (Object.prototype.hasOwnProperty.call(raw, field.key)) picked[field.key] = raw[field.key];
     }
     const result = validateTestResponses(definition, picked, {}, "ATTENDEE", { ignoredFieldKeys: ignored, ignoreAvailability: true });
-    for (const issue of result.issues) problems.push(partySize > 1 ? `Person ${index + 1}: ${issue.message}` : issue.message);
+    for (const issue of result.issues) problems.push(partySize > 1 ? `${roles[index] ?? `Person ${index + 1}`}: ${issue.message}` : issue.message);
     const visible: Record<string, unknown> = {};
     for (const field of questions) {
       if (!isFieldVisible(field, picked)) continue;

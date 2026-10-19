@@ -44,7 +44,7 @@ vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.find
 vi.mock("@/modules/rate-limit/service", () => ({ checkPublicRegistrationRateLimit: mocks.checkRateLimit }));
 vi.mock("@/modules/staff-invitations/repository", () => ({
   StaffInvitationError: mocks.StaffInvitationError,
-  staffInvitationErrorStatus: (code: string) => (code === "INVITATION_USED" ? 409 : code === "INVITATION_UNAVAILABLE" ? 410 : code === "REQUEST_TOO_LARGE" ? 413 : 400),
+  staffInvitationErrorStatus: (code: string) => (code === "INVITATION_USED" || code === "NOT_REINVITABLE" ? 409 : code === "INVITATION_UNAVAILABLE" ? 410 : code === "REQUEST_TOO_LARGE" ? 413 : 400),
   listInvitations: mocks.listInvitations,
   previewInvitationImport: mocks.previewInvitationImport,
   confirmInvitationImport: mocks.confirmInvitationImport,
@@ -196,7 +196,7 @@ describe("the staff routes (#804)", () => {
     expect(mocks.reinviteInvitation).toHaveBeenCalledTimes(1);
     mocks.requirePermission.mockResolvedValue({ user: { id: "user-1" } });
     mocks.reinviteInvitation.mockRejectedValue(new mocks.StaffInvitationError("NOT_REINVITABLE", "Only a person whose registration was declined can be re-invited."));
-    expect((await ONE(post("/o", { action: "reinvite" }), one)).status).toBe(400);
+    expect((await ONE(post("/o", { action: "reinvite" }), one)).status).toBe(409);
   });
 
   it("approve or decline in one batch, and nothing else", async () => {

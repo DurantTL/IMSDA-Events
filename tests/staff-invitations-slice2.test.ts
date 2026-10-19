@@ -1,10 +1,15 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+import { StaffInvitationQuestions } from "@/components/staff-invitation-questions";
 import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { buildStaffMealServiceCounts, staffMealServiceCsvRows, type CoveredMealRow } from "@/modules/meals/staff-coverage-domain";
 import { buildKitchenReport, kitchenReportCsv } from "@/modules/registrations/kitchen-report";
+import { toStaffQuestion } from "@/modules/staff-invitations/event-questions";
+import { staffInvitationErrorStatus } from "@/modules/staff-invitations/repository";
 import { checkPartyAnswers, staffEventQuestions, staffQuestionExclusion } from "@/modules/staff-invitations/event-questions";
 import { FAMILY_MAX_DEPENDANTS, invitationReinvitable, invitationRegistrationSchema } from "@/modules/staff-invitations/domain";
 
@@ -170,5 +175,37 @@ describe("conference-paid meal counts by service (#1027)", () => {
     expect(csv).toContain('"Service date","Service","Meal","Staff","Pastor","Volunteer","Total"');
     expect(csv).toContain('"2027-06-16","Service early","Breakfast","1","1","0","2"');
     expect(kitchenReportCsv(buildKitchenReport([]))).not.toContain("Conference-paid meals by service");
+  });
+});
+
+describe("the medical-data and wording rules (#1027 review)", () => {
+  const asked = (fields: FieldInput[]) => staffEventQuestions(definition(fields)).map((entry) => entry.key);
+
+  it("never asks a health-type or birth-date question, even one flagged sensitive: false", () => {
+    expect(asked([field("allergies", { type: "LONG_TEXT", sensitive: false }), field("date_of_birth", { type: "DATE", sensitive: false }), field("hobby")])).toEqual(["hobby"]);
+  });
+
+  it("matches lodging words as whole words only", () => {
+    expect(asked([field("ministry_interest", { label: "Potential ministry interest" }), field("tent_size", { label: "Contents of the tent" }), field("family_note", { label: "Household notes" }), field("housing_need", { label: "Housing" })])).toEqual(["ministry_interest", "family_note"]);
+  });
+
+  it("names the person in a required-answer problem", () => {
+    const checked = checkPartyAnswers(form, [{ shirt_size: "Small", ministry_areas: ["Music"] }, { ministry_areas: ["Music"] }, { shirt_size: "Small" }], 3, ["You", "Spouse", "Child 1"]);
+    expect(checked.problems).toEqual(["Spouse: Shirt size is required.", "Child 1: Ministry areas is required."]);
+  });
+
+  it("groups each person's questions under a legend naming them, with help outside the label and the group described", () => {
+    const questions = staffEventQuestions(definition([field("shirt_size", { type: "RADIO", options: ["S", "M"], required: true, helpText: "Pick one." }), field("hobby", { helpText: "Anything." })])).map(toStaffQuestion);
+    const html = renderToStaticMarkup(createElement(StaffInvitationQuestions, { answers: {}, idPrefix: "spouse", onChange: () => undefined, personLabel: "your spouse", questions }));
+    expect(html).toContain("<legend>Questions for your spouse</legend>");
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain('aria-required="true"');
+    expect(html).toContain('aria-describedby="spouse-shirt_size-help"');
+    expect(html).not.toMatch(/<label[^>]*>[^<]*<input[^>]*id="spouse-hobby"[^>]*\/><small/);
+    expect(html).toMatch(/<\/label><small class="field-help" id="spouse-hobby-help">Anything\.<\/small>/);
+  });
+
+  it("maps a refused re-invite to 409", () => {
+    expect(staffInvitationErrorStatus("NOT_REINVITABLE")).toBe(409);
   });
 });

@@ -147,7 +147,7 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
             <label>Phone (optional)<input autoComplete="tel" maxLength={40} onChange={(changeEvent) => setPhone(changeEvent.target.value)} type="tel" value={phone} /></label>
           </div>
           {questions.length > 0 && (
-            <StaffInvitationQuestions answers={primaryAnswers} idPrefix="you" onChange={setPrimaryAnswers} questions={questions} />
+            <StaffInvitationQuestions answers={primaryAnswers} idPrefix="you" personLabel="you" onChange={setPrimaryAnswers} questions={questions} />
           )}
         </fieldset>
 
@@ -163,7 +163,7 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
             </div>
           )}
           {hasSpouse && questions.length > 0 && (
-            <StaffInvitationQuestions answers={spouseAnswers} idPrefix="spouse" onChange={setSpouseAnswers} questions={questions} />
+            <StaffInvitationQuestions answers={spouseAnswers} idPrefix="spouse" personLabel="your spouse" onChange={setSpouseAnswers} questions={questions} />
           )}
           <p className="field-help">Children and dependants up to age {FAMILY_MAX_DEPENDANT_AGE} on the first day of the event.</p>
           {children.map((child, index) => (
@@ -183,6 +183,7 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
               <StaffInvitationQuestions
                 answers={childAnswers[child.key] ?? {}}
                 idPrefix={`child-${child.key}`}
+                personLabel={`child ${index + 1}${child.firstName.trim() ? ` (${child.firstName.trim()})` : ""}`}
                 onChange={(next) => setChildAnswers((current) => ({ ...current, [child.key]: next }))}
                 questions={questions}
               />
