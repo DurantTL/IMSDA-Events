@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
 import { useConfirm } from "@/components/use-confirm";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
@@ -2981,6 +2982,7 @@ export function PublicRegistrationForm({
               An account can show registrations and attendees that use your verified
               contact email, across events, without requesting another private link.
             </p>
+            <AccountComingSoonNotice />
             <fieldset>
               <legend>Choose what happens after submission</legend>
               <label>
