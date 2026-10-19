@@ -100,7 +100,6 @@ import {
   formatPublicRegistrationAnswer,
   clickableSteps,
   errorMarkedStepIds,
-  furthestReachedIndex,
   getPublicRegistrationStepPlan,
   issueBelongsToPlanStep,
   withVisitedStep,
@@ -986,6 +985,7 @@ export function PublicRegistrationForm({
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
     setVisitedStepIds([]);
     setServerIssues([]);
+    setAttemptedStepIds([]);
     setContinueAttempted(false);
     setDraftNotice(null);
   }
@@ -999,6 +999,8 @@ export function PublicRegistrationForm({
   const [visitedStepIds, setVisitedStepIds] = useState<string[]>([]);
   // Issues the server returned and the person has not got past yet; client issues are recomputed live.
   const [serverIssues, setServerIssues] = useState<FormIssue[]>([]);
+  // Steps where a failed Continue or Submit showed errors; only these show client-issue markers.
+  const [attemptedStepIds, setAttemptedStepIds] = useState<string[]>([]);
   const currentStepKey = currentStep.id;
   useEffect(() => {
     setVisitedStepIds((visited) => withVisitedStep(visited, currentStepKey));
@@ -1328,6 +1330,7 @@ export function PublicRegistrationForm({
       issueBelongsToStep(issue, currentStep)
     ));
     if (stepIssues.length > 0) {
+      setAttemptedStepIds((current) => withVisitedStep(current, currentStep.id));
       showIssues(
         stepIssues,
         `Complete ${currentStep.shortLabel.toLowerCase()} before continuing.`,
@@ -1357,6 +1360,7 @@ export function PublicRegistrationForm({
       return next;
     });
     setIssues((current) => current.filter((issue) => issue.key !== key));
+    setServerIssues((current) => current.filter((issue) => issue.key !== key));
     setError("");
     setIdempotencyKey(null);
   }
@@ -3111,6 +3115,7 @@ export function PublicRegistrationForm({
     const clientIssues = allClientIssues();
     setServerIssues([]);
     if (clientIssues.length > 0) {
+      setAttemptedStepIds([...new Set([...visitedStepIds, currentStep.id])]);
       showIssues(
         clientIssues,
         "Review the highlighted fields before submitting.",
@@ -3240,17 +3245,11 @@ export function PublicRegistrationForm({
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
     setVisitedStepIds([]);
     setServerIssues([]);
+    setAttemptedStepIds([]);
     setContinueAttempted(false);
     window.imsdaEmbedScrollTop?.();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-
-  const errorStepIds = errorMarkedStepIds(registrationSteps, {
-    attempted: continueAttempted,
-    clientIssues: continueAttempted ? allClientIssues() : [],
-    serverIssues,
-    furthestIndex: furthestReachedIndex(registrationSteps, visitedStepIds, currentStepIndex),
-  });
 
   if (confirmation && club) {
     return (
@@ -3386,6 +3385,14 @@ export function PublicRegistrationForm({
     );
   }
 
+  // Computed only after a failed Continue or Submit (or a server error), and after the confirmation returns above.
+  const errorStepIds = attemptedStepIds.length > 0 || serverIssues.length > 0
+    ? errorMarkedStepIds(registrationSteps, {
+      attemptedStepIds,
+      clientIssues: attemptedStepIds.length > 0 ? allClientIssues() : [],
+      serverIssues,
+    })
+    : [];
   const Shell = club ? "div" : "main";
   return (
     <Shell className={club ? "public-registration-page club-registration-form" : "public-registration-page"}>

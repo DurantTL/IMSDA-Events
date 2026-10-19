@@ -86,19 +86,19 @@ describe("clickableSteps (#1042)", () => {
 });
 
 describe("errorMarkedStepIds (#1042)", () => {
-  const base = { attempted: true, serverIssues: [], furthestIndex: 3 };
+  const base = { attemptedStepIds: ["s_one", "s_two", "s_three", "__review"], serverIssues: [] };
 
   it("marks every reached step that has an issue, from the full list", () => {
     expect(errorMarkedStepIds(steps, { ...base, clientIssues: [issueFor("team_name"), issueFor("extra_note")] }))
       .toEqual(["s_one", "s_three"]);
   });
 
-  it("marks nothing before a submit or continue was attempted", () => {
-    expect(errorMarkedStepIds(steps, { ...base, attempted: false, clientIssues: [issueFor("team_name")] })).toEqual([]);
+  it("marks nothing before a failed submit or continue", () => {
+    expect(errorMarkedStepIds(steps, { ...base, attemptedStepIds: [], clientIssues: [issueFor("team_name")] })).toEqual([]);
   });
 
-  it("does not mark steps beyond the furthest reached from client issues", () => {
-    expect(errorMarkedStepIds(steps, { ...base, furthestIndex: 1, clientIssues: [issueFor("team_name"), issueFor("extra_note")] }))
+  it("only marks steps where a failed Continue or Submit showed errors", () => {
+    expect(errorMarkedStepIds(steps, { ...base, attemptedStepIds: ["s_one"], clientIssues: [issueFor("team_name"), issueFor("extra_note")] }))
       .toEqual(["s_one"]);
   });
 
@@ -125,15 +125,27 @@ describe("errorMarkedStepIds (#1042)", () => {
     expect(errorMarkedStepIds(steps, { ...base, clientIssues: [], serverIssues: cleared })).toEqual([]);
   });
 
+  it("a failed Continue on step 1 then a good Continue leaves the empty step 2 unmarked", () => {
+    const failed = errorMarkedStepIds(steps, { attemptedStepIds: ["s_one"], serverIssues: [], clientIssues: [issueFor("team_name"), issueFor("contact_name")] });
+    expect(failed).toEqual(["s_one"]);
+    const after = errorMarkedStepIds(steps, { attemptedStepIds: ["s_one"], serverIssues: [], clientIssues: [issueFor("contact_name")] });
+    expect(after).toEqual([]);
+  });
+
+  it("a failed Submit marks every visited step with errors", () => {
+    const visited = ["s_one", "s_two", "s_three", "__review"];
+    expect(errorMarkedStepIds(steps, { attemptedStepIds: visited, serverIssues: [], clientIssues: [issueFor("contact_name")] })).toEqual(["s_two"]);
+  });
+
   it("a reset (nothing attempted, no server issues) clears everything", () => {
-    expect(errorMarkedStepIds(steps, { attempted: false, clientIssues: [], serverIssues: [], furthestIndex: 0 })).toEqual([]);
+    expect(errorMarkedStepIds(steps, { attemptedStepIds: [], clientIssues: [], serverIssues: [] })).toEqual([]);
   });
 
   it("follows conditional steps appearing and disappearing", () => {
     const issues = [issueFor("contact_name"), issueFor("extra_note")];
     const without = plan(["team_name", "extra_note"]);
     // The Contact section is hidden, so its issue maps to no step; Extras still shows.
-    expect(errorMarkedStepIds(without, { ...base, furthestIndex: 2, clientIssues: issues })).toEqual(["s_three"]);
+    expect(errorMarkedStepIds(without, { ...base, clientIssues: issues })).toEqual(["s_three"]);
     expect(errorMarkedStepIds(steps, { ...base, clientIssues: issues })).toEqual(["s_two", "s_three"]);
     expect(review!.id).toBe("__review");
   });

@@ -200,24 +200,25 @@ export function furthestReachedIndex(
 }
 
 /**
- * Which steps get an error marker. Client issues count only for steps already
- * reached (a later step's empty required field is not an error yet); server
+ * Which steps get an error marker. Client issues count only for steps where a
+ * failed Continue or Submit already showed errors (a step the person just
+ * arrived on is not an error yet); server
  * issues count wherever they land. Computed live, so a step that now passes
  * loses its marker and a scoped Continue never drops another step's marker.
  */
 export function errorMarkedStepIds(
   steps: PublicRegistrationStep[],
   options: {
-    attempted: boolean;
+    /** Steps where a failed Continue or Submit already showed the person their errors. */
+    attemptedStepIds: readonly string[];
     clientIssues: readonly IssueLike[];
     serverIssues: readonly IssueLike[];
-    furthestIndex: number;
   },
 ): string[] {
-  if (!options.attempted && options.serverIssues.length === 0) return [];
+  const attempted = new Set(options.attemptedStepIds);
   return steps
-    .filter((step, index) => (
-      (options.attempted && index <= options.furthestIndex
+    .filter((step) => (
+      (attempted.has(step.id)
         && options.clientIssues.some((issue) => issueBelongsToPlanStep(issue, step)))
       || options.serverIssues.some((issue) => issueBelongsToPlanStep(issue, step))
     ))
