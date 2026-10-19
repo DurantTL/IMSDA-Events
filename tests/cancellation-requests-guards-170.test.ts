@@ -27,9 +27,11 @@ function read(relative: string) {
 }
 
 describe("cancellation requests migration (#170)", () => {
-  it("sorts after the latest earlier migration, in its own folder", () => {
+  it("sorts after the slice 1 migration it builds on, in its own folder", () => {
+    // Later migrations may follow it; what matters is that it exists once and runs after #169's tables.
     const names = readdirSync(migrationsDir).filter((name) => /^\d{14}_/.test(name)).sort();
-    expect(names.at(-1)).toBe(folder);
+    expect(names.filter((name) => name === folder)).toHaveLength(1);
+    expect(names.indexOf(folder)).toBeGreaterThan(names.findIndex((name) => name.startsWith(`${slice1}_`)));
     expect(folder > `${slice1}_`).toBe(true);
   });
 
