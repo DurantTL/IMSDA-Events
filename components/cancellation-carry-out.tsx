@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { postJson } from "@/lib/post-json";
 import { formatCents } from "@/modules/cancellation-policy/rules";
@@ -53,12 +53,21 @@ export function CancellationCarryOut({
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
+  const [note, setNote] = useState("");
+  const [resolveConfirmed, setResolveConfirmed] = useState(false);
+  const messageRef = useRef<HTMLDivElement>(null);
+  // A failed attempt moves focus to what went wrong, so a keyboard or screen reader user lands on it.
+  useEffect(() => {
+    if (message?.kind === "error") messageRef.current?.focus();
+  }, [message]);
 
   const needsMethod = Boolean(options && options.approvedRefundCents > 0);
   const startBlocked = options ? (options.reReviewReason ?? options.blockedReason ?? (options.scopeSupported ? null : "Only a whole registration or approved attendees can be carried out here.")) : null;
   const chosen = options?.methods.find((option) => option.method === method);
+  const noMethod = Boolean(needsMethod && options && options.methods.every((option) => option.unavailableReason || !option.sufficient));
   const whyOff = (): string | null => {
     if (execution) return null;
+    if (noMethod) return "Neither refund method can cover the approved refund right now, so this cannot be carried out. The reasons are listed above.";
     if (needsMethod && !method) return "Choose how the refund is made first.";
     if (needsMethod && chosen && (chosen.unavailableReason || !chosen.sufficient)) return chosen.unavailableReason ?? "This method cannot cover the approved refund.";
     if (!confirmed) return "Tick the box to confirm you are carrying this out.";
@@ -85,6 +94,27 @@ export function CancellationCarryOut({
     router.refresh();
   }
 
+  async function resolve(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    const response = await postJson(
+      `/api/events/${encodeURIComponent(eventId)}/cancellation-requests/${encodeURIComponent(requestId)}/carry-out/resolve`,
+      { confirm: true, note },
+      "The refund could not be recorded as resolved.",
+    );
+    setBusy(false);
+    if (!response.ok) {
+      setMessage({ kind: "error", text: typeof response.body.message === "string" ? response.body.message : "The refund could not be recorded as resolved." });
+      return;
+    }
+    setNote("");
+    setResolveConfirmed(false);
+    setMessage({ kind: "ok", text: "Recorded. No money moved here." });
+    router.refresh();
+  }
+
+  const resolveOff = note.trim().length < 5 ? "Write a note of at least 5 characters first." : !resolveConfirmed ? "Tick the box to confirm." : null;
   const off = whyOff();
   return (
     <section className="cancel-request-actions" aria-labelledby={`${id}-title`}>
@@ -98,6 +128,11 @@ export function CancellationCarryOut({
             and {needsMethod ? <>refund <strong translate="no">{formatCents(options.approvedRefundCents)}</strong></> : "refund nothing, because the approved refund is zero"}.
             Nothing is credited toward a future event; that comes later.
           </p>
+          {noMethod && (
+            <ul className="field-help">
+              {options.methods.map((option) => <li key={option.method}>{refundMethodLabels[option.method]}: {option.unavailableReason ?? "These payments do not cover the approved refund."}</li>)}
+            </ul>
+          )}
           {startBlocked ? (
             <p className="form-error"><AlertCircle size={16} aria-hidden="true" /> {startBlocked}</p>
           ) : (
@@ -151,11 +186,28 @@ export function CancellationCarryOut({
               <li key={leg.id}>
                 Refund <span translate="no">{formatCents(leg.amountCents)}</span>: <strong>{leg.withProcessor ? "Waiting for Square" : stepWords[leg.status]}</strong>
                 {failureText(leg.failureCode) ? <> <span className="field-help">{failureText(leg.failureCode)}</span></> : null}
+                {leg.resolved ? <> <span className="field-help">Recorded as settled outside this tool by <span translate="no">{leg.resolvedByName}</span>: {leg.resolutionNote}</span></> : null}
               </li>
             ))}
             {execution.legs.length === 0 && <li>Refund: none, the approved refund is zero.</li>}
           </ul>
           <p className="field-help">{execution.nextStep}</p>
+          {execution.canResolve && (
+            <form className="cancel-request-form" onSubmit={resolve}>
+              <label htmlFor={`${id}-note`}>
+                How was the failed refund settled outside this tool? (required)
+                <textarea id={`${id}-note`} maxLength={500} onChange={(event) => setNote(event.target.value)} rows={3} value={note} />
+              </label>
+              <label className="cancel-request-choice">
+                <input checked={resolveConfirmed} onChange={(event) => setResolveConfirmed(event.target.checked)} type="checkbox" />
+                <span>This was settled outside this tool. Recording it moves no money.</span>
+              </label>
+              {resolveOff && <p className="field-help" id={`${id}-resolve-why`}>{resolveOff}</p>}
+              <button aria-describedby={resolveOff ? `${id}-resolve-why` : undefined} className="secondary-button" disabled={busy || resolveOff !== null} type="submit">
+                {busy ? "Saving…" : "Record as settled outside this tool"}
+              </button>
+            </form>
+          )}
           {execution.canContinue && (
             <form onSubmit={send}>
               <button className="secondary-button" disabled={busy} type="submit">
@@ -167,7 +219,7 @@ export function CancellationCarryOut({
       )}
 
       {/* Always mounted, so a change of its content is announced. */}
-      <div aria-atomic="true" aria-live="polite" id={`${id}-message`}>
+      <div aria-atomic="true" aria-live="polite" id={`${id}-message`} ref={messageRef} tabIndex={-1}>
         {message && (
           <p className={message.kind === "error" ? "form-error" : "cancel-request-message is-ok"}>
             {message.kind === "error" ? <AlertCircle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />} {message.text}

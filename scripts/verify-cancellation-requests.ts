@@ -419,7 +419,7 @@ async function main() {
     function squareMock() {
       const refunds = new Map<string, { id: string; status: string; payment_id: string; amount_money: { amount: number; currency: string } }>();
       const calls: Array<{ url: string; key: string; paymentId: string; amount: number }> = [];
-      const behavior = { loseResponseOnce: false, rejectOnce: false, serverErrorOnce: false };
+      const behavior = { loseResponseOnce: false, rejectOnce: false, serverErrorOnce: false, declineOnce: false };
       let serial = 0;
       const fetcher = (async (url: string, init: RequestInit) => {
         const body = JSON.parse(String(init.body)) as { idempotency_key: string; payment_id: string; amount_money: { amount: number; currency: string } };
@@ -435,9 +435,10 @@ async function main() {
         let refund = refunds.get(body.idempotency_key);
         if (!refund) {
           serial += 1;
-          refund = { id: `${P}_sqrefund_${serial}_${Date.now()}`, status: "PENDING", payment_id: body.payment_id, amount_money: body.amount_money };
+          refund = { id: `${P}_sqrefund_${serial}_${Date.now()}`, status: behavior.declineOnce ? "REJECTED" : "PENDING", payment_id: body.payment_id, amount_money: body.amount_money };
           refunds.set(body.idempotency_key, refund);
         }
+        if (behavior.declineOnce) behavior.declineOnce = false;
         if (behavior.loseResponseOnce) {
           behavior.loseResponseOnce = false;
           throw new TypeError("Synthetic network failure after Square accepted the refund");
@@ -512,6 +513,8 @@ async function main() {
       assert(await mailCount(open.registrationId, "REFUND_NOTICE") === 2 && await mailCount(open.registrationId, "REGISTRATION_CANCELLED") === 1, "the refund notices and the cancellation email are queued once each");
       const mails = await base.messageOutbox.findMany({ where: { registrationId: open.registrationId, templateKey: { in: ["REFUND_NOTICE", "REGISTRATION_CANCELLED"] } } });
       assert(mails.every((mail) => !mail.bodyTextSnapshot.includes(SECRET_REASON) && !mail.bodyTextSnapshot.includes("Approved to carry out.")), "no email carries a reason");
+      const cancelledMail = mails.find((mail) => mail.templateKey === "REGISTRATION_CANCELLED")!;
+      assert(cancelledMail.bodyTextSnapshot.includes("has been carried out and your registration is cancelled") && !cancelledMail.bodyTextSnapshot.includes("did not automatically refund"), "the one cancellation email says what was done, never that nothing was refunded");
       const audits = await base.auditLog.findMany({ where: { OR: [{ entityType: { startsWith: "CancellationExecution" } }, { action: "REFUND_RECORDED", eventId }] } });
       assert(audits.length >= 5 && audits.every((entry) => !stable(entry).includes(SECRET_REASON) && !stable(entry).includes("Request Check Finance") && !stable(entry).includes("Approved to carry out.")), "audit entries hold ids and amounts only");
       const requestRow = await base.cancellationRequest.findUniqueOrThrow({ where: { id: openRequestId } });
@@ -608,12 +611,15 @@ async function main() {
       const leg = await base.cancellationExecutionRefund.findFirstOrThrow({ where: { executionId: first.id } });
       assert(refund.status === "PENDING" && refund.idempotencyKey === leg.idempotencyKey && refund.externalReference === leg.providerRefundId && square.calls[0].key === leg.idempotencyKey, "a pending refund row with the leg's key and Square's refund id");
       assert(await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "no refund notice until Square confirms");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 0, "no cancellation email while the refund is with Square");
       const checked = await carry(eventId, requestId);
       assert(callCount() === 1 && checked.status === "PROCESSOR_PENDING", "checking the status does not ask Square for another refund");
       // Square's own confirmation arrives through the existing refund webhook, which marks the refund done.
       await base.refund.update({ where: { id: refund.id }, data: { status: "SUCCEEDED" } });
       const finished = await carry(eventId, requestId);
       assert(finished.status === "COMPLETED" && finished.legs[0].status === "DONE" && callCount() === 1, "once Square confirms, it is completed without another request");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "the one cancellation email goes out when the refund has settled");
+      assert(!(await base.messageOutbox.findFirstOrThrow({ where: { registrationId: reg.registrationId, templateKey: "REGISTRATION_CANCELLED" } })).bodyTextSnapshot.includes("did not automatically refund"), "and it does not say nothing was refunded");
       assert((await rejects(() => carry(eventId, requestId, "OFFLINE")))?.code === "METHOD_FIXED", "the method cannot change once started");
       assert((await refundRows(reg.registrationId)).length === 1, "one refund in all");
     }
@@ -633,21 +639,116 @@ async function main() {
       assert(refundCount() === refundsBefore + 1, "Square made one refund in all");
       assert(retried.status === "PROCESSOR_PENDING" && (await refundRows(reg.registrationId)).length === 1, "the retry recorded the one refund");
     }
-    // Square refuses, then the same leg is sent again; and a server error is retried the same way.
+    // A server error is uncertain and retried with the same key.
+    {
+      const reg = await createRegistration({ card: true });
+      const requestId = await ask(reg, { scope: "FULL_REGISTRATION" }, 39_000);
+      await approve(eventId, requestId);
+      square.behavior.serverErrorOnce = true;
+      const errored = await carry(eventId, requestId, "SQUARE");
+      assert(errored.status === "FAILED" && errored.legs[0].failureCode === "SQUARE_UNCERTAIN" && errored.canContinue, "a server error is uncertain and retryable");
+      const sent = await carry(eventId, requestId);
+      assert(sent.status === "PROCESSOR_PENDING" && (await refundRows(reg.registrationId)).length === 1, "the second try is accepted once");
+      assert(new Set(square.calls.slice(-2).map((call) => call.key)).size === 1, "both tries used the same key");
+    }
+    // Square rejects the request outright: stuck, never resent, (the reservation of its amount is released).
     {
       const reg = await createRegistration({ card: true });
       const requestId = await ask(reg, { scope: "FULL_REGISTRATION" }, 39_000);
       await approve(eventId, requestId);
       square.behavior.rejectOnce = true;
       const rejected = await carry(eventId, requestId, "SQUARE");
-      assert(rejected.status === "FAILED" && rejected.legs[0].failureCode?.startsWith("SQUARE_REJECTED") === true && rejected.canContinue, "a refusal is a failed refund that can be retried");
-      square.behavior.serverErrorOnce = true;
-      const errored = await carry(eventId, requestId);
-      assert(errored.status === "FAILED" && errored.legs[0].failureCode === "SQUARE_UNCERTAIN", "a server error is uncertain and retryable");
-      const sent = await carry(eventId, requestId);
-      assert(sent.status === "PROCESSOR_PENDING" && (await refundRows(reg.registrationId)).length === 1, "the third try is accepted once");
-      const keys = new Set(square.calls.slice(-3).map((call) => call.key));
-      assert(keys.size === 1, "every try used the same key");
+      assert(rejected.status === "FAILED" && rejected.legs[0].failureCode?.startsWith("SQUARE_REJECTED") === true, "a refusal is a failed refund");
+      assert(!rejected.canContinue && rejected.canResolve && !rejected.legs[0].canResend, "a rejected refund is not resent: it waits for a person");
+      const before = callCount();
+      await carry(eventId, requestId);
+      assert(callCount() === before, "pressing again does not send the rejected refund again");
+      const resolved = await execution.resolveOutsideTool(eventId, requestId, { userId: staffId }, { confirm: true, note: "Refunded in the Square dashboard by hand." }, { now });
+      assert(resolved.status === "COMPLETED" && resolved.legs[0].resolved && resolved.legs[0].resolvedByName === "Request Check Finance", "a named person's note completes it");
+      assert(callCount() === before && (await refundRows(reg.registrationId)).length === 0, "resolving moved no money and wrote no refund");
+    }
+    // Square answers 200 but declined the refund, after the registration was cancelled.
+    {
+      const reg = await createRegistration({ card: true });
+      const requestId = await ask(reg, { scope: "FULL_REGISTRATION" }, 39_000);
+      await approve(eventId, requestId);
+      square.behavior.declineOnce = true;
+      const declined = await carry(eventId, requestId, "SQUARE");
+      assert(declined.status === "FAILED" && declined.cancelStatus === "DONE" && declined.legs[0].failureCode === "PROVIDER_DECLINED", `a declined refund fails after cancelling, got ${declined.status}`);
+      assert(!declined.canContinue && declined.canResolve && !declined.legs[0].canResend, "it cannot be resent, and a person can resolve it");
+      assert((await base.registration.findUniqueOrThrow({ where: { id: reg.registrationId } })).status === "CANCELLED", "the cancellation stands");
+      const [row] = await refundRows(reg.registrationId);
+      assert(row.status === "FAILED", "the declined refund is recorded as failed");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 0 && await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "no final message while a refund needs a person");
+      const before = callCount();
+      await carry(eventId, requestId);
+      assert(callCount() === before, "pressing again does not resend a declined refund");
+      assert((await rejects(() => execution.resolveOutsideTool(eventId, requestId, { userId: `${P}_nobody` }, { confirm: true, note: "Settled by hand." })))?.code === "ACTOR_REQUIRED", "resolving needs a named person");
+      const done = await execution.resolveOutsideTool(eventId, requestId, { userId: staffTwoId }, { confirm: true, note: "Customer was refunded by check from the office." }, { now });
+      assert(done.status === "COMPLETED" && done.legs[0].resolved && done.legs[0].resolutionNote?.includes("by check"), "recording it completes the execution");
+      assert((await refundRows(reg.registrationId)).length === 1 && callCount() === before, "resolving made no refund and called no processor");
+      assert(await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1 && await mailCount(reg.registrationId, "REFUND_NOTICE") === 0, "the one final message goes out, with no refund notice for a refund that never happened");
+      const audit = await base.auditLog.findFirstOrThrow({ where: { action: "CANCELLATION_REFUND_RESOLVED_OUTSIDE_TOOL", metadata: { path: ["requestId"], equals: requestId } } });
+      assert(audit.actorUserId === staffTwoId && !stable(audit).includes("by check") && (audit.metadata as { moneyMoved?: boolean }).moneyMoved === false, "the audit entry names the person and holds ids and amounts only");
+      assert((await rejects(() => execution.resolveOutsideTool(eventId, requestId, { userId: staffId }, { confirm: true, note: "Again by hand." })))?.code === "NOTHING_TO_RESOLVE", "there is nothing left to resolve");
+      const legRow = await base.cancellationExecutionRefund.findFirstOrThrow({ where: { executionId: done.id } });
+      const rewrite = await rejects(() => base.$executeRaw`UPDATE "CancellationExecutionRefund" SET "resolutionNote" = 'Edited' WHERE "id" = ${legRow.id}`);
+      assert(rewrite && /resolved cancellation refund cannot be changed/.test(String(rewrite.message)), "a resolution cannot be rewritten");
+      const doneLeg = await base.cancellationExecutionRefund.findFirstOrThrow({ where: { execution: { requestId: openRequestId } } });
+      const noNote = await rejects(() => base.$executeRaw`UPDATE "CancellationExecutionRefund" SET "resolvedAt" = now(), "resolvedByUserId" = ${staffId} WHERE "id" = ${doneLeg.id}`);
+      assert(noNote && /resolution_is_named/.test(String(noNote.message)), "the database refuses a resolution with no note, name or failed refund");
+    }
+    // Square reports the refund failed (webhook) after the registration was cancelled.
+    {
+      const reg = await createRegistration({ card: true });
+      const requestId = await ask(reg, { scope: "FULL_REGISTRATION" }, 39_000);
+      await approve(eventId, requestId);
+      const pending = await carry(eventId, requestId, "SQUARE");
+      assert(pending.status === "PROCESSOR_PENDING", "waiting for Square");
+      const [row] = await refundRows(reg.registrationId);
+      await base.refund.update({ where: { id: row.id }, data: { status: "FAILED" } });
+      const before = callCount();
+      const failed = await carry(eventId, requestId);
+      assert(failed.status === "FAILED" && failed.legs[0].failureCode === "PROVIDER_FAILED" && !failed.canContinue && failed.canResolve, "a failed refund after cancelling waits for a person");
+      assert(callCount() === before, "it is not sent again");
+      const done = await execution.resolveOutsideTool(eventId, requestId, { userId: staffId }, { confirm: true, note: "Handled in the Square dashboard." }, { now });
+      assert(done.status === "COMPLETED" && await mailCount(reg.registrationId, "REGISTRATION_CANCELLED") === 1, "recording it completes the execution and sends the one final message");
+    }
+    // Two approved requests on one registration, pressed at the same moment: one execution, one set of refunds.
+    {
+      const reg = await createRegistration();
+      const first = await ask(reg, { scope: "FULL_REGISTRATION" }, 39_000);
+      await approve(eventId, first);
+      const second = await ask(reg, { scope: "ATTENDEE", attendeeIds: [reg.attendeeIds[0]] }, 19_000);
+      await approve(eventId, second);
+      const results = await Promise.allSettled([
+        carry(eventId, first, "OFFLINE"),
+        carry(eventId, second, "OFFLINE", staffTwoId, { attendeeRemoval: stubPort }),
+      ]);
+      const ok = results.filter((result) => result.status === "fulfilled");
+      const refused = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+      assert(ok.length === 1 && refused.length === 1, `exactly one runs, got ${results.map((result) => result.status).join()}`);
+      assert(["RE_REVIEW_REQUIRED", "ANOTHER_EXECUTION_IN_PROGRESS"].includes((refused[0].reason as { code?: string }).code ?? ""), `the other is refused, got ${(refused[0].reason as { code?: string }).code}`);
+      const total = (await refundRows(reg.registrationId)).reduce((sum, refund) => sum + Math.round(Number(refund.amount) * 100), 0);
+      assert(total === 39_000 || total === 19_000, `one request's refunds only, got ${total}`);
+      assert((await base.cancellationExecution.count({ where: { registrationId: reg.registrationId } })) === 1, "one execution on the registration");
+    }
+    // An unfinished execution blocks another request on the same registration.
+    {
+      const reg = await createRegistration({ card: true });
+      const first = await ask(reg, { scope: "FULL_REGISTRATION" }, 39_000);
+      await approve(eventId, first);
+      const second = await ask(reg, { scope: "ATTENDEE", attendeeIds: [reg.attendeeIds[0]] }, 19_000);
+      await approve(eventId, second);
+      const started = await carry(eventId, first, "SQUARE");
+      assert(started.status === "PROCESSOR_PENDING", "the first is waiting for Square");
+      const before = callCount();
+      assert((await rejects(() => carry(eventId, second, "SQUARE", staffId, { attendeeRemoval: stubPort })))?.code === "ANOTHER_EXECUTION_IN_PROGRESS", "the second waits for the first to finish");
+      assert(callCount() === before && (await base.cancellationExecution.count({ where: { requestId: second } })) === 0, "nothing was sent or started for it");
+      const [row] = await refundRows(reg.registrationId);
+      await base.refund.update({ where: { id: row.id }, data: { status: "SUCCEEDED" } });
+      assert((await carry(eventId, first)).status === "COMPLETED", "the first completes");
+      assert((await rejects(() => carry(eventId, second, "SQUARE", staffId, { attendeeRemoval: stubPort })))?.code === "RE_REVIEW_REQUIRED", "then the second is sent for re-review, because the registration changed");
     }
     console.log("ok: Square refunds use one key per leg, stay pending until confirmed, and a retry never pays twice");
 

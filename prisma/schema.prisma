@@ -3689,6 +3689,11 @@ model CancellationExecutionRefund {
   providerRefundId  String?
   failureCode       String?
   attempts          Int                    @default(0)
+  /// A failed refund that a named person settled outside this tool, with a required note (no money moves). Only a FAILED leg.
+  resolvedAt             DateTime?
+  resolvedByUserId       String?
+  resolvedByNameSnapshot String?
+  resolutionNote         String?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
 

@@ -12165,3 +12165,4 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .cancel-request-steps { display: grid; gap: 6px; margin: 0; padding-left: 18px; }
 .cancel-request-detail .cancel-request-form { display: grid; gap: 6px; }
 .cancel-request-detail fieldset.cancel-request-form { margin: 0; border: 0; padding: 0; min-width: 0; }
+.cancel-request-actions [aria-live]:focus { outline: 2px solid var(--imsda-navy); outline-offset: 2px; }

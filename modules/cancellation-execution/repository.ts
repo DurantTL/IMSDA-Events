@@ -11,6 +11,7 @@ import {
   executionStatusLabels,
   executionStatusOf,
   expectedFingerprint,
+  isStuckFailure,
   legIdempotencyKey,
   methodWord,
   type CarryOutInput,
@@ -18,6 +19,7 @@ import {
   type PaymentForRefund,
   type RefundLeg,
   type RefundMethod,
+  type ResolveInput,
   type StepStatus,
 } from "@/modules/cancellation-execution/domain";
 import { amendmentRequestId } from "@/modules/cancellation-execution/ids";
@@ -31,6 +33,7 @@ import type {
 import { diffRegistrationState, registrationStateOf, type RegistrationStateSnapshot, type RequestConflict } from "@/modules/cancellation-requests/domain";
 import { stateFingerprint } from "@/modules/cancellation-requests/fingerprint";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
+import { enqueueRegistrationCancelledMessage } from "@/modules/communications/transactional-messages";
 import { PaymentOperationError, recordRefund } from "@/modules/payments/repository";
 import { createSquareRefund, SquareAdapterError } from "@/modules/payments/square-adapter";
 import { getSquareConfiguration, type SquareRuntimeConfiguration } from "@/modules/payments/square-config";
@@ -76,6 +79,8 @@ export type ExecutionErrorCode =
   | "METHOD_FIXED"
   | "REFUND_NOT_AVAILABLE"
   | "ATTENDEES_NOT_REMOVABLE"
+  | "ANOTHER_EXECUTION_IN_PROGRESS"
+  | "NOTHING_TO_RESOLVE"
   | "SQUARE_NOT_CONFIGURED";
 
 export class CancellationExecutionError extends Error {
@@ -179,11 +184,15 @@ function refundableCentsOf(payment: PaymentRow, reservedByLegs: number) {
 
 async function reservedByLegs(db: Pick<Prisma.TransactionClient, "cancellationExecutionRefund">, paymentIds: string[]) {
   const legs = await db.cancellationExecutionRefund.findMany({
-    where: { paymentId: { in: paymentIds }, refundId: null },
-    select: { paymentId: true, amountCents: true },
+    where: { paymentId: { in: paymentIds }, refundId: null, resolvedAt: null },
+    select: { paymentId: true, amountCents: true, failureCode: true },
   });
   const byPayment = new Map<string, number>();
-  for (const leg of legs) byPayment.set(leg.paymentId, (byPayment.get(leg.paymentId) ?? 0) + leg.amountCents);
+  for (const leg of legs) {
+    // A refund Square rejected outright is never sent again, so it holds no money back.
+    if (leg.failureCode?.startsWith("SQUARE_REJECTED")) continue;
+    byPayment.set(leg.paymentId, (byPayment.get(leg.paymentId) ?? 0) + leg.amountCents);
+  }
   return byPayment;
 }
 
@@ -266,6 +275,15 @@ async function startExecution(
   const db = getPrisma();
   if (!canCarryOutScope(request.scope)) {
     throw new CancellationExecutionError("SCOPE_NOT_SUPPORTED", "Only a whole registration or approved attendees can be carried out here. Cancelling single items and allocating a refund across them comes with the credit and allocation work (#119, #120).");
+  }
+  // The registration is locked by the caller. Another request carried out on it must finish (or be resolved) first, so two
+  // executions never plan refunds against the same payments.
+  const unfinished = await db.cancellationExecution.findFirst({
+    where: { registrationId: request.registrationId, requestId: { not: request.id }, status: { not: "COMPLETED" } },
+    select: { id: true },
+  });
+  if (unfinished) {
+    throw new CancellationExecutionError("ANOTHER_EXECUTION_IN_PROGRESS", "Another approved request on this registration is being carried out and is not finished. Finish it first (or record it as resolved), then carry this one out.");
   }
   const state = await checkApprovedState(request, now);
   if (!state.matches) throw new CancellationExecutionError("RE_REVIEW_REQUIRED", state.reason ?? "The registration changed since it was approved.", { conflicts: state.conflicts });
@@ -378,7 +396,7 @@ async function deliver(messageIds: string[], what: string) {
 async function reconcileLegs(execution: ExecutionRow) {
   const db = getPrisma();
   for (const leg of execution.refunds) {
-    if (!leg.refundId || stepOf(leg.status) === "DONE") continue;
+    if (!leg.refundId || stepOf(leg.status) === "DONE" || leg.resolvedAt) continue;
     const refund = await db.refund.findUnique({ where: { id: leg.refundId }, select: { status: true } });
     if (!refund) continue;
     if (refund.status === "SUCCEEDED") {
@@ -395,6 +413,22 @@ async function failLeg(legId: string, failureCode: string, extra: Prisma.Cancell
 
 type Leg = ExecutionRow["refunds"][number];
 
+/**
+ * Whether the payment still has this leg's amount to refund, counted with the Payment row locked so a refund recorded
+ * meanwhile cannot slip past, and counting every other execution's unsent legs (this leg's own reservation is not counted
+ * against itself).
+ */
+async function remainderAllows(leg: Leg) {
+  return getPrisma().$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id" = ${leg.paymentId} FOR NO KEY UPDATE`;
+    const payment = await tx.payment.findUnique({ where: { id: leg.paymentId }, select: paymentSelect });
+    if (!payment) return false;
+    const reserved = (await reservedByLegs(tx, [leg.paymentId])).get(leg.paymentId) ?? 0;
+    const own = leg.refundId === null && !leg.failureCode?.startsWith("SQUARE_REJECTED") ? leg.amountCents : 0;
+    return refundableCentsOf(payment, Math.max(reserved - own, 0)) >= leg.amountCents;
+  }, { timeout: 20_000 });
+}
+
 async function sendSquareLeg(execution: ExecutionRow, leg: Leg, user: { id: string }, deps: ExecutionDependencies) {
   const db = getPrisma();
   const configuration = configurationOrNull(deps);
@@ -404,7 +438,7 @@ async function sendSquareLeg(execution: ExecutionRow, leg: Leg, user: { id: stri
   const providerPaymentId = payment.paymentAttempt!.providerPaymentId!;
   // The remainder is checked before the first attempt only. A resend repeats the same key, which Square answers with the
   // refund it already made, so it can never take more money; checking again would count that refund against itself.
-  if (leg.attempts === 0 && refundableCentsOf(payment, 0) < leg.amountCents) return failLeg(leg.id, "REFUND_EXCEEDS_AVAILABLE");
+  if (leg.attempts === 0 && !(await remainderAllows(leg))) return failLeg(leg.id, "REFUND_EXCEEDS_AVAILABLE");
 
   await db.cancellationExecutionRefund.update({ where: { id: leg.id }, data: { attempts: { increment: 1 } } });
   let result;
@@ -513,7 +547,7 @@ async function runLegs(execution: ExecutionRow, user: { id: string }, deps: Exec
   const legs = await db.cancellationExecutionRefund.findMany({ where: { executionId: execution.id }, orderBy: { createdAt: "asc" } });
   for (const leg of legs) {
     // Done, or already with the processor, is never sent again. Only a leg that was never accepted is (same key).
-    if (stepOf(leg.status) === "DONE" || leg.refundId) continue;
+    if (stepOf(leg.status) === "DONE" || leg.refundId || leg.resolvedAt || isStuckFailure(leg.failureCode)) continue;
     const fresh = { ...execution, refunds: legs };
     if (execution.refundMethod === "SQUARE") await sendSquareLeg(fresh, leg, user, deps);
     else await recordOfflineLeg(fresh, leg, user);
@@ -651,7 +685,8 @@ async function runCancellation(execution: ExecutionRow, user: { id: string; disp
     // Cancelling is done once. A registration that is already cancelled (this step ran before, or a person did it) is done.
     if (registration.status === "CANCELLED") return markCancelled(execution, user, registration.cancelledAt ?? now, { alreadyCancelled: true });
     try {
-      const result = await cancelRegistration(execution.eventId, execution.registrationId, user.id, "Cancelled at the registrant's request.", now);
+      // The cancellation email is held: one message is sent when the refunds settle (see `settle`).
+      const result = await cancelRegistration(execution.eventId, execution.registrationId, user.id, "Cancelled at the registrant's request.", now, { holdCancellationMessage: true });
       await markCancelled(execution, user, now, { alreadyCancelled: false, autoPromotedRegistrationId: result.autoPromotedRegistration?.id ?? null });
       await deliver(result.pendingMessageIds, "Cancellation");
     } catch (error) {
@@ -707,7 +742,14 @@ async function runSteps(execution: ExecutionRow, user: { id: string; displayName
   if (settled.refunds.every((leg) => stepOf(leg.status) === "DONE")) await runCancellation(settled, user, deps, now);
 }
 
-/** Saves the status the steps add up to, and writes one audit entry when it changed. */
+/** What the registrant is told once a whole-registration cancellation has settled: what was done, no amounts. */
+const finalMessageNote = "Your approved cancellation request has been carried out and your registration is cancelled. If a refund was approved, you receive a separate refund notice when it is complete. Contact the event team with any questions.";
+
+/**
+ * Saves the status the steps add up to, and writes one audit entry when it changed. When a whole-registration execution
+ * completes, its one cancellation message is queued in the same transaction (idempotent per execution), so it is sent only
+ * from facts that are committed. Returns the execution and the messages to deliver after commit.
+ */
 async function settle(requestId: string, user: { id: string }, now: Date) {
   const db = getPrisma();
   const execution = await loadExecution(db, requestId);
@@ -716,15 +758,19 @@ async function settle(requestId: string, user: { id: string }, now: Date) {
   const current = (await loadExecution(db, requestId)) ?? execution;
   const status = executionStatusOf({
     cancelStatus: stepOf(current.cancelStatus),
-    legs: current.refunds.map((leg) => ({ status: stepOf(leg.status), withProcessor: Boolean(leg.refundId) })),
+    legs: current.refunds.map((leg) => ({ status: stepOf(leg.status), withProcessor: Boolean(leg.refundId), resolved: Boolean(leg.resolvedAt) })),
   });
-  const failure = current.cancelStatus === "FAILED" ? current.cancelFailureCode : current.refunds.find((leg) => leg.status === "FAILED")?.failureCode ?? null;
+  const failure = current.cancelStatus === "FAILED"
+    ? current.cancelFailureCode
+    : current.refunds.find((leg) => leg.status === "FAILED" && !leg.resolvedAt)?.failureCode ?? null;
+  let pendingMessageIds: string[] = [];
   if (status !== current.status || (failure ?? null) !== (current.lastFailureCode ?? null)) {
-    await db.cancellationExecution.update({
-      where: { id: current.id },
-      data: { status, lastFailureCode: failure, completedAt: status === "COMPLETED" ? current.completedAt ?? now : null },
-    });
-    if (status !== current.status) {
+    pendingMessageIds = await db.$transaction(async (tx) => {
+      await tx.cancellationExecution.update({
+        where: { id: current.id },
+        data: { status, lastFailureCode: failure, completedAt: status === "COMPLETED" ? current.completedAt ?? now : null },
+      });
+      if (status === current.status) return [] as string[];
       await writeAuditLog({
         eventId: current.eventId,
         actorUserId: user.id,
@@ -733,9 +779,20 @@ async function settle(requestId: string, user: { id: string }, now: Date) {
         entityId: current.id,
         summary: status === "COMPLETED" ? "An approved cancellation was carried out." : status === "FAILED" ? "Carrying out an approved cancellation needs attention." : "The status of carrying out an approved cancellation changed.",
         metadata: { requestId: current.requestId, executionId: current.id, registrationId: current.registrationId, fromStatus: current.status, toStatus: status, approvedRefundCents: current.approvedRefundCents, failureCode: failure },
+      }, tx);
+      if (status !== "COMPLETED" || current.scope !== "FULL_REGISTRATION") return [] as string[];
+      const queued = await enqueueRegistrationCancelledMessage(tx, {
+        eventId: current.eventId,
+        registrationId: current.registrationId,
+        correlationId: crypto.randomUUID(),
+        transitionKey: `cancellation-execution:${current.id}`,
+        cancellationNote: finalMessageNote,
+        metadata: { source: "CANCELLATION_EXECUTION", executionId: current.id },
       });
-    }
+      return queued.pendingMessageIds;
+    }, { timeout: 20_000 });
   }
+  await deliver(pendingMessageIds, "Cancellation status");
   return loadExecution(db, requestId);
 }
 
@@ -763,10 +820,7 @@ export async function carryOutCancellation(
   if (!user || !user.displayName.trim()) throw new CancellationExecutionError("ACTOR_REQUIRED", "A named staff member is required to carry out a cancellation.");
   const now = deps.now ?? new Date();
 
-  return db.$transaction(async (lock) => {
-    // One call per request at a time. The transaction only holds the lock; the work below commits on its own, so a
-    // refund that Square accepted stays recorded even if this call is interrupted afterwards.
-    await lock.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`cancellation-execution:${requestId}`}))`;
+  return underLocks(eventId, requestId, async () => {
     const request = await db.cancellationRequest.findFirst({ where: { id: requestId, eventId }, select: requestSelect });
     if (!request) throw new CancellationExecutionError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
     if (request.status !== "APPROVED") throw new CancellationExecutionError("NOT_APPROVED", "Only an approved request can be carried out.");
@@ -784,34 +838,107 @@ export async function carryOutCancellation(
     const settled = await settle(requestId, user, now);
     if (!settled) throw new CancellationExecutionError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
     return viewOf(settled);
+  });
+}
+
+/**
+ * Runs `work` with this request and its registration locked, in that order, for every caller. One call per request at a
+ * time, and one execution per registration at a time, so two requests on the same registration never plan refunds
+ * against the same payments. The locks live in a transaction that only holds them; the work commits on its own
+ * connections (so the pool needs more than one connection, see docs/CANCELLATION-POLICY.md), and a refund Square accepted
+ * stays recorded even if the call is interrupted afterwards.
+ */
+async function underLocks<T>(eventId: string, requestId: string, work: () => Promise<T>): Promise<T> {
+  const db = getPrisma();
+  const found = await db.cancellationRequest.findFirst({ where: { id: requestId, eventId }, select: { registrationId: true } });
+  if (!found) throw new CancellationExecutionError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
+  return db.$transaction(async (lock) => {
+    await lock.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`cancellation-execution:${requestId}`}))`;
+    await lock.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`cancellation-execution-registration:${found.registrationId}`}))`;
+    return work();
   }, { timeout: 120_000, maxWait: 30_000 });
+}
+
+/**
+ * A named person settles a failed refund that this tool cannot send again (Square refused it, reported it failed, made a
+ * different refund, or rejected the request), with a required note. It moves no money and writes no Refund: it records that
+ * the refund was handled outside this tool, so the execution can finish. Only MANAGE_FINANCE staff reach it, through the
+ * resolve route. The audit entry holds ids and amounts; the note stays on the leg for staff.
+ */
+export async function resolveOutsideTool(
+  eventId: string,
+  requestId: string,
+  actor: StaffExecutionActor,
+  input: ResolveInput,
+  deps: Pick<ExecutionDependencies, "now"> = {},
+): Promise<ExecutionView> {
+  if (!actor.userId?.trim()) throw new CancellationExecutionError("ACTOR_REQUIRED", "A named staff member is required to record this.");
+  const db = getPrisma();
+  const user = await db.user.findUnique({ where: { id: actor.userId }, select: { id: true, displayName: true } });
+  if (!user || !user.displayName.trim()) throw new CancellationExecutionError("ACTOR_REQUIRED", "A named staff member is required to record this.");
+  const now = deps.now ?? new Date();
+  return underLocks(eventId, requestId, async () => {
+    const execution = await loadExecution(db, requestId);
+    if (!execution) throw new CancellationExecutionError("NOTHING_TO_RESOLVE", "This request has not been carried out, so there is no failed refund to resolve.");
+    await reconcileLegs(execution);
+    const fresh = (await loadExecution(db, requestId)) ?? execution;
+    const stuck = fresh.refunds.filter((leg) => stepOf(leg.status) === "FAILED" && !leg.resolvedAt && isStuckFailure(leg.failureCode));
+    if (stuck.length === 0) throw new CancellationExecutionError("NOTHING_TO_RESOLVE", "No failed refund is waiting for a person. A refund that can be sent again is continued with Continue.");
+    for (const leg of stuck) {
+      await db.$transaction(async (tx) => {
+        await tx.cancellationExecutionRefund.update({
+          where: { id: leg.id },
+          data: { resolvedAt: now, resolvedByUserId: user.id, resolvedByNameSnapshot: user.displayName, resolutionNote: input.note },
+        });
+        await writeAuditLog({
+          eventId: fresh.eventId,
+          actorUserId: user.id,
+          action: "CANCELLATION_REFUND_RESOLVED_OUTSIDE_TOOL",
+          entityType: "CancellationExecutionRefund",
+          entityId: leg.id,
+          summary: "Staff recorded a failed refund for an approved cancellation as settled outside this tool. No money moved here.",
+          metadata: { executionId: fresh.id, requestId: fresh.requestId, legId: leg.id, paymentId: leg.paymentId, amountCents: leg.amountCents, failureCode: leg.failureCode, moneyMoved: false },
+        }, tx);
+      });
+    }
+    const settled = await settle(requestId, user, now);
+    if (!settled) throw new CancellationExecutionError("REQUEST_NOT_FOUND", "That request could not be found for this event.");
+    return viewOf(settled);
+  });
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Views
 // ---------------------------------------------------------------------------------------------------------------------
 
+function unresolvedStuck(execution: ExecutionRow) {
+  return execution.refunds.filter((leg) => stepOf(leg.status) === "FAILED" && !leg.resolvedAt && isStuckFailure(leg.failureCode));
+}
+
 function nextStepOf(execution: ExecutionRow, status: ExecutionStatus) {
-  if (status === "COMPLETED") return "Done. The approved scope is cancelled and the approved refund is complete.";
+  if (status === "COMPLETED") {
+    return execution.refunds.some((leg) => leg.resolvedAt)
+      ? "Done. The approved scope is cancelled. A failed refund was recorded as settled outside this tool; nothing was refunded here for it."
+      : "Done. The approved scope is cancelled and the approved refund is complete.";
+  }
   const cancelFailed = stepOf(execution.cancelStatus) === "FAILED";
-  const declined = execution.refunds.find((leg) => leg.failureCode === "PROVIDER_DECLINED" || leg.failureCode === "PROVIDER_FAILED" || leg.failureCode === "SQUARE_MISMATCH");
-  if (declined) return "Square did not complete a refund. It cannot be sent again from here; resolve it in Square, and the registrant keeps their record in the meantime.";
+  if (unresolvedStuck(execution).length > 0) return "A refund cannot be sent again from here (Square refused or failed it). Settle it in Square or with the registrant, then record that below with a note. Recording it moves no money.";
   if (cancelFailed) return "Cancelling did not finish. Review the reason, then press Continue to try again; nothing is refunded before the cancellation completes for a whole registration.";
-  if (execution.refunds.some((leg) => stepOf(leg.status) === "FAILED")) return "A refund was not confirmed. Press Continue to send it again; the same key means it can never refund twice.";
+  if (execution.refunds.some((leg) => stepOf(leg.status) === "FAILED" && !leg.resolvedAt)) return "A refund was not confirmed. Press Continue to send it again; the same key means it can never refund twice.";
   if (status === "PROCESSOR_PENDING") return "Square has the refund and confirms it by itself. Press Check status to update this page.";
   return "Press Continue to finish the remaining steps.";
 }
 
 /** Reads the refunds' own statuses, which the Square webhook keeps current, so a page load shows them without writing anything. */
 async function withRefundStatuses(execution: ExecutionRow): Promise<ExecutionRow> {
-  const ids = execution.refunds.flatMap((leg) => (leg.refundId ? [leg.refundId] : []));
+  const ids = execution.refunds.flatMap((leg) => (leg.refundId && !leg.resolvedAt ? [leg.refundId] : []));
   if (ids.length === 0) return execution;
   const refunds = await getPrisma().refund.findMany({ where: { id: { in: ids } }, select: { id: true, status: true } });
   const byId = new Map(refunds.map((refund) => [refund.id, refund.status]));
   return {
     ...execution,
     refunds: execution.refunds.map((leg) => {
-      const status = leg.refundId ? byId.get(leg.refundId) : undefined;
+      const status = leg.refundId && !leg.resolvedAt ? byId.get(leg.refundId) : undefined;
       if (status === "SUCCEEDED") return { ...leg, status: "DONE" as const, failureCode: null };
       if (status === "FAILED" && leg.status !== "FAILED") return { ...leg, status: "FAILED" as const, failureCode: "PROVIDER_FAILED" };
       return leg;
@@ -826,10 +953,13 @@ function viewOf(execution: ExecutionRow): ExecutionView {
     status: stepOf(leg.status),
     withProcessor: Boolean(leg.refundId) && stepOf(leg.status) === "PENDING",
     failureCode: leg.failureCode,
-    canResend: !leg.refundId && stepOf(leg.status) !== "DONE",
+    canResend: !leg.refundId && !leg.resolvedAt && !isStuckFailure(leg.failureCode) && stepOf(leg.status) !== "DONE",
+    resolved: Boolean(leg.resolvedAt),
+    resolvedByName: leg.resolvedByNameSnapshot,
+    resolutionNote: leg.resolutionNote,
   }));
-  const status = executionStatusOf({ cancelStatus: stepOf(execution.cancelStatus), legs: legs.map((leg) => ({ status: leg.status, withProcessor: leg.withProcessor })) });
-  const stuck = Boolean(execution.refunds.find((leg) => leg.failureCode === "PROVIDER_DECLINED" || leg.failureCode === "PROVIDER_FAILED" || leg.failureCode === "SQUARE_MISMATCH"));
+  const status = executionStatusOf({ cancelStatus: stepOf(execution.cancelStatus), legs: legs.map((leg) => ({ status: leg.status, withProcessor: leg.withProcessor, resolved: leg.resolved })) });
+  const stuck = unresolvedStuck(execution).length > 0;
   return {
     id: execution.id,
     status,
@@ -846,6 +976,7 @@ function viewOf(execution: ExecutionRow): ExecutionView {
     attempts: execution.attempts,
     nextStep: nextStepOf(execution, status),
     canContinue: status !== "COMPLETED" && !stuck,
+    canResolve: status !== "COMPLETED" && stuck,
   };
 }
 

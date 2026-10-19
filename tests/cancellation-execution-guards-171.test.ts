@@ -38,6 +38,7 @@ describe("only a named staff member's button press carries a cancellation out", 
     const importers = sources.filter((file) => /cancellation-execution\/repository/.test(read(relative(file)))).map(relative).sort();
     expect(importers).toEqual([
       "app/(workspace)/finance/cancellation-requests/page.tsx",
+      "app/api/events/[eventId]/cancellation-requests/[requestId]/carry-out/resolve/route.ts",
       "app/api/events/[eventId]/cancellation-requests/[requestId]/carry-out/route.ts",
       "modules/cancellation-execution/api.ts",
       "scripts/verify-cancellation-requests.ts",
@@ -46,6 +47,21 @@ describe("only a named staff member's button press carries a cancellation out", 
     // The page only reads (getCarryOutPanel).
     expect(read("app/(workspace)/finance/cancellation-requests/page.tsx")).not.toContain("carryOutCancellation");
     expect(read("modules/cancellation-requests/repository.ts")).not.toMatch(/cancellation-execution|lifecycle|payments\//);
+  });
+
+  it("records a failed refund as resolved only from its own staff route, which moves no money", () => {
+    const callers = sources.filter((file) => read(relative(file)).includes("resolveOutsideTool(")).map(relative).sort();
+    expect(callers).toEqual([
+      "app/api/events/[eventId]/cancellation-requests/[requestId]/carry-out/resolve/route.ts",
+      "modules/cancellation-execution/repository.ts",
+      "scripts/verify-cancellation-requests.ts",
+    ]);
+    const route = read("app/api/events/[eventId]/cancellation-requests/[requestId]/carry-out/resolve/route.ts");
+    expect(route).toContain('"MANAGE_FINANCE"');
+    expect(route).toContain("{ userId: access.user.id }");
+    const source = read("modules/cancellation-execution/repository.ts");
+    const resolver = source.slice(source.indexOf("export async function resolveOutsideTool"), source.indexOf("// Views"));
+    expect(resolver).not.toMatch(/createSquareRefund|recordRefund|refund\.create|payment\.create/);
   });
 
   it("requires MANAGE_FINANCE and takes the actor from the session, never the body", () => {

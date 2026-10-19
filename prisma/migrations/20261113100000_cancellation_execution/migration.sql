@@ -55,6 +55,10 @@ CREATE TABLE "CancellationExecutionRefund" (
     "providerRefundId" TEXT,
     "failureCode" TEXT,
     "attempts" INTEGER NOT NULL DEFAULT 0,
+    "resolvedAt" TIMESTAMP(3),
+    "resolvedByUserId" TEXT,
+    "resolvedByNameSnapshot" TEXT,
+    "resolutionNote" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -210,6 +214,14 @@ BEGIN
   IF OLD."status" = 'DONE' AND NEW."status" <> 'DONE' THEN
     RAISE EXCEPTION 'A completed cancellation refund cannot be reopened';
   END IF;
+  IF OLD."resolvedAt" IS NOT NULL AND (
+    NEW."resolvedAt" IS DISTINCT FROM OLD."resolvedAt"
+    OR NEW."resolvedByUserId" IS DISTINCT FROM OLD."resolvedByUserId"
+    OR NEW."resolutionNote" IS DISTINCT FROM OLD."resolutionNote"
+    OR NEW."status" <> 'FAILED'
+  ) THEN
+    RAISE EXCEPTION 'A resolved cancellation refund cannot be changed';
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -218,3 +230,16 @@ CREATE TRIGGER "CancellationExecutionRefund_fixed_once_created"
 BEFORE UPDATE ON "CancellationExecutionRefund"
 FOR EACH ROW
 EXECUTE FUNCTION "reject_cancellation_execution_refund_change"();
+
+-- A failed refund can be settled outside this tool only by a named person with a note, and never a completed one. Settling it
+-- moves no money: it records who decided the failed refund needs nothing more from here.
+ALTER TABLE "CancellationExecutionRefund" ADD CONSTRAINT "CancellationExecutionRefund_resolution_is_named"
+  CHECK (
+    "resolvedAt" IS NULL
+    OR (
+      "status" = 'FAILED'
+      AND length(btrim(coalesce("resolvedByUserId", ''))) > 0
+      AND length(btrim(coalesce("resolvedByNameSnapshot", ''))) > 0
+      AND length(btrim(coalesce("resolutionNote", ''))) > 0
+    )
+  );

@@ -5,7 +5,9 @@ import {
   carryOutInputSchema,
   executionStatusOf,
   expectedFingerprint,
+  isStuckFailure,
   legIdempotencyKey,
+  resolveInputSchema,
 } from "@/modules/cancellation-execution/domain";
 import { amendmentRequestId } from "@/modules/cancellation-execution/ids";
 
@@ -81,5 +83,26 @@ describe("keys and inputs", () => {
     expect(carryOutInputSchema.safeParse({ method: "SQUARE" }).success).toBe(false);
     expect(carryOutInputSchema.safeParse({ confirm: true, amountCents: 5 }).success).toBe(false);
     expect(carryOutInputSchema.safeParse({ confirm: true, method: "CHECK" }).success).toBe(false);
+  });
+});
+
+describe("failures that wait for a person", () => {
+  it("treats a refusal, a failure, a mismatch and a rejection as stuck, and an uncertain send as retryable", () => {
+    for (const code of ["PROVIDER_DECLINED", "PROVIDER_FAILED", "SQUARE_MISMATCH", "SQUARE_REJECTED", "SQUARE_REJECTED_REFUND_AMOUNT_INVALID"]) expect(isStuckFailure(code)).toBe(true);
+    for (const code of ["SQUARE_UNCERTAIN", "REFUND_EXCEEDS_AVAILABLE", null, undefined]) expect(isStuckFailure(code)).toBe(false);
+  });
+
+  it("counts a refund a named person resolved as settled, so the execution can complete", () => {
+    const failedAndResolved = { status: "FAILED" as const, withProcessor: false, resolved: true };
+    expect(executionStatusOf({ cancelStatus: "DONE", legs: [failedAndResolved] })).toBe("COMPLETED");
+    expect(executionStatusOf({ cancelStatus: "DONE", legs: [{ ...failedAndResolved, resolved: false }] })).toBe("FAILED");
+    expect(executionStatusOf({ cancelStatus: "PENDING", legs: [failedAndResolved] })).toBe("REQUESTED");
+  });
+
+  it("needs a real note and a confirmation to record one", () => {
+    expect(resolveInputSchema.safeParse({ confirm: true, note: "Refunded by check." }).success).toBe(true);
+    expect(resolveInputSchema.safeParse({ confirm: true, note: "ok" }).success).toBe(false);
+    expect(resolveInputSchema.safeParse({ note: "Refunded by check." }).success).toBe(false);
+    expect(resolveInputSchema.safeParse({ confirm: true, note: "Refunded by check.", amountCents: 1 }).success).toBe(false);
   });
 });

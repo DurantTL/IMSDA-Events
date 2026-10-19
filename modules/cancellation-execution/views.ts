@@ -16,6 +16,10 @@ export type ExecutionLegView = {
   failureCode: string | null;
   /** Whether pressing the button again can send this refund (never once the processor accepted one). */
   canResend: boolean;
+  /** A named person recorded this failed refund as settled outside this tool (it moved no money). */
+  resolved: boolean;
+  resolvedByName: string | null;
+  resolutionNote: string | null;
 };
 
 export type ExecutionView = {
@@ -37,6 +41,8 @@ export type ExecutionView = {
   nextStep: string;
   /** True while pressing "Carry out" again can make progress. */
   canContinue: boolean;
+  /** True when a refund cannot be sent again and a named person has to record how it was settled. */
+  canResolve: boolean;
 };
 
 export type MethodOption = {

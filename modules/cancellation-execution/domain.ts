@@ -36,6 +36,13 @@ export function canCarryOutScope(scope: string) {
   return (carryOutScopes as readonly string[]).includes(scope);
 }
 
+/** The body of the staff "resolved outside this tool" call: a named person's required note. It moves no money. */
+export const resolveInputSchema = z.object({
+  note: z.string().trim().min(5, "Say what was done outside this tool (at least 5 characters).").max(500, "Keep the note under 500 characters."),
+  confirm: z.literal(true, { error: "Confirm that this refund was settled outside this tool." }),
+}).strict();
+export type ResolveInput = z.infer<typeof resolveInputSchema>;
+
 /** The body of the staff "Carry out" call. The method is required to start a request with money to refund. */
 export const carryOutInputSchema = z.object({
   method: z.enum(refundMethods).optional(),
@@ -105,14 +112,27 @@ export type LegState = {
   status: StepStatus;
   /** True once the processor has accepted the refund (it has a provider refund id) and has not finished it. */
   withProcessor: boolean;
+  /** A failed refund a named person settled outside this tool: it needs nothing more from here and moved no money. */
+  resolved?: boolean;
 };
 
 /**
- * One status from the steps. COMPLETED needs every step done. A failed step wins over a pending one, because it needs a
- * person. Waiting for Square is a refund the processor accepted and has not finished.
+ * Failures that sending again cannot fix: Square refused or reversed the refund, made a different one, or rejected the
+ * request outright. They wait for a person (`resolveOutsideTool`) instead of being resent. An uncertain failure is not
+ * stuck: the same key is safe to send again.
+ */
+export function isStuckFailure(code: string | null | undefined) {
+  return code === "PROVIDER_DECLINED" || code === "PROVIDER_FAILED" || code === "SQUARE_MISMATCH" || Boolean(code?.startsWith("SQUARE_REJECTED"));
+}
+
+/**
+ * One status from the steps. COMPLETED needs every step done (a refund resolved by a named person counts as settled). A
+ * failed step wins over a pending one, because it needs a person. Waiting for Square is a refund the processor accepted
+ * and has not finished.
  */
 export function executionStatusOf(input: { cancelStatus: StepStatus; legs: readonly LegState[] }): ExecutionStatus {
-  const { cancelStatus, legs } = input;
+  const { cancelStatus } = input;
+  const legs = input.legs.filter((leg) => !leg.resolved);
   if (cancelStatus === "FAILED" || legs.some((leg) => leg.status === "FAILED")) return "FAILED";
   if (cancelStatus === "DONE" && legs.every((leg) => leg.status === "DONE")) return "COMPLETED";
   if (legs.some((leg) => leg.status === "PENDING" && leg.withProcessor)) return "PROCESSOR_PENDING";
