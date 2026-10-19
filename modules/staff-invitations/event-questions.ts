@@ -1,4 +1,5 @@
 import { isBirthDateField, isFieldVisible, validateTestResponses, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { isLinkedToBlockedField } from "@/modules/forms/field-dependency-walk";
 import { isFieldSensitive, isHealthTypeField, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { mealTicketBinding } from "@/modules/meals/domain";
 
@@ -29,7 +30,7 @@ const TYPE_KEYS: ReadonlySet<string> = new Set(["attendee_type", "guest_type"]);
 /** Words that make a question about eating a meal (the conference covers every meal). */
 const MEAL_PATTERN = /(^|[^a-z])(meals?|breakfasts?|lunch(es)?|suppers?|dinners?)([^a-z]|$)/i;
 /** Words that make a question about where someone sleeps. Staff are housed by the office, never by a link. */
-const LODGING_PATTERN = /\b(hous(e|ing)|lodg(e|ing)|dorms?|dormitor(y|ies)|cabins?|camp[\s_-]?sites?|campers?|\brv\b|tents?|trailers?|roommates?|bunks?|\bbeds?\b|\bnights?\b|accommodations?|first[\s_-]?floor|rooming)\b/i;
+const LODGING_PATTERN = /\b(hous(e[sd]?|ing)|lodg(e[sd]?|ing)|dorms?|dormitor(y|ies)|cabins?|camp[\s_-]?sites?|campers?|\brv\b|tents?|trailers?|roommates?|bunks?|\bbeds?\b|\bnights?\b|accommodations?|first[\s_-]?floor|rooming)\b/i;
 
 function priced(field: RegistrationFormField) {
   return field.type === "CALCULATED"
@@ -37,6 +38,11 @@ function priced(field: RegistrationFormField) {
     || field.choicePricesCents !== undefined
     || field.latePricing !== undefined
     || field.creditCentsPerUnit !== undefined;
+}
+
+/** Health-type wording (the field's own group heading included), a sensitive flag, or a birth date: never asked through a link. */
+function isMedicalField(field: RegistrationFormField, sectionTitle: string) {
+  return isHealthTypeField(field, `${sectionTitle} ${field.group ?? ""}`) || isFieldSensitive(field, { sectionTitle }) || isBirthDateField(field);
 }
 
 /** Why a question is left off the link form, or null when it is asked. */
@@ -51,7 +57,7 @@ export function staffQuestionExclusion(field: RegistrationFormField, sectionTitl
   // An address answer is a structured object, and a directory-sourced list (churches, clubs) is read from the directory, not the form.
   if (field.type === "ACKNOWLEDGMENT" || field.type === "ADDRESS" || field.autoDate || field.optionSource) return "unsupported";
   // An explicit "not sensitive" flag can only ever add exclusions here: health-type wording and birth dates stay off the form.
-  if (isHealthTypeField(field, sectionTitle) || isFieldSensitive(field, { sectionTitle }) || isBirthDateField(field)) return "sensitive";
+  if (isMedicalField(field, sectionTitle)) return "sensitive";
   return null;
 }
 
@@ -68,6 +74,11 @@ export function staffEventQuestions(definition: RegistrationFormDefinition | nul
   const left = new Set<string>();
   for (const field of all) {
     if (staffQuestionExclusion(field, sectionTitleOf(field))) left.add(field.key);
+  }
+  // A neutral question wired to a medical one, in either direction (a Yes/No whose "Yes" opens a medical question), would give
+  // that answer away: it is left out too. The same linkage check the answer filter uses.
+  for (const field of all) {
+    if (!left.has(field.key) && isLinkedToBlockedField(field, all, (other) => isMedicalField(other, sectionTitleOf(other)))) left.add(field.key);
   }
   // A question that depends on one left out is left out too (its answer could never be given), however deeply it is chained.
   let changed = true;

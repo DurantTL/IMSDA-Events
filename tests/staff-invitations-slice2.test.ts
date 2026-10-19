@@ -189,6 +189,23 @@ describe("the medical-data and wording rules (#1027 review)", () => {
     expect(asked([field("ministry_interest", { label: "Potential ministry interest" }), field("tent_size", { label: "Contents of the tent" }), field("family_note", { label: "Household notes" }), field("housing_need", { label: "Housing" })])).toEqual(["ministry_interest", "family_note"]);
   });
 
+  it("checks the group heading for health wording", () => {
+    expect(asked([field("notes", { group: "Medical information" }), field("hobby")])).toEqual(["hobby"]);
+  });
+
+  it("leaves out a neutral question that controls a medical follow-up, and the follow-up", () => {
+    expect(asked([
+      field("needs_help", { type: "RADIO", options: ["Yes", "No"] }),
+      field("details", { conditional: { fieldKey: "needs_help", operator: "EQUALS", value: "Yes" } }),
+      field("allergies", { conditional: { fieldKey: "needs_help", operator: "EQUALS", value: "Yes" } }),
+      field("hobby"),
+    ])).toEqual(["hobby"]);
+  });
+
+  it("still catches housed and lodged wording", () => {
+    expect(asked([field("onsite", { label: "Do you need to be housed on site?" }), field("stay", { label: "Were you lodged here before?" }), field("ministry_interest", { label: "Potential ministry interest" }), field("family_note", { label: "Household notes" })])).toEqual(["ministry_interest", "family_note"]);
+  });
+
   it("names the person in a required-answer problem", () => {
     const checked = checkPartyAnswers(form, [{ shirt_size: "Small", ministry_areas: ["Music"] }, { ministry_areas: ["Music"] }, { shirt_size: "Small" }], 3, ["You", "Spouse", "Child 1"]);
     expect(checked.problems).toEqual(["Spouse: Shirt size is required.", "Child 1: Ministry areas is required."]);
