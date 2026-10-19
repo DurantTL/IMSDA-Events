@@ -52,7 +52,7 @@ describe("the team form's wording", () => {
     expect(model.booksLine).toBe("The Book of Mark, 1-2 Peter, 1-3 John & Commentary");
     expect(model.teamParagraph).toContain("not older than 19 as of January 1, 2026");
     expect(model.teamParagraph).toContain("a minimum of two members, and the maximum number is seven, which includes the alternate member.");
-    expect(model.confirmationText).toBe("Every team member is an inducted Pathfinder/TLT in good standing, has not graduated from high school and is not older than 19 as of January 1, 2026.");
+    expect(model.confirmationText).toBe("Every team member is an inducted Pathfinder in good standing, has not graduated from high school and is not older than 19 as of January 1, 2026.");
     expect(model.releaseText).toContain("photographed and/or videotaped");
     expect(model.formNumber).toBe("4-1");
   });
@@ -97,11 +97,13 @@ describe("the printed sheet", () => {
     expect(html).not.toContain("Club Director&#x27;s Signature:");
   });
 
-  it("shows the release answer the director gave, or says none was recorded", () => {
+  it("shows the release answer an older registration gave, and nothing when the form had none (the release is a notice)", () => {
     const html = (releaseAnswer: "Yes" | "No" | "") => renderToStaticMarkup(createElement(TeamFormSheet, { model: buildTeamForm({ ...base, filled: { ...filled, releaseAnswer } }) }));
     expect(html("Yes")).toContain("Release understood and agreed:</strong> Yes");
     expect(html("No")).toContain("Release understood and agreed:</strong> No");
-    expect(html("")).toContain("Not recorded");
+    expect(html("")).not.toContain("Not recorded");
+    expect(html("")).not.toContain("Release understood and agreed");
+    expect(html("")).toContain("photographed and/or videotaped");
     expect(renderToStaticMarkup(createElement(TeamFormSheet, { model: buildTeamForm({ ...base, filled: null }) }))).not.toContain("Release understood and agreed");
   });
 

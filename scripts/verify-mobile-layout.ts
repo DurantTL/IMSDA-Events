@@ -624,9 +624,10 @@ async function seedPbeEvent(prisma: PrismaClient) {
   const versionId = form.versions[0]!.id;
   const locations = await prisma.eventLocation.findMany({ where: { eventId: pbeEventId }, orderBy: { sortOrder: "asc" } });
   const { submitGeneralLinkRegistration } = await import("../modules/general-link-registrations/repository");
-  const person = (first: string, last: string, age: number, role = "Pathfinder", alternate = false) => ({
+  const person = (first: string, last: string, age: number, alternate = false) => ({
     clientId: `c${`${first}${last}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12)}`,
-    responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
+    // Team members only, no role question (#1044).
+    responses: { first_name: first, last_name: last, attendee_age: age, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
   });
   const submit = async (teamName: string, clubName: string, email: string, key: string, location: string, extraResponses: Record<string, unknown> = {}) => {
     if (await prisma.generalLinkSubmission.findFirst({ where: { eventId: pbeEventId, teamName } })) return;
@@ -635,10 +636,10 @@ async function seedPbeEvent(prisma: PrismaClient) {
       responses: {
         club_name: clubName, director_name: "Dana Mobilecheck-Directorsson", email, phone: "515-555-0100",
         coordinator_name: "Casey Mobilecheck-Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
-        coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true, photo_video_release: "Yes",
+        coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true,
         ...extraResponses,
       },
-      attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, "Pathfinder", true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Coach", 40, "Coach")],
+      attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Member", 15)],
       website: "",
     }, { locationId: location, teamName });
   };
@@ -3198,7 +3199,7 @@ async function fillRequiredStep(page: Page, email: string) {
   for (let index = 0; index < (await selects.count()); index += 1) {
     if ((await selects.nth(index).inputValue()) === "") await selects.nth(index).selectOption({ index: 1 });
   }
-  // A choice nobody has made yet (the release's Yes): the first option of each radio group with none chosen.
+  // A choice nobody has made yet: the first option of each radio group with none chosen.
   const radios = content.locator("input[type=radio]:visible");
   const groups = new Set<string>();
   for (let index = 0; index < (await radios.count()); index += 1) {
@@ -3241,7 +3242,6 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
         for (const [suffix, value] of [["pbe_member_first", `Walker${person + 1}`], ["pbe_member_last", "Mobilecheck-Synthetic"], ["pbe_member_age", "14"]] as const) {
           await sheet.locator(`input[id$="_${suffix}"]`).fill(value);
         }
-        await sheet.locator('input[type=radio][id$="_pbe_member_role"]').first().check({ force: true }).catch(() => undefined);
         // A phone edits a person in a sheet that is closed with Done; a desktop edits in place.
         const done = sheet.locator('button:has-text("Done with"):visible');
         if ((await done.count()) > 0) await done.first().click({ timeout: 5000 });

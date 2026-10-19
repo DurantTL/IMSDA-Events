@@ -10,7 +10,7 @@ import {
   normalizeDirectorEmail,
   pendingConfirmationCode,
 } from "@/modules/general-link-registrations/domain";
-import { readTypedInTeam, requestHash, stableJson, typedInPersonId } from "@/modules/general-link-registrations/typed-team";
+import { readTypedInTeam, requestHash, rosterOverMaximumMessage, stableJson, typedInPersonId, withoutRetiredAnswers } from "@/modules/general-link-registrations/typed-team";
 import type { TeamSettings } from "@/modules/club-teams/domain";
 
 const pbe = registrationFormDefinitionSchema.parse(formTemplates.find((template) => template.key === "pbe_registration")!.definition);
@@ -85,7 +85,7 @@ describe("the form the link needs", () => {
 });
 
 describe("the people typed into a team", () => {
-  const read = (people: ReturnType<typeof person>[]) => readTypedInTeam(pbe, people, settings, "2027-01-16");
+  const read = (people: Array<{ clientId: string; responses: Record<string, unknown> }>) => readTypedInTeam(pbe, people, settings, "2027-01-16");
 
   it("reads names, ages on the age date, the role and the alternate", () => {
     const team = read([person("Ann", "14"), person("Bo", 19, "TLT", true), person("Cy", 41, "Coach")]);
@@ -95,6 +95,20 @@ describe("the people typed into a team", () => {
       ["Bo", 19, "MEMBER", true, true],
       ["Cy", 41, "COACH", false, true],
     ]);
+  });
+
+  it("counts everyone as a team member when the form has no role answers, the 7th the alternate (#1044)", () => {
+    const noRole = (first: string, age: number, alternate = false) => ({ clientId: first, responses: { first_name: first, last_name: "Synthetic", attendee_age: age, ...(alternate ? { alternate: true } : {}) } });
+    const members = (count: number) => Array.from({ length: count }, (_, index) => noRole(`Kid${index}`, 14));
+    const two = read(members(2));
+    expect(two.problems).toEqual([]);
+    expect(two.people.map((p) => p.role)).toEqual(["MEMBER", "MEMBER"]);
+    expect(read(members(1)).problems.join(" ")).toMatch(/this one has 1/);
+    expect(read([...members(6), noRole("Alt", 15, true)]).problems).toEqual([]);
+    expect(read([...members(7), noRole("Extra", 15)]).problems.join(" ")).toMatch(/this one has 8/);
+    // An 18-year-old with no role answer is a member; the age rule is unchanged (20 is over 19 on the age date).
+    expect(read([noRole("A", 18), noRole("B", 19)]).people.map((p) => p.role)).toEqual(["MEMBER", "MEMBER"]);
+    expect(read([noRole("A", 14), noRole("B", 20)]).people[1]!.role).toBe("COACH");
   });
 
   it("holds a team to 2 to 7 members, coaches never counted", () => {
@@ -292,5 +306,22 @@ describe("the portal's roster-link route", () => {
     mocks.linkExtraPersonToRoster.mockClear();
     await postRosterLink(json({ attendeeId: "att-1", rosterMemberId: "member-1", firstName: "Nope" }), rosterContext);
     expect(mocks.linkExtraPersonToRoster).not.toHaveBeenCalled();
+  });
+});
+
+describe("a team received on an older PBE form, attached under the current one (#1044)", () => {
+  it("drops answers to questions the current form no longer asks, and keeps the rest", () => {
+    const kept = withoutRetiredAnswers(pbe, { first_name: "Ann", attendee_age: 14, attendee_type: "Coach", alternate: true });
+    expect(kept).toEqual({ first_name: "Ann", attendee_age: 14, alternate: true });
+    expect(withoutRetiredAnswers(pbe, { club_name: "Synthetic Club", photo_video_release: "Yes", director_confirmation: true }))
+      .toEqual({ club_name: "Synthetic Club", director_confirmation: true });
+  });
+
+  it("names the problem when the waiting team has more people than the form's maximum of 7", () => {
+    expect(rosterOverMaximumMessage(pbe, 7)).toBeNull();
+    const message = rosterOverMaximumMessage(pbe, 9)!;
+    expect(message).toContain("9 people");
+    expect(message).toContain("at most 7");
+    expect(message).toMatch(/older form/);
   });
 });

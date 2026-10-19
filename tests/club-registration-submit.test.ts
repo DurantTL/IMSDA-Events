@@ -87,6 +87,9 @@ function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CL
     { id: "m3", personId: "person-m3", attendeeType: "YOUTH", role: "Pathfinder", gender: null, sealedBirthDate: null, person: { firstName: "Casey", lastName: "Nobirth" } },
     // No birth date, but a reported age from an import (#639).
     { id: "m4", personId: "person-m4", attendeeType: "YOUTH", role: "Pathfinder", gender: null, sealedBirthDate: null, reportedAge: 15, person: { firstName: "Morgan", lastName: "Reported" } },
+    // Adults whose reported age is at the edge of the age limit (#1044).
+    { id: "m5", personId: "person-m5", attendeeType: "STAFF", role: "Counselor", gender: null, sealedBirthDate: null, reportedAge: 18, person: { firstName: "Staff", lastName: "Eighteen" } },
+    { id: "m6", personId: "person-m6", attendeeType: "ADULT", role: "Parent", gender: null, sealedBirthDate: null, reportedAge: 19, person: { firstName: "Adult", lastName: "Nineteen" } },
   ];
   const tx = {
     organization: {
@@ -1025,6 +1028,22 @@ describe("team rules on submit (#809)", () => {
     await submit(people("member:m1", "member:m2"), clubTeam("Bible Bees"));
     const roles = tx.registrationAttendee.create.mock.calls.map(([call]) => call.data.profileSnapshot?.teamRole);
     expect(roles).toEqual(["MEMBER", "COACH"]);
+  });
+
+  it("with no role question on the form and an age limit (#1044), staff or adults of 18 and 19 are team members and older ones coaches", async () => {
+    const tx = fixture();
+    rules(tx, { minTeamMembers: 1 });
+    await submit(people("member:m5", "member:m6", "member:m2"), clubTeam("Bible Bees"));
+    const roles = tx.registrationAttendee.create.mock.calls.map(([call]) => call.data.profileSnapshot?.teamRole);
+    expect(roles).toEqual(["MEMBER", "MEMBER", "COACH"]);
+  });
+
+  it("with no role question and no age limit (#1044), an adult with no role answer is still a coach", async () => {
+    const tx = fixture();
+    rules(tx, { minTeamMembers: 1, maxMemberAge: null });
+    await submit(people("member:m1", "member:m5", "member:m6"), clubTeam("Bible Bees"));
+    const roles = tx.registrationAttendee.create.mock.calls.map(([call]) => call.data.profileSnapshot?.teamRole);
+    expect(roles).toEqual(["MEMBER", "COACH", "COACH"]);
   });
 
   it("writes no role on an event without team rules", async () => {
