@@ -1724,6 +1724,7 @@ model Event {
   cancellationPolicyVersions          EventCancellationPolicyVersion[]
   cancellationCalculations            CancellationCalculation[]
   cancellationRequests                CancellationRequest[]
+  cancellationExecutions              CancellationExecution[]
   cancellationRequestEvents           CancellationRequestEvent[]
   communitySettings                   EventCommunitySettings?
   communityParticipations             CommunityParticipation[]
@@ -3584,12 +3585,16 @@ model CancellationRequest {
   decidedAt             DateTime?
   /// True when the registration had changed since the request and the decider acknowledged it.
   decidedWithChanges    Boolean                   @default(false)
+  /// The registration state fingerprint at the moment of approval (#171), written in the same update that approves. Carrying
+  /// the request out refuses when the registration no longer matches it. Null on a request approved before #171.
+  approvedStateFingerprint String?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
 
   event       Event                      @relation(fields: [eventId], references: [id], onDelete: Restrict)
   calculation CancellationCalculation    @relation(fields: [calculationId], references: [id], onDelete: Restrict)
   timeline    CancellationRequestEvent[]
+  execution   CancellationExecution?
 
   @@unique([registrationId, idempotencyKey])
   @@index([eventId, status, createdAt])
@@ -3616,6 +3621,91 @@ model CancellationRequestEvent {
 
   @@index([requestId, createdAt])
   @@index([eventId, createdAt])
+}
+
+enum CancellationExecutionStatus {
+  REQUESTED
+  PROCESSOR_PENDING
+  COMPLETED
+  FAILED
+}
+
+enum CancellationRefundMethod {
+  SQUARE
+  OFFLINE
+}
+
+enum CancellationStepStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+/// Carrying out one approved cancellation request (#171), by a named staff member. One row per request, kept apart from
+/// the request so the request stays final once decided. Holds the approved snapshot it was started from; the amounts and
+/// the method never change after creation (the database refuses it).
+model CancellationExecution {
+  id                       String                      @id @default(cuid())
+  eventId                  String
+  requestId                String                      @unique
+  registrationId           String
+  /// REQUESTED, PROCESSOR_PENDING (a refund is with the processor), COMPLETED or FAILED. A failed step can be retried.
+  status                   CancellationExecutionStatus @default(REQUESTED)
+  scope                    String
+  attendeeIds              String[]                    @default([])
+  /// The approved refund. Everything refunded for this execution adds up to at most this.
+  approvedRefundCents      Int
+  /// Null only when the approved refund is zero.
+  refundMethod             CancellationRefundMethod?
+  /// The fingerprint the registration had when approved, which the registration matched when this was started.
+  approvedStateFingerprint String
+  executedByUserId         String
+  executedByNameSnapshot   String
+  cancelStatus             CancellationStepStatus      @default(PENDING)
+  cancelFailureCode        String?
+  cancelledAt              DateTime?
+  attempts                 Int                         @default(1)
+  lastFailureCode          String?
+  startedAt                DateTime                    @default(now())
+  completedAt              DateTime?
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+
+  event   Event                        @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  request CancellationRequest          @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  refunds CancellationExecutionRefund[]
+
+  @@index([eventId, status])
+  @@index([registrationId])
+}
+
+/// One refund an execution makes against one payment (#171). The key is fixed at creation, so a retry sends the same key
+/// and can never refund twice. `refundId` points at the `Refund` row once the processor accepted it or it was recorded.
+model CancellationExecutionRefund {
+  id                String                 @id @default(cuid())
+  eventId           String
+  executionId       String
+  paymentId         String
+  amountCents       Int
+  idempotencyKey    String                 @unique
+  /// PENDING (not sent or not confirmed), DONE (the refund succeeded) or FAILED (the processor declined or could not be reached).
+  status            CancellationStepStatus @default(PENDING)
+  refundId          String?
+  providerRefundId  String?
+  failureCode       String?
+  attempts          Int                    @default(0)
+  /// A failed refund that a named person settled outside this tool, with a required note (no money moves). Only a FAILED leg.
+  resolvedAt             DateTime?
+  resolvedByUserId       String?
+  resolvedByNameSnapshot String?
+  resolutionNote         String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  execution CancellationExecution @relation(fields: [executionId], references: [id], onDelete: Restrict)
+
+  @@unique([executionId, paymentId])
+  @@index([eventId, status])
 }
 
 model Refund {

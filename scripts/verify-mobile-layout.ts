@@ -676,7 +676,7 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
       await tx.eventMembership.create({ data: { eventId: cancelEventId, userId: admin.id, role: "EVENT_ADMIN", status: "ACTIVE" } });
       await tx.registrationForm.create({ data: { id: formId, eventId: cancelEventId, createdByUserId: admin.id, name: "Cancellation form", slug: `${P}-cancel-form` } });
       await tx.registrationFormVersion.create({
-        data: { id: formVersionId, formId, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: { title: "Check", description: "", confirmationMessage: "Received.", sections: [] } },
+        data: { id: formVersionId, formId, createdByUserId: admin.id, versionNumber: 1, status: "PUBLISHED", publishedAt: new Date(), definition: { title: "Check", description: "", confirmationMessage: "Received.", sections: [{ id: `${P}_contact`, title: "Contact", description: "", fields: [{ id: `${P}_email`, key: "email", label: "Email", helpText: "", type: "EMAIL", scope: "REGISTRATION", required: false, options: [] }] }] } },
       });
       // The director's own person row (the audit's accounts make one), so this is their registration, not a second person.
       const holder = await tx.person.findUnique({ where: { normalizedEmail: `${P}.director@example.test` } })
@@ -733,10 +733,46 @@ async function seedCancellationEvent(prisma: PrismaClient): Promise<PageSpec[]> 
   }
   const first = await prisma.cancellationRequest.findFirstOrThrow({ where: { eventId: cancelEventId, status: "INFORMATION_NEEDED" }, select: { id: true } });
   const issued = await createRegistrationAccessToken({ registrationId });
+
+  // Approved requests (#171): one waiting to be carried out, one approved for attendees only, one already carried out.
+  const execution = await import("../modules/cancellation-execution/repository");
+  const approvedIds: Record<string, string> = {};
+  for (const [code, label] of [["MOBCAN2", "carry-out"], ["MOBCAN3", "carried-out"]] as const) {
+    const id = `${P}_reg_${label}`;
+    if (!(await prisma.registration.findUnique({ where: { id }, select: { id: true } }))) {
+      const holderData = { id: `${P}_person_${label}_holder`, firstName: "Casey", lastName: `Mobilecheck-${label}`, normalizedEmail: `${P}.${label}@example.test` };
+      const holder = await prisma.person.upsert({ where: { id: holderData.id }, update: {}, create: holderData });
+      await prisma.registration.create({
+        data: { id, eventId: cancelEventId, accountHolderPersonId: holder.id, confirmationCode: code, totalAmount: 200, status: "CONFIRMED", submittedAt: new Date(), contactSnapshot: { firstName: "Casey", lastName: `Mobilecheck-${label}`, email: `${P}.${label}@example.test`, phone: "" } },
+      });
+      await prisma.registrationAttendee.create({
+        data: { id: `${P}_${label}_attendee`, eventId: cancelEventId, registrationId: id, personId: holder.id, attendeeType: "ADULT", position: 0, profileSnapshot: { firstName: "Casey", lastName: `Mobilecheck-${label}` } },
+      });
+      await prisma.publicRegistrationSubmission.create({
+        data: {
+          eventId: cancelEventId, formVersionId, registrationId: id, idempotencyKey: `${P}_${label}_idem`, requestHash: "hash", responses: {},
+          pricingSnapshot: { currency: "USD", subtotalCents: 20_000, processingFeeCents: 0, totalCents: 20_000, lineItems: [{ key: "attendees.0.registration_fee", label: "Registration, Casey", amountCents: 20_000, attendeeIndex: 0 }] },
+        },
+      });
+      await prisma.payment.create({ data: { eventId: cancelEventId, registrationId: id, amount: 200, status: "SUCCEEDED", method: "CHECK", receivedAt: new Date() } });
+      const asked = await requests.submitCancellationRequest({ registrationId: id, eventId: cancelEventId }, { via: "MANAGE_LINK" }, {
+        action: "submit", selection: { scope: "FULL_REGISTRATION" }, reason: "A schedule conflict.", contactMethod: "EMAIL", idempotencyKey: `${P}-cancel-key-${label}`, expectedRefundCents: 19_000,
+      });
+      await requests.reviewCancellationRequest(cancelEventId, asked.request.id, { userId: admin.id }, { action: "APPROVE", reason: "Within the policy." });
+    }
+    approvedIds[label] = (await prisma.cancellationRequest.findFirstOrThrow({ where: { registrationId: id }, select: { id: true } })).id;
+  }
+  const done = await prisma.cancellationExecution.findUnique({ where: { requestId: approvedIds["carried-out"]! }, select: { id: true } });
+  if (!done) await execution.carryOutCancellation(cancelEventId, approvedIds["carried-out"]!, { userId: admin.id }, { confirm: true, method: "OFFLINE" });
+  const second = await prisma.cancellationRequest.findFirstOrThrow({ where: { registrationId, scope: "ATTENDEE", status: { in: ["REQUESTED", "APPROVED"] } }, select: { id: true, status: true } });
+  if (second.status === "REQUESTED") await requests.reviewCancellationRequest(cancelEventId, second.id, { userId: admin.id }, { action: "APPROVE", reason: "Within the policy." });
   return [
     { name: "cancellation-manage-link", path: issued.managePath, role: "visitor", expectText: /Ask to cancel/ },
     { name: "cancellation-staff-queue", path: `/finance/cancellation-requests?event=${cancelEventId}`, role: "event-admin", expectText: /Cancellation requests/ },
     { name: "cancellation-staff-detail", path: `/finance/cancellation-requests?event=${cancelEventId}&request=${first.id}`, role: "event-admin", expectText: /Your decision/ },
+    { name: "cancellation-staff-carry-out", path: `/finance/cancellation-requests?event=${cancelEventId}&status=APPROVED&request=${approvedIds["carry-out"]}`, role: "event-admin", expectText: /How is the refund made/ },
+    { name: "cancellation-staff-carried-out", path: `/finance/cancellation-requests?event=${cancelEventId}&status=APPROVED&request=${approvedIds["carried-out"]}`, role: "event-admin", expectText: /Completed/ },
+    { name: "cancellation-staff-attendees-approved", path: `/finance/cancellation-requests?event=${cancelEventId}&status=APPROVED&request=${second.id}`, role: "event-admin", expectText: /Carry out/ },
   ];
 }
 

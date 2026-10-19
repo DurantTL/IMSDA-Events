@@ -12162,6 +12162,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .kitchen-meals-served .served-split { display: block; margin-top: 2px; }
 .kitchen-meals-served .served-total > * { border-top: 2px solid var(--line, #d6dee2); }
 .scanner-import-review { overflow-wrap: anywhere; }
+.cancel-request-steps { display: grid; gap: 6px; margin: 0; padding-left: 18px; }
+.cancel-request-detail .cancel-request-form { display: grid; gap: 6px; }
+.cancel-request-detail fieldset.cancel-request-form { margin: 0; border: 0; padding: 0; min-width: 0; }
+.cancel-request-actions [aria-live]:focus { outline: 2px solid var(--imsda-navy); outline-offset: 2px; }
 
 /* Kitchen counts (#1029). Phone first: one form per count, full-width inputs and 44px-tall buttons. */
 .kitchen-counts .served-split { display: block; margin-top: 2px; }

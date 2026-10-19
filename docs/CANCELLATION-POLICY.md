@@ -132,3 +132,55 @@ policy version, scope, from and to status, actor kind), never the reason, a name
 calculation), additive migration `20261109110000_cancellation_requests`. A request cites its calculation by foreign key and
 its registration by id only, so history outlives the registration. Deleting an event removes the timeline, the requests and
 then the calculations. Real-database check: `npm run test:cancellation-requests`.
+
+# Carrying out an approved request (slice 3, #171)
+
+Approving records a decision only. **Carry out** is a separate step that a named staff member with `MANAGE_FINANCE` presses on an
+APPROVED request (`/finance/cancellation-requests`). No scheduler, worker, webhook or approval hook runs it. It applies exactly
+what was approved and nothing else.
+
+## What it does
+
+- **Exact snapshot.** Approving records the registration's state fingerprint. Carry out refuses (`RE_REVIEW_REQUIRED`) and changes
+  nothing if the registration no longer matches it, or if an older approval made over acknowledged changes cannot be proven
+  unchanged. Re-review means declining the request or asking the registrant for a new one.
+- **Whole registration:** cancelled first through the existing cancellation (seats released, waitlist offered once), then refunded.
+  A failed refund leaves the cancellation standing and can be continued.
+- **Approved attendees:** the refund is made **first**, then the attendees are removed through the staff amendment, because the
+  amendment will not lower the total below what is paid. If removal then fails, the state stays visible on the request (refund
+  done, removal needs attention) and **Continue** tries the removal again without refunding twice. Before anything starts, a check
+  refuses attendees that cannot be removed. That includes any case where the policy keeps part of the payment: recording a kept
+  amount is the adjustment work (#120), so cancel the whole registration or handle it by hand.
+- **Single items** (a component) are not carried out here (#119, #120). Credit toward a future event is deferred too.
+- **Refund method**, chosen by the person: through Square (the Refunds API, one idempotency key per payment, never more than the
+  approved amount or the payment's refundable remainder, pending until Square's webhook confirms), or recorded as paid outside
+  Square (the existing manual refund; card payments are Square-only).
+- **One execution per registration at a time.** A second approved request on a registration waits until the first is completed or
+  resolved. Locks are taken in a fixed order (request, then registration), and the remainder of a payment is checked with its row
+  locked, counting other executions' unsent refunds.
+
+## When a refund fails
+
+States are Requested, Waiting for Square, Completed and Needs attention. A send that Square did not confirm (network error, server
+error) is retried with the same key. A refund Square **declined, reported as failed, made differently, or rejected** is never sent
+again: the page asks a named person to settle it in Square or with the registrant and then **Record as settled outside this tool**,
+with a required note. That step moves no money and writes no refund; it releases the refund's reserved amount and lets the
+execution complete. Its audit entry holds ids and amounts only; the note stays on the page for staff.
+
+## Email
+
+No new template, and nothing waits for a later press. The registrant gets the existing registration-cancelled email at once, with the
+cancellation, in neutral words (cancelled; any refund is handled separately and they are notified when one completes; no amount, and
+no "we did not refund" sentence). Each refund sends the existing refund notice (#277) from its own committed row when it completes
+(the manual path at once, a Square refund when Square's webhook confirms it). A waitlisted registration gets the waitlist-removal
+notice only. A refund settled outside this tool sends nothing, and no email promises a notice that will not come.
+
+## Running it
+
+The per-request lock is a transaction-level advisory lock held while the work commits on other connections, so the database pool
+needs **more than one connection** (the default is more than one). A pool of one would wait on itself.
+
+Data: `CancellationExecution` and `CancellationExecutionRefund`, additive migration `20261113100000_cancellation_execution`, with
+database checks (an approved request only; refunds never above the approved amount; the approved snapshot, a leg's amount and key
+fixed; a completed leg never reopened; a resolution only by a named person with a note). Real-database check:
+`npm run test:cancellation-requests`.
