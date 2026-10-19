@@ -7729,6 +7729,11 @@ body:has(.auth-page) { padding-bottom: 0; }
 .club-import-summary p { margin: 0; }
 .club-import-club > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
 .club-import-club > summary::-webkit-details-marker { display: none; }
+/* A thumb-sized "import this club" box on a phone (the mobile audit's 44px target). */
+@media (max-width: 600px) { .club-import-club > summary > input[type="checkbox"] { width: 44px; height: 44px; flex: none; margin: -6px -6px -6px -10px; } }
+.club-import-update-church { min-height: 44px; }
+.club-import-update-church input { width: 24px; height: 24px; min-width: 24px; }
+@media (max-width: 600px) { .form-stack .club-import-update-church input { width: 44px; height: 44px; min-width: 44px; } }
 .club-import-club > summary > span:nth-child(2) { display: grid; flex: 1; gap: 2px; min-width: 0; }
 .club-import-club > summary small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.72rem); }
 .club-import-club[open] > summary { margin-bottom: 14px; }
