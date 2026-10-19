@@ -11,7 +11,7 @@ import {
   starterEventTemplates,
   starterPayload,
 } from "@/modules/event-templates/starters";
-import { formTemplates, getFormTemplate } from "@/modules/forms/definition";
+import { formTemplates, getFormTemplate, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
 const wantedNames = ["Blank event", "Blank club event", "Women's Retreat", "Man Camp", "Spring Camporee", "Fall Camporee", "Camp Meeting", "Pathfinder Bible Experience", "Honors Weekend", "Pathfinder Leadership Weekend", "TLT Retreat", "Outdoor School", "Hispanic Institute of Evangelism"];
 
@@ -153,15 +153,24 @@ describe("starter event templates (#546)", () => {
       expect(JSON.stringify(definition)).not.toMatch(/priceCents|choicePricesCents|creditCentsPerUnit|"payment"/);
     });
 
-    it("asks for the coordinator, partner club, alternate, coach role, confirmation and release", () => {
+    it("asks for the coordinator, partner club, alternate and confirmation, with team members only and the release as a notice (#1044)", () => {
       const keys = fieldsOf("pbe_registration").map((field) => `${field.scope}:${field.key}`);
       for (const key of [
         "REGISTRATION:coordinator_name", "REGISTRATION:coordinator_address", "REGISTRATION:coordinator_city", "REGISTRATION:coordinator_state",
         "REGISTRATION:coordinator_zip", "REGISTRATION:coordinator_phone", "REGISTRATION:coordinator_email", "REGISTRATION:partner_club",
-        "REGISTRATION:director_confirmation", "REGISTRATION:photo_video_release", "ATTENDEE:alternate", "ATTENDEE:attendee_type", "ATTENDEE:attendee_age",
+        "REGISTRATION:director_confirmation", "ATTENDEE:alternate", "ATTENDEE:attendee_age",
       ]) expect(keys).toContain(key);
-      const role = fieldsOf("pbe_registration").find((field) => field.key === "attendee_type")!;
-      expect(role.options).toEqual(["Pathfinder", "TLT", "Coach"]);
+      // No role question (so no TLT or Coach choice) and no Yes/No release answer.
+      expect(keys).not.toContain("ATTENDEE:attendee_type");
+      expect(keys).not.toContain("REGISTRATION:photo_video_release");
+      const definition = getFormTemplate("pbe_registration")!.definition;
+      expect(JSON.stringify(definition)).not.toMatch(/\bTLT\b|[Cc]oach/);
+      expect(definition.attendeeRoster).toMatchObject({ minAttendees: 2, maxAttendees: 7, attendeeLabel: "Team member", addButtonLabel: "Add another team member" });
+      const confirmation = definition.sections.find((section) => section.id === "pbe_confirmation")!;
+      // The release is the confirmation checkbox's help text, so it is read with the checkbox (aria-describedby).
+      expect(confirmation.fields.find((field) => field.key === "director_confirmation")!.helpText).toContain("photographed and/or videotaped");
+      expect(confirmation.fields.some((field) => field.type === "RADIO")).toBe(false);
+      expect(registrationFormDefinitionSchema.safeParse(definition).success).toBe(true);
     });
 
     it("picks the partner club from the clubs directory, with a not-listed fallback, and says Club director (#963)", () => {

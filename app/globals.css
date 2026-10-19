@@ -2317,6 +2317,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .builder-step-link { margin: 0 6px 2px; color: var(--imsda-purple); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.49rem); font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
 .builder-section-head input { border-color: var(--field-border); background: var(--field-bg); padding: 4px 6px; font-size: max(var(--type-body-floor, 0px), 0.78rem); font-weight: 800; }
 .builder-section-head .section-description-input { margin-top: 2px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.61rem); font-weight: 500; }
+.builder-section-head textarea.section-description-input { border-color: var(--field-border); background: var(--field-bg); padding: 4px 6px; font-family: inherit; resize: vertical; }
 .builder-step-settings { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 14px; margin: 9px 6px 0; border-top: 1px solid #e1e9ec; padding-top: 9px; }
 .builder-step-settings > label { display: grid; gap: 3px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.51rem); font-weight: 800; text-transform: uppercase; }
 .builder-step-settings > label:first-child { min-width: 150px; flex: 1; }
@@ -3360,6 +3361,72 @@ body:has(.auth-page) { padding-bottom: 0; }
   border-color: #9cc9b4;
   background: var(--green-soft);
 }
+/* #1042: steps already reached are buttons; they look like the plain items. */
+.public-registration-progress li > button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  position: relative;
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px;
+  font: inherit;
+  text-align: left;
+}
+.public-registration-progress li > button:hover > small { text-decoration: underline; }
+.public-registration-progress li > button:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: 2px;
+}
+.public-registration-progress li > button > span {
+  display: grid;
+  width: 1.917em;
+  height: 1.917em;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #c5d2d7;
+  border-radius: 50%;
+  background: white;
+  font-size: var(--text-badge);
+  font-weight: 900;
+}
+.public-registration-progress li.is-complete > button > span {
+  border-color: #9cc9b4;
+  background: var(--green-soft);
+}
+.public-registration-progress li > button > small,
+.public-registration-progress li > small {
+  min-width: 0;
+}
+.public-registration-progress li > button > small {
+  overflow: hidden;
+  font-size: var(--text-helper-min);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.public-registration-progress .public-registration-step-warning {
+  display: inline-grid;
+  width: 1.4em;
+  height: 1.4em;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #b42318;
+  color: white;
+  font-size: var(--text-helper-min);
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+}
+.public-registration-progress li.has-errors > button > span,
+.public-registration-progress li.has-errors > span { border-color: #b42318; }
 
 .public-registration-error-summary {
   border: 1px solid #dfbab4;
@@ -5700,10 +5767,14 @@ body:has(.auth-page) { padding-bottom: 0; }
   .public-registration-progress li { flex: 1 1 0; gap: 4px; }
   /* With 5-6 steps the other labels ellipsize first; the current step keeps the most room, and the heading above always reads "Step N of M". */
   .public-registration-progress li.is-current { flex-grow: 2.5; }
-  .public-registration-progress li > span { width: 1.583em; height: 1.583em; font-size: var(--text-badge); }
+  .public-registration-progress li > span,
+  .public-registration-progress li > button > span { width: 1.583em; height: 1.583em; font-size: var(--text-badge); }
+  .public-registration-progress li:has(> button) { min-width: 44px; }
+  .public-registration-progress li > button { min-width: 44px; gap: 4px; padding: 0 2px; justify-content: center; }
   .public-registration-progress li > small { font-size: var(--text-helper-min); }
   /* #996: a step that is not the current one has room for its number only (its label was an ellipsis in a ~25px box).
      The label stays for screen readers, and "Step N of M" above names the current step. */
+  .public-registration-progress li:not(.is-current) > button > small { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .public-registration-progress li:not(.is-current) > small { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .public-registration-step-heading { padding: 18px; }
   .public-registration-section,

@@ -98,7 +98,12 @@ import {
 } from "@/modules/forms/attendee-roster-csv";
 import {
   formatPublicRegistrationAnswer,
+  clickableSteps,
+  errorMarkedStepIds,
   getPublicRegistrationStepPlan,
+  issueBelongsToPlanStep,
+  withVisitedStep,
+  withoutServerIssuesForStep,
   type PublicRegistrationStep,
   type PublicRegistrationStepId,
 } from "@/modules/forms/public-registration-steps";
@@ -978,6 +983,10 @@ export function PublicRegistrationForm({
     setIdempotencyKey(null);
     setAccountChoice("without");
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
+    setVisitedStepIds([]);
+    setServerIssues([]);
+    setAttemptedStepIds([]);
+    setContinueAttempted(false);
     setDraftNotice(null);
   }
   const currentStepIndex = Math.max(
@@ -985,6 +994,17 @@ export function PublicRegistrationForm({
     0,
   );
   const currentStep = registrationSteps[currentStepIndex]!;
+  // Furthest step reached (#1042): steps up to it become buttons in the step list.
+  // Tracked by step id, so a section appearing or going away cannot shift which steps are reachable.
+  const [visitedStepIds, setVisitedStepIds] = useState<string[]>([]);
+  // Issues the server returned and the person has not got past yet; client issues are recomputed live.
+  const [serverIssues, setServerIssues] = useState<FormIssue[]>([]);
+  // Steps where a failed Continue or Submit showed errors; only these show client-issue markers.
+  const [attemptedStepIds, setAttemptedStepIds] = useState<string[]>([]);
+  const currentStepKey = currentStep.id;
+  useEffect(() => {
+    setVisitedStepIds((visited) => withVisitedStep(visited, currentStepKey));
+  }, [currentStepKey]);
   const attendeeSections = useMemo(
     () => definition.sections.map((section) => ({
       ...section,
@@ -1302,11 +1322,7 @@ export function PublicRegistrationForm({
   }
 
   function issueBelongsToStep(issue: FormIssue, step: PublicRegistrationStep) {
-    if (issue.key === "attendees" || issue.path === "attendees") {
-      return step.managesAttendees;
-    }
-    if (issue.key === "lodging") return step.isLodging === true;
-    return step.fieldKeys.includes(issue.key);
+    return issueBelongsToPlanStep(issue, step);
   }
 
   function continueRegistration() {
@@ -1314,6 +1330,7 @@ export function PublicRegistrationForm({
       issueBelongsToStep(issue, currentStep)
     ));
     if (stepIssues.length > 0) {
+      setAttemptedStepIds((current) => withVisitedStep(current, currentStep.id));
       showIssues(
         stepIssues,
         `Complete ${currentStep.shortLabel.toLowerCase()} before continuing.`,
@@ -1321,6 +1338,7 @@ export function PublicRegistrationForm({
       );
       return;
     }
+    setServerIssues((current) => withoutServerIssuesForStep(current, currentStep));
     const nextStep = registrationSteps[currentStepIndex + 1];
     if (nextStep) goToStep(nextStep);
   }
@@ -1342,6 +1360,7 @@ export function PublicRegistrationForm({
       return next;
     });
     setIssues((current) => current.filter((issue) => issue.key !== key));
+    setServerIssues((current) => current.filter((issue) => issue.key !== key));
     setError("");
     setIdempotencyKey(null);
   }
@@ -1457,6 +1476,12 @@ export function PublicRegistrationForm({
   // Always handled here (#738) so focus doesn't depend on hash navigation.
   function followIssueLink(clickEvent: ReactMouseEvent<HTMLAnchorElement>, issue: FormIssue, targetId: string) {
     clickEvent.preventDefault();
+    // The field only renders while its step is showing (#1042). Keep the issues so it still shows its error.
+    const issueStep = stepForIssue(issue);
+    if (issueStep && issueStep.id !== currentStep.id) {
+      setSheetOpen(false);
+      setCurrentStepId(issueStep.id);
+    }
     const attendee = attendeeForIssue(issue);
     expandAttendeeCardsFor([issue]);
     if (attendee && isPhone && rosterEnabled && roster.maxAttendees > 1) setSheetOpen(true);
@@ -3089,7 +3114,9 @@ export function PublicRegistrationForm({
       return;
     }
     const clientIssues = allClientIssues();
+    setServerIssues([]);
     if (clientIssues.length > 0) {
+      setAttemptedStepIds([...new Set([...visitedStepIds, currentStep.id])]);
       showIssues(
         clientIssues,
         "Review the highlighted fields before submitting.",
@@ -3105,7 +3132,10 @@ export function PublicRegistrationForm({
       try {
         const outcome = await club.submitEdit(attendees);
         if (outcome.ok) club.onSubmitted?.();
-        else showIssues(outcome.issues, outcome.message, stepForIssue(outcome.issues[0]) ?? currentStep);
+        else {
+          setServerIssues(outcome.issues);
+          showIssues(outcome.issues, outcome.message, stepForIssue(outcome.issues[0]) ?? currentStep);
+        }
       } catch {
         setError("We could not reach the registration service. Your answers are still here; please try again.");
         window.requestAnimationFrame(() => errorSummaryRef.current?.focus());
@@ -3169,6 +3199,7 @@ export function PublicRegistrationForm({
           setPromoCodeQuote(null);
           setPromoCodeNotice(promoIssue.message);
         }
+        setServerIssues(nextIssues);
         showIssues(
           nextIssues,
           result.message ?? "We could not complete the registration. Review the form and try again.",
@@ -3213,6 +3244,10 @@ export function PublicRegistrationForm({
     setIdempotencyKey(null);
     setAccountChoice("without");
     setCurrentStepId(registrationSteps[0]?.id ?? "__review");
+    setVisitedStepIds([]);
+    setServerIssues([]);
+    setAttemptedStepIds([]);
+    setContinueAttempted(false);
     window.imsdaEmbedScrollTop?.();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -3351,6 +3386,14 @@ export function PublicRegistrationForm({
     );
   }
 
+  // Computed only after a failed Continue or Submit (or a server error), and after the confirmation returns above.
+  const errorStepIds = attemptedStepIds.length > 0 || serverIssues.length > 0
+    ? errorMarkedStepIds(registrationSteps, {
+      attemptedStepIds,
+      clientIssues: attemptedStepIds.length > 0 ? allClientIssues() : [],
+      serverIssues,
+    })
+    : [];
   const Shell = club ? "div" : "main";
   return (
     <Shell className={club ? "public-registration-page club-registration-form" : "public-registration-page"}>
@@ -3433,22 +3476,32 @@ export function PublicRegistrationForm({
               />
             </div>
             <ol>
-              {registrationSteps.map((step, stepIndex) => (
-                <li
-                  className={
-                    stepIndex === currentStepIndex
-                      ? "is-current"
-                      : stepIndex < currentStepIndex
-                        ? "is-complete"
-                        : ""
-                  }
-                  aria-current={stepIndex === currentStepIndex ? "step" : undefined}
-                  key={step.id}
-                >
-                  <span>{stepIndex + 1}</span>
-                  <small>{step.shortLabel}</small>
-                </li>
-              ))}
+              {clickableSteps(registrationSteps, visitedStepIds, currentStepIndex, errorStepIds).map((item) => {
+                const inner = (
+                  <>
+                    <span>{item.index + 1}</span>
+                    <small>{item.step.shortLabel}</small>
+                    {item.hasErrors && <i className="public-registration-step-warning" aria-hidden="true">!</i>}
+                    {item.hasErrors && !item.clickable && <span className="sr-only">, has errors</span>}
+                  </>
+                );
+                return (
+                  <li
+                    className={
+                      (item.isCurrent ? "is-current" : item.isComplete ? "is-complete" : "")
+                      + (item.hasErrors ? " has-errors" : "")
+                    }
+                    aria-current={item.isCurrent ? "step" : undefined}
+                    key={item.step.id}
+                  >
+                    {item.clickable ? (
+                      <button type="button" aria-label={item.label} onClick={() => goToStep(item.step)}>
+                        {inner}
+                      </button>
+                    ) : inner}
+                  </li>
+                );
+              })}
             </ol>
           </section>
 

@@ -24,6 +24,16 @@ export function isAlternateAnswer(value: unknown): boolean {
   return false;
 }
 
+/** Whether a form definition (or form version) has the role question every club roster form shares. */
+export function formAsksRole(definition: { sections: ReadonlyArray<{ fields: ReadonlyArray<{ key: string }> }> }): boolean {
+  return definition.sections.some((section) => section.fields.some((field) => field.key === ROLE_FIELD_KEY));
+}
+
+/** Whether the person answered the role question at all (a form without that question leaves no answer). */
+function hasRoleAnswer(value: unknown): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 /** A role answer (or roster class level) that names a Pathfinder or a TLT: a youth member, even at 18 or 19. */
 function isYouthRoleAnswer(value: unknown): boolean {
   if (typeof value !== "string") return false;
@@ -35,8 +45,10 @@ function isYouthRoleAnswer(value: unknown): boolean {
  * Whether a person is a team member or a coach, the same rule for roster people and extra people (#809), by their age on
  * the event's age date, so a director cannot dodge the size limit by marking a child as staff:
  * - under 18 is a team member, whatever the roster says;
- * - 18 up to the oldest team member age is a team member when the role answer is Pathfinder or TLT (or the roster class
- *   level is TLT), otherwise a coach;
+ * - 18 up to the oldest team member age is a team member when the answer is Pathfinder or TLT (or the roster class level
+ *   is TLT), otherwise a coach. The one exception (#1044): a form with no role question at all (`formAsksRole` false, the
+ *   Pathfinder Bible Experience form lists team members only) and an age limit leaves a person with no role answer a team
+ *   member, since the age limit is then the only rule. Without an age limit nothing changes: an adult is still a coach;
  * - older than that is a coach;
  * - an age that is not known follows the roster type (staff and adults are coaches, everyone else a team member).
  */
@@ -45,6 +57,8 @@ export function teamRoleFor(input: {
   rosterAttendeeType?: "YOUTH" | "STAFF" | "ADULT" | "UNDERAGE" | null;
   rosterClassLevel?: string | null;
   maxMemberAge?: number | null;
+  /** False only when the form the answers were given on has no role question. Unknown (omitted) is treated as asking. */
+  formAsksRole?: boolean;
   age: number | null;
 }): TeamRole {
   if (input.age === null) {
@@ -52,6 +66,10 @@ export function teamRoleFor(input: {
   }
   if (input.age < 18) return "MEMBER";
   if (input.maxMemberAge !== null && input.maxMemberAge !== undefined && input.age > input.maxMemberAge) return "COACH";
+  // A form with no role question (the Pathfinder Bible Experience form since #1044 lists team members only) and an age limit:
+  // the age limit decides. An answer given on an older form version (a Coach) is still honored below.
+  const limited = input.maxMemberAge !== null && input.maxMemberAge !== undefined;
+  if (input.formAsksRole === false && limited && !hasRoleAnswer(input.responses[ROLE_FIELD_KEY])) return "MEMBER";
   return isYouthRoleAnswer(input.responses[ROLE_FIELD_KEY]) || input.rosterClassLevel === "TLT" ? "MEMBER" : "COACH";
 }
 

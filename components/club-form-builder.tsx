@@ -269,7 +269,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
                 <input maxLength={120} onChange={(event) => edit((s) => updateSection(s, section.id, { title: event.target.value }))} value={section.title} />
               </label>
               <label>Section description
-                <input maxLength={300} onChange={(event) => edit((s) => updateSection(s, section.id, { description: event.target.value }))} value={section.description} />
+                <input maxLength={500} onChange={(event) => edit((s) => updateSection(s, section.id, { description: event.target.value }))} value={section.description} />
               </label>
             </div>
             <label>Notes shown above the questions (separate paragraphs with a blank line)
@@ -406,7 +406,7 @@ function FieldEditor({
               </select>
             </label>
             <label>Help text
-              <input maxLength={240} onChange={(event) => edit((s) => updateField(s, field.id, { helpText: event.target.value }))} value={field.helpText} />
+              <input maxLength={500} onChange={(event) => edit((s) => updateField(s, field.id, { helpText: event.target.value }))} value={field.helpText} />
             </label>
             <label>Field key (letters, numbers, underscores)
               <input

@@ -132,6 +132,8 @@ async function main() {
   });
   assert(applied.event, "the template creates an event");
   const eventId = applied.event.id;
+  // These checks cover coaches and the Yes/No release, which the form no longer asks (#1044): put them back as an older form version.
+  await (await import("./support/pbe-legacy-form")).restoreLegacyPbeFields(prisma, eventId);
   await prisma.eventTeamSettings.update({
     where: { eventId },
     data: { levelInfo: [{ level: "CONFERENCE", date: "2027-02-20", place: "Camp Synthetic" }, { level: "UNION", date: "2027-03-20", place: "Union Test Site" }] },

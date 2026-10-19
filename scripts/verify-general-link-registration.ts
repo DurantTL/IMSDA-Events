@@ -166,6 +166,8 @@ async function main() {
   });
   assert(applied.event, "the template creates an event");
   const eventId = applied.event.id;
+  // These checks cover coaches and the Yes/No release, which the form no longer asks (#1044): put them back as an older form version.
+  await (await import("./support/pbe-legacy-form")).restoreLegacyPbeFields(prisma, eventId);
   const eventSlug = `${S}-pbe`;
   const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId } });
   assert(event.generalRegistrationLinkEnabled, "the PBE starter turns the general registration link on");

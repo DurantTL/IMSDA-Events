@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { ClubTeamError } from "@/modules/club-teams/errors";
 import { normalizeTeamName } from "@/modules/club-teams/domain";
-import { ALTERNATE_FIELD_KEY, ROLE_FIELD_KEY, isAlternateAnswer, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
+import { ALTERNATE_FIELD_KEY, ROLE_FIELD_KEY, isAlternateAnswer, formAsksRole, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
 import { syncTeamMemberPermissions } from "@/modules/club-teams/permission-repository";
 import { permissionDeclinedGenericProblem, permissionDeclinedProblem } from "@/modules/club-teams/permission-domain";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -127,7 +127,7 @@ export async function enforceTeamRegistrationRules(
 ): Promise<{ queuedMessageIds: string[] }> {
   const team = await tx.clubEventRegistration.findUnique({
     where: { registrationId },
-    select: { id: true, eventId: true, organizationId: true, registration: { select: { event: { select: { startsAt: true, timezone: true } } } } },
+    select: { id: true, eventId: true, organizationId: true, registration: { select: { event: { select: { startsAt: true, timezone: true } }, publicFormSubmission: { select: { formVersion: { select: { definition: true } } } } } } },
   });
   const nothing = { queuedMessageIds: [] as string[] };
   if (!team) return nothing;
@@ -148,6 +148,8 @@ export async function enforceTeamRegistrationRules(
   const rosterByPerson = new Map<string, (typeof roster)[number]>();
   for (const member of roster) if (member.personId && !rosterByPerson.has(member.personId)) rosterByPerson.set(member.personId, member);
 
+  const registeredDefinition = team.registration.publicFormSubmission?.formVersion.definition as { sections?: Array<{ fields: Array<{ key: string }> }> } | null | undefined;
+  const registeredFormAsksRole = registeredDefinition?.sections ? formAsksRole({ sections: registeredDefinition.sections }) : true;
   const eventDate = calendarDateInEventTimeZone(team.registration.event.startsAt, team.registration.event.timezone);
   const ageDate = teamAgeDate(settings, eventDate);
   const people: TeamPerson[] = [];
@@ -169,6 +171,8 @@ export async function enforceTeamRegistrationRules(
       rosterAttendeeType: rosterMember?.attendeeType ?? null,
       rosterClassLevel: rosterMember?.classLevel ?? null,
       maxMemberAge: settings.maxMemberAge,
+      // The form version the team was registered on decides whether a missing role answer means anything (#1044).
+      formAsksRole: registeredFormAsksRole,
       age,
     });
     // Staff's confirmation that this is a different person from someone with the same name on another team is kept on the

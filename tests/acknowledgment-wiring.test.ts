@@ -93,7 +93,10 @@ describe("other places an acknowledgment must not leak or be mis-attributed (#15
   it("confirms a general-link team only with acknowledgment answers from the form version the director saw", () => {
     expect(generalLink).toContain("storedVersionId !== experience.form.versionId");
     expect(generalLink).toContain('"FORM_CHANGED"');
-    expect(generalLink).toContain("withoutAcknowledgments(stored.responses ?? {})");
+    // Acknowledgments are stripped first, then answers to questions the current form no longer has (#1044).
+    expect(generalLink).toContain("withoutRetiredAnswers(experience.form.definition, withoutAcknowledgments(answers))");
+    expect(generalLink).toContain("responses: currentAnswers(stored.responses ?? {})");
+    expect(generalLink).toContain("responses: currentAnswers(attendee.responses)");
   });
 
   it("shows an acknowledgment's standing from its evidence in the amendment editor, since staff evidence never rewrites the stored answer", () => {

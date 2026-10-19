@@ -155,3 +155,108 @@ export function formatPublicRegistrationAnswer(
   if (isPlainAddressObject(value)) return formatAddressDisplay(value) || null;
   return null;
 }
+
+export type ClickableStep = {
+  step: PublicRegistrationStep;
+  index: number;
+  isCurrent: boolean;
+  isComplete: boolean;
+  /** Reached before (and not the one showing): the step list renders it as a button. */
+  clickable: boolean;
+  hasErrors: boolean;
+  /** Accessible name for the button, e.g. "Go to step 2: Team members, has errors". */
+  label: string;
+};
+
+type IssueLike = { key: string; path?: string };
+
+/** Does this issue belong to this step? One rule for the form, the markers and the tests. */
+export function issueBelongsToPlanStep(issue: IssueLike, step: PublicRegistrationStep) {
+  if (issue.key === "attendees" || issue.path === "attendees") return step.managesAttendees;
+  if (issue.key === "lodging") return step.isLodging === true;
+  return step.fieldKeys.includes(issue.key);
+}
+
+/** Remember a step the person has been on, by id, so a section appearing or going away cannot shift which steps are reached. */
+export function withVisitedStep(visited: readonly string[], stepId: string): string[] {
+  return visited.includes(stepId) ? [...visited] : [...visited, stepId];
+}
+
+/**
+ * Index of the furthest step reached in the current plan: the last step, by
+ * position now, that was visited. Steps whose section went away are ignored.
+ */
+export function furthestReachedIndex(
+  steps: PublicRegistrationStep[],
+  visitedStepIds: readonly string[],
+  currentIndex: number,
+) {
+  const visited = new Set(visitedStepIds);
+  let furthest = currentIndex;
+  steps.forEach((step, index) => {
+    if (visited.has(step.id)) furthest = Math.max(furthest, index);
+  });
+  return furthest;
+}
+
+/**
+ * Which steps get an error marker. Client issues count only for steps where a
+ * failed Continue or Submit already showed errors (a step the person just
+ * arrived on is not an error yet); server
+ * issues count wherever they land. Computed live, so a step that now passes
+ * loses its marker and a scoped Continue never drops another step's marker.
+ */
+export function errorMarkedStepIds(
+  steps: PublicRegistrationStep[],
+  options: {
+    /** Steps where a failed Continue or Submit already showed the person their errors. */
+    attemptedStepIds: readonly string[];
+    clientIssues: readonly IssueLike[];
+    serverIssues: readonly IssueLike[];
+  },
+): string[] {
+  const attempted = new Set(options.attemptedStepIds);
+  return steps
+    .filter((step) => (
+      (attempted.has(step.id)
+        && options.clientIssues.some((issue) => issueBelongsToPlanStep(issue, step)))
+      || options.serverIssues.some((issue) => issueBelongsToPlanStep(issue, step))
+    ))
+    .map((step) => step.id);
+}
+
+/** Server issues still unresolved after the person got past `stepId` (Continue from it passed). */
+export function withoutServerIssuesForStep<T extends IssueLike>(
+  serverIssues: readonly T[],
+  step: PublicRegistrationStep,
+): T[] {
+  return serverIssues.filter((issue) => !issueBelongsToPlanStep(issue, step));
+}
+
+/**
+ * What the step list at the top of the public form shows for each step.
+ * Steps up to the furthest one reached are clickable (except the current step);
+ * later steps stay plain.
+ */
+export function clickableSteps(
+  steps: PublicRegistrationStep[],
+  visitedStepIds: readonly string[],
+  currentIndex: number,
+  errorStepIds: ReadonlySet<string> | readonly string[] = [],
+): ClickableStep[] {
+  const errors = new Set(errorStepIds);
+  const furthest = furthestReachedIndex(steps, visitedStepIds, currentIndex);
+  return steps.map((step, index) => {
+    const hasErrors = errors.has(step.id);
+    const isCurrent = index === currentIndex;
+    return {
+      step,
+      index,
+      isCurrent,
+      isComplete: index < currentIndex,
+      clickable: !isCurrent && index <= furthest,
+      hasErrors,
+      label: `Go to step ${index + 1}: ${step.shortLabel}${hasErrors ? ", has errors" : ""}`,
+    };
+  });
+}
