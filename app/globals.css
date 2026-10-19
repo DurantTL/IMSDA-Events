@@ -12164,7 +12164,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .scanner-import-review { overflow-wrap: anywhere; }
 
 /* System administrator notification bell (#1032): a 44px button and a panel that fits 390px. */
-.attention-bell { overflow: visible; }
+.attention-bell { overflow: visible; width: 44px; height: 44px; }
 .attention-bell:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
 .attention-badge {
   position: absolute;
@@ -12195,7 +12195,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attention-popover .attention-item span { font-size: max(var(--type-body-floor, 0px), 0.74rem); line-height: 1.35; }
 .attention-popover .attention-note { margin-bottom: 0; }
 @media (max-width: 760px) {
-  .attention-bell { width: 44px; height: 44px; }
-  /* The bell sits mid-row on a phone, so the panel spans the viewport (16px gutters) under the header instead of hanging off its anchor. */
-  .attention-popover { position: fixed; top: auto; right: 16px; left: 16px; width: auto; margin-top: 10px; }
+  /* The bell sits mid-row on a phone, so the panel is anchored to the header row (not fixed to the window): it spans
+     the header with the page's gutters, scrolls away with the page and never floats over scrolled content. */
+  .workspace-header { position: relative; }
+  .menu-anchor:has(.attention-bell) { position: static; }
+  .attention-popover { position: absolute; top: 100%; right: 0; left: 0; width: auto; margin-top: 6px; }
 }

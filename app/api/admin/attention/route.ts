@@ -6,8 +6,8 @@ import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repos
 /**
  * The system administrator notification bell (#1032). Counts span every event, so this is gated on the global role,
  * checked here on the server; the bell is only rendered for system administrators, but hiding it is not the control.
- * Read only. `private` so no shared cache ever holds it; the short browser cache and the server's shared 30 second
- * answer keep a busy page from turning into a query storm.
+ * Read only. `private, no-store` so neither a shared cache nor the browser holds it (opening the panel must read
+ * again); the server's shared 30 second answer keeps a busy page from turning into a query storm.
  */
 async function getHandler() {
   const { user } = await getCurrentSession();
@@ -18,7 +18,7 @@ async function getHandler() {
     );
   }
   try {
-    return Response.json({ attention: await getAdminAttentionSummary() }, { headers: { "Cache-Control": "private, max-age=30" } });
+    return Response.json({ attention: await getAdminAttentionSummary() }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     logError("Loading the admin notification bell failed", error);
     return Response.json(

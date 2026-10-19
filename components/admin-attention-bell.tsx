@@ -45,7 +45,7 @@ export function AdminAttentionBell({
   const load = useCallback(async (signal?: AbortSignal) => {
     setState((current) => (current === "ready" ? current : "loading"));
     try {
-      const response = await fetch(ATTENTION_ENDPOINT, { credentials: "same-origin", signal });
+      const response = await fetch(ATTENTION_ENDPOINT, { cache: "no-store", credentials: "same-origin", signal });
       if (!response.ok) throw new Error("attention request failed");
       const body = (await response.json()) as { attention?: AttentionSummary };
       if (!body.attention || typeof body.attention.total !== "number" || !Array.isArray(body.attention.groups)) throw new Error("unexpected response");
@@ -76,8 +76,10 @@ export function AdminAttentionBell({
     headingRef.current?.focus();
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      // Focus goes back to the bell only when it was inside the panel; otherwise the person is somewhere else on the page.
+      const focusWasInside = anchorRef.current?.contains(document.activeElement) ?? false;
       setOpen(false);
-      triggerRef.current?.focus();
+      if (focusWasInside) triggerRef.current?.focus();
     }
     function onPointerDown(event: MouseEvent | TouchEvent) {
       if (anchorRef.current && !anchorRef.current.contains(event.target as Node)) setOpen(false);
@@ -101,7 +103,16 @@ export function AdminAttentionBell({
   const total = summary?.total ?? null;
 
   return (
-    <div className="menu-anchor" ref={anchorRef}>
+    <div
+      className="menu-anchor"
+      onBlur={(event) => {
+        // Tabbing out of the panel closes it. A null target (a click on plain text, a window switch) is left to the
+        // outside-click handler.
+        const next = event.relatedTarget as Node | null;
+        if (open && next && !event.currentTarget.contains(next)) setOpen(false);
+      }}
+      ref={anchorRef}
+    >
       <button
         aria-controls={open ? panelId : undefined}
         aria-expanded={open}

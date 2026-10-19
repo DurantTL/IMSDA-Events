@@ -37,6 +37,11 @@ export type AttentionItem = {
   count: number;
   /** A same-site path (never an absolute URL) to the page that handles it. */
   href: string;
+  /**
+   * A to-review list rather than an alert: shown in the panel with its count but left out of the badge total, because
+   * nothing lets staff dismiss it, so its count would never go down.
+   */
+  reviewOnly?: boolean;
 };
 
 export type AttentionGroup = { key: AttentionGroupKey; title: string; items: AttentionItem[] };
@@ -45,7 +50,7 @@ export type AttentionSummary = {
   generatedAt: string;
   /** True when some checks could not be read, so the list may be missing items. */
   partial: boolean;
-  /** Sum of every item's count. */
+  /** Sum of the alert items' counts (review-only lists are left out). */
   total: number;
   groups: AttentionGroup[];
 };
@@ -113,7 +118,7 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
       group: "waiting",
       count: signals.cancellationRequestsWaiting.total,
       label: plural(signals.cancellationRequestsWaiting.total, "cancellation request waiting for review", "cancellation requests waiting for review"),
-      href: withEvent("/finance/cancellation-requests", signals.cancellationRequestsWaiting.topEventId),
+      href: withEvent("/finance/cancellation-requests", signals.cancellationRequestsWaiting.topEventId, "status=REQUESTED"),
     });
   }
   if (signals.staffInvitationApprovals.total > 0) {
@@ -130,7 +135,8 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
       key: "directory-review",
       group: "waiting",
       count: signals.directoryReview.total,
-      label: plural(signals.directoryReview.total, "directory change to review", "directory changes to review"),
+      label: plural(signals.directoryReview.total, "directory entry to review (a list, not an alert)", "directory entries to review (a list, not an alert)"),
+      reviewOnly: true,
       href: withEvent("/people/directory-review", signals.directoryReview.topEventId),
     });
   }
@@ -142,8 +148,8 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
       count: signals.emailFailed.total,
       label: plural(
         signals.emailFailed.total,
-        `email failed or bounced in the last ${EMAIL_PROBLEM_WINDOW_DAYS} days`,
-        `emails failed or bounced in the last ${EMAIL_PROBLEM_WINDOW_DAYS} days`,
+        `email failed, bounced or marked as spam in the last ${EMAIL_PROBLEM_WINDOW_DAYS} days`,
+        `emails failed, bounced or marked as spam in the last ${EMAIL_PROBLEM_WINDOW_DAYS} days`,
       ),
       href: emailHref(signals.emailFailed.topEventId),
     });
@@ -201,7 +207,7 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
   return {
     generatedAt: signals.now.toISOString(),
     partial: signals.unreadableChecks > 0,
-    total: groups.reduce((sum, group) => sum + group.items.reduce((inner, item) => inner + item.count, 0), 0),
+    total: groups.reduce((sum, group) => sum + group.items.filter((item) => !item.reviewOnly).reduce((inner, item) => inner + item.count, 0), 0),
     groups,
   };
 }

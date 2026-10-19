@@ -90,19 +90,27 @@ describe("admin notification bell model (#1032)", () => {
     expect(items["scheduled-emails-overdue"].href).toBe("/communications/scheduled?event=evt_e");
     expect(items["scheduled-emails-failed"].href).toBe("/communications/scheduled?event=evt_f");
     expect(summary.groups.map((group) => group.title)).toEqual(["Waiting on staff", "Email problems", "System health"]);
-    expect(summary.total).toBe(2 + 3 + 1 + 4 + 5 + 1 + 1 + 1 + 2);
+    // The directory-review list (4) is shown but is not part of the badge total.
+    expect(items["directory-review"]).toMatchObject({ reviewOnly: true, label: "directory entries to review (a list, not an alert)" });
+    expect(summary.total).toBe(2 + 3 + 1 + 5 + 1 + 1 + 1 + 2);
     for (const item of Object.values(items)) expect(isSafeAttentionHref(item.href)).toBe(true);
   });
 
   it("lists cancellation requests waiting for review with a link to the queue", () => {
     expect(buildAttentionSummary(signals()).groups).toEqual([]);
     const summary = buildAttentionSummary(signals({ cancellationRequestsWaiting: { total: 2, topEventId: "evt_1" } }));
-    expect(summary.groups[0].items[0]).toMatchObject({ key: "cancellation-requests", count: 2, href: "/finance/cancellation-requests?event=evt_1" });
+    expect(summary.groups[0].items[0]).toMatchObject({ key: "cancellation-requests", count: 2, href: "/finance/cancellation-requests?status=REQUESTED&event=evt_1" });
   });
 
   it("shows a sweep problem only when it stopped or failed, not when it has never reported", () => {
     for (const status of ["ok", "never"] as const) expect(buildAttentionSummary(signals({ outboxSweep: status })).groups).toEqual([]);
     expect(buildAttentionSummary(signals({ outboxSweep: "failing" })).groups[0].items[0].label).toContain("failed");
+  });
+
+  it("keeps a review-only list out of the badge and the button name", () => {
+    const summary = buildAttentionSummary(signals({ directoryReview: { total: 9, topEventId: "e1" } }));
+    expect(summary.total).toBe(0);
+    expect(summary.groups[0].items[0].count).toBe(9);
   });
 
   it("flags a partial list when a check could not be read", () => {
@@ -162,12 +170,21 @@ describe("admin notification bell counts (#1032)", () => {
     expect(prisma.staffInvitation.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: { approval: "WAITING" } }));
     expect(prisma.scheduledEmailBatch.groupBy).toHaveBeenCalledTimes(2);
     expect(prisma.cancellationRequest.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: { status: "REQUESTED" } }));
-    const [failed, stuck] = prisma.messageOutbox.groupBy.mock.calls.map((call) => (call[0] as { where: Record<string, unknown> }).where);
-    expect(failed.OR).toEqual([{ status: "FAILED" }, { providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] } }]);
-    expect((failed.updatedAt as { gte: Date }).gte.toISOString()).toBe("2026-10-12T12:00:00.000Z");
+    const [failed, providerProblems, stuck] = prisma.messageOutbox.groupBy.mock.calls.map((call) => (call[0] as { where: Record<string, unknown> }).where);
+    const since = "2026-10-12T12:00:00.000Z";
+    expect(failed.status).toBe("FAILED");
+    expect((failed.failedAt as { gte: Date }).gte.toISOString()).toBe(since);
+    expect(failed.retries).toEqual({ none: { status: "SENT" } });
+    expect(providerProblems).toMatchObject({
+      status: { not: "FAILED" },
+      provider: { in: ["RESEND", "SES"] },
+      providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] },
+      retries: { none: { status: "SENT" } },
+    });
+    expect((providerProblems.providerStatusAt as { gte: Date }).gte.toISOString()).toBe(since);
     expect(stuck.status).toEqual({ in: ["PENDING", "PROCESSING"] });
     expect((stuck.availableAt as { lt: Date }).lt.toISOString()).toBe("2026-10-19T11:30:00.000Z");
-    expect(prisma.event.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 10, where: expect.objectContaining({ archivedAt: null }) }));
+    expect(prisma.event.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 11, where: expect.objectContaining({ archivedAt: null }) }));
 
     expect(result).toMatchObject({
       clubApplicationsWaiting: 2,
@@ -189,6 +206,37 @@ describe("admin notification bell counts (#1032)", () => {
     expect(result.unreadableChecks).toBe(1);
     expect(result.pendingTeams.total).toBe(5);
     expect(mocks.logError).toHaveBeenCalled();
+  });
+
+  it("counts a failed and a recovered message once each way: the provider query leaves out FAILED originals", async () => {
+    const prisma = fakePrisma();
+    mocks.getPrisma.mockReturnValue(prisma);
+    const result = await loadAttentionSignals(now);
+    // Both failed-email reads return rows (fake): total is their sum, with the busiest event named.
+    expect(result.emailFailed.total).toBe(6);
+  });
+
+  it("marks the list partial when more events exist than the directory scan reads, or one scan fails", async () => {
+    const prisma = fakePrisma();
+    prisma.event.findMany.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({ id: `e${index}` })));
+    mocks.getPrisma.mockReturnValue(prisma);
+    expect((await loadAttentionSignals(now)).unreadableChecks).toBe(1);
+    expect(mocks.listDirectoryReviewEntries).toHaveBeenCalledTimes(10);
+    mocks.listDirectoryReviewEntries.mockRejectedValueOnce(new Error("scan failed"));
+    expect((await loadAttentionSignals(now)).unreadableChecks).toBe(2);
+  });
+
+  it("does not cache a partial or failed load, so the next call reads again", async () => {
+    const prisma = fakePrisma();
+    prisma.newClubApplication.count.mockRejectedValueOnce(new Error("db down"));
+    mocks.getPrisma.mockReturnValue(prisma);
+    const first = await getAdminAttentionSummary(2_000_000);
+    expect(first.partial).toBe(true);
+    const second = await getAdminAttentionSummary(2_001_000);
+    expect(second.partial).toBe(false);
+    expect(prisma.newClubApplication.count).toHaveBeenCalledTimes(2);
+    await getAdminAttentionSummary(2_002_000);
+    expect(prisma.newClubApplication.count).toHaveBeenCalledTimes(2);
   });
 
   it("shares one answer for the cache window", async () => {
@@ -232,7 +280,7 @@ describe("admin notification bell API (#1032)", () => {
     mocks.getSweepHeartbeat.mockResolvedValue({ status: "ok" });
     const response = await GET(new Request("http://localhost/api/admin/attention") as never);
     expect(response.status).toBe(200);
-    expect(response.headers.get("Cache-Control")).toBe("private, max-age=30");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     const body = await response.json();
     expect(body.attention.total).toBe(1);
     expect(body.attention.groups[0].items[0].href).toBe("/admin/clubs/applications");
