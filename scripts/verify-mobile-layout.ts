@@ -1362,7 +1362,6 @@ async function seedDeadlines(prisma: PrismaClient) {
  */
 /** Kitchen counts (#1029): two services with entries, one corrected, and a long note, so the entry cards and the table have content. */
 async function seedKitchenCounts(prisma: PrismaClient) {
-  if (await prisma.eventMealKitchenCount.findUnique({ where: { id: `${P}_kc_1` }, select: { id: true } })) return;
   const user = await prisma.user.findFirst({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
   if (!user) return;
   // A Kitchen staff account on this event (#1029) for the audit page that opens the counts page as that role.
@@ -1374,6 +1373,9 @@ async function seedKitchenCounts(prisma: PrismaClient) {
     where: { eventId_userId: { eventId, userId: kitchen.id } }, update: { role: "KITCHEN_STAFF", status: "ACTIVE" },
     create: { eventId, userId: kitchen.id, role: "KITCHEN_STAFF", status: "ACTIVE" },
   });
+  // A session is only valid for an account with a credential row; this one can never sign in with a password.
+  await prisma.authCredential.upsert({ where: { userId: kitchen.id }, update: {}, create: { userId: kitchen.id, passwordHash: "mobilecheck-never-a-real-hash" } });
+  if (await prisma.eventMealKitchenCount.findUnique({ where: { id: `${P}_kc_1` }, select: { id: true } })) return;
   const base = { eventId, enteredByUserId: user.id };
   const longNote = "Second pan held back for the late serving line, then split between the vegetarian and the gluten-free lines";
   await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_1`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "PREPARED", quantity: 120, note: "First count" } });
@@ -3769,7 +3771,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "area", "event-admin", "system-admin"] as Role[]) {
+      for (const role of ["visitor", "director", "area", "event-admin", "system-admin", "kitchen"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || spec.name.includes(only)));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({
