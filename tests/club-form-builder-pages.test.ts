@@ -113,12 +113,15 @@ describe("a form behind the code points to Sync templates, not a terminal (#810)
     const seed = clubFormTemplateSeeds.find((candidate) => candidate.key === "off_premises_permission_slip")!;
     mocks.getClubFormBuilderView.mockResolvedValue({
       key: seed.key, version: 1, needsSync: true, draftStale: false, draftBaseVersion: null, draft: null, draftUnreadable: false,
-      customized: false, published: { name: seed.name, definition: seed.definition },
+      customized: false, published: { name: seed.name, definition: seed.definition }, alertRecipients: ["office@imsda-events.test"],
     });
     const markup = renderToStaticMarkup((await ClubFormBuilderPage({ params })) as React.ReactElement);
     expect(markup).toContain("Sync templates");
     expect(markup).toContain('href="/admin/club-forms"');
     expect(markup).not.toContain("npm run");
     expect(markup).not.toContain("club-forms:sync");
+    // The alert recipients box (#1017) shows the saved list, apart from the builder.
+    expect(markup).toContain("Email these addresses when this form is submitted");
+    expect(markup).toContain("office@imsda-events.test");
   });
 });
