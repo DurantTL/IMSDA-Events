@@ -189,6 +189,8 @@ async function main() {
   });
   assert(applied.event, "the template creates an event");
   const eventId = applied.event.id;
+  // These checks cover coaches and the Yes/No release, which the form no longer asks (#1044): put them back as an older form version.
+  await (await import("./support/pbe-legacy-form")).restoreLegacyPbeFields(prisma, eventId);
   const settings = await getTeamSettings(eventId);
   assert(settings?.allowMultipleTeams && settings.minTeamMembers === 2 && settings.maxTeamMembers === 7 && settings.maxAlternates === 1
     && settings.ageAsOf === "2026-01-01" && settings.maxMemberAge === 19, "the event has the Pathfinder Bible Experience team rules");

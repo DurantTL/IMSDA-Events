@@ -603,9 +603,10 @@ async function seedPbeEvent(prisma: PrismaClient) {
   const versionId = form.versions[0]!.id;
   const locations = await prisma.eventLocation.findMany({ where: { eventId: pbeEventId }, orderBy: { sortOrder: "asc" } });
   const { submitGeneralLinkRegistration } = await import("../modules/general-link-registrations/repository");
-  const person = (first: string, last: string, age: number, role = "Pathfinder", alternate = false) => ({
+  const person = (first: string, last: string, age: number, alternate = false) => ({
     clientId: `c${`${first}${last}`.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12)}`,
-    responses: { first_name: first, last_name: last, attendee_age: age, attendee_type: role, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
+    // Team members only, no role question (#1044).
+    responses: { first_name: first, last_name: last, attendee_age: age, ...(alternate ? { alternate: true } : {}) } as Record<string, unknown>,
   });
   const submit = async (teamName: string, clubName: string, email: string, key: string, location: string, extraResponses: Record<string, unknown> = {}) => {
     if (await prisma.generalLinkSubmission.findFirst({ where: { eventId: pbeEventId, teamName } })) return;
@@ -614,10 +615,10 @@ async function seedPbeEvent(prisma: PrismaClient) {
       responses: {
         club_name: clubName, director_name: "Dana Mobilecheck-Directorsson", email, phone: "515-555-0100",
         coordinator_name: "Casey Mobilecheck-Coordinator", coordinator_address: "1 Synthetic Road", coordinator_city: "Testville", coordinator_state: "IA", coordinator_zip: "50000",
-        coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true, photo_video_release: "Yes",
+        coordinator_phone: "515-555-0101", coordinator_email: `${P}.coordinator@example.test`, director_confirmation: true,
         ...extraResponses,
       },
-      attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, "Pathfinder", true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Coach", 40, "Coach")],
+      attendees: [person("Bartholomew-Alexander", "Quillfeather-Hargreaves", 14), person("Maria", "de la Cruz-Montenegro", 15, true), person("Lisa", "Hickman", 16), person("Pat", "Mobilecheck-Member", 15)],
       website: "",
     }, { locationId: location, teamName });
   };
