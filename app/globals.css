@@ -12196,6 +12196,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attention-popover .attention-note { margin-bottom: 0; }
 @media (max-width: 760px) {
   .attention-bell { width: 44px; height: 44px; }
-  /* The popover is positioned against its anchor; keep it inside the viewport on a narrow header. */
-  .attention-popover { right: -8px; }
+  /* The bell sits mid-row on a phone, so the panel spans the viewport (16px gutters) under the header instead of hanging off its anchor. */
+  .attention-popover { position: fixed; top: auto; right: 16px; left: 16px; width: auto; margin-top: 10px; }
 }
