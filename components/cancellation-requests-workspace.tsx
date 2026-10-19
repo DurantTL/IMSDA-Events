@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { CancellationCarryOut } from "@/components/cancellation-carry-out";
 import { postJson } from "@/lib/post-json";
+import type { CarryOutPanel } from "@/modules/cancellation-execution/views";
 import { formatCents } from "@/modules/cancellation-policy/rules";
 import { requestStatuses, requestStatusLabels, type RequestStatus } from "@/modules/cancellation-requests/domain";
 import type { StaffQueueRow, StaffRequestDetail } from "@/modules/cancellation-requests/views";
@@ -12,7 +14,8 @@ import type { StaffQueueRow, StaffRequestDetail } from "@/modules/cancellation-r
 /**
  * Staff queue for cancellation requests (#170). It shows what the registrant was shown, what has changed since, and the
  * capacity and waitlist context. Deciding records the decision, by the signed-in person with a reason, and nothing
- * else: no registration is cancelled, no refund or credit is created. Every action is checked again on the server for
+ * else: no registration is cancelled, no refund or credit is created. Carrying an approved request out (#171) is a
+ * separate step, by a named person, in its own section. Every action is checked again on the server for
  * MANAGE_FINANCE on this event; hiding a button is never the protection.
  */
 
@@ -34,6 +37,7 @@ export function CancellationRequestsWorkspace({
   filter,
   rows,
   detail,
+  carryOut,
 }: {
   eventId: string;
   eventName: string;
@@ -41,6 +45,8 @@ export function CancellationRequestsWorkspace({
   filter: string;
   rows: StaffQueueRow[];
   detail: StaffRequestDetail | null;
+  /** How far carrying out the open request has got, or what it needs to start. Only for an approved request. */
+  carryOut: CarryOutPanel | null;
 }) {
   const query = (extra: Record<string, string>) => {
     const params = new URLSearchParams({ event: eventId, status: filter, ...extra });
@@ -55,7 +61,7 @@ export function CancellationRequestsWorkspace({
           <p>
             Registrants ask to cancel from their private link or account for {eventName}. You decide each request, by name and
             with a reason. Approving records your decision only: it does not cancel the registration, refund money or create
-            credit. Those are separate, reviewed steps.
+            credit. Carrying an approved request out is a separate step that a named person presses, on the request itself.
           </p>
         </div>
       </div>
@@ -91,12 +97,12 @@ export function CancellationRequestsWorkspace({
       </section>
 
       {/* Keyed by request, so a reason, an acknowledgement or a message typed for one request never carries over to another. */}
-      {detail && <RequestDetail detail={detail} eventId={eventId} key={detail.id} timezone={timezone} />}
+      {detail && <RequestDetail carryOut={carryOut} detail={detail} eventId={eventId} key={detail.id} timezone={timezone} />}
     </section>
   );
 }
 
-function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDetail; eventId: string; timezone: string }) {
+function RequestDetail({ detail, eventId, timezone, carryOut }: { detail: StaffRequestDetail; eventId: string; timezone: string; carryOut: CarryOutPanel | null }) {
   const id = useId();
   const router = useRouter();
   const [text, setText] = useState("");
@@ -163,6 +169,9 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
       </dl>
       <details><summary>How it was worked out</summary><ul>{detail.proposal.explanation.map((line, index) => <li key={index}>{line}</li>)}</ul></details>
 
+      {/* Once carried out, the registration is meant to differ from the request, so these comparisons would only mislead. */}
+      {!carryOut?.execution && (
+        <>
       <h4>Conflicts and changes</h4>
       {detail.conflicts.length === 0 ? <p>The registration is as it was when the request was made.</p> : (
         <ul className="cancel-request-conflicts">
@@ -180,6 +189,8 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
         {detail.capacity.componentsReleased > 0 ? ` and ${detail.capacity.componentsReleased} item${detail.capacity.componentsReleased === 1 ? "" : "s"}` : ""}
         {detail.capacity.waitlistPlaceReleased ? " and a waitlist place" : ""}. {detail.capacity.waitlistedInEvent} registration{detail.capacity.waitlistedInEvent === 1 ? " is" : "s are"} waitlisted for this event. {detail.capacity.note}
       </p>
+        </>
+      )}
 
       {detail.otherOpenRequests.length > 0 && (
         <p>Other open requests on this registration: {detail.otherOpenRequests.map((other) => `${requestStatusLabels[other.status]} (${scopeWords[other.scope]})`).join(", ")}.</p>
@@ -197,6 +208,10 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
 
       {detail.decision && (
         <p><strong>{detail.statusLabel} by <span translate="no">{detail.decision.byName}</span></strong> on {when(detail.decision.at, timezone)}: {detail.decision.reason}{detail.decision.withChanges ? " (decided after acknowledging changes to the registration)" : ""}</p>
+      )}
+
+      {detail.status === "APPROVED" && carryOut && (
+        <CancellationCarryOut attendeeCount={detail.attendeeNames.length} eventId={eventId} panel={carryOut} requestId={detail.id} scope={detail.scope} />
       )}
 
       {/* Always mounted, so a change of its content is announced. */}

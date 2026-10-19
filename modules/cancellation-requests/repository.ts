@@ -598,14 +598,16 @@ async function conflictsFor(
   client: Client | null,
   request: { id: string; eventId: string; registrationId: string; scope: string; attendeeIds: string[]; chargeIds: string[]; policyVersion: number | null; proposedRefundCents: number; registrationState: unknown },
   now: Date,
-): Promise<{ conflicts: RequestConflict[]; registrationStatus: string }> {
+): Promise<{ conflicts: RequestConflict[]; registrationStatus: string; fingerprint: string | null }> {
   const conflicts: RequestConflict[] = [];
   let registrationStatus = "UNKNOWN";
+  let fingerprint: string | null = null;
   const recorded = request.registrationState as RegistrationStateSnapshot;
   try {
     const { facts } = await loadRegistrationFacts(request.eventId, request.registrationId, now, client ?? undefined);
     registrationStatus = facts.registration?.status ?? "UNKNOWN";
     const currentState = registrationStateOf(facts);
+    fingerprint = stateFingerprint(currentState);
     const stateDiff = diffRegistrationState(recorded, currentState);
     conflicts.push(...stateDiff);
     // The registration itself is as it was when the request was made: any difference in outcome is only time passing.
@@ -641,7 +643,7 @@ async function conflictsFor(
   } catch {
     conflicts.push({ code: "REGISTRATION_NOT_CANCELLABLE", severity: "CHANGE", message: "The registration could not be loaded; it may have been removed." });
   }
-  return { conflicts, registrationStatus };
+  return { conflicts, registrationStatus, fingerprint };
 }
 
 function capacityEffects(result: CancellationResult, waitlistedInEvent: number): CapacityEffects {
@@ -755,8 +757,12 @@ export async function reviewCancellationRequest(eventId: string, requestId: stri
     // What changed, read after the lock and just before deciding, so the acknowledgement and `decidedWithChanges` describe
     // the registration at the moment of the decision. An approval over a changed registration must be acknowledged.
     let changed = false;
+    // The registration's state at this moment, recorded with the approval (#171): carrying the request out later applies only
+    // to a registration that still matches it.
+    let approvedFingerprint: string | null = null;
     if (action.action === "APPROVE") {
-      const { conflicts } = await conflictsFor(tx, request, now);
+      const { conflicts, fingerprint } = await conflictsFor(tx, request, now);
+      approvedFingerprint = fingerprint;
       changed = hasChangeConflict(conflicts);
       if (changed && !action.acknowledgeChanges) {
         throw new CancellationRequestError(
@@ -779,6 +785,7 @@ export async function reviewCancellationRequest(eventId: string, requestId: stri
             decisionReason: action.action === "APPROVE" || action.action === "DECLINE" ? action.reason : null,
             decidedAt: now,
             decidedWithChanges: changed,
+            ...(action.action === "APPROVE" ? { approvedStateFingerprint: approvedFingerprint } : {}),
           }
           : {}),
       },

@@ -39,7 +39,7 @@ type Context<P> = { params: Promise<{ eventId: string } & P> };
  * CONFIGURE_EVENT; plans, prices, orders and anything that moves money need MANAGE_FINANCE.
  */
 export function mealRoute<P extends Record<string, string> = Record<never, never>>(
-  permission: EventPermission,
+  permission: EventPermission | readonly EventPermission[],
   action: string,
   work: (input: { request: Request; eventId: string; userId: string; params: { eventId: string } & P }) => Promise<Response>,
   options: { mutates?: boolean } = {},
@@ -51,7 +51,19 @@ export function mealRoute<P extends Record<string, string> = Record<never, never
     }
     try {
       const params = await context.params;
-      const access = await requirePermission(await getCurrentSession(), params.eventId, permission, findActiveMembership);
+      const session = await getCurrentSession();
+      // A list means any one of them opens the route; the last refusal is the one reported.
+      const options = Array.isArray(permission) ? permission as readonly EventPermission[] : [permission as EventPermission];
+      let access: Awaited<ReturnType<typeof requirePermission>> | null = null;
+      for (const [index, candidate] of options.entries()) {
+        try {
+          access = await requirePermission(session, params.eventId, candidate, findActiveMembership);
+          break;
+        } catch (error) {
+          if (!(error instanceof AccessDeniedError) || error.code !== "PERMISSION_DENIED" || index === options.length - 1) throw error;
+        }
+      }
+      if (!access) throw new AccessDeniedError("A permission is required for this event.", 403, "PERMISSION_DENIED");
       return await work({ request, eventId: params.eventId, userId: access.user.id, params });
     } catch (error) {
       return mealApiError(error, action);
