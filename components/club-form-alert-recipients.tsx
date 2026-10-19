@@ -54,7 +54,8 @@ export function ClubFormAlertRecipients({ templateKey, initialEmails }: { templa
         <label className="field">
           <span>Email these addresses when this form is submitted</span>
           <textarea
-            aria-describedby="club-form-alerts-help club-form-alerts-status"
+            aria-describedby={`club-form-alerts-help club-form-alerts-status${error ? " club-form-alerts-error" : ""}`}
+            aria-invalid={Boolean(error)}
             autoComplete="off"
             maxLength={2000}
             name="alertRecipients"
@@ -72,7 +73,7 @@ export function ClubFormAlertRecipients({ templateKey, initialEmails }: { templa
         <div aria-live="polite" id="club-form-alerts-status" role="status">
           {notice && <p className="quiet-copy">{notice}</p>}
         </div>
-        {error && <div className="inline-notice error" role="alert">{error}</div>}
+        {error && <div className="inline-notice error" id="club-form-alerts-error" role="alert">{error}</div>}
         <div>
           <button className="primary-button" disabled={saving} type="submit">
             <Save aria-hidden="true" size={14} /> {saving ? "Saving..." : "Save addresses"}

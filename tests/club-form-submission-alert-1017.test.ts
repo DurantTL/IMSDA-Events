@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   switchRead: vi.fn(),
   configured: vi.fn(),
   deliver: vi.fn(),
+  logError: vi.fn(),
+  senderFails: false,
   events: [] as string[],
 }));
 
@@ -55,8 +57,12 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/communications/account-email", () => ({
   AccountEmailNotConfiguredError: class extends Error {},
   isAccountEmailConfigured: mocks.configured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => {
+    if (mocks.senderFails) throw new Error("sender settings broken");
+    return { name: "IMSDA Events", address: "events@example.test", replyTo: null };
+  },
 }));
+vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logInfo: vi.fn(), logWarn: vi.fn() }));
 vi.mock("@/modules/communications/email-delivery", () => ({ processAccountEmailQueue: mocks.deliver }));
 vi.mock("@/modules/notifications/settings", () => ({
   isNotificationEnabled: async (key: string) => {
@@ -211,6 +217,17 @@ describe("saving the list (#1017)", () => {
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
+  it("refuses eleven addresses with a 400-class validation error and writes nothing", async () => {
+    const eleven = Array.from({ length: 11 }, (_, index) => `person${index}@imsda-events.test`);
+    const error = await setClubFormAlertRecipients("off_premises_permission_slip", eleven, "admin-1").catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ code: "VALIDATION_FAILED", message: "Add at most 10 addresses." });
+    const { clubFormApiError } = await import("@/modules/club-forms/api-errors");
+    expect(clubFormApiError(error, "test").status).toBe(400);
+    expect(mocks.templateFindUnique).not.toHaveBeenCalled();
+    expect(mocks.templateUpdate).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
   it("says not found for a form that does not exist", async () => {
     mocks.templateFindUnique.mockResolvedValue(null);
     await expect(setClubFormAlertRecipients("missing", [], "admin-1")).rejects.toMatchObject({ code: "TEMPLATE_NOT_FOUND" });
@@ -239,6 +256,16 @@ describe("a submission queues one email per recipient (#1017)", () => {
     expect(body).toContain("https://events.imsda.test/more/club-forms/");
   });
 
+  it("a link submission's email holds no answer and not the link's subject name", async () => {
+    await viaLink();
+    expect(outbox).toHaveLength(2);
+    for (const row of outbox) {
+      const text = `${row.subjectSnapshot}\n${row.bodyTextSnapshot}\n${JSON.stringify(row.metadata)}`;
+      expect(text).not.toContain(openLink().subjectName);
+      for (const value of Object.values(slipAnswers)) expect(text, `must not contain "${value}"`).not.toContain(value);
+    }
+  });
+
   it("names the staff member when a system administrator submits as a director", async () => {
     await viaPortal(actingDirector);
     expect(String(outbox[0].bodyTextSnapshot)).toContain("Submitted by: Alex Admin");
@@ -248,6 +275,56 @@ describe("a submission queues one email per recipient (#1017)", () => {
     await viaPortal(director, false);
     expect(outbox).toEqual([]);
     expect(mocks.switchRead).not.toHaveBeenCalled();
+  });
+});
+
+describe("a failure to queue the alert never undoes or refuses the submission (#1017)", () => {
+  const failures: Array<[string, () => void]> = [
+    ["the outbox insert fails", () => mocks.outboxCreate.mockRejectedValue(new Error("outbox down"))],
+    ["the idempotency lookup fails", () => mocks.outboxFindMany.mockRejectedValue(new Error("lookup down"))],
+    ["the organization lookup fails", () => mocks.organizationFindUnique.mockRejectedValue(new Error("organization lookup down"))],
+  ];
+
+  for (const [name, fail] of failures) {
+    it(`${name}: a link submission still succeeds and the error is logged without addresses`, async () => {
+      // The alert is queued after the transaction, so the submission is already saved when the failure happens.
+      let committed = false;
+      mocks.submissionCreate.mockImplementation(async () => { committed = true; return {}; });
+      fail();
+      const result = await viaLink();
+      expect(committed).toBe(true);
+      expect(result).toMatchObject({ submissionId: expect.any(String) });
+      expect(mocks.logError).toHaveBeenCalledTimes(1);
+      const logged = JSON.stringify(mocks.logError.mock.calls[0].slice(2));
+      expect(logged).toContain("submissionId");
+      expect(logged).not.toContain("imsda-events.test");
+      expect(outbox).toEqual([]);
+    });
+  }
+
+  it("a portal submission still succeeds when the outbox insert fails", async () => {
+    mocks.outboxCreate.mockRejectedValue(new Error("outbox down"));
+    await expect(viaPortal()).resolves.toMatchObject({ status: "SUBMITTED" });
+    expect(mocks.logError).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failing sender lookup is logged, not thrown", async () => {
+    mocks.senderFails = true;
+    try {
+      await expect(viaLink()).resolves.toMatchObject({ submissionId: expect.any(String) });
+      await expect(viaPortal()).resolves.toMatchObject({ status: "SUBMITTED" });
+    } finally {
+      mocks.senderFails = false;
+    }
+    expect(mocks.logError).toHaveBeenCalledTimes(2);
+    expect(outbox).toEqual([]);
+  });
+
+  it("queues nothing and logs nothing when the switch is off", async () => {
+    mocks.switchRead.mockReturnValue(false);
+    await viaLink();
+    expect(mocks.logError).not.toHaveBeenCalled();
+    expect(outbox).toEqual([]);
   });
 });
 

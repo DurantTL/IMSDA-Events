@@ -31,7 +31,7 @@ import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
-import { deliverClubFormSubmittedEmails, queueClubFormSubmittedEmails } from "@/modules/club-forms/submission-alert";
+import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-alert";
 import { usableRosterMapping } from "@/modules/club-forms/roster-mapping";
 import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
 
@@ -242,19 +242,19 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
         hasSensitiveAnswers: hasSensitive,
       },
     }, tx);
-    const alertMessageIds = input.submit
-      ? await queueClubFormSubmittedEmails(tx, {
-        submissionId: id,
-        templateId: template.id,
-        organizationId: input.organizationId,
-        actor: leader.actor,
-        submittedAt: now,
-      }, alertEnabled)
-      : [];
-    return { id, status: data.status, alertMessageIds };
+    return { id, status: data.status };
   });
-  await deliverClubFormSubmittedEmails(saved.alertMessageIds);
-  return { id: saved.id, status: saved.status };
+  // After the commit, and never throwing: the saved form stands whatever happens to the alert (#1017).
+  if (input.submit) {
+    await sendClubFormSubmittedAlert({
+      submissionId: saved.id,
+      templateId: template.id,
+      organizationId: input.organizationId,
+      actor: leader.actor,
+      submittedAt: now,
+    }, alertEnabled);
+  }
+  return saved;
 }
 
 export type ClubFormListFilter = {

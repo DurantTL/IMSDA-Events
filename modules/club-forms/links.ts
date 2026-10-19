@@ -31,7 +31,7 @@ import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/m
 import { assertAnswersSize, resolveRosterMemberName } from "@/modules/club-forms/submissions";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
-import { deliverClubFormSubmittedEmails, queueClubFormSubmittedEmails } from "@/modules/club-forms/submission-alert";
+import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-alert";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 
 /**
@@ -344,15 +344,15 @@ export async function submitClubFormViaLink(token: string, rawAnswers: Record<st
       summary: "A club form was submitted through a private link.",
       metadata: { organizationId: link.organizationId, templateKey: template.key, hasSensitiveAnswers: hasSensitive, linkId: link.id },
     }, tx);
-    const alertMessageIds = await queueClubFormSubmittedEmails(tx, {
-      submissionId,
-      templateId: link.template.id,
-      organizationId: link.organizationId,
-      actor: null,
-      submittedAt: now,
-    }, alertEnabled);
-    return { submissionId, confirmationMessage: template.definition.confirmationMessage, alertMessageIds };
+    return { submissionId, confirmationMessage: template.definition.confirmationMessage };
   });
-  await deliverClubFormSubmittedEmails(result.alertMessageIds);
-  return { submissionId: result.submissionId, confirmationMessage: result.confirmationMessage };
+  // After the commit, and never throwing: the club's submission is saved whatever happens to the alert (#1017).
+  await sendClubFormSubmittedAlert({
+    submissionId,
+    templateId: link.template.id,
+    organizationId: link.organizationId,
+    actor: null,
+    submittedAt: now,
+  }, alertEnabled);
+  return result;
 }

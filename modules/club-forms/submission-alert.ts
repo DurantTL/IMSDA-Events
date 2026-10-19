@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
 import { logError } from "@/lib/logger";
+import { getPrisma } from "@/lib/prisma";
 import { neutralizePlaceholders } from "@/modules/club-applications/email";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
@@ -15,6 +16,9 @@ import type { ClubFormActor } from "@/modules/club-forms/domain";
  *
  * The email says which form, which club, who submitted it (a name, nothing more), when, and a staff link. It never
  * carries an answer: a club form can hold health or other sensitive information, so the reader signs in to see it.
+ *
+ * The alert is queued AFTER the submission commits (`sendClubFormSubmittedAlert`), never inside its transaction: a failed
+ * statement aborts a Postgres transaction, so a queueing error inside it would undo the club's save.
  *
  * `enabled` is the "Club form submitted" switch (#1016). The caller reads it BEFORE its transaction opens and passes it
  * in, because this runs inside one and must not read the database for a switch.
@@ -134,6 +138,22 @@ export async function queueClubFormSubmittedEmails(client: Client, input: ClubFo
     ids.push(message.id);
   }
   return ids;
+}
+
+/**
+ * Queues and delivers the alert once the submission has committed. Never throws: any failure (the sender settings, a
+ * lookup, the outbox insert, delivery) is logged with the submission id only, never an address or an answer, and the
+ * caller carries on. The idempotency keys are the same, so a later attempt for the same submission adds nothing twice.
+ * `enabled` was read before the transaction opened.
+ */
+export async function sendClubFormSubmittedAlert(input: ClubFormSubmittedInput, enabled: boolean): Promise<void> {
+  if (!enabled) return;
+  try {
+    const ids = await queueClubFormSubmittedEmails(getPrisma(), input, true);
+    await deliverClubFormSubmittedEmails(ids);
+  } catch (error) {
+    logError("A club form submitted alert could not be queued; the submission was saved.", error, { submissionId: input.submissionId });
+  }
 }
 
 /** Best-effort delivery after the transaction commits. Never throws; the outbox sweep retries what fails. */
