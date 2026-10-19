@@ -12178,7 +12178,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   border-radius: 999px;
   background: var(--imsda-purple);
   color: white;
-  font-size: 0.68rem;
+  font-size: max(var(--type-floor, 0px), 0.68rem);
   font-weight: 800;
   line-height: 16px;
   text-align: center;
