@@ -4604,6 +4604,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .cancel-request-message { display: flex; align-items: flex-start; gap: 7px; }
 .cancel-request-message.is-ok { color: var(--imsda-navy); }
 .cancel-request-message svg { flex: none; margin-top: 2px; }
+.cancel-request-actions { display: grid; gap: 12px; min-width: 0; }
+.cancel-request-actions .field-help, .cancel-request-panel .field-help { margin: 4px 0 0; }
 .cancel-request-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cancel-request-confirm p { flex: 1 1 100%; }
 .cancel-request-panel [aria-live]:focus { outline: 2px solid var(--imsda-navy); outline-offset: 2px; }
