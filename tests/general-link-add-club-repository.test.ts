@@ -96,12 +96,14 @@ vi.mock("@/modules/forms/public-repository", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/forms/public-repository")>()),
   getPublicRegistrationExperience: async () => ({ form: { versionId: "v1", definition: pbe } }),
   submitPublicRegistration: async (_slug: string, _form: string, input: { idempotencyKey: string; attendees?: unknown[] }, _now: Date, bulk: {
+    beforeValidation?: (tx: unknown) => Promise<void>;
     prepareAttendees: (tx: unknown, args: unknown) => Promise<unknown>;
     inTransaction: (tx: unknown, created: { registrationId: string; confirmationCode: string; waitlisted: boolean }) => Promise<void>;
   }) => {
     const before = { orgs: new Map(mocks.state.orgs), audits: [...mocks.state.audits], registrations: new Map(mocks.state.registrations), submission: { ...mocks.state.submission } };
     const tx = makeTx();
     try {
+      await bulk.beforeValidation?.(tx);
       await bulk.prepareAttendees(tx, { definition: pbe, event: { id: "event-1", startsAt: new Date("2027-03-01T00:00:00Z"), timezone: "UTC" }, input });
       if (mocks.state.registrations.has(input.idempotencyKey)) return; // a replay: nothing new commits
       if (mocks.failRegistration) throw new Error("registration refused");

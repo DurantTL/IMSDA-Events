@@ -1228,16 +1228,14 @@ export async function resolvePendingTeam(
       row.createdAt,
       {
         ...clubPreparer,
-        // A club staff add exists only if the registration does: it is created first thing in the registration's transaction.
+        // A club staff add exists only if the registration does: it is created first thing in the registration's transaction, before
+        // the club question is validated against the directory.
         ...(action.action === "ADD_CLUB" ? {
-          prepareAttendees: async (tx, args) => {
-            await addClubInTransaction(tx, {
-              id: club.id, name: club.name, sponsoringChurchId: action.sponsoringChurchId, acknowledgeSimilar: action.acknowledgeSimilar === true,
-              eventId, submissionId: row.id, actorUserId,
-            });
-            return clubPreparer.prepareAttendees(tx, args);
-          },
-        } satisfies Pick<ClubSubmissionContext, "prepareAttendees"> : {}),
+          beforeValidation: (tx: Tx) => addClubInTransaction(tx, {
+            id: club.id, name: club.name, sponsoringChurchId: action.sponsoringChurchId, acknowledgeSimilar: action.acknowledgeSimilar === true,
+            eventId, submissionId: row.id, actorUserId,
+          }),
+        } : {}),
         auditMetadata: { generalLinkSubmissionId: row.id, matchBasis: "STAFF", ...(adding ? { clubAdded: true } : {}) },
         auditActorUserId: actorUserId,
         // This submission's own waiting name is released by this very confirmation; every other waiting name stays reserved.
