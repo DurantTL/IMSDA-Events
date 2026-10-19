@@ -37,6 +37,8 @@ import { getRegistrantLodgingView } from "@/modules/lodging/preferences-service"
 import { PublicLodgingAssignment } from "@/components/public-lodging-assignment";
 import { getRegistrantAssignmentView } from "@/modules/lodging/assignment-view";
 import { getRegistrantWaitlistView } from "@/modules/lodging/waitlist-service";
+import { CancellationRequestPanel } from "@/components/cancellation-request-panel";
+import { getRegistrantRequestView } from "@/modules/cancellation-requests/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +125,12 @@ export default async function PublicManagePage({
     : null;
   const lodgingWaitlist = lodgingActive
     ? await getRegistrantWaitlistView({ eventId: responsibleAdultAccess.eventId, registrationId: responsibleAdultAccess.registrationId }).catch(() => null)
+    : null;
+  // Cancellation requests (#170): offered for a registration the contact pays for, and always shown when one exists so a
+  // request can be followed or withdrawn. A failure here must not take the page down.
+  const cancellationAccess = !view.isGroup && !view.isClub && !view.perPerson ? await authorizeRegistrationAccessToken(token) : null;
+  const cancellationView = cancellationAccess
+    ? await getRegistrantRequestView({ registrationId: cancellationAccess.registrationId, eventId: cancellationAccess.eventId }).catch(() => null)
     : null;
   const attendeePassesAvailable = (
     view.registration.status === "SUBMITTED"
@@ -393,6 +401,13 @@ export default async function PublicManagePage({
             )}
             {!view.perPerson && !view.isGroup && <PublicSquarePayment token={token} initialKind={initialPaymentKind} />}
           </section>
+
+          {cancellationView && (cancellationView.available || cancellationView.requests.length > 0) && (
+            <CancellationRequestPanel
+              endpoint={`/api/public/manage/${encodeURIComponent(token)}/cancellation`}
+              initialView={cancellationView}
+            />
+          )}
         </div>
 
         <aside className="public-manage-side">

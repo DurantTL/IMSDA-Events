@@ -24,6 +24,8 @@ export const MESSAGE_TEMPLATE_KEYS = [
   "REGISTRATION_ACCESS_RECOVERY",
   "EVENT_ANNOUNCEMENT",
   "CLUB_ASSIGNMENTS",
+  "CANCELLATION_REQUEST_RECEIVED",
+  "CANCELLATION_REQUEST_UPDATED",
   "CUSTOM_MESSAGE",
 ] as const;
 
@@ -83,6 +85,8 @@ export const MESSAGE_TEMPLATE_TOKEN_KEYS = [
   "checkin_qr_image",
   "checkin_qr_images",
   "club_assignments_block",
+  "request_status",
+  "request_status_detail",
 ] as const;
 
 export type MessageTemplateToken = (typeof MESSAGE_TEMPLATE_TOKEN_KEYS)[number];
@@ -200,6 +204,8 @@ export const DEFAULT_MESSAGE_TEMPLATE_NAMES: Readonly<Record<MessageTemplateKey,
   REGISTRATION_ACCESS_RECOVERY: "Private registration link recovery",
   EVENT_ANNOUNCEMENT: "Event announcement",
   CLUB_ASSIGNMENTS: "Club assignments",
+  CANCELLATION_REQUEST_RECEIVED: "Cancellation request received",
+  CANCELLATION_REQUEST_UPDATED: "Cancellation request update",
   CUSTOM_MESSAGE: "Custom message",
 };
 
@@ -250,6 +256,10 @@ export const DEFAULT_MESSAGE_TEMPLATE_DESCRIPTIONS: Readonly<
     "Sends a published event-feed announcement to active registration contacts after an explicit staff broadcast action.",
   CLUB_ASSIGNMENTS:
     "Sent only after staff review a batch of clubs whose campsite, duty, and activity are all set. Tells a club director what staff assigned; re-sent after an assignment changes.",
+  CANCELLATION_REQUEST_RECEIVED:
+    "Sent when a registrant asks to cancel. Says only that the request was received and that nothing has changed: never the reason, the amount or the outcome.",
+  CANCELLATION_REQUEST_UPDATED:
+    "Sent when a cancellation request changes status (under review, information needed, approved, declined, withdrawn, replaced). Says only the status and what happens next: never the reason, the amount or a staff note.",
   CUSTOM_MESSAGE:
     "Your own message, written from a blank page. Sent only when staff choose registrations under Email selected and publish this template first; no workflow sends it on its own.",
 };
@@ -295,6 +305,10 @@ export const DEFAULT_MESSAGE_TEMPLATE_SUBJECTS: Readonly<
     "{{event_name}} update: {{announcement_title}}",
   CLUB_ASSIGNMENTS:
     "Your club's assignments for {{event_name}}",
+  CANCELLATION_REQUEST_RECEIVED:
+    "Cancellation request received: {{event_name}} ({{confirmation_code}})",
+  CANCELLATION_REQUEST_UPDATED:
+    "Cancellation request update: {{event_name}} ({{confirmation_code}})",
   // Starts blank: staff write it, and publishing needs both fields.
   CUSTOM_MESSAGE: "",
 };
@@ -711,6 +725,44 @@ export const DEFAULT_MESSAGE_TEMPLATE_BODIES: Readonly<Record<MessageTemplateKey
     "",
     "Questions? Contact {{contact_email}}.",
   ].join("\n"),
+  CANCELLATION_REQUEST_RECEIVED: [
+    "# We received your cancellation request for {{event_name}}",
+    "",
+    "Hello {{recipient_name}},",
+    "",
+    "We received a request about registration **{{confirmation_code}}**.",
+    "",
+    "- **Status:** {{request_status}}",
+    "",
+    "{{request_status_detail}}",
+    "",
+    "For your privacy, this message does not include the reason or any amounts.",
+    "",
+    "**[See your request]({{portal_url}})**",
+    "",
+    "---",
+    "",
+    "If you did not make this request, contact {{contact_email}}.",
+  ].join("\n"),
+  CANCELLATION_REQUEST_UPDATED: [
+    "# Your cancellation request for {{event_name}}",
+    "",
+    "Hello {{recipient_name}},",
+    "",
+    "The status of your request about registration **{{confirmation_code}}** changed.",
+    "",
+    "- **Status:** {{request_status}}",
+    "",
+    "{{request_status_detail}}",
+    "",
+    "For your privacy, this message does not include the reason or any amounts.",
+    "",
+    "**[See your request]({{portal_url}})**",
+    "",
+    "---",
+    "",
+    "Questions? Contact {{contact_email}}.",
+  ].join("\n"),
   CUSTOM_MESSAGE: "",
 };
 
@@ -899,6 +951,16 @@ export const MESSAGE_TEMPLATE_TOKEN_OPTIONS: readonly {
     label: "Club assignments block",
     description: "The club's staff-set campsite, duty, and activity, as a short list. Only what staff set is shown.",
   },
+  {
+    key: "request_status",
+    label: "Cancellation request status",
+    description: "The status of a cancellation request, such as Under review or Approved. Never the reason, an amount or a staff note.",
+  },
+  {
+    key: "request_status_detail",
+    label: "Cancellation request status detail",
+    description: "One fixed sentence about what the status means and what happens next.",
+  },
 ];
 
 /**
@@ -1020,6 +1082,8 @@ export const SAMPLE_MESSAGE_TEMPLATE_CONTEXT: Readonly<
     "- **Duty:** Flag raising / lowering — Friday morning",
     "- **Activity:** Lead singing around campfire at your campsite",
   ].join("\n"),
+  request_status: "Under review",
+  request_status_detail: "The event team is reviewing your request. Nothing has been cancelled, refunded or changed yet.",
 });
 
 /**

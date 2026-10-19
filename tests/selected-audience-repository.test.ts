@@ -491,6 +491,6 @@ describe("custom message on the selected-audience path (#850)", () => {
     }));
     expect(created).not.toContain("template-CUSTOM_MESSAGE");
     expect(created).toContain("template-EVENT_ANNOUNCEMENT");
-    expect(created).toHaveLength(22);
+    expect(created).toHaveLength(24);
   });
 });

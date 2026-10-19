@@ -50,6 +50,8 @@ type TransactionalTemplateKey =
   | "CUSTOM_MESSAGE"
   | "PAYMENT_RECEIPT"
   | "REFUND_NOTICE"
+  | "CANCELLATION_REQUEST_RECEIVED"
+  | "CANCELLATION_REQUEST_UPDATED"
   // Sent one at a time by the transactional path only when staff choose a set
   // of registrations to send it to; the event-wide reminder batch renders its
   // own copy against the reminder audience.
@@ -106,6 +108,8 @@ type TransactionalMessageInput = {
   /** An announcement's own attachments, sent alongside the template version's (#824). */
   announcementFileIds?: readonly string[];
   metadata?: Record<string, string | number | boolean | null>;
+  /** Cancellation request notices (#170): the request's status. The wording comes from a fixed list, never from the registrant or staff. */
+  requestStatus?: { label: string; detail: string };
   /** One plain line placed at the top of the message (#931: the club a team was attached to), added as escaped text, never as template source. */
   leadNote?: string | null;
 };
@@ -604,6 +608,8 @@ async function enqueueTransactionalMessage(
       ? registrationUpdateCategoryLabels[input.changeCategory]
       : "Registration details",
     seminar_preferences: seminarPreferences,
+    request_status: input.requestStatus?.label ?? "Received",
+    request_status_detail: input.requestStatus?.detail ?? "",
   };
   const rendered = renderMessageTemplate(
     {
@@ -875,6 +881,37 @@ export function enqueuePaymentReceiptMessage(
       paymentAttemptId: input.paymentAttemptId ?? null,
       provider: "SQUARE",
     },
+  });
+}
+
+/**
+ * A cancellation request was received or changed status (#170). The message says the status and what happens next from
+ * a fixed list; it never carries the registrant's reason, an amount, the outcome or a staff note. One message per
+ * request and status, so a retried step queues nothing twice.
+ */
+export function enqueueCancellationRequestMessage(
+  tx: Prisma.TransactionClient,
+  input: {
+    eventId: string;
+    registrationId: string;
+    requestId: string;
+    /** The timeline step this message is for, so a status that repeats (information needed twice) is emailed each time. */
+    stepId: string;
+    kind: "RECEIVED" | "UPDATED";
+    status: string;
+    statusLabel: string;
+    statusDetail: string;
+    correlationId?: string;
+  },
+) {
+  return enqueueTransactionalMessage(tx, {
+    eventId: input.eventId,
+    registrationId: input.registrationId,
+    templateKey: input.kind === "RECEIVED" ? "CANCELLATION_REQUEST_RECEIVED" : "CANCELLATION_REQUEST_UPDATED",
+    correlationId: input.correlationId ?? randomUUID(),
+    transitionKey: `cancellation-request:${input.requestId}:${input.stepId}`,
+    requestStatus: { label: input.statusLabel, detail: input.statusDetail },
+    metadata: { requestId: input.requestId, stepId: input.stepId, status: input.status },
   });
 }
 
