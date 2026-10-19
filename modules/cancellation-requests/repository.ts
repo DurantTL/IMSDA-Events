@@ -595,6 +595,7 @@ const staffActionsFor = (status: RequestStatus): StaffRequestDetail["actions"] =
  * recorded with the request, today's outcome against the proposal they were shown, and overlapping open requests.
  */
 async function conflictsFor(
+  client: Client | null,
   request: { id: string; eventId: string; registrationId: string; scope: string; attendeeIds: string[]; chargeIds: string[]; policyVersion: number | null; proposedRefundCents: number; registrationState: unknown },
   now: Date,
 ): Promise<{ conflicts: RequestConflict[]; registrationStatus: string }> {
@@ -602,14 +603,14 @@ async function conflictsFor(
   let registrationStatus = "UNKNOWN";
   const recorded = request.registrationState as RegistrationStateSnapshot;
   try {
-    const { facts } = await loadRegistrationFacts(request.eventId, request.registrationId, now);
+    const { facts } = await loadRegistrationFacts(request.eventId, request.registrationId, now, client ?? undefined);
     registrationStatus = facts.registration?.status ?? "UNKNOWN";
     const currentState = registrationStateOf(facts);
     const stateDiff = diffRegistrationState(recorded, currentState);
     conflicts.push(...stateDiff);
     // The registration itself is as it was when the request was made: any difference in outcome is only time passing.
     const registrationUnchanged = stateFingerprint(recorded) === stateFingerprint(currentState);
-    const current = await previewCancellation(request.eventId, selectionRequest(request.registrationId, toSelection(request)) as PreviewRequest, now);
+    const current = await previewCancellation(request.eventId, selectionRequest(request.registrationId, toSelection(request)) as PreviewRequest, now, client ?? undefined);
     if (current.result.status !== "CALCULATED") {
       conflicts.push({
         code: current.result.status === "NOT_CANCELLABLE" ? "REGISTRATION_NOT_CANCELLABLE" : "SCOPE_NO_LONGER_VALID",
@@ -617,12 +618,15 @@ async function conflictsFor(
         message: current.result.message ?? "The request can no longer be calculated against the registration as it is now.",
       });
     } else {
+      const newerPolicy = request.policyVersion !== null && current.result.policy !== null && current.result.policy.version !== request.policyVersion;
       if (current.result.money.refundCents !== request.proposedRefundCents) {
         conflicts.push({
           code: "OUTCOME_CHANGED",
           severity: registrationUnchanged ? "NOTE" : "CHANGE",
           message: registrationUnchanged
-            ? `Time has passed since the request. The registration is unchanged, but today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`
+            ? (newerPolicy
+              ? `A newer refund policy is in effect. The registration is unchanged, but today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`
+              : `Time has passed since the request. The registration is unchanged, but today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`)
             : `Today the policy would propose a ${formatCents(current.result.money.refundCents)} refund; the registrant was shown ${formatCents(request.proposedRefundCents)}.`,
         });
       }
@@ -630,7 +634,7 @@ async function conflictsFor(
         conflicts.push({
           code: "POLICY_VERSION_CHANGED",
           severity: "NOTE",
-          message: `Policy version ${current.result.policy.version} is in effect now; the request used version ${request.policyVersion}.`,
+          message: `A newer refund policy is in effect (version ${current.result.policy.version}); the request used version ${request.policyVersion}.`,
         });
       }
     }
@@ -661,7 +665,7 @@ export async function getCancellationRequestDetail(eventId: string, requestId: s
   if (!row) return null;
   const status = asStatus(row.status);
   const [{ conflicts, registrationStatus }, registration, others, waitlistedInEvent] = await Promise.all([
-    conflictsFor(row, now),
+    conflictsFor(null, row, now),
     db.registration.findFirst({ where: { id: row.registrationId, eventId }, select: { confirmationCode: true, contactSnapshot: true } }),
     db.cancellationRequest.findMany({
       where: { eventId, registrationId: row.registrationId, status: { in: [...openStatuses] }, NOT: { id: row.id } },
@@ -752,7 +756,7 @@ export async function reviewCancellationRequest(eventId: string, requestId: stri
     // the registration at the moment of the decision. An approval over a changed registration must be acknowledged.
     let changed = false;
     if (action.action === "APPROVE") {
-      const { conflicts } = await conflictsFor(request, now);
+      const { conflicts } = await conflictsFor(tx, request, now);
       changed = hasChangeConflict(conflicts);
       if (changed && !action.acknowledgeChanges) {
         throw new CancellationRequestError(

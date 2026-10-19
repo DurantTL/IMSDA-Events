@@ -34,6 +34,8 @@ const world = vi.hoisted(() => ({
   emails: [] as Array<Record<string, unknown>>,
   processed: [] as string[][],
   writes: [] as string[],
+  transactions: [] as unknown[],
+  clients: [] as Array<{ call: string; client: unknown }>,
   users: new Map<string, { id: string; displayName: string }>(),
   nextId: 1,
 }));
@@ -124,7 +126,12 @@ const fakeDb = {
   },
   user: { findUnique: async ({ where }: { where: { id: string } }) => world.users.get(where.id) ?? null },
   $executeRaw: async () => 1,
-  $transaction: async (run: (tx: unknown) => unknown) => run(db),
+  // A distinct client for the transaction, so a test can tell a read on it from a read through the pool.
+  $transaction: async (run: (tx: unknown) => unknown) => {
+    const tx = new Proxy(db, {});
+    world.transactions.push(tx);
+    return run(tx);
+  },
 };
 
 // Any touch of a guarded model, or a write to the registration, fails the test that did it.
@@ -181,7 +188,7 @@ function currentFacts(at: Date): CalculationFacts {
 }
 
 vi.mock("@/modules/cancellation-policy/repository", () => ({
-  previewCancellation: vi.fn(async (_eventId: string, request: { selection: never }, at: Date) => ({
+  previewCancellation: vi.fn(async (_eventId: string, request: { selection: never }, at: Date, client?: unknown) => (world.clients.push({ call: "preview", client }), {
     result: calculateCancellation({ facts: currentFacts(at ?? world.now), selection: request.selection, policyVersions: world.policies as never }),
     registration: null,
     recorded: false,
@@ -192,7 +199,8 @@ vi.mock("@/modules/cancellation-policy/repository", () => ({
     world.calculations.push(row);
     return { id: row.id, createdAt: world.now };
   }),
-  loadRegistrationFacts: vi.fn(async (_eventId: string, registrationId: string, at: Date) => {
+  loadRegistrationFacts: vi.fn(async (_eventId: string, registrationId: string, at: Date, client?: unknown) => {
+    world.clients.push({ call: "facts", client });
     if (registrationId !== "reg-1") throw new Error("REGISTRATION_NOT_FOUND");
     return {
       facts: currentFacts(at ?? world.now),
@@ -240,6 +248,8 @@ beforeEach(() => {
   world.emails = [];
   world.processed = [];
   world.writes = [];
+  world.transactions = [];
+  world.clients = [];
   world.nextId = 1;
   world.users = new Map([["staff-1", { id: "staff-1", displayName: "Fran Finance" }], ["staff-2", { id: "staff-2", displayName: "Rae Registrar" }]]);
 });
@@ -551,6 +561,19 @@ describe("staff review (#170)", () => {
   });
 });
 
+describe("the decision reads on its own transaction (#170)", () => {
+  it("runs every read of the change check on the transaction client, never through the pool", async () => {
+    const { request } = await submit();
+    world.clients = [];
+    world.transactions = [];
+    await reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "APPROVE", reason: "Within the policy." }, world.now);
+    const [tx] = world.transactions;
+    expect(tx).toBeTruthy();
+    expect(world.clients.map((entry) => entry.call).sort()).toEqual(["facts", "preview"]);
+    for (const entry of world.clients) expect(entry.client, entry.call).toBe(tx);
+  });
+});
+
 describe("a status that repeats (#170)", () => {
   it("is emailed for each timeline step, each with its own step id", async () => {
     const { request } = await submit();
@@ -576,6 +599,18 @@ describe("a registration that changed after the request (#170)", () => {
     expect(detail!.conflicts.filter((conflict) => conflict.severity === "CHANGE")).toEqual([]);
     await reviewCancellationRequest("event-1", request.id, { userId: "staff-1" }, { action: "APPROVE", reason: "Asked in time." }, world.now);
     expect(world.requests[0]).toMatchObject({ status: "APPROVED", decidedWithChanges: false });
+  });
+
+  it("words a newer policy separately from elapsed time", async () => {
+    const { request } = await submit();
+    const rules = parseCancellationRules({ ...campMeetingPreset("2026-05-25"), windows: [{ ...campMeetingPreset("2026-05-25").windows![0], terms: { refund: { kind: "FULL" }, flatWithholdCents: 0, flatWithholdLabel: "Processing fee", depositTreatment: "REFUND", creditAllowed: false } }] });
+    world.policies = [...(world.policies as unknown[]), { id: "pv-2", version: 2, effectiveFrom: new Date("2026-05-02T00:00:00Z"), rules }];
+    world.now = new Date("2026-05-03T15:00:00.000Z");
+    const detail = await getCancellationRequestDetail("event-1", request.id, world.now);
+    const messages = detail!.conflicts.map((conflict) => `${conflict.code}:${conflict.severity}:${conflict.message}`).join("\n");
+    expect(messages).toMatch(/POLICY_VERSION_CHANGED:NOTE:A newer refund policy is in effect/);
+    expect(messages).toMatch(/OUTCOME_CHANGED:NOTE:A newer refund policy is in effect/);
+    expect(messages).not.toMatch(/Time has passed/);
   });
 
   it("decides from the registration as it is at the moment of the decision", async () => {

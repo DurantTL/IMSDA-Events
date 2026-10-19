@@ -480,8 +480,9 @@ export type PreviewResponse = {
  * Read-only: it writes nothing, not even a calculation record. The only registration data returned is the chosen
  * registration's own attendees and charges, which the screen needs to pick a scope.
  */
-export async function previewCancellation(eventId: string, request: PreviewRequest, now = new Date()): Promise<PreviewResponse> {
-  const db = getPrisma();
+export async function previewCancellation(eventId: string, request: PreviewRequest, now = new Date(), client?: Client): Promise<PreviewResponse> {
+  // A caller inside a transaction passes its own client, so this never takes a second pool connection while it holds one.
+  const db = client ?? getPrisma();
   const event = await loadEvent(db, eventId);
   if (!isValidTimeZone(event.timezone)) throw new CancellationPolicyError("TIMEZONE_INVALID", "This event's time zone is not valid, so deadlines cannot be evaluated.");
   const evaluatedAt = request.asOf ? new Date(request.asOf) : now;
@@ -568,8 +569,8 @@ export async function recordCalculationAt(
  * The registration's current facts, read-only, for a caller that compares them with an earlier calculation (#170).
  * Records nothing.
  */
-export async function loadRegistrationFacts(eventId: string, registrationId: string, now = new Date()) {
-  const db = getPrisma();
+export async function loadRegistrationFacts(eventId: string, registrationId: string, now = new Date(), client?: Client) {
+  const db = client ?? getPrisma();
   const event = await loadEvent(db, eventId);
   const prepared = await prepareRegistrationFacts(db, event, { kind: "REGISTRATION", registration: registrationId, noShowFirstNight: false }, now, "SERVER");
   return { facts: prepared.facts, summary: prepared.summary };

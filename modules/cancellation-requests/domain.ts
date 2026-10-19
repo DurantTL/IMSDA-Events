@@ -145,7 +145,8 @@ export function scopesOverlap(a: RequestScope, b: RequestScope) {
 export type RegistrationStateSnapshot = {
   registrationStatus: string;
   attendeeIds: string[];
-  charges: Array<{ id: string; amountCents: number }>;
+  /** What each charge is and whose it is, so a charge moving to another attendee, or being reclassified, is a change. */
+  charges: Array<{ id: string; amountCents: number; attendeeId: string | null; category: string; fieldKey: string | null }>;
   paidCents: number;
   depositCents: number;
 };
@@ -154,7 +155,7 @@ export function registrationStateOf(facts: CalculationFacts): RegistrationStateS
   return {
     registrationStatus: facts.registration?.status ?? "UNKNOWN",
     attendeeIds: facts.attendees.map((attendee) => attendee.id).sort(),
-    charges: facts.charges.map((charge) => ({ id: charge.id, amountCents: charge.amountCents })).sort((a, b) => a.id.localeCompare(b.id)),
+    charges: facts.charges.map((charge) => ({ id: charge.id, amountCents: charge.amountCents, attendeeId: charge.attendeeId, category: charge.category, fieldKey: charge.fieldKey })).sort((a, b) => a.id.localeCompare(b.id)),
     paidCents: facts.registrationPaidCents,
     depositCents: facts.depositCents,
   };
@@ -165,7 +166,7 @@ export function canonicalState(state: RegistrationStateSnapshot) {
   return JSON.stringify({
     registrationStatus: state.registrationStatus,
     attendeeIds: [...state.attendeeIds].sort(),
-    charges: [...state.charges].sort((a, b) => a.id.localeCompare(b.id)),
+    charges: [...state.charges].map((charge) => ({ id: charge.id, amountCents: charge.amountCents, attendeeId: charge.attendeeId ?? null, category: charge.category ?? null, fieldKey: charge.fieldKey ?? null })).sort((a, b) => a.id.localeCompare(b.id)),
     paidCents: state.paidCents,
     depositCents: state.depositCents,
   });
@@ -210,9 +211,10 @@ export function diffRegistrationState(then: RegistrationStateSnapshot, now: Regi
       message: `Attendees changed since the request (${added} added, ${removed} removed).`,
     });
   }
-  const before = new Map(then.charges.map((charge) => [charge.id, charge.amountCents]));
-  const after = new Map(now.charges.map((charge) => [charge.id, charge.amountCents]));
-  const chargesChanged = before.size !== after.size || [...before].some(([id, amount]) => after.get(id) !== amount);
+  const describe = (charge: RegistrationStateSnapshot["charges"][number]) => `${charge.amountCents}|${charge.attendeeId ?? ""}|${charge.category ?? ""}|${charge.fieldKey ?? ""}`;
+  const before = new Map(then.charges.map((charge) => [charge.id, describe(charge)]));
+  const after = new Map(now.charges.map((charge) => [charge.id, describe(charge)]));
+  const chargesChanged = before.size !== after.size || [...before].some(([id, text]) => after.get(id) !== text);
   if (chargesChanged) {
     conflicts.push({ code: "CHARGES_CHANGED", severity: "CHANGE", message: "The registration's charges changed since the request." });
   }

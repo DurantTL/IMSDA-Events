@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { calculateCancellation, type CalculationFacts } from "@/modules/cancellation-policy/calculator";
 import { campMeetingPreset, parseCancellationRules } from "@/modules/cancellation-policy/rules";
 import {
+  canonicalState,
   canTransition,
   diffRegistrationState,
   hasChangeConflict,
@@ -109,13 +110,18 @@ describe("scope keys and overlap (#170)", () => {
   });
 });
 
+const stateOf = (state: ReturnType<typeof registrationStateOf>) => canonicalState(state);
+
 describe("registration state and what changed (#170)", () => {
   it("records ids and amounts only", () => {
     const state = registrationStateOf(facts());
     expect(state).toEqual({
       registrationStatus: "CONFIRMED",
       attendeeIds: ["att-1", "att-2"],
-      charges: [{ id: "line:a", amountCents: 10_000 }, { id: "line:b", amountCents: 10_000 }],
+      charges: [
+        { id: "line:a", amountCents: 10_000, attendeeId: "att-1", category: "REGISTRATION", fieldKey: "a" },
+        { id: "line:b", amountCents: 10_000, attendeeId: "att-2", category: "REGISTRATION", fieldKey: "b" },
+      ],
       paidCents: 20_000,
       depositCents: 5_000,
     });
@@ -124,6 +130,19 @@ describe("registration state and what changed (#170)", () => {
 
   it("reports no conflicts when nothing changed", () => {
     expect(diffRegistrationState(registrationStateOf(facts()), registrationStateOf(facts()))).toEqual([]);
+  });
+
+  it("treats a charge moving to another attendee, or changing its category or field, as a change, though id and amount are the same", () => {
+    const then = registrationStateOf(facts());
+    const mutate = (change: Partial<CalculationFacts["charges"][number]>) => {
+      const base = facts();
+      return registrationStateOf({ ...base, charges: base.charges.map((charge, index) => (index === 0 ? { ...charge, ...change } : charge)) });
+    };
+    for (const change of [{ attendeeId: "att-2" }, { category: "MEAL" as const }, { fieldKey: "other_field" }, { attendeeId: null }]) {
+      const conflicts = diffRegistrationState(then, mutate(change));
+      expect(conflicts.map((conflict) => [conflict.code, conflict.severity]), JSON.stringify(change)).toEqual([["CHARGES_CHANGED", "CHANGE"]]);
+    }
+    expect(stateOf(then)).not.toBe(stateOf(mutate({ attendeeId: "att-2" })));
   });
 
   it("flags a removed attendee, a changed charge, a payment and a status change as changes", () => {
