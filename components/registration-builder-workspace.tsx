@@ -1002,7 +1002,7 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
             <div className="builder-section-copy">
               <span className="builder-step-link">Public step {sectionIndex + 1}{isPublicReviewSection(definition, section) ? " · Final review" : ""}</span>
               <input aria-label={`Section ${sectionIndex + 1} title`} disabled={!canEdit} value={section.title} maxLength={120} onChange={(event) => updateSection(sectionIndex, { title: event.target.value })} />
-              <input aria-label={`Section ${sectionIndex + 1} description`} className="section-description-input" disabled={!canEdit} value={section.description} maxLength={300} placeholder="Optional section description" onChange={(event) => updateSection(sectionIndex, { description: event.target.value })} />
+              <input aria-label={`Section ${sectionIndex + 1} description`} className="section-description-input" disabled={!canEdit} value={section.description} maxLength={500} placeholder="Optional section description" onChange={(event) => updateSection(sectionIndex, { description: event.target.value })} />
               <div className="builder-step-settings">
                 <label>Progress label<input aria-label={`Step ${sectionIndex + 1} progress label`} disabled={!canEdit} value={section.stepLabel ?? section.title.slice(0, 40)} maxLength={40} onChange={(event) => updateSection(sectionIndex, { stepLabel: event.target.value })} /></label>
                 <label className="builder-review-toggle"><input disabled={!canEdit} type="checkbox" checked={isPublicReviewSection(definition, section)} onChange={(event) => setReviewSection(sectionIndex, event.target.checked)} /> Final review and payment step</label>
