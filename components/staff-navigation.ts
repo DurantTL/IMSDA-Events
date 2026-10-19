@@ -74,6 +74,8 @@ export type NavigationItem = {
   requiredAnyPermissions?: readonly EventPermission[];
   /** Hidden from a viewer who holds this permission (the kitchen counts item is for staff who do not have the event view, #1029). */
   hiddenWithPermission?: EventPermission;
+  /** Hidden from a viewer whose only permission is this one (kitchen staff have no dashboard, #1029). */
+  hiddenWhenOnlyPermission?: EventPermission;
   /** The sidebar section the item is listed in; an item without one is not a sidebar item (#964). */
   sidebar?: SidebarSection;
   /**
@@ -221,8 +223,8 @@ export const systemNavigation: NavigationItem = {
 };
 
 export const navigation: readonly NavigationItem[] = [
-  // The dashboard needs the event view permission; kitchen staff (#1029) hold only the kitchen counts one.
-  { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, requiredPermission: "VIEW_EVENT", sidebar: "daily" },
+  // The dashboard page needs the event view permission; kitchen staff (#1029) hold only the kitchen counts one and see no dashboard item.
+  { href: "/overview", label: staffPageTitles.overview, icon: LayoutDashboard, hiddenWhenOnlyPermission: "MANAGE_KITCHEN_COUNTS", sidebar: "daily" },
   // Kitchen staff's one page (#1029). Staff who also have the event view reach it from the kitchen report instead.
   { href: kitchenCountsPath, label: staffPageTitles.kitchenCounts, icon: UtensilsCrossed, requiredPermission: "MANAGE_KITCHEN_COUNTS", hiddenWithPermission: "VIEW_EVENT", sidebar: "daily" },
   { href: "/check-in", label: staffPageTitles.checkIn, icon: CheckCircle2, requiredPermission: "MANAGE_CHECK_IN", sidebar: "daily" },
@@ -347,10 +349,11 @@ export function orderedMobileTabs(visibleItems: readonly NavigationItem[]): Navi
 }
 
 export function matchesVisibility(
-  item: Pick<NavigationItem, "requiredPermission" | "requiredAnyPermissions"> & { hiddenWithPermission?: EventPermission },
+  item: Pick<NavigationItem, "requiredPermission" | "requiredAnyPermissions"> & Pick<NavigationItem, "hiddenWithPermission" | "hiddenWhenOnlyPermission">,
   selectedPermissions: ReadonlySet<EventPermission>,
 ) {
   if (item.hiddenWithPermission && selectedPermissions.has(item.hiddenWithPermission)) return false;
+  if (item.hiddenWhenOnlyPermission && selectedPermissions.size === 1 && selectedPermissions.has(item.hiddenWhenOnlyPermission)) return false;
   if (item.requiredPermission && !selectedPermissions.has(item.requiredPermission)) return false;
   if (
     item.requiredAnyPermissions

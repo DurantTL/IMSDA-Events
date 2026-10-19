@@ -71,7 +71,7 @@ export function KitchenCountsTable({
               <td role="cell" data-label="Ordered">{report.totals.ordered}</td>
               <td role="cell" data-label="Served">{report.totals.served}</td>
               {kitchenCountKinds.map((kind) => <td role="cell" data-label={kitchenCountKindLabels[kind]} key={kind}>{figure(report.totals.counts[kind] ?? undefined)}</td>)}
-              <td role="cell" data-label="Variance (services with prepared entered)">
+              <td role="cell" data-label="Variance">
                 <strong>{signed(report.totals.variance)}</strong>
                 {report.totals.variance !== null && (
                   <span className="field-help served-split">
