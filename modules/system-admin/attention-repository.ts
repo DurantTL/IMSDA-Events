@@ -27,8 +27,12 @@ const DIRECTORY_REVIEW_EVENT_LIMIT = 10;
 const DIRECTORY_REVIEW_RECENT_DAYS = 30;
 /** One event's directory scan may take this long before the list is marked incomplete. */
 const DIRECTORY_REVIEW_BUDGET_MS = 4_000;
+/** At most this many directory scans run at once, so they cannot hold many database connections together. */
+const DIRECTORY_REVIEW_CONCURRENCY = 3;
 /** One shared answer for this long, so a busy page cannot turn into a query storm. */
 export const ATTENTION_CACHE_MS = 30_000;
+/** A partial answer (some check could not be read) is shared only briefly, so it is retried soon without a storm. */
+export const ATTENTION_PARTIAL_CACHE_MS = 10_000;
 
 const NONE: EventCount = { total: 0, topEventId: null };
 
@@ -42,6 +46,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
   const stuckBefore = minutesAgo(EMAIL_STUCK_AFTER_MINUTES);
   const overdueBefore = minutesAgo(SCHEDULED_EMAIL_OVERDUE_AFTER_MINUTES);
   let unreadable = 0;
+  let directoryReviewTruncated = false;
   const read = async <T,>(name: string, fallback: T, query: () => Promise<T>): Promise<T> => {
     try {
       return await query();
@@ -81,13 +86,13 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     read("directory review", NONE, async () => {
       const events = await prisma.event.findMany({
         where: { archivedAt: null, endsAt: { gte: minutesAgo(DIRECTORY_REVIEW_RECENT_DAYS * 24 * 60) } },
-        orderBy: { startsAt: "asc" },
+        orderBy: { startsAt: "desc" },
         take: DIRECTORY_REVIEW_EVENT_LIMIT + 1,
         select: { id: true },
       });
-      // More events than the limit: the extra one is not read, and the list says it may be incomplete.
-      if (events.length > DIRECTORY_REVIEW_EVENT_LIMIT) unreadable += 1;
-      const rows = await Promise.all(events.slice(0, DIRECTORY_REVIEW_EVENT_LIMIT).map(async (event) => {
+      // More events than the limit: the extra one is not read. That is flagged as truncated, not as a failed check.
+      directoryReviewTruncated = events.length > DIRECTORY_REVIEW_EVENT_LIMIT;
+      const scan = async (event: { id: string }) => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
           const counted = await Promise.race([
@@ -103,6 +108,11 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
         } finally {
           if (timer) clearTimeout(timer);
         }
+      };
+      const queue = events.slice(0, DIRECTORY_REVIEW_EVENT_LIMIT);
+      const rows: Array<{ eventId: string; count: number }> = [];
+      await Promise.all(Array.from({ length: DIRECTORY_REVIEW_CONCURRENCY }, async () => {
+        for (let event = queue.shift(); event; event = queue.shift()) rows.push(await scan(event));
       }));
       return eventCountFromGroups(rows.filter((row) => row.count > 0));
     }),
@@ -170,22 +180,24 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     scheduledEmailsOverdue,
     scheduledEmailsFailed,
     unreadableChecks: unreadable,
+    directoryReviewTruncated,
   };
 }
 
-let cached: { at: number; value: Promise<AttentionSummary> } | null = null;
+let cached: { at: number; ttl: number; value: Promise<AttentionSummary> } | null = null;
 
 /**
- * The summary, shared for `ATTENTION_CACHE_MS`. A failed load is never cached, and neither is a partial one (some check
- * could not be read), so the next call tries again.
+ * The summary, shared for `ATTENTION_CACHE_MS`, or only `ATTENTION_PARTIAL_CACHE_MS` when some check could not be read, so a
+ * check that keeps failing is retried soon but cannot make every page load run every query. A failed load is never cached.
  */
 export function getAdminAttentionSummary(nowMs = Date.now()): Promise<AttentionSummary> {
-  if (cached && nowMs - cached.at < ATTENTION_CACHE_MS) return cached.value;
+  if (cached && nowMs - cached.at < cached.ttl) return cached.value;
   const value = loadAttentionSignals(new Date(nowMs)).then(buildAttentionSummary);
-  cached = { at: nowMs, value };
+  const entry = { at: nowMs, ttl: ATTENTION_CACHE_MS, value };
+  cached = entry;
   value.then(
-    (summary) => { if (summary.partial && cached?.value === value) cached = null; },
-    () => { if (cached?.value === value) cached = null; },
+    (summary) => { if (summary.partial) entry.ttl = ATTENTION_PARTIAL_CACHE_MS; },
+    () => { if (cached === entry) cached = null; },
   );
   return value;
 }

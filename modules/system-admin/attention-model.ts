@@ -50,6 +50,8 @@ export type AttentionSummary = {
   generatedAt: string;
   /** True when some checks could not be read, so the list may be missing items. */
   partial: boolean;
+  /** True when more current events exist than the directory review reads. */
+  truncated: boolean;
   /** Sum of the alert items' counts (review-only lists are left out). */
   total: number;
   groups: AttentionGroup[];
@@ -78,6 +80,8 @@ export type AttentionSignals = {
   scheduledEmailsFailed: EventCount;
   /** How many of the checks above could not be read and were left empty. */
   unreadableChecks: number;
+  /** More current events exist than the directory review reads (not a failure). */
+  directoryReviewTruncated: boolean;
 };
 
 function withEvent(path: string, eventId: string | null, query = "") {
@@ -207,6 +211,7 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
   return {
     generatedAt: signals.now.toISOString(),
     partial: signals.unreadableChecks > 0,
+    truncated: signals.directoryReviewTruncated,
     total: groups.reduce((sum, group) => sum + group.items.filter((item) => !item.reviewOnly).reduce((inner, item) => inner + item.count, 0), 0),
     groups,
   };

@@ -57,6 +57,7 @@ function signals(overrides: Partial<AttentionSignals> = {}): AttentionSignals {
     scheduledEmailsOverdue: none,
     scheduledEmailsFailed: none,
     unreadableChecks: 0,
+    directoryReviewTruncated: false,
     ...overrides,
   };
 }
@@ -216,26 +217,61 @@ describe("admin notification bell counts (#1032)", () => {
     expect(result.emailFailed.total).toBe(6);
   });
 
-  it("marks the list partial when more events exist than the directory scan reads, or one scan fails", async () => {
+  it("flags more events than the directory scan reads as truncated, not as a failed check", async () => {
     const prisma = fakePrisma();
     prisma.event.findMany.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({ id: `e${index}` })));
     mocks.getPrisma.mockReturnValue(prisma);
-    expect((await loadAttentionSignals(now)).unreadableChecks).toBe(1);
+    const result = await loadAttentionSignals(now);
+    expect(result).toMatchObject({ unreadableChecks: 0, directoryReviewTruncated: true });
     expect(mocks.listDirectoryReviewEntries).toHaveBeenCalledTimes(10);
-    mocks.listDirectoryReviewEntries.mockRejectedValueOnce(new Error("scan failed"));
-    expect((await loadAttentionSignals(now)).unreadableChecks).toBe(2);
+    expect(buildAttentionSummary(result)).toMatchObject({ partial: false, truncated: true });
   });
 
-  it("does not cache a partial or failed load, so the next call reads again", async () => {
+  it("runs at most three directory scans at once", async () => {
+    const prisma = fakePrisma();
+    prisma.event.findMany.mockResolvedValue(Array.from({ length: 10 }, (_, index) => ({ id: `e${index}` })));
+    mocks.getPrisma.mockReturnValue(prisma);
+    let running = 0;
+    let peak = 0;
+    mocks.listDirectoryReviewEntries.mockImplementation(async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+      return [];
+    });
+    await loadAttentionSignals(now);
+    expect(mocks.listDirectoryReviewEntries).toHaveBeenCalledTimes(10);
+    expect(peak).toBe(3);
+  });
+
+  it("marks the list partial when one directory scan fails", async () => {
+    const prisma = fakePrisma();
+    mocks.getPrisma.mockReturnValue(prisma);
+    mocks.listDirectoryReviewEntries.mockRejectedValueOnce(new Error("scan failed"));
+    expect((await loadAttentionSignals(now)).unreadableChecks).toBe(1);
+  });
+
+  it("still caches a truncated answer for the full window", async () => {
+    const prisma = fakePrisma();
+    prisma.event.findMany.mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({ id: `e${index}` })));
+    mocks.getPrisma.mockReturnValue(prisma);
+    const first = await getAdminAttentionSummary(3_000_000);
+    expect(first.truncated).toBe(true);
+    await getAdminAttentionSummary(3_025_000);
+    expect(prisma.newClubApplication.count).toHaveBeenCalledTimes(1);
+  });
+
+  it("caches a partial answer only briefly, then reads again", async () => {
     const prisma = fakePrisma();
     prisma.newClubApplication.count.mockRejectedValueOnce(new Error("db down"));
     mocks.getPrisma.mockReturnValue(prisma);
-    const first = await getAdminAttentionSummary(2_000_000);
-    expect(first.partial).toBe(true);
-    const second = await getAdminAttentionSummary(2_001_000);
-    expect(second.partial).toBe(false);
+    expect((await getAdminAttentionSummary(2_000_000)).partial).toBe(true);
+    await getAdminAttentionSummary(2_005_000);
+    expect(prisma.newClubApplication.count).toHaveBeenCalledTimes(1);
+    expect((await getAdminAttentionSummary(2_011_000)).partial).toBe(false);
     expect(prisma.newClubApplication.count).toHaveBeenCalledTimes(2);
-    await getAdminAttentionSummary(2_002_000);
+    await getAdminAttentionSummary(2_040_000);
     expect(prisma.newClubApplication.count).toHaveBeenCalledTimes(2);
   });
 

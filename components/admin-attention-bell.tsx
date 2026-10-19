@@ -11,6 +11,7 @@ import {
 } from "@/modules/system-admin/attention-model";
 
 export const ATTENTION_ENDPOINT = "/api/admin/attention";
+const DIRECTORY_REVIEW_EVENT_LIMIT_LABEL = 10;
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -151,6 +152,7 @@ export function AdminAttentionBell({
             </section>
           ))}
           {summary?.partial && <p className="attention-note">Some checks could not be read, so this list may be incomplete.</p>}
+          {summary?.truncated && <p className="attention-note">Only the {DIRECTORY_REVIEW_EVENT_LIMIT_LABEL} most recent events were checked for directory review.</p>}
         </div>
       )}
     </div>
