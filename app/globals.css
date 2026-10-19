@@ -12166,3 +12166,42 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .cancel-request-detail .cancel-request-form { display: grid; gap: 6px; }
 .cancel-request-detail fieldset.cancel-request-form { margin: 0; border: 0; padding: 0; min-width: 0; }
 .cancel-request-actions [aria-live]:focus { outline: 2px solid var(--imsda-navy); outline-offset: 2px; }
+
+/* System administrator notification bell (#1032): a 44px button and a panel that fits 390px. */
+.attention-bell { overflow: visible; width: 44px; height: 44px; }
+.attention-bell:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
+.attention-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border: 2px solid white;
+  border-radius: 999px;
+  background: var(--imsda-purple);
+  color: white;
+  font-size: max(var(--type-floor, 0px), 0.68rem);
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+.attention-popover { width: min(340px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow-y: auto; }
+.attention-popover .attention-heading { margin: 0 0 8px; color: var(--imsda-navy); font-size: max(var(--type-body-floor, 0px), 1.05rem); font-weight: 800; }
+.attention-popover .attention-heading:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
+.attention-popover .attention-group h3 { margin: 12px 0 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.68rem); letter-spacing: 0.04em; text-transform: uppercase; }
+.attention-popover ul { margin: 0; padding: 0; list-style: none; }
+.attention-popover .attention-item { display: flex; align-items: center; gap: 10px; min-height: 44px; box-sizing: border-box; padding: 4px 6px; border-radius: 10px; color: var(--imsda-navy); text-decoration: none; }
+.attention-popover a.attention-item:hover { background: var(--imsda-purple-soft); }
+.attention-popover a.attention-item:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
+.attention-popover .attention-item strong { flex: 0 0 auto; min-width: 2ch; color: var(--imsda-purple); font-size: max(var(--type-body-floor, 0px), 0.9rem); text-align: right; }
+.attention-popover .attention-item span { font-size: max(var(--type-body-floor, 0px), 0.74rem); line-height: 1.35; }
+.attention-popover .attention-note { margin-bottom: 0; }
+@media (max-width: 760px) {
+  /* The bell sits mid-row on a phone, so the panel is anchored to the header row (not fixed to the window): it spans
+     the header with the page's gutters, scrolls away with the page and never floats over scrolled content. */
+  .workspace-header { position: relative; }
+  .menu-anchor:has(.attention-bell) { position: static; }
+  .attention-popover { position: absolute; top: 100%; right: 0; left: 0; width: auto; margin-top: 6px; }
+}

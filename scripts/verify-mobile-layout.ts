@@ -363,6 +363,23 @@ const pages: PageSpec[] = [
   // approval list. The link form itself is added once the open link's token exists (see staffInvitePages).
   staff("staff-invitations", `/people/staff-invitations?event=${staffInviteEventId}`),
   staff("staff-invitation-approvals", `/people/staff-invitations/approvals?event=${staffInviteEventId}`),
+  // The system administrator's notification bell (#1032), opened: the panel must sit inside the window with its links reachable.
+  {
+    ...staff("admin-bell-open", "/admin/settings", "system-admin"),
+    prepare: async (page, width) => {
+      await page.getByRole("button", { name: /^Notifications/ }).click();
+      const panel = page.locator(".attention-popover");
+      await panel.waitFor();
+      await page.getByRole("heading", { name: "Needs attention" }).waitFor();
+      // Wait for the read that opening the panel starts, so the list (not "Checking…") is what gets measured.
+      await panel.locator("section, [role=status]").first().waitFor();
+      await page.waitForFunction(() => !document.querySelector(".attention-popover")?.textContent?.includes("Checking"));
+      const box = await panel.boundingBox();
+      if (!box || box.x < 0 || box.x + box.width > width + 0.5) {
+        throw new Error(`the notification panel sits outside the ${width}px window (x ${box?.x}, width ${box?.width})`);
+      }
+    },
+  },
 ];
 
 /** The public link form of one not-yet-used invitation: with a spouse and a child added, so every person's event questions show. */
