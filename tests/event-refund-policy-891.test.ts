@@ -181,6 +181,7 @@ function enqueueFixture(refundPolicy: string | null) {
 }
 
 const enqueueInput = (attendeeType: "ATTENDEE" | "WORKER"): RegistrationMessageInput => ({
+  staffCopyEnabled: true,
   event: { id: "event-1", name: "Synthetic Retreat", slug: "synthetic-retreat", startsAt: new Date("2027-02-19T21:00:00.000Z"), endsAt: new Date("2027-02-21T17:00:00.000Z"), timezone: "America/Chicago", location: "Camp", billingMode: "ATTENDEE_PAY" },
   registration: { id: "registration-1", confirmationCode: "REG-TEST", attendeeType },
   formVersionId: "version-1",

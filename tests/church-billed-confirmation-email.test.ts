@@ -52,6 +52,7 @@ function fixture() {
 function input(billingMode: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE"): RegistrationMessageInput {
   const lineItem = (index: number) => ({ key: `attendees.${index}.fee`, label: `Fee — Person ${index + 1}`, amountCents: 2500, attendeeIndex: index, attendeeLabel: `Person ${index + 1}` });
   return {
+    staffCopyEnabled: true,
     event: {
       id: "event-1",
       name: "Synthetic Camporee",
@@ -92,6 +93,14 @@ describe("church-billed confirmation email (#621)", () => {
     await enqueuePublicRegistrationMessages(tx as never, input("DEFERRED_ORGANIZATION_INVOICE"));
     const internal = create.mock.calls.map(([call]) => call.data).find((data) => data.recipientKind === "INTERNAL");
     expect(String(internal?.bodyTextSnapshot)).toContain("$50.00");
+  });
+
+  it("skips only the staff copy when its switch is off (#1016)", async () => {
+    const { tx, create } = fixture();
+    await enqueuePublicRegistrationMessages(tx as never, { ...input("ATTENDEE_PAY"), staffCopyEnabled: false });
+    const kinds = create.mock.calls.map(([call]) => call.data.recipientKind);
+    expect(kinds).toContain("REGISTRANT");
+    expect(kinds).not.toContain("INTERNAL");
   });
 
   it("keeps the total in a self-pay confirmation email", async () => {

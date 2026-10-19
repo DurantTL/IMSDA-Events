@@ -90,11 +90,16 @@ export function submittedEmailContent(rawInput: SubmittedEmailInput) {
   };
 }
 
-export async function queueSubmittedEmail(client: Outbox, notifyEmail: string | null, input: SubmittedEmailInput): Promise<string[]> {
+/**
+ * `enabled` is the "New club application submitted" switch (#1016). The caller reads it before its transaction opens;
+ * this is called inside one, so it must not read the database. Off: the application still waits in the queue.
+ */
+export async function queueSubmittedEmail(client: Outbox, notifyEmail: string | null, input: SubmittedEmailInput, enabled: boolean): Promise<string[]> {
   if (!notifyEmail) {
     logInfo("A new club application arrived but no notification address is set in system settings.", { applicationId: input.applicationId });
     return [];
   }
+  if (!enabled) return [];
   const from = await sender();
   if (!from) return [];
   const content = submittedEmailContent(input);

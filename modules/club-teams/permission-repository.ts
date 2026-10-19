@@ -43,7 +43,7 @@ const actorMetadata = (actor: PermissionActor) => (actor.accountId ? { actorAcco
  */
 export async function syncTeamMemberPermissions(
   tx: Tx,
-  input: { eventId: string; clubEventRegistrationId: string; registrationId: string; people: readonly PermissionCandidate[]; actor?: PermissionActor },
+  input: { eventId: string; clubEventRegistrationId: string; registrationId: string; people: readonly PermissionCandidate[]; actor?: PermissionActor; notifyApprovers: boolean },
 ): Promise<PermissionSyncResult> {
   const actor = input.actor ?? {};
   const needing = input.people.filter((person) => person.role === "MEMBER" && person.age !== null && person.age >= 18);
@@ -96,7 +96,7 @@ export async function syncTeamMemberPermissions(
     }
     if (row.status === "DECLINED") declined.push({ name: person.name, tlt: person.tlt === true, attendeeId: person.attendeeId });
   }
-  const queuedMessageIds = created.length > 0 ? await queuePermissionRequest(tx, { eventId: input.eventId, registrationId: input.registrationId, people: created }) : [];
+  const queuedMessageIds = created.length > 0 && input.notifyApprovers ? await queuePermissionRequest(tx, { eventId: input.eventId, registrationId: input.registrationId, people: created }) : [];
   return { declined, queuedMessageIds };
 }
 

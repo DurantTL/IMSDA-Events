@@ -71,7 +71,11 @@ export async function conferenceOfficeAddress(): Promise<string | null> {
   return settings.supportContact?.trim() || null;
 }
 
-export async function queueRequestSubmittedEmail(client: Outbox, officeEmail: string | null, rawInput: SubmittedEmailInput): Promise<string[]> {
+/**
+ * `enabled` is the "Event feature requested" switch (#1016). The caller reads it before its transaction opens; this is
+ * called inside one, so it must not read the database. Off: the request still waits for review.
+ */
+export async function queueRequestSubmittedEmail(client: Outbox, officeEmail: string | null, rawInput: SubmittedEmailInput, enabled: boolean): Promise<string[]> {
   const input = {
     ...rawInput,
     moduleTitle: neutralizePlaceholders(rawInput.moduleTitle),
@@ -83,6 +87,7 @@ export async function queueRequestSubmittedEmail(client: Outbox, officeEmail: st
     logInfo("A module request was made but no conference office address is set in platform settings.", { requestId: input.requestId });
     return [];
   }
+  if (!enabled) return [];
   const from = await sender();
   if (!from) return [];
   const message = await client.messageOutbox.create({

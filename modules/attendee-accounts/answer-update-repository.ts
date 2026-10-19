@@ -37,6 +37,8 @@ export async function updateTieredRegistrationAnswersWithClient(
       responses: Record<string, unknown>;
     }>;
     now: Date;
+    /** The "Team approval requested" switch (#1016), read by the caller before its transaction opens. */
+    notifyApprovers: boolean;
     audit: {
       action: string;
       summary: (confirmationCode: string) => string;
@@ -260,6 +262,7 @@ export async function updateTieredRegistrationAnswersWithClient(
       // Only someone whose own answers change here can be stopped by their own declined permission; a teammate's never stops this.
       teamMessageIds = (await enforceTeamRegistrationRules(tx, registration.id, {
         declineScope: "CHANGED_ONLY",
+        notifyApprovers: input.notifyApprovers,
         changedAttendeeIds: new Set(prepared.filter((update) => update.changedKeys.length > 0).map((update) => update.attendee.id)),
       })).queuedMessageIds;
     } catch (error) {

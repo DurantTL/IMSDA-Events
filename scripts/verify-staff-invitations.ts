@@ -308,6 +308,29 @@ async function main() {
   await repo.submitInvitationRegistration(gusToken2, { firstName: "Gus", lastName: surname, dependants: [{ firstName: "Pip", lastName: surname, age: 3 }] });
   const laterDigests = await prisma.messageOutbox.findMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL", status: "PENDING" } });
   assert(laterDigests.length === 1 && (await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } })) === digestsBefore + 1 && laterDigests[0].idempotencyKey.includes(":next") && laterDigests[0].availableAt.getTime() > Date.now(), "a registration after a digest went out is named in a digest for the next window");
+  // The office digest has its own switch (#1016): off, a registration in a new window sends the office nothing, while the
+  // registrant's own notice still goes out; the switch row is removed again.
+  {
+    const { resetNotificationSettingsCache } = await import("../modules/notifications/settings");
+    await prisma.messageOutbox.updateMany({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" }, data: { status: "SENT", sentAt: new Date() } });
+    const halCsv = `email\n${email("hal")}`;
+    const halPreview = await repo.previewInvitationImport(eventId, { csv: halCsv, defaultGroup: "STAFF" });
+    await repo.confirmInvitationImport(eventId, userId, { csv: halCsv, defaultGroup: "STAFF", digest: halPreview.digest });
+    const halToken = invitationToken(await prisma.staffInvitation.findFirstOrThrow({ where: { eventId, email: email("hal") } }));
+    await prisma.notificationSetting.upsert({ where: { key: "STAFF_INVITATION_APPROVAL_DIGEST" }, update: { enabled: false }, create: { key: "STAFF_INVITATION_APPROVAL_DIGEST", enabled: false } });
+    resetNotificationSettingsCache();
+    try {
+      const officeBefore = await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } });
+      const registrantBefore = await prisma.messageOutbox.count({ where: { eventId, recipientEmail: email("hal") } });
+      await repo.submitInvitationRegistration(halToken, { firstName: "Hal", lastName: surname });
+      assert(await prisma.messageOutbox.count({ where: { eventId, recipientEmail: officeEmail, recipientKind: "INTERNAL" } }) === officeBefore, "switch off: the office gets no digest");
+      assert(await prisma.messageOutbox.count({ where: { eventId, recipientEmail: email("hal") } }) === registrantBefore + 1, "switch off: the registrant's own notice is still queued");
+    } finally {
+      await prisma.notificationSetting.deleteMany({ where: { key: "STAFF_INVITATION_APPROVAL_DIGEST" } });
+      resetNotificationSettingsCache();
+    }
+    console.log("ok  the office digest skips while its switch is off; the registrant's notice is unaffected");
+  }
   const gusRow = (await repo.listApprovals(eventId)).rows.find((entry) => entry.email === email("gus"))!;
   await prisma.eventMealPlan.updateMany({ where: { eventId, payer: "CONFERENCE" }, data: { isActive: false } });
   await expectCode(repo.approveRegistrations(eventId, userId, [gusRow.id]), "MEAL_PLAN_REQUIRED", "approving without a conference-paid plan");

@@ -23,6 +23,8 @@ const formSlug = "public-messaging-verification";
 const settingsId = "msgset_public_messaging_verification";
 const idempotencyKey = "9d527f52-5ccb-43a8-a1b5-7c3176b5188e";
 const registrantEmail = "messaging.registrant@example.test";
+const secondRegistrantEmail = "messaging.registrant.two@example.test";
+const secondIdempotencyKey = "3c1f6a52-7d0e-4b1e-9a41-0f6a5a2b7c19";
 const internalEmails = [
   "messaging.internal.one@example.test",
   "messaging.internal.two@example.test",
@@ -100,7 +102,7 @@ async function cleanup() {
   await prisma.event.deleteMany({ where: { id: eventId } });
   await prisma.person.deleteMany({
     where: {
-      normalizedEmail: registrantEmail,
+      normalizedEmail: { in: [registrantEmail, secondRegistrantEmail] },
       heldRegistrations: { none: {} },
       registrationEvents: { none: {} },
     },
@@ -108,7 +110,7 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: actorId } });
 }
 
-async function postRegistration() {
+async function postRegistration(key: string = idempotencyKey, email: string = registrantEmail) {
   const response = await fetch(
     `${baseUrl}/api/public/events/${eventSlug}/forms/${formSlug}/registrations`,
     {
@@ -116,11 +118,11 @@ async function postRegistration() {
       headers: { "Content-Type": "application/json", Origin: origin },
       body: JSON.stringify({
         versionId: formVersionId,
-        idempotencyKey,
+        idempotencyKey: key,
         responses: {
           first_name: "Messaging",
           last_name: "Registrant",
-          email: registrantEmail,
+          email,
         },
         website: "",
       }),
@@ -338,6 +340,35 @@ async function main() {
     "The idempotent replay created duplicate registration or messaging records.",
     { beforeReplayCounts, afterReplayCounts },
   );
+
+  // The staff copy has its own switch (#1016): off, a new registration queues only the registrant's confirmation. The
+  // running app keeps a switch reading for up to 15 seconds, so wait that out after changing the row, in both directions.
+  await prisma.notificationSetting.upsert({
+    where: { key: "NEW_REGISTRATION_STAFF_COPY" },
+    update: { enabled: false },
+    create: { key: "NEW_REGISTRATION_STAFF_COPY", enabled: false },
+  });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 16_000));
+    const quiet = await postRegistration(secondIdempotencyKey, secondRegistrantEmail);
+    assert(quiet.status === 201, "A registration with the staff copy switched off did not succeed.", quiet);
+    const afterOff = await waitForLocalCapture(expectedMessageCount + 1);
+    assert(
+      afterOff.filter((message) => message.recipientKind === "INTERNAL").length === internalEmails.length,
+      "The staff copy was queued for a registration while its switch was off.",
+      afterOff,
+    );
+    assert(
+      afterOff.filter((message) => message.recipientKind === "REGISTRANT" && message.recipientEmail === secondRegistrantEmail).length === 1,
+      "The registrant's confirmation must still be queued while the staff copy is off.",
+      afterOff,
+    );
+  } finally {
+    await prisma.notificationSetting.deleteMany({ where: { key: "NEW_REGISTRATION_STAFF_COPY" } });
+    // The running app still holds "off" for up to 15 seconds. The next script in CI (test:public-roster) runs against the
+    // same app and expects the staff copy, so do not exit until the app has had time to read the row's removal.
+    await new Promise((resolve) => setTimeout(resolve, 16_000));
+  }
 
   console.log(JSON.stringify({
     confirmationCode,

@@ -36,6 +36,7 @@ vi.mock("@/modules/communications/email-delivery", () => ({
   processAccountEmailQueue: dependencies.processAccountEmailQueue,
 }));
 
+import { resetNotificationSettingsCache } from "@/modules/notifications/settings";
 import {
   dispatchLockoutEmails,
   scheduleLockoutEmails,
@@ -102,6 +103,7 @@ const minutes = (count: number) => count * 60 * 1000;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetNotificationSettingsCache();
   dependencies.getServerEnv.mockReturnValue({
     APP_BASE_URL: "https://events.imsda.org",
     ACCOUNT_EMAIL_SENDER_NAME: "IMSDA Events",
@@ -243,6 +245,52 @@ describe("the office alert", () => {
     // The alert names the account without belonging to it.
     expect(office?.accountUserId).toBeUndefined();
     expect(office?.accountAttendeeId).toBeUndefined();
+  });
+
+  it("is skipped when its switch is off (#1016), and the account holder is still emailed", async () => {
+    dependencies.getPlatformSettings.mockResolvedValue({
+      defaultTimezone: "America/Chicago",
+      securityAlertEmail: "security@imsda.org",
+    });
+    const fixture = Object.assign(outboxFixture({ findEmail: "staff@imsda.org", findDisplayName: "Alex Staff" }), {
+      notificationSetting: { findMany: vi.fn().mockResolvedValue([{ key: "SIGN_IN_LOCKOUT_OFFICE_COPY", enabled: false }]) },
+    });
+    dependencies.getPrisma.mockReturnValue(fixture);
+
+    await dispatchLockoutEmails({ audience: "STAFF", kind: "CODE", accountUserId: "user-1", lockedUntil, now });
+
+    expect(fixture.created).toHaveLength(1);
+    expect(fixture.created[0]?.recipientKind).toBe("ACCOUNT");
+  });
+
+  it("is sent when its switch row is missing (#1016)", async () => {
+    dependencies.getPlatformSettings.mockResolvedValue({
+      defaultTimezone: "America/Chicago",
+      securityAlertEmail: "security@imsda.org",
+    });
+    const fixture = Object.assign(outboxFixture({ findEmail: "staff@imsda.org", findDisplayName: "Alex Staff" }), {
+      notificationSetting: { findMany: vi.fn().mockResolvedValue([]) },
+    });
+    dependencies.getPrisma.mockReturnValue(fixture);
+
+    await dispatchLockoutEmails({ audience: "STAFF", kind: "CODE", accountUserId: "user-1", lockedUntil, now });
+
+    expect(fixture.created.map((row) => row.recipientKind).sort()).toEqual(["ACCOUNT", "INTERNAL"]);
+  });
+
+  it("is sent when the switch cannot be read (#1016)", async () => {
+    dependencies.getPlatformSettings.mockResolvedValue({
+      defaultTimezone: "America/Chicago",
+      securityAlertEmail: "security@imsda.org",
+    });
+    const fixture = Object.assign(outboxFixture({ findEmail: "staff@imsda.org", findDisplayName: "Alex Staff" }), {
+      notificationSetting: { findMany: vi.fn().mockRejectedValue(new Error("connection lost")) },
+    });
+    dependencies.getPrisma.mockReturnValue(fixture);
+
+    await dispatchLockoutEmails({ audience: "STAFF", kind: "CODE", accountUserId: "user-1", lockedUntil, now });
+
+    expect(fixture.created.map((row) => row.recipientKind).sort()).toEqual(["ACCOUNT", "INTERNAL"]);
   });
 
   it("never includes a code or password either", async () => {

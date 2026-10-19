@@ -33,7 +33,6 @@ const optionalUrl = optionalField(z.url().max(500));
 export const platformSettingsInputSchema = z.object({
   organizationName: z.string().trim().min(2).max(120),
   logoUrl: optionalUrl,
-  supportContact: optionalEmail,
   publicWebsiteUrl: optionalUrl,
   defaultTimezone: z.string().trim().min(1).max(60),
   defaultSenderName: z.string().trim().min(2).max(120),
@@ -48,16 +47,6 @@ export const platformSettingsInputSchema = z.object({
       .refine(isValidRelyingPartyId, "Enter just the domain, like events.imsda.org."),
   ),
   /**
-   * Where the short lockout alert goes, in addition to the account holder
-   * (#456). Blank means only the account holder is emailed.
-   */
-  securityAlertEmail: optionalEmail,
-  /**
-   * Where "a new club applied" notices go (#817), such as the youth department's administrative assistant. Blank means
-   * no notice is sent (applications still wait in the queue). Never hard-coded: staff change it here.
-   */
-  newClubApplicationEmail: optionalEmail,
-  /**
    * The header block of the church invoice PDF (#780): the department line, the organization name, the mailing
    * address (one line per row) and the phone. All blank means the PDF prints the platform organization name alone.
    */
@@ -71,7 +60,26 @@ export const platformSettingsInputSchema = z.object({
 
 export type PlatformSettingsInput = z.infer<typeof platformSettingsInputSchema>;
 
-export type PlatformSettingsRecord = PlatformSettingsInput & {
+/**
+ * The three addresses automatic alerts are sent to (#1016). They are edited on
+ * System management > Notifications and nowhere else, so the platform settings
+ * form above cannot clear them by leaving them out of its request.
+ *
+ * - `supportContact`: also receives event feature requests.
+ * - `securityAlertEmail`: gets the short lockout alert (#456), in addition to
+ *   the account holder. Blank means only the account holder is emailed.
+ * - `newClubApplicationEmail`: gets the "a new club applied" notice (#817).
+ *   Blank means no notice is sent; applications still wait in the queue.
+ */
+export const platformAddressesInputSchema = z.object({
+  supportContact: optionalEmail,
+  securityAlertEmail: optionalEmail,
+  newClubApplicationEmail: optionalEmail,
+}).strict();
+
+export type PlatformAddressesInput = z.infer<typeof platformAddressesInputSchema>;
+
+export type PlatformSettingsRecord = PlatformSettingsInput & PlatformAddressesInput & {
   updatedAt: string;
   updatedByName: string | null;
 };
@@ -191,8 +199,6 @@ export async function updatePlatformSettings(
               defaultTimezone: before.defaultTimezone,
               defaultAttendeeEditPolicy: before.defaultAttendeeEditPolicy,
               passkeyRpId: before.passkeyRpId,
-              securityAlertEmail: before.securityAlertEmail,
-              newClubApplicationEmail: before.newClubApplicationEmail,
               invoiceHeaderDepartment: before.invoiceHeaderDepartment,
               invoiceHeaderOrganization: before.invoiceHeaderOrganization,
               invoiceHeaderAddress: before.invoiceHeaderAddress,
@@ -206,8 +212,6 @@ export async function updatePlatformSettings(
             defaultTimezone: input.defaultTimezone,
             defaultAttendeeEditPolicy: input.defaultAttendeeEditPolicy,
             passkeyRpId: input.passkeyRpId ?? null,
-            securityAlertEmail: input.securityAlertEmail ?? null,
-            newClubApplicationEmail: input.newClubApplicationEmail ?? null,
             invoiceHeaderDepartment: input.invoiceHeaderDepartment ?? null,
             invoiceHeaderOrganization: input.invoiceHeaderOrganization ?? null,
             invoiceHeaderAddress: input.invoiceHeaderAddress ?? null,
@@ -218,4 +222,58 @@ export async function updatePlatformSettings(
     });
   });
   return getPlatformSettings();
+}
+
+/**
+ * Saves the three alert addresses and writes the audit row in the same
+ * transaction, with both sides, so "who changed where the lockout alert goes"
+ * has an answer.
+ */
+export async function updatePlatformAddresses(
+  input: PlatformAddressesInput,
+  actorUserId: string,
+): Promise<PlatformAddressesInput> {
+  const prisma = getPrisma();
+  await prisma.$transaction(async (tx) => {
+    const before = await tx.platformSettings.findUnique({
+      where: { id: PLATFORM_SETTINGS_ID },
+      select: { supportContact: true, securityAlertEmail: true, newClubApplicationEmail: true },
+    });
+    const after = {
+      supportContact: input.supportContact ?? null,
+      securityAlertEmail: input.securityAlertEmail ?? null,
+      newClubApplicationEmail: input.newClubApplicationEmail ?? null,
+    };
+    await tx.platformSettings.upsert({
+      where: { id: PLATFORM_SETTINGS_ID },
+      update: { ...after, updatedByUserId: actorUserId },
+      create: { id: PLATFORM_SETTINGS_ID, ...after, updatedByUserId: actorUserId },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorUserId,
+        action: "PLATFORM_ALERT_ADDRESSES_UPDATED",
+        entityType: "PlatformSettings",
+        entityId: PLATFORM_SETTINGS_ID,
+        correlationId: `platform-alert-addresses:${Date.now()}`,
+        summary: "Updated the addresses automatic alerts are sent to.",
+        metadata: {
+          before: before
+            ? {
+              supportContact: before.supportContact,
+              securityAlertEmail: before.securityAlertEmail,
+              newClubApplicationEmail: before.newClubApplicationEmail,
+            }
+            : null,
+          after,
+        },
+      },
+    });
+  });
+  const saved = await getPlatformSettings();
+  return {
+    supportContact: saved.supportContact,
+    securityAlertEmail: saved.securityAlertEmail,
+    newClubApplicationEmail: saved.newClubApplicationEmail,
+  };
 }

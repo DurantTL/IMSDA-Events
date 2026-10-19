@@ -100,6 +100,7 @@ describe("tiered attendee answer updates", () => {
     const now = new Date("2026-07-30T11:00:00.000Z");
 
     const result = await updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "a2f15c6b-c2e7-45fe-8d49-e8e8e80d41de",
       expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -182,6 +183,7 @@ describe("tiered attendee answer updates", () => {
   it("rejects a stale expected timestamp before writing", async () => {
     const { registration, tx } = fixture();
     await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "b5dab067-1895-4e87-8808-ec4f02ead6eb",
       expectedUpdatedAt: "2026-07-29T10:00:00.000Z",
@@ -205,6 +207,7 @@ describe("tiered attendee answer updates", () => {
     const { registration, tx } = fixture();
 
     await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "7cfdcc22-0cc2-491c-9fbc-dda9c6e5d3b4",
       expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -224,6 +227,7 @@ describe("tiered attendee answer updates", () => {
     registration.event.seminarPreferenceClosesOn = null;
     registration.event.seminarPreferenceSelfServiceLocked = true;
     await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "ef743666-82b8-4193-9387-1a06182ea87e",
       expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -248,6 +252,7 @@ describe("tiered attendee answer updates", () => {
     }]);
 
     await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "7ec8c160-3675-41bb-bda1-aaf87f6087d7",
       expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -282,6 +287,7 @@ describe("tiered attendee answer updates", () => {
           }]
     ));
     await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "251c971a-e0f1-4086-ad4d-6bafcd28c8af",
       expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -317,10 +323,10 @@ describe("tiered attendee answer updates", () => {
         metadata: { source: "PRIVATE_MANAGE_LINK" },
       },
     };
-    const first = await updateTieredRegistrationAnswersWithClient(tx as never, input);
+    const first = await updateTieredRegistrationAnswersWithClient(tx as never, { ...input, notifyApprovers: true });
     const metadata = tx.auditLog.create.mock.calls[0]![0].data.metadata;
     tx.auditLog.findFirst.mockResolvedValue({ metadata });
-    const retried = await updateTieredRegistrationAnswersWithClient(tx as never, input);
+    const retried = await updateTieredRegistrationAnswersWithClient(tx as never, { ...input, notifyApprovers: true });
 
     expect(retried).toMatchObject({
       expectedUpdatedAt: first!.expectedUpdatedAt,
@@ -348,6 +354,7 @@ describe("tiered attendee answer updates", () => {
     }]);
 
     const result = await updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "8f32f746-8669-4400-a126-b78310aa842a",
       expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -385,6 +392,7 @@ describe("tiered attendee answer updates", () => {
     definition.sections[0].fields[0].choiceLimits = { Prayer: 1, Service: 1 };
     try {
       await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
         registrationId: registration.id,
         clientRequestId: "7f915f2d-c67b-43bb-b0b5-36fa310f813f",
         expectedUpdatedAt: registration.updatedAt.toISOString(),
@@ -411,6 +419,7 @@ describe("tiered attendee answer updates", () => {
     registration.updatedAt = new Date("2026-08-10T15:01:00.000Z");
 
     await expect(updateTieredRegistrationAnswersWithClient(tx as never, {
+      notifyApprovers: true,
       registrationId: registration.id,
       clientRequestId: "7ab6def9-8938-4ed3-a054-a760cd0381bf",
       expectedUpdatedAt: "2026-07-30T10:00:00.000Z",

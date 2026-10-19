@@ -12059,3 +12059,14 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   color: var(--imsda-navy);
   font-weight: 800;
 }
+
+/* System management > Notifications (#1016). */
+.notifications-table th[scope="row"] { min-width: 220px; }
+.notification-description { display: block; margin-top: 2px; font-weight: 400; }
+.notification-event-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.notification-event-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line); }
+.notification-event-list li:first-child { border-top: 0; }
+.notification-event-list li > span { display: grid; min-width: 0; gap: 2px; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .notification-event-list .secondary-button { width: 100%; justify-content: center; }
+}

@@ -1,4 +1,5 @@
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { checkLocationSeats } from "@/modules/event-locations/admission";
 import { promoteWaitlistAfterSeatsFreed } from "@/modules/registrations/lifecycle-repository";
 import { crossSitePickCount } from "@/modules/honors/locations";
@@ -273,11 +274,14 @@ async function queueTransferNotification(
   templateKey: NotificationTemplate,
   recipients: NotificationRecipient[],
   content: { subject: string; bodyText: string },
+  /** The notice's switch (#1016), read by the caller before its transaction opens. False queues nothing. */
+  enabled: boolean,
 ) {
   // Best-effort, same as the club team role notice: the transfer stands even
   // where account email isn't configured (local dev). Never a bulk send:
   // one message per person party to this one transfer.
   if (!isAccountEmailConfigured()) return [];
+  if (!enabled) return [];
   const unique = dedupeNotificationRecipients(recipients.filter((recipient) => Boolean(recipient.email)));
   if (unique.length === 0) return [];
   const sender = getAccountEmailSender();
@@ -338,9 +342,11 @@ export async function requestTransfer(
   const orgProblem = transferOrganizationsProblem(input.fromOrganizationId, toOrganizationId);
   if (orgProblem) throw new MemberTransferError("SAME_CLUB", orgProblem);
 
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyStarted = await isNotificationEnabled("MEMBER_TRANSFER_STARTED");
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await requestTransferOnce(toOrganizationId, input, actor, now);
+      return await requestTransferOnce(toOrganizationId, input, actor, now, notifyStarted);
     } catch (error) {
       // A racing request for the same person or the same typed name lost the
       // unique index: one more pass sees the winner and answers the way a
@@ -354,7 +360,7 @@ export async function requestTransfer(
   }
 }
 
-async function requestTransferOnce(toOrganizationId: string, input: RequestTransferInput, actor: TransferActor, now: Date) {
+async function requestTransferOnce(toOrganizationId: string, input: RequestTransferInput, actor: TransferActor, now: Date, notifyStarted: boolean) {
   const clubYear = clubYearFor(now);
   return getPrisma().$transaction(async (tx) => {
     const [fromClub, toClub] = await Promise.all([
@@ -467,6 +473,7 @@ async function requestTransferOnce(toOrganizationId: string, input: RequestTrans
           toClubName: toClub.name,
           staffCompletes: staffReason === "SAME_DIRECTOR",
         }),
+        notifyStarted,
       )
       : [];
     return { transferId: transfer.id, messageIds };
@@ -523,6 +530,8 @@ async function completeTransfer(
     actor: TransferActor;
     now: Date;
     fromRosterMemberId?: string;
+    /** The "Member transfer completed" switch (#1016), read by the caller before its transaction opens. */
+    notifyCompleted: boolean;
   },
 ) {
   const { actor, now } = options;
@@ -649,6 +658,7 @@ async function completeTransfer(
       fromClubName: fromClub.name,
       toClubName: toClub.name,
     }),
+    options.notifyCompleted,
   );
 
   return { transferId: transfer.id, rosterMemberId: receiving.id, registrationMovesQueued: moves };
@@ -740,6 +750,8 @@ async function queueRegistrationMoves(
 
 /** The sending club accepts a pending request (#489). Never self-acknowledgment (N6). */
 export async function acceptTransfer(fromOrganizationId: string, transferId: string, actor: TransferActor, now = new Date()) {
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyCompleted = await isNotificationEnabled("MEMBER_TRANSFER_COMPLETED");
   return getPrisma().$transaction(async (tx) => {
     const transfer = await loadTransfer(tx, transferId);
     assertSendingClub(transfer, fromOrganizationId);
@@ -762,6 +774,7 @@ export async function acceptTransfer(fromOrganizationId: string, transferId: str
       note: "",
       actor,
       now,
+      notifyCompleted,
     });
   });
 }
@@ -833,6 +846,8 @@ export async function cancelTransferByClub(organizationId: string, transferId: s
 
 /** Conference staff finish a transfer the sending club hasn't answered within 14 days (#489 N2: only once overdue). */
 export async function staffFinishTransfer(transferId: string, note: string, actor: StaffTransferActor, now = new Date()) {
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyCompleted = await isNotificationEnabled("MEMBER_TRANSFER_COMPLETED");
   return getPrisma().$transaction(async (tx) => {
     const transfer = await loadTransfer(tx, transferId);
     if (transfer.status !== "PENDING") throw new MemberTransferError("NOT_PENDING", "Only a request still waiting on the sending club can be finished. Use override instead.");
@@ -846,6 +861,7 @@ export async function staffFinishTransfer(transferId: string, note: string, acto
       note,
       actor,
       now,
+      notifyCompleted,
     });
   });
 }
@@ -863,6 +879,8 @@ export async function staffOverrideTransfer(
   now = new Date(),
 ) {
   if (!input.note.trim()) throw new MemberTransferError("REASON_REQUIRED", "Enter a note explaining the override.");
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyCompleted = await isNotificationEnabled("MEMBER_TRANSFER_COMPLETED");
   return getPrisma().$transaction(async (tx) => {
     const transfer = await loadTransfer(tx, transferId);
     if (!isOpenTransfer(transfer.status)) throw new MemberTransferError("ALREADY_RESOLVED", "This transfer was already resolved.");
@@ -877,6 +895,7 @@ export async function staffOverrideTransfer(
       actor,
       now,
       fromRosterMemberId: transfer.status === "UNMATCHED" ? input.fromRosterMemberId : undefined,
+      notifyCompleted,
     });
   });
 }
@@ -1376,11 +1395,13 @@ export async function listRegistrationMoves(status: "PENDING" | "DECIDED" = "PEN
  * works inside one registration and reprices it, which this must never do.
  */
 export async function approveRegistrationMove(moveId: string, note: string, actor: StaffTransferActor, now = new Date()) {
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       return await getPrisma().$transaction(
-        (tx) => approveRegistrationMoveOnce(tx, moveId, note, actor, now),
+        (tx) => approveRegistrationMoveOnce(tx, moveId, note, actor, now, notifyApprovers),
         // The receiving location's row lock may be waited on for up to 5s (#413).
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: locationTransactionTimeoutMs },
       );
@@ -1398,7 +1419,7 @@ export async function approveRegistrationMove(moveId: string, note: string, acto
   throw new MemberTransferError("TRANSFER_CONFLICT", "Another change touched these registrations at the same time. Refresh and try again.");
 }
 
-async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId: string, note: string, actor: StaffTransferActor, now: Date) {
+async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId: string, note: string, actor: StaffTransferActor, now: Date, notifyApprovers: boolean) {
   const guard = await tx.memberTransferRegistrationMove.updateMany({
     where: { id: moveId, status: "PENDING" },
     data: { status: "APPROVED", decidedAt: now, decidedByUserId: actor.userId, note },
@@ -1496,8 +1517,8 @@ async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId:
   // runs first so the person's permission flag leaves it before the receiving team flags them again. A refusal stops the move.
   const teamMessageIds: string[] = [];
   try {
-    teamMessageIds.push(...(await enforceTeamRegistrationRules(tx, fromRegistrationId, { actorUserId: actor.userId, declineScope: "CHANGED_ONLY", changedAttendeeIds: new Set([attendeeId]) })).queuedMessageIds);
-    teamMessageIds.push(...(await enforceTeamRegistrationRules(tx, toRegistrationId, { actorUserId: actor.userId, declineScope: "CHANGED_ONLY", changedAttendeeIds: new Set([attendeeId]) })).queuedMessageIds);
+    teamMessageIds.push(...(await enforceTeamRegistrationRules(tx, fromRegistrationId, { actorUserId: actor.userId, declineScope: "CHANGED_ONLY", changedAttendeeIds: new Set([attendeeId]), notifyApprovers })).queuedMessageIds);
+    teamMessageIds.push(...(await enforceTeamRegistrationRules(tx, toRegistrationId, { actorUserId: actor.userId, declineScope: "CHANGED_ONLY", changedAttendeeIds: new Set([attendeeId]), notifyApprovers })).queuedMessageIds);
   } catch (error) {
     if (error instanceof ClubTeamError) throw new MemberTransferError("MOVE_BLOCKED", `The event's team rules stop this move. ${error.message}`);
     throw error;

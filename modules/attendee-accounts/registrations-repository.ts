@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -206,6 +207,8 @@ export async function updateTieredAttendeeAnswers(input: {
   now?: Date;
 }) {
   const now = input.now ?? new Date();
+  // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   const result = await getPrisma().$transaction(async (tx) => {
     const owned = await tx.$queryRaw<Array<{
       id: string;
@@ -221,6 +224,7 @@ export async function updateTieredAttendeeAnswers(input: {
     const ownership = owned[0];
     if (!ownership) return null;
     return updateTieredRegistrationAnswersWithClient(tx, {
+      notifyApprovers,
       registrationId: ownership.id,
       clientRequestId: input.clientRequestId,
       expectedUpdatedAt: input.expectedUpdatedAt,

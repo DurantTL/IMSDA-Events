@@ -698,6 +698,23 @@ async function main() {
   assert(await digestCount() === digestsNow + 1, "the next window sends one more");
   console.log("ok  a waitlisted team is told it is waitlisted; staff get one digest per 15 minutes");
 
+  // 15d1. The staff digest has its own switch (#1016): off, a team in a new window sends staff nothing and the team still
+  // gets its own notice; the switch row is removed again.
+  const { resetNotificationSettingsCache } = await import("../modules/notifications/settings");
+  await prisma.notificationSetting.upsert({ where: { key: "GROUP_REGISTRATION_APPROVAL_DIGEST" }, update: { enabled: false }, create: { key: "GROUP_REGISTRATION_APPROVAL_DIGEST", enabled: false } });
+  resetNotificationSettingsCache();
+  try {
+    const digestsBeforeOff = await digestCount();
+    const directorMailsBefore = (await mailsTo(emailOf("regc"))).length;
+    await link.submitGeneralLinkRegistration(eventSlug, request(youth("Dg3"), { club_name: clubName("c"), email: emailOf("regc") }), { locationId: missouri!.id, teamName: "Digest Switched Off" }, new Date(now.getTime() + 40 * 60 * 1000));
+    assert(await digestCount() === digestsBeforeOff, "switch off: staff get no digest for a team in a new window");
+    assert((await mailsTo(emailOf("regc"))).length === directorMailsBefore + 1, "switch off: the team's own notice is still sent");
+  } finally {
+    await prisma.notificationSetting.deleteMany({ where: { key: "GROUP_REGISTRATION_APPROVAL_DIGEST" } });
+    resetNotificationSettingsCache();
+  }
+  console.log("ok  the staff digest skips while its switch is off; the team's own notice is unaffected");
+
   // 15d2. A team name typed by a visitor is text in every email, never markup: no link or image comes of it.
   const noMarkup = (html: string | null) => !/<a\s[^>]*a\.test|<img[^>]*a\.test/i.test(html ?? "");
   const linkName = "[Invoice due - pay here](https://a.test)";

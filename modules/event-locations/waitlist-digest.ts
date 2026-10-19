@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -37,7 +38,7 @@ import {
  */
 
 export type LocationWaitlistDigestResult = {
-  status: "NOT_DUE" | "NO_CHANGES" | "EMAIL_NOT_CONFIGURED" | "QUEUED";
+  status: "NOT_DUE" | "NO_CHANGES" | "EMAIL_NOT_CONFIGURED" | "SWITCHED_OFF" | "QUEUED";
   dateKey: string;
   changesCovered: number;
   recipients: number;
@@ -171,6 +172,8 @@ export async function sendDueLocationWaitlistDigests(
     delivered: 0,
   };
   if (!window.due) return result;
+  // A system administrator can turn this digest off (#1016). Nothing is queued or stamped, so the changes wait.
+  if (!await isNotificationEnabled("LOCATION_WAITLIST_DIGEST")) return { ...result, status: "SWITCHED_OFF" };
 
   const prisma = getPrisma();
   // Cheap early exit on the common run: nothing changed since the last digest.

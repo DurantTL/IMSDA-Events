@@ -60,7 +60,7 @@ function database(options: { existing?: Row[]; coordinator?: boolean; coordinato
 
 const person = (attendeeId: string, name: string, age: number | null, role: "MEMBER" | "COACH" = "MEMBER", personId = `person-${attendeeId}`): { attendeeId: string; personId: string; name: string; age: number | null; role: "MEMBER" | "COACH"; tlt?: boolean } => ({ attendeeId, personId, name, age, role });
 const input = (people: ReturnType<typeof person>[]) => ({ eventId: "event-1", clubEventRegistrationId: "cer-1", registrationId: "reg-1", people });
-const run = (tx: ReturnType<typeof database>, people: ReturnType<typeof person>[]) => syncTeamMemberPermissions(tx as never, input(people));
+const run = (tx: ReturnType<typeof database>, people: ReturnType<typeof person>[]) => syncTeamMemberPermissions(tx as never, { ...input(people), notifyApprovers: true });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -80,6 +80,17 @@ describe("flagging team members of 18 or older (#809)", () => {
     expect(message.bodyTextSnapshot).not.toContain("Blake Two");
     expect(message.bodyTextSnapshot).toContain("/account/area-clubs/team-permissions");
     expect(result).toEqual({ declined: [], queuedMessageIds: ["msg-ac@example.test"] });
+  });
+
+  it("with the approval alert switched off (#1016) still flags the person and audits it, and only skips the email", async () => {
+    const tx = database();
+    const result = await syncTeamMemberPermissions(tx as never, { ...input([person("a", "Alex One", 18), person("b", "Blake Two", 14)]), notifyApprovers: false });
+    expect(tx.clubTeamMemberPermission.create).toHaveBeenCalledTimes(1);
+    expect(tx.clubTeamMemberPermission.create.mock.calls[0]![0].data).toMatchObject({ registrationAttendeeId: "a", ageOnAgeDate: 18, eventId: "event-1" });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_PERMISSION_REQUESTED" }), tx);
+    expect(tx.messageOutbox.upsert).not.toHaveBeenCalled();
+    expect(tx.registration.findUnique).not.toHaveBeenCalled();
+    expect(result).toEqual({ declined: [], queuedMessageIds: [] });
   });
 
   it("does not flag a 17-year-old or a coach, whatever their age", async () => {
@@ -118,7 +129,7 @@ describe("flagging team members of 18 or older (#809)", () => {
 
   it("deletes a pending flag when the person becomes a coach, and audits it with who acted", async () => {
     const tx = database({ existing: [row("a", "PENDING")] });
-    await syncTeamMemberPermissions(tx as never, { ...input([person("a", "Alex One", 18, "COACH")]), actor: { accountId: "acct-director" } });
+    await syncTeamMemberPermissions(tx as never, { ...input([person("a", "Alex One", 18, "COACH")]), actor: { accountId: "acct-director" }, notifyApprovers: true });
     expect(tx.clubTeamMemberPermission.delete).toHaveBeenCalledWith({ where: { id: "perm-a" } });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_TEAM_PERMISSION_CLEARED", metadata: expect.objectContaining({ kept: false, actorAccountId: "acct-director" }) }), tx);
   });
@@ -164,7 +175,7 @@ describe("flagging team members of 18 or older (#809)", () => {
 
   it("reports a declined person who is still a team member, and whether they are a TLT", async () => {
     const tx = database({ existing: [row("a", "DECLINED")] });
-    const result = await syncTeamMemberPermissions(tx as never, input([{ ...person("a", "Alex One", 18), tlt: true }]));
+    const result = await syncTeamMemberPermissions(tx as never, { ...input([{ ...person("a", "Alex One", 18), tlt: true }]), notifyApprovers: true });
     expect(result.declined).toEqual([{ name: "Alex One", tlt: true, attendeeId: "a" }]);
   });
 

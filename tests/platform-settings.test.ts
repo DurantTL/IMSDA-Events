@@ -7,7 +7,9 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: database.getPrisma }));
 
 import {
   PlatformSettingsError,
+  platformAddressesInputSchema,
   platformSettingsInputSchema,
+  updatePlatformAddresses,
   updatePlatformSettings,
 } from "@/modules/system-admin/platform-settings";
 
@@ -57,13 +59,11 @@ describe("platform settings input", () => {
     const parsed = platformSettingsInputSchema.parse(validInput({
       defaultSenderEmail: "",
       logoUrl: "",
-      supportContact: "",
     }));
     // Null, not "". Inheritance asks whether a default exists, and an empty
     // string would answer yes while supplying nothing.
     expect(parsed.defaultSenderEmail).toBeNull();
     expect(parsed.logoUrl).toBeNull();
-    expect(parsed.supportContact).toBeNull();
   });
 
   it("normalises an address the way the rest of the system stores one", () => {
@@ -100,30 +100,76 @@ describe("platform settings input", () => {
     ).success).toBe(false);
   });
 
-  it("validates the security alert email address and allows leaving it blank (#456)", () => {
-    const blank = platformSettingsInputSchema.parse(validInput({ securityAlertEmail: "" }));
-    expect(blank.securityAlertEmail).toBeNull();
-
-    const normalized = platformSettingsInputSchema.parse(
-      validInput({ securityAlertEmail: "  Security@IMSDA.org " }),
-    );
-    expect(normalized.securityAlertEmail).toBe("security@imsda.org");
-
-    expect(platformSettingsInputSchema.safeParse(
-      validInput({ securityAlertEmail: "not-an-address" }),
-    ).success).toBe(false);
+  it("no longer takes the alert addresses: they are edited on Notifications, so this form cannot clear them (#1016)", () => {
+    for (const field of ["supportContact", "securityAlertEmail", "newClubApplicationEmail"]) {
+      expect(platformSettingsInputSchema.safeParse(validInput({ [field]: "a@imsda-events.test" })).success).toBe(false);
+    }
   });
 });
 
-describe("platform settings new club application notifications (#817)", () => {
-  it("is optional and never defaults to an address: blank means no notice", () => {
-    expect(platformSettingsInputSchema.parse(validInput()).newClubApplicationEmail).toBeNull();
-    expect(platformSettingsInputSchema.parse(validInput({ newClubApplicationEmail: "  " })).newClubApplicationEmail).toBeNull();
+describe("platform alert addresses (#456, #817, #1016)", () => {
+  it("are optional and never default to an address: blank means no notice", () => {
+    const parsed = platformAddressesInputSchema.parse({});
+    expect(parsed).toEqual({ supportContact: null, securityAlertEmail: null, newClubApplicationEmail: null });
+    expect(platformAddressesInputSchema.parse({ newClubApplicationEmail: "  ", securityAlertEmail: "" })).toMatchObject({
+      newClubApplicationEmail: null,
+      securityAlertEmail: null,
+    });
   });
 
-  it("keeps a valid address, trimmed and lower-cased, and refuses a malformed one", () => {
-    expect(platformSettingsInputSchema.parse(validInput({ newClubApplicationEmail: "  Youth.Assistant@IMSDA-Events.test " })).newClubApplicationEmail).toBe("youth.assistant@imsda-events.test");
-    expect(platformSettingsInputSchema.safeParse(validInput({ newClubApplicationEmail: "not-an-address" })).success).toBe(false);
+  it("keep a valid address, trimmed and lower-cased, and refuse a malformed one", () => {
+    const parsed = platformAddressesInputSchema.parse({
+      newClubApplicationEmail: "  Youth.Assistant@IMSDA-Events.test ",
+      securityAlertEmail: "  Security@IMSDA.org ",
+      supportContact: " Help@IMSDA.org",
+    });
+    expect(parsed).toEqual({
+      newClubApplicationEmail: "youth.assistant@imsda-events.test",
+      securityAlertEmail: "security@imsda.org",
+      supportContact: "help@imsda.org",
+    });
+    for (const field of ["supportContact", "securityAlertEmail", "newClubApplicationEmail"]) {
+      expect(platformAddressesInputSchema.safeParse({ [field]: "not-an-address" }).success).toBe(false);
+    }
+  });
+
+  it("refuse unknown fields", () => {
+    expect(platformAddressesInputSchema.safeParse({ organizationName: "x" }).success).toBe(false);
+  });
+
+  it("are saved with an audit row holding both sides, in one transaction", async () => {
+    const auditCreate = vi.fn();
+    const upsert = vi.fn();
+    const tx = {
+      platformSettings: {
+        findUnique: vi.fn().mockResolvedValue({ supportContact: "old@imsda-events.test", securityAlertEmail: null, newClubApplicationEmail: null }),
+        upsert,
+      },
+      auditLog: { create: auditCreate },
+    };
+    database.getPrisma.mockReturnValue({
+      $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
+      platformSettings: {
+        upsert: vi.fn().mockResolvedValue({ updatedBy: null, updatedAt: new Date("2026-10-18T12:00:00.000Z") }),
+      },
+    });
+    await updatePlatformAddresses(
+      platformAddressesInputSchema.parse({ securityAlertEmail: "security@imsda-events.test" }),
+      "admin-1",
+    );
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: { supportContact: null, securityAlertEmail: "security@imsda-events.test", newClubApplicationEmail: null, updatedByUserId: "admin-1" },
+    }));
+    expect(auditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: "admin-1",
+        action: "PLATFORM_ALERT_ADDRESSES_UPDATED",
+        metadata: {
+          before: { supportContact: "old@imsda-events.test", securityAlertEmail: null, newClubApplicationEmail: null },
+          after: { supportContact: null, securityAlertEmail: "security@imsda-events.test", newClubApplicationEmail: null },
+        },
+      }),
+    });
   });
 });
 

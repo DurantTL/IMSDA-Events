@@ -1,4 +1,5 @@
 import { enforceTeamRegistrationRules } from "@/modules/club-teams/registration-guard";
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
@@ -726,8 +727,9 @@ async function createPublicRegistrationTransaction(
   formSlug: string,
   submittedInput: PublicRegistrationInput,
   now: Date,
-  bulk?: BulkSubmissionContext,
-  requestContext?: SubmissionRequestContext,
+  bulk: BulkSubmissionContext | undefined,
+  requestContext: SubmissionRequestContext | undefined,
+  notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean },
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -1510,7 +1512,7 @@ async function createPublicRegistrationTransaction(
     }
     // The team's rules once more on what was just saved, and the flag for any team member of 18 or older (#809). Nothing
     // for an event without team rules.
-    teamPermissionMessageIds = (await enforceTeamRegistrationRules(tx, registration.id, { actorUserId: club.submittedByUserId, actorAccountId: club.submittedByAccountId })).queuedMessageIds;
+    teamPermissionMessageIds = (await enforceTeamRegistrationRules(tx, registration.id, { actorUserId: club.submittedByUserId, actorAccountId: club.submittedByAccountId, notifyApprovers: notifications.notifyApprovers })).queuedMessageIds;
   }
   if (group) {
     // The contact is the billing party; no club, church, or roster is involved (#650).
@@ -1558,6 +1560,7 @@ async function createPublicRegistrationTransaction(
         location: registrationLocation,
         billedToGroup: Boolean(group),
         ...(club?.confirmationNote ? { registrantNote: club.confirmationNote({ waitlisted: false }) } : {}),
+        staffCopyEnabled: notifications.staffCopyEnabled,
       });
   await tx.auditLog.create({
     data: {
@@ -1699,10 +1702,15 @@ export async function submitPublicRegistration(
   requestContext?: SubmissionRequestContext,
 ) {
   const prisma = getPrisma();
+  // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
+  const [staffCopyEnabled, notifyApprovers] = await Promise.all([
+    isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY"),
+    isNotificationEnabled("TEAM_APPROVAL_REQUESTED"),
+  ]);
   for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
     try {
       const result = await prisma.$transaction(
-        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext),
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers }),
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the

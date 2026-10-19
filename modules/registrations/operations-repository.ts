@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -704,6 +705,8 @@ export async function substituteRegistrationAttendee(
     },
   });
 
+  // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
+  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   let permissionMessageIds: string[] = [];
   const result = await runSerializableOperation(async (tx) => {
     // Each attempt starts clean, so a retried transaction never delivers the ids of one that rolled back.
@@ -864,7 +867,7 @@ export async function substituteRegistrationAttendee(
       },
     });
     // The same team rules as any other change to the team, inside this transaction, so a refused one saves nothing.
-    if (onTeamEvent) permissionMessageIds.push(...(await enforceTeamRegistrationRules(tx, registrationId, { actorUserId: actor.id })).queuedMessageIds);
+    if (onTeamEvent) permissionMessageIds.push(...(await enforceTeamRegistrationRules(tx, registrationId, { actorUserId: actor.id, notifyApprovers })).queuedMessageIds);
 
     const priorName = `${prior.firstName} ${prior.lastName}`.trim();
     const replacementName = `${input.firstName} ${input.lastName}`.trim();
