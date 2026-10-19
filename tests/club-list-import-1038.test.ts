@@ -327,6 +327,31 @@ describe("review fixes (#1038)", () => {
     expect(html).not.toContain(">Imported<");
   });
 
+  it("flags near-duplicates with the directory's similar-club rules, starts them unselected, and still links an exact name (#1031)", async () => {
+    mocks.orgs.push(org("club-near", "CLUB", "Sample Hollo Pathfinder Club", { isActive: false }), org("club-exact", "CLUB", "Pretend Ridge Pathfinders"));
+    const annotated = await annotateImportDrafts(parseClubListExport({ clubs: [
+      club({ name: "Sample Hollow SDA Pathfinders", namesOnSheet: {} }),
+      club({ name: "Pretend Ridge Pathfinders", churchSearchHint: "Pretend Ridge", namesOnSheet: {} }),
+      club({ name: "Unrelated Meadow Pathfinders", churchSearchHint: "Nowhere", namesOnSheet: {} }),
+    ] }, now).drafts);
+    const [near, exact, none] = annotated.drafts;
+    expect(near!.existingClub).toBeNull();
+    expect(near!.possibleMatches).toMatchObject([{ id: "club-near", name: "Sample Hollo Pathfinder Club", isActive: false }]);
+    // An exact name links (any church); it is not a "possible" match.
+    expect(exact!.existingClub?.id).toBe("club-exact");
+    expect(exact!.possibleMatches).toEqual([]);
+    expect(none!.possibleMatches).toEqual([]);
+
+    const { loadPreviewDrafts } = await import("@/components/club-import-workspace");
+    expect(loadPreviewDrafts(annotated.drafts).map((draft) => draft.include)).toEqual([false, true, true]);
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { ClubImportWorkspace } = await import("@/components/club-import-workspace");
+    const html = renderToStaticMarkup(createElement(ClubImportWorkspace, { initialPreview: { drafts: annotated.drafts, churches: annotated.churches, clubYearChoices: [], skipped: 0 } }));
+    expect(html).toContain("Possible match, check:");
+    expect(html).toContain("Sample Hollo Pathfinder Club (inactive)");
+  });
+
   it("takes the club's own name over an older name", async () => {
     mocks.orgs.push(org("club-older-name", "CLUB", "Sample Hollow Pathfinder Club"), org("club-own", "CLUB", "Sample Hollow Pathfinders"));
     const [draft] = (await annotateImportDrafts(parseClubListExport({ clubs: [club()] }, now).drafts)).drafts;

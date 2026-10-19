@@ -61,7 +61,8 @@ function draftProblems(draft: Draft) {
 export function loadPreviewDrafts(drafts: AnnotatedImportDraft[]): Draft[] {
   return drafts.map((draft) => {
     // A club-list row has no earlier import to point at (its number is not a form 89 entry).
-    const loaded = { ...draft, include: draft.kind === "CLUB_LIST" || !earlierImportNotice(draft.importedYears, draft.clubYear), expanded: false };
+    // A club-list row with possible matches starts unselected: ticking it says it is a new club, not one of them.
+    const loaded = { ...draft, include: draft.kind === "CLUB_LIST" ? draft.possibleMatches.length === 0 : !earlierImportNotice(draft.importedYears, draft.clubYear), expanded: false };
     // Open the cards that need attention; the rest stay folded until clicked.
     return { ...loaded, expanded: !loaded.include || draftProblems(loaded).length > 0 };
   });
@@ -265,6 +266,13 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                         </>
                       )}
                     </small>
+                    {isList && draft.possibleMatches.length > 0 && (
+                      <small className="club-import-year-note">
+                        Possible match, check:{" "}
+                        {draft.possibleMatches.map((match) => `${match.name}${match.isActive ? "" : " (inactive)"}${match.sponsorName ? `, ${match.sponsorName}` : ""}${match.city ? `, ${match.city}` : ""}`).join("; ")}.
+                        Tick the box only if this is a new club.
+                      </small>
+                    )}
                     {isList && draft.checkNote && <small className="club-import-year-note">Note: {draft.checkNote}</small>}
                     {isList && !draft.existingClub && !draft.churchId && draft.include && <small className="club-import-year-note">No church chosen: this club will not be created.</small>}
                     {submissionYearNote(draft) && <small className="club-import-year-note">{submissionYearNote(draft)}</small>}

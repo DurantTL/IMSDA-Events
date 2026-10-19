@@ -363,9 +363,11 @@ export function parseClubImportFile(input: unknown, now = new Date()) {
 
 /**
  * The names a club-list row is matched on in the directory: its own and its
- * older names, normalized and de-duplicated. The one place to swap in the
- * near-duplicate check from #1031 (`modules/organizations/similar-clubs.ts`)
- * once it merges; until then the match is exact.
+ * older names, normalized and de-duplicated. This is the exact-name rule: an
+ * existing club of one of these names, at any church, is linked and never
+ * duplicated (as in the directory's club check, #1031). Near matches are not
+ * linked; the preview lists them as "possible match, check" with
+ * `similarClubMatches` from `modules/organizations/similar-clubs.ts`.
  */
 export function clubMatchNames(clubName: string, namesOnSheet: string[]) {
   return [...new Set([clubName, ...namesOnSheet].map(normalizeOrganizationName).filter(Boolean))];

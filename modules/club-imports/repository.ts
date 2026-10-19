@@ -19,6 +19,8 @@ import {
 } from "@/modules/club-imports/domain";
 import type { ClubImportItem } from "@/modules/club-imports/schemas";
 import { SPONSOR_ORGANIZATION_TYPES, canSponsorClub, normalizeOrganizationName } from "@/modules/organizations/domain";
+import { listSimilarClubCandidates } from "@/modules/organizations/repository";
+import { shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
 
 /**
  * Club import storage (#376). The export itself is never stored: the preview
@@ -40,6 +42,8 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
       select: { externalId: true, providerScope: true, organization: { select: { id: true, name: true } } },
     }),
   ]);
+  // Near matches for club-list rows (#1031's rules, the same as Pending teams): only read when the file has list rows.
+  const similarCandidates = drafts.some((draft) => draft.kind === "CLUB_LIST") ? await listSimilarClubCandidates(prisma) : [];
   type Sponsor = (typeof churches)[number];
   // An exact name match comes first; a church wins an exact tie with a company or group.
   const sponsorsByName = new Map<string, Sponsor[]>();
@@ -100,11 +104,18 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
       const { club, ambiguous } = findClubs(draft);
       if (draft.kind === "CLUB_LIST") {
         const suggestion = suggestChurches(draft.churchHint, draft.state, churches, draft.sponsoringChurchId);
+        // An existing club is already linked; otherwise list the clubs that could be this one.
+        const suggested = churches.find((church) => church.id === suggestion.churchId);
+        const possibleMatches = club || ambiguous.length > 0
+          ? []
+          : shownMatches(similarClubMatches(draft.clubName, { sponsorId: suggestion.churchId, city: suggested?.city ?? null, state: suggested?.state ?? null }, similarCandidates))
+            .map((match) => ({ id: match.id, name: match.name, isActive: match.isActive, sponsorName: match.sponsorName, city: match.city, kind: match.kind }));
         return {
           ...draft,
           churchId: suggestion.churchId,
           newChurchName: "",
           churchSuggestion: suggestion,
+          possibleMatches,
           importedYears,
           ambiguousClubs: ambiguous.map((candidate) => ({ id: candidate.id, name: candidate.name, isActive: candidate.isActive, hasSponsoringChurch: Boolean(candidate.parentOrganizationId), sponsorId: candidate.parentOrganizationId })),
           existingClub: club
@@ -118,6 +129,7 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
         churchId: church?.id ?? null,
         newChurchName: church ? "" : draft.churchName,
         churchSuggestion: null as ReturnType<typeof suggestChurches> | null,
+        possibleMatches: [] as Array<{ id: string; name: string; isActive: boolean; sponsorName: string | null; city: string | null; kind: "SAME_NAME" | "SIMILAR_NAME" }>,
         ambiguousClubs: [] as Array<{ id: string; name: string; isActive: boolean; hasSponsoringChurch: boolean; sponsorId: string | null }>,
         importedYears,
         existingClub: club

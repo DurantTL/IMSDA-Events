@@ -15,7 +15,7 @@ const now = new Date("2026-09-28T15:00:00Z");
 
 function preview(importedYears: ImportedYears = {}, response: Record<string, unknown> = {}): ClubImportPreview {
   const [draft] = parseClubRegistrationExport([syntheticExportEntry({}, response)], now).drafts;
-  const annotated: AnnotatedImportDraft = { ...draft, churchId: null, newChurchName: draft.churchName, churchSuggestion: null, ambiguousClubs: [], importedYears, existingClub: null };
+  const annotated: AnnotatedImportDraft = { ...draft, churchId: null, newChurchName: draft.churchName, churchSuggestion: null, ambiguousClubs: [], possibleMatches: [], importedYears, existingClub: null };
   return { drafts: [annotated], churches: [], clubYearChoices: ["2025-26", "2026-27", "2027-28"], skipped: 0 };
 }
 
