@@ -20,7 +20,7 @@ import {
 import type { ClubImportItem } from "@/modules/club-imports/schemas";
 import { SPONSOR_ORGANIZATION_TYPES, canSponsorClub, normalizeOrganizationName } from "@/modules/organizations/domain";
 import { listSimilarClubCandidates } from "@/modules/organizations/repository";
-import { shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
+import { clubNameKey, namesAreClose, shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
 
 /**
  * Club import storage (#376). The export itself is never stored: the preview
@@ -35,7 +35,8 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
   const [churches, clubs, identities] = await Promise.all([
     // A church, company or group may sponsor a club (#822).
     prisma.organization.findMany({ where: { type: { in: [...SPONSOR_ORGANIZATION_TYPES] }, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, normalizedName: true, type: true, city: true, state: true } }),
-    prisma.organization.findMany({ where: { type: "CLUB" }, select: { id: true, name: true, normalizedName: true, isActive: true, parentOrganizationId: true } }),
+    // The same order the confirm step uses, so a name shared by two clubs resolves to the same one in both.
+    prisma.organization.findMany({ where: { type: "CLUB" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, name: true, normalizedName: true, isActive: true, parentOrganizationId: true } }),
     // Only form 89 entries are Fluent Forms identities. A club-list row's number ("1", "2") must never match one.
     prisma.externalIdentity.findMany({
       where: { provider: "FLUENT_FORMS", externalId: { in: drafts.filter((draft) => draft.kind === "REGISTRATION").map((draft) => draft.entryId) } },
@@ -109,7 +110,11 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
         const possibleMatches = club || ambiguous.length > 0
           ? []
           : shownMatches(similarClubMatches(draft.clubName, { sponsorId: suggestion.churchId, city: suggested?.city ?? null, state: suggested?.state ?? null }, similarCandidates))
-            .map((match) => ({ id: match.id, name: match.name, isActive: match.isActive, sponsorName: match.sponsorName, city: match.city, kind: match.kind }));
+            .map((match) => ({
+              id: match.id, name: match.name, isActive: match.isActive, sponsorName: match.sponsorName, city: match.city, kind: match.kind,
+              // A club that only shares the church, under an unrelated name, is shown but does not hold the row back.
+              nameBased: match.kind === "SAME_NAME" || !match.sameSponsor || namesAreClose(clubNameKey(draft.clubName), clubNameKey(match.name)),
+            }));
         return {
           ...draft,
           churchId: suggestion.churchId,
@@ -129,7 +134,7 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
         churchId: church?.id ?? null,
         newChurchName: church ? "" : draft.churchName,
         churchSuggestion: null as ReturnType<typeof suggestChurches> | null,
-        possibleMatches: [] as Array<{ id: string; name: string; isActive: boolean; sponsorName: string | null; city: string | null; kind: "SAME_NAME" | "SIMILAR_NAME" }>,
+        possibleMatches: [] as Array<{ id: string; name: string; isActive: boolean; sponsorName: string | null; city: string | null; kind: "SAME_NAME" | "SIMILAR_NAME"; nameBased: boolean }>,
         ambiguousClubs: [] as Array<{ id: string; name: string; isActive: boolean; hasSponsoringChurch: boolean; sponsorId: string | null }>,
         importedYears,
         existingClub: club
@@ -189,7 +194,7 @@ async function importListedClub(item: ClubImportItem, actorUserId: string): Prom
       }
       // What the administrator saw must be what is confirmed.
       if ((club?.id ?? null) !== item.existingClubId) {
-        throw new ImportRefused("The directory has changed since the preview. Nothing was changed; preview the file again.");
+        throw new ImportRefused("This club is already in the directory, or the directory changed since the preview. Nothing was changed; preview the file again to see it.");
       }
 
       if (club) {

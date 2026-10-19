@@ -32,7 +32,12 @@ const client = {
       return Promise.resolve(orgs()
         .filter((org) => (typeof where.type === "string" ? org.type === where.type : (where.type as { in: string[] }).in.includes(org.type)) && (typeof where.type === "string" || org.isActive))
         .filter((org) => !where.normalizedName || where.normalizedName.in.includes(org.normalizedName))
-        .sort(byCreated));
+        .sort(byCreated)
+        // The sponsoring church as the similar-clubs query selects it.
+        .map((org) => {
+          const parent = org.parentOrganizationId ? orgs().find((other) => other.id === org.parentOrganizationId) : undefined;
+          return { ...org, parentOrganization: parent ? { id: parent.id, name: parent.name, churchLocation: null } : null };
+        }));
     },
     findFirst: ({ where }: { where: { type: string; normalizedName: string | { in: string[] } } }) => {
       mocks.calls.push("org.findFirst");
@@ -308,6 +313,17 @@ describe("system administrators only", () => {
 });
 
 describe("review fixes (#1038)", () => {
+  it("shows a club that only shares the church but keeps the new club ticked (re-review N1)", async () => {
+    const church = orgs().find((o) => o.type === "CHURCH")!;
+    mocks.orgs.push(org("club-sibling", "CLUB", "Quiet Valley Adventurers", { parentOrganizationId: church.id }));
+    const annotated = await annotateImportDrafts(parseClubListExport({ clubs: [club({ name: "Brand New Pathfinders", namesOnSheet: {} })] }, now).drafts);
+    const [row] = annotated.drafts;
+    expect(row!.churchId).toBe(church.id);
+    expect(row!.possibleMatches).toMatchObject([{ id: "club-sibling", nameBased: false }]);
+    const { loadPreviewDrafts } = await import("@/components/club-import-workspace");
+    expect(loadPreviewDrafts(annotated.drafts).map((draft) => draft.include)).toEqual([true]);
+  });
+
   const draftsFor = async (list: unknown[]) => {
     const annotated = await annotateImportDrafts(parseClubListExport({ clubs: list }, now).drafts);
     return annotated.drafts.map((draft) => ({ ...draft, include: true }) as unknown as PreviewDraft);

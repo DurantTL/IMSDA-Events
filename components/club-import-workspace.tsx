@@ -62,7 +62,7 @@ export function loadPreviewDrafts(drafts: AnnotatedImportDraft[]): Draft[] {
   return drafts.map((draft) => {
     // A club-list row has no earlier import to point at (its number is not a form 89 entry).
     // A club-list row with possible matches starts unselected: ticking it says it is a new club, not one of them.
-    const loaded = { ...draft, include: draft.kind === "CLUB_LIST" ? draft.possibleMatches.length === 0 : !earlierImportNotice(draft.importedYears, draft.clubYear), expanded: false };
+    const loaded = { ...draft, include: draft.kind === "CLUB_LIST" ? !draft.possibleMatches.some((match) => match.nameBased) : !earlierImportNotice(draft.importedYears, draft.clubYear), expanded: false };
     // Open the cards that need attention; the rest stay folded until clicked.
     return { ...loaded, expanded: !loaded.include || draftProblems(loaded).length > 0 };
   });

@@ -77,7 +77,7 @@ function townKey(city: string | null, state: string | null) {
   return town ? `${town}|${normalizeOrganizationName(state ?? "")}` : null;
 }
 
-function namesAreClose(a: string, b: string) {
+export function namesAreClose(a: string, b: string) {
   if (!a || !b) return false;
   if (a === b) return true;
   const shorter = a.length <= b.length ? a : b;
