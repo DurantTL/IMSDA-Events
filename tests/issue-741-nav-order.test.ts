@@ -131,7 +131,9 @@ describe("sidebar order (#964)", () => {
   });
 
   it("keeps navigation's sidebar items in the table's order, with the moved items out and More last", () => {
-    const listed = navigation.filter((item) => item.sidebar).map((item) => item.label);
+    const listed = navigation.filter((item) => item.sidebar).map((item) => item.label).filter((label) => label !== "Kitchen counts");
+    // Kitchen counts (#1029) is the one sidebar item for staff without the event view, so no admin sees it: it follows the dashboard.
+    expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Dashboard", "Kitchen counts"]);
     expect(listed).toEqual(fullOrder.filter((entry) => !entry.startsWith("# ") && entry !== "More" && entry !== "Event features"));
     expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Team", "Promo codes"]);
     expect(navigation.at(-1)?.href).toBe("/more");
@@ -284,7 +286,7 @@ describe("System management and the event picker (#741 slice 4)", () => {
 
 describe("phone tabs (#741 slice 4)", () => {
   it("is Home, People, Check-in, Payments (finance only), Emails, More; People is the Registrations page", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
+    expect([...mobileNavigationOrder]).toEqual(["/overview", "/more/kitchen-report/counts", "/people", "/check-in", "/finance", "/communications", "/more"]);
     expect(mobileNavigationLabels["/people"]).toBe("People");
     expect(navigation.find((item) => item.href === "/people")?.label).toBe("Registrations");
     expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);

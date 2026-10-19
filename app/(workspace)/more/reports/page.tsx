@@ -133,7 +133,7 @@ export default async function OperationalReportsPage({
   searchParams: Promise<{ event?: string }>;
 }) {
   const requested = (await searchParams).event;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   if (!permissions.includes("VIEW_REPORTS")) {
     return (
       <AccessRestricted

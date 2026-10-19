@@ -25,6 +25,12 @@ export const eventPermissions = [
    * permission, so a person who finalizes for several events holds it on each.
    */
   "FINALIZE_INVOICES",
+  /**
+   * Entering the kitchen's own counts for a meal service: prepared, wasted, donated and transferred (#1029). It opens
+   * the kitchen counts page and its CSV and nothing else: no registration, people, finance or report page. Carried by
+   * the Kitchen staff role and Event Admin.
+   */
+  "MANAGE_KITCHEN_COUNTS",
 ] as const;
 
 export type EventPermission = (typeof eventPermissions)[number];
@@ -36,6 +42,7 @@ export const eventRoles = [
   "COMMUNICATIONS_MANAGER",
   "CHECK_IN_STAFF",
   "READ_ONLY_STAFF",
+  "KITCHEN_STAFF",
 ] as const;
 
 export type EventRole = (typeof eventRoles)[number];
@@ -48,4 +55,17 @@ export const rolePermissions: Record<EventRole, readonly EventPermission[]> = {
   COMMUNICATIONS_MANAGER: ["VIEW_EVENT", "MANAGE_COMMUNICATIONS"],
   CHECK_IN_STAFF: ["VIEW_EVENT", "MANAGE_CHECK_IN", "VIEW_SENSITIVE_DATA"],
   READ_ONLY_STAFF: ["VIEW_EVENT"],
+  // Deliberately without VIEW_EVENT: that permission opens the registration search, and kitchen staff must not see registrations (#1029).
+  KITCHEN_STAFF: ["MANAGE_KITCHEN_COUNTS"],
 };
+
+/**
+ * Whether the permissions are a kitchen viewer's without the event view (#1029): MANAGE_KITCHEN_COUNTS and no
+ * VIEW_EVENT. Without VIEW_EVENT the dashboard and the registration search are closed, so the viewer's home is the
+ * kitchen counts page, and any workspace page that does not open on a permission of its own sends them there.
+ */
+export function isKitchenWithoutEventView(permissions: readonly EventPermission[]): boolean {
+  return permissions.includes("MANAGE_KITCHEN_COUNTS") && !permissions.includes("VIEW_EVENT");
+}
+
+export const kitchenCountsPath = "/more/kitchen-report/counts";

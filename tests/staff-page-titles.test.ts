@@ -32,15 +32,15 @@ describe("staff page names (#685)", () => {
     expect(byHref["/more/promo-codes"]).toBe(titles.promoCodes);
     // The sidebar's own items, as the target names them.
     expect(navigation.filter((item) => item.sidebar).map((item) => item.label)).toEqual([
-      "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
+      "Dashboard", "Kitchen counts", "Check-in", "Registrations", "Payments", "Emails",
       "Event settings", "Registration forms", "Attendee setup", "Tags",
       "Operational reports", "Operational health",
     ]);
   });
 
   it("keeps five phone tabs with short labels while the sidebar keeps full labels (#711)", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
-    expect(mobileNavigationOrder.map((href) => mobileNavigationLabels[href])).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
+    expect([...mobileNavigationOrder]).toEqual(["/overview", "/more/kitchen-report/counts", "/people", "/check-in", "/finance", "/communications", "/more"]);
+    expect(mobileNavigationOrder.map((href) => mobileNavigationLabels[href])).toEqual(["Home", "Kitchen", "People", "Check-in", "Pay", "Emails", "More"]);
     for (const href of mobileNavigationOrder) {
       expect(navigation.find((item) => item.href === href)?.label).toBeTruthy();
     }
@@ -115,7 +115,7 @@ describe("staff page names (#685)", () => {
 
   it("has every page's <title> read the shared constant", () => {
     const pages: Record<string, string> = {
-      overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", payments: "finance", registrationForm: "registration-builder",
+      overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", kitchenCounts: "more/kitchen-report/counts", payments: "finance", registrationForm: "registration-builder",
       emails: "communications", team: "staff", imports: "imports", systemManagement: "admin", checkIn: "check-in",
       more: "more", eventModules: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
       attendeeSetup: "more/attendee-configuration", tags: "more/tags", eventSettings: "more/event-settings",

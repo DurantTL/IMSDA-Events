@@ -12163,6 +12163,22 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .kitchen-meals-served .served-total > * { border-top: 2px solid var(--line, #d6dee2); }
 .scanner-import-review { overflow-wrap: anywhere; }
 
+/* Kitchen counts (#1029). Phone first: one form per count, full-width inputs and 44px-tall buttons. */
+.kitchen-counts .served-split { display: block; margin-top: 2px; }
+.kitchen-counts .served-total > * { border-top: 2px solid var(--line, #d6dee2); }
+.kitchen-definitions { display: grid; gap: 4px; margin: 0 0 12px; }
+.kitchen-definitions dd { margin: 0; }
+.kitchen-history ul { padding-left: 18px; margin: 4px 0 12px; }
+.kitchen-entry-list { display: grid; gap: 16px; }
+.kitchen-entry-card { display: grid; gap: 12px; min-width: 0; }
+.kitchen-count-block { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line, #d6dee2); min-width: 0; }
+.kitchen-count-form { min-width: 0; }
+.kitchen-count-form input { width: 100%; min-height: 44px; font-size: 1rem; }
+.kitchen-count-form .form-actions .primary-button { min-height: 44px; width: 100%; }
+@media (min-width: 700px) {
+  .kitchen-entry-list { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); align-items: start; }
+  .kitchen-count-form .form-actions .primary-button { width: auto; }
+}
 /* System administrator notification bell (#1032): a 44px button and a panel that fits 390px. */
 .attention-bell { overflow: visible; width: 44px; height: 44px; }
 .attention-bell:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }

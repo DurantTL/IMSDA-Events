@@ -28,7 +28,7 @@ export default async function EventHealthPage({
   searchParams: Promise<{ event?: string; club?: string; sheet?: string }>;
 }) {
   const query = await searchParams;
-  const { event } = await resolveEventContext(query.event);
+  const { event } = await resolveEventContext(query.event, { allowWithoutEventView: true });
   const viewer = await resolveStaffHealthViewer();
   if (!viewer) {
     return <AccessRestricted title="Health information is restricted" detail="Ask a system administrator if you need health information access for this event." />;

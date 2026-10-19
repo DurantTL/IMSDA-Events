@@ -30,6 +30,8 @@ enum EventRole {
   COMMUNICATIONS_MANAGER
   CHECK_IN_STAFF
   READ_ONLY_STAFF
+  /// Kitchen staff (#1029): enter prepared, wasted, donated and transferred counts. Holds no registration or people access.
+  KITCHEN_STAFF
 }
 
 enum EventPermission {
@@ -52,6 +54,8 @@ enum EventPermission {
   /// conference to the amount. Never part of a role (Event Admin and MANAGE_FINANCE do not include
   /// it): a system administrator has it everywhere and grants it to named people one membership at a time.
   FINALIZE_INVOICES
+  /// Enter the kitchen's own meal counts (#1029). Carried by the Kitchen staff role and Event Admin; opens no registration or people page.
+  MANAGE_KITCHEN_COUNTS
 }
 
 enum MembershipStatus {
@@ -1760,6 +1764,7 @@ model Event {
   mealTickets                         EventMealTicket[]
   mealImportBatches                   EventMealImportBatch[]
   mealRedemptions                     EventMealRedemption[]
+  mealKitchenCounts                   EventMealKitchenCount[]
   mealSelectionChanges                EventMealSelectionChange[]
   mealLedgerEntries                   EventMealLedgerEntry[]
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
@@ -9670,4 +9675,33 @@ model StaffInvitation {
   @@index([eventId, group])
   @@index([eventId, approval])
   @@index([lastMessageId])
+}
+
+enum MealKitchenCountKind {
+  PREPARED
+  WASTED
+  DONATED
+  TRANSFERRED
+}
+
+/// Append-only kitchen-entered count for one meal service (#1029). A correction is a new row whose `supersedesId` names the
+/// row it replaces; the latest row of a (service, kind) chain is the current figure and every earlier row stays visible.
+/// `serviceDate` is empty for a ticket good on any day (same convention as the served report). Never touches redemptions.
+model EventMealKitchenCount {
+  id              String               @id @default(cuid())
+  eventId         String
+  serviceDate     String
+  mealType        MealType
+  kind            MealKitchenCountKind
+  quantity        Int
+  note            String?
+  enteredByUserId String
+  supersedesId    String?              @unique
+  createdAt       DateTime             @default(now())
+
+  event      Event                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  supersedes EventMealKitchenCount? @relation("KitchenCountSupersedes", fields: [supersedesId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supersededBy EventMealKitchenCount? @relation("KitchenCountSupersedes")
+
+  @@index([eventId, serviceDate, mealType, kind, createdAt])
 }
