@@ -8,6 +8,7 @@ import {
 } from "@/components/attendee-google-button";
 import { isGoogleSignInConfigured } from "@/integrations/oauth/google";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
+import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default async function AttendeeSignUpPage({
             through your inbox for the right link.
           </p>
         </div>
+        <AccountComingSoonNotice />
         {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
         {googleAvailable && (
           <>
