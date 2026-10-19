@@ -74,7 +74,6 @@ export function AdminAttentionBell({
   useEffect(() => {
     if (!open) return;
     headingRef.current?.focus();
-    if (!initial) void load();
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setOpen(false);
@@ -91,7 +90,13 @@ export function AdminAttentionBell({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("touchstart", onPointerDown);
     };
-  }, [open, initial, load]);
+  }, [open]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && !initial) void load();
+  }
 
   const total = summary?.total ?? null;
 
@@ -102,7 +107,7 @@ export function AdminAttentionBell({
         aria-expanded={open}
         aria-label={attentionButtonName(total)}
         className="avatar attention-bell"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         ref={triggerRef}
         type="button"
       >

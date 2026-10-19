@@ -128,12 +128,12 @@ describe("admin notification bell model (#1032)", () => {
 
 describe("admin notification bell counts (#1032)", () => {
   function fakePrisma() {
-    const groupBy = (rows: unknown[]) => vi.fn(async (_args: unknown) => rows);
+    const groupBy = (rows: unknown[]) => vi.fn<(args?: unknown) => Promise<unknown[]>>(async () => rows);
     return {
-      newClubApplication: { count: vi.fn(async (_args: unknown) => 2) },
+      newClubApplication: { count: vi.fn<(args?: unknown) => Promise<number>>(async () => 2) },
       generalLinkSubmission: { groupBy: groupBy([{ eventId: "e1", _count: { _all: 1 } }, { eventId: "e2", _count: { _all: 4 } }]) },
       staffInvitation: { groupBy: groupBy([{ eventId: "e1", _count: { _all: 3 } }]) },
-      event: { findMany: vi.fn(async (_args: unknown) => [{ id: "e1" }, { id: "e2" }, { id: "e3" }]) },
+      event: { findMany: vi.fn<(args?: unknown) => Promise<unknown[]>>(async () => [{ id: "e1" }, { id: "e2" }, { id: "e3" }]) },
       messageOutbox: { groupBy: groupBy([{ eventId: null, _count: { _all: 2 } }, { eventId: "e1", _count: { _all: 1 } }]) },
       scheduledEmailBatch: { groupBy: groupBy([{ eventId: "e2", _count: { _all: 1 } }]) },
     };
@@ -211,7 +211,7 @@ describe("admin notification bell API (#1032)", () => {
     ["an event administrator", { id: "u1", globalRole: null }],
   ])("refuses %s without reading any count", async (_name, user) => {
     mocks.getCurrentSession.mockResolvedValue({ user });
-    const response = await GET(new Request("http://localhost/api/admin/attention") as never, undefined as never);
+    const response = await GET(new Request("http://localhost/api/admin/attention") as never);
     expect(response.status).toBe(403);
     expect(mocks.getPrisma).not.toHaveBeenCalled();
   });
@@ -227,7 +227,7 @@ describe("admin notification bell API (#1032)", () => {
       scheduledEmailBatch: { groupBy: vi.fn(async () => []) },
     });
     mocks.getSweepHeartbeat.mockResolvedValue({ status: "ok" });
-    const response = await GET(new Request("http://localhost/api/admin/attention") as never, undefined as never);
+    const response = await GET(new Request("http://localhost/api/admin/attention") as never);
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("private, max-age=30");
     const body = await response.json();

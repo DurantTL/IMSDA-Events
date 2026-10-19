@@ -73,13 +73,19 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
     scheduledEmailsFailed,
   ] = await Promise.all([
     read("club applications", 0, () => prisma.newClubApplication.count({ where: { status: "PENDING" } })),
-    read("pending teams", NONE, async () => groupedCount(await prisma.generalLinkSubmission.groupBy({
-      by: ["eventId"], where: { status: "PENDING" }, _count: { _all: true },
-    }))),
+    read("pending teams", NONE, async () => {
+      const rows = await prisma.generalLinkSubmission.groupBy({
+        by: ["eventId"], where: { status: "PENDING" }, _count: { _all: true },
+      });
+      return groupedCount(rows);
+    }),
     read("cancellation requests", null, countCancellationRequestsWaiting),
-    read("staff invitation approvals", NONE, async () => groupedCount(await prisma.staffInvitation.groupBy({
-      by: ["eventId"], where: { approval: "WAITING" }, _count: { _all: true },
-    }))),
+    read("staff invitation approvals", NONE, async () => {
+      const rows = await prisma.staffInvitation.groupBy({
+        by: ["eventId"], where: { approval: "WAITING" }, _count: { _all: true },
+      });
+      return groupedCount(rows);
+    }),
     read("directory review", NONE, async () => {
       const events = await prisma.event.findMany({
         where: { archivedAt: null, endsAt: { gte: minutesAgo(DIRECTORY_REVIEW_RECENT_DAYS * 24 * 60) } },
@@ -91,30 +97,42 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
       for (const event of events) rows.push({ eventId: event.id, count: (await listDirectoryReviewEntries(event.id)).length });
       return eventCountFromGroups(rows.filter((row) => row.count > 0));
     }),
-    read("failed email", NONE, async () => groupedCount(await prisma.messageOutbox.groupBy({
-      by: ["eventId"],
-      where: {
-        updatedAt: { gte: problemSince },
-        OR: [{ status: "FAILED" }, { providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] } }],
-      },
-      _count: { _all: true },
-    }))),
-    read("stuck email", NONE, async () => groupedCount(await prisma.messageOutbox.groupBy({
-      by: ["eventId"],
-      where: { status: { in: ["PENDING", "PROCESSING"] }, availableAt: { lt: stuckBefore }, updatedAt: { lt: stuckBefore } },
-      _count: { _all: true },
-    }))),
-    read("email sweep", "never" as const, async () => (await getSweepHeartbeat(now)).status),
-    read("overdue scheduled email", NONE, async () => groupedCount(await prisma.scheduledEmailBatch.groupBy({
-      by: ["eventId"],
-      where: { status: "ACTIVE", claimToken: null, sendAt: { lt: overdueBefore } },
-      _count: { _all: true },
-    }))),
-    read("failed scheduled email", NONE, async () => groupedCount(await prisma.scheduledEmailBatch.groupBy({
-      by: ["eventId"],
-      where: { status: "FAILED", failedAt: { gte: problemSince } },
-      _count: { _all: true },
-    }))),
+    read("failed email", NONE, async () => {
+      const rows = await prisma.messageOutbox.groupBy({
+        by: ["eventId"],
+        where: {
+          updatedAt: { gte: problemSince },
+          OR: [{ status: "FAILED" }, { providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] } }],
+        },
+        _count: { _all: true },
+      });
+      return groupedCount(rows);
+    }),
+    read("stuck email", NONE, async () => {
+      const rows = await prisma.messageOutbox.groupBy({
+        by: ["eventId"],
+        where: { status: { in: ["PENDING", "PROCESSING"] }, availableAt: { lt: stuckBefore }, updatedAt: { lt: stuckBefore } },
+        _count: { _all: true },
+      });
+      return groupedCount(rows);
+    }),
+    read("email sweep", "never", async () => (await getSweepHeartbeat(now)).status),
+    read("overdue scheduled email", NONE, async () => {
+      const rows = await prisma.scheduledEmailBatch.groupBy({
+        by: ["eventId"],
+        where: { status: "ACTIVE", claimToken: null, sendAt: { lt: overdueBefore } },
+        _count: { _all: true },
+      });
+      return groupedCount(rows);
+    }),
+    read("failed scheduled email", NONE, async () => {
+      const rows = await prisma.scheduledEmailBatch.groupBy({
+        by: ["eventId"],
+        where: { status: "FAILED", failedAt: { gte: problemSince } },
+        _count: { _all: true },
+      });
+      return groupedCount(rows);
+    }),
   ]);
 
   return {
