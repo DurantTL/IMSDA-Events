@@ -172,9 +172,11 @@ describe("notifications page (#1016)", () => {
     expect((html.match(/role="switch"/g) ?? [])).toHaveLength(notificationCatalog.length);
     expect((html.match(/aria-checked="true"/g) ?? [])).toHaveLength(notificationCatalog.length);
     expect(html).not.toContain('aria-checked="false"');
-    // The row and switch are ready for the club form alert, which is not sent yet.
+    // The club form alert (#1017) is listed with its recipients set per form and a link to the club forms.
     expect(html).toContain("Club form submitted");
-    expect(html).toContain("Not sent yet.");
+    expect(html).not.toContain("Not sent yet.");
+    expect(html).toContain("Set on each club form.");
+    expect(html).toContain('href="/admin/club-forms"');
     // One editor for the three addresses, here.
     expect(html).toContain('value="support@imsda-events.test"');
     expect(html).toContain('value="clubs@imsda-events.test"');

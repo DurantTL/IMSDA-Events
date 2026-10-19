@@ -9,6 +9,7 @@ import {
   templateSpecProblems,
   type ClubFormTemplateRecord,
 } from "@/modules/club-forms/domain";
+import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { resealClubFormSubmissions } from "@/modules/club-forms/reseal";
 import { recordClubFormTemplateVersion } from "@/modules/club-forms/versions";
@@ -467,4 +468,33 @@ export async function getClubFormTemplateById(id: string, client: Client = getPr
 export async function withLiveDirectory(definition: RegistrationFormDefinition, client: Client = getPrisma()) {
   if (!hasDirectoryOptionSource(definition)) return definition;
   return withDirectoryOptions(definition, await getOrganizationDirectory(client));
+}
+
+/**
+ * The addresses emailed when this form is submitted (#1017). Saved on its own, outside the draft and publish cycle,
+ * because it is a notification setting and not part of what a club fills in: it needs no new version. Empty turns the
+ * email off for this form. System administrators only; the route checks that, and the audit row records the counts and
+ * who changed it, never the addresses.
+ */
+export async function setClubFormAlertRecipients(key: string, raw: string | string[], actorUserId: string) {
+  const parsed = parseAlertRecipients(raw);
+  if (!parsed.ok) throw new ClubFormError("VALIDATION_FAILED", parsed.message, [{ key: "submissionNotifyEmails", message: parsed.message }]);
+  return getPrisma().$transaction(async (tx) => {
+    const template = await tx.clubFormTemplate.findUnique({ where: { key }, select: { id: true, submissionNotifyEmails: true } });
+    if (!template) throw new ClubFormError("TEMPLATE_NOT_FOUND", "That form could not be found.");
+    const same = template.submissionNotifyEmails.length === parsed.emails.length
+      && template.submissionNotifyEmails.every((email, index) => email === parsed.emails[index]);
+    if (!same) {
+      await tx.clubFormTemplate.update({ where: { id: template.id }, data: { submissionNotifyEmails: parsed.emails } });
+      await writeAuditLog({
+        actorUserId,
+        action: "CLUB_FORM_ALERT_RECIPIENTS_CHANGED",
+        entityType: "ClubFormTemplate",
+        entityId: template.id,
+        summary: "Changed who is emailed when a club form is submitted.",
+        metadata: { templateKey: key, previousCount: template.submissionNotifyEmails.length, newCount: parsed.emails.length },
+      }, tx);
+    }
+    return { key, emails: parsed.emails };
+  });
 }

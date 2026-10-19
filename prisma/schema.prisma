@@ -639,6 +639,8 @@ enum MessageTemplateKey {
   HONOR_CLASS_PICKS_NOT_RESTORED
   /// A team advanced to the next level of a multi-level event (#945): one email to the team's director, queued and sent only when staff press "Send notices". Not an event template.
   CLUB_TEAM_ADVANCEMENT_NOTICE
+  /// A club form was submitted (#1017): one internal email per address on the form's alert list. Names, a time and a staff link; never an answer.
+  CLUB_FORM_SUBMITTED
 }
 
 enum MessageTemplateStatus {
@@ -6436,6 +6438,9 @@ model ClubFormTemplate {
   /// pre-filled mapping, which is off. Birth-date and sensitive fields map only
   /// to protected roster fields and health fields never map (validated in code).
   rosterMapping      Json?
+  /// Addresses emailed when this form is submitted (#1017), at most 10, set from the form's settings page and not
+  /// versioned with the definition. Empty means no email. The email never carries answers.
+  submissionNotifyEmails String[] @default([])
   sortOrder          Int       @default(0)
   enabled            Boolean   @default(false)
   enabledAt          DateTime?

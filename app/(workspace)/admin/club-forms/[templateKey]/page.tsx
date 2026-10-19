@@ -5,6 +5,7 @@ import { BackLink } from "@/components/back-link";
 import { notFound, redirect } from "next/navigation";
 import { BuilderPhoneNotice } from "@/components/builder-phone-notice";
 import { ClubFormBuilder } from "@/components/club-form-builder";
+import { ClubFormAlertRecipients } from "@/components/club-form-alert-recipients";
 import { ClubFormDraftDiscard } from "@/components/club-form-draft-discard";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getClubFormBuilderView } from "@/modules/club-forms/builder";
@@ -53,6 +54,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
       ) : view.draftBaseVersion !== null && (view.draft !== null || view.draftUnreadable)
         ? <p className="field-help">This draft was started on version {view.draftBaseVersion}.</p>
         : null}
+      <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
       <BuilderPhoneNotice backHref="/admin/club-forms" backLabel="Back to club forms" builderName="club form builder" />
       <div className="builder-phone-hidden">
         {view.draftUnreadable ? (

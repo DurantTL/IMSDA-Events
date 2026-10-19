@@ -30,12 +30,12 @@ describe("notification catalog (#1016)", () => {
     expect(isNotificationKey(undefined)).toBe(false);
   });
 
-  it("covers the ten send sites the issue traced, plus a switch ready for the club form alert", () => {
+  it("covers the ten send sites the issue traced, plus the club form alert built in #1017", () => {
     expect(notificationKeys).toHaveLength(11);
     const built = notificationCatalog.filter((entry) => entry.built);
-    expect(built).toHaveLength(10);
+    expect(built).toHaveLength(11);
     const ready = notificationCatalog.find((entry) => entry.key === "CLUB_FORM_SUBMITTED");
-    expect(ready?.built).toBe(false);
+    expect(ready?.built).toBe(true);
   });
 
   it("is wired into every built send site: each reader names its key and reads the switch", () => {
@@ -49,16 +49,12 @@ describe("notification catalog (#1016)", () => {
     }
   });
 
-  it("does not build the club form alert yet", () => {
+  it("lists the club form alert as sent from the submission alert, with its recipients set on each form (#1017)", () => {
     const entry = notificationCatalog.find((candidate) => candidate.key === "CLUB_FORM_SUBMITTED");
-    expect(entry?.sentFrom).toBe("not built yet");
-    for (const file of ["modules/club-forms/repository.ts", "modules/club-forms/submissions.ts"]) {
-      try {
-        expect(read(file)).not.toContain("CLUB_FORM_SUBMITTED");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-    }
+    expect(entry?.sentFrom).toBe("modules/club-forms/submission-alert.ts");
+    expect(entry?.recipients).toBe("Set on each club form.");
+    expect(entry?.source).toEqual({ kind: "club-form-list" });
+    expect(entry?.switchReadIn).toEqual(["modules/club-forms/links.ts", "modules/club-forms/submissions.ts"]);
   });
 
   it("asks for a warning only before the lockout alert goes off", () => {

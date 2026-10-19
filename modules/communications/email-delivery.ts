@@ -1220,6 +1220,10 @@ async function prepareAccountEmailBody(
       now: input.now,
     });
   }
+  // Club form submitted alert (#1017): names only, no sentinel; never rewrite anything in it.
+  if (input.templateKey === "CLUB_FORM_SUBMITTED") {
+    return { bodyText: input.bodyText };
+  }
   if (input.templateKey?.startsWith("NEW_CLUB_APPLICATION_")) {
     return { bodyText: input.bodyText };
   }

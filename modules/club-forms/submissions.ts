@@ -30,6 +30,8 @@ import { ClubFormError } from "@/modules/club-forms/errors";
 import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
+import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-alert";
 import { usableRosterMapping } from "@/modules/club-forms/roster-mapping";
 import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
 
@@ -168,8 +170,10 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
   if (issues.length > 0) throw new ClubFormError("VALIDATION_FAILED", issues[0].message, issues);
   const subjectName = memberName || input.subjectName?.trim().slice(0, 120) || deriveSubjectName(answers);
   const who = attribution(leader.actor);
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const alertEnabled = input.submit ? await isNotificationEnabled("CLUB_FORM_SUBMITTED") : false;
 
-  return prisma.$transaction(async (tx) => {
+  const saved = await prisma.$transaction(async (tx) => {
     // Which answers are sensitive is decided under a share lock on the template row, so a concurrent re-seal cannot leave this save in plaintext.
     const keys = await lockClubFormTemplateForWrite(tx, template);
     let id = input.submissionId ?? randomUUID();
@@ -240,6 +244,17 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
     }, tx);
     return { id, status: data.status };
   });
+  // After the commit, and never throwing: the saved form stands whatever happens to the alert (#1017).
+  if (input.submit) {
+    await sendClubFormSubmittedAlert({
+      submissionId: saved.id,
+      templateId: template.id,
+      organizationId: input.organizationId,
+      actor: leader.actor,
+      submittedAt: now,
+    }, alertEnabled);
+  }
+  return saved;
 }
 
 export type ClubFormListFilter = {

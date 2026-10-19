@@ -24,6 +24,8 @@ export const createLinkSchema = z.object({
 
 export const publicSubmitSchema = z.object({ answers }).strict();
 
+export const templateAlertRecipientsSchema = z.object({ emails: z.array(z.string().max(200)).max(50) }).strict();
+
 export const templateEnabledSchema = z.object({ enabled: z.boolean() }).strict();
 
 /**
