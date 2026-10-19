@@ -44,6 +44,26 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The merge commit and its first parent (the base), to list the files this pull request changes.
+          fetch-depth: 2
+      # Visual-only pull requests (components, pages, styles, docs, tests) skip the
+      # real-database and HTTP suites below; lint, types, unit tests and the build
+      # still run. Anything else (modules, prisma, scripts, API routes, config,
+      # packages, workflows), a scheduled run or a manual run gets the full gate.
+      - name: Decide what this change needs
+        id: scope
+        run: |
+          full=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(git diff --name-only HEAD^1 HEAD)
+            echo "Changed files:"; echo "$changed"
+            other=$(echo "$changed" | grep -vE '^(components/|public/|docs/|tests/)|^app/.*\.(tsx|css)$|\.md$' | grep -E '.' || true)
+            api=$(echo "$changed" | grep -E '^app/api/|/route\.tsx?$' || true)
+            if [ -n "$changed" ] && [ -z "$other" ] && [ -z "$api" ]; then full=false; fi
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "Full gate (database and HTTP suites): $full"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -70,61 +90,79 @@ jobs:
       - run: npm run form-templates:sync
       - run: npm run verify
       # Real-database check that Honors Weekend class seats hold under concurrent saves (#359).
-      - run: npm run test:honor-capacity
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-capacity
       # Real-database check of "Group" registration on a club event (#650): never a club or church, no roster, billing contact recorded, shared class and location seats under concurrent saves, the contact's reopen-and-change path re-validating ages and seats.
-      - run: npm run test:group-registration
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:group-registration
       # Real-database check of revising a published form: a draft beside the live version keeps public and club registration open, withdraw closes both, edits delete tests, each version needs its own test, and concurrent save/publish, save/withdraw and test/save through the form-row lock never mutate a published version or leave a stale valid test (#564).
-      - run: npm run test:form-revisions
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:form-revisions
       # Real-database check of the one-active-act-as-per-session index and racing starts (#442).
-      - run: npm run test:staff-act-as
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:staff-act-as
       # Real-database check of the read-only single-account dry run (#554): staff/attendee pairs by normalised email, the conflicts and per-side counts, masked emails by default, PostgreSQL refusing writes in its read-only transaction, and no row, updatedAt or checksum changed anywhere it reads.
-      - run: npm run test:single-account-dry-run
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:single-account-dry-run
       # Real-database check of the staff User to AttendeeAccount link (#554 slice a): nullable and unlinked by default, unique (one account, one user), both sides must exist, ON DELETE SET NULL on the account and no effect on it when the user goes, and the one-sign-in switch off by default.
-      - run: npm run test:user-attendee-link
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:user-attendee-link
       # Real-database check of one account per person, slice (b) (#554): with the switch off activation links nothing; with it on a new staff user gets a verified linked attendee account, unverified or already-linked accounts are never taken, a reset links nothing, and no attendee password, Google or email-code sign-in yields a staff session.
-      - run: npm run test:staff-attendee-activation
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:staff-attendee-activation
       # Real-database check of one account per person, slice (c) (#554), with the switch both on and off: the single password sign-in gives a staff person both sessions and an attendee-only person one, an attendee password never yields a staff session or challenge (even with a valid staff code), the staff and attendee credentials are checked independently, every refusal is the same and takes about as long, an administrator's email change clears the attendee's verification (re-verified by a reset code or Google), hand-linking and unlinking by a system administrator (reason required, ids-only audit, refuses a linked side, never a staff session), and no enumeration through sign-up, reset or Google.
-      - run: npm run test:unified-sign-in
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:unified-sign-in
       # Real-database check of club member transfers: unique indexes, transfer back, duplicate recipients, removal orders (#489).
-      - run: npm run test:club-transfers
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-transfers
 
       # Real-database check of the #527 background-check list migration and matching:
       # statuses unchanged across the migration, refreshes, and a re-upload (#527).
-      - run: npm run test:background-check-list
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:background-check-list
 
       # Real-database round trip of the full club supply reference file (#531).
-      - run: npm run test:club-supplies
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-supplies
 
       # Real-database check of the form 89 club import: current-year default, 48 in 48 listed,
       # one import per club and year, and moving an import to another year with no new people (#541).
-      - run: npm run test:club-imports
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-imports
 
       # Real-database check of new club applications (#817): a public submission waits and creates nothing; the notice goes to the configured address with only the club, church and director names and a link; system administrators and Area Coordinators see the queue and attachment but only administrators decide; the director's Sterling Volunteers status and possible duplicates are flagged; approving makes the club and its director invite exactly once even when approvals race; declining emails the reason; a private link stores only its token hash and works once; audit rows hold ids only.
-      - run: npm run test:new-club-application
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:new-club-application
 
       # Real-database check of who may sponsor a club (#822): an active church, company or group is accepted and a school, camp, inactive company or club is refused, on create, edit and the club profile; pickers list the kind; church-billed charges and the billing contact go to a company sponsor.
-      - run: npm run test:organization-sponsors
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:organization-sponsors
 
       # Real-database round trip of club order fulfillment: idempotent need
       # syncing, order/stock math, receiving, awarding never below zero, and
       # an idempotent Honors Weekend write-back (#487).
-      - run: npm run test:club-orders
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-orders
 
       # Real-database check of uniform ordering on the club order layer: bulk
       # needs, order math with stock and extras, receive/issue, "already has
       # one", a combined honors + uniforms batch, and double-tap safety (#497).
-      - run: npm run test:uniform-orders
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:uniform-orders
 
       # Real-database check of earned awards on the same order layer: insignia
       # suggested and added only on confirmation, event patches for attendees
       # only, multi-group Master Award rules (staff-edited and audited), one
       # batch with honors and uniforms, and double-tap safety (#532).
-      - run: npm run test:earned-awards
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:earned-awards
 
       # Real-database check of the audited honor-entry void: status, awards and needs
       # skip voided entries, double and racing voids, DB CHECKs, and the Honors Weekend
       # write-back never re-creating a voided completion (#591).
-      - run: npm run test:honor-entry-void
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-entry-void
 
       # Real-database check of Honors Weekend class instructors (#833): staff invite and assign, only the invited
       # verified email accepts, an instructor reads and marks only their own classes and gets name and club only
@@ -132,39 +170,47 @@ jobs:
       # a Sterling Volunteers check that isn't current blocks a roster and its marks, Completed also marks attended
       # and writes the honor record once through the existing write-back (even under races), staff can void, marks
       # close 14 days after the event ends, and removing an instructor ends their access.
-      - run: npm run test:honor-instructors
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-instructors
 
       # Real-database check of event templates: apply, revision isolation, save/publish
       # races, parallel same-key applies, key reuse, and sticky archive (#152).
-      - run: npm run test:event-templates
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-templates
 
       # Real-database check that the seeded form templates sync and re-sync without changing any existing event, form or published form version, and that a newer template version reaches only forms created after it (#153).
-      - run: npm run test:seeded-form-templates
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:seeded-form-templates
 
       # Real-database check of reviewed annual event cloning: a populated source clones
       # configuration only, excluded domains, disabled modules, stale sources, parallel
       # duplicates, and key reuse (#157).
-      - run: npm run test:event-cloning
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-cloning
 
       # Real-database check of the features step of event creation (#965): the chosen modules, flags and calendar choice are saved with the event in its own transaction, a skipped step gets the audience's defaults, a failed creation leaves nothing and a repeat changes nothing, a template keeps its settings and takes the overrides (a retry rewrites nothing), a copy carries what its preview showed, and the module permission and data rules are untouched.
-      - run: npm run test:event-creation-features
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-creation-features
 
       # Real-database check of the public event page content blocks: every kind saves and
       # reads back, custom HTML is stored sanitized and system-administrator only (a refused
       # save changes nothing), block images must be the event's own uploaded images and are
       # public only while published, an image a block shows cannot be deleted, drafts stay
       # off the public listing, and deleting an event removes its blocks (#816).
-      - run: npm run test:event-content-blocks
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-content-blocks
 
       # Real-database check of church-sponsored promo codes: linking rules, the
       # owed line per redemption, cancellation dropping it, parallel redemptions,
       # and no double billing on church-billed events (#545).
-      - run: npm run test:church-promo-codes
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:church-promo-codes
 
       # Real-database check of church promo code invoices (#399): a draft invoice prepared from a church's redemptions
       # (idempotent, race-safe, never numbered or sent), finalized only with the Finalize invoices permission, revised when
       # the usage changes, and the church report agreeing with the payment ledger.
-      - run: npm run test:church-code-invoices
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:church-code-invoices
 
       # Real-database check of locations inside one event: the required pick on a
       # real club submit, per-location capacity under the location row lock (two
@@ -172,133 +218,178 @@ jobs:
       # dates and last days, changing location on a director edit, a held lock
       # timing out as a retryable busy, the location filters and CSV columns,
       # and cloning with shifted dates (#413).
-      - run: npm run test:event-locations
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-locations
       # Real-database check of the event-scoped operations search (#180): attendee-not-payer lookup, words matching one person, duplicate names in a deterministic order, note text never searchable, refused filters that read like missing ones, stale and health form keys reported, another event unreachable, results/counts/facets/suggestions agreeing, and canonical paging over 1,500 tied rows with the index used.
-      - run: npm run test:operations-search
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:operations-search
       # Real-database check of lodging inventory (#198): idempotent and concurrent template sync with no names or prices, night-by-night availability with partial stays, closures and unavailable units, per-event overrides, holds that keep append-only history and refuse overlapping active holds under a race, optional finance-only rates, and cascade on event deletion.
-      - run: npm run test:lodging
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:lodging
       # Real-database check of lodging preferences, roommate requests and household rules (#199): versioned requests that keep every earlier version, a registrant deadline that staff changes can pass and are flagged for, a full type refused at selection and one winner when five registrants race for the last place, directional roommate requests that are mutual only when both ask or staff approve and never reveal who asked or any contact detail, yes/no accessibility flags with no free-text column that staff without sensitive access neither see nor set, keep-together/split/keep-apart rules that keep history and follow a household change, the review queue, the lodging step of the real public registration (first version from the form, per-night and flat-for-the-event charges as their own line, no line without a rate, rooms for a party, a full type refused at submit with one winner under a race and against a private-page save, church-billed events never charged, a waitlisted choice kept unpriced, lodging never discounted by a promo code, change requests rather than repricing after submission), and the database refusing cross-event rows and rewrites.
-      - run: npm run test:lodging-preferences
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:lodging-preferences
       # Real-database check of lodging assignment, moves, the waitlist and the attendee display (#200): capacity enforced night by night under the unit locks and the capacity version (five staff racing for the last bed leave one winner, one person raced into two rooms ends in one, a closure racing an assignment stays coherent, and the check fails when the locks are removed), partial stays, held, unavailable and special-use rooms, moves that split a stay with append-only history and a reason and actor, cancellation, late arrival, early departure and transfer that release or keep capacity on purpose, a room closed or lowered after assignment shown as a conflict, alternate housing and expected guests that link to a registration later, a proposal and a CSV import that preview first and apply only exactly what was previewed, accessibility flags only with sensitive access, occupancy by night reproduced and drilled to assignments, the lodging waitlist (explicit idempotent offers one email each through the outbox, reserved places, expired offers, accept, decline, promote), the attendee display (first-name roommates, adults of other registrations only, no contact detail), versioned room notices that become obsolete, no change to any registration's charge, and every row going with its event.
-      - run: npm run test:lodging-assignment
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:lodging-assignment
       # Real-database check of issued assets (#213): a numbered range (K-201..K-260) that is safe to run twice, two room keys and a welcome packet issued in one request and linked to the exact lodging assignment, a repeated scan that is a duplicate and writes nothing, a key held by someone else refused, partial and all-or-nothing group issue, saved retry keys, eight staff racing for one key (one holder), a lot of three never over-issued by eight racers, overlapping group issues in opposite orders without a deadlock, a key that keeps its room and assignment after the family moves with the desk showing the move, replacement keys that follow the new assignment, transfers and corrections that end the old issue and append history, offline entries that keep when they happened and the assignment as it was then, the database refusing a second open issue, an over-issue, a rewrite and a delete even around the service, no change to any charge, and every row going with its event.
-      - run: npm run test:issued-assets
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:issued-assets
       # Real-database check of issued assets slice 2 (#214), the Camp Meeting key deposit: a partial group checkout that leaves the cash deposit unsettled until both keys are back, a full hand-back recorded only then, a lost key replaced in the same step whose deposit is kept (never a full refund), a damaged key under the keep-fees policy, a charge posted as an append-only ASSET line that check-in staff may record only at the standard fee, a waiver that needs finance or an administrator and a reason and is the reversing line, a lot returned in part that ends the issue and continues the remainder, duplicate, offline and racing returns that write one return, a facility issue with a room block that takes the room out of availability without touching the assignment, a closeout that lists what is out, lost, charged, held and unresolved, reconciles and exports formula-safe CSV while writing nothing, the database refusing a rewrite, a delete and an over-settlement of the money ledger, and every row going with its event.
-      - run: npm run test:issued-assets-returns
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:issued-assets-returns
       # Real-database check that a lodging change on a church-sponsored registration updates the church's bill automatically (#813): the sponsor's share of each staff edit moves the church's amount owed in the same transaction (increase, decrease and revert, 50% and 100% codes, an approved change request), the registrant's total and recorded discount are untouched, an amendment never erases it, the church-owed lines, CSV and overview agree, every change is audited with ids and amounts only, concurrent edits never double count, and a finalized church invoice is never revised or moved but flagged for the finance office, who see and clear the flag.
-      - run: npm run test:church-sponsor-lodging
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:church-sponsor-lodging
       # Real-database check of calendar bulk changes (#796): the feed's advisory lock is taken and rows are read again under it, a racing feed sync never leaves a removed entry published and a bulk hide survives it, the 500-entry cap, and a refresh keeping a bulk-set category with no local-edit mark.
-      - run: npm run test:calendar-bulk
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:calendar-bulk
       # Real-database check of calendar items and registration events being one thing (#445): Add registration links the item in the event's own transaction (blank and template flows) and an item that can't be linked leaves no event behind, a linked pair shows once on the public calendar and feed while a draft event never leaks, the link survives every refresh, a moved or removed item and a deleted feed, a moved item never changes the event until staff choose Update or Keep (previewed, audited, stale answers refused), link and unlink, one item per event (also under racing links), possible matches flagged but never linked and Not the same permanent, and audit rows with ids only.
-      - run: npm run test:calendar-event-links
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:calendar-event-links
       # Real-database check of deadline reminders (#910): imported "due" items become Deadlines and a staff choice (single or bulk) survives refreshes, Deadlines never reach the public calendar data or the .ics feed, the upcoming deadlines list (7 days back to 90 ahead), the 14-day and 2-day reminder batches arriving at Chicago midnight across both daylight-saving changes, one batch per deadline and point under eight concurrent runs (and the database refusing a duplicate or another point), nothing queued before a staff send, a stale or racing send queueing one email per eligible person once, recipients (active club roles and lasting coordinators, one each, never revoked, ended, future, disabled, unverified, inactive-club, temporary or opted-out), and a changed, cancelled, hidden or un-marked deadline updating or withdrawing its waiting batch.
-      - run: npm run test:deadline-reminders
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:deadline-reminders
       # Real-database check of location waitlists: a full location waitlists the club there in per-location order, a freed seat promotes the next club at that location only and never overfills it under races, a busy location is skipped, and the daily digest reaches the active coordinator and event administrators once a day while an email failure changes nothing (#599).
-      - run: npm run test:location-waitlist
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:location-waitlist
 
       # Real-database check of club forms: templates start off and stay invisible to clubs until enabled, sensitive answers are sealed at rest and in no audit, outbox or CSV row, role visibility (director, other club, Area Coordinator, staff with and without VIEW_SENSITIVE_DATA), one audit row per view, and a single-use private link that stores only a token hash, submits exactly once when many submits race, expires, can be withdrawn, and is rate limited (#610).
-      - run: npm run test:club-forms
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-forms
 
       # Real-database check of the Pathfinder Health Record: switched off stores nothing (the script turns the flag on only inside its own process), every field is sealed on its own and appears in no stored or audit row, one audit row per view, a single-use private link that submits exactly once under a race, Needs update by club year, and removal erasing every year's record (#611); a Registrar who can enter and replace a record but never read one back, with refused reads audited and no value in any row, the one-time privacy acknowledgment per person and wording version (staff by user, everyone else by attendee account, asked again after a wording change, one person per row, gone with its account, referring to no event, club, roster row or person) (#923).
-      - run: npm run test:health-records
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:health-records
 
       # Real-database check of the sealed per-event copies of the health record (#924): a copy sealed at check-in and at the event's start, once per person per event even when attempts race, never for a person with no record or off a club registration; every field its own ciphertext under the copy's own key purpose with no plaintext in any column or audit row; the database refusing every update, every addition to a copy, every incomplete copy and every delete outside the retention job and event deletion; expiry per copy from the birth date at the event (a minor's 26th birthday, an adult's 5 years, the longer reading when there is no birth date) with no birth date stored; the live record's removal leaving the copy, and a person with a copy not deletable; the daily job deleting only expired copies, never one under a person or event hold, once a day, audited with ids and counts; holds and lifts by a system administrator with a reason; break-glass as the only way in (system administrator, privacy acknowledgment, typed reason, 24 hours, every use and refusal audited, never a value); event deletion removing an event's copies and refusing while a hold covers one; and everything off with HEALTH_RECORDS_ENABLED off.
-      - run: npm run test:health-snapshots
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:health-snapshots
 
       # Real-database check of the Cognito health record import (#878): switched off stores nothing; only a system administrator past the privacy acknowledgment can preview or apply (a director, and an administrator acting as one, are refused); the preview names members, results and section names and no health value and stores nothing; apply writes one sealed record per previewed, still-matching member, marked imported for director review, reading Needs update, with the imported consent from a signed form and no plaintext in any stored or audit row; a member who already has a record keeps it untouched and re-running the same file (CSV or Excel) changes nothing, even when applies race; a pair that is not what the preview showed is refused; and removal erasing an imported record.
-      - run: npm run test:health-import
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:health-import
 
       # Real-database check of roster guardian contacts: slot constraints, replace-on-edit, prior-year writes refused, deletion on removal, reader scoping, and no guardian value in any audit row (#510).
-      - run: npm run test:club-roster-guardians
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-roster-guardians
 
       # Real-database check of carrying a club roster forward to the next club year: the offer lists only last year's active people with no birth date, one confirmation carries the ticked people with the same Person and the same sealed birth date, a Pathfinder becoming staff changes type and role, last year's roster stays readable, a repeat (and eight racing confirmations) leaves one winner and no duplicate rows, another club's person is refused as not found, removal erases every year's row, the oversight list of clubs that have not started, and no birth date or name in any audit row or record (#414).
-      - run: npm run test:club-roster-carry-forward
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:club-roster-carry-forward
 
       # Real-database check of billing responsibility and organization billing contacts: the resolver is idempotent and race-safe, staff decisions survive re-resolution, one active contact per organization even under parallel replacement with history kept, the constraints and append-only history hold, and no audit row holds contact details (#165).
-      - run: npm run test:billing-responsibility
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:billing-responsibility
 
       # Real-database check of attendance reconciliation: only checked-in people are billed (no-shows counted, not billed) with the #409 credit applied to those who attended, idempotent and race-safe prepares and approvals, immutable approved versions that attendance changes after approval leave untouched, append-only corrections with one active per person, and no audit row holding a reason or name (#166).
-      - run: npm run test:attendance-reconciliation
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:attendance-reconciliation
 
       # Real-database check of declared guardian authority: the registrant's choice is the only source of a responsible adult (household, canManage, surname, email and account holder create none), one ACTIVE declaration per minor even under parallel writes, append-only rows with supersede and revoke, the trigger refusing an adult who is not on the registration, minor status at the event start date, two adults claiming one minor becoming a review item, staff changes scoped to the event, and no audit row holding a reason or name (#131).
-      - run: npm run test:guardian-authority
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:guardian-authority
 
       # Real-database check of consent policies (#129): kind and scope fixed at creation, one draft per policy, publishing freezing a version (repository and trigger both refuse any change), required publisher, hash and human material-change flag, version-effective-at-date and version-referenced-by-evidence as separate queries (overlap, open-ended), the current-version pointer, per-event applicability by type, role and age band, ids-only audit rows, and cascade on event deletion.
-      - run: npm run test:consent-policies
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:consent-policies
 
       # Real-database check of acknowledgment evidence (#150): one append-only row per ticked acknowledgment recorded with its registration (the exact text, or a published policy version by id; who, when, which channel, approved request metadata only), hidden conditional acknowledgments recording nothing, retries and repeats creating no second row, a minor's acknowledgment needing the declared responsible adult (account holder, other adults, household members and the minor's own tick all refused, leaving no registration behind), staff-entered and paper evidence, status resolved at a past moment against policy versions, RESTRICT references, the database refusing another event's, another kind's or a draft policy version, event deletion refusing while evidence exists, and no wording in any response snapshot, audit row or message.
-      - run: npm run test:acknowledgments
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:acknowledgments
 
       # Real-database check of deferred-organization invoices: drafts only from a current approved reconciliation, numbers assigned exactly once under parallel and retried finalization (per event, code and year), immutable finalized versions with one receivable each, contact-only and amount revisions with the Finalize invoices rule, and no audit row holding a contact name or email (#167).
-      - run: npm run test:invoices
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:invoices
 
       # Real-database check of event scholarship funds (#398): one fund per event with nothing carried between events (racing first contributions make one fund), contributions in integer cents from a directory church or a typed sponsor, a funded award that is a scholarship adjustment line drawing on the fund in the same transaction (an over-balance award refused with nothing left behind, a reversal returning the money), a pledged award that may exceed the balance but needs a sponsor and settles only once the money is recorded, contribution reversals as negative lines refused when awards drew on the money, parallel awards and an award racing the reversal of its funding never overspending the fund, the database refusing negative or cross-event lines, a formula-safe export audited with counts, and no audit row holding a sponsor name, note or reason.
-      - run: npm run test:scholarship-funds
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:scholarship-funds
 
       # Real-database check of the hosted "Pay on Square" link (#327) against a fake Square at the HTTP boundary (no network, no credentials): the link is quoted by the same checkout as the embedded form (fee parity for pay-later, card-priced, fee-absorbed and promoted-waitlist registrations, nothing added on creation), creation is idempotent, only the verified webhook confirms payment and a replay changes nothing, the first recorded payment wins across the embedded and hosted paths (a later one is held as a duplicate-charge record with an urgent alert and never counts), stale links after a staff payment, cancellation, refund or expiry are withdrawn and deleted at Square (a failed deletion is retried), and the setting is off unless staff turn it on.
-      - run: npm run test:square-hosted-link
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:square-hosted-link
 
       # Real-database check of meals (#210): the Camp Meeting services and prices, form tickets recorded as selections and followed through an amendment, staff orders priced and posted as MEAL adjustment lines, quantity and plan changes, substitution on a paid registration (charge first), complimentary roles, conference-paid entitlement that keeps paid extras, walk-up orders and capacity, service and registration cancellation, a removed attendee's meals credited, the append-only ledger and histories, clone safety, the backfill script and event deletion.
-      - run: npm run test:meals
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:meals
 
       # Real-database check of the café scanner's meal ticket export (#916): one row per ticket in the scanner's columns, stable MT- ids across exports, quantity increases and decreases, cancellation and concurrent orders (a number is never reused or duplicated), day and date in event time, a repaired selection with no tickets, the kept summary CSV and event deletion.
-      - run: npm run test:meal-ticket-export
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:meal-ticket-export
 
       # Real-database check that simultaneous meal-bearing registration submissions queue instead of abort (#920): 20 submissions for the same meal at once through the production public path (its own 4 attempts, no extra retry), 20 runs in a row, all succeed, and "no lost conflict" (no submission loses even one serialization conflict) is asserted only in runs where nothing but submissions race; a gate wait that outruns a lowered lock timeout gets SUBMISSION_CONFLICT and the same idempotency key then succeeds; the selections, tickets and ledger are exactly what one at a time would write, and a staff order and a form-answer change racing them neither deadlock nor fail.
-      - run: npm run test:meal-submit-contention
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:meal-submit-contention
 
       # Real-database check of the reservation deposit (#415): a staff check deposit and a card deposit racing for one registration (including a card transaction that read first while the check commits) leave exactly one counted deposit, the late one held as a duplicate charge or refused, the card fee only on the deposit, and one audit row.
-      - run: npm run test:reservation-deposit
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:reservation-deposit
 
       # Real-database check of cancellation policy slice 1 (#169): versioned per-event rules (sequential and parallel-safe, never in the past, immutable in the database), the version in effect chosen by time with recorded calculations that never change, the Camp Meeting rule against a real registration (exact deadline boundary in the event time zone, full refund minus the $10 fee before it, forfeited deposit after it or on a first-night no-show, one attendee removed with the deposit left on the registration), previews that read only their own event, and no registration, payment, refund, adjustment or merchandise row changed by any calculation.
-      - run: npm run test:cancellation-policy
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:cancellation-policy
 
       # Real-database check of cancellation requests (#170): a request saves its recorded calculation, policy version and timeline together; duplicate, overlapping and parallel submissions leave one open request per scope; the database refuses a decision without a named person and a reason and any timeline change; approving changes no registration, attendee, payment, refund or capacity row; status emails never carry the reason; deleting an event removes its requests.
-      - run: npm run test:cancellation-requests
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:cancellation-requests
 
       # Real-database check of invoice delivery (#168): one stored, hash-checked PDF per finalized version, sends with the exact recipients and the same attachment on every resend, superseded versions refused, bounce and suppression recorded, append-only AR postings and payments (partial, void, overpaid, carried across a revision), statements scoped to the event, a formula-safe treasurer CSV, and no audit row holding an address or a contact name.
-      - run: npm run test:invoice-delivery
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:invoice-delivery
 
       # Real-database check of Amazon SES delivery (#861) against a local SMTP stand-in (no AWS): one message through the outbox worker with an attachment, an inline picture and a QR per attendee, throttling and daily-quota retries, a final 554 rejection, an authentication failure, and STARTTLS required.
-      - run: npm run test:ses-delivery
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:ses-delivery
 
       # Real-database check of announcement emails (#824): each attendee's own seminar choices in ranked order, one labelled QR per attendee, paragraph spacing, and a real test naming a registration showing no sample value.
-      - run: npm run test:announcement-email
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:announcement-email
 
       # Real-database check of attachments, embedded pictures and button links in announcement emails (#824), through a local stand-in for the email provider: files stored under generated names after a byte check, the 10 MB and 20 MB limits, attachments carried forward between template versions, the announcement's and the template's files and an inline part for the picture and each attendee's QR reaching the adapter with the HTML rewritten to cid:, a retry and a staff retry copy sending the same parts, and an audit trail of file names and sizes only.
-      - run: npm run test:announcement-attachments
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:announcement-attachments
 
       # Real-database check of unsubscribe and email preferences for event announcements (#838), through a local stand-in for the email provider: a one-click opt-out (RFC 8058, no login or CSRF token) and the page's choices skipping an address for this event or for all events in the review and the send with the skipped counted by kind, another event's opt-out changing nothing, an opt-out recorded after the broadcast was queued still honoured at delivery with a recorded reason and an audit row holding no address, an announcement marked essential by an event manager (audited) reaching opted-out addresses, a payment receipt never affected and carrying no unsubscribe link, List-Unsubscribe and List-Unsubscribe-Post headers and a signed link on every announcement, an altered token or a GET recording nothing, and re-subscribing clearing the opt-out.
-      - run: npm run test:announcement-unsubscribe
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:announcement-unsubscribe
 
       # Real-database check of the reviewed event audience builder (#176), preview only, selecting registrations through the operations search (#180): one email in several roles and registrations is one recipient with every role, reason and each registration's own balance kept; payment, check-in, tag, attendee-type, lifecycle and form-answer filters from the search, readiness and role qualify people with a reason; opted-out, bounced, missing and invalid addresses are excluded with a reason; a restricted note, answer text, a sensitive form question, another event's tag and the staff list never appear in any preview; a filter the caller may not use (tag, payment, check-in or text without its permission), another event's tag, a stale or sensitive answer, a malformed search, a draft or a domain the event lacks is refused with one identical answer; equivalent searches have one hash and fingerprint, which are identical across batch sizes while paged previews cover 650+ registrations once each; a snapshot needs the previewed fingerprint, replays by UUID, refuses a reused id and writes an audit row with no address; and nothing is queued, sent or scheduled.
-      - run: npm run test:event-audience-builder
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-audience-builder
 
       # Real-database check of scheduled email batches (#177), through a local stand-in for the email provider: a schedule sends nothing until a person approves it with the review they were shown; event-time projection including the spring-forward gap; every approved recipient re-evaluated when due and again right before the send (payment, cancellation, transfer, bounce, a payment-filtered audience); three concurrent workers and a crashed worker cannot duplicate a message; pause only before a send begins and cancel after partial delivery keeping sent rows; youth addresses never written to unless an adult also uses them; edits, a changed time zone, a republished template, a lost approver, lateness and cross-event access all stopped.
-      - run: npm run test:scheduled-emails
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:scheduled-emails
 
       # Real-database check of "Retry failed" after a provider quota (#860), through a local stand-in for the email provider: a 429 daily quota recorded as PROVIDER_QUOTA with a staff-readable reason and a backoff in hours, a bulk send where some guests were sent and some failed, a preview naming every skip, one new copy for each failed guest and none for anyone who was sent the email, nothing sent inside the request, a re-post and a double click adding no second copy, exactly one email per guest once the worker has run, and an audit row with ids and counts only.
-      - run: npm run test:retry-failed
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:retry-failed
 
       # Real-database check of module requests: one pending per event and module under concurrent submits, approve enables in one transaction, decline needs a reason, audit holds ids only, and free text cannot become an email placeholder (#741).
-      - run: npm run test:module-requests
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:module-requests
 
       # Real-database check of Honors Weekend sessions at sites: per-site names beside the
       # no-site rule, copying and cloning by site name with the no-match warning (#589).
-      - run: npm run test:honor-sites
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-sites
 
       # Real-database check that one Honors Weekend class can teach several honors (#812): the
       # migration's backfill, the database refusing an honor twice in a session or twice across
       # all sessions at a site (whichever class teaches it), one seat per enrollment however many
       # honors, adding and removing honors after clubs enroll (and the refusal after write-back), each honor completed once, and races on seats,
       # honor edits and write-backs.
-      - run: npm run test:multi-honor-classes
-      - run: npm run test:honor-class-requirements
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:multi-honor-classes
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend schedule board (#834): a class never has more seats than its
       # room (app and database), one class per room and session, moving a class that has enrollments keeps them
       # and never overfills, is blocked (with a count) when enrolled people would hold two classes in one session,
       # and races (two moves into one room, a move against a pick, a room shrink against a class) end valid.
-      - run: npm run test:honor-schedule-board
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-schedule-board
 
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on
@@ -306,13 +397,16 @@ jobs:
       # their place), per-club limits counting seats only, eligibility re-checked on accept, nothing
       # offered after the class-change deadline, a cancellation passing seats on, and two seats opening
       # at once with sweeps and direct picks racing: never overfilled, never offered out of order.
-      - run: npm run test:honor-class-waitlist
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-class-waitlist
 
       # Real-database check that reinstating or promoting a registration never overfills an Honors Weekend class (#880):
       # a seat given away in between drops that pick (audited, reported to staff, director emailed), for class capacity and
       # the per-club limit, by staff or automatic promotion; a restored pick never jumps the class waitlist; races never overfill.
-      - run: npm run test:honor-reinstate-seats
-      - run: npm run test:honor-admin-seat-override
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-reinstate-seats
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-admin-seat-override
 
       # Real-database check of deleting an event at any stage: a rich event
       # (registrations, payments, honors, forms, messages, locations, club forms,
@@ -320,10 +414,12 @@ jobs:
       # anywhere, shared people/clubs/accounts survive, permissions and the typed
       # name are enforced, the audit row holds counts only, a mid-deletion failure
       # rolls everything back, and the ledger trigger flag never leaks (#620).
-      - run: npm run test:event-deletion
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-deletion
       # Real-database check of archiving an event (#635): permissions, audit rows with ids only, no other row
       # changed, hidden from staff lists, the public page and calendar, registration closed, unarchive restores it.
-      - run: npm run test:event-archive
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:event-archive
 
       # Real-database check of PBE registration (#809): the starter template, several
       # named teams per club, the name unique per event (also under concurrent
@@ -332,7 +428,8 @@ jobs:
       # settings guards and the table constraints, level results with audit, the
       # filled and blank print form, billing/church/packet/QR/check-in views per
       # team, and an event without team rules behaving exactly as before.
-      - run: npm run test:pbe-registration
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:pbe-registration
 
       # Real-database check of PBE advancement inside one event (#945): 1st and 2nd per Area advance (a tie advances
       # both), staff overrides are audited with ids only and survive a recompute, the Conference list, results and
@@ -340,7 +437,8 @@ jobs:
       # advance never reaches the next level, notices are queued only when staff press "Send notices" (once per team
       # and level, with the next level's date and place), team check-in for the Conference day, a director's team
       # changes between levels under the team rules, and old free-text placements staying readable.
-      - run: npm run test:pbe-advancement
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:pbe-advancement
 
       # Real-database check of the general registration link (#931): a director with no
       # account registers a PBE team through one public link; a matching director or
@@ -350,7 +448,8 @@ jobs:
       # concurrency; the team rules and unique team name hold (also racing); the generic
       # public route refuses a club form; honeypot, rate limit and idempotency; the optional
       # roster link; the table constraints.
-      - run: npm run test:general-link-registration
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:general-link-registration
 
       # Real-database check of personal staff, pastor and volunteer invitations (#804): a CSV
       # preview creates nothing and confirming creates only what was previewed; one derived
@@ -359,19 +458,22 @@ jobs:
       # children up to 18 for $0, waiting for the office as a draft (also under racing clicks);
       # batch approval confirms it and covers every meal under the conference-paid plan, a
       # decline cancels it; the table constraints and event deletion.
-      - run: npm run test:staff-invitations
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:staff-invitations
 
       # Check-in desk concurrency (#825): 4 devices checking in the same attendee,
       # the same retry key re-sent, and different attendees of one registration at
       # once, plus check-in racing undo and double undo. One record and one audit
       # entry each, "already checked in by <name>" for the others, never an error.
-      - run: npm run test:check-in-concurrency
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:check-in-concurrency
 
       # Real-database check of the eAdventist organizations import and church map
       # locations (#649, #724). It creates, migrates and drops its own scratch
       # database on this same Postgres service (the CI role may create databases),
       # so it cannot touch the seeded data above (#740).
-      - run: npm run test:eadventist-import
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:eadventist-import
 
       # The four HTTP suites below call the real public routes, so they need the
       # app running. `npm run verify` just built it; start that build against the
@@ -381,6 +483,7 @@ jobs:
       # Fictitious CI-only values for production mode. Keep this block identical
       # to the one in badge-print.yml.
       - name: Start the built app
+        if: steps.scope.outputs.full == 'true'
         env:
           MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
           ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
@@ -400,25 +503,32 @@ jobs:
       # Each suite creates its own throwaway event with dates relative to today
       # (#740), so none depends on a seeded event whose deadlines have passed.
       # Concurrent submits for the last seat: exactly one 201 and one 409.
-      - run: npm run test:public-capacity
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:public-capacity
       # Hash-only private access links: resolve, contact-only updates, revocation.
-      - run: npm run test:public-access
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:public-access
       # Locally captured confirmation and internal notification messages.
-      - run: npm run test:public-messaging
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:public-messaging
       # Roster registrations: attendee limits and per-attendee capacity.
-      - run: npm run test:public-roster
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:public-roster
       # Lodging assignment through the built app (#200): the private page shows a published room and roommates by first name only, nothing before publishing, the registrant waitlist route needs a private link and the same origin, and every staff route refuses a signed-out caller.
-      - run: npm run test:lodging-assignment-http
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:lodging-assignment-http
       # Honors Weekend instructors (#833) by URL and API: an instructor opens only their own class (name and club only, no
       # planted contact, health, guardian or birth-date data in the JSON or the page), any other class, a missing class and
       # a non-instructor all get the same 404 for reading and marking, no current Sterling Volunteers check shows the message
       # and no names, signed-out and cross-origin calls and every staff route without a staff session are refused.
-      - run: npm run test:honor-instructors-http
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-instructors-http
       # One staff account on four devices (#825): four cookie jars sign in at once
       # (password and second step), then scan in parallel with no 401, 403, 429 or
       # 500, an address change mid-session, re-sent scans, check-in racing undo,
       # the small live-list poll, and every session still valid at the end.
-      - run: npm run test:check-in-multi-device-http
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:check-in-multi-device-http
 
       - name: Show the app log when a suite failed
         if: failure()
