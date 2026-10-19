@@ -3112,7 +3112,7 @@ async function fillRequiredStep(page: Page, email: string) {
   for (let index = 0; index < (await selects.count()); index += 1) {
     if ((await selects.nth(index).inputValue()) === "") await selects.nth(index).selectOption({ index: 1 });
   }
-  // A choice nobody has made yet (the release's Yes): the first option of each radio group with none chosen.
+  // A choice nobody has made yet: the first option of each radio group with none chosen.
   const radios = content.locator("input[type=radio]:visible");
   const groups = new Set<string>();
   for (let index = 0; index < (await radios.count()); index += 1) {
@@ -3155,7 +3155,6 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
         for (const [suffix, value] of [["pbe_member_first", `Walker${person + 1}`], ["pbe_member_last", "Mobilecheck-Synthetic"], ["pbe_member_age", "14"]] as const) {
           await sheet.locator(`input[id$="_${suffix}"]`).fill(value);
         }
-        await sheet.locator('input[type=radio][id$="_pbe_member_role"]').first().check({ force: true }).catch(() => undefined);
         // A phone edits a person in a sheet that is closed with Done; a desktop edits in place.
         const done = sheet.locator('button:has-text("Done with"):visible');
         if ((await done.count()) > 0) await done.first().click({ timeout: 5000 });

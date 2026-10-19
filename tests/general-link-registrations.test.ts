@@ -85,7 +85,7 @@ describe("the form the link needs", () => {
 });
 
 describe("the people typed into a team", () => {
-  const read = (people: ReturnType<typeof person>[]) => readTypedInTeam(pbe, people, settings, "2027-01-16");
+  const read = (people: Array<{ clientId: string; responses: Record<string, unknown> }>) => readTypedInTeam(pbe, people, settings, "2027-01-16");
 
   it("reads names, ages on the age date, the role and the alternate", () => {
     const team = read([person("Ann", "14"), person("Bo", 19, "TLT", true), person("Cy", 41, "Coach")]);
