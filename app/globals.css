@@ -3737,6 +3737,115 @@ body:has(.auth-page) { padding-bottom: 0; }
 .searchable-select-options > button small { color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), 0.58rem); font-weight: 800; }
 .searchable-select-options > p { margin: 0; color: var(--muted); padding: 11px; font-size: max(var(--type-body-floor, 0px), 0.7rem); }
 
+/* Phone pick list (#1046): the field is a trigger; the open list is a full-screen dialog that follows the visual viewport. */
+.searchable-select-trigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-size: max(16px, 1rem);
+  text-align: left;
+}
+.searchable-select-trigger > span { min-width: 0; overflow-wrap: anywhere; }
+.searchable-select-trigger > span.is-placeholder { color: var(--muted); }
+.searchable-select.is-phone-trigger .searchable-select-control { padding-right: 4px; padding-left: 11px; }
+.searchable-select.is-phone-trigger .searchable-select-control > button.searchable-select-trigger { width: 100%; height: auto; place-items: unset; }
+.searchable-select.is-phone-trigger .searchable-select-control > button.searchable-select-clear { width: 44px; height: 44px; }
+.searchable-select-picker {
+  position: fixed;
+  top: var(--picker-top, 0px);
+  right: 0;
+  left: 0;
+  z-index: 200;
+  display: flex;
+  height: var(--picker-height, 100dvh);
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: var(--ink);
+  overscroll-behavior: contain;
+}
+.searchable-select-picker-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #d9e3e7;
+  padding: 6px 8px 6px 16px;
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
+}
+.searchable-select-picker-bar h2 { margin: 0; font-weight: 800; min-width: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.searchable-select-picker-close {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--imsda-purple-soft);
+  color: var(--imsda-purple);
+  cursor: pointer;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+}
+.searchable-select-picker-search {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 0;
+  border: 1px solid var(--field-border);
+  border-radius: 11px;
+  background: #fcfdfd;
+  padding: 0 11px;
+  color: var(--muted);
+}
+.searchable-select-picker-search:focus-within { border-color: var(--imsda-purple); box-shadow: 0 0 0 4px rgba(88, 44, 131, 0.1); }
+.searchable-select-picker-search > input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 9px 0 !important;
+  box-shadow: none !important;
+  color: var(--ink);
+  font: inherit;
+  font-size: max(16px, 1rem);
+  outline: 0;
+}
+.searchable-select-picker-search > input::-webkit-search-cancel-button { display: none; }
+.searchable-select-picker-count { flex: 0 0 auto; margin: 6px 16px 4px; color: var(--muted); font-size: 0.85rem; }
+.searchable-select-picker .searchable-select-options {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  align-content: start;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  box-shadow: none;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.searchable-select-picker .searchable-select-options > button { min-height: 48px; font-size: max(16px, 1rem); }
+
 .public-registration-choice-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .public-registration-option { display: flex; min-height: 58px; align-items: flex-start; gap: 10px; border: 1px solid #d2dfe4; border-radius: 12px; background: #fbfcfd; cursor: pointer; padding: 11px 12px; transition: border 150ms ease, background 150ms ease, transform 150ms ease; }
 .public-registration-option:hover { border-color: #9fb9c4; background: white; transform: translateY(-1px); }
@@ -9195,17 +9304,17 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 
 /* Every input, select and textarea gets one clear keyboard/typing focus ring
    (several form styles set outline: 0 and relied on a 10%-alpha shadow). */
-:root:root:root :is(input, select, textarea):not(.searchable-select-control > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
-:root:root:root :is(.searchable-select-control, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
+:root:root:root :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
+:root:root:root :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
   outline: 2px solid var(--imsda-purple);
   outline-offset: 2px;
 }
 /* The same fields on the dark navy surfaces (the sidebar's event picker) get the gold ring (#1003); this has to match the
    strength of the purple rule above and come after it. */
 :root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
-  :is(input, select, textarea):not(.searchable-select-control > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
+  :is(input, select, textarea):not(.searchable-select-control > input, .searchable-select-picker-search > input, .money-input > input, .event-slug-input input, .input-with-icon input, .search-field input, .filter-field select):focus-visible,
 :root:root:root :is(.sidebar, .event-hero, .checkin-hero, .public-registration-hero, .public-registration-submit-card, .on-dark)
-  :is(.searchable-select-control, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
+  :is(.searchable-select-control, .searchable-select-picker-search, .money-input, .event-slug-input, .input-with-icon, .search-field, .filter-field):focus-within {
   outline-color: var(--focus-ring-on-dark);
 }
 
@@ -10335,21 +10444,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   .public-registration-attendee.is-sheet .public-registration-attendee-body > :first-child:not(.public-registration-attendee-sheet-footer) { margin-top: 0; }
   .public-registration-attendee.is-sheet .public-registration-attendee-sheet-footer { position: sticky; bottom: 0; z-index: 2; display: block; margin-top: auto; border-top: 1px solid #d9e3e7; background: #fff; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
   .public-registration-attendee.is-sheet .public-registration-attendee-sheet-footer button { width: 100%; min-height: var(--target-cta, 48px); border: 1px solid var(--imsda-purple); border-radius: 12px; background: var(--imsda-purple); color: #fff; cursor: pointer; font: inherit; font-size: var(--type-button-cta, 1rem); font-weight: 800; }
-
-  /* The existing searchable pick list is a bottom sheet above the keyboard. */
-  .searchable-select.is-sheet-picker .searchable-select-options {
-    position: fixed;
-    right: 0;
-    bottom: var(--searchable-sheet-inset, 0px);
-    left: 0;
-    z-index: 70;
-    max-height: min(42dvh, 20rem);
-    border: 0;
-    border-radius: 16px 16px 0 0;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -12px 30px rgba(0, 59, 92, 0.22), 0 0 0 100vmax rgba(0, 20, 36, 0.28);
-  }
-  .searchable-select.is-sheet-picker .searchable-select-options > button { min-height: 48px; font-size: max(16px, 1rem); }
 }
 
 /* Module requests (#741 slice 3) */

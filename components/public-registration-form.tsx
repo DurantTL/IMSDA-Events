@@ -2148,6 +2148,7 @@ export function PublicRegistrationForm({
           <SearchableSelect
             id={id}
             sheet={!embedded}
+            label={field.label}
             value={typeof context.values[field.key] === "string" ? context.values[field.key] as string : ""}
             required={field.required && !excused}
             invalid={Boolean(issue)}

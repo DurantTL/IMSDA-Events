@@ -86,10 +86,11 @@ describe("attendee sheet accessibility (#743)", () => {
     expect(form).toContain("const [sheetOpen, setSheetOpen] = useState(false);");
   });
 
-  it("is full screen with the safe-area inset, and the pick list is a bottom sheet", () => {
+  it("is full screen with the safe-area inset, and the pick list is a full-screen picker (#1046)", () => {
     expect(block).toMatch(/\.public-registration-attendee\.is-sheet \{[^}]*position: fixed;[^}]*inset: 0;/);
     expect(block).toContain("env(safe-area-inset-top");
-    expect(block).toMatch(/\.searchable-select-options \{[^}]*position: fixed;[^}]*bottom: var\(--searchable-sheet-inset, 0px\)/);
+    expect(css).toMatch(/\.searchable-select-picker \{[^}]*position: fixed;[^}]*top: var\(--picker-top, 0px\);[^}]*height: var\(--picker-height, 100dvh\)/);
+    expect(css).not.toContain("--searchable-sheet-inset");
   });
 });
 
@@ -234,9 +235,9 @@ describe("review fixes (#743)", () => {
   it("Escape in an open pick list does not also close the sheet; the sheet CSS is scoped to the registration form", () => {
     const select = read("components/searchable-select.tsx");
     expect(select).toMatch(/key === "Escape"[\s\S]*?if \(open\) event\.stopPropagation\(\)/);
-    expect(select).toContain("if (!sheet || !open || !viewport || !wrapper) return;");
+    expect(select).toMatch(/key === "Escape"[\s\S]*?event\.stopPropagation\(\);[\s\S]*?setOpen\(false\)/);
     expect(form).toMatch(/<SearchableSelect\s+id=\{id\}\s+sheet/);
-    expect(block).toContain(".searchable-select.is-sheet-picker .searchable-select-options {");
+    expect(css).toContain(".searchable-select-picker .searchable-select-options {");
     expect(block).not.toMatch(/\n  \.searchable-select-options \{/);
   });
 
@@ -254,7 +255,7 @@ describe("review fixes (#743)", () => {
   it("does not render the pick-list bottom sheet in an embed", () => {
     expect(form).toContain("sheet={!embedded}");
     const select = read("components/searchable-select.tsx");
-    expect(select).toContain('sheet ? " is-sheet-picker" : ""');
+    expect(select).toContain("props.sheet && phone");
     // The screen clamp rule has specificity (0,2,0); the print override is (0,2,2) so order cannot undo it.
     expect(css.indexOf("Issue 743 (print)")).toBeLessThan(css.indexOf(".expandable-text-body.is-clamped { display: -webkit-box"));
   });

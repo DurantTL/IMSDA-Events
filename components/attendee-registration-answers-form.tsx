@@ -302,6 +302,8 @@ export function AttendeeRegistrationAnswersForm({
                     <input readOnly value={typeof value === "string" ? value : ""} />
                   ) : <SearchableSelect
                     id={`${attendee.attendeeId}_${field.id}`}
+                    sheet
+                    label={field.label}
                     required={field.required}
                     value={typeof value === "string" ? value : ""}
                     placeholder={`Search ${field.label.toLocaleLowerCase()}…`}
