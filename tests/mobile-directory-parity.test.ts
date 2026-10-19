@@ -293,7 +293,7 @@ const deniedOnPhone: Record<string, readonly string[]> = {
   CHECK_IN_STAFF: [...configPages, "/more", "/more/health", "/more/reports", "/registration-builder", "/more/program-assignments", "/finance", "/more/promo-codes", "/communications", "/community", "/staff", "/imports", ...clubPages],
   READ_ONLY_STAFF: [...configPages, "/more", "/more/health", "/more/reports", "/people", "/check-in", "/registration-builder", "/more/program-assignments", "/finance", "/more/promo-codes", "/communications", "/community", "/staff", "/imports", ...clubPages],
   // #1029: kitchen staff hold only the kitchen counts permission, so the phone shows them none of these.
-  KITCHEN_STAFF: [...configPages, "/more", "/more/health", "/more/reports", "/people", "/check-in", "/registration-builder", "/more/program-assignments", "/finance", "/more/promo-codes", "/communications", "/community", "/staff", "/imports", ...clubPages],
+  KITCHEN_STAFF: [...configPages, "/overview", "/more", "/more/health", "/more/reports", "/people", "/check-in", "/registration-builder", "/more/program-assignments", "/finance", "/more/promo-codes", "/communications", "/community", "/staff", "/imports", ...clubPages],
   // #481: a GENERAL event shows no club features, even for a system admin
   // (who still reaches the directory from System management, not the phone).
   "SYSTEM_ADMIN on a GENERAL event": ["/admin/organizations", "/more/clubs", "/more/club-assignments"],

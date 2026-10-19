@@ -214,6 +214,10 @@ describe("who may enter counts, and what that role cannot open", () => {
     const html = renderToStaticMarkup(await KitchenCountsPage({ searchParams: Promise.resolve({ event: "evt" }) }));
     expect(html).toContain("Kitchen counts");
     expect(html).toContain('name="quantity"');
+    // Each count is its own form with an always-present status region, the service in every name, and the note guidance.
+    expect(html).toContain('role="status" aria-live="polite"');
+    expect(html).toContain('<span class="sr-only"> for 2026-10-15 · Lunch</span>');
+    expect(html).toContain("Counts context only. No names or health details.");
     const people = renderToStaticMarkup(await PeoplePage({ searchParams: Promise.resolve({ event: "evt" }) } as never));
     expect(people).toContain("restricted");
     await expect(KitchenReportPage({ searchParams: Promise.resolve({ event: "evt" }) })).rejects.toThrow("REDIRECT:/more/kitchen-report/counts?event=evt");

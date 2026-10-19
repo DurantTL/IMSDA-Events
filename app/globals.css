@@ -12171,7 +12171,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .kitchen-history ul { padding-left: 18px; margin: 4px 0 12px; }
 .kitchen-entry-list { display: grid; gap: 16px; }
 .kitchen-entry-card { display: grid; gap: 12px; min-width: 0; }
-.kitchen-count-form { padding-top: 12px; border-top: 1px solid var(--line, #d6dee2); min-width: 0; }
+.kitchen-count-block { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line, #d6dee2); min-width: 0; }
+.kitchen-count-form { min-width: 0; }
 .kitchen-count-form input { width: 100%; min-height: 44px; font-size: 1rem; }
 .kitchen-count-form .form-actions .primary-button { min-height: 44px; width: 100%; }
 @media (min-width: 700px) {

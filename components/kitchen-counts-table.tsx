@@ -70,8 +70,15 @@ export function KitchenCountsTable({
               <th role="rowheader" scope="row">All services</th>
               <td role="cell" data-label="Ordered">{report.totals.ordered}</td>
               <td role="cell" data-label="Served">{report.totals.served}</td>
-              {kitchenCountKinds.map((kind) => <td role="cell" data-label={kitchenCountKindLabels[kind]} key={kind}>{report.totals.counts[kind]}</td>)}
-              <td role="cell" data-label="Variance"><strong>{signed(report.totals.variance)}</strong></td>
+              {kitchenCountKinds.map((kind) => <td role="cell" data-label={kitchenCountKindLabels[kind]} key={kind}>{figure(report.totals.counts[kind] ?? undefined)}</td>)}
+              <td role="cell" data-label="Variance (services with prepared entered)">
+                <strong>{signed(report.totals.variance)}</strong>
+                {report.totals.variance !== null && (
+                  <span className="field-help served-split">
+                    Only the {report.totals.varianceServices} service{report.totals.varianceServices === 1 ? "" : "s"} with prepared entered; served there: {report.totals.varianceServed}
+                  </span>
+                )}
+              </td>
             </tr>
           </tbody>
         </table></div>

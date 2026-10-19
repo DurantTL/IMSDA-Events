@@ -9,7 +9,7 @@ import { kitchenCountKinds } from "@/modules/meals/kitchen-counts";
 import { loadKitchenCountsReport } from "@/modules/meals/kitchen-counts-repository";
 import { eventLocalDateTime } from "@/modules/meals/scanner-import";
 
-export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
+export const metadata: Metadata = { title: staffPageTitles.kitchenCounts };
 
 /**
  * Kitchen counts (#1029). MANAGE_KITCHEN_COUNTS enters and corrects counts; report viewers (VIEW_REPORTS) may read the table.
@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
 export default async function KitchenCountsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const requested = Array.isArray(params.event) ? params.event[0] : params.event;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions } = await resolveEventContext(requested, { allowKitchenCountsOnly: true });
   const canEnter = permissions.includes("MANAGE_KITCHEN_COUNTS");
   if (!canEnter && !permissions.includes("VIEW_REPORTS")) {
     return <AccessRestricted title="Kitchen counts are restricted" detail="Your event role does not include kitchen counts." />;

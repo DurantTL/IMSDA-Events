@@ -58,3 +58,13 @@ export const rolePermissions: Record<EventRole, readonly EventPermission[]> = {
   // Deliberately without VIEW_EVENT: that permission opens the registration search, and kitchen staff must not see registrations (#1029).
   KITCHEN_STAFF: ["MANAGE_KITCHEN_COUNTS"],
 };
+
+/**
+ * Whether the permissions are the kitchen's alone (#1029): MANAGE_KITCHEN_COUNTS and nothing else. Such a viewer may open
+ * the kitchen counts page and nothing else in the event workspace, so every other page sends them there.
+ */
+export function holdsKitchenCountsOnly(permissions: readonly EventPermission[]): boolean {
+  return permissions.length > 0 && permissions.every((permission) => permission === "MANAGE_KITCHEN_COUNTS");
+}
+
+export const kitchenCountsPath = "/more/kitchen-report/counts";

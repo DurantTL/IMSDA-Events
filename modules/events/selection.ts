@@ -3,7 +3,7 @@ import "server-only";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { redirect } from "next/navigation";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { eventPermissions, rolePermissions } from "@/modules/access/permissions";
+import { eventPermissions, holdsKitchenCountsOnly, kitchenCountsPath, rolePermissions } from "@/modules/access/permissions";
 import { withoutArchivedEvents } from "@/modules/events/archive";
 import { selectEventContext } from "@/modules/events/context-selection";
 import { readLastUsedEventId } from "@/modules/events/last-used-event";
@@ -22,12 +22,15 @@ import { findActiveMembership, listEventsForUser } from "@/modules/events/reposi
  *   the picker. `autoSelected` tells the caller to show the "chosen for you"
  *   notice, since the account didn't ask for this specific event.
  *
+ * - A viewer whose only permission is MANAGE_KITCHEN_COUNTS (#1029) is sent to the kitchen counts page from every page
+ *   that does not pass `allowKitchenCountsOnly`.
+ *
  * The selection itself is `selectEventContext` (`context-selection.ts`),
  * pure and unit-tested on its own; this function only gathers what it needs
  * (the session, the account's events, the remembered event) and acts on the
  * result.
  */
-export async function resolveEventContext(requestedEventId?: string) {
+export async function resolveEventContext(requestedEventId?: string, options: { allowKitchenCountsOnly?: boolean } = {}) {
   const { user, events } = await loadSignedInEvents();
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
 
@@ -51,6 +54,12 @@ export async function resolveEventContext(requestedEventId?: string) {
   const permissions = user.globalRole === "SYSTEM_ADMIN"
     ? [...eventPermissions]
     : [...new Set([...(membership ? rolePermissions[membership.role] : []), ...(membership?.permissions ?? [])])];
+
+  // Kitchen staff (#1029) hold the kitchen counts permission and nothing else: the one page they may open is the counts
+  // page, so any other page of the workspace, including the dashboard they land on after signing in, sends them there.
+  if (!options.allowKitchenCountsOnly && holdsKitchenCountsOnly(permissions)) {
+    redirect(`${kitchenCountsPath}?event=${encodeURIComponent(event.id)}`);
+  }
 
   return {
     event,

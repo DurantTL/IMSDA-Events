@@ -79,7 +79,18 @@ export type KitchenCountRow = {
   /** Every entry of the service, oldest first, with whether a later one superseded it. */
   history: Array<KitchenCountEntry & { superseded: boolean }>;
 };
-export type KitchenCountsReport = { rows: KitchenCountRow[]; totals: Omit<KitchenCountRow, "key" | "label" | "serviceDate" | "mealType" | "history" | "counts"> & { counts: Record<KitchenCountKind, number> } };
+export type KitchenCountsTotals = {
+  ordered: number;
+  served: number;
+  /** Per kind, the sum over services that have an entry; null when no service has one (nothing entered is not zero). */
+  counts: Record<KitchenCountKind, number | null>;
+  /** Prepared minus served over only the services where prepared was entered; null when none. */
+  variance: number | null;
+  /** The served total of those same services, shown beside the variance so it can be read against them. */
+  varianceServed: number;
+  varianceServices: number;
+};
+export type KitchenCountsReport = { rows: KitchenCountRow[]; totals: KitchenCountsTotals };
 
 /** The current entry of every (service, kind): the one no other entry supersedes. */
 export function currentEntries(entries: readonly KitchenCountEntry[]): KitchenCountEntry[] {
@@ -124,15 +135,22 @@ export function buildKitchenCountsReport(served: Pick<ServedReport, "rows">, ent
   }
   const sorted = [...rows.values()].sort((a, b) =>
     (a.serviceDate || "9999-99-99").localeCompare(b.serviceDate || "9999-99-99") || mealOrder(a.mealType) - mealOrder(b.mealType));
-  const totals = { ordered: 0, served: 0, counts: { PREPARED: 0, WASTED: 0, DONATED: 0, TRANSFERRED: 0 } as Record<KitchenCountKind, number>, variance: null as number | null };
+  const totals: KitchenCountsTotals = {
+    ordered: 0, served: 0, counts: { PREPARED: null, WASTED: null, DONATED: null, TRANSFERRED: null }, variance: null, varianceServed: 0, varianceServices: 0,
+  };
   for (const row of sorted) {
     row.variance = kitchenVariance(row.counts.PREPARED?.quantity, row.served);
     totals.ordered += row.ordered;
     totals.served += row.served;
-    for (const kind of kitchenCountKinds) totals.counts[kind] += row.counts[kind]?.quantity ?? 0;
+    for (const kind of kitchenCountKinds) {
+      const quantity = row.counts[kind]?.quantity;
+      if (quantity !== undefined) totals.counts[kind] = (totals.counts[kind] ?? 0) + quantity;
+    }
   }
   // The total variance only compares services where prepared was entered, so a missing entry never reads as zero made.
   const withPrepared = sorted.filter((row) => row.counts.PREPARED);
+  totals.varianceServices = withPrepared.length;
+  totals.varianceServed = withPrepared.reduce((sum, row) => sum + row.served, 0);
   totals.variance = withPrepared.length === 0 ? null : withPrepared.reduce((sum, row) => sum + (row.variance ?? 0), 0);
   return { rows: sorted, totals };
 }
@@ -143,7 +161,7 @@ export function kitchenCountsCsv(report: KitchenCountsReport): string {
     .filter((kind) => row.counts[kind]?.note)
     .map((kind) => `${kitchenCountKindLabels[kind]}: ${row.counts[kind]?.note}`)
     .join(" | ");
-  const cell = (value: number | undefined) => (value === undefined ? "" : value);
+  const cell = (value: number | null | undefined) => (value === undefined || value === null ? "" : value);
   return "﻿" + toCsv([
     ["Service", "Ordered (tickets sold)", "Served (scanner)", "Prepared", "Wasted", "Donated", "Transferred", "Variance (prepared minus served)", "Notes"],
     ...report.rows.map((row) => [
@@ -153,8 +171,9 @@ export function kitchenCountsCsv(report: KitchenCountsReport): string {
     ]),
     [
       "All services", report.totals.ordered, report.totals.served,
-      report.totals.counts.PREPARED, report.totals.counts.WASTED, report.totals.counts.DONATED, report.totals.counts.TRANSFERRED,
-      report.totals.variance ?? "", "",
+      cell(report.totals.counts.PREPARED), cell(report.totals.counts.WASTED), cell(report.totals.counts.DONATED), cell(report.totals.counts.TRANSFERRED),
+      report.totals.variance ?? "",
+      report.totals.variance === null ? "" : `Variance covers only the ${report.totals.varianceServices} service${report.totals.varianceServices === 1 ? "" : "s"} with prepared entered (served there: ${report.totals.varianceServed}).`,
     ],
   ]);
 }

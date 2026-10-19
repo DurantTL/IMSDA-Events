@@ -156,7 +156,7 @@ const upperLabelFloorPx = 12;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "director" | "area" | "visitor";
+type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "area" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -275,6 +275,8 @@ const pages: PageSpec[] = [
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   // Kitchen counts (#1029): the phone entry forms and the per-service table, with a long note and a correction in the history.
   staff("kitchen-counts", "/more/kitchen-report/counts"),
+  // The same page as a Kitchen staff user (#1029): no event view, so the sidebar and phone tabs show only Kitchen counts.
+  staff("kitchen-counts-as-kitchen-staff", "/more/kitchen-report/counts", "kitchen"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -1001,6 +1003,9 @@ async function cleanupSynthetic(prisma: PrismaClient) {
     prisma.assetIssuanceHistory.deleteMany({ where: { issuanceId: mine } }),
     prisma.assetIssuance.deleteMany({ where: { id: mine } }),
     prisma.eventMealKitchenCount.deleteMany({ where: { id: mine } }),
+    prisma.userSession.deleteMany({ where: { userId: mine } }),
+    prisma.eventMembership.deleteMany({ where: { userId: mine } }),
+    prisma.user.deleteMany({ where: { id: mine } }),
     prisma.issuedAsset.deleteMany({ where: { id: mine } }),
     prisma.issuedAssetType.deleteMany({ where: { id: mine } }),
     prisma.attendeeSession.deleteMany({ where: { accountId: { in: accountIds } } }),
@@ -1360,6 +1365,15 @@ async function seedKitchenCounts(prisma: PrismaClient) {
   if (await prisma.eventMealKitchenCount.findUnique({ where: { id: `${P}_kc_1` }, select: { id: true } })) return;
   const user = await prisma.user.findFirst({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
   if (!user) return;
+  // A Kitchen staff account on this event (#1029) for the audit page that opens the counts page as that role.
+  const kitchen = await prisma.user.upsert({
+    where: { email: `${P}.kitchen@example.test` }, update: {},
+    create: { id: `${P}_user_kitchen`, email: `${P}.kitchen@example.test`, displayName: "Kim Mobilecheck-Kitchen" },
+  });
+  await prisma.eventMembership.upsert({
+    where: { eventId_userId: { eventId, userId: kitchen.id } }, update: { role: "KITCHEN_STAFF", status: "ACTIVE" },
+    create: { eventId, userId: kitchen.id, role: "KITCHEN_STAFF", status: "ACTIVE" },
+  });
   const base = { eventId, enteredByUserId: user.id };
   const longNote = "Second pan held back for the late serving line, then split between the vegetarian and the gluten-free lines";
   await prisma.eventMealKitchenCount.create({ data: { ...base, id: `${P}_kc_1`, serviceDate: "2026-10-15", mealType: "LUNCH", kind: "PREPARED", quantity: 120, note: "First count" } });
@@ -1577,7 +1591,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
       tokens.attendee.push(session.token);
       return { name: attendeeSession.ATTENDEE_SESSION_COOKIE_NAME, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
     }
-    const email = role === "system-admin" ? "system@imsda-events.test" : "admin@imsda-events.test";
+    const email = role === "system-admin" ? "system@imsda-events.test" : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error(`The seeded account ${email} is missing. Run \`npm run db:seed\` first.`);
     const session = await staffSession.createDatabaseSession(user.id, null);
@@ -1587,6 +1601,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const cookies: Record<SignedInRole, { name: string; value: string; expires: number }> = {
     "event-admin": await cookie("event-admin"),
     "system-admin": await cookie("system-admin"),
+    kitchen: await cookie("kitchen"),
     director: await cookie("director"),
     area: await cookie("area"),
   };

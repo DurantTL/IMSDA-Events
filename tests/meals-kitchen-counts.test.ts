@@ -57,6 +57,22 @@ describe("kitchen counts report (#1029)", () => {
     expect(report.totals.variance).toBe(3);
   });
 
+  it("totals a partly entered report honestly: no entries is not zero, and variance covers only services with prepared", () => {
+    const report = buildKitchenCountsReport(servedReport, [entry({ kind: "PREPARED", quantity: 1 }), entry({ kind: "WASTED", quantity: 2 })]);
+    // Lunch has prepared (1) with 2 served; supper has nothing entered and 0 served, and is left out of the variance.
+    expect(report.totals).toMatchObject({
+      ordered: 4, served: 2, counts: { PREPARED: 1, WASTED: 2, DONATED: null, TRANSFERRED: null },
+      variance: -1, varianceServices: 1, varianceServed: 2,
+    });
+    const csv = kitchenCountsCsv(report).replace("\uFEFF", "").trimEnd().split("\r\n");
+    // A negative variance stays a number, and the totals row says which services it covers.
+    expect(csv[1]).toMatch(/^"2026-10-15 · Lunch","3","2","1","2","","","-1",/);
+    expect(csv.at(-1)).toBe('"All services","4","2","1","2","","","-1","Variance covers only the 1 service with prepared entered (served there: 2)."');
+    const none = buildKitchenCountsReport(servedReport, []);
+    expect(none.totals).toMatchObject({ counts: { PREPARED: null, WASTED: null, DONATED: null, TRANSFERRED: null }, variance: null, varianceServices: 0 });
+    expect(kitchenCountsCsv(none).trimEnd().split("\r\n").at(-1)).toBe('"All services","4","2","","","","","",""');
+  });
+
   it("shows a correction as the current figure and keeps the earlier entry in the history", () => {
     const first = entry({ kind: "PREPARED", quantity: 5, note: "First pan" });
     const second = entry({ kind: "PREPARED", quantity: 7, supersedesId: first.id, note: "Recount", enteredBy: "Lee Lead" });
@@ -66,6 +82,7 @@ describe("kitchen counts report (#1029)", () => {
     expect(lunch.history.map((item) => [item.quantity, item.superseded, item.enteredBy])).toEqual([[5, true, "Kim Kitchen"], [7, false, "Lee Lead"]]);
     expect(currentEntries([first, second]).map((item) => item.id)).toEqual([second.id]);
     expect(report.totals.counts.PREPARED).toBe(7);
+    expect(report.totals.counts.WASTED).toBeNull();
   });
 
   it("lists a service the kitchen entered counts for even when it has no tickets", () => {

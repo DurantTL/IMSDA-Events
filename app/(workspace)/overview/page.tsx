@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { evaluateEventRegistrationPhase } from "@/modules/events/lifecycle";
 import { getEventOverview } from "@/modules/events/repository";
+import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listRegistrations } from "@/modules/registrations/repository";
 import { listEventBackgroundFlags } from "@/modules/background-checks/repository";
@@ -51,6 +52,10 @@ function registrationSummary(registration: Awaited<ReturnType<typeof listRegistr
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const requested = (await searchParams).event;
   const { event, permissions } = await resolveEventContext(requested);
+  // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
+  if (!permissions.includes("VIEW_EVENT")) {
+    return <AccessRestricted title="The dashboard is restricted" detail="Your event role does not include this page." />;
+  }
   const canSeeSensitiveData = permissions.includes("VIEW_SENSITIVE_DATA");
   // "Staff tools" (#1009): a link to System management for system administrators only. The link grants nothing; /admin checks again.
   const systemAdminContext = otherWorkspaceContextsForStaff({

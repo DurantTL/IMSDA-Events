@@ -20,6 +20,7 @@ import { moduleState } from "@/modules/event-modules/service";
 import { listModuleRequestsForEvent } from "@/modules/event-modules/requests";
 import { formatRequestDate, latestRequestPerModule } from "@/modules/event-modules/request-domain";
 import { ModuleRequestForm } from "@/components/module-request-form";
+import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { eventKindFromAudience, selectActivity } from "@/modules/events/settings-sections";
 import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
@@ -37,6 +38,10 @@ export const metadata: Metadata = { title: staffPageTitles.eventModules };
 export default async function MorePage({ searchParams }: { searchParams: Promise<{ event?: string; activity?: string }> }) {
   const { event: requested, activity: activityFilter } = await searchParams;
   const { event, permissions, user } = await resolveEventContext(requested);
+  // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
+  if (!permissions.includes("VIEW_EVENT")) {
+    return <AccessRestricted title="More is restricted" detail="Your event role does not include this page." />;
+  }
   const { allowed: clubOversight, clubEvent } = await resolveClubOversight(event.id);
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   const kind = eventKindFromAudience(clubEvent ? "CLUB" : "GENERAL");

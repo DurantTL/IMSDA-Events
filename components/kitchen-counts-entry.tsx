@@ -15,9 +15,11 @@ export type KitchenEntryService = {
 function CountForm({ eventId, service, kind }: { eventId: string; service: KitchenEntryService; kind: KitchenCountKind }) {
   const router = useRouter();
   const cell = service.cells[kind];
+  const kindLabel = kitchenCountKindLabels[kind];
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const id = `${service.key.replace(/[^a-z0-9]/gi, "-")}-${kind}`;
+  const invalid = message?.tone === "error";
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,7 +27,7 @@ function CountForm({ eventId, service, kind }: { eventId: string; service: Kitch
     const raw = String(form.get("quantity") ?? "").trim();
     if (!/^\d+$/.test(raw)) { setMessage({ tone: "error", text: "Enter a whole number, 0 or more." }); return; }
     setBusy(true);
-    setMessage(null);
+    setMessage({ tone: "ok", text: "Saving…" });
     try {
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/meals/kitchen-counts`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -33,7 +35,7 @@ function CountForm({ eventId, service, kind }: { eventId: string; service: Kitch
       });
       const result = await response.json().catch(() => ({})) as { message?: string; changed?: boolean };
       if (!response.ok) throw new Error(result.message ?? "That could not be saved. Nothing was changed.");
-      setMessage({ tone: "ok", text: result.changed === false ? "No change." : "Saved." });
+      setMessage({ tone: "ok", text: result.changed === false ? `${kindLabel} for ${service.label}: no change.` : `${kindLabel} for ${service.label} saved.` });
       router.refresh();
     } catch (caught) {
       setMessage({ tone: "error", text: caught instanceof Error ? caught.message : "That could not be saved. Nothing was changed." });
@@ -43,21 +45,27 @@ function CountForm({ eventId, service, kind }: { eventId: string; service: Kitch
   }
 
   return (
-    // The key makes a refreshed figure reset the inputs to the new current entry.
-    <form className="kitchen-count-form form-stack" key={cell?.entryId ?? "none"} onSubmit={save} noValidate>
-      <label htmlFor={`${id}-q`}>{kitchenCountKindLabels[kind]}
-        <input id={`${id}-q`} name="quantity" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={String(KITCHEN_COUNT_MAX).length}
-          defaultValue={cell ? String(cell.quantity) : ""} placeholder="Not entered" aria-describedby={`${id}-by`} />
-      </label>
-      <label htmlFor={`${id}-n`}>Note (optional)
-        <input id={`${id}-n`} name="note" type="text" maxLength={KITCHEN_NOTE_MAX} defaultValue={cell?.note ?? ""} autoComplete="off" />
-      </label>
-      <p className="field-help" id={`${id}-by`}>{cell ? `Current: ${cell.quantity}. ${cell.byline}` : "Nothing entered yet."}</p>
-      <div className="form-actions">
-        <button className="primary-button" type="submit" disabled={busy}>{busy ? "Saving…" : cell ? `Correct ${kitchenCountKindLabels[kind].toLowerCase()}` : `Save ${kitchenCountKindLabels[kind].toLowerCase()}`}</button>
-      </div>
-      {message && <p className={message.tone === "error" ? "form-error" : "field-help"} role={message.tone === "error" ? "alert" : "status"}>{message.text}</p>}
-    </form>
+    <div className="kitchen-count-block">
+      {/* The key makes a refreshed figure reset the inputs to the new current entry. The status region below stays mounted, so its text is announced. */}
+      <form className="kitchen-count-form form-stack" key={cell?.entryId ?? "none"} onSubmit={save} noValidate>
+        <label htmlFor={`${id}-q`}>{kindLabel}<span className="sr-only"> for {service.label}</span>
+          <input id={`${id}-q`} name="quantity" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={String(KITCHEN_COUNT_MAX).length}
+            defaultValue={cell ? String(cell.quantity) : ""} placeholder="Not entered"
+            aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? `${id}-msg ${id}-by` : `${id}-by`} />
+        </label>
+        <label htmlFor={`${id}-n`}>Note (optional)<span className="sr-only"> for {kindLabel.toLowerCase()}, {service.label}</span>
+          <input id={`${id}-n`} name="note" type="text" maxLength={KITCHEN_NOTE_MAX} defaultValue={cell?.note ?? ""} autoComplete="off" aria-describedby={`${id}-nh`} />
+        </label>
+        <p className="field-help" id={`${id}-nh`}>Counts context only. No names or health details.</p>
+        <p className="field-help" id={`${id}-by`}>{cell ? `Current: ${cell.quantity}. ${cell.byline}` : "Nothing entered yet."}</p>
+        <div className="form-actions">
+          <button className="primary-button" type="submit" disabled={busy}>
+            {busy ? "Saving…" : cell ? `Correct ${kindLabel.toLowerCase()}` : `Save ${kindLabel.toLowerCase()}`}<span className="sr-only"> for {service.label}</span>
+          </button>
+        </div>
+      </form>
+      <p className={invalid ? "form-error" : "field-help"} id={`${id}-msg`} role="status" aria-live="polite">{message?.text ?? ""}</p>
+    </div>
   );
 }
 

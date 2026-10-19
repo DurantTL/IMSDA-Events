@@ -5,7 +5,9 @@ export type CsvOptions = {
 
 export function csvCell(value: string | number, options: CsvOptions = {}) {
   let text = String(value);
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  // A finite number is data, not text a person typed: a negative figure (a variance of -2) must stay a number, so only strings get the formula guard.
+  const isPlainNumber = typeof value === "number" && Number.isFinite(value);
+  if (!isPlainNumber && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   if (options.minimalQuoting && !/[",\r\n]/.test(text)) return text;
   return `"${text.replaceAll('"', '""')}"`;
 }
