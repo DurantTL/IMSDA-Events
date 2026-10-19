@@ -7,6 +7,10 @@ import type { ClubImportItem } from "@/modules/club-imports/schemas";
  * without a browser.
  */
 export type PreviewDraft = {
+  kind?: "REGISTRATION" | "CLUB_LIST";
+  namesOnSheet?: string[];
+  isActive?: boolean;
+  updateChurch?: boolean;
   sourceKey: string;
   entryId: string;
   clubYear: string;
@@ -30,12 +34,15 @@ export type PreviewDraft = {
 export function confirmPayload(drafts: PreviewDraft[]) {
   return {
     clubs: drafts.filter((draft) => draft.include).map((draft) => ({
+      ...(draft.kind === "CLUB_LIST"
+        ? { kind: "CLUB_LIST" as const, matchNames: draft.namesOnSheet ?? [], isActive: draft.isActive ?? true, updateChurch: Boolean(draft.updateChurch && draft.churchId) }
+        : {}),
       sourceKey: draft.sourceKey,
       entryId: draft.entryId,
       clubYear: draft.clubYear,
       clubName: draft.clubName,
       churchId: draft.churchId,
-      newChurchName: draft.churchId ? "" : draft.newChurchName,
+      newChurchName: draft.churchId || draft.kind === "CLUB_LIST" ? "" : draft.newChurchName,
       invites: draft.invites.filter((invite) => invite.include && invite.email).map(({ role, name, email }) => ({ role, name, email })),
       people: draft.people.filter((person) => person.include).map((person) => ({
         firstName: person.firstName,

@@ -4,7 +4,15 @@ const name = z.string().trim().max(80);
 
 /** One club as the administrator confirmed it in the preview (#376). */
 export const clubImportItemSchema = z.object({
-  sourceKey: z.string().trim().regex(/^form-\d+:[A-Za-z0-9_-]{1,40}$/),
+  /** "CLUB_LIST" rows come from the club-list JSON (#1038): club only, no people, no invites, no roster year. */
+  kind: z.enum(["REGISTRATION", "CLUB_LIST"]).default("REGISTRATION"),
+  sourceKey: z.string().trim().regex(/^(form-\d+|club-list):[A-Za-z0-9_-]{1,40}$/),
+  /** Club-list only: the club's older names; an existing club is found by any of them. */
+  matchNames: z.array(z.string().trim().min(1).max(120)).max(20).default([]),
+  /** Club-list only: a new club is created active or not. */
+  isActive: z.boolean().default(true),
+  /** Club-list only: change an existing club's church to `churchId` (the "update church" tick). */
+  updateChurch: z.boolean().default(false),
   entryId: z.string().trim().min(1).max(40),
   clubYear: z.string().regex(/^\d{4}-\d{2}$/).refine((value) => (Number(value.slice(0, 4)) + 1) % 100 === Number(value.slice(5)), "Choose a valid club year."),
   clubName: z.string().trim().min(2, "Every imported club needs a name.").max(120),
@@ -26,10 +34,12 @@ export const clubImportItemSchema = z.object({
     /** "Keep both" (#541): add this person even though an earlier person in the file has the same name and section. */
     keepBoth: z.boolean().default(false),
   }).strict()).max(300),
-}).strict();
+}).strict().refine((item) => item.kind !== "CLUB_LIST" || (item.people.length === 0 && item.invites.length === 0 && !item.newChurchName), {
+  message: "A club-list row creates only the club: no people, no invites, and no new church.",
+});
 
 export const clubImportConfirmSchema = z.object({
-  clubs: z.array(clubImportItemSchema).min(1, "Choose at least one club to import.").max(400),
+  clubs: z.array(clubImportItemSchema).min(1, "Choose at least one club to import.").max(500),
 }).strict();
 
 const clubYear = z.string().regex(/^\d{4}-\d{2}$/, "Choose a valid club year.");

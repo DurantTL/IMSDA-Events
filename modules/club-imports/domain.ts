@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { clubYearChoices, clubYearFor, rosterSectionOf, type ClubClassLevel } from "@/modules/club-rosters/domain";
 
 export { clubYearChoices };
@@ -41,7 +42,24 @@ export type ImportInvite = {
   email: string;
 };
 
+/** Which file a draft came from: the old form 89 export, or the club-list JSON (#1038). */
+export type ClubImportKind = "REGISTRATION" | "CLUB_LIST";
+
 export type ClubImportDraft = {
+  /** A club-list draft has no people and no invites; confirm creates only the club (#1038). */
+  kind: ClubImportKind;
+  /** Club-list only: the town or church name the church is suggested from. Empty for form 89. */
+  churchHint: string;
+  /** Club-list only: IA or MO narrows the church suggestion. */
+  state: string | null;
+  /** Club-list only: carried to a new club. */
+  isActive: boolean;
+  /** Club-list only: free text shown on the row for the reviewer. */
+  checkNote: string;
+  /** Club-list only: an organization id from the file, used as the suggested church when it is an active sponsor. */
+  sponsoringChurchId: string | null;
+  /** Club-list only: the club's older names, also used to find it in the directory. */
+  namesOnSheet: string[];
   sourceKey: string;
   entryId: string;
   /** The club year the roster is imported into. Defaults to the current one at import time, not the submission date (#541). */
@@ -212,6 +230,13 @@ function draftFrom(entry: z.infer<typeof entrySchema>, now: Date): ClubImportDra
   });
 
   return {
+    kind: "REGISTRATION",
+    churchHint: "",
+    state: null,
+    isActive: true,
+    checkNote: "",
+    sponsoringChurchId: null,
+    namesOnSheet: [],
     sourceKey: `form-${CLUB_IMPORT_FORM_ID}:${entryId}`,
     entryId,
     clubYear,
@@ -260,6 +285,124 @@ export function parseClubRegistrationExport(input: unknown, now = new Date()) {
     throw new ClubImportParseError("No club registrations were found in that file. Check that it is the entries export of form 89.");
   }
   return { drafts, skipped };
+}
+
+export const MAX_CLUB_LIST_BYTES = 1_000_000;
+export const MAX_CLUB_LIST_CLUBS = 500;
+export const CLUB_LIST_STATES = ["IA", "MO"] as const;
+
+const clubListItemSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  type: z.string().optional(),
+  isActive: z.boolean().default(true),
+  sponsoringChurch: z.string().trim().max(40).nullish(),
+  churchSearchHint: z.string().nullish(),
+  state: z.enum(CLUB_LIST_STATES).nullish(),
+  namesOnSheet: z.record(z.string(), z.unknown()).nullish(),
+  checkNote: z.string().nullish(),
+});
+
+/** True for the club-list JSON: an object with a top-level `clubs` array (#1038). */
+export function isClubListExport(input: unknown): input is { clubs: unknown[] } {
+  return typeof input === "object" && input !== null && !Array.isArray(input) && Array.isArray((input as { clubs?: unknown }).clubs);
+}
+
+/**
+ * The club-list JSON as drafts (#1038): one per club, no people and no
+ * invites. Unknown fields are ignored. Rows whose `type` is something other
+ * than CLUB are skipped. A row that cannot be read stops the whole file with
+ * its position, because a half-read list would look complete.
+ */
+export function parseClubListExport(input: unknown, now = new Date()) {
+  if (!isClubListExport(input)) throw new ClubImportParseError("That file isn't a club list. It needs a top-level \"clubs\" array.");
+  if (input.clubs.length > MAX_CLUB_LIST_CLUBS) {
+    throw new ClubImportParseError(`That list has ${input.clubs.length} clubs. Import at most ${MAX_CLUB_LIST_CLUBS} at a time.`);
+  }
+  const clubYear = clubYearFor(now);
+  const drafts: ClubImportDraft[] = [];
+  let skipped = 0;
+  input.clubs.forEach((raw, index) => {
+    const parsed = clubListItemSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new ClubImportParseError(`Club ${index + 1} in the list can't be read: it needs a name of 2 to 120 characters, and state must be IA, MO or empty.`);
+    }
+    const club = parsed.data;
+    if (club.type !== undefined && club.type.toUpperCase() !== "CLUB") {
+      skipped += 1;
+      return;
+    }
+    const namesOnSheet = [...new Set(Object.values(club.namesOnSheet ?? {}).map((value) => text(value, 120)).filter(Boolean))].slice(0, 20);
+    drafts.push({
+      kind: "CLUB_LIST",
+      sourceKey: `club-list:${index + 1}`,
+      entryId: String(index + 1),
+      clubYear,
+      submittedClubYear: clubYear,
+      submittedOn: "",
+      churchName: "",
+      churchHint: text(club.churchSearchHint, 120),
+      state: club.state ?? null,
+      isActive: club.isActive,
+      checkNote: text(club.checkNote, 500),
+      sponsoringChurchId: club.sponsoringChurch ? club.sponsoringChurch : null,
+      namesOnSheet,
+      clubName: text(club.name, 120),
+      invites: [],
+      people: [],
+      approxPathfinders: "",
+    });
+  });
+  if (drafts.length === 0) throw new ClubImportParseError("No clubs were found in that list.");
+  return { drafts, skipped };
+}
+
+/** Either supported file: the club-list JSON or the form 89 export. */
+export function parseClubImportFile(input: unknown, now = new Date()) {
+  return isClubListExport(input) ? parseClubListExport(input, now) : parseClubRegistrationExport(input, now);
+}
+
+/**
+ * The names a club-list row is matched on in the directory: its own and its
+ * older names, normalized and de-duplicated. The one place to swap in the
+ * near-duplicate check from #1031 (`modules/organizations/similar-clubs.ts`)
+ * once it merges; until then the match is exact.
+ */
+export function clubMatchNames(clubName: string, namesOnSheet: string[]) {
+  return [...new Set([clubName, ...namesOnSheet].map(normalizeOrganizationName).filter(Boolean))];
+}
+
+export type ChurchSuggestionInput = { id: string; name: string; city?: string | null; state?: string | null };
+export type ChurchSuggestion = {
+  /** Preselected when there is exactly one best match (or the file named a sponsor). */
+  churchId: string | null;
+  /** Every church that matched, for "pick one". */
+  candidateIds: string[];
+  status: "GIVEN" | "ONE" | "SEVERAL" | "NONE";
+};
+
+/**
+ * Suggests a church for a club-list row (#1038) from its hint (a town or
+ * church name) with `churchStem`, narrowed by state when given. Tiers: the
+ * church's stem equals the hint, the town equals the hint, the stem contains
+ * the hint as whole words. The best tier with matches wins; one match is
+ * preselected, several say "pick one", none says "no match".
+ */
+export function suggestChurches(hint: string, state: string | null, churches: ChurchSuggestionInput[], givenId: string | null = null): ChurchSuggestion {
+  if (givenId && churches.some((church) => church.id === givenId)) return { churchId: givenId, candidateIds: [givenId], status: "GIVEN" };
+  const wanted = churchStem(hint);
+  if (!wanted) return { churchId: null, candidateIds: [], status: "NONE" };
+  const inState = churches.filter((church) => !state || !church.state || church.state.trim().toUpperCase() === state);
+  const town = (church: ChurchSuggestionInput) => churchStem(church.city ?? "");
+  const tiers: ChurchSuggestionInput[][] = [
+    inState.filter((church) => churchStem(church.name) === wanted),
+    inState.filter((church) => town(church) === wanted),
+    inState.filter((church) => ` ${churchStem(church.name)} `.includes(` ${wanted} `)),
+  ];
+  const best = tiers.find((tier) => tier.length > 0) ?? [];
+  const candidateIds = [...new Set(tiers.flat().map((church) => church.id))];
+  if (best.length === 1) return { churchId: best[0]!.id, candidateIds, status: "ONE" };
+  if (best.length > 1) return { churchId: null, candidateIds, status: "SEVERAL" };
+  return { churchId: null, candidateIds: [], status: "NONE" };
 }
 
 /** The ExternalIdentity scope: one import per club per club year. */

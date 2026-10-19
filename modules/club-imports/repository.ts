@@ -6,11 +6,14 @@ import { refreshBackgroundCheckMatchesSafely } from "@/modules/background-checks
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   churchStem,
+  clubMatchNames,
   clubYearChoices,
   importPersonKey,
   importScope,
   scopeClubYear,
+  suggestChurches,
   type ClubImportDraft,
+  type ClubImportKind,
   type ImportedYears,
   type ImportSkipReason,
 } from "@/modules/club-imports/domain";
@@ -29,7 +32,7 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
   const prisma = getPrisma();
   const [churches, clubs, identities] = await Promise.all([
     // A church, company or group may sponsor a club (#822).
-    prisma.organization.findMany({ where: { type: { in: [...SPONSOR_ORGANIZATION_TYPES] }, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, normalizedName: true, type: true } }),
+    prisma.organization.findMany({ where: { type: { in: [...SPONSOR_ORGANIZATION_TYPES] }, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, normalizedName: true, type: true, city: true, state: true } }),
     prisma.organization.findMany({ where: { type: "CLUB" }, select: { id: true, name: true, normalizedName: true, isActive: true, parentOrganizationId: true } }),
     prisma.externalIdentity.findMany({
       where: { provider: "FLUENT_FORMS", externalId: { in: drafts.map((draft) => draft.entryId) } },
@@ -58,6 +61,15 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
     return sharing?.length === 1 ? sharing[0]! : null;
   };
   const clubByName = new Map(clubs.map((club) => [club.normalizedName, club]));
+  // Club-list rows (#1038) are found by their own name or any older name on the sheet.
+  // Exact for now; the near-duplicate check from #1031 plugs in here (see `clubMatchNames`).
+  const findClub = (draft: ClubImportDraft) => {
+    for (const name of clubMatchNames(draft.clubName, draft.kind === "CLUB_LIST" ? draft.namesOnSheet : [])) {
+      const club = clubByName.get(name);
+      if (club) return club;
+    }
+    return null;
+  };
 
   return {
     churches,
@@ -73,15 +85,29 @@ export async function annotateImportDrafts(drafts: ClubImportDraft[]) {
           importedYears[year] = { id: identity.organization.id, name: identity.organization.name };
         }
       }
+      const club = findClub(draft);
+      if (draft.kind === "CLUB_LIST") {
+        const suggestion = suggestChurches(draft.churchHint, draft.state, churches, draft.sponsoringChurchId);
+        return {
+          ...draft,
+          churchId: suggestion.churchId,
+          newChurchName: "",
+          churchSuggestion: suggestion,
+          importedYears,
+          existingClub: club
+            ? { id: club.id, name: club.name, isActive: club.isActive, hasSponsoringChurch: Boolean(club.parentOrganizationId), sponsorId: club.parentOrganizationId }
+            : null,
+        };
+      }
       const church = matchSponsor(draft.churchName);
-      const club = clubByName.get(normalizeOrganizationName(draft.clubName)) ?? null;
       return {
         ...draft,
         churchId: church?.id ?? null,
         newChurchName: church ? "" : draft.churchName,
+        churchSuggestion: null as ReturnType<typeof suggestChurches> | null,
         importedYears,
         existingClub: club
-          ? { id: club.id, name: club.name, isActive: club.isActive, hasSponsoringChurch: Boolean(club.parentOrganizationId) }
+          ? { id: club.id, name: club.name, isActive: club.isActive, hasSponsoringChurch: Boolean(club.parentOrganizationId), sponsorId: club.parentOrganizationId }
           : null,
       };
     }),
@@ -94,7 +120,9 @@ export type ClubImportResult = {
   sourceKey: string;
   clubName: string;
   clubYear: string;
-  status: "IMPORTED" | "ALREADY_IMPORTED" | "FAILED";
+  /** SKIPPED: a club-list row with no church, or one the administrator skipped. Nothing was created. */
+  status: "IMPORTED" | "ALREADY_IMPORTED" | "FAILED" | "SKIPPED";
+  kind: ClubImportKind;
   message: string;
   organizationId: string | null;
   membersAdded: number;
@@ -106,9 +134,77 @@ export type ClubImportResult = {
 
 class ImportRefused extends Error {}
 
+/**
+ * One club-list row (#1038): the club only. No roster year, no people, no
+ * invites, no external identity. An existing club (found by its name or an
+ * older name) is linked and left as it is, unless the row picks a church and
+ * "update church" is ticked. Running it again finds the club it made, so
+ * confirming twice creates nothing new. The audit records ids and counts.
+ */
+async function importListedClub(item: ClubImportItem, actorUserId: string): Promise<ClubImportResult> {
+  const base = { sourceKey: item.sourceKey, kind: item.kind, clubName: item.clubName, clubYear: item.clubYear, membersAdded: 0, membersSkipped: 0, skipped: [], invitesCreated: 0 };
+  const prisma = getPrisma();
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const names = clubMatchNames(item.clubName, item.matchNames);
+      // The #1031 near-duplicate check plugs in here; until then, exact normalized names.
+      const club = await tx.organization.findFirst({ where: { type: "CLUB", normalizedName: { in: names } }, orderBy: { createdAt: "asc" }, select: { id: true, parentOrganizationId: true } });
+
+      if (club) {
+        let churchUpdated = false;
+        if (item.updateChurch && item.churchId && item.churchId !== club.parentOrganizationId) {
+          const church = await tx.organization.findUnique({ where: { id: item.churchId }, select: { type: true, isActive: true } });
+          if (!canSponsorClub(church)) throw new ImportRefused("The chosen church or company is no longer available.");
+          await tx.organization.update({ where: { id: club.id }, data: { parentOrganizationId: item.churchId } });
+          churchUpdated = true;
+        }
+        if (churchUpdated) {
+          await writeAuditLog({
+            actorUserId,
+            action: "CLUB_IMPORTED",
+            entityType: "Organization",
+            entityId: club.id,
+            summary: "Changed an existing club's church from the club list.",
+            metadata: { organizationId: club.id, sourceKey: item.sourceKey, clubCreated: false, churchUpdated: true, membersAdded: 0, invitesCreated: 0 },
+          }, tx);
+        }
+        return {
+          ...base,
+          status: "ALREADY_IMPORTED" as const,
+          message: churchUpdated ? "Already in the directory. Its church was updated." : "Already in the directory. Nothing was changed.",
+          organizationId: club.id,
+        };
+      }
+
+      if (!item.churchId) {
+        return { ...base, status: "SKIPPED" as const, message: "No church was chosen, so this club was not created.", organizationId: null };
+      }
+      const church = await tx.organization.findUnique({ where: { id: item.churchId }, select: { type: true, isActive: true } });
+      if (!canSponsorClub(church)) throw new ImportRefused("The chosen church or company is no longer available.");
+      const created = await tx.organization.create({
+        data: { type: "CLUB", name: item.clubName, normalizedName: normalizeOrganizationName(item.clubName), parentOrganizationId: item.churchId, isActive: item.isActive },
+        select: { id: true },
+      });
+      await writeAuditLog({
+        actorUserId,
+        action: "CLUB_IMPORTED",
+        entityType: "Organization",
+        entityId: created.id,
+        summary: "Imported a club from the club list.",
+        metadata: { organizationId: created.id, sourceKey: item.sourceKey, clubCreated: true, churchCreated: false, membersAdded: 0, membersSkipped: 0, invitesCreated: 0 },
+      }, tx);
+      return { ...base, status: "IMPORTED" as const, message: "Club created.", organizationId: created.id };
+    });
+  } catch (error) {
+    if (error instanceof ImportRefused) return { ...base, status: "FAILED", message: error.message, organizationId: null };
+    throw error;
+  }
+}
+
 async function importOne(item: ClubImportItem, actorUserId: string, now: Date): Promise<ClubImportResult> {
+  if (item.kind === "CLUB_LIST") return importListedClub(item, actorUserId);
   const scope = importScope(item.clubYear);
-  const base = { sourceKey: item.sourceKey, clubName: item.clubName, clubYear: item.clubYear, membersAdded: 0, membersSkipped: 0, skipped: [], invitesCreated: 0 };
+  const base = { sourceKey: item.sourceKey, kind: item.kind, clubName: item.clubName, clubYear: item.clubYear, membersAdded: 0, membersSkipped: 0, skipped: [], invitesCreated: 0 };
   const prisma = getPrisma();
 
   if (!clubYearChoices(now).includes(item.clubYear)) {

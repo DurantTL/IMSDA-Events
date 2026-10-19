@@ -9,8 +9,8 @@ import { clubClassLevelLabels } from "@/modules/club-rosters/domain";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 
-type Draft = AnnotatedImportDraft & { include: boolean; expanded: boolean };
-type Church = { id: string; name: string; type: string };
+type Draft = AnnotatedImportDraft & { include: boolean; expanded: boolean; updateChurch?: boolean };
+type Church = { id: string; name: string; type: string; city?: string | null; state?: string | null };
 type ApiError = { message?: string; issues?: Array<{ message?: string; path?: Array<string | number> }> };
 /** What the preview route returns for an uploaded export. */
 export type ClubImportPreview = { drafts: AnnotatedImportDraft[]; churches?: Church[]; clubYearChoices?: string[]; skipped?: number };
@@ -25,8 +25,18 @@ function importedFor(draft: Pick<AnnotatedImportDraft, "importedYears" | "clubYe
 /** Where staff move an import to another year: the club's staff page (#541). */
 const moveHref = (clubId: string) => `/admin/organizations/${encodeURIComponent(clubId)}/club#club-import-year`;
 
+const churchLabel = (church: Church) => {
+  const place = [church.city, church.state].filter(Boolean).join(", ");
+  return place ? `${sponsorOptionLabel(church)} · ${place}` : sponsorOptionLabel(church);
+};
+
 function draftProblems(draft: Draft) {
   const problems: string[] = [];
+  // A club-list row (#1038) is only the club. A new club with no church is left out and listed in the result, so it never blocks the import.
+  if (draft.kind === "CLUB_LIST") {
+    if (draft.clubName.trim().length < 2) problems.push("Give the club a name.");
+    return problems;
+  }
   const earlier = earlierImportNotice(draft.importedYears, draft.clubYear);
   if (earlier?.blocking) problems.push(earlier.message);
   if (draft.existingClub && !draft.existingClub.isActive) problems.push("A club with this name is inactive. Rename it or reactivate that club first.");
@@ -65,6 +75,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
   const [yearChoices, setYearChoices] = useState<string[]>(initialPreview?.clubYearChoices ?? []);
   const [skipped, setSkipped] = useState(initialPreview?.skipped ?? 0);
   const [results, setResults] = useState<ClubImportResult[] | null>(null);
+  const [leftOut, setLeftOut] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -75,6 +86,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
     setBusy(true);
     setError("");
     setResults(null);
+    setLeftOut([]);
     try {
       const response = await fetch("/api/admin/club-import/preview", {
         method: "POST",
@@ -117,6 +129,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
       });
       const result = await response.json().catch(() => ({})) as ApiError & { results?: ClubImportResult[] };
       if (!response.ok || !result.results) throw new Error(result.message ?? "The import could not be completed.");
+      setLeftOut(drafts.filter((draft) => draft.kind === "CLUB_LIST" && !draft.include).map((draft) => draft.clubName));
       setResults(result.results);
       setDrafts(null);
     } catch (caught) {
@@ -134,8 +147,10 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
           <h2>Import clubs</h2>
           <p>
             Upload the entries export of the old website&apos;s <strong>Pathfinder Yearly Club Registration</strong> form (form 89,
-            JSON). Review and edit each club, then import. The file isn&apos;t stored. Addresses, phone numbers, and
-            child-protection answers are left out. Nothing is emailed until you send invites.
+            JSON), or a <strong>club list</strong> (JSON with a top-level <code>clubs</code> list). Review and edit each club, then
+            import. A club list adds the clubs only: no rosters and no invites, and a club already in the directory is linked, never
+            duplicated. The file isn&apos;t stored. Addresses, phone numbers, and child-protection answers are left out. Nothing is
+            emailed until you send invites.
           </p>
         </div>
       </div>
@@ -151,8 +166,11 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                 {result.status === "IMPORTED" ? <CheckCircle2 aria-hidden="true" size={16} /> : <CircleAlert aria-hidden="true" size={16} />}
                 <span>
                   <strong translate="no">{result.clubName}</strong> ({result.clubYear}): {result.message}
-                  {result.status === "IMPORTED" && ` ${result.membersAdded} added to the roster, ${result.membersSkipped} skipped; ${result.invitesCreated} invite${result.invitesCreated === 1 ? "" : "s"} waiting.`}
-                  {result.organizationId && result.status !== "FAILED" && (
+                  {result.status === "IMPORTED" && result.kind !== "CLUB_LIST" && ` ${result.membersAdded} added to the roster, ${result.membersSkipped} skipped; ${result.invitesCreated} invite${result.invitesCreated === 1 ? "" : "s"} waiting.`}
+                  {result.organizationId && result.status !== "FAILED" && result.kind === "CLUB_LIST" && (
+                    <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}`}>Open the club</a>.</>
+                  )}
+                  {result.organizationId && result.status !== "FAILED" && result.kind !== "CLUB_LIST" && (
                     <> <a href={`/admin/organizations/${encodeURIComponent(result.organizationId)}/club?year=${encodeURIComponent(result.clubYear)}`}>View the {result.clubYear} roster</a>.</>
                   )}
                   {result.skipped.length > 0 && (
@@ -166,6 +184,9 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
               </li>
             ))}
           </ul>
+          {leftOut.length > 0 && (
+            <p className="field-help">Skipped by you, nothing created: {leftOut.map((name, index) => <span key={`${name}-${index}`}>{index ? ", " : ""}<span translate="no">{name}</span></span>)}.</p>
+          )}
           <p className="field-help club-import-next">Next: <a href="/admin/clubs/invites">review and send the club invites</a>.</p>
         </section>
       )}
@@ -183,8 +204,8 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
         <>
           <div className="panel club-import-summary">
             <p>
-              <strong>{drafts.length}</strong> registration{drafts.length === 1 ? "" : "s"} found
-              {skipped ? ` (${skipped} skipped: not form 89 or in the trash)` : ""}. <strong>{chosen.length}</strong> selected.
+              <strong>{drafts.length}</strong> {drafts.every((draft) => draft.kind === "CLUB_LIST") ? "club" : "registration"}{drafts.length === 1 ? "" : "s"} found
+              {skipped ? ` (${skipped} skipped: not form 89, not a club, or in the trash)` : ""}. <strong>{chosen.length}</strong> selected.
             </p>
             <div className="intro-actions">
               <button className="secondary-button" disabled={busy} onClick={() => setDrafts(null)} type="button">Start over</button>
@@ -198,7 +219,14 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
           {drafts.map((draft, index) => {
             const problems = draftProblems(draft);
             const earlier = earlierImportNotice(draft.importedYears, draft.clubYear);
+            const isList = draft.kind === "CLUB_LIST";
             const duplicates = inFileDuplicateKeys(draft.people);
+            const matched = churches.filter((church) => draft.churchSuggestion?.candidateIds.includes(church.id));
+            const others = churches.filter((church) => !draft.churchSuggestion?.candidateIds.includes(church.id));
+            const churchNote = !isList ? "" : draft.churchSuggestion?.status === "GIVEN" ? "Church from the list."
+              : draft.churchSuggestion?.status === "ONE" ? `Best match for "${draft.churchHint}".`
+              : draft.churchSuggestion?.status === "SEVERAL" ? `Several churches match "${draft.churchHint}": pick one.`
+              : "No match, pick a church.";
             const unkeptDuplicates = draft.people.filter((person) => duplicates.has(person.key) && !person.keepBoth).length;
             const churchValue = draft.churchId ?? (draft.newChurchName ? NEW_CHURCH : "");
             return (
@@ -222,10 +250,18 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                   <span>
                     <strong translate="no">{draft.clubName || "Unnamed club"}</strong>
                     <small>
-                      {draft.clubYear} · entry {draft.entryId}{draft.submittedOn ? ` · ${draft.submittedOn}` : ""} ·{" "}
-                      {draft.people.filter((person) => person.include).length} people
-                      {draft.existingClub?.isActive ? " · adds to the existing club" : ""}
+                      {isList ? (
+                        <>{draft.existingClub ? "Already in the directory (will be linked, not duplicated)" : "New"}{draft.isActive ? "" : " · inactive"}</>
+                      ) : (
+                        <>
+                          {draft.clubYear} · entry {draft.entryId}{draft.submittedOn ? ` · ${draft.submittedOn}` : ""} ·{" "}
+                          {draft.people.filter((person) => person.include).length} people
+                          {draft.existingClub?.isActive ? " · adds to the existing club" : ""}
+                        </>
+                      )}
                     </small>
+                    {isList && draft.checkNote && <small className="club-import-year-note">Note: {draft.checkNote}</small>}
+                    {isList && !draft.existingClub && !draft.churchId && draft.include && <small className="club-import-year-note">No church chosen: this club will not be created.</small>}
                     {submissionYearNote(draft) && <small className="club-import-year-note">{submissionYearNote(draft)}</small>}
                   </span>
                   {problems.length > 0 && draft.include && <span className="status-chip coral">Needs a fix</span>}
@@ -253,7 +289,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     />
                   </label>
                   <label>
-                    Sponsoring church or company{draft.churchName ? ` (form: ${draft.churchName})` : ""}
+                    Sponsoring church or company{draft.churchName ? ` (form: ${draft.churchName})` : ""}{isList && draft.churchHint ? ` (list: ${draft.churchHint})` : ""}
                     <select
                       required
                       onChange={(event) => {
@@ -267,13 +303,31 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                       value={churchValue}
                     >
                       <option disabled value="">Choose a church or company</option>
-                      {(draft.newChurchName || draft.churchName) && (
+                      {isList && <option value="">No church</option>}
+                      {!isList && (draft.newChurchName || draft.churchName) && (
                         <option value={NEW_CHURCH}>Create church: {draft.newChurchName || draft.churchName}</option>
                       )}
-                      {churches.map((church) => <option key={church.id} value={church.id}>{church.type !== "CHURCH" && churchStem(church.name) === churchStem(draft.churchName) ? `Use existing ${church.type === "GROUP" ? "group" : "company"}: ${church.name}` : sponsorOptionLabel(church)}</option>)}
+                      {isList && matched.length > 0 && (
+                        <optgroup label="Matches">
+                          {matched.map((church) => <option key={church.id} value={church.id}>{churchLabel(church)}</option>)}
+                        </optgroup>
+                      )}
+                      {isList && (
+                        <optgroup label="All churches">
+                          {others.map((church) => <option key={church.id} value={church.id}>{churchLabel(church)}</option>)}
+                        </optgroup>
+                      )}
+                      {!isList && churches.map((church) => <option key={church.id} value={church.id}>{church.type !== "CHURCH" && churchStem(church.name) === churchStem(draft.churchName) ? `Use existing ${church.type === "GROUP" ? "group" : "company"}: ${church.name}` : sponsorOptionLabel(church)}</option>)}
                     </select>
                   </label>
-                  <label>
+                  {isList && <p className="field-help" role="status">{churchNote}</p>}
+                  {isList && draft.existingClub && draft.churchId && draft.churchId !== draft.existingClub.sponsorId && (
+                    <label className="checkbox-label">
+                      <input checked={Boolean(draft.updateChurch)} onChange={(event) => update(index, (d) => ({ ...d, updateChurch: event.target.checked }))} type="checkbox" />
+                      Update church of the existing club
+                    </label>
+                  )}
+                  {!isList && <label>
                     Club year to import into
                     <select
                       aria-label={`Club year for ${draft.clubName || "this club"}`}
@@ -282,10 +336,11 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     >
                       {(yearChoices.length ? yearChoices : [draft.clubYear]).map((year) => <option key={year} value={year}>{year}</option>)}
                     </select>
-                  </label>
+                  </label>}
                 </div>
                 </div>
 
+                {!isList && <>
                 <h3 className="club-import-subhead">Invites (sent later, from Club invites)</h3>
                 {draft.invites.length === 0 ? (
                   <p className="field-help">The form had no leader email. Add a director from the club&apos;s Team page later.</p>
@@ -394,6 +449,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                 <p className="field-help">
                   The form has ages, not birth dates. Imported people show &ldquo;birth date needed&rdquo; until the director adds one.
                 </p>
+                </>}
               </details>
             );
           })}
