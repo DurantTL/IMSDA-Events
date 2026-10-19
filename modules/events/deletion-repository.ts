@@ -358,6 +358,9 @@ export async function removeEventOwnedRows(tx: Db, eventId: string) {
   // Cancellation policy versions and the calculations that cite them (#169): append-only, so they are removed here,
   // calculations first (they RESTRICT their version), under the same transaction-local setting as the ledgers above.
   // The requests that cite a calculation (#170) go first: their timeline, then the requests.
+  // What was carried out for a request (#171) goes before the request it RESTRICTs: its refund legs, then the execution.
+  await tx.cancellationExecutionRefund.deleteMany({ where: inEvent });
+  await tx.cancellationExecution.deleteMany({ where: inEvent });
   await tx.cancellationRequestEvent.deleteMany({ where: inEvent });
   await tx.cancellationRequest.deleteMany({ where: inEvent });
   await tx.cancellationCalculation.deleteMany({ where: inEvent });

@@ -54,7 +54,7 @@ describe("More launcher follows permitted destinations (#737)", () => {
 
 describe("phone tab for child routes (#737)", () => {
   it("keeps the tabs in their order, Payments being for finance staff (#890)", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
+    expect([...mobileNavigationOrder]).toEqual(["/overview", "/more/kitchen-report/counts", "/people", "/check-in", "/finance", "/communications", "/more"]);
   });
 
   it("lights More for Settings, builder and other pages without a tab", () => {

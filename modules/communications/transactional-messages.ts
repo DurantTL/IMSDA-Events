@@ -80,6 +80,11 @@ type TransactionalMessageInput = {
   paymentReference?: string;
   refundAmountCents?: number;
   refundReference?: string;
+  /**
+   * Replaces the cancellation message's payment wording. A cancellation carried out from an approved request (#171) sends its
+   * one message after the refunds settle and says only what was done, never that nothing was refunded.
+   */
+  cancellationNote?: string;
   priorPersonName?: string;
   newPersonName?: string;
   announcementTitle?: string;
@@ -463,14 +468,16 @@ async function enqueueTransactionalMessage(
     );
   }
   const fallback = DEFAULT_MESSAGE_TEMPLATES[input.templateKey];
-  const instructions = paymentInstructions(
-    input.templateKey,
-    balanceCents,
-    paidCents,
-    refundedCents,
-    registration.event.paymentInstructionVersions?.[0]?.instructions,
-    registration.event.billingMode,
-  );
+  const instructions = input.cancellationNote && input.templateKey === "REGISTRATION_CANCELLED"
+    ? input.cancellationNote
+    : paymentInstructions(
+      input.templateKey,
+      balanceCents,
+      paidCents,
+      refundedCents,
+      registration.event.paymentInstructionVersions?.[0]?.instructions,
+      registration.event.billingMode,
+    );
   // The organiser's published address, which is what a "questions? contact …"
   // line means. The reply-to is a delivery header and can be a no-reply.
   const eventContactEmail = registration.event.supportContact?.trim()
@@ -581,7 +588,7 @@ async function enqueueTransactionalMessage(
       waitlistPosition,
       paymentInstructions: instructions,
       portalUrl: REGISTRATION_MANAGE_LINK_SENTINEL,
-      cancellationNote: cancellationPaymentWording({ paidCents, refundedCents }),
+      cancellationNote: input.cancellationNote ?? cancellationPaymentWording({ paidCents, refundedCents }),
       perPersonNotice,
       // The confirmation carries the event's refund policy (#891); other messages do not.
       refundPolicy: isRegistrationConfirmation(input.templateKey) ? registration.event.refundPolicy : null,

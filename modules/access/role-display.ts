@@ -7,6 +7,7 @@ export const roleDetails: Record<EventRole, { label: string; description: string
   COMMUNICATIONS_MANAGER: { label: "Communications manager", description: "Draft and publish attendee event-feed updates." },
   CHECK_IN_STAFF: { label: "Check-in staff", description: "Arrival search, check-in, and check-in reversal." },
   READ_ONLY_STAFF: { label: "Read-only staff", description: "View the event workspace without making changes." },
+  KITCHEN_STAFF: { label: "Kitchen staff", description: "Enter the kitchen's meal counts. Cannot see registrations or people." },
 };
 
 export function roleLabel(role: EventRole) {
