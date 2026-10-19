@@ -6436,6 +6436,9 @@ model ClubFormTemplate {
   /// pre-filled mapping, which is off. Birth-date and sensitive fields map only
   /// to protected roster fields and health fields never map (validated in code).
   rosterMapping      Json?
+  /// Addresses emailed when this form is submitted (#1017), at most 10, set from the form's settings page and not
+  /// versioned with the definition. Empty means no email. The email never carries answers.
+  submissionNotifyEmails String[] @default([])
   sortOrder          Int       @default(0)
   enabled            Boolean   @default(false)
   enabledAt          DateTime?

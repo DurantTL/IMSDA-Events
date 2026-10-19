@@ -36,6 +36,8 @@ export type NotificationRecipientSource =
   | { kind: "platform-address"; field: PlatformAddressField }
   /** A list kept per event, on that event's Communications page. */
   | { kind: "event-list" }
+  /** A list kept per club form, on that form's settings page; the club forms list is where to choose one. */
+  | { kind: "club-form-list" }
   /** Worked out from people's roles; there is no list to edit. */
   | { kind: "roles" };
 
@@ -187,13 +189,13 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
   {
     key: "CLUB_FORM_SUBMITTED",
     name: "Club form submitted",
-    when: "When a club submits an event form. Not sent yet: its recipients are being built as a separate change, and the switch is ready for it.",
-    recipients: "To be set per form.",
-    source: { kind: "roles" },
-    sourceNote: "Coming soon: recipients will be set for each form.",
-    sentFrom: "not built yet",
-    switchReadIn: [],
-    built: false,
+    when: "When a club form is submitted, in the club portal or through a private link. The email names the form, the club, who submitted it and when, and links to the submission. It never carries the answers.",
+    recipients: "Set on each club form.",
+    source: { kind: "club-form-list" },
+    sourceNote: "Set on each club form's settings page, under \"Email these addresses when this form is submitted\". An empty list sends nothing.",
+    sentFrom: "modules/club-forms/submission-alert.ts",
+    switchReadIn: ["modules/club-forms/links.ts", "modules/club-forms/submissions.ts"],
+    built: true,
   },
 ];
 

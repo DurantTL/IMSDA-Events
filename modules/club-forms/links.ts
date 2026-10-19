@@ -30,6 +30,8 @@ import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
 import { assertAnswersSize, resolveRosterMemberName } from "@/modules/club-forms/submissions";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
+import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { deliverClubFormSubmittedEmails, queueClubFormSubmittedEmails } from "@/modules/club-forms/submission-alert";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 
 /**
@@ -300,8 +302,10 @@ export async function submitClubFormViaLink(token: string, rawAnswers: Record<st
   if (issues.length > 0) throw new ClubFormError("VALIDATION_FAILED", issues[0].message, issues);
   const submissionId = randomUUID();
   const tokenHash = hashOpaqueToken(token);
+  // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
+  const alertEnabled = await isNotificationEnabled("CLUB_FORM_SUBMITTED");
 
-  return getPrisma().$transaction(async (tx) => {
+  const result = await getPrisma().$transaction(async (tx) => {
     // Which answers are sensitive is decided under a share lock on the template row, so a concurrent re-seal cannot leave this save in plaintext.
     const keys = await lockClubFormTemplateForWrite(tx, template);
     const { plain, sensitive } = splitAnswers({ sensitiveFieldKeys: keys.sensitiveFieldKeys }, answers);
@@ -340,6 +344,15 @@ export async function submitClubFormViaLink(token: string, rawAnswers: Record<st
       summary: "A club form was submitted through a private link.",
       metadata: { organizationId: link.organizationId, templateKey: template.key, hasSensitiveAnswers: hasSensitive, linkId: link.id },
     }, tx);
-    return { submissionId, confirmationMessage: template.definition.confirmationMessage };
+    const alertMessageIds = await queueClubFormSubmittedEmails(tx, {
+      submissionId,
+      templateId: link.template.id,
+      organizationId: link.organizationId,
+      actor: null,
+      submittedAt: now,
+    }, alertEnabled);
+    return { submissionId, confirmationMessage: template.definition.confirmationMessage, alertMessageIds };
   });
+  await deliverClubFormSubmittedEmails(result.alertMessageIds);
+  return { submissionId: result.submissionId, confirmationMessage: result.confirmationMessage };
 }

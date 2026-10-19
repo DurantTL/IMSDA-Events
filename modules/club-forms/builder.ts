@@ -53,6 +53,7 @@ const rowSelect = {
   hiddenFieldKeys: true,
   printLayout: true,
   rosterMapping: true,
+  submissionNotifyEmails: true,
   sortOrder: true,
   enabled: true,
   customizedAt: true,
@@ -104,6 +105,8 @@ export type ClubFormBuilderView = {
   enabled: boolean;
   customized: boolean;
   submissionCount: number;
+  /** Addresses emailed when the form is submitted (#1017). Not part of the draft. */
+  alertRecipients: string[];
   needsSync: boolean;
   /** The published version, as an editable spec. */
   published: ClubFormDraftSpec;
@@ -144,6 +147,7 @@ export async function getClubFormBuilderView(key: string): Promise<ClubFormBuild
     enabled: row.enabled,
     customized: Boolean(row.customizedAt),
     submissionCount,
+    alertRecipients: row.submissionNotifyEmails,
     needsSync: Boolean(seed && !row.customizedAt && row.version < seed.version),
     published: specFromRecord({ ...record, sortOrder: row.sortOrder }),
     draft,

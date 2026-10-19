@@ -181,6 +181,9 @@ export function NotificationsWorkspace({
                         {definition.source.kind === "platform-address" && (
                           <a className="text-button" href="#alert-addresses">Edit the address</a>
                         )}
+                        {definition.source.kind === "club-form-list" && (
+                          <Link className="text-button" href="/admin/club-forms">Open the club forms</Link>
+                        )}
                         {definition.source.kind === "event-list" && (
                           <a className="text-button" href="#event-lists">See each event</a>
                         )}
