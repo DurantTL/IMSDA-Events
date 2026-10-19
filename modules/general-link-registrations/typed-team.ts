@@ -117,8 +117,9 @@ export function withoutRetiredAnswers(definition: RegistrationFormDefinition, an
 }
 
 /** The sentence staff read when a waiting team has more people than the current form's roster allows, or null when it fits. */
-export function rosterOverMaximumMessage(definition: RegistrationFormDefinition, count: number): string | null {
+export function rosterOverMaximumMessage(definition: RegistrationFormDefinition, count: number, formChanged = true): string | null {
   const max = definition.attendeeRoster?.enabled ? definition.attendeeRoster.maxAttendees : null;
   if (max === null || count <= max) return null;
-  return `This team lists ${count} people, but the current form allows at most ${max}. It was received on an older form that also listed coaches. Ask the director to register again with the team members only, then reject this one.`;
+  const cause = formChanged ? " It was received on an older form that also listed coaches." : "";
+  return `This team lists ${count} people, but the current form allows at most ${max}.${cause} Ask the director to register again with the team members only, then reject this one.`;
 }
