@@ -90,8 +90,9 @@ function namesAreClose(a: string, b: string) {
 /**
  * The directory clubs a typed name could be: the same name or a close one, anywhere, and every club the chosen sponsoring church
  * already has, whatever its name (a church rarely has two clubs of one kind, and a name of nothing but filler words matches
- * nothing else). Inactive clubs are included, marked so staff can tell. Ones at the same sponsoring church or in the same town
- * come first, then the same name before a close one, then by name. At most `SIMILAR_CLUBS_LIMIT`.
+ * nothing else). Inactive clubs are included, marked so staff can tell. An active club of the very same name comes first, then
+ * ones at the same sponsoring church or in the same town, then the same name before a close one, then by name. The WHOLE list:
+ * `addClubBlock` must see every match, so only what is shown is cut, with `shownMatches`.
  */
 export function similarClubMatches(name: string, place: NewClubPlace, candidates: readonly SimilarClubCandidate[]): SimilarClub[] {
   const normalized = normalizeOrganizationName(name);
@@ -115,10 +116,13 @@ export function similarClubMatches(name: string, place: NewClubPlace, candidates
       sameArea: here !== null && here === there,
     });
   }
-  const rank = (match: SimilarClub) => (match.sameSponsor ? 0 : match.sameArea ? 1 : 2) * 2 + (match.kind === "SAME_NAME" ? 0 : 1);
-  return matches
-    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    .slice(0, SIMILAR_CLUBS_LIMIT);
+  const rank = (match: SimilarClub) => (match.kind === "SAME_NAME" && match.isActive ? -1 : (match.sameSponsor ? 0 : match.sameArea ? 1 : 2) * 2 + (match.kind === "SAME_NAME" ? 0 : 1));
+  return matches.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+}
+
+/** The matches staff are shown: the first `SIMILAR_CLUBS_LIMIT`, an exact-name club always among them. Never use it to decide a block. */
+export function shownMatches(matches: readonly SimilarClub[]): SimilarClub[] {
+  return matches.slice(0, SIMILAR_CLUBS_LIMIT);
 }
 
 /**

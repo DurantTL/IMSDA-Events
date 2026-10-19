@@ -36,7 +36,7 @@ import { evaluateLocationPhase, locationLifecycleSource } from "@/modules/event-
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import { acknowledgmentFields } from "@/modules/acknowledgments/domain";
 import { createOrganizationInTransaction, listSimilarClubCandidates, sponsorPlace } from "@/modules/organizations/repository";
-import { addClubBlock, similarClubMatches } from "@/modules/organizations/similar-clubs";
+import { addClubBlock, shownMatches, similarClubMatches } from "@/modules/organizations/similar-clubs";
 import { preparePublicRegistration, type PublicRegistrationInput } from "@/modules/forms/public-domain";
 import { attendeePromoCodeField, promoCodeField } from "@/modules/promo-codes/domain";
 import {
@@ -1057,7 +1057,7 @@ export async function similarClubsFor(eventId: string, submissionId: string, inp
   const name = input.clubName.normalize("NFKC").replace(/\s+/g, " ").trim();
   const place = input.sponsoringChurchId ? await sponsorPlace(prisma, input.sponsoringChurchId) : null;
   if (name.length < 2 && !place) return [];
-  return similarClubMatches(name, place ?? { sponsorId: null, city: null, state: null }, await listSimilarClubCandidates(prisma));
+  return shownMatches(similarClubMatches(name, place ?? { sponsorId: null, city: null, state: null }, await listSimilarClubCandidates(prisma)));
 }
 
 /**

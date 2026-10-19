@@ -6,7 +6,7 @@ import {
   generalLinkClubOtherKey,
   generalLinkDisplayDefinition,
 } from "@/modules/general-link-registrations/domain";
-import { addClubBlock, clubNameKey, similarClubMatches, type SimilarClubCandidate } from "@/modules/organizations/similar-clubs";
+import { addClubBlock, clubNameKey, shownMatches, similarClubMatches, type SimilarClubCandidate } from "@/modules/organizations/similar-clubs";
 
 const pbe = registrationFormDefinitionSchema.parse(formTemplates.find((template) => template.key === "pbe_registration")!.definition);
 
@@ -90,7 +90,7 @@ describe("close-name matches from the directory", () => {
   it("finds nothing for a name nothing is close to, and at most eight", () => {
     expect(similarClubMatches("Brand New Voyagers", { sponsorId: "ch9", city: null, state: null }, directory)).toEqual([]);
     const many = Array.from({ length: 20 }, (_, index) => club(`m${index}`, `Albia Pathfinders ${index % 2 ? "Club" : ""}`.trim(), `ch${index}`));
-    expect(similarClubMatches("Albia Pathfinders", { sponsorId: null, city: null, state: null }, many)).toHaveLength(8);
+    expect(shownMatches(similarClubMatches("Albia Pathfinders", { sponsorId: null, city: null, state: null }, many))).toHaveLength(8);
   });
 
   it("never allows the same name twice, at any church, even when staff have checked the similar ones", () => {
@@ -105,6 +105,20 @@ describe("close-name matches from the directory", () => {
     const inactive = [club("x1", "Albia Pathfinders", "ch1", "Albia", "XX", false)];
     expect(addClubBlock(similarClubMatches("Albia Pathfinders", { sponsorId: "ch9", city: null, state: null }, inactive), true)).toBeNull();
     expect(addClubBlock(similarClubMatches("Albia Pathfinders", { sponsorId: "ch9", city: null, state: null }, inactive), false)?.code).toBe("SIMILAR_CLUBS");
+  });
+
+  it("still refuses an exact-name club elsewhere when nine or more clubs of the church and town rank above it", () => {
+    const crowded = Array.from({ length: 10 }, (_, index) => club(`s${index}`, `Crowded Church Club ${index}`, "chX", "Albia"));
+    const twin = club("twin", "Voyagers of Albia", "chFar", "Faraway");
+    const matches = similarClubMatches("Voyagers of Albia", { sponsorId: "chX", city: "Albia", state: "XX" }, [...crowded, twin]);
+    expect(matches).toHaveLength(11);
+    expect(matches[0]).toMatchObject({ id: "twin", kind: "SAME_NAME" });
+    expect(addClubBlock(matches, true)?.code).toBe("CLUB_EXISTS");
+    // What is shown is cut, but the exact-name club is among it, and a block is never decided on the cut list.
+    expect(shownMatches(matches)).toHaveLength(8);
+    expect(shownMatches(matches).map((match) => match.id)).toContain("twin");
+    // Even if it ranked low, the full list still blocks.
+    expect(addClubBlock([...matches.slice(1), matches[0]!], true)?.code).toBe("CLUB_EXISTS");
   });
 
   it("wants a word that similar ones were checked", () => {
