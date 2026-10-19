@@ -167,7 +167,8 @@ describe("starter event templates (#546)", () => {
       expect(JSON.stringify(definition)).not.toMatch(/\bTLT\b|[Cc]oach/);
       expect(definition.attendeeRoster).toMatchObject({ minAttendees: 2, maxAttendees: 7, attendeeLabel: "Team member", addButtonLabel: "Add another team member" });
       const confirmation = definition.sections.find((section) => section.id === "pbe_confirmation")!;
-      expect(confirmation.description).toContain("photographed and/or videotaped");
+      // The release is the confirmation checkbox's help text, so it is read with the checkbox (aria-describedby).
+      expect(confirmation.fields.find((field) => field.key === "director_confirmation")!.helpText).toContain("photographed and/or videotaped");
       expect(confirmation.fields.some((field) => field.type === "RADIO")).toBe(false);
       expect(registrationFormDefinitionSchema.safeParse(definition).success).toBe(true);
     });

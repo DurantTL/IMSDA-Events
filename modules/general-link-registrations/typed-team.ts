@@ -3,6 +3,7 @@ import { attendeeAgeKey, attendeeNameKeys, guestIsAdult } from "@/modules/club-r
 import type { TeamSettings } from "@/modules/club-teams/domain";
 import {
   ALTERNATE_FIELD_KEY,
+  formAsksRole,
   isAlternateAnswer,
   teamRoleFor,
   teamRuleProblems,
@@ -67,7 +68,7 @@ export function readTypedInTeam(
       firstName,
       lastName,
       age,
-      role: teamRoleFor({ responses: attendee.responses, maxMemberAge: settings?.maxMemberAge ?? null, age }),
+      role: teamRoleFor({ responses: attendee.responses, maxMemberAge: settings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age }),
       alternate: isAlternateAnswer(attendee.responses[ALTERNATE_FIELD_KEY]),
       adult: age !== null && guestIsAdult({ age }),
     };
@@ -103,4 +104,21 @@ export function stableJson(value: unknown): string {
 
 export function requestHash(value: unknown) {
   return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+/**
+ * Answers to questions the form no longer asks (#1044), dropped when a team received under an older form version is attached
+ * under the current one: the form engine refuses an answer it has no question for. Only the copy sent along is changed;
+ * what the director typed is not edited.
+ */
+export function withoutRetiredAnswers(definition: RegistrationFormDefinition, answers: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const keys = new Set(definition.sections.flatMap((section) => section.fields.map((field) => field.key)));
+  return Object.fromEntries(Object.entries(answers).filter(([key]) => keys.has(key)));
+}
+
+/** The sentence staff read when a waiting team has more people than the current form's roster allows, or null when it fits. */
+export function rosterOverMaximumMessage(definition: RegistrationFormDefinition, count: number): string | null {
+  const max = definition.attendeeRoster?.enabled ? definition.attendeeRoster.maxAttendees : null;
+  if (max === null || count <= max) return null;
+  return `This team lists ${count} people, but the current form allows at most ${max}. It was received on an older form that also listed coaches. Ask the director to register again with the team members only, then reject this one.`;
 }

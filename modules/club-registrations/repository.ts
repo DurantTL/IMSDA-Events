@@ -75,7 +75,7 @@ import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { NO_TEAM_KEY, draftKeySchema, resolveTeamName, teamLabel, type TeamLevel, type TeamSettings } from "@/modules/club-teams/domain";
 import { betweenLevelsEditOpen, currentLevelOf, levelInfoFor, levelWhenWhere, placementLabel } from "@/modules/club-teams/results-domain";
 import { ClubTeamError } from "@/modules/club-teams/errors";
-import { ALTERNATE_FIELD_KEY, ROLE_FIELD_KEY, isAlternateAnswer, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
+import { ALTERNATE_FIELD_KEY, ROLE_FIELD_KEY, formAsksRole, isAlternateAnswer, teamAgeDate, teamRoleFor, teamRuleProblems, type TeamPerson } from "@/modules/club-teams/rules";
 import { formHasPrices } from "@/modules/club-registrations/per-person-price";
 import { permissionNotice, type PermissionStatus } from "@/modules/club-teams/permission-domain";
 import { permissionNoticesForRegistration, permissionsForRegistration } from "@/modules/club-teams/permission-repository";
@@ -1194,7 +1194,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           );
         }
         // An extra person's typed age is their age on the event's age date (#809).
-        const role = teamRoleFor({ responses: attendee.responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: guest.age });
+        const role = teamRoleFor({ responses: attendee.responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
         resolved.set(attendee.clientId, {
           personId: null,
           rosterMemberId: null,
@@ -1237,7 +1237,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
       }
       const person = effectiveAge === undefined ? rosterOnly : { ...rosterOnly, ageOnEventDate: effectiveAge };
       if (typedAge !== undefined && typedAge !== (member.reportedAge ?? undefined) && actor && !teamSettings?.ageAsOf && !saveOff.has(member.id)) saveBack.push({ memberId: member.id, age: typedAge });
-      const memberRole = teamRoleFor({ responses: attendee.responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: person.ageOnEventDate });
+      const memberRole = teamRoleFor({ responses: attendee.responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
       teamMemberPersons.push({ personId: member.personId, name: `${person.firstName} ${person.lastName}`.trim(), onRoster: true });
       resolved.set(attendee.clientId, { personId: member.personId, rosterMemberId: member.id, ageOnEventDate: person.ageOnEventDate, ...(teamSettings ? { teamRole: memberRole } : {}) });
       teamPeople.push({
@@ -1547,7 +1547,15 @@ export async function amendClubRegistration(
 
   /** The answers to keep for an attendee already registered: sent ones, or theirs as they stand. */
   function keptAnswers(clientId: string, current: CurrentClubAttendee) {
-    return input.attendeeResponses[clientId] ?? recordFromJson(current.formResponses);
+    const stored = recordFromJson(current.formResponses);
+    const sent = input.attendeeResponses[clientId];
+    if (!sent) return stored;
+    // A team registered on an older form version still has answers to questions the current form no longer asks (the role the
+    // Pathfinder Bible Experience form dropped, #1044). The page does not send them, and the amendment is checked against the
+    // version the team was registered on, so they are carried over rather than lost.
+    const currentKeys = new Set(definition.sections.flatMap((section) => section.fields.map((field) => field.key)));
+    const retired = Object.fromEntries(Object.entries(stored).filter(([key]) => !currentKeys.has(key) && !(key in sent)));
+    return { ...retired, ...sent };
   }
 
   /** Class/seminar picks are chosen elsewhere; an edit here must leave them as they are. */
@@ -1595,7 +1603,7 @@ export async function amendClubRegistration(
     if (current) assertSeminarPicksUnchanged(current, responses);
     if (betweenLevelsOnly) assertBetweenLevelsAnswers(current ? recordFromJson(current.formResponses) : null, responses, Object.keys(owned));
     amendmentAttendees.push({ attendeeId: current?.id ?? null, clientId, responses });
-    const memberRole = teamRoleFor({ responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: person.ageOnEventDate });
+    const memberRole = teamRoleFor({ responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
     serverOptions.set(clientId, {
       // A newly added roster person is that roster person, never a new or
       // name-matched one (the submit path links them the same way).
@@ -1621,7 +1629,7 @@ export async function amendClubRegistration(
     if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses);
     const ageOnEventDate = typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null;
     amendmentAttendees.push({ attendeeId: current.id, clientId, responses });
-    const guestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: ageOnEventDate });
+    const guestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: ageOnEventDate });
     serverOptions.set(clientId, {
       // Their own email, as submitted, not whatever the form answers imply.
       email: typeof snapshot.email === "string" ? snapshot.email : null,
@@ -1657,7 +1665,7 @@ export async function amendClubRegistration(
     };
     if (betweenLevelsOnly) assertBetweenLevelsAnswers(null, responses, Object.keys(rosterOwnedResponses(definition, person)));
     amendmentAttendees.push({ attendeeId: null, clientId, responses });
-    const newGuestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, age: guest.age });
+    const newGuestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
     serverOptions.set(clientId, {
       email: guest.email,
       profileMetadata: {

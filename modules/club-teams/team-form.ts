@@ -1,5 +1,6 @@
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import type { TeamSettings } from "@/modules/club-teams/domain";
+import { PBE_RELEASE_NOTICE } from "@/modules/forms/definition";
 
 /**
  * The printable team registration form (#809): the paper Pathfinder Bible Experience form (4-1) as data. Pure, so the
@@ -111,7 +112,7 @@ export function buildTeamForm(input: TeamFormInput): TeamFormModel {
     ? `The team must have a minimum of ${word(min)} members, and the maximum number is ${word(max)}${(settings?.maxAlternates ?? 0) > 0 ? ", which includes the alternate member" : ""}.`
     : "";
   const teamParagraph = [
-    "Teams can be any Pathfinder inducted into the Pathfinder Club which includes TLTs.",
+    "Teams can be any Pathfinder inducted into the Pathfinder Club.",
     `The team member must be an active Pathfinder in good standing and not graduated from high school${ageLimit}.`,
     sizeSentence,
     "If a team member is absent, they can still go on to the next level if the team qualifies.",
@@ -138,8 +139,8 @@ export function buildTeamForm(input: TeamFormInput): TeamFormModel {
     memberSlots,
     alternate: filled?.alternate ?? "",
     coaches: filled?.coaches ?? [],
-    confirmationText: `Every team member is an inducted Pathfinder/TLT in good standing, has not graduated from high school${confirmedAge}.`,
-    releaseText: "Participants agree to be photographed and/or videotaped by or on behalf of the IA-MO Conference Youth Department during Youth Department events, and grants the IA-MO Conference Youth Department permission to use any such photographs and/or videotapes in any future promotional and/or advertising publications, and further releases Camp Heritage and/or the Conference from any and all liability in connection with such use.",
+    confirmationText: `Every team member is an inducted Pathfinder in good standing, has not graduated from high school${confirmedAge}.`,
+    releaseText: PBE_RELEASE_NOTICE,
     mailLine: "Please mail or email this form in as soon as possible!",
     contactLines: [
       "YOUTH DEPARTMENT, PO Box 65665, West Des Moines, IA 50265  Email: youth@imsda.org",

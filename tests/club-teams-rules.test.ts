@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAlternateAnswer,
   teamAgeDate,
+  formAsksRole,
   teamRoleFor,
   teamRuleProblems,
   type TeamPerson,
@@ -123,10 +124,25 @@ describe("who is a coach", () => {
     expect(teamRoleFor({ responses: { attendee_type: "Pathfinder" }, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 19 })).toBe("MEMBER");
   });
 
-  it("makes everyone a team member when the form has no role answer (#1044), still held to the oldest age", () => {
-    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 18 })).toBe("MEMBER");
-    expect(teamRoleFor({ responses: { attendee_type: "  " }, rosterAttendeeType: "STAFF", maxMemberAge: 19, age: 19 })).toBe("MEMBER");
-    expect(teamRoleFor({ responses: {}, maxMemberAge: 19, age: 20 })).toBe("COACH");
+  it("makes everyone up to the age limit a team member when the form has no role question (#1044)", () => {
+    const noRoleForm = { formAsksRole: false };
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 18, ...noRoleForm })).toBe("MEMBER");
+    expect(teamRoleFor({ responses: { attendee_type: "  " }, rosterAttendeeType: "STAFF", maxMemberAge: 19, age: 19, ...noRoleForm })).toBe("MEMBER");
+    expect(teamRoleFor({ responses: {}, maxMemberAge: 19, age: 20, ...noRoleForm })).toBe("COACH");
+    // An answer an older form version collected is still honored.
+    expect(teamRoleFor({ responses: { attendee_type: "Coach" }, maxMemberAge: 19, age: 18, ...noRoleForm })).toBe("COACH");
+  });
+
+  it("keeps an adult a coach with no age limit, or when the form asks the role and the answer is blank (#1044)", () => {
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "STAFF", maxMemberAge: null, age: 40, formAsksRole: false })).toBe("COACH");
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "STAFF", age: 40, formAsksRole: false })).toBe("COACH");
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "STAFF", maxMemberAge: 19, age: 18, formAsksRole: true })).toBe("COACH");
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "STAFF", maxMemberAge: 19, age: 18 })).toBe("COACH");
+  });
+
+  it("knows whether a form asks the role question", () => {
+    expect(formAsksRole({ sections: [{ fields: [{ key: "first_name" }, { key: "attendee_type" }] }] })).toBe(true);
+    expect(formAsksRole({ sections: [{ fields: [{ key: "first_name" }] }] })).toBe(false);
   });
 
   it("makes an 18 or older person who answered a role a coach unless it is a team member's role", () => {

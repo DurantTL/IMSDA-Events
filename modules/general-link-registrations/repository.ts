@@ -64,7 +64,7 @@ import {
   staffDigestWindow,
   staffPendingDigestNotice,
 } from "@/modules/general-link-registrations/domain";
-import { readTypedInTeam, requestHash, typedInPersonId } from "@/modules/general-link-registrations/typed-team";
+import { readTypedInTeam, requestHash, rosterOverMaximumMessage, typedInPersonId, withoutRetiredAnswers } from "@/modules/general-link-registrations/typed-team";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 
 /**
@@ -1211,6 +1211,10 @@ export async function resolvePendingTeam(
   const withoutAcknowledgments = (answers: Record<string, unknown>) => (
     !formChanged || acknowledgmentKeys.size === 0 ? answers : Object.fromEntries(Object.entries(answers).filter(([key]) => !acknowledgmentKeys.has(key)))
   );
+  // Answers to questions the current form no longer has (an older form's role or release) are not carried over (#1044).
+  const currentAnswers = (answers: Record<string, unknown>) => withoutRetiredAnswers(experience.form.definition, withoutAcknowledgments(answers));
+  const tooManyPeople = rosterOverMaximumMessage(experience.form.definition, (stored.attendees ?? []).length);
+  if (tooManyPeople) throw new GeneralLinkError("FORM_CHANGED", tooManyPeople);
   let attachedHere = false;
   try {
     await submitPublicRegistration(
@@ -1220,8 +1224,8 @@ export async function resolvePendingTeam(
         // The form as it stands now: a team received before a form revision is attached under the current form's rules.
         versionId: experience.form.versionId,
         idempotencyKey: `general-link-confirm:${row.id}`,
-        responses: withoutAcknowledgments(stored.responses ?? {}),
-        attendees: (stored.attendees ?? []).map((attendee) => ({ ...attendee, responses: withoutAcknowledgments(attendee.responses) })),
+        responses: currentAnswers(stored.responses ?? {}),
+        attendees: (stored.attendees ?? []).map((attendee) => ({ ...attendee, responses: currentAnswers(attendee.responses) })),
         website: "",
       },
       // As of the day the director submitted: a team received before the deadline is not refused because staff confirmed it after.

@@ -857,6 +857,32 @@ async function main() {
   const plainList = (await club.listClubEvents(clubOf("a"), now)).find((entry) => entry.id === plainEventId)!;
   assert(!plainList.multipleTeams && plainList.registration && plainList.teams.length === 0, "the plain event list shows the one registration");
   console.log("ok  an event without team rules behaves exactly as before");
+
+  // 17. A team registered on the older form (with the role and release questions) is amended after the form dropped them (#1044).
+  // The director's page sends only the answers the current form asks; the answers only the older version has are carried over.
+  await addMember("g", "old1", "youth", "YOUTH", "PbeOld", "One");
+  await addMember("g", "old2", "youth", "YOUTH", "PbeOld", "Two");
+  await addMember("g", "old3", "youth", "YOUTH", "PbeOld", "Three");
+  await submit("g", "Old Form Team", [person("g", "old1"), person("g", "old2")], iowa!.id);
+  const { getFormTemplate } = await import("../modules/forms/definition");
+  const currentDefinition = getFormTemplate("pbe_registration")!.definition;
+  assert(!JSON.stringify(currentDefinition).includes("attendee_type"), "the current template has no role question");
+  await prisma.registrationFormVersion.updateMany({ where: { formId: form.id, status: RegistrationFormStatus.PUBLISHED }, data: { status: RegistrationFormStatus.ARCHIVED } });
+  await prisma.registrationFormVersion.create({
+    data: { id: `${P}_norolever`, formId: form.id, createdByUserId: staffUserId, versionNumber: 2, status: RegistrationFormStatus.PUBLISHED, publishedAt: new Date(), definition: currentDefinition as never },
+  });
+  const oldRow = await rowOf("g", "Old Form Team");
+  const keepOld = (selected: string[]) => ({
+    clientRequestId: randomUUID(), expectedUpdatedAt: oldRow.registration.updatedAt.toISOString(), selectedMemberIds: selected.map((key) => members.get(`g:${key}`)!),
+    keptGuestIds: [] as string[], keptOffRosterAttendeeIds: [] as string[], newGuests: [] as never[],
+    // What the current form's page sends: no role answer.
+    attendeeResponses: Object.fromEntries(selected.map((key) => [clientId("g", key), {}])),
+    teamKey: "old form team",
+  });
+  await club.amendClubRegistration(clubOf("g"), eventId, actor, keepOld(["old1", "old2"]), now);
+  const keptAttendees = await prisma.registrationAttendee.findMany({ where: { registrationId: oldRow.registrationId } });
+  assert(keptAttendees.length === 2 && keptAttendees.every((attendee) => (attendee.formResponses as { attendee_type?: string }).attendee_type === "Pathfinder"), "an amendment of a team from the older form keeps its role answers and is not asked for a role");
+  console.log("ok  a team registered on the older form is amended without the role question, keeping its older answers");
 }
 
 main()

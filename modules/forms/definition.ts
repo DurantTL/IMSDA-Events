@@ -107,7 +107,7 @@ export const formFieldSchema = z.object({
   id: z.string().trim().min(3).max(80),
   key: z.string().trim().min(2).max(60).regex(/^[a-z][a-z0-9_]*$/, "Field keys use lowercase letters, numbers, and underscores."),
   label: z.string().trim().min(2, "Every field needs a label.").max(120),
-  helpText: z.string().trim().max(240).default(""),
+  helpText: z.string().trim().max(500).default(""),
   placeholder: z.string().trim().max(120).optional(),
   type: z.enum(formFieldTypes),
   scope: z.enum(formFieldScopes),
@@ -925,8 +925,9 @@ export const formTemplates: FormTemplate[] = [
           templateField("pbe_member_age", "attendee_age", "Age", "NUMBER", true, [], { scope: "ATTENDEE", helpText: "Counted on the date set for this event, not the event day." }),
           templateField("pbe_member_alternate", "alternate", "Alternate team member", "CHECKBOX", false, [], { scope: "ATTENDEE", placeholder: "This team member is the alternate.", helpText: "At most one team member is the alternate. If a team member is absent, they can still go on to the next level if the team qualifies." }),
         ] },
-        { id: "pbe_confirmation", title: "Director confirmation & release", description: `Photo and video release (a notice, no answer needed): ${PBE_RELEASE_NOTICE}`, fields: [
-          templateField("pbe_confirm", "director_confirmation", "Director confirmation", "CHECKBOX", true, [], { placeholder: "I confirm this about every team member.", helpText: "Every team member is an inducted Pathfinder in good standing, has not graduated from high school, and is within the event's age limit on the age date shown in the team rules." }),
+        { id: "pbe_confirmation", title: "Director confirmation & release", description: "A checked box replaces the signature. Every team member is an inducted Pathfinder in good standing, has not graduated from high school, and is within the event's age limit on the age date shown in the team rules.", fields: [
+          // The release is a notice, not a question: it is the checkbox's own help text, so a screen reader reads it with the checkbox.
+          templateField("pbe_confirm", "director_confirmation", "Director confirmation", "CHECKBOX", true, [], { placeholder: "I confirm this about every team member.", helpText: `Photo and video release (a notice, no answer needed): ${PBE_RELEASE_NOTICE}` }),
         ] },
       ],
     },

@@ -10,7 +10,7 @@ import {
   normalizeDirectorEmail,
   pendingConfirmationCode,
 } from "@/modules/general-link-registrations/domain";
-import { readTypedInTeam, requestHash, stableJson, typedInPersonId } from "@/modules/general-link-registrations/typed-team";
+import { readTypedInTeam, requestHash, rosterOverMaximumMessage, stableJson, typedInPersonId, withoutRetiredAnswers } from "@/modules/general-link-registrations/typed-team";
 import type { TeamSettings } from "@/modules/club-teams/domain";
 
 const pbe = registrationFormDefinitionSchema.parse(formTemplates.find((template) => template.key === "pbe_registration")!.definition);
@@ -306,5 +306,22 @@ describe("the portal's roster-link route", () => {
     mocks.linkExtraPersonToRoster.mockClear();
     await postRosterLink(json({ attendeeId: "att-1", rosterMemberId: "member-1", firstName: "Nope" }), rosterContext);
     expect(mocks.linkExtraPersonToRoster).not.toHaveBeenCalled();
+  });
+});
+
+describe("a team received on an older PBE form, attached under the current one (#1044)", () => {
+  it("drops answers to questions the current form no longer asks, and keeps the rest", () => {
+    const kept = withoutRetiredAnswers(pbe, { first_name: "Ann", attendee_age: 14, attendee_type: "Coach", alternate: true });
+    expect(kept).toEqual({ first_name: "Ann", attendee_age: 14, alternate: true });
+    expect(withoutRetiredAnswers(pbe, { club_name: "Synthetic Club", photo_video_release: "Yes", director_confirmation: true }))
+      .toEqual({ club_name: "Synthetic Club", director_confirmation: true });
+  });
+
+  it("names the problem when the waiting team has more people than the form's maximum of 7", () => {
+    expect(rosterOverMaximumMessage(pbe, 7)).toBeNull();
+    const message = rosterOverMaximumMessage(pbe, 9)!;
+    expect(message).toContain("9 people");
+    expect(message).toContain("at most 7");
+    expect(message).toMatch(/older form/);
   });
 });
