@@ -340,12 +340,11 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                     </label>
                   )}
                   {isList && draft.existingClub && draft.churchId && draft.churchId !== draft.existingClub.sponsorId && (
-                    <label className="checkbox-label" style={{ minHeight: 44 }}>
+                    <label className="checkbox-label club-import-update-church">
                       <input
                         aria-label={`Update church of the existing club ${draft.existingClub.name}`}
                         checked={Boolean(draft.updateChurch)}
                         onChange={(event) => update(index, (d) => ({ ...d, updateChurch: event.target.checked }))}
-                        style={{ width: 24, height: 24 }}
                         type="checkbox"
                       />
                       Update church of the existing club
