@@ -1,14 +1,19 @@
+import "server-only";
+
+import { getPrisma } from "@/lib/prisma";
+import { eventCountFromGroups } from "@/modules/system-admin/attention-event-count";
 import type { EventCount } from "@/modules/system-admin/attention-model";
 
 /**
- * Cancellation requests waiting for review (#170) for the notification bell (#1032).
- *
- * Cancellation requests are not on main yet, so there is nothing to count and
- * this returns `null`, which leaves the item out of the bell. When #170 merges,
- * replace the body with its pending-request count (all events, and the event
- * holding the most) and adjust the link in `attention-model.ts`. Nothing else
- * in the bell needs to change.
+ * Cancellation requests (#170) waiting for staff to start a review, for the notification bell (#1032). Only
+ * REQUESTED counts: UNDER_REVIEW is already with someone and INFORMATION_NEEDED is waiting on the registrant. This is
+ * the one place that decides what "waiting" means for cancellation requests.
  */
-export async function countCancellationRequestsWaiting(): Promise<EventCount | null> {
-  return null;
+export async function countCancellationRequestsWaiting(): Promise<EventCount> {
+  const rows = await getPrisma().cancellationRequest.groupBy({
+    by: ["eventId"],
+    where: { status: "REQUESTED" },
+    _count: { _all: true },
+  });
+  return eventCountFromGroups(rows.map((row) => ({ eventId: row.eventId, count: row._count._all })));
 }

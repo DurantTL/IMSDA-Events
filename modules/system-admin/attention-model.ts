@@ -61,11 +61,8 @@ export type AttentionSignals = {
   now: Date;
   clubApplicationsWaiting: number;
   pendingTeams: EventCount;
-  /**
-   * Cancellation requests waiting for review (#170). Always `null` until that
-   * work is on main; `attention-cancellation-hook.ts` is the one place to wire it.
-   */
-  cancellationRequestsWaiting: EventCount | null;
+  /** Cancellation requests waiting for review (#170); `attention-cancellation-hook.ts` decides what waits. */
+  cancellationRequestsWaiting: EventCount;
   staffInvitationApprovals: EventCount;
   directoryReview: EventCount;
   emailFailed: EventCount;
@@ -110,14 +107,13 @@ export function buildAttentionSummary(signals: AttentionSignals): AttentionSumma
       href: withEvent("/people/pending-teams", signals.pendingTeams.topEventId),
     });
   }
-  if (signals.cancellationRequestsWaiting && signals.cancellationRequestsWaiting.total > 0) {
+  if (signals.cancellationRequestsWaiting.total > 0) {
     waiting.push({
       key: "cancellation-requests",
       group: "waiting",
       count: signals.cancellationRequestsWaiting.total,
       label: plural(signals.cancellationRequestsWaiting.total, "cancellation request waiting for review", "cancellation requests waiting for review"),
-      // The review page ships with #170; the hook supplies the event, this is its path.
-      href: withEvent("/people", signals.cancellationRequestsWaiting.topEventId),
+      href: withEvent("/finance/cancellation-requests", signals.cancellationRequestsWaiting.topEventId),
     });
   }
   if (signals.staffInvitationApprovals.total > 0) {

@@ -33,8 +33,8 @@ import {
   isSafeAttentionHref,
   type AttentionSignals,
 } from "@/modules/system-admin/attention-model";
+import { eventCountFromGroups } from "@/modules/system-admin/attention-event-count";
 import {
-  eventCountFromGroups,
   getAdminAttentionSummary,
   loadAttentionSignals,
   resetAdminAttentionCache,
@@ -48,7 +48,7 @@ function signals(overrides: Partial<AttentionSignals> = {}): AttentionSignals {
     now,
     clubApplicationsWaiting: 0,
     pendingTeams: none,
-    cancellationRequestsWaiting: null,
+    cancellationRequestsWaiting: none,
     staffInvitationApprovals: none,
     directoryReview: none,
     emailFailed: none,
@@ -94,10 +94,10 @@ describe("admin notification bell model (#1032)", () => {
     for (const item of Object.values(items)) expect(isSafeAttentionHref(item.href)).toBe(true);
   });
 
-  it("leaves out cancellation requests until the hook supplies them, then lists them", () => {
+  it("lists cancellation requests waiting for review with a link to the queue", () => {
     expect(buildAttentionSummary(signals()).groups).toEqual([]);
-    const withHook = buildAttentionSummary(signals({ cancellationRequestsWaiting: { total: 2, topEventId: "evt_1" } }));
-    expect(withHook.groups[0].items[0]).toMatchObject({ key: "cancellation-requests", count: 2 });
+    const summary = buildAttentionSummary(signals({ cancellationRequestsWaiting: { total: 2, topEventId: "evt_1" } }));
+    expect(summary.groups[0].items[0]).toMatchObject({ key: "cancellation-requests", count: 2, href: "/finance/cancellation-requests?event=evt_1" });
   });
 
   it("shows a sweep problem only when it stopped or failed, not when it has never reported", () => {
@@ -136,6 +136,7 @@ describe("admin notification bell counts (#1032)", () => {
       event: { findMany: vi.fn<(args?: unknown) => Promise<unknown[]>>(async () => [{ id: "e1" }, { id: "e2" }, { id: "e3" }]) },
       messageOutbox: { groupBy: groupBy([{ eventId: null, _count: { _all: 2 } }, { eventId: "e1", _count: { _all: 1 } }]) },
       scheduledEmailBatch: { groupBy: groupBy([{ eventId: "e2", _count: { _all: 1 } }]) },
+      cancellationRequest: { groupBy: groupBy([{ eventId: "e1", _count: { _all: 2 } }, { eventId: "e3", _count: { _all: 1 } }]) },
     };
   }
 
@@ -160,6 +161,7 @@ describe("admin notification bell counts (#1032)", () => {
     expect(prisma.generalLinkSubmission.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: { status: "PENDING" } }));
     expect(prisma.staffInvitation.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: { approval: "WAITING" } }));
     expect(prisma.scheduledEmailBatch.groupBy).toHaveBeenCalledTimes(2);
+    expect(prisma.cancellationRequest.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: { status: "REQUESTED" } }));
     const [failed, stuck] = prisma.messageOutbox.groupBy.mock.calls.map((call) => (call[0] as { where: Record<string, unknown> }).where);
     expect(failed.OR).toEqual([{ status: "FAILED" }, { providerDeliveryStatus: { in: ["BOUNCED", "COMPLAINED", "FAILED"] } }]);
     expect((failed.updatedAt as { gte: Date }).gte.toISOString()).toBe("2026-10-12T12:00:00.000Z");
@@ -170,7 +172,7 @@ describe("admin notification bell counts (#1032)", () => {
     expect(result).toMatchObject({
       clubApplicationsWaiting: 2,
       pendingTeams: { total: 5, topEventId: "e2" },
-      cancellationRequestsWaiting: null,
+      cancellationRequestsWaiting: { total: 3, topEventId: "e1" },
       staffInvitationApprovals: { total: 3, topEventId: "e1" },
       directoryReview: { total: 2, topEventId: "e2" },
       outboxSweep: "stale",
@@ -225,6 +227,7 @@ describe("admin notification bell API (#1032)", () => {
       event: { findMany: vi.fn(async () => []) },
       messageOutbox: { groupBy: vi.fn(async () => []) },
       scheduledEmailBatch: { groupBy: vi.fn(async () => []) },
+      cancellationRequest: { groupBy: vi.fn(async () => []) },
     });
     mocks.getSweepHeartbeat.mockResolvedValue({ status: "ok" });
     const response = await GET(new Request("http://localhost/api/admin/attention") as never);

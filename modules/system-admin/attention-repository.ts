@@ -4,6 +4,7 @@ import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { listDirectoryReviewEntries } from "@/modules/forms/directory-review";
 import { getSweepHeartbeat } from "@/modules/operations/sweep-heartbeat-repository";
+import { eventCountFromGroups } from "@/modules/system-admin/attention-event-count";
 import { countCancellationRequestsWaiting } from "@/modules/system-admin/attention-cancellation-hook";
 import {
   EMAIL_PROBLEM_WINDOW_DAYS,
@@ -28,17 +29,6 @@ const DIRECTORY_REVIEW_RECENT_DAYS = 30;
 export const ATTENTION_CACHE_MS = 30_000;
 
 const NONE: EventCount = { total: 0, topEventId: null };
-
-/** Totals the rows and names the event holding the most. Rows with no event count toward the total only. */
-export function eventCountFromGroups(rows: Array<{ eventId: string | null; count: number }>): EventCount {
-  let total = 0;
-  let top: { eventId: string; count: number } | null = null;
-  for (const row of rows) {
-    total += row.count;
-    if (row.eventId && (!top || row.count > top.count)) top = { eventId: row.eventId, count: row.count };
-  }
-  return { total, topEventId: top?.eventId ?? null };
-}
 
 const groupedCount = (rows: Array<{ eventId: string | null; _count: { _all: number } }>) =>
   eventCountFromGroups(rows.map((row) => ({ eventId: row.eventId, count: row._count._all })));
@@ -79,7 +69,7 @@ export async function loadAttentionSignals(now = new Date()): Promise<AttentionS
       });
       return groupedCount(rows);
     }),
-    read("cancellation requests", null, countCancellationRequestsWaiting),
+    read("cancellation requests", NONE, countCancellationRequestsWaiting),
     read("staff invitation approvals", NONE, async () => {
       const rows = await prisma.staffInvitation.groupBy({
         by: ["eventId"], where: { approval: "WAITING" }, _count: { _all: true },
