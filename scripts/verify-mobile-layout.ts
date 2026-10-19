@@ -3243,8 +3243,6 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   }
   // Let late client effects (fonts, hydration) settle before measuring, and wait out the shell's loading fallback (#996).
   await waitForShell(page);
-  // A page that needs a step before it shows what is audited (an upload, a checked box) says so with `prepare`.
-  if (spec.prepare) await spec.prepare(page, width);
   if (spec.expectText) {
     const shown: string = await page.evaluate(() => document.body.innerText);
     if (!spec.expectText.test(shown)) record("wrong-page", spec.name, width, `${url} (status ${status}) does not show the expected copy ${spec.expectText}`);
