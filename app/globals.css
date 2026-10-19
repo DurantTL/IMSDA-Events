@@ -12184,7 +12184,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   text-align: center;
 }
 .attention-popover { width: min(340px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow-y: auto; }
-.attention-popover .attention-heading { margin: 0 0 8px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.82rem); }
+.attention-popover .attention-heading { margin: 0 0 8px; color: var(--imsda-navy); font-size: max(var(--type-body-floor, 0px), 1.05rem); font-weight: 800; }
 .attention-popover .attention-heading:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
 .attention-popover .attention-group h3 { margin: 12px 0 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.68rem); letter-spacing: 0.04em; text-transform: uppercase; }
 .attention-popover ul { margin: 0; padding: 0; list-style: none; }
