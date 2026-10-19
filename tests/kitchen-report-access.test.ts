@@ -31,6 +31,9 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn(as
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: mocks.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: mocks.listRegistrations }));
+vi.mock("@/modules/meals/scanner-import-repository", () => ({
+  loadServedReport: vi.fn(async () => ({ rows: [], totals: { label: "All services", sold: { paying: 0, conference: 0, total: 0 }, served: { paying: 0, conference: 0, total: 0 }, notUsed: { paying: 0, conference: 0, total: 0 } }, anyServed: false, anyImport: false })),
+}));
 
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { GET as staffCsv } from "@/app/api/events/[eventId]/exports/kitchen/route";
