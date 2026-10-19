@@ -232,6 +232,7 @@ export function FinanceWorkspace({
           { href: `/finance/invoices?event=${eventId}`, label: "Invoices" },
           { href: `/more/promo-codes?event=${eventId}`, label: "Promo codes" },
           { href: `/finance/cancellation-policy?event=${eventId}`, label: "Cancellation rules" },
+          { href: `/finance/cancellation-requests?event=${eventId}`, label: "Cancellation requests" },
           { href: `/finance/square-payments?event=${eventId}`, label: "Unmatched Square payments" },
         ]}
       />

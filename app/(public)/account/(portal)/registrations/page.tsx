@@ -15,6 +15,9 @@ import { AttendeeRegistrationContactForm } from "@/components/attendee-registrat
 import { AttendeeRegistrationAnswersForm } from "@/components/attendee-registration-answers-form";
 import { PublicSquarePayment } from "@/components/public-square-payment";
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
+import { CancellationRequestPanel } from "@/components/cancellation-request-panel";
+import { getRegistrantRequestViewById } from "@/modules/cancellation-requests/repository";
+import type { RegistrantRequestView } from "@/modules/cancellation-requests/views";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import {
@@ -54,9 +57,12 @@ function dateLabel(startsAt: string, endsAt: string, timeZone: string) {
 function RegistrationCard({
   registration,
   editable,
+  cancellation,
 }: {
   registration: AttendeeRegistrationSummary;
   editable: boolean;
+  /** Cancellation requests (#170) for this registration; null when there is nothing to offer or show. */
+  cancellation: RegistrantRequestView | null;
 }) {
   return (
     <section className="public-manage-card attendee-registration-card">
@@ -132,6 +138,13 @@ function RegistrationCard({
           initialContact={registration.contact}
         />
       )}
+      {cancellation && (
+        <CancellationRequestPanel
+          endpoint={`/api/attendee/registrations/${encodeURIComponent(registration.id)}/cancellation`}
+          headingLevel={3}
+          initialView={cancellation}
+        />
+      )}
       {registration.answerEditing.fields.length > 0 && (
         <AttendeeRegistrationAnswersForm
           registrationId={registration.id}
@@ -146,12 +159,23 @@ function RegistrationCard({
   );
 }
 
+/**
+ * The request panel for one of the signed-in attendee's own registrations. Only a signed-in attendee (not a staff user
+ * looking at the portal) can ask; a failure here leaves the rest of the card alone.
+ */
+async function cancellationFor(registration: AttendeeRegistrationSummary, editable: boolean): Promise<RegistrantRequestView | null> {
+  if (!editable) return null;
+  const view = await getRegistrantRequestViewById(registration.id).catch(() => null);
+  return view && (view.available || view.requests.length > 0) ? view : null;
+}
+
 export default async function AttendeeRegistrationsPage() {
   await requireAttendeeSecondStep();
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
 
   const registrations = await listRegistrationsForVerifiedEmail(account.verifiedEmail);
+  const cancellations = await Promise.all(registrations.map((registration) => cancellationFor(registration, via === "attendee")));
 
   return (
     <>
@@ -167,11 +191,12 @@ export default async function AttendeeRegistrationsPage() {
       <div className="public-manage-layout">
         <div className="public-manage-main">
           {registrations.length > 0
-            ? registrations.map((registration) => (
+            ? registrations.map((registration, index) => (
               <RegistrationCard
                 key={registration.id}
                 registration={registration}
                 editable={via === "attendee"}
+                cancellation={cancellations[index] ?? null}
               />
             ))
             : (

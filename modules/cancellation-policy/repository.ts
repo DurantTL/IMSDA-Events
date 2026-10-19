@@ -505,6 +505,53 @@ export async function recordCancellationCalculation(eventId: string, actorUserId
   return recordCalculationAt(eventId, actorUserId, request, new Date());
 }
 
+/**
+ * Appends one calculation row and its audit entry inside the caller's transaction. Shared by `recordCalculationAt` and
+ * the cancellation request workflow (#170), which saves the calculation and the request together so a request can
+ * never cite a calculation that was not saved. The actor is null when a registrant, not staff, asked.
+ */
+export async function appendCalculationRecord(
+  tx: Client,
+  eventId: string,
+  actorUserId: string | null,
+  request: Omit<PreviewRequest, "asOf">,
+  result: CancellationResult,
+  requestedBy: "STAFF" | "REGISTRANT" = "STAFF",
+) {
+  const created = await tx.cancellationCalculation.create({
+    data: {
+      eventId,
+      registrationId: result.facts.registration?.id ?? null,
+      policyVersionId: result.policy?.versionId ?? null,
+      policyVersion: result.policy?.version ?? null,
+      source: request.input.kind,
+      status: result.status,
+      scope: result.scope?.requested ?? request.selection.scope,
+      evaluatedAt: new Date(result.evaluatedAt),
+      facts: result.facts as unknown as Prisma.InputJsonValue,
+      result: result as unknown as Prisma.InputJsonValue,
+      createdByUserId: actorUserId,
+    },
+    select: { id: true, createdAt: true },
+  });
+  await writeAuditLog({
+    eventId,
+    ...(actorUserId ? { actorUserId } : {}),
+    action: "CANCELLATION_CALCULATION_RECORDED",
+    entityType: "CancellationCalculation",
+    entityId: created.id,
+    summary: `Recorded a cancellation calculation (${result.status}).`,
+    metadata: {
+      registrationId: result.facts.registration?.id ?? null,
+      policyVersion: result.policy?.version ?? null,
+      refundCents: result.money.refundCents,
+      ...(requestedBy === "REGISTRANT" ? { requestedBy } : {}),
+      sideEffects: "NONE",
+    },
+  }, tx);
+  return created;
+}
+
 /** Test seam for the real-database check, which needs fixed times. Callers in the app use `recordCancellationCalculation`. */
 export async function recordCalculationAt(
   eventId: string,
@@ -513,41 +560,24 @@ export async function recordCalculationAt(
   now: Date,
 ) {
   const { result } = await previewCancellation(eventId, { ...request, asOf: undefined }, now);
-  const db = getPrisma();
-  const row = await db.$transaction(async (tx) => {
-    const created = await tx.cancellationCalculation.create({
-      data: {
-        eventId,
-        registrationId: result.facts.registration?.id ?? null,
-        policyVersionId: result.policy?.versionId ?? null,
-        policyVersion: result.policy?.version ?? null,
-        source: request.input.kind,
-        status: result.status,
-        scope: result.scope?.requested ?? request.selection.scope,
-        evaluatedAt: new Date(result.evaluatedAt),
-        facts: result.facts as unknown as Prisma.InputJsonValue,
-        result: result as unknown as Prisma.InputJsonValue,
-        createdByUserId: actorUserId,
-      },
-      select: { id: true, createdAt: true },
-    });
-    await writeAuditLog({
-      eventId,
-      actorUserId,
-      action: "CANCELLATION_CALCULATION_RECORDED",
-      entityType: "CancellationCalculation",
-      entityId: created.id,
-      summary: `Recorded a cancellation calculation (${result.status}).`,
-      metadata: {
-        registrationId: result.facts.registration?.id ?? null,
-        policyVersion: result.policy?.version ?? null,
-        refundCents: result.money.refundCents,
-        sideEffects: "NONE",
-      },
-    }, tx);
-    return created;
-  });
+  const row = await getPrisma().$transaction((tx) => appendCalculationRecord(tx, eventId, actorUserId, request, result));
   return { id: row.id, createdAt: row.createdAt.toISOString(), result };
+}
+
+/**
+ * The registration's current facts, read-only, for a caller that compares them with an earlier calculation (#170).
+ * Records nothing.
+ */
+export async function loadRegistrationFacts(eventId: string, registrationId: string, now = new Date()) {
+  const db = getPrisma();
+  const event = await loadEvent(db, eventId);
+  const prepared = await prepareRegistrationFacts(db, event, { kind: "REGISTRATION", registration: registrationId, noShowFirstNight: false }, now, "SERVER");
+  return { facts: prepared.facts, summary: prepared.summary };
+}
+
+/** The version in effect at `now`, or null, for deciding which scopes a registrant may request (#170). */
+export async function policyInEffect(eventId: string, now = new Date()) {
+  return selectPolicyVersion(await usablePolicyVersions(getPrisma(), eventId), now);
 }
 
 export async function getRecordedCalculation(eventId: string, calculationId: string) {

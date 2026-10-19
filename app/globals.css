@@ -4578,6 +4578,36 @@ body:has(.auth-page) { padding-bottom: 0; }
 }
 .public-manage-main,
 .public-manage-side { display: grid; min-width: 0; gap: 15px; }
+/* Cancellation requests (#170): the request panel on the manage link and the portal, and the staff queue. */
+.cancel-request-panel { display: grid; gap: 14px; min-width: 0; }
+.cancel-request-panel .public-manage-card-heading h2,
+.cancel-request-panel .public-manage-card-heading h3 { margin: 3px 0 0; color: var(--ink); font-size: 1.2rem; letter-spacing: -0.02em; }
+.cancel-request-form, .cancel-request-outcome { display: grid; gap: 12px; min-width: 0; }
+.cancel-request-form fieldset { display: grid; gap: 6px; margin: 0; border: 0; padding: 0; min-width: 0; }
+.cancel-request-form legend { padding: 0; margin-bottom: 4px; font-weight: 700; color: var(--ink); }
+.cancel-request-form textarea { width: 100%; box-sizing: border-box; min-height: 88px; }
+.cancel-request-choice { display: flex; align-items: flex-start; gap: 9px; min-height: 44px; padding: 6px 2px; cursor: pointer; }
+.cancel-request-choice input { flex: none; width: 20px; height: 20px; margin-top: 2px; }
+.cancel-request-outcome { border: 1px solid var(--line); border-radius: 14px; background: #f7fafb; padding: 15px; }
+.cancel-request-outcome p, .cancel-request-panel p { margin: 0; overflow-wrap: anywhere; }
+.cancel-request-money { display: grid; gap: 6px; margin: 0; }
+.cancel-request-money > div { display: flex; justify-content: space-between; gap: 12px; }
+.cancel-request-money dt { color: var(--muted); }
+.cancel-request-money dd { margin: 0; font-weight: 700; }
+.cancel-request-money .is-total dt, .cancel-request-money .is-total dd { color: var(--ink); font-size: 1.05rem; }
+.cancel-request-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.cancel-request-list > li { display: grid; gap: 8px; min-width: 0; border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.cancel-request-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.cancel-request-head span { color: var(--muted); }
+.cancel-request-note { border-left: 3px solid var(--imsda-navy); padding-left: 10px; }
+.cancel-request-timeline { display: grid; gap: 2px; margin: 0; padding-left: 18px; color: var(--muted); }
+.cancel-request-message { display: flex; align-items: flex-start; gap: 7px; }
+.cancel-request-message.is-ok { color: var(--imsda-navy); }
+.cancel-request-message svg { flex: none; margin-top: 2px; }
+.cancel-request-panel .secondary-button, .cancel-request-panel .primary-button { min-height: 44px; justify-self: start; }
+@media (max-width: 560px) {
+  .cancel-request-panel .secondary-button, .cancel-request-panel .primary-button { justify-self: stretch; }
+}
 .public-manage-card,
 .public-manage-contact-card,
 .public-manage-help-card,

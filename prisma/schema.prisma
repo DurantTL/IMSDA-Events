@@ -641,6 +641,10 @@ enum MessageTemplateKey {
   CLUB_TEAM_ADVANCEMENT_NOTICE
   /// A club form was submitted (#1017): one internal email per address on the form's alert list. Names, a time and a staff link; never an answer.
   CLUB_FORM_SUBMITTED
+  /// A registrant's cancellation request was received (#170). Status only: never the reason, the amount or the outcome.
+  CANCELLATION_REQUEST_RECEIVED
+  /// A cancellation request changed status (#170). Status only: never the reason, the amount or a staff note.
+  CANCELLATION_REQUEST_UPDATED
 }
 
 enum MessageTemplateStatus {
@@ -1715,6 +1719,8 @@ model Event {
   registrationPaymentChoiceOperations RegistrationPaymentChoiceOperation[]
   cancellationPolicyVersions          EventCancellationPolicyVersion[]
   cancellationCalculations            CancellationCalculation[]
+  cancellationRequests                CancellationRequest[]
+  cancellationRequestEvents           CancellationRequestEvent[]
   communitySettings                   EventCommunitySettings?
   communityParticipations             CommunityParticipation[]
   communityPosts                      CommunityPost[]
@@ -3509,10 +3515,100 @@ model CancellationCalculation {
 
   event         Event                           @relation(fields: [eventId], references: [id], onDelete: Restrict)
   policyVersionRow EventCancellationPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  requests         CancellationRequest[]
 
   @@index([eventId, createdAt])
   @@index([registrationId, createdAt])
   @@index([policyVersionId])
+}
+
+/// Where a cancellation request stands (#170). A request is only ever a request: no state here cancels a registration,
+/// refunds money or issues credit. APPROVED records a human decision; carrying it out is a later slice (#171).
+enum CancellationRequestStatus {
+  REQUESTED
+  UNDER_REVIEW
+  INFORMATION_NEEDED
+  APPROVED
+  DECLINED
+  WITHDRAWN
+  SUPERSEDED
+}
+
+/// A registrant's request to cancel a registration, one attendee or a component (#170). It cites the recorded
+/// calculation (policy version, rules and facts) the registrant was shown, so the proposed outcome can never change
+/// after the fact. `registrationId` is deliberately not a foreign key, like the calculation, so history outlives it.
+/// The request row's status moves; every move is also appended to CancellationRequestEvent, which is immutable.
+model CancellationRequest {
+  id                    String                    @id @default(cuid())
+  eventId               String
+  registrationId        String
+  calculationId         String
+  policyVersionId       String?
+  policyVersion         Int?
+  /// FULL_REGISTRATION, ATTENDEE or COMPONENT, as the registrant chose it.
+  scope                 String
+  attendeeIds           String[]                  @default([])
+  chargeIds             String[]                  @default([])
+  /// The scope and its ids in one canonical string, so a repeat of the same request is recognised.
+  scopeKey              String
+  status                CancellationRequestStatus @default(REQUESTED)
+  /// The registrant's own words. Never copied into an email, an audit entry or a log.
+  reason                String
+  /// EMAIL or PHONE: how the registrant would like the event team to reach them about this request.
+  contactMethod         String
+  /// The proposed outcome that was shown when the request was made (the calculation's, never recalculated).
+  proposedRefundCents   Int
+  proposedRetainedCents Int
+  /// A hash of the registration facts the calculation used, so staff can see whether the registration has changed since.
+  stateFingerprint      String
+  /// The registration state when requested: status, attendee and charge ids, paid and deposit amounts. No names.
+  registrationState     Json
+  /// MANAGE_LINK or ATTENDEE_PORTAL.
+  requestedVia          String
+  requestedByAccountId  String?
+  /// One key per submit attempt, so a retry returns the same request instead of making another.
+  idempotencyKey        String
+  supersededById        String?
+  /// What staff asked the registrant to provide, while INFORMATION_NEEDED. Shown on the registrant's page, never emailed.
+  registrantNote        String?
+  decidedByUserId       String?
+  decidedByNameSnapshot String?
+  decisionReason        String?
+  decidedAt             DateTime?
+  /// True when the registration had changed since the request and the decider acknowledged it.
+  decidedWithChanges    Boolean                   @default(false)
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  event       Event                      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  calculation CancellationCalculation    @relation(fields: [calculationId], references: [id], onDelete: Restrict)
+  timeline    CancellationRequestEvent[]
+
+  @@unique([registrationId, idempotencyKey])
+  @@index([eventId, status, createdAt])
+  @@index([registrationId, status])
+}
+
+/// One step in a request's timeline (#170). Append-only, like a calculation. Names are snapshots; the note never holds
+/// the registrant's reason.
+model CancellationRequestEvent {
+  id                String                     @id @default(cuid())
+  eventId           String
+  requestId         String
+  fromStatus        CancellationRequestStatus?
+  toStatus          CancellationRequestStatus
+  /// REGISTRANT, STAFF or SYSTEM. A system step never approves or declines.
+  actorKind         String
+  actorUserId       String?
+  actorNameSnapshot String?
+  note              String?
+  createdAt         DateTime                   @default(now())
+
+  event   Event               @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  request CancellationRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+  @@index([eventId, createdAt])
 }
 
 model Refund {

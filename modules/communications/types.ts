@@ -23,6 +23,8 @@ export type MessageTemplateKeyValue =
   | "REGISTRATION_ACCESS_RECOVERY"
   | "EVENT_ANNOUNCEMENT"
   | "CLUB_ASSIGNMENTS"
+  | "CANCELLATION_REQUEST_RECEIVED"
+  | "CANCELLATION_REQUEST_UPDATED"
   | "CUSTOM_MESSAGE";
 
 export type MessageOutboxStatusValue =
