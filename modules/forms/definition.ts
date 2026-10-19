@@ -282,7 +282,7 @@ export function fieldRuns<T extends { group?: string }>(fields: readonly T[]) {
 export const formSectionSchema = z.object({
   id: z.string().trim().min(3).max(80),
   title: z.string().trim().min(2, "Every section needs a title.").max(120),
-  description: z.string().trim().max(300).default(""),
+  description: z.string().trim().max(500).default(""),
   stepLabel: z.string().trim().min(2).max(40).optional(),
   isReviewStep: z.boolean().optional(),
   fields: z.array(formFieldSchema).min(1, "Every section needs at least one field.").max(20),
@@ -727,6 +727,12 @@ export function templatesForPicker<T extends { key: string; name: string; collec
   return blank ? [{ ...blank, name: "Blank form" }, ...rest] : rest;
 }
 
+/**
+ * The Pathfinder Bible Experience photo, video and liability release (#1044): a notice shown on the director
+ * confirmation step, not a question. It has no answer, so nothing records or prints a blank release answer.
+ */
+export const PBE_RELEASE_NOTICE = "Participants agree to be photographed and/or videotaped by or on behalf of the IA-MO Conference Youth Department during Youth Department events, and grants the IA-MO Conference Youth Department permission to use any such photographs and/or videotapes in any future promotional and/or advertising publications, and further releases Camp Heritage and/or the Conference from any and all liability in connection with such use.";
+
 export const formTemplates: FormTemplate[] = [
   {
     key: "simple_rsvp",
@@ -885,13 +891,13 @@ export const formTemplates: FormTemplate[] = [
   {
     key: "pbe_registration",
     name: "Pathfinder Bible Experience",
-    description: "One team's registration: the team coordinator, a partner club for a joint team, the team members (with one alternate) and coaches, the director's confirmation and the photo release. Use with the Pathfinder Bible Experience starter, which sets teams per club, team size, the alternate and the age rule. Free: no fee fields.",
+    description: "One team's registration: the team coordinator (the team's one adult contact), a partner club for a joint team, the team members (with one alternate), the director's confirmation and the photo release notice. Use with the Pathfinder Bible Experience starter, which sets teams per club, team size, the alternate and the age rule. Free: no fee fields.",
     audience: "Club / group",
     definition: {
       title: "Pathfinder Bible Experience team registration",
-      description: "Register one team. A club can enter more than one team, each with its own name. Team members are inducted Pathfinders and TLTs; adults who come with the team register as coaches and do not count toward the team.",
+      description: "Register one team. A club can enter more than one team, each with its own name. Team members are inducted Pathfinders. The team coordinator is the team's one adult contact.",
       confirmationMessage: "Your Pathfinder Bible Experience team registration has been received. There is no fee.",
-      attendeeRoster: { enabled: true, minAttendees: 2, maxAttendees: 20, attendeeLabel: "Team member or coach", addButtonLabel: "Add another team member or coach" },
+      attendeeRoster: { enabled: true, minAttendees: 2, maxAttendees: 7, attendeeLabel: "Team member", addButtonLabel: "Add another team member" },
       sections: [
         { id: "pbe_club", title: "Club & contact", description: "Select the Pathfinder club and enter the director’s contact information.", fields: [
           templateField("pbe_club_name", "club_name", "Pathfinder club", "SELECT", true, [], { optionSource: "CLUBS_DIRECTORY" }),
@@ -902,7 +908,7 @@ export const formTemplates: FormTemplate[] = [
           templateField("pbe_email", "email", "Director or club email", "EMAIL", true),
           templateField("pbe_phone", "phone", "Director contact number", "PHONE", true),
         ] },
-        { id: "pbe_coordinator", title: "Team coordinator", description: "We would like a contact person’s name and number to be able to send out updates and information as needed. This starts as the club director; change it if someone else leads the team.", fields: [
+        { id: "pbe_coordinator", title: "Team coordinator", description: "The team coordinator is the team’s one adult contact, and we send updates and information to them. This starts as the club director; change it if someone else leads the team.", fields: [
           templateField("pbe_coord_name", "coordinator_name", "Contact person / team coordinator", "TEXT", true),
           templateField("pbe_coord_address", "coordinator_address", "Address", "TEXT", true),
           templateField("pbe_coord_city", "coordinator_city", "City", "TEXT", true),
@@ -913,16 +919,14 @@ export const formTemplates: FormTemplate[] = [
           templateField("pbe_partner", "partner_club", "Partner club (joint team)", "SELECT", false, [], { optionSource: "CLUBS_DIRECTORY", helpText: "A club with 4 or fewer interested Pathfinders may join with one other club. Pick the other club here (not your own), and add its Pathfinders under Who’s going as people not on your roster." }),
           templateField("pbe_partner_other", "partner_club_other", "Partner club — not listed", "TEXT", true, [], { conditional: { fieldKey: "partner_club", operator: "EQUALS", value: DIRECTORY_NOT_LISTED_VALUE } }),
         ] },
-        { id: "pbe_roster", title: "Team members and coaches", description: "A team has 2 to 7 team members. The 7th is the alternate. Adults and staff are coaches: they are listed with the team and do not count toward the 2 to 7. All adults 18 and over must complete NAD background screening, and all drivers with passengers must be 21 or over.", fields: [
+        { id: "pbe_roster", title: "Team members", description: "A team has 2 to 7 team members. The 7th is the alternate. Add the team coordinator above, not here.", fields: [
           templateField("pbe_member_first", "first_name", "First name", "TEXT", true, [], { scope: "ATTENDEE" }),
           templateField("pbe_member_last", "last_name", "Last name", "TEXT", true, [], { scope: "ATTENDEE" }),
           templateField("pbe_member_age", "attendee_age", "Age", "NUMBER", true, [], { scope: "ATTENDEE", helpText: "Counted on the date set for this event, not the event day." }),
-          templateField("pbe_member_role", "attendee_type", "Role", "RADIO", true, ["Pathfinder", "TLT", "Coach"], { scope: "ATTENDEE", helpText: "Team members are inducted Pathfinders or TLTs, in good standing, who have not graduated from high school. Adults are coaches." }),
           templateField("pbe_member_alternate", "alternate", "Alternate team member", "CHECKBOX", false, [], { scope: "ATTENDEE", placeholder: "This team member is the alternate.", helpText: "At most one team member is the alternate. If a team member is absent, they can still go on to the next level if the team qualifies." }),
         ] },
-        { id: "pbe_confirmation", title: "Director confirmation & release", description: "A checked box replaces the director’s signature. The date is recorded when you submit.", fields: [
+        { id: "pbe_confirmation", title: "Director confirmation & release", description: `A checked box replaces the signature. Photo and video release (a notice, no answer needed): ${PBE_RELEASE_NOTICE}`, fields: [
           templateField("pbe_confirm", "director_confirmation", "Director confirmation", "CHECKBOX", true, [], { placeholder: "I confirm this about every team member.", helpText: "Every team member is an inducted Pathfinder/TLT in good standing, has not graduated from high school, and is within the event's age limit on the age date shown in the team rules." }),
-          templateField("pbe_release", "photo_video_release", "Photo, video and liability release", "RADIO", true, ["Yes", "No"], { helpText: "Do you understand and agree with the release below?", optionDescriptions: { Yes: "Participants agree to be photographed and/or videotaped by or on behalf of the IA-MO Conference Youth Department during Youth Department events, and grants the IA-MO Conference Youth Department permission to use any such photographs and/or videotapes in any future promotional and/or advertising publications, and further releases Camp Heritage and/or the Conference from any and all liability in connection with such use." } }),
         ] },
       ],
     },

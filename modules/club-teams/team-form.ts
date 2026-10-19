@@ -26,7 +26,7 @@ export type TeamFormFilled = {
   /** The director's confirmation box was checked, and the date it was recorded. */
   confirmed: boolean;
   confirmedOn: string | null;
-  /** The photo, video and liability release answer the director gave: "Yes", "No", or blank when none was recorded. */
+  /** The photo, video and liability release answer the director gave: "Yes", "No", or blank when none (the release is a notice since #1044; only older registrations carry an answer). */
   releaseAnswer: "Yes" | "No" | "";
 };
 

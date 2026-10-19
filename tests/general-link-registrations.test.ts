@@ -97,6 +97,20 @@ describe("the people typed into a team", () => {
     ]);
   });
 
+  it("counts everyone as a team member when the form has no role answers, the 7th the alternate (#1044)", () => {
+    const noRole = (first: string, age: number, alternate = false) => ({ clientId: first, responses: { first_name: first, last_name: "Synthetic", attendee_age: age, ...(alternate ? { alternate: true } : {}) } });
+    const members = (count: number) => Array.from({ length: count }, (_, index) => noRole(`Kid${index}`, 14));
+    const two = read(members(2));
+    expect(two.problems).toEqual([]);
+    expect(two.people.map((p) => p.role)).toEqual(["MEMBER", "MEMBER"]);
+    expect(read(members(1)).problems.join(" ")).toMatch(/this one has 1/);
+    expect(read([...members(6), noRole("Alt", 15, true)]).problems).toEqual([]);
+    expect(read([...members(7), noRole("Extra", 15)]).problems.join(" ")).toMatch(/this one has 8/);
+    // An 18-year-old with no role answer is a member; the age rule is unchanged (20 is over 19 on the age date).
+    expect(read([noRole("A", 18), noRole("B", 19)]).people.map((p) => p.role)).toEqual(["MEMBER", "MEMBER"]);
+    expect(read([noRole("A", 14), noRole("B", 20)]).people[1]!.role).toBe("COACH");
+  });
+
   it("holds a team to 2 to 7 members, coaches never counted", () => {
     expect(read(youth(1)).problems.join(" ")).toMatch(/at least 2 team members; this one has 1/);
     expect(read([...youth(1), person("C1", 40, "Coach"), person("C2", 41, "Coach")]).problems.join(" ")).toMatch(/this one has 1.*Coaches don't count/);

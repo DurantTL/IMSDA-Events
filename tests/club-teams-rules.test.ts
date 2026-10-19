@@ -123,9 +123,14 @@ describe("who is a coach", () => {
     expect(teamRoleFor({ responses: { attendee_type: "Pathfinder" }, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 19 })).toBe("MEMBER");
   });
 
-  it("makes an 18 or older person a coach unless given a team member's role", () => {
-    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 18 })).toBe("COACH");
-    expect(teamRoleFor({ responses: {}, age: 35 })).toBe("COACH");
+  it("makes everyone a team member when the form has no role answer (#1044), still held to the oldest age", () => {
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 18 })).toBe("MEMBER");
+    expect(teamRoleFor({ responses: { attendee_type: "  " }, rosterAttendeeType: "STAFF", maxMemberAge: 19, age: 19 })).toBe("MEMBER");
+    expect(teamRoleFor({ responses: {}, maxMemberAge: 19, age: 20 })).toBe("COACH");
+  });
+
+  it("makes an 18 or older person who answered a role a coach unless it is a team member's role", () => {
+    expect(teamRoleFor({ responses: { attendee_type: "Staff" }, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 18 })).toBe("COACH");
     expect(teamRoleFor({ responses: { attendee_type: "Coach" }, age: 35 })).toBe("COACH");
     expect(teamRoleFor({ responses: { attendee_type: "Coach" }, rosterAttendeeType: "STAFF", age: 38 })).toBe("COACH");
   });

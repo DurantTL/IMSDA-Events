@@ -67,7 +67,7 @@ export function TeamFormSheet({ model }: { model: TeamFormModel }) {
         </ol>
         <div className="team-form-grid">
           <Line label="Alternate Member:" value={model.alternate} wide />
-          <Line label="Coaches:" value={model.coaches.join(", ")} wide />
+          {model.coaches.length > 0 && <Line label="Coaches:" value={model.coaches.join(", ")} wide />}
         </div>
       </section>
 
@@ -91,9 +91,9 @@ export function TeamFormSheet({ model }: { model: TeamFormModel }) {
       </section>
 
       <p className="team-form-release">{model.releaseText}</p>
-      {filled && (
+      {filled && filled.releaseAnswer && (
         <p className="team-form-release-answer">
-          <strong>Release understood and agreed:</strong> {filled.releaseAnswer || "Not recorded"}
+          <strong>Release understood and agreed:</strong> {filled.releaseAnswer}
         </p>
       )}
       <footer className="team-form-footer">

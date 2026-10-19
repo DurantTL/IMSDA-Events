@@ -97,11 +97,13 @@ describe("the printed sheet", () => {
     expect(html).not.toContain("Club Director&#x27;s Signature:");
   });
 
-  it("shows the release answer the director gave, or says none was recorded", () => {
+  it("shows the release answer an older registration gave, and nothing when the form had none (the release is a notice)", () => {
     const html = (releaseAnswer: "Yes" | "No" | "") => renderToStaticMarkup(createElement(TeamFormSheet, { model: buildTeamForm({ ...base, filled: { ...filled, releaseAnswer } }) }));
     expect(html("Yes")).toContain("Release understood and agreed:</strong> Yes");
     expect(html("No")).toContain("Release understood and agreed:</strong> No");
-    expect(html("")).toContain("Not recorded");
+    expect(html("")).not.toContain("Not recorded");
+    expect(html("")).not.toContain("Release understood and agreed");
+    expect(html("")).toContain("photographed and/or videotaped");
     expect(renderToStaticMarkup(createElement(TeamFormSheet, { model: buildTeamForm({ ...base, filled: null }) }))).not.toContain("Release understood and agreed");
   });
 

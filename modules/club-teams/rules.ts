@@ -24,6 +24,11 @@ export function isAlternateAnswer(value: unknown): boolean {
   return false;
 }
 
+/** Whether the person answered the role question at all (a form without that question leaves no answer). */
+function hasRoleAnswer(value: unknown): boolean {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 /** A role answer (or roster class level) that names a Pathfinder or a TLT: a youth member, even at 18 or 19. */
 function isYouthRoleAnswer(value: unknown): boolean {
   if (typeof value !== "string") return false;
@@ -35,8 +40,8 @@ function isYouthRoleAnswer(value: unknown): boolean {
  * Whether a person is a team member or a coach, the same rule for roster people and extra people (#809), by their age on
  * the event's age date, so a director cannot dodge the size limit by marking a child as staff:
  * - under 18 is a team member, whatever the roster says;
- * - 18 up to the oldest team member age is a team member when the role answer is Pathfinder or TLT (or the roster class
- *   level is TLT), otherwise a coach;
+ * - 18 up to the oldest team member age is a team member when there is no role answer (the form has no role question),
+ *   or the answer is Pathfinder or TLT (or the roster class level is TLT), otherwise a coach;
  * - older than that is a coach;
  * - an age that is not known follows the roster type (staff and adults are coaches, everyone else a team member).
  */
@@ -52,6 +57,9 @@ export function teamRoleFor(input: {
   }
   if (input.age < 18) return "MEMBER";
   if (input.maxMemberAge !== null && input.maxMemberAge !== undefined && input.age > input.maxMemberAge) return "COACH";
+  // A form with no role question (the Pathfinder Bible Experience form since #1044 lists team members only) leaves every
+  // person a team member. Older registrations that answered the question keep their Coach answers.
+  if (!hasRoleAnswer(input.responses[ROLE_FIELD_KEY])) return "MEMBER";
   return isYouthRoleAnswer(input.responses[ROLE_FIELD_KEY]) || input.rosterClassLevel === "TLT" ? "MEMBER" : "COACH";
 }
 
