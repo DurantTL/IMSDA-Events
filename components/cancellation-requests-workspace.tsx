@@ -106,7 +106,7 @@ function RequestDetail({ detail, eventId, timezone }: { detail: StaffRequestDeta
   const changes = detail.conflicts.filter((conflict) => conflict.severity === "CHANGE");
   const needsText = (action: string) => action === "REQUEST_INFORMATION" || action === "APPROVE" || action === "DECLINE";
   /** Why a button is off, in words, so nobody has to guess (and a screen reader hears it). */
-  const whyOff = (action: string) => {
+  const whyOff = (action: string): string | null => {
     if (needsText(action) && text.trim().length < 3) return "Write a reason or note of at least 3 characters first.";
     if (action === "APPROVE" && changes.length > 0 && !acknowledge) return "Confirm you have reviewed the changes above to approve.";
     return null;
