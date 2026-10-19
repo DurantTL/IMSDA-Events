@@ -18,8 +18,6 @@ import { campMeetingPreset, parseCancellationRules } from "@/modules/cancellatio
 
 vi.mock("server-only", () => ({}));
 
-type Row = Record<string, unknown> & { id: string };
-
 const world = vi.hoisted(() => ({
   now: new Date("2026-05-01T15:00:00.000Z"),
   status: "CONFIRMED",

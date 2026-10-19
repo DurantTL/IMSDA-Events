@@ -101,8 +101,8 @@ describe("the request workflow never reaches money, registrations or capacity (#
     const source = read("modules/cancellation-requests/repository.ts");
     expect(source.match(/decidedByUserId: user\.id/g)).toHaveLength(1);
     expect(source).toContain("export async function reviewCancellationRequest");
-    // No scheduled job, worker or route other than the staff route calls it.
-    const callers = ["app", "modules", "scripts"].flatMap((dir) => walk(path.join(root, dir)))
+    // No scheduled job, worker or route other than the staff route calls it (the real-database harness in scripts/ is run by hand).
+    const callers = ["app", "modules"].flatMap((dir) => walk(path.join(root, dir)))
       .filter((file) => /\.(ts|tsx)$/.test(file) && read(path.relative(root, file)).includes("reviewCancellationRequest("))
       .map((file) => path.relative(root, file).split(path.sep).join("/"));
     expect(callers.sort()).toEqual([
