@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Eye, EyeOff, LogIn, ShieldCheck } from "lucide-react";
@@ -282,6 +283,7 @@ export function LoginForm({
         <div className="auth-alternate">
           <strong>New to IMSDA Events?</strong>
           <span>Want one place to manage future registrations? Create an optional account. Registration itself never requires one.</span>
+          <AccountComingSoonNotice />
           <Link className="secondary-button full-button" href="/account/sign-up">Create an account</Link>
           <p className="field-help"><Link href="/recover-registration">Manage my registration without an account</Link>.</p>
         </div>
