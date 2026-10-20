@@ -9,6 +9,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { passkeysConfigured as staffPasskeysConfigured } from "@/modules/access/passkeys";
 import { resolvePostLoginDestination } from "@/modules/access/post-login-destination";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
+import { isStaffSessionTimedOutForLinkedAttendee, STAFF_TIMED_OUT_NOTICE } from "@/modules/account-merge/staff-timeout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured as attendeePasskeysConfigured } from "@/modules/attendee-accounts/passkeys";
 import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
@@ -45,7 +46,13 @@ export default async function SignInPage({
   const next = typeof rawNext === "string" ? rawNext : undefined;
   const session = await getCurrentSession();
   if (session.user) redirect(await resolvePostLoginDestination(session.user, { returnTo: next }));
-  if ((await getCurrentAttendee()).account) redirect(attendeeReturnDestination(next, "/account"));
+  // A linked person whose staff side idled out (#1092) arrives here from a staff page (or the
+  // header's "Staff sign-in" link) with a `next`, still holding a live attendee session. They stay
+  // on this page with a notice instead of being sent on to /account. The check reads only this
+  // browser's own attendee session and its link, never a typed email, so nothing about staff
+  // accounts is revealed; an anonymous visitor never sees the notice.
+  const staffTimedOut = next ? await isStaffSessionTimedOutForLinkedAttendee() : false;
+  if (!staffTimedOut && (await getCurrentAttendee()).account) redirect(attendeeReturnDestination(next, "/account"));
 
   const errorMessage = attendeeSignInErrorMessage(typeof error === "string" ? error : undefined);
   const googleAvailable = isGoogleSignInConfigured();
@@ -64,6 +71,7 @@ export default async function SignInPage({
           <h1>Sign in</h1>
           <p>Use your email and password. Some accounts will be asked for a second step after the password.</p>
         </div>
+        {staffTimedOut && <p className="form-notice" role="status">{STAFF_TIMED_OUT_NOTICE}</p>}
         {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
         {(googleAvailable || passkeysAvailable) && (
           <>

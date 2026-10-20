@@ -8,9 +8,11 @@ const mocks = vi.hoisted(() => ({
   getCurrentSession: vi.fn(),
   getCurrentAttendee: vi.fn(),
   isUnifiedSignInEnabled: vi.fn(),
+  staffTimedOut: vi.fn(),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
+vi.mock("@/modules/account-merge/staff-timeout", () => ({ isStaffSessionTimedOutForLinkedAttendee: mocks.staffTimedOut }));
 vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: mocks.isUnifiedSignInEnabled }));
 
 import { AccountHeaderActions } from "@/components/account-header-actions";
@@ -59,6 +61,7 @@ describe("PublicHeaderSessionLinks (#1009)", () => {
     mocks.getCurrentSession.mockReset().mockResolvedValue({ user: null });
     mocks.getCurrentAttendee.mockReset().mockResolvedValue({ account: null, via: null, sessionId: null });
     mocks.isUnifiedSignInEnabled.mockReset().mockResolvedValue(false);
+    mocks.staffTimedOut.mockReset().mockResolvedValue(false);
   });
   const html = async () => renderToStaticMarkup(await PublicHeaderSessionLinks());
 
@@ -84,6 +87,27 @@ describe("PublicHeaderSessionLinks (#1009)", () => {
     const out = await html();
     expect(out).toContain('href="/account/sign-in"');
     expect(out).toContain("Sign in");
+  });
+
+  it("a linked attendee whose staff side timed out gets a Staff sign-in link (#1092)", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct_1" }, via: "attendee", sessionId: "s1" });
+    mocks.staffTimedOut.mockResolvedValue(true);
+    const out = await html();
+    expect(out).toContain("My account");
+    expect(out).toContain("Staff sign-in");
+    expect(out).toContain('href="/sign-in?next=%2Foverview"');
+  });
+
+  it("an attendee not linked to staff, an anonymous visitor and a staff session get no Staff sign-in link (#1092)", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct_1" }, via: "attendee", sessionId: "s1" });
+    expect(await html()).not.toContain("Staff sign-in");
+    mocks.staffTimedOut.mockClear();
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    mocks.staffTimedOut.mockResolvedValue(true);
+    expect(await html()).not.toContain("Staff sign-in");
+    expect(mocks.staffTimedOut).not.toHaveBeenCalled();
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: null } });
+    expect(await html()).not.toContain("Staff sign-in");
   });
 
   it("a staff session shows Staff workspace", async () => {

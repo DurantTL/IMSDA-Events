@@ -3,6 +3,7 @@ import { PublicHeaderLinks } from "@/components/public-header-links";
 import { logError } from "@/lib/logger";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
+import { isStaffSessionTimedOutForLinkedAttendee } from "@/modules/account-merge/staff-timeout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 
 /**
@@ -18,11 +19,14 @@ export async function PublicHeaderSessionLinks() {
   let staffSignedIn = false;
   let attendeeSignedIn = false;
   let unifiedSignInEnabled = false;
+  let staffTimedOut = false;
   try {
     const [session, attendee] = await Promise.all([getCurrentSession(), getCurrentAttendee()]);
     staffSignedIn = Boolean(session.user);
     attendeeSignedIn = Boolean(attendee.account);
     if (!staffSignedIn && !attendeeSignedIn) unifiedSignInEnabled = await isUnifiedSignInEnabled();
+    // (#1092) Never throws and is false for anyone not signed in as an attendee linked to staff.
+    if (!staffSignedIn && attendee.account && attendee.via === "attendee") staffTimedOut = await isStaffSessionTimedOutForLinkedAttendee();
   } catch (error) {
     unstable_rethrow(error);
     logError("Public header session read failed", error);
@@ -30,5 +34,5 @@ export async function PublicHeaderSessionLinks() {
     attendeeSignedIn = false;
     unifiedSignInEnabled = false;
   }
-  return <PublicHeaderLinks staffSignedIn={staffSignedIn} attendeeSignedIn={attendeeSignedIn} unifiedSignInEnabled={unifiedSignInEnabled} />;
+  return <PublicHeaderLinks staffSignedIn={staffSignedIn} attendeeSignedIn={attendeeSignedIn} unifiedSignInEnabled={unifiedSignInEnabled} staffTimedOut={staffTimedOut} />;
 }
