@@ -8,9 +8,7 @@ import {
   CHURCH_AGREEMENT,
   MAX_APPLICATION_ATTACHMENT_BYTES,
   MAX_OTHER_BOARD_MEMBERS,
-  NEW_CLUB_TYPES,
   PHILOSOPHY_STATEMENT,
-  newClubTypeLabels,
 } from "@/modules/club-applications/domain";
 
 const OTHER = "__other__";
@@ -36,7 +34,6 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
   const [openedAt] = useState(() => Date.now());
   const [values, setValues] = useState({
     clubName: "",
-    clubType: "" as "" | (typeof NEW_CLUB_TYPES)[number],
     church: "",
     churchOther: "",
     pastorName: "",
@@ -75,7 +72,6 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
       const isOther = values.church === OTHER;
       const data = {
         clubName: values.clubName,
-        clubType: values.clubType,
         sponsoringChurchId: isOther ? null : values.church || null,
         sponsoringChurchOther: isOther ? values.churchOther : null,
         pastorName: values.pastorName,
@@ -129,13 +125,6 @@ export function NewClubApplicationForm({ churches, todayLabel, inviteToken, pref
           <label>
             Club name
             <input autoComplete="off" maxLength={120} onChange={(event) => set("clubName", event.target.value)} required value={values.clubName} />
-          </label>
-          <label>
-            Type of club
-            <select onChange={(event) => set("clubType", event.target.value as typeof values.clubType)} required value={values.clubType}>
-              <option value="">Choose…</option>
-              {NEW_CLUB_TYPES.map((type) => <option key={type} value={type}>{newClubTypeLabels[type]}</option>)}
-            </select>
           </label>
           <label>
             Sponsoring church or company

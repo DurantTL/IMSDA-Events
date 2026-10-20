@@ -130,6 +130,18 @@ describe("POST /api/public/club-applications", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
 
+  it("refuses an Adventurer application with a plain message, and takes one with no club type", async () => {
+    const refused = await post(formWith({ ...validData, clubType: "ADVENTURER" }));
+    expect(refused.status).toBe(400);
+    expect((await refused.json()).message).toBe("New club applications are for Pathfinder clubs only.");
+    expect(mocks.submit).not.toHaveBeenCalled();
+
+    const withoutType: Record<string, unknown> = { ...validData };
+    delete withoutType.clubType;
+    expect((await post(formWith(withoutType))).status).toBe(201);
+    expect(mocks.submit.mock.calls[0]![0]).toMatchObject({ clubType: "PATHFINDER" });
+  });
+
   it("passes the attachment and the invite token along", async () => {
     const file = new File(["%PDF-1.4"], "page.pdf", { type: "application/pdf" });
     await post(formWith(validData, { attachment: file, inviteToken: "token-abc" }));
