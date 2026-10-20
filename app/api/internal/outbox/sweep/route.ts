@@ -9,6 +9,7 @@ import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitli
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
+import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
 import { runHealthSnapshotSweep } from "@/modules/health-records/snapshot-hooks";
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
@@ -93,6 +94,13 @@ async function postHandler(request: Request) {
       logError("The instructor class email sweep failed after a successful outbox sweep", error);
       return null;
     });
+    // Honor watch summaries (#1099): from about 6:00 AM Central, each watch's one daily email of who joined or left the classes
+    // it looks at, read from the same change log. At most one per watch, address and Central date, so running it on every sweep
+    // is safe. Its failure must not make a successful sweep look failed.
+    const honorWatchSummaries = await sendDueHonorWatchSummaries().catch((error) => {
+      logError("The honor watch summary sweep failed after a successful outbox sweep", error);
+      return null;
+    });
     // Sealed health copies (#924): the event-start copies that are due, and the daily deletion of copies whose
     // keep-until date has passed (never one under a legal hold). A no-op with HEALTH_RECORDS_ENABLED off, safe on
     // every sweep, and it reports counts only. Its failure must not make a successful sweep look failed.
@@ -124,6 +132,7 @@ async function postHandler(request: Request) {
       hostedLinks,
       classWaitlists,
       instructorClassEmails,
+      honorWatchSummaries,
       healthSnapshots,
       generalLinkRetention,
       locationWaitlistDigest: locationWaitlistDigest && {
