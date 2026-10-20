@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { LoginForm } from "@/components/login-form";
 import { AttendeeGoogleButton, attendeeSignInErrorMessage } from "@/components/attendee-google-button";
-import { PasskeySignInButton } from "@/components/passkey-sign-in-button";
-import { StaffPasskeySignInButton } from "@/components/staff-passkey-sign-in-button";
+import { CombinedPasskeySignInButton } from "@/components/combined-passkey-sign-in-button";
 import { isGoogleSignInConfigured } from "@/integrations/oauth/google";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { passkeysConfigured as staffPasskeysConfigured } from "@/modules/access/passkeys";
@@ -50,7 +49,9 @@ export default async function SignInPage({
 
   const errorMessage = attendeeSignInErrorMessage(typeof error === "string" ? error : undefined);
   const googleAvailable = isGoogleSignInConfigured();
+  // One button for both kinds of passkey (#1085); it shows when either side can sign in.
   const [staffPasskeys, attendeePasskeys] = await Promise.all([staffPasskeysConfigured(), attendeePasskeysConfigured()]);
+  const passkeysAvailable = staffPasskeys || attendeePasskeys;
 
   return (
     <main className="auth-page">
@@ -64,10 +65,9 @@ export default async function SignInPage({
           <p>Use your email and password. Some accounts will be asked for a second step after the password.</p>
         </div>
         {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
-        {(googleAvailable || staffPasskeys || attendeePasskeys) && (
+        {(googleAvailable || passkeysAvailable) && (
           <>
-            {staffPasskeys && <StaffPasskeySignInButton next={next} label="Sign in with a team passkey" />}
-            {attendeePasskeys && <PasskeySignInButton next={next} label="Sign in with an account passkey" />}
+            {passkeysAvailable && <CombinedPasskeySignInButton next={next} label="Sign in with a passkey" />}
             {googleAvailable && <AttendeeGoogleButton label="Sign in with Google" next={next} />}
             <p className="auth-divider"><span>or</span></p>
           </>

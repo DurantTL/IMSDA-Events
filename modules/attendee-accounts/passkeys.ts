@@ -332,6 +332,31 @@ export async function beginPasskeySignIn(requestOrigin: string | null, now = new
   return { options, challengeId: challenge.id };
 }
 
+/**
+ * Stores an attendee sign-in prompt for options made elsewhere (#1085): the
+ * combined sign-in generates one set of authentication options and keeps the
+ * same challenge on both sides. Same single use and five-minute life as
+ * `beginPasskeySignIn`.
+ */
+export async function storeSignInChallenge(requestOrigin: string | null, challenge: string, now = new Date()) {
+  await requireRelyingParty(requestOrigin);
+  const prisma = getPrisma();
+  await prisma.attendeePasskeyChallenge.deleteMany({ where: { purpose: "SIGN_IN", expiresAt: { lt: now } } });
+  const stored = await prisma.attendeePasskeyChallenge.create({
+    data: { purpose: "SIGN_IN", challenge, expiresAt: new Date(now.getTime() + PASSKEY_CHALLENGE_MINUTES * 60_000) },
+    select: { id: true },
+  });
+  return stored.id;
+}
+
+/** Spends an attendee sign-in prompt without answering it (#1085). Idempotent. */
+export async function spendSignInChallenge(challengeId: string, now = new Date()) {
+  await getPrisma().attendeePasskeyChallenge.updateMany({
+    where: { id: challengeId, purpose: "SIGN_IN", usedAt: null },
+    data: { usedAt: now },
+  });
+}
+
 function decodeUserHandle(value: string | undefined) {
   if (!value) return null;
   try {
