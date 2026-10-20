@@ -27,6 +27,7 @@
     "test:earned-awards": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-earned-awards.ts",
     "test:honor-entry-void": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-honor-entry-void.ts",
     "test:honor-instructors": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-honor-instructors.ts",
+    "test:honor-class-emails": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-honor-class-emails.ts",
     "test:event-content-blocks": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-content-blocks.ts",
     "test:event-templates": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-templates.ts",
     "test:seeded-form-templates": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-seeded-form-templates.ts",

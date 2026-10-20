@@ -76,6 +76,8 @@ function database(options: { taken?: Array<[string, number]>; clubTaken?: Array<
     honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
     honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue(sessions) },
+    // The instructor change log (#1098).
+    honorClassChange: { createManyAndReturn: vi.fn(async ({ data }: { data: unknown[] }) => data.map((_row, index) => ({ id: `change-${index}` }))) },
     honorEnrollment: {
       groupBy: vi.fn()
         .mockResolvedValueOnce(groups(options.taken))
@@ -83,7 +85,7 @@ function database(options: { taken?: Array<[string, number]>; clubTaken?: Array<
         .mockResolvedValue(groups(options.taken)),
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn(),
-      createMany: vi.fn(async ({ data }: { data: Array<{ offeringId: string; registrationAttendeeId: string }> }) => { created.push(...data); return { count: data.length }; }),
+      createManyAndReturn: vi.fn(async ({ data }: { data: Array<{ offeringId: string; registrationAttendeeId: string }> }) => { created.push(...data); return data.map((_row, index) => ({ id: `e-new-${index}` })); }),
     },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(db)),

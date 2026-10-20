@@ -649,6 +649,10 @@ enum MessageTemplateKey {
   CANCELLATION_REQUEST_RECEIVED
   /// A cancellation request changed status (#170). Status only: never the reason, the amount or a staff note.
   CANCELLATION_REQUEST_UPDATED
+  /// The daily summary of youth who joined or left an Honors Weekend instructor's classes (#1098): one email per instructor, names, clubs and ages only. Not an event template.
+  HONOR_INSTRUCTOR_CLASS_SUMMARY
+  /// One youth joined or left an Honors Weekend instructor's class, sent right away when the instructor chose that (#1098). Not an event template.
+  HONOR_INSTRUCTOR_CLASS_CHANGE
 }
 
 enum MessageTemplateStatus {
@@ -744,6 +748,18 @@ enum ClubInviteStatus {
 enum HonorOfferingSpan {
   SINGLE_SESSION
   ALL_SESSIONS
+}
+
+/// How an Honors Weekend instructor hears that a youth joined or left one of their classes (#1098).
+enum HonorClassChangeEmails {
+  DAILY
+  IMMEDIATE
+  OFF
+}
+
+enum HonorClassChangeKind {
+  JOINED
+  LEFT
 }
 
 enum ProgramAssignmentOutcome {
@@ -1722,6 +1738,7 @@ model Event {
   clubRegistrationDrafts              ClubRegistrationDraft[]
   clubAssignments                     ClubEventAssignment[]
   honorEnrollments                    HonorEnrollment[]
+  honorClassChanges                   HonorClassChange[]
   honorClassWaitlist                  HonorClassWaitlistEntry[]
   memberTransferRegistrationMoves     MemberTransferRegistrationMove[]
   registrationOperations              RegistrationOperation[]
@@ -5249,6 +5266,7 @@ model HonorOffering {
   /// Honors a youth must have completed first (#832); every one is required.
   prerequisites HonorOfferingPrerequisite[]
   waitlist     HonorClassWaitlistEntry[]
+  classChanges HonorClassChange[]
 
   // "No honor twice in a session" and the all-sessions rules now live on
   // `HonorOfferingHonor`, one row per honor taught (#812).
@@ -8628,6 +8646,10 @@ model HonorInstructor {
   acceptedAt        DateTime?
   revokedAt         DateTime?
   revokedByUserId   String?
+  /// How the instructor hears about youth joining or leaving their classes (#1098). Set only by the instructor.
+  classChangeEmails HonorClassChangeEmails @default(DAILY)
+  /// The end of the last daily summary's window (#1098): changes at or before it are never summarized again.
+  classChangeSummaryAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -8654,6 +8676,33 @@ model HonorInstructorClass {
 
   @@unique([instructorId, offeringId])
   @@index([offeringId])
+}
+
+/// One youth joining or leaving a class (#1098), written in the same transaction as the enrollment change. It is the
+/// source for the instructor's daily summary (a join then a leave nets out) and for right-away emails. `enrollmentId` and
+/// `registrationAttendeeId` are plain ids, not keys: the enrollment (or the attendee) may be gone by the time it is read.
+/// The name, club and age are copied when the change happens so the summary never needs the youth's record (and never a birth date).
+model HonorClassChange {
+  id                     String               @id @default(cuid())
+  eventId                String
+  offeringId             String
+  enrollmentId           String
+  registrationAttendeeId String
+  kind                   HonorClassChangeKind
+  youthName              String
+  clubName               String?
+  ageOnEventDate         Int?
+  at                     DateTime             @default(now())
+  /// Set once the right-away emails for this change were queued (or none were due), so a sweep never queues them twice.
+  immediateHandledAt     DateTime?
+
+  event    Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  offering HonorOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+
+  @@index([offeringId, at])
+  @@index([at])
+  @@index([immediateHandledAt, at])
+  @@index([eventId])
 }
 
 /// An instructor's mark on one class enrollment (#833): attended, and

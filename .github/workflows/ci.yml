@@ -173,6 +173,14 @@ jobs:
       - if: steps.scope.outputs.full == 'true'
         run: npm run test:honor-instructors
 
+      # Real-database check of the emails to Honors Weekend instructors when a youth joins or leaves their class (#1098):
+      # every real enrollment path writes its change row, a daily summary nets a join and a leave and is sent once
+      # however many sweeps run at once, a right-away instructor gets one email per change, OFF, revoked and
+      # not-accepted instructors get none, the staff switch holds everything, a paused event's email is suppressed,
+      # and no birth date reaches an email.
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-class-emails
+
       # Real-database check of event templates: apply, revision isolation, save/publish
       # races, parallel same-key applies, key reuse, and sticky archive (#152).
       - if: steps.scope.outputs.full == 'true'

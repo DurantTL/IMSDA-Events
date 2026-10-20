@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
 import { INSTRUCTOR_EDIT_GRACE_DAYS } from "@/modules/honors/instructor-domain";
+import { classChangeEmailLabels } from "@/modules/honors/class-change-domain";
 
 type ClassOption = { id: string; label: string };
 type Instructor = {
@@ -15,6 +16,7 @@ type Instructor = {
   sterlingCurrent: boolean;
   sterlingState: string;
   offeringIds: string[];
+  classChangeEmails: "DAILY" | "IMMEDIATE" | "OFF";
 };
 type ListResponse = { instructors?: Instructor[]; classes?: ClassOption[]; emailQueued?: boolean; message?: string };
 
@@ -151,6 +153,7 @@ export function HonorsInstructorsWorkspace({
                       ? "Sterling Volunteers check flagged \"!\" (expiring soon; not current)"
                       : "No current Sterling Volunteers check"}
                 </span>
+                <span className="status-chip">Class list emails: {classChangeEmailLabels[instructor.classChangeEmails].label} (the instructor chooses)</span>
                 <fieldset>
                   <legend className="sr-only">Classes for {instructor.name}</legend>
                   {classes.map((option) => (

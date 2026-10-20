@@ -12422,3 +12422,10 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .sterling-check-in-override-form { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
 .sterling-check-in-override-form input { width: 100%; min-width: 0; }
 .sterling-check-in-override .status-chip { white-space: normal; }
+
+/* Honors Weekend instructor: how they hear about class list changes (#1098). */
+.instructor-email-choice { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; border: 0; min-width: 0; }
+.instructor-email-choice legend { padding: 0; margin-bottom: 4px; color: var(--imsda-purple); }
+.instructor-email-choice label { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 4px 0; color: var(--imsda-purple); overflow-wrap: anywhere; }
+.instructor-email-choice input[type="radio"] { flex: 0 0 auto; width: 20px; height: 20px; margin: 2px 0 0; }
+.instructor-email-choice small { display: block; opacity: 0.8; }

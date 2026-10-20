@@ -107,8 +107,96 @@ only is not completed by a later check-in-based run (the staff notice counts
 them as skipped). Someone with no instructor
 mark is still completed by check-in, as before.
 
+## Class list emails (#1098)
+
+An instructor can be told when a youth joins or leaves one of their classes. Each instructor chooses, on their own classes
+page (`/account/instructor`, one choice per event they teach at):
+
+- **Daily summary** (the default): one email a day, only on a day something changed.
+- **Right away**: one email per change.
+- **No emails**.
+
+Staff see the choice on the instructors list but cannot change it; no staff route sets it. An instructor who leaves the daily
+summary (for right-away or no emails) is sent one last summary of what changed since their previous one, after the choice has
+committed; if nothing changed, only the summary point moves. Choosing the daily summary again
+starts it from that moment, so changes already emailed (or not wanted) do not come back in a summary.
+
+Only instructors who accepted their invite and were not removed get anything, and only while their roster is open (14 days
+after the event ends). Emails respect paused event email (`modules/communications/effective-delivery.ts`): while an event is
+paused the message is recorded as suppressed, like a waitlist offer's.
+
+### What counts as a change
+
+A youth **joins** a class when a pick for it is created, and **leaves** when the pick is deleted. Every path that does
+either writes a row to `HonorClassChange` (class, enrollment, youth, kind, time) in the same transaction, through
+`modules/honors/class-change-log.ts`:
+
+| Path | Logged |
+| --- | --- |
+| A director or group contact saves class picks (`setOwnerClassSelections`) | joins and leaves |
+| A system administrator places a youth, or removes a pick (`admin-placement.ts`) | join, leave |
+| A director accepts a waitlist offer (`acceptClassWaitlistOffer`) | join |
+| A registration is cancelled, or moved to the waitlist (`lifecycle-repository.ts`) | a leave for each pick (no enrollment row is deleted, but the pick leaves the instructor's list) |
+| A cancelled or waitlisted registration comes back (`restoreClassSeatsInTransaction`) | a join for each pick that still fits |
+| An attendee is removed in a registration amendment (`amendments-repository.ts`) | a leave for each of their picks (the picks go with the attendee) |
+| A registration import update cancels or waitlists an active registration (`imports/repository.ts`) | a leave for each pick |
+| A member transfer moves a pick between registrations whose status differs in being active (`club-transfers/repository.ts`) | a leave (the old one is active, the new one isn't) or a join (the reverse); nothing when both are active, since the class and the list are unchanged |
+
+Deliberately not logged, each with a test that names it: deleting a whole event, deleting a class (the class and its
+instructor assignments go too), and a pick dropped while a registration is brought back (it was never on a class list, since
+the registration was inactive). A new code path that creates or deletes an `HonorEnrollment` fails
+`tests/honor-class-change-log-1098.test.ts` until it logs or is listed as exempt with a reason.
+
+Rows are written only for classes that have an instructor who has not been removed. Each row copies the youth's name, club
+and age on the event date, because the enrollment or even the attendee can be gone by the time it is read. The birth date is
+never read, copied or emailed.
+
+Logging only writes a row, so it is safe inside the serializable pick transaction (docs/MEALS.md). It reads the picks it logs and writes the rows in one statement; it does not read instructor assignments, so the pick transaction does not depend on them. Every change is logged, whether or not the class has an instructor yet.
+
+### Retention
+
+The rows hold a youth's name, club and age, so the sweep deletes them (`pruneClassChanges`, on every run, whatever the staff switch says):
+
+- every row of an event whose roster has closed (the event's end plus the 14-day roster window, the same rule that stops the emails), and
+- any row older than 8 days, which is past every daily window. If the staff switch was off for longer than that, those changes are not reported.
+
+The daily query also leaves closed rosters out, so they stop being read.
+
+### Sending
+
+The code is `modules/honors/class-change-emails.ts`. The staff switch **Honor instructor class emails** (System management,
+Email, Staff alerts; `HONOR_INSTRUCTOR_CLASS_EMAILS`, #1016) is read before any transaction. Turning it off queues and stamps
+nothing, so the changes wait and go out (netted) when it is turned back on; a right-away email older than a day is skipped
+rather than sent late.
+
+- **Daily summary.** The outbox sweep calls `sendDueClassChangeEmails` on every run. From 6:00 AM Central (plus a two-minute
+  grace, so a request that began just before the cutoff has committed) each accepted instructor gets one email covering all
+  their classes, listing who joined and who left (name, club, age), the count against the class limit and a link to each
+  class list. A youth who joined and left (or left and rejoined) the same class in the window is dropped: the first and last
+  change decide. Nothing is sent, and nothing queued, on a day with no net change.
+- **Right away.** After the transaction commits, the caller kicks `kickClassChangeEmails` with the ids of the rows it wrote
+  and no others (`recordClassChanges` returns them). Nested paths (cancel, reinstate, waitlist move, amendment, import,
+  transfer) are wrapped in `withClassChangeKick`, which collects the ids and kicks once after the whole call. The kick queues
+  one email per change for each right-away instructor of the class through the outbox and delivers after commit
+  (`processQueuedMessageIdsAfterCommit`). When nobody teaching those classes is on right-away it only stamps the rows. The
+  backlog is left to the sweep, which repeats this for anything a failed kick left behind.
+
+### Why a second sweep cannot send twice
+
+Three guards, any one of which is enough:
+
+1. The summary's point in time, `HonorInstructor.classChangeSummaryAt`, is moved to the cutoff by one conditional update
+   (`classChangeSummaryAt` is null or earlier than the cutoff). Only one run can win it; the others see zero rows and stop.
+   It is moved in the same transaction that queues the message, so a rollback leaves both untouched.
+2. The message key is `honor-class-change-summary:<instructor>:<Central date>`; the outbox reuses an existing message.
+3. A right-away change is stamped `immediateHandledAt` by a conditional update in the transaction that queues its emails,
+   and its message key is `honor-class-change:<change>:<instructor>`.
+
+`npm run test:honor-class-emails` proves this against a real database, including three sweeps at the same moment.
+
 ## Audit
 
 Each mark call writes `HONOR_CLASS_MARKS_UPDATED` with the event, class,
 instructor, account, action and counts: ids and counts only, never names.
 Invites, class changes, accepting and removing are audited too.
+An instructor changing their class list email choice is audited as `HONOR_INSTRUCTOR_CLASS_EMAILS_CHANGED` (ids and the old and new choice).

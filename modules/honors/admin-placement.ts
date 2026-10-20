@@ -5,6 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { pauseBeforeRetry } from "@/lib/prisma-errors";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { seatOverrideReasonMax, seatOverrideReasonMin } from "@/modules/honors/admin-placement-limits";
+import { recordClassChanges } from "@/modules/honors/class-change-log";
 import {
   requirementGaps,
   requirementResolution,
@@ -123,8 +124,11 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
     throw new SeatOverrideError("SELECTION_INVALID", `Give a reason of 3 to ${seatOverrideReasonMax} characters for placing someone who doesn't meet a class requirement.`);
   }
   let waitlistMessageIds: string[] = [];
+  // Joins and leaves logged for instructors (#1098); their right-away emails are kicked off once the transaction commits.
+  let classChangesLogged: string[] = [];
   const placed = await runSerializable(async (tx) => {
     waitlistMessageIds = [];
+    classChangesLogged = [];
     await requireSystemAdministratorRow(tx, actorUserId);
 
     const attendee = await tx.registrationAttendee.findFirst({
@@ -239,6 +243,7 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
       },
       select: { id: true },
     });
+    classChangesLogged.push(...(await recordClassChanges(tx, [created.id], "JOINED", now)));
 
     // The youth's own place on this class's waitlist is settled, as when a director picks a class they wait for: a place still in
     // the line, or the offer the close just cut off (its seat is the one this placement takes). Nobody else's position or offer changes.
@@ -323,6 +328,7 @@ export async function placeYouthInClass(eventId: string, actorUserId: string, in
     return { enrollmentId: created.id, registrationId: registration.registrationId, offeringId: offering.id, overCapacity, clubLimitExceeded };
   });
   if (waitlistMessageIds.length > 0) await (await import("@/modules/honors/waitlist-repository")).deliverWaitlistOfferMessages(waitlistMessageIds);
+  await (await import("@/modules/honors/class-change-emails")).kickClassChangeEmails(classChangesLogged);
   return placed;
 }
 
@@ -336,8 +342,10 @@ export type RemovePickInput = { enrollmentId: string; reason: string };
 export async function removePickAsAdministrator(eventId: string, actorUserId: string, input: RemovePickInput, now = new Date()) {
   const reason = cleanReason(input.reason);
   let waitlistMessageIds: string[] = [];
+  let classChangesLogged: string[] = [];
   const removed = await runSerializable(async (tx) => {
     waitlistMessageIds = [];
+    classChangesLogged = [];
     await requireSystemAdministratorRow(tx, actorUserId);
     const pick = await tx.honorEnrollment.findFirst({
       where: { id: input.enrollmentId, eventId },
@@ -353,6 +361,8 @@ export async function removePickAsAdministrator(eventId: string, actorUserId: st
     if (marked || completed) {
       throw new SeatOverrideError("PICK_HAS_MARKS", "The instructor has already marked this pick, or it was written to an honor record, so it can't be removed here.");
     }
+    // Logged for the instructor before the pick goes: the row reads it (#1098). Only a row is written here.
+    classChangesLogged.push(...(await recordClassChanges(tx, [pick.id], "LEFT", now)));
     const deleted = await tx.honorEnrollment.deleteMany({ where: { id: pick.id } });
     if (deleted.count === 0) throw new SeatOverrideError("PICK_NOT_FOUND", "That class pick no longer exists.");
 
@@ -380,5 +390,6 @@ export async function removePickAsAdministrator(eventId: string, actorUserId: st
     return { registrationId: pick.registrationId, offeringId: pick.offeringId };
   });
   if (waitlistMessageIds.length > 0) await (await import("@/modules/honors/waitlist-repository")).deliverWaitlistOfferMessages(waitlistMessageIds);
+  await (await import("@/modules/honors/class-change-emails")).kickClassChangeEmails(classChangesLogged);
   return removed;
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { withClassChangeKick } from "@/modules/honors/class-change-log";
 
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -196,7 +197,7 @@ export async function createEventLocation(eventId: string, actorUserId: string, 
  * seats a racing registration is taking: the new capacity may not be below the
  * people already registered there.
  */
-export async function updateEventLocation(eventId: string, locationId: string, actorUserId: string, rawInput: unknown) {
+async function updateEventLocationInner(eventId: string, locationId: string, actorUserId: string, rawInput: unknown) {
   const input = eventLocationUpdateSchema.parse(rawInput);
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -362,3 +363,6 @@ export async function deleteEventLocation(eventId: string, locationId: string, a
 export async function listPickableLocations(eventId: string) {
   return (await listEventLocations(eventId)).filter((location) => location.isActive);
 }
+
+/** Promoting the location's waitlisted registrations can bring picks back onto class lists (#1098): the right-away emails start after it commits. */
+export const updateEventLocation: typeof updateEventLocationInner = (...args) => withClassChangeKick(() => updateEventLocationInner(...args));

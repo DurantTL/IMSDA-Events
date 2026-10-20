@@ -212,6 +212,8 @@ function fixture({
     })) },
     clubEventRegistration: { findUnique: vi.fn(async (): Promise<{ registrationId: string } | null> => ({ registrationId: "registration-1" })) },
     eventMealSelection: { findMany: vi.fn(async () => []) },
+    // The instructor class change log (#1098) reads a removed attendee's picks; there are none.
+    honorEnrollment: { findMany: vi.fn(async () => []) },
     registrationAttendee: {
       findMany: vi.fn(async () => registration.attendees.map((a) => ({ id: a.id, personId: a.personId, profileSnapshot: a.profileSnapshot, formResponses: a.formResponses }))),
       count: vi.fn(async () => 0),
@@ -870,7 +872,7 @@ describe("club registration edit at an event location (#413)", () => {
       $queryRaw: queryRaw,
       $executeRawUnsafe: executeRaw,
       eventLocation: { findFirst, findUnique: vi.fn(async () => ({ name: current.name })), count: vi.fn().mockResolvedValue(known.length) },
-      honorEnrollment: { count: classPickCount },
+      honorEnrollment: { count: classPickCount, findMany: vi.fn(async () => []) },
       honorClassWaitlistEntry: { count: vi.fn().mockResolvedValue(0) },
     };
     Object.assign(prisma, extra, { clubEventRegistration: { findUnique: clubRegistrationFindUnique } });

@@ -1,3 +1,4 @@
+import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { checkLocationSeats } from "@/modules/event-locations/admission";
@@ -1394,7 +1395,7 @@ export async function listRegistrationMoves(status: "PENDING" | "DECIDED" = "PEN
  * The registration amendment engine isn't used for the move itself: it
  * works inside one registration and reprices it, which this must never do.
  */
-export async function approveRegistrationMove(moveId: string, note: string, actor: StaffTransferActor, now = new Date()) {
+async function approveRegistrationMoveInner(moveId: string, note: string, actor: StaffTransferActor, now = new Date()) {
   // Read before the transaction opens (#1016): a read inside one would need a second pool connection.
   const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   let lastError: unknown = null;
@@ -1501,10 +1502,17 @@ async function approveRegistrationMoveOnce(tx: Prisma.TransactionClient, moveId:
       data: { registrationId: toRegistrationId, organizationId: move.transfer.toOrganizationId },
     });
   }
+  // The pick keeps its class, but whether it is on an instructor's list follows the registration's status (#1098): logged only when
+  // the two registrations differ in that. A leave is logged before the move, a join after it (so the row names the new club).
+  const activeStatuses = ["SUBMITTED", "CONFIRMED"];
+  const fromActive = activeStatuses.includes(move.fromRegistration.status);
+  const toActive = activeStatuses.includes(described.toRegistration.status);
+  if (fromActive && !toActive) await recordAttendeeClassChanges(tx, [attendeeId], "LEFT", now);
   const honorEnrollments = await tx.honorEnrollment.updateMany({
     where: { registrationAttendeeId: attendeeId },
     data: { registrationId: toRegistrationId, organizationId: move.transfer.toOrganizationId },
   });
+  if (!fromActive && toActive) await recordAttendeeClassChanges(tx, [attendeeId], "JOINED", now);
   const reservations = await tx.registrationCapacityReservation.updateMany({
     where: { registrationAttendeeId: attendeeId },
     data: { registrationId: toRegistrationId },
@@ -1609,3 +1617,5 @@ export async function skipRegistrationMove(moveId: string, note: string, actor: 
     return { moveId };
   });
 }
+
+export const approveRegistrationMove: typeof approveRegistrationMoveInner = (...args) => withClassChangeKick(() => approveRegistrationMoveInner(...args));

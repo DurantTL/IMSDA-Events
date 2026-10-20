@@ -4,6 +4,7 @@ import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
+import { recordRegistrationClassChanges } from "@/modules/honors/class-change-log";
 import { loadOfferings, seatCounts, type SeatOwner, type Snapshot } from "@/modules/honors/enrollment-repository";
 import { contactOf, promoteClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { classChangesOpen } from "@/modules/honors/locations";
@@ -47,17 +48,25 @@ export type RestoredClassSeats = {
 
 const nothing = (pendingMessageIds: string[] = []): RestoredClassSeats => ({ dropped: { report: [], items: [] }, droppedCount: 0, keptOverCount: 0, pendingMessageIds });
 
-export async function restoreClassSeatsInTransaction(
-  tx: Prisma.TransactionClient,
-  input: {
-    eventId: string;
-    registrationId: string;
-    now: Date;
-    actorUserId: string | null;
-    correlationId: string;
-    trigger: RestoreTrigger;
-  },
-): Promise<RestoredClassSeats> {
+type RestoreInput = {
+  eventId: string;
+  registrationId: string;
+  now: Date;
+  actorUserId: string | null;
+  correlationId: string;
+  trigger: RestoreTrigger;
+};
+
+export async function restoreClassSeatsInTransaction(tx: Prisma.TransactionClient, input: RestoreInput): Promise<RestoredClassSeats> {
+  const restored = await restoreClassSeatsCore(tx, input);
+  // The picks that survive are on their classes again the moment the registration flips to active, which is what
+  // instructors see (#1098). A pick dropped above was never visible (the registration was inactive), so it logs nothing.
+  // Only rows are written here; the right-away emails are sent by the sweep.
+  await recordRegistrationClassChanges(tx, input.registrationId, "JOINED", input.now);
+  return restored;
+}
+
+async function restoreClassSeatsCore(tx: Prisma.TransactionClient, input: RestoreInput): Promise<RestoredClassSeats> {
   const picks = await tx.honorEnrollment.findMany({
     where: { registrationId: input.registrationId },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],

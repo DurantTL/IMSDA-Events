@@ -59,11 +59,13 @@ function database(options: { registrationLocation: { id: string; name: string } 
     honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
     honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue(sessions) },
+    // The instructor change log (#1098): no class here has an instructor, so nothing is written.
+    honorClassChange: { createManyAndReturn: vi.fn(async ({ data }: { data: unknown[] }) => data.map((_row, index) => ({ id: `change-${index}` }))) },
     honorEnrollment: {
       groupBy: vi.fn().mockResolvedValue([]),
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn(),
-      createMany: vi.fn(async ({ data }: { data: Array<{ offeringId: string }> }) => { created.push(...data); return { count: data.length }; }),
+      createManyAndReturn: vi.fn(async ({ data }: { data: Array<{ offeringId: string }> }) => { created.push(...data); return data.map((_row, index) => ({ id: `e-new-${index}` })); }),
     },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(db)),
@@ -125,7 +127,7 @@ describe("the server keeps a club to its own site's classes (#589)", () => {
     await expect(setClassSelections("club-1", "event-1", actor, { "attendee-1": ["knots-hr"] }, now))
       .rejects.toMatchObject({ code: "SELECTION_INVALID", message: expect.stringContaining("isn't offered at your location, Des Moines") });
     expect(created).toEqual([]);
-    expect(db.honorEnrollment.createMany).not.toHaveBeenCalled();
+    expect(db.honorEnrollment.createManyAndReturn).not.toHaveBeenCalled();
   });
 
   it("refuses another site's all-sessions class too", async () => {
@@ -141,8 +143,8 @@ describe("the server keeps a club to its own site's classes (#589)", () => {
     const { db, created } = database({ registrationLocation: { id: "loc-dm", name: "Des Moines" }, eventHasLocations: true });
     // A pick at Camp Heritage came along with a member transfer.
     db.honorEnrollment.findMany.mockResolvedValue([
-      { id: "e-hidden", registrationAttendeeId: "attendee-1", offeringId: "knots-hr" },
-      { id: "e-visible", registrationAttendeeId: "attendee-1", offeringId: "birds-dm" },
+      { id: "e-hidden", registrationAttendeeId: "attendee-1", offeringId: "knots-hr", registrationAttendee: { profileSnapshot: { firstName: "Alex", lastName: "Youth", ageOnEventDate: 12 } }, organization: { name: "Synthetic Pathfinders" }, eventId: "event-1" },
+      { id: "e-visible", registrationAttendeeId: "attendee-1", offeringId: "birds-dm", registrationAttendee: { profileSnapshot: { firstName: "Alex", lastName: "Youth", ageOnEventDate: 12 } }, organization: { name: "Synthetic Pathfinders" }, eventId: "event-1" },
     ]);
     const workspace = await getClassSelectionWorkspace("club-1", "event-1", now);
     expect(workspace.selections).toEqual({ "attendee-1": ["birds-dm"] });

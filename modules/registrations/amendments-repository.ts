@@ -52,6 +52,7 @@ import { registrationOperationFingerprint } from "@/modules/registrations/operat
 import { getRegistrationByIdWithClient } from "@/modules/registrations/repository";
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
+import { recordAttendeeClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 import { holdAcknowledgmentAnswers } from "@/modules/acknowledgments/domain";
 import type { RegistrationAmendmentInput } from "@/modules/registrations/schemas";
 
@@ -1508,7 +1509,7 @@ function retryable(error: unknown) {
     || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002");
 }
 
-export async function amendRegistration(
+async function amendRegistrationInner(
   eventId: string,
   registrationId: string,
   input: RegistrationAmendmentInput,
@@ -1626,6 +1627,9 @@ export async function amendRegistration(
           } catch (error) {
             throw mealErrorToAmendment(error);
           }
+          // Removing an attendee deletes their class picks with them (the key cascades): the instructor's change log
+          // records each leave first, in this transaction (#1098). Only rows are written.
+          await recordAttendeeClassChanges(tx, prepared.removedAttendees.map((attendee) => attendee.id), "LEFT", now);
           try {
             await tx.registrationAttendee.deleteMany({
               where: {
@@ -2051,3 +2055,5 @@ export async function amendRegistration(
     "Another action changed this registration at the same time. Refresh, review, and try again.",
   );
 }
+
+export const amendRegistration: typeof amendRegistrationInner = (...args) => withClassChangeKick(() => amendRegistrationInner(...args));

@@ -82,6 +82,9 @@ function transactionFixture() {
       update: vi.fn().mockResolvedValue({}),
     },
     locationWaitlistChange: { create: vi.fn().mockResolvedValue({ id: "change-1" }) },
+    // The instructor class change log (#1098) reads the registration's picks; this registration has none.
+    honorEnrollment: { findMany: vi.fn().mockResolvedValue([]) },
+    honorClassChange: { createManyAndReturn: vi.fn().mockResolvedValue([]) },
     staffInvitation: { findUnique: vi.fn().mockResolvedValue(null), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     registrationAttendee: {
       count: vi.fn().mockResolvedValue(0),
@@ -251,6 +254,65 @@ describe("registration lifecycle repository", () => {
         registrationId: active.id,
         waitlistPosition: 6,
       }));
+  });
+
+  /** One synthetic pick in a class that has an instructor: the registration's picks, and the rows the change log reads for them. */
+  function givePickInTaughtClass(tx: ReturnType<typeof transactionFixture>["tx"]) {
+    tx.honorEnrollment.findMany.mockImplementation((async ({ where }: { where: { registrationId?: string; id?: { in: string[] } } }) => {
+      if (where.registrationId) return [{ id: "pick-1" }];
+      return [{
+        id: "pick-1", eventId: event.id, offeringId: "class-knots", registrationAttendeeId: "attendee-youth",
+        organization: { name: "Synthetic Pathfinders" },
+        registrationAttendee: { profileSnapshot: { firstName: "Pat", lastName: "Example", ageOnEventDate: 12 } },
+      }];
+    }) as never);
+    tx.honorClassChange.createManyAndReturn.mockResolvedValue([{ id: "change-1" }]);
+  }
+
+  it("logs a cancelled registration's picks as left, in the same transaction and before the status flips (#1098)", async () => {
+    const { prisma, tx } = transactionFixture();
+    const active = registration({ status: "CONFIRMED" });
+    tx.registration.findFirst.mockResolvedValue(active);
+    givePickInTaughtClass(tx);
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await cancelRegistration(event.id, active.id, "user-1", "Registrant requested cancellation.", new Date("2026-08-12T12:00:00.000Z"));
+
+    expect(tx.honorClassChange.createManyAndReturn).toHaveBeenCalledTimes(1);
+    expect(tx.honorClassChange.createManyAndReturn.mock.calls[0]![0].data).toEqual([expect.objectContaining({
+      eventId: event.id, offeringId: "class-knots", enrollmentId: "pick-1", registrationAttendeeId: "attendee-youth",
+      kind: "LEFT", youthName: "Pat Example", clubName: "Synthetic Pathfinders", ageOnEventDate: 12,
+    })]);
+    const flip = tx.registration.update.mock.calls.findIndex(([call]) => call.data.status === "CANCELLED");
+    expect(tx.honorClassChange.createManyAndReturn.mock.invocationCallOrder[0]).toBeLessThan(tx.registration.update.mock.invocationCallOrder[flip]!);
+  });
+
+  it("logs nothing when a registration that was only waitlisted is cancelled: its picks were never on a class list (#1098)", async () => {
+    const { prisma, tx } = transactionFixture();
+    const waiting = registration({ status: "WAITLISTED", waitlistEntry: { id: "entry-1", status: "WAITING", position: 1 } });
+    tx.registration.findFirst.mockResolvedValue(waiting);
+    givePickInTaughtClass(tx);
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await cancelRegistration(event.id, waiting.id, "user-1", "Removed from the waitlist.", new Date("2026-08-12T12:00:00.000Z"));
+
+    expect(tx.honorClassChange.createManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it("logs the picks of a registration moved to the waitlist as left (#1098)", async () => {
+    const { prisma, tx } = transactionFixture();
+    const active = registration({ status: "CONFIRMED", capacityReservations: [{ id: "reservation-live" }] });
+    tx.registration.findFirst.mockResolvedValue(active);
+    tx.registrationCapacityReservation.updateMany.mockResolvedValue({ count: 1 });
+    tx.registrationWaitlistEntry.aggregate.mockResolvedValue({ _max: { position: 5 } });
+    givePickInTaughtClass(tx);
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await moveRegistrationToWaitlist(event.id, active.id, "user-1", "Holding the registration while plans change.", new Date("2026-08-12T12:00:00.000Z"));
+
+    expect(tx.honorClassChange.createManyAndReturn.mock.calls[0]![0].data).toEqual([expect.objectContaining({ enrollmentId: "pick-1", kind: "LEFT" })]);
+    const flip = tx.registration.update.mock.calls.findIndex(([call]) => call.data.status === "WAITLISTED");
+    expect(tx.honorClassChange.createManyAndReturn.mock.invocationCallOrder[0]).toBeLessThan(tx.registration.update.mock.invocationCallOrder[flip]!);
   });
 
   it("removes a waitlisted registration with its prior position and safe operator reason", async () => {

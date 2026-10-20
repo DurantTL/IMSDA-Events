@@ -32,6 +32,7 @@ import {
 } from "@/modules/events/lifecycle";
 import { getRegistrationById, type RegistrationRecord } from "@/modules/registrations/repository";
 import type { RestoredClassSeats } from "@/modules/honors/restore-seats";
+import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 
 export type RegistrationLifecycleErrorCode =
   | "REGISTRATION_NOT_FOUND"
@@ -794,7 +795,7 @@ export type CancelRegistrationResult = {
   pendingMessageIds: string[];
 };
 
-export async function cancelRegistration(
+async function cancelRegistrationInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -839,6 +840,8 @@ export async function cancelRegistration(
         },
       });
     }
+    // A cancelled registration's picks leave every instructor's class list (#1098): logged before the flip, in this transaction.
+    if (wasActive) await recordRegistrationClassChanges(tx, registration.id, "LEFT", now);
     await tx.registration.update({
       where: { id: registration.id },
       data: { status: "CANCELLED", cancelledAt: now },
@@ -936,7 +939,7 @@ export async function cancelRegistration(
   };
 }
 
-export async function moveRegistrationToWaitlist(
+async function moveRegistrationToWaitlistInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -956,6 +959,8 @@ export async function moveRegistrationToWaitlist(
     const correlationId = crypto.randomUUID();
     const released = await releaseOptionReservations(tx, registration.id, now);
     const eventPosition = await placeAtEndOfWaitlist(tx, registration, now);
+    // A registration moved to the waitlist holds no seats: its picks leave every instructor's class list (#1098).
+    await recordRegistrationClassChanges(tx, registration.id, "LEFT", now);
     await tx.registration.update({
       where: { id: registration.id },
       data: { status: "WAITLISTED", cancelledAt: null },
@@ -1006,7 +1011,7 @@ export async function moveRegistrationToWaitlist(
   };
 }
 
-export async function promoteRegistrationFromWaitlist(
+async function promoteRegistrationFromWaitlistInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -1055,7 +1060,7 @@ export async function promoteRegistrationFromWaitlist(
   };
 }
 
-export async function reactivateRegistration(
+async function reactivateRegistrationInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -1174,3 +1179,11 @@ export async function reactivateRegistration(
     pendingMessageIds: result.pendingMessageIds,
   };
 }
+
+export const cancelRegistration: typeof cancelRegistrationInner = (...args) => withClassChangeKick(() => cancelRegistrationInner(...args));
+
+export const moveRegistrationToWaitlist: typeof moveRegistrationToWaitlistInner = (...args) => withClassChangeKick(() => moveRegistrationToWaitlistInner(...args));
+
+export const promoteRegistrationFromWaitlist: typeof promoteRegistrationFromWaitlistInner = (...args) => withClassChangeKick(() => promoteRegistrationFromWaitlistInner(...args));
+
+export const reactivateRegistration: typeof reactivateRegistrationInner = (...args) => withClassChangeKick(() => reactivateRegistrationInner(...args));

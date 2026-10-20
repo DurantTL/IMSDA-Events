@@ -156,12 +156,15 @@ function fixture() {
     honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
     honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue([{ id: "sabbath", name: "Sabbath afternoon", locationId: null }]) },
+    // The instructor change log (#1098): this class has no instructor, so nothing is logged.
+    honorClassChange: { createManyAndReturn: vi.fn(async ({ data }: { data: unknown[] }) => data.map((_row, index) => ({ id: `change-${index}` }))) },
     honorEnrollment: {
-      findMany: vi.fn(async () => enrollments.map(({ id, registrationAttendeeId, offeringId }) => ({ id, registrationAttendeeId, offeringId }))),
+      findMany: vi.fn(async () => enrollments.map(({ id, registrationAttendeeId, offeringId }) => ({ id, registrationAttendeeId, offeringId, eventId: "event-1", organization: null, registrationAttendee: { profileSnapshot: {} } }))),
       deleteMany: vi.fn(),
-      createMany: vi.fn(async ({ data }: { data: Array<Omit<Enrollment, "id">> }) => {
-        for (const row of data) enrollments.push({ ...row, id: `enrollment-${enrollments.length + 1}` });
-        return { count: data.length };
+      createManyAndReturn: vi.fn(async ({ data }: { data: Array<Omit<Enrollment, "id">> }) => {
+        const made = data.map((row) => ({ ...row, id: `enrollment-${enrollments.length + 1}` }));
+        enrollments.push(...made);
+        return made.map((row) => ({ id: row.id }));
       }),
       groupBy: vi.fn(async ({ where }: { where: { organizationId?: string } }) => seatRows(where)),
     },

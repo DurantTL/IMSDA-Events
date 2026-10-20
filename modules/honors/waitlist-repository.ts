@@ -9,6 +9,7 @@ import { getServerEnv } from "@/lib/env";
 import { pauseBeforeRetry } from "@/lib/prisma-errors";
 import { logError } from "@/lib/logger";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { recordClassChanges } from "@/modules/honors/class-change-log";
 import { HonorConfigurationError } from "@/modules/honors/repository";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import {
@@ -705,10 +706,12 @@ export async function acceptClassWaitlistOffer(organizationId: string, eventId: 
   let refusal: ClassSelectionError | null = null;
   let offeringOfEntry = "";
   let messageIds: string[] = [];
+  let classChangesLogged: string[] = [];
   await runSerializable(async (tx) => {
     expired = false;
     refusal = null;
     messageIds = [];
+    classChangesLogged = [];
     const found = await tx.honorClassWaitlistEntry.findFirst({ where: { id: entryId, eventId, organizationId }, select: { id: true, offeringId: true } });
     if (!found) throw new ClassSelectionError("OFFER_NOT_FOUND", "That waitlist place wasn't found.");
     offeringOfEntry = found.offeringId;
@@ -782,7 +785,7 @@ export async function acceptClassWaitlistOffer(organizationId: string, eventId: 
 
     // The seat is held for them: marking the offer accepted and taking the seat is one step.
     await tx.honorClassWaitlistEntry.update({ where: { id: entry.id }, data: { status: "ACCEPTED", resolvedAt: now, resolution: "Accepted by the director" } });
-    await tx.honorEnrollment.create({
+    const accepted = await tx.honorEnrollment.create({
       data: {
         eventId, offeringId: offering.id, registrationId: registration.registrationId, registrationAttendeeId: attendee.id, organizationId,
         consumesSeat: true,
@@ -791,13 +794,17 @@ export async function acceptClassWaitlistOffer(organizationId: string, eventId: 
         requirementOverrideReason: entry.requirementOverrideReason,
         requirementOverriddenByUserId: entry.requirementOverriddenByUserId,
       },
+      select: { id: true },
     });
+    // The instructor's change log (#1098): a row only, in this transaction; their right-away email is kicked off after it commits.
+    classChangesLogged.push(...(await recordClassChanges(tx, [accepted.id], "JOINED", now)));
     await writeAuditLog({
       eventId, ...actorFields(actor), action: "HONOR_CLASS_WAITLIST_ACCEPTED", entityType: "HonorClassWaitlistEntry", entityId: entry.id,
       summary: "A club director accepted a seat offered from a class waitlist.",
       metadata: { organizationId, offeringId: offering.id, registrationAttendeeId: attendee.id, offerCount: entry.offerCount, ...actorMetadata(actor) },
     }, tx);
   });
+  if (classChangesLogged.length > 0) await (await import("@/modules/honors/class-change-emails")).kickClassChangeEmails(classChangesLogged);
   if (expired) {
     await deliverWaitlistOfferMessages(messageIds);
     throw new ClassSelectionError("OFFER_EXPIRED", "The time to accept this seat ran out, so it has gone to the next youth in line.");
