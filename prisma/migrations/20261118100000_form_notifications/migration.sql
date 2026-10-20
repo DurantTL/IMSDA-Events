@@ -40,7 +40,7 @@ CREATE INDEX "RegistrationFormNotification_formId_position_idx" ON "Registration
 CREATE INDEX "RegistrationNotificationDelivery_registrationId_idx" ON "RegistrationNotificationDelivery"("registrationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "RegistrationNotificationDelivery_notificationId_registrationId_key" ON "RegistrationNotificationDelivery"("notificationId", "registrationId");
+CREATE UNIQUE INDEX "RegistrationNotificationDelivery_notificationId_registratio_key" ON "RegistrationNotificationDelivery"("notificationId", "registrationId");
 
 -- AddForeignKey
 ALTER TABLE "RegistrationFormNotification" ADD CONSTRAINT "RegistrationFormNotification_formId_fkey" FOREIGN KEY ("formId") REFERENCES "RegistrationForm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
