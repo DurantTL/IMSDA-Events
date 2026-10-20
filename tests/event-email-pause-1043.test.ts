@@ -118,7 +118,7 @@ describe("pausing an event's email: system administrators only (#1043)", () => {
 describe("/api/admin/email (#1043)", () => {
   it.each(everyoneElse)("refuses %s on every method", async (_label, user) => {
     mocks.getCurrentSession.mockResolvedValue({ user });
-    expect((await GET()).status).toBe(403);
+    expect((await GET(new Request("https://events.imsda-events.test/api/admin/email"))).status).toBe(403);
     expect((await patch({ eventId: "event-1", paused: true })).status).toBe(403);
     expect((await patch({ sender: { defaultSenderName: "Hijack", defaultSenderEmail: "", defaultReplyToEmail: "" } })).status).toBe(403);
     expect(mocks.getPrisma).not.toHaveBeenCalled();

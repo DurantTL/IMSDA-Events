@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/modules/communications/effective-delivery", async () => (await import("./support/effective-delivery-double")).effectiveDeliveryDouble);
 
 /**
  * Teams advance from Area to Conference and Union inside one event (#945): the placement rule with ties, staff overrides that

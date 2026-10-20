@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/modules/communications/effective-delivery", async () => (await import("./support/effective-delivery-double")).effectiveDeliveryDouble);
 
 vi.mock("server-only", () => ({}));
 
@@ -113,10 +114,11 @@ describe("processQueuedMessageIdsAfterCommit leaves real email with files to the
         findMany: vi.fn(async () => messages.map((message) => ({
           id: message.id,
           eventId: "event-1",
-          event: { messageSettings: { deliveryMode: message.mode } },
           files: message.files,
         }))),
       },
+      // The effective delivery of the event (#1043), which every message in these cases shares.
+      eventMessageSettings: { findUnique: vi.fn(async () => ({ deliveryMode: messages[0]?.mode })) },
     };
     mocks.getPrisma.mockReturnValue(tx);
     return tx;

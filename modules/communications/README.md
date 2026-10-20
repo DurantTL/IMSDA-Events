@@ -143,3 +143,12 @@ Every refusal (not permitted, not on this event, another event's tag, a form que
   - What vouches for a youth address: a group billing or organization contact holding that role now, the registration contact when the account holder is not a minor, or an adult-type attendee of the registration holding the address. A minor account holder never vouches, so a youth who types a younger sibling's address as the contact, or is their own contact through the account-holder fallback, is never emailed. A lapsed leader role cannot vouch.
   - Any other address reached only as an attendee needs an adult-type attendee holding it.
 - **Real-database check:** `npm run test:scheduled-emails` (a stand-in email provider, a spring-forward schedule, three concurrent workers, partial delivery and cancel, the youth cases, edits and every send-time gate).
+
+## Central email: effective delivery (#1043)
+
+Real email is on for every event. There is no per-event delivery switch and no per-event sender address.
+
+- `effective-delivery.ts` is the one place that decides whether an event's email is sent. **Paused** (`EventMessageSettings.deliveryPaused`, set only by a system administrator on System management > Email, audited with ids only) is capture only. Otherwise the platform mode applies: real email where account and provider email is configured in this environment and the central sender address is set, capture locally where it is not (development and CI). The `deliveryMode` field on the objects it returns is that effective mode.
+- The From address is always the central sender (`PlatformSettings.defaultSenderEmail`). An event overrides only its display name (`senderName`) and reply-to (`replyToEmail`); `senderEmail` and `deliveryMode` on `EventMessageSettings` are retired and read only by migration `20261114100000_central_email` and `central-email-preview.ts`.
+- Every send path, retry and readiness check calls `loadEventEmailSettings`, `loadEventEmailSettingsOrThrow` or `getEffectiveDelivery`. `tests/effective-delivery-1043.test.ts` fails if any other file reads `EventMessageSettings.deliveryMode` or `senderEmail`.
+- Before applying the migration, `npm run email:migration-preview` (read-only) lists the events it will pause and the events whose own sender email differs from the central one.

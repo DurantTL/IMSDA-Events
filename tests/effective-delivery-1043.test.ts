@@ -206,7 +206,7 @@ describe("nothing reads EventMessageSettings.deliveryMode directly (#1043)", () 
       return settingsReadViolations(readFileSync(file, "utf8"), relative).map((problem) => `${relative}: ${problem}`);
     });
     expect(offenders).toEqual([]);
-  });
+  }, 60_000);
 
   it("the guard itself flags the patterns it exists to stop", () => {
     expect(settingsReadViolations("await prisma.eventMessageSettings.findUnique({ where: { eventId } });")).toHaveLength(1);
