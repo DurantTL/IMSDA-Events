@@ -48,6 +48,8 @@ vi.mock("@/modules/registrations/repository", () => ({
   addRegistrationAttendee: mocks.addRegistrationAttendee,
 }));
 
+// The route finishes a change by refreshing the registration PDF after commit (#1082); not under test here.
+vi.mock("@/modules/registration-pdf/after-commit", () => ({ finishRegistrationChange: vi.fn(async () => undefined) }));
 import { POST } from "@/app/api/events/[eventId]/registrations/[registrationId]/attendees/route";
 
 function request() {

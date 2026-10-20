@@ -1,5 +1,6 @@
 import "server-only";
 
+import { registrationPdfHoldUntil } from "@/modules/registration-pdf/hold";
 import {
   getEffectiveDelivery,
   loadEventEmailSettings,
@@ -201,6 +202,11 @@ export type RegistrationMessageInput = {
    * visitor cannot become a link, an image or a token.
    */
   registrantNote?: string | null;
+  /**
+   * The registration PDF (#1082) is made after the transaction commits, so the messages are queued held (not claimable for a
+   * couple of minutes) and `attachRegistrationPdfAfterCommit` attaches the file and releases them.
+   */
+  holdForRegistrationPdf?: boolean;
   /** The "New public registration" switch (#1016), read before the transaction; false skips the staff copy only. */
   staffCopyEnabled: boolean;
 };
@@ -3670,6 +3676,8 @@ export async function enqueuePublicRegistrationMessages(
         subjectSnapshot: rendered.subject,
         bodyTextSnapshot: shown.body,
         bodyHtmlSnapshot: shown.bodyHtml,
+        // Held until the registration PDF is attached after the commit (#1082); a suppressed row is never sent, so never held.
+        ...(input.holdForRegistrationPdf && !suppressed ? { availableAt: registrationPdfHoldUntil() } : {}),
         metadata: {
           trigger: "PUBLIC_REGISTRATION_SUBMITTED",
           confirmationCode: input.registration.confirmationCode,

@@ -8,6 +8,8 @@ import {
   updateRegistrationAttendeeEmail,
 } from "@/modules/registrations/repository";
 import { attendeeEmailUpdateSchema } from "@/modules/registrations/schemas";
+import { finishRegistrationChange } from "@/modules/registration-pdf/after-commit";
+import { randomUUID } from "node:crypto";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -33,6 +35,9 @@ async function patchHandler(
       input.email,
       access.user.id,
     );
+    // The PDF does not show attendee emails, so this sends nothing unless the PDF changed (#1082).
+    const changeId = randomUUID();
+    await finishRegistrationChange({ eventId, registrationId, changeKey: `staff-attendee-edited:${changeId}`, correlationId: changeId, meaningful: false });
     return Response.json({ registration });
   } catch (error) {
     if (error instanceof z.ZodError) {

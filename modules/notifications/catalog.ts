@@ -73,7 +73,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     source: { kind: "event-list" },
     sourceNote: "Set on each event's Communications page.",
     sentFrom: "modules/communications/messaging-repository.ts",
-    switchReadIn: ["modules/forms/public-repository.ts"],
+    switchReadIn: ["modules/forms/public-repository.ts", "modules/registration-pdf/after-commit.ts"],
     built: true,
   },
   {

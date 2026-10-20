@@ -42,11 +42,11 @@ export type InvoicePdfInput = {
   paymentInstructions: string;
 };
 
-const PAGE = { width: 612, height: 792 } as const;
-const MARGIN = 54;
-const TEXT = rgb(0.1, 0.12, 0.14);
-const MUTED = rgb(0.38, 0.42, 0.45);
-const RULE = rgb(0.8, 0.84, 0.86);
+export const PAGE = { width: 612, height: 792 } as const;
+export const MARGIN = 54;
+export const TEXT = rgb(0.1, 0.12, 0.14);
+export const MUTED = rgb(0.38, 0.42, 0.45);
+export const RULE = rgb(0.8, 0.84, 0.86);
 
 export function formatPdfMoney(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -61,7 +61,7 @@ function formatIssueDate(date: Date, timezone: string) {
   }
 }
 
-class Writer {
+export class Writer {
   pages: PDFPage[] = [];
   page!: PDFPage;
   y = 0;

@@ -15,6 +15,8 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// The registration PDF (#1082) is made after the commit and has its own tests. This fake database has no PDF tables.
+vi.mock("@/modules/registration-pdf/after-commit", () => ({ attachRegistrationPdfAfterCommit: vi.fn(), finishRegistrationChange: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getServerEnv: dependencies.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/communications/messaging-repository", () => ({

@@ -43,6 +43,8 @@ type TransactionalTemplateKey =
   | "REGISTRATION_REACTIVATED"
   | "REGISTRATION_CONTACT_UPDATED"
   | "REGISTRATION_UPDATED"
+  // The staff copy of a registration, re-sent marked "Updated" with the new PDF (#1082).
+  | "INTERNAL_NEW_REGISTRATION"
   | "REGISTRATION_TRANSFERRED_NEW_CONTACT"
   | "REGISTRATION_TRANSFERRED_PRIOR_CONTACT"
   | "ATTENDEE_SUBSTITUTED"
@@ -118,6 +120,12 @@ type TransactionalMessageInput = {
   requestStatus?: { label: string; detail: string };
   /** One plain line placed at the top of the message (#931: the club a team was attached to), added as escaped text, never as template source. */
   leadNote?: string | null;
+  /** The one file sent with the message: the registration PDF (#1082), a stored `MessageAttachment` the caller already made. */
+  attachmentId?: string | null;
+  /** Hold the message (not claimable until then) while its registration PDF is made after the commit (#1082). */
+  holdUntil?: Date;
+  /** The staff copy of a changed registration (#1082): the subject starts "Updated:" and the default heading says "Updated registration". */
+  updatedCopy?: boolean;
 };
 
 export type RegistrationUpdateCategory =
@@ -633,7 +641,14 @@ async function enqueueTransactionalMessage(
     );
   }
 
-  const shown = withPlainLeadNote(rendered, input.leadNote);
+  const isInternalCopy = input.templateKey === "INTERNAL_NEW_REGISTRATION";
+  const shown = withPlainLeadNote(
+    input.updatedCopy
+      ? { ...rendered, body: rendered.body.replace(/^# New registration/m, "# Updated registration"), bodyHtml: rendered.bodyHtml.replace("New registration", "Updated registration") }
+      : rendered,
+    input.leadNote,
+  );
+  const subjectSnapshot = input.updatedCopy ? `Updated: ${rendered.subject}` : rendered.subject;
   const suppressed = settings.deliveryMode === "DISABLED"
     || template?.isEnabled === false;
   const message = await tx.messageOutbox.upsert({
@@ -646,15 +661,17 @@ async function enqueueTransactionalMessage(
       registrationId: input.registrationId,
       templateVersionId: source?.id ?? null,
       templateKey: input.templateKey,
-      recipientKind: "REGISTRANT",
+      recipientKind: isInternalCopy ? "INTERNAL" : "REGISTRANT",
       recipientEmail,
       recipientName,
       senderNameSnapshot: settings.senderName,
       senderEmailSnapshot: settings.senderEmail,
       replyToEmailSnapshot: settings.replyToEmail,
-      subjectSnapshot: rendered.subject,
+      subjectSnapshot,
       bodyTextSnapshot: shown.body,
       bodyHtmlSnapshot: shown.bodyHtml,
+      ...(input.attachmentId ? { attachmentId: input.attachmentId } : {}),
+      ...(input.holdUntil && !suppressed ? { availableAt: input.holdUntil } : {}),
       metadata: {
         trigger: input.templateKey,
         transitionKey: input.transitionKey,
@@ -774,6 +791,22 @@ export function enqueueRegistrationUpdatedMessage(
     metadata: {
       changeCategory: input.changeCategory,
     },
+  });
+}
+
+/**
+ * The staff copy of a registration that was changed (#1082): the "new registration" notice to one team address, re-sent
+ * as "Updated" with the new registration PDF attached. One message per address and change.
+ */
+export function enqueueStaffRegistrationUpdatedMessage(
+  tx: Prisma.TransactionClient,
+  input: Pick<TransactionalMessageInput, "eventId" | "registrationId" | "correlationId" | "transitionKey" | "recipientEmail" | "attachmentId" | "pricingSnapshot" | "leadNote">,
+) {
+  return enqueueTransactionalMessage(tx, {
+    ...input,
+    templateKey: "INTERNAL_NEW_REGISTRATION",
+    recipientName: "IMSDA event team",
+    updatedCopy: true,
   });
 }
 

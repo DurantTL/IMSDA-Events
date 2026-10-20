@@ -7,6 +7,8 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// The registration PDF (#1082) is made after the commit and has its own tests. This fake database has no PDF tables.
+vi.mock("@/modules/registration-pdf/after-commit", () => ({ attachRegistrationPdfAfterCommit: vi.fn(), finishRegistrationChange: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/registrations/repository", () => ({
   getRegistrationByIdWithClient: dependencies.getRegistrationByIdWithClient,
@@ -22,6 +24,7 @@ import {
   resolveAmendmentAttendeeType,
 } from "@/modules/registrations/amendments-repository";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
+import { finishRegistrationChange } from "@/modules/registration-pdf/after-commit";
 
 const actor = { kind: "STAFF" as const, id: "user-1", displayName: "Staff User" };
 const initialUpdatedAt = new Date("2026-08-04T12:00:00.000Z");
@@ -496,6 +499,19 @@ describe("registration amendments repository", () => {
     expect(amended.result.pendingMessageIds).toEqual(["message-1"]);
     expect(replayed.pendingMessageIds).toEqual(["message-1"]);
     expect(dependencies.enqueueRegistrationUpdatedMessage).toHaveBeenCalledOnce();
+    // The notice is queued held, without an attachment: the PDF is made after the commit, never inside the transaction (#1082).
+    const queuedInput = dependencies.enqueueRegistrationUpdatedMessage.mock.calls[0]![1] as { holdUntil: Date; attachmentId?: string };
+    expect(queuedInput.holdUntil.getTime()).toBeGreaterThan(Date.now());
+    expect(queuedInput.attachmentId).toBeUndefined();
+    // After the commit, once (not again on the replay), with the held notice so the PDF can be attached and the staff copy re-sent.
+    expect(finishRegistrationChange).toHaveBeenCalledOnce();
+    expect(finishRegistrationChange).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: "event-1",
+      registrationId: "registration-1",
+      meaningful: true,
+      heldMessageIds: ["message-1"],
+      changeKey: expect.stringMatching(/^amendment:/),
+    }));
     expect(JSON.stringify(dependencies.enqueueRegistrationUpdatedMessage.mock.calls))
       .not.toContain("taylor@example.test");
     expect(JSON.stringify(dependencies.enqueueRegistrationUpdatedMessage.mock.calls))
@@ -556,6 +572,8 @@ describe("registration amendments repository", () => {
 
     expect(result.pendingMessageIds).toEqual([]);
     expect(dependencies.enqueueRegistrationUpdatedMessage).not.toHaveBeenCalled();
+    // Still handed to the after-commit step, which sends only when the PDF changed and an earlier version exists (#1082).
+    expect(finishRegistrationChange).toHaveBeenCalledWith(expect.objectContaining({ meaningful: false, heldMessageIds: [] }));
   });
 
   it("requires a reason and records a staff seminar override through the amendment path", async () => {

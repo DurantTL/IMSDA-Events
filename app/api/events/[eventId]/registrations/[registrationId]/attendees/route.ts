@@ -9,6 +9,8 @@ import {
   RegistrationAttendeeOperationError,
 } from "@/modules/registrations/repository";
 import { attendeeInputSchema } from "@/modules/registrations/schemas";
+import { finishRegistrationChange } from "@/modules/registration-pdf/after-commit";
+import { randomUUID } from "node:crypto";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -28,6 +30,9 @@ async function postHandler(
     );
     const input = attendeeInputSchema.parse(await request.json());
     const registration = await addRegistrationAttendee(eventId, registrationId, input, access.user.id);
+    // The updated PDF goes out marked Updated, after the change is saved; it never fails the change (#1082).
+    const changeId = randomUUID();
+    await finishRegistrationChange({ eventId, registrationId, changeKey: `staff-attendee-added:${changeId}`, correlationId: changeId, meaningful: true });
     return Response.json({ registration }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
