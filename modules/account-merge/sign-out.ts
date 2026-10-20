@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { logError } from "@/lib/logger";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { revokeDatabaseSession, SESSION_COOKIE_NAME } from "@/modules/access/session-store";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
@@ -38,7 +39,12 @@ function expire(cookieStore: Awaited<ReturnType<typeof cookies>>, name: string) 
   });
 }
 
-export async function signOutThisBrowser(side: SignOutSide): Promise<void> {
+/**
+ * Returns false when a session revoke failed. Every step is attempted on its own
+ * and all cookies for the sides being ended are expired regardless, so an error
+ * on one side never leaves the other signed in; the caller answers 500 afterwards.
+ */
+export async function signOutThisBrowser(side: SignOutSide): Promise<boolean> {
   let unified = false;
   try {
     unified = await isUnifiedSignInEnabled();
@@ -49,17 +55,35 @@ export async function signOutThisBrowser(side: SignOutSide): Promise<void> {
   const cookieStore = await cookies();
   const endStaff = side === "staff" || unified;
   const endAttendee = side === "attendee" || unified;
+  let revokeFailed = false;
 
-  if (endStaff) {
-    // Resolved before the session is revoked, since act-as is keyed by this session's id.
-    const { sessionId } = await getCurrentSession();
-    if (sessionId) await endActiveActAsOnSignOut(sessionId);
-    await revokeDatabaseSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-    expire(cookieStore, SESSION_COOKIE_NAME);
+  try {
+    if (endStaff) {
+      try {
+        // Resolved before the session is revoked, since act-as is keyed by this session's id.
+        const { sessionId } = await getCurrentSession();
+        if (sessionId) await endActiveActAsOnSignOut(sessionId);
+      } catch (error) {
+        logError("Ending act-as at sign-out failed", error);
+      }
+      try {
+        await revokeDatabaseSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+      } catch (error) {
+        revokeFailed = true;
+        logError("The staff session could not be revoked at sign-out", error);
+      }
+    }
+    if (endAttendee) {
+      try {
+        await revokeAttendeeSession(cookieStore.get(ATTENDEE_SESSION_COOKIE_NAME)?.value);
+      } catch (error) {
+        revokeFailed = true;
+        logError("The attendee session could not be revoked at sign-out", error);
+      }
+    }
+  } finally {
+    if (endStaff) expire(cookieStore, SESSION_COOKIE_NAME);
+    if (endAttendee) for (const name of [ATTENDEE_SESSION_COOKIE_NAME, ATTENDEE_PENDING_COOKIE_NAME]) expire(cookieStore, name);
   }
-
-  if (endAttendee) {
-    await revokeAttendeeSession(cookieStore.get(ATTENDEE_SESSION_COOKIE_NAME)?.value);
-    for (const name of [ATTENDEE_SESSION_COOKIE_NAME, ATTENDEE_PENDING_COOKIE_NAME]) expire(cookieStore, name);
-  }
+  return !revokeFailed;
 }

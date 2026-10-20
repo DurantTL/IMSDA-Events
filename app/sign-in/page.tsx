@@ -51,7 +51,8 @@ export default async function SignInPage({
   // on this page with a notice instead of being sent on to /account. The check reads only this
   // browser's own attendee session and its link, never a typed email, so nothing about staff
   // accounts is revealed; an anonymous visitor never sees the notice.
-  const staffTimedOut = next ? await isStaffSessionTimedOutForLinkedAttendee() : false;
+  // Only for a staff-side target: an attendee or profile destination keeps the old redirect.
+  const staffTimedOut = next && !attendeeReturnDestination(next, "") ? await isStaffSessionTimedOutForLinkedAttendee() : false;
   if (!staffTimedOut && (await getCurrentAttendee()).account) redirect(attendeeReturnDestination(next, "/account"));
 
   const errorMessage = attendeeSignInErrorMessage(typeof error === "string" ? error : undefined);

@@ -8,8 +8,9 @@ async function postHandler(request: Request) {
 
   // Ends the staff session and any active act-as (#442). With one sign-in on it
   // also ends this browser's attendee session (#1092). See `signOutThisBrowser`.
-  await signOutThisBrowser("staff");
-  return Response.json({ ok: true });
+  const ok = await signOutThisBrowser("staff");
+  // Cookies are cleared either way; a failed revoke is reported after that.
+  return ok ? Response.json({ ok: true }) : Response.json({ ok: false }, { status: 500 });
 }
 
 export const POST = withRequestContext(postHandler);

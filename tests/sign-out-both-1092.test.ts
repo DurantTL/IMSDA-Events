@@ -95,6 +95,23 @@ describe("sign-out with one sign-in ON", () => {
     expect(mocks.revokeAllAttendee).not.toHaveBeenCalled();
   });
 
+  it("an act-as failure does not stop the sign-out: both revokes run and every cookie is cleared", async () => {
+    mocks.endActAs.mockRejectedValue(new Error("boom"));
+    const response = await staffLogout(post("/api/auth/logout"));
+    expect(response.status).toBe(200);
+    expect(mocks.revokeStaff).toHaveBeenCalledWith("staff-token");
+    expect(mocks.revokeAttendee).toHaveBeenCalledWith("attendee-token");
+    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session", "imsda_session"]);
+  });
+
+  it("a failed staff revoke still revokes the attendee side, clears every cookie, then answers 500", async () => {
+    mocks.revokeStaff.mockRejectedValue(new Error("boom"));
+    const response = await attendeeSignOut(post("/api/attendee/sign-out"));
+    expect(response.status).toBe(500);
+    expect(mocks.revokeAttendee).toHaveBeenCalledWith("attendee-token");
+    expect(clearedNames()).toEqual(["imsda_attendee_pending", "imsda_attendee_session", "imsda_session"]);
+  });
+
   it("with no staff cookie it still ends the attendee side and does not touch act-as", async () => {
     mocks.cookies.delete("imsda_session");
     mocks.getCurrentSession.mockResolvedValue({ user: null });

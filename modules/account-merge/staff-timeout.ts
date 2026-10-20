@@ -7,7 +7,7 @@ import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 
 export const STAFF_TIMED_OUT_NOTICE =
-  "Your staff session timed out after an hour of inactivity. Sign in again to use staff tools. Your registrations are still signed in.";
+  "Your staff sign-in has ended, usually after an hour of inactivity. Sign in again to use staff tools. Your registrations are still signed in.";
 
 /**
  * Whether THIS browser is signed in as an attendee whose account is linked to a
