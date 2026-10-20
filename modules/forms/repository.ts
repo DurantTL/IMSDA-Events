@@ -497,17 +497,20 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     const questionOrder = clubQuestionOrderProblem(definition);
     if (questionOrder) throw new FormOperationError("CLUB_QUESTION_ORDER", questionOrder);
     await assertAcknowledgmentPolicies(eventId, definition);
-    // Every version is gated on its own valid test submission (#564). A test
-    // proves the version being published can be filled in and priced; an
-    // earlier version's test says nothing about a new module, a switch to team
-    // registration, or a changed price. Saving a draft deletes its tests, so a
-    // revised draft always needs a fresh one.
+    // A test is required only before a form's first publish (#564, #1061).
+    // The first publish proves the form can be filled in and priced. Once a
+    // version has been published or archived, later drafts are mostly wording
+    // changes, so they publish without a retest; a test stays optional. Saving
+    // a draft still deletes its tests.
     // A draft saved before the meal plan's price changed would sell tickets at a price the plan no longer has (#210).
     if (mealPriceDrift(definition, await loadTicketPrices(tx, eventId)).length > 0) {
-      throw new FormOperationError("MEAL_PRICE_DRIFT", "The meal ticket prices on this form no longer match the event's meal plan. Open the form and save it again to bring them up to date, run a test submission, then publish.");
+      throw new FormOperationError("MEAL_PRICE_DRIFT", "The meal ticket prices on this form no longer match the event's meal plan. Open the form and save it again to bring them up to date, then publish.");
     }
-    const validTests = await tx.formTestSubmission.count({ where: { formVersionId: draft.id, isValid: true } });
-    if (validTests === 0) throw new FormOperationError("TEST_REQUIRED", "Run at least one valid test submission against this version before publishing it.");
+    const everPublished = form.versions.some((version) => version.status === RegistrationFormStatus.PUBLISHED || version.status === RegistrationFormStatus.ARCHIVED);
+    if (!everPublished) {
+      const validTests = await tx.formTestSubmission.count({ where: { formVersionId: draft.id, isValid: true } });
+      if (validTests === 0) throw new FormOperationError("TEST_REQUIRED", "Run at least one valid test submission before publishing this form for the first time.");
+    }
     await tx.registrationFormVersion.updateMany({ where: { formId, status: RegistrationFormStatus.PUBLISHED }, data: { status: RegistrationFormStatus.ARCHIVED } });
     // Conditional on the draft being exactly what was tested: a save that
     // landed after the test count changes updatedAt (and deletes the tests),

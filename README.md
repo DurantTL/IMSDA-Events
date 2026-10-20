@@ -274,7 +274,7 @@ Never place real attendee exports, medical details, production identifiers, or c
 - `GET|POST /api/events/:eventId/forms` lists event forms and templates or creates a local draft from a template.
 - `GET|PATCH /api/events/:eventId/forms/:formId` returns one versioned form or saves its draft with optimistic conflict protection.
 - `POST /api/events/:eventId/forms/:formId/test-submissions` validates and stores a fictitious response against an exact form version.
-- `POST /api/events/:eventId/forms/:formId/publish` publishes a tested draft as an immutable local version and archives the prior published version.
+- `POST /api/events/:eventId/forms/:formId/publish` publishes a draft as an immutable local version and archives the prior published version.
 - `GET|POST /api/events/:eventId/program-assignments` previews a deterministic ranked-interest assignment or applies the exact reviewed fingerprint as a new immutable, audited run.
 - `GET /api/events/:eventId/program-assignments/:runId/roster` downloads the event-authorized, formula-safe CSV for one frozen assignment run.
 - `GET|PATCH /api/events/:eventId/community` returns the staff moderation workspace or updates settings, post state, and reports for communications managers.
@@ -335,7 +335,7 @@ The current UI writes authoritative operational state to the configured IMSDA Ev
 3. Add, remove, and reorder sections and fields; insert reusable modules; configure labels, stable field keys, field types, scope, choices, help text, and required status.
 4. Configure conditional visibility, ordinary versus capacity/ranked-interest choices, per-choice limits, prices, automatic fees, and optional date-driven late prices. Add the **Promo code** drop-in module when the event offers finance-managed discounts. Use the calculation-preview date to test both sides of a pricing deadline.
 5. Save the draft, complete the live preview with fictitious responses, and run a test submission. Validation feedback is attached to the exact saved version.
-6. Publish only after a valid test passes. The published definition becomes immutable, its public registration link activates, and a later edit automatically creates the next draft version while the prior public version remains live.
+6. Publish a form for the first time only after a valid test passes; later drafts publish without a retest (a test stays optional). The published definition becomes immutable, its public registration link activates, and a later edit automatically creates the next draft version while the prior public version remains live.
 
 The builder supports short and long text, email, phone, dropdown, radio, multiselect, ranked choice, checkbox, date, number, and automatic-fee fields. Conditional logic, scheduled late pricing, card-fee gross-up, bounded promo-code rules, repeatable attendee modules, public rendering, server-side validation and pricing, immutable answer snapshots, duplicate-submit idempotency, serializable capacity reservations, automatic waitlists, private links, external email delivery, and Square payment collection are implemented. File uploads remain separate work.
 
