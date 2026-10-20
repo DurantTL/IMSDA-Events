@@ -46,6 +46,8 @@ function linkProblem(entry: { entryType: "STANDARD" | "CLOSURE" | "DEADLINE"; re
 
 /** Links inside the caller's transaction. `how` records whether the event was made from the item or already existed. */
 async function linkInTransaction(tx: Tx, entryId: string, eventId: string, actorUserId: string, how: "created" | "existing") {
+  // Event first, then the item: the same order as resolveCalendarDateChange, so a link and an Update can't interleave.
+  await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR NO KEY UPDATE`;
   const entry = await lockEntry(tx, entryId);
   const problem = linkProblem(entry);
   if (problem) throw new CalendarError("NOT_LINKABLE", problem);
@@ -300,7 +302,8 @@ export async function getCalendarLinkNotice(eventId: string): Promise<CalendarLi
       pricingNote: pricingDeadlineNote,
     });
   }
-  if (datePrompts.length === 0 && sourceRemoved.length === 0) return null;
+  // With several items the page always lists them; with one, nothing to show means nothing to ask.
+  if (datePrompts.length === 0 && sourceRemoved.length === 0 && single) return null;
   return {
     linkedItems: entries.map((entry) => ({ id: entry.id, title: entry.title, startsOn: entry.startsOn, endsOn: entry.endsOn })),
     datePrompts,

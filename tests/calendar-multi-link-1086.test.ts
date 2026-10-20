@@ -70,6 +70,7 @@ vi.mock("@/lib/prisma", () => {
   return { getPrisma: () => db };
 });
 
+import { getPrisma } from "@/lib/prisma";
 import { CalendarLinkBanner } from "@/components/calendar-link-banner";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarError } from "@/modules/calendar/errors";
@@ -110,6 +111,7 @@ const eventRow = (overrides: Record<string, unknown> = {}) => ({
 const linkedTo = (eventId: string) => (state.entries as EntryRow[]).filter((row) => row.linkedEventId === eventId).map((row) => row.id);
 
 beforeEach(() => {
+  vi.mocked(getPrisma().$queryRaw).mockClear();
   state.entries = [];
   state.event = eventRow();
   state.eventUpdates = [];
@@ -122,6 +124,8 @@ describe("linking several calendar items to one event (#1086)", () => {
     await linkCalendarEntryToEvent("mo", "event-1", "admin-1");
     await linkCalendarEntryToEvent("ia", "event-1", "admin-1");
     expect(linkedTo("event-1")).toEqual(["mo", "ia"]);
+    // The event row is locked before the item, as in an Update: two raw lock queries per link.
+    expect(vi.mocked(getPrisma().$queryRaw).mock.calls.length).toBe(4);
     await linkCalendarEntryToEvent("es", "event-1", "admin-1");
     expect(linkedTo("event-1")).toEqual(["mo", "ia", "es"]);
     expect(state.audits).toHaveLength(3);
@@ -181,11 +185,19 @@ describe("the event's date banner with several linked items (#1086)", () => {
     }
   });
 
-  it("an item whose dates were acknowledged (Keep) or agree asks nothing, per item", async () => {
+  it("an item whose dates were acknowledged (Keep) or agree asks nothing, but the several items are still listed", async () => {
     state.entries = [
       entry("mo", { linkedEventId: "event-1" }),
       entry("ia", { linkedEventId: "event-1", startsOn: "2027-03-05", endsOn: "2027-03-07", baselineStartsOn: "2027-03-05", baselineEndsOn: "2027-03-07" }),
     ];
+    const notice = await getCalendarLinkNotice("event-1");
+    expect(notice?.datePrompts).toEqual([]);
+    expect(notice?.sourceRemoved).toEqual([]);
+    expect(notice?.linkedItems.map((item) => item.id)).toEqual(["mo", "ia"]);
+  });
+
+  it("with one item and nothing to ask there is no notice", async () => {
+    state.entries = [entry("mo", { linkedEventId: "event-1" })];
     expect(await getCalendarLinkNotice("event-1")).toBeNull();
   });
 
@@ -328,7 +340,7 @@ describe("the calendar admin for a shared event (#1086)", () => {
     linkedIneligible: false,
     possibleMatch: null,
   };
-  const linkedEvent = { id: "event-1", name: "Honors Weekend 2027", slug: "honors-weekend-2027", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2027-02-05", endsOn: "2027-02-07", otherLinkedItems: 2 };
+  const linkedEvent = { id: "event-1", name: "Honors Weekend 2027", slug: "honors-weekend-2027", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2027-02-05", endsOn: "2027-02-07", otherLinkedItems: 2, showsWithRegister: true };
   const events: CalendarAdminEvent[] = [
     { id: "event-1", name: "Honors Weekend 2027", startsOn: "2027-02-05", endsOn: "2027-02-07", isPublished: true, showOnCalendar: true, calendarCategory: "", linkedEntries: [{ id: "ia", title: "Iowa" }, { id: "es", title: "Spanish" }] },
   ];
@@ -346,7 +358,7 @@ describe("the calendar admin for a shared event (#1086)", () => {
   });
 
   it("a single link reads as before", () => {
-    const html = render({ linkedEvent: { ...linkedEvent, otherLinkedItems: 0 } });
+    const html = render({ linkedEvent: { ...linkedEvent, otherLinkedItems: 0, showsWithRegister: false } });
     expect(html).not.toContain("also linked");
     expect(html).toContain("The calendar shows this pair once, as the event with Register");
   });

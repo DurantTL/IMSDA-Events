@@ -1365,7 +1365,7 @@ async function seedCalendarEventPairs(prisma: PrismaClient) {
     { key: "linked", name: "Mobilecheck Spring Conference Registration", start: 40, end: 42 },
   ];
   for (const row of events) {
-    const data = { name: row.name, slug: `${P}-calpair-${row.key}`, startsAt: new Date(`${addDays(today, row.start)}T12:00:00Z`), endsAt: new Date(`${addDays(today, row.end)}T12:00:00Z`), isPublished: false };
+    const data = { name: row.name, slug: `${P}-calpair-${row.key}`, startsAt: new Date(`${addDays(today, row.start)}T12:00:00Z`), endsAt: new Date(`${addDays(today, row.end)}T12:00:00Z`), isPublished: row.key === "linked" };
     await prisma.event.upsert({ where: { id: `${P}_calpair_event_${row.key}` }, update: data, create: { id: `${P}_calpair_event_${row.key}`, ...data } });
   }
   const entries = [

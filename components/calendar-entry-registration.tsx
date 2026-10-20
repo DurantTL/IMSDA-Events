@@ -36,7 +36,7 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
           {event.isArchived
             ? " The event is archived and off the calendar, so this item shows on its own. Unarchive the event to put the pair back."
             : shared
-              ? <>{" "}{event.isPublished ? "The calendar shows this item on its own date, with Register to the event." : "This item shows on its own until the event is published."}</>
+              ? <>{" "}{!event.isPublished ? "This item shows on its own until the event is published." : event.showsWithRegister ? "The calendar shows this item on its own date, with Register to the event." : "Several items share this event. Whether this one shows with Register depends on the event being on the calendar and on the item being public."}</>
               : <>{" "}The calendar shows this pair once{event.isPublished ? ", as the event with Register" : " (this item stands in until the event is published)"}.</>}
           {entry.datesDifferFromEvent && !event.isArchived
             ? shared

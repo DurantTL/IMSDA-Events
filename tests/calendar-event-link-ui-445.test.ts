@@ -75,7 +75,7 @@ describe("calendar item registration actions (#445)", () => {
   });
 
   it("warns, without unlinking, when a linked item has become a deadline, closure or repeating item", () => {
-    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0 };
+    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0, showsWithRegister: false };
     const html = render({ linkedEvent, linkedIneligible: true, canLinkToEvent: false, entryType: "DEADLINE" });
     expect(html).toContain("calendar-linked-ineligible");
     expect(html).toContain("stays linked until you unlink it");
@@ -85,7 +85,7 @@ describe("calendar item registration actions (#445)", () => {
 
   it("still shows the link to an archived event, marked archived, with Unlink", () => {
     const html = render({
-      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: true, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0 },
+      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: true, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0, showsWithRegister: false },
       datesDifferFromEvent: true,
     });
     expect(html).toContain("archived, ");
@@ -97,7 +97,7 @@ describe("calendar item registration actions (#445)", () => {
 
   it("shows a linked item with its event and Unlink, and says the pair shows once", () => {
     const html = render({
-      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0 },
+      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0, showsWithRegister: false },
       datesDifferFromEvent: true,
       sourceRemovedAt: "2026-10-10T00:00:00.000Z",
     });

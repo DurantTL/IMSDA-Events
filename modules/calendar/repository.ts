@@ -118,7 +118,7 @@ export async function listPublicCalendarItems(
     const event = entry.linkedEventId ? publishedLinked.get(entry.linkedEventId) : undefined;
     if (!event || !event.showOnCalendar || sharedItemCount(event) < 2 || entry.entryType === "DEADLINE") return [];
     const registrationOpen = evaluateEventRegistrationPhase(event, now) === "OPEN";
-    return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure
+    return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
       ? item
       : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, registrationOpen });
   });
@@ -254,9 +254,23 @@ export async function listCalendarEntries(now = new Date()) {
   ).map((match) => [match.entryId, match.eventId]));
 
   // How many items share each linked event (#1086), from the items listed.
+  // Counted in the database, not from the listed items, so the 1,000-item list limit can't skew them. "Public" uses
+  // the same filter as the public calendar.
+  const listedEventIds = [...new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : [])))];
+  const linkedRows = listedEventIds.length === 0
+    ? []
+    : await prisma.calendarEntry.findMany({
+      where: { linkedEventId: { in: listedEventIds } },
+      select: { linkedEventId: true, entryType: true, isPublished: true, isHiddenLocally: true, sourceRemovedAt: true },
+    });
+  const isPublicLinked = (row: { entryType: string; isPublished: boolean; isHiddenLocally: boolean; sourceRemovedAt: Date | null }) =>
+    row.entryType !== "DEADLINE" && row.isPublished && !row.isHiddenLocally && row.sourceRemovedAt === null;
   const linkedCounts = new Map<string, number>();
-  for (const entry of entries) {
-    if (entry.linkedEventId) linkedCounts.set(entry.linkedEventId, (linkedCounts.get(entry.linkedEventId) ?? 0) + 1);
+  const publicLinkedCounts = new Map<string, number>();
+  for (const row of linkedRows) {
+    if (!row.linkedEventId) continue;
+    linkedCounts.set(row.linkedEventId, (linkedCounts.get(row.linkedEventId) ?? 0) + 1);
+    if (isPublicLinked(row)) publicLinkedCounts.set(row.linkedEventId, (publicLinkedCounts.get(row.linkedEventId) ?? 0) + 1);
   }
 
   return entries.map((entry) => {
@@ -272,6 +286,9 @@ export async function listCalendarEntries(now = new Date()) {
         endsOn: calendarDateIn(entry.linkedEvent.endsAt, entry.linkedEvent.timezone),
         /** Other calendar items linked to the same event (#1086). */
         otherLinkedItems: Math.max(0, (linkedCounts.get(entry.linkedEvent.id) ?? 1) - 1),
+        /** The public calendar shows this item on its own date with Register: several public items share a published event that is on the calendar. */
+        showsWithRegister: entry.linkedEvent.isPublished && !entry.linkedEvent.archivedAt && entry.linkedEvent.showOnCalendar
+          && isPublicLinked(entry) && (publicLinkedCounts.get(entry.linkedEvent.id) ?? 0) >= 2,
       }
       : null;
     return {

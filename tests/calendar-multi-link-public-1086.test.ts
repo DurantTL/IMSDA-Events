@@ -104,6 +104,13 @@ describe("several linked items on the public calendar (#1086)", () => {
     expect(items.every((item) => item.href === "/events/honors-weekend-2027")).toBe(true);
   });
 
+  it("a cancelled linked item gets no Register button", async () => {
+    seed({ windowEvents: [eventRow({}, 2)], linkedEvents: [eventRow({}, 2)], entries: [entryRow("mo"), entryRow("ia", { status: "CANCELLED", linkUrl: null })] });
+    const items = await listPublicCalendarItems("2027-02-01", "2027-02-28", now);
+    expect(items.find((item) => item.key === "entry-ia")).toMatchObject({ kind: "ENTRY", registrationOpen: false, href: null, status: "CANCELLED" });
+    expect(items.find((item) => item.key === "entry-mo")).toMatchObject({ kind: "EVENT", registrationOpen: true });
+  });
+
   it("a draft event leaves every item on its own, with no link to the event", async () => {
     seed({ windowEvents: [], linkedEvents: [], entries: three });
     const items = await listPublicCalendarItems("2027-02-01", "2027-04-30", now);

@@ -177,7 +177,6 @@ async function main() {
   console.log("ok  link to existing event shows the pair once; unlink restores the item on its own");
 
   // 4. The database allows several items per event, and racing links both land.
-  await links.unlinkCalendarEntry(retreatEntry.id, userId);
   const racers = await Promise.allSettled([
     links.linkCalendarEntryToEvent(retreatEntry.id, retreatEvent.id, userId),
     links.linkCalendarEntryToEvent(spare.id, retreatEvent.id, userId),
@@ -193,7 +192,7 @@ async function main() {
     pairedRefused = true;
   }
   assert(pairedRefused, "the database refuses a baseline start date without a baseline end date");
-  console.log("ok  the database allows one item per event; racing links leave exactly one; baseline dates come as a pair");
+  console.log("ok  the database allows several items per event; racing links both land; baseline dates come as a pair");
 
   // 5. Add registration (blank flow): linked in the same transaction, location and description carried, draft only.
   const created = await createEvent(settings("Evlink Conference", `${P}-spring-conference`, conferenceEntry.startsOn, conferenceEntry.endsOn, conferenceEntry.location), userId, { calendarEntryId: conferenceEntry.id });
