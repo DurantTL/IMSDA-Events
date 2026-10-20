@@ -7,6 +7,9 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+// The registration PDF (#1082) has its own tests. This fake database has no PDF tables, so no PDF is made here.
+vi.mock("@/modules/registration-pdf/repository", () => ({ ensureRegistrationPdf: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/modules/registration-pdf/notices", () => ({ REGISTRANT_UPDATED_PDF_NOTE: "", queueStaffUpdatedRegistrationCopies: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/registrations/repository", () => ({
   getRegistrationByIdWithClient: dependencies.getRegistrationByIdWithClient,

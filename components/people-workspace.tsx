@@ -1117,6 +1117,7 @@ export function PeopleWorkspace({
                   <>
                     <div className="registration-management-actions">
                       {selected.publicSubmission?.rosterEnabled && <button className="primary-button" type="button" onClick={() => { setError(""); setNotice(""); setAmending(true); }}><PencilLine aria-hidden="true" size={17} /> Edit choices & attendees</button>}
+                      {selected.publicSubmission && <a className="secondary-button" download href={`/api/events/${encodeURIComponent(eventId)}/registrations/${encodeURIComponent(selected.id)}/pdf`}><Download aria-hidden="true" size={17} /> Download registration PDF</a>}
                       <button className="secondary-button" type="button" onClick={() => { setError(""); setNotice(""); setModal("edit"); }}><UserRoundPen aria-hidden="true" size={17} /> Edit contact</button>
                       <button className="secondary-button" type="button" onClick={beginTransfer}><ArrowRightLeft aria-hidden="true" size={17} /> Transfer registration</button>
                       {(selected.status === "SUBMITTED" || selected.status === "CONFIRMED") && waitlistEnabled && <button className="secondary-button" type="button" onClick={() => { setError(""); setNotice(""); setLifecycleAction("waitlist"); }}><ListPlus aria-hidden="true" size={17} /> Move to waitlist</button>}

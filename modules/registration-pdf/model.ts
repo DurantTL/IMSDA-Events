@@ -8,8 +8,8 @@
  *
  * What never gets in, whatever the form says:
  * - a field marked sensitive, or one that reads as health, medical, insurance, dietary or custody wording
- *   (`resolveFieldOffer`, the same decision the answer filter and the staff views use, including a question linked to a
- *   sensitive one), so health answers stay in their protected views;
+ *   (`resolveFieldFlags` and `isHealthTypeField`, the decisions the answer filter and the staff views use), and any
+ *   follow-up question that depends on such a field, so health answers stay in their protected views;
  * - a birth date, in any field: only an AGE appears, as of the event (the age the registration saved, never computed
  *   here from a date);
  * - the payment-method answer and the promo code, the confirmation code, and anything that is a private link.
@@ -25,7 +25,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 import { formatAddressDisplay } from "@/modules/forms/address";
-import { resolveFieldOffer } from "@/modules/forms/field-flags";
+import { isHealthTypeField, resolveFieldFlags } from "@/modules/forms/field-flags";
 import { pluralizeAttendeeLabel } from "@/modules/forms/attendee-label";
 import { formatTypedDate } from "@/modules/forms/typed-date";
 import { perPersonPriceText, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
@@ -109,7 +109,12 @@ function isBirthDateField(field: RegistrationFormField) {
   return BIRTH_DATE_PATTERN.test(field.key.replaceAll("_", " ")) || BIRTH_DATE_PATTERN.test(field.label);
 }
 
-/** The keys of every field the PDF must never show, from the whole form. */
+/**
+ * The keys of every field the PDF must never show, from the whole form. A field's own flags decide (`resolveFieldFlags`:
+ * the explicit "sensitive" flag, else the health-type default) plus `isHealthTypeField` even when staff turned the flag off.
+ * A question that is only asked because of an excluded answer is excluded too (a follow-up to a sensitive question would
+ * reveal that answer by being there); the question a sensitive one depends on, like a roster role, is not.
+ */
 export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<string> {
   const allFields = definition.sections.flatMap((section) => section.fields);
   const sectionTitleByField = new Map<RegistrationFormField, string>();
@@ -117,17 +122,25 @@ export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<s
   const paymentKey = definition.payment?.paymentMethodFieldKey ?? null;
   const excluded = new Set<string>();
   for (const field of allFields) {
-    const offer = resolveFieldOffer(field, {
-      allFields,
-      sectionTitleOf: (candidate) => sectionTitleByField.get(candidate) ?? "",
-      paymentMethodFieldKey: paymentKey,
-    });
+    const sectionTitle = sectionTitleByField.get(field) ?? "";
     if (
-      offer.sensitive
+      resolveFieldFlags(field, { sectionTitle, paymentMethodFieldKey: paymentKey }).sensitive
+      || isHealthTypeField(field, sectionTitle)
       || isBirthDateField(field)
       || (paymentKey && field.key === paymentKey)
       || field.key === "promo_code"
+      // A calculated field is a price: it is in the fees at the end, not in the answers.
+      || field.type === "CALCULATED"
     ) excluded.add(field.key);
+  }
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const field of allFields) {
+      if (!excluded.has(field.key) && field.conditional && excluded.has(field.conditional.fieldKey)) {
+        excluded.add(field.key);
+        changed = true;
+      }
+    }
   }
   return excluded;
 }

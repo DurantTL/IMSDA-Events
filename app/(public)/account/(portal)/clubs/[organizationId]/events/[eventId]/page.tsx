@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowRight, CalendarDays, CheckCircle2, MapPin, Plus, Printer, QrCode, UsersRound } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, FileDown, MapPin, Plus, Printer, QrCode, UsersRound } from "lucide-react";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { BackLink } from "@/components/back-link";
@@ -294,9 +294,15 @@ export default async function ClubEventRegistrationPage({
             ))}
           </ul>
           {(activeRegistrationStatuses as readonly string[]).includes(workspace.registration.status) && (
-            <Link className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/events/${eventId}/packet${teamQuery}`}>
-              <Printer aria-hidden="true" size={14} /> Print club packet
-            </Link>
+            <p>
+              <Link className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/events/${eventId}/packet${teamQuery}`}>
+                <Printer aria-hidden="true" size={14} /> Print club packet
+              </Link>{" "}
+              {/* A file, not a page: a plain link to the download route, never client navigation. */}
+              <a className="secondary-button club-event-action" download href={`/api/attendee/clubs/${organizationId}/events/${eventId}/registration/pdf${teamQuery}`}>
+                <FileDown aria-hidden="true" size={14} /> Download registration PDF
+              </a>
+            </p>
           )}
           {workspace.teams.settings && (
             <p>
