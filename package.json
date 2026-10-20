@@ -123,7 +123,7 @@
     "payments:reconcile": "tsx scripts/payments-reconcile.ts",
     "payments:hosted-sweep": "tsx --require ./scripts/support/allow-server-only.cjs scripts/payments-hosted-sweep.ts",
     "payments:match-audit": "tsx scripts/square-match-audit.ts",
-    "event:shirt-sizes": "tsx scripts/shirt-size-audience.ts",
+    "event:shirt-sizes": "tsx --require ./scripts/support/allow-server-only.cjs scripts/shirt-size-audience.ts",
     "attendee-types:backfill": "tsx scripts/backfill-attendee-types.ts",
     "household-membership:backfill": "tsx scripts/backfill-household-membership-effective-dates.ts",
     "event-modules:backfill": "tsx --require ./scripts/support/allow-server-only.cjs scripts/backfill-event-modules.ts",

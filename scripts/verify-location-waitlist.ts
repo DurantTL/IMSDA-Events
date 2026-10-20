@@ -13,6 +13,7 @@
  *
  *   npm run test:location-waitlist
  */
+import { setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { PrismaClient, RegistrationFormStatus } from "@prisma/client";
@@ -70,6 +71,7 @@ async function expectCode(promise: Promise<unknown>, code: string, message: stri
 }
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   // Events this run cloned are removed with the ones it made.
   const cloneIds = (await prisma.eventCloneRecord.findMany({ where: { actorUserId: staffUserId }, select: { resultEventId: true } })).map((row) => row.resultEventId);
   const allEventIds = [...eventIds, ...cloneIds];
@@ -476,7 +478,8 @@ async function main() {
   console.log("ok  the coordinator portal lists their location's waiting clubs; a revoked coordinator sees none");
 
   // 10b. The director's own emails: a delivery failure after the commit never blocks or undoes the registration change.
-  await prisma.eventMessageSettings.create({ data: { eventId, deliveryMode: "EXTERNAL_EMAIL", senderName: "IMSDA Events", senderEmail: "events@example.test" } });
+  await setSyntheticCentralSender(prisma);
+  await prisma.eventMessageSettings.create({ data: { eventId, deliveryPaused: false, senderName: "IMSDA Events" } });
   const cancelledWithOutage = await cancel("a2", "Synthetic cancellation during an outage.");
   assert(cancelledWithOutage.autoPromotedRegistration !== null && cancelledWithOutage.pendingMessageIds.length >= 2, "the cancel promoted the waiting club and queued both emails");
   const outage = await processQueuedMessageIdsAfterCommit(cancelledWithOutage.pendingMessageIds, { sendEmail: failing as never, configuration });

@@ -19,6 +19,7 @@
  *
  *   npm run test:announcement-unsubscribe
  */
+import { configureSyntheticEmailEnvironment, setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
@@ -29,6 +30,7 @@ import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
+configureSyntheticEmailEnvironment();
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-announcement-unsubscribe-synthetic-key-not-a-secret");
 fillBlankSyntheticEnv("MANAGE_LINK_DERIVATION_SECRET", "verify-announcement-unsubscribe-synthetic-derivation-secret-01");
 fillBlankSyntheticEnv("ATTENDEE_PASS_SIGNING_SECRET", "verify-announcement-unsubscribe-synthetic-pass-signing-secret-01");
@@ -84,6 +86,7 @@ function startProviderStub() {
 }
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId: { in: [ids.event, ids.other] } }, { actorUserId: { in: [ids.staff, ids.manager] } }] } });
   await prisma.emailAnnouncementOptOut.deleteMany({ where: { normalizedEmail: { in: people.map((person) => person.email) } } });
   await prisma.messageOutbox.deleteMany({ where: { eventId: { in: [ids.event, ids.other] } } });
@@ -160,9 +163,10 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
     },
   });
   await ensureEventMessagingDefaults(ids.event);
+  await setSyntheticCentralSender(prisma);
   await prisma.eventMessageSettings.update({
     where: { eventId: ids.event },
-    data: { deliveryMode: "EXTERNAL_EMAIL", senderEmail: "events@example.test", senderName: "Synthetic Events" },
+    data: { deliveryPaused: false, senderName: "Synthetic Events" },
   });
 
   const call = (token: string, body: string) => route.POST(

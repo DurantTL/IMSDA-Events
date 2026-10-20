@@ -18,6 +18,7 @@
  *
  *   npm run test:retry-failed
  */
+import { configureSyntheticEmailEnvironment, setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
@@ -28,6 +29,7 @@ import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
+configureSyntheticEmailEnvironment();
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-retry-failed-synthetic-key-not-a-secret");
 fillBlankSyntheticEnv("MANAGE_LINK_DERIVATION_SECRET", "verify-retry-failed-synthetic-derivation-secret-01");
 fillBlankSyntheticEnv("ATTENDEE_PASS_SIGNING_SECRET", "verify-retry-failed-synthetic-pass-signing-secret-01");
@@ -81,6 +83,7 @@ function startProviderStub(state: StubState) {
 }
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId: { in: eventIds } }, { actorUserId: ids.staff }] } });
   await prisma.messageOutbox.deleteMany({ where: { eventId: { in: eventIds } } });
   await prisma.eventMessageTemplate.deleteMany({ where: { eventId: { in: eventIds } } });
@@ -120,9 +123,10 @@ async function runChecks(state: StubState) {
   }
   await ensureEventMessagingDefaults(ids.event);
   await ensureEventMessagingDefaults(ids.other);
+  await setSyntheticCentralSender(prisma);
   await prisma.eventMessageSettings.update({
     where: { eventId: ids.event },
-    data: { deliveryMode: "EXTERNAL_EMAIL", senderName: "IMSDA Events", senderEmail: EMAIL("sender") },
+    data: { deliveryPaused: false, senderName: "IMSDA Events" },
   });
 
   const registrationIds: string[] = [];
@@ -392,10 +396,10 @@ async function runChecks(state: StubState) {
     await prisma.messageOutbox.deleteMany({ where: { id: { in: sources } } });
   }
 
-  // 10. Delivery turned off: the preview says so and a confirmation is refused.
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryMode: "DISABLED" } });
+  // 10. Email paused by an administrator: the preview says so and a confirmation is refused.
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryPaused: true } });
   const off = await previewFailedMessagesRetry(ids.event, { type: "EVENT" });
-  assert(off.blocker?.code === "DELIVERY_DISABLED", "with delivery off the preview blocks a retry");
+  assert(off.blocker?.code === "DELIVERY_DISABLED", "with email paused the preview blocks a retry");
 
   console.log(`Retry failed verification passed: ${state.accepted.length} emails, ${state.rejected} quota rejections, ${copies.length} retry copies.`);
 }

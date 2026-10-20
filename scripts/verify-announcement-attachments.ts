@@ -17,6 +17,7 @@
  *
  *   npm run test:announcement-attachments
  */
+import { configureSyntheticEmailEnvironment, setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -30,6 +31,7 @@ import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
+configureSyntheticEmailEnvironment();
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-announcement-attachments-synthetic-key-not-a-secret");
 fillBlankSyntheticEnv("MANAGE_LINK_DERIVATION_SECRET", "verify-announcement-attachments-synthetic-derivation-secret-01");
 fillBlankSyntheticEnv("ATTENDEE_PASS_SIGNING_SECRET", "verify-announcement-attachments-synthetic-pass-signing-secret-01");
@@ -121,6 +123,7 @@ function startProviderStub(statuses: number[]) {
 }
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId: { in: [ids.event, ids.other] } }, { actorUserId: ids.staff }] } });
   await prisma.publicRegistrationSubmission.deleteMany({ where: { eventId: ids.event } });
   // The foreign keys to a message file are RESTRICT, so what refers to one goes first (as event deletion does).
@@ -228,9 +231,10 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>, st
   });
 
   await ensureEventMessagingDefaults(ids.event);
+  await setSyntheticCentralSender(prisma);
   await prisma.eventMessageSettings.update({
     where: { eventId: ids.event },
-    data: { deliveryMode: "EXTERNAL_EMAIL", senderEmail: "events@example.test", senderName: "Synthetic Events" },
+    data: { deliveryPaused: false, senderName: "Synthetic Events" },
   });
   const template = await prisma.eventMessageTemplate.findUniqueOrThrow({
     where: { eventId_key: { eventId: ids.event, key: "EVENT_ANNOUNCEMENT" } },
