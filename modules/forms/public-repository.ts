@@ -1747,7 +1747,7 @@ export async function submitPublicRegistration(
     isNotificationEnabled("TEAM_APPROVAL_REQUESTED"),
     isNotificationEnabled("REGISTRATION_FORM_NOTIFICATIONS"),
   ]);
-  // Also before the transaction (#1097): which clubs the form's Club notifications route on still exist. One query, and only
+  // Also before the transaction (#1097): which clubs the form's Club notifications route on still exist. One notification read, plus one organization read only
   // when some notification routes on a club. A club deleted between this read and the commit is accepted.
   const existingClubIds = formNotificationsEnabled
     ? await existingConditionClubIds(

@@ -248,6 +248,7 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     locationName: "Des Moines",
     eventName: "Synthetic Camporee",
     registrantName: "Dana Sample",
+    existingClubIds: new Set<string>() as ReadonlySet<string>,
   };
 
   it("queues only the notifications whose condition matches, one held message per address, with a retry-safe key", async () => {
@@ -602,7 +603,7 @@ describe("review fixes (#1081)", () => {
     };
     const submitted = await queueFormNotificationsForSubmission(tx as never, {
       enabled: true, eventId: "event-1", formId: "form-1", registrationId: "registration-1", correlationId: "c", definition,
-      answers: {}, locationId: null, locationName: null, eventName: "Synthetic Camporee", registrantName: "Dana Sample",
+      answers: {}, locationId: null, locationName: null, eventName: "Synthetic Camporee", registrantName: "Dana Sample", existingClubIds: new Set<string>(),
     });
     expect(submitted.groups.map((group) => group.notificationId)).toEqual(["fine"]);
 

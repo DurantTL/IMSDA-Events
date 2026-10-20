@@ -164,7 +164,7 @@ export async function queueFormNotificationsForSubmission(
      * The club ids that still exist, read BEFORE the transaction opened (`existingConditionClubIds`, docs/MEALS.md): no
      * organization query runs inside the submission's transaction. Only used by Club conditions.
      */
-    existingClubIds?: ReadonlySet<string>;
+    existingClubIds: ReadonlySet<string>;
     locationName: string | null;
     eventName: string;
     registrantName: string;
@@ -173,7 +173,7 @@ export async function queueFormNotificationsForSubmission(
   const none = { groups: [] as QueuedFormNotificationGroup[], pendingMessageIds: [] as string[] };
   if (!input.enabled) return none;
   const rows = await tx.registrationFormNotification.findMany({ where: { formId: input.formId }, orderBy: { position: "asc" } });
-  const clubIds = input.existingClubIds ?? new Set<string>();
+  const clubIds = input.existingClubIds;
   const matching = rows.filter((row) => {
     if (row.recipients.length === 0) return false;
     if (!clubConditionStillExists(row, clubIds)) {
