@@ -108,6 +108,7 @@ vi.mock("@/modules/rate-limit/service", () => ({
 
 import { POST as OPTIONS } from "@/app/api/sign-in/passkey/options/route";
 import { POST as FINISH } from "@/app/api/sign-in/passkey/route";
+import { resolveLoginDestination } from "@/modules/access/login-routing";
 import { COMBINED_PASSKEY_SIGN_IN_COOKIE } from "@/modules/account-merge/combined-passkey-sign-in-cookie";
 
 const origin = "https://events.imsda.test";
@@ -308,5 +309,56 @@ describe("combined passkey sign-in (#1085): finish", () => {
     expect(response.status).toBe(409);
     expect(mocks.createDatabaseSession).not.toHaveBeenCalled();
     expect(spent()).toEqual({ staff: true, attendee: true });
+  });
+
+  it("answers a stale handle the same for a known and an unknown credential", async () => {
+    mocks.cookieGet.mockReturnValue({ value: "gone-staff:gone-attendee" });
+    const bodies = [];
+    for (const credential of ["staff-cred", "attendee-cred", "nobody-cred"]) {
+      const response = await FINISH(post("/api/sign-in/passkey", answer(credential)));
+      expect(response.status).toBe(400);
+      bodies.push(await response.json());
+    }
+    expect(bodies.map((body) => body.error)).toEqual(["CHALLENGE_EXPIRED", "CHALLENGE_EXPIRED", "CHALLENGE_EXPIRED"]);
+    expect(new Set(bodies.map((body) => body.message)).size).toBe(1);
+    expect(mocks.createDatabaseSession).not.toHaveBeenCalled();
+    expect(mocks.createAttendeeSession).not.toHaveBeenCalled();
+  });
+
+  it("refuses when only one of the two prompts is still open", async () => {
+    await begin();
+    state.attendeeChallenges.forEach((row) => { row.usedAt = new Date(); });
+    const response = await FINISH(post("/api/sign-in/passkey", answer("staff-cred")));
+    expect((await response.json()).error).toBe("CHALLENGE_EXPIRED");
+    expect(mocks.createDatabaseSession).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the default destination for a hostile next, on both branches", async () => {
+    mocks.resolvePostLoginDestination.mockImplementation(async (_user: unknown, options: { returnTo?: string }) =>
+      resolveLoginDestination({ isSystemAdmin: true, events: [], lastEventId: null, returnTo: options.returnTo }));
+    const defaultStaff = resolveLoginDestination({ isSystemAdmin: true, events: [], lastEventId: null, returnTo: undefined });
+    await begin();
+    const staff = await (await FINISH(post("/api/sign-in/passkey", { ...answer("staff-cred"), next: "https://evil.example" }))).json();
+    expect(staff.redirectTo).toBe(defaultStaff);
+    await begin();
+    const attendee = await (await FINISH(post("/api/sign-in/passkey", { ...answer("attendee-cred"), next: "https://evil.example" }))).json();
+    expect(attendee.redirectTo).toBe("/account");
+  });
+
+  it("refuses a disabled attendee and a disabled staff user through the combined route", async () => {
+    (state.attendeePasskeys[0].account as Row).disabledAt = new Date("2026-02-01");
+    await begin();
+    const attendee = await FINISH(post("/api/sign-in/passkey", answer("attendee-cred")));
+    expect(attendee.status).toBe(400);
+    expect((await attendee.json()).error).toBe("PASSKEY_NOT_VERIFIED");
+    expect(mocks.createAttendeeSession).not.toHaveBeenCalled();
+
+    (state.staffPasskeys[0].user as Row).accountStatus = "DISABLED";
+    await begin();
+    const staff = await FINISH(post("/api/sign-in/passkey", answer("staff-cred")));
+    expect(staff.status).toBe(400);
+    expect((await staff.json()).error).toBe("PASSKEY_NOT_VERIFIED");
+    expect(mocks.createDatabaseSession).not.toHaveBeenCalled();
+    expect(mocks.issueLinkedAttendeeSession).not.toHaveBeenCalled();
   });
 });

@@ -34,6 +34,7 @@ import {
 
 /** Same wording both sides use, so a miss reveals nothing about which side exists. */
 const SIGN_IN_REFUSED = "That passkey didn't sign you in. Try again, or sign in with your email and password.";
+const PASSKEYS_UNAVAILABLE = "Passkeys aren't available here right now. Sign in with your email and password.";
 const PROMPT_EXPIRED = "That passkey prompt expired. Please try again.";
 
 export type CombinedPasskeySignInResult =
@@ -61,15 +62,37 @@ async function requireUnifiedSignIn() {
   } catch {
     enabled = false;
   }
-  if (!enabled) throw new PasskeyError("PASSKEYS_NOT_AVAILABLE", "Passkeys aren't available on this site yet. Sign in with your password instead.");
+  if (!enabled) throw new PasskeyError("PASSKEYS_NOT_AVAILABLE", PASSKEYS_UNAVAILABLE);
 }
 
 /** The attendee module has its own error class; the route maps one class, so re-throw as that one. */
 function toStaffError(error: unknown) {
   if (error instanceof AttendeePasskeyError) {
-    return new PasskeyError(error.code as PasskeyError["code"], error.message);
+    switch (error.code) {
+      case "CHALLENGE_EXPIRED":
+        return new PasskeyError("CHALLENGE_EXPIRED", PROMPT_EXPIRED);
+      case "PASSKEYS_NOT_AVAILABLE":
+        return new PasskeyError("PASSKEYS_NOT_AVAILABLE", PASSKEYS_UNAVAILABLE);
+      default:
+        // Anything else (including codes the staff side has no status for) reads as the one refusal.
+        return new PasskeyError("PASSKEY_NOT_VERIFIED", SIGN_IN_REFUSED);
+    }
+  }
+  if (error instanceof PasskeyError && error.code === "PASSKEYS_NOT_AVAILABLE") {
+    return new PasskeyError("PASSKEYS_NOT_AVAILABLE", PASSKEYS_UNAVAILABLE);
   }
   return error;
+}
+
+/** Both stored prompts must still be open before anything about the credential is looked at. */
+async function bothPromptsOpen(ids: { staff: string; attendee: string }, now: Date) {
+  const prisma = getPrisma();
+  const where = (id: string) => ({ id, purpose: "SIGN_IN" as const, sessionId: null, usedAt: null, expiresAt: { gt: now } });
+  const [staff, attendee] = await Promise.all([
+    prisma.userPasskeyChallenge.findFirst({ where: where(ids.staff), select: { id: true } }),
+    prisma.attendeePasskeyChallenge.findFirst({ where: where(ids.attendee), select: { id: true } }),
+  ]);
+  return Boolean(staff && attendee);
 }
 
 export async function beginCombinedPasskeySignIn(requestOrigin: string | null, now = new Date()) {
@@ -95,6 +118,9 @@ export async function finishCombinedPasskeySignIn(
   try {
     await requireUnifiedSignIn();
     if (!ids) throw new PasskeyError("CHALLENGE_EXPIRED", PROMPT_EXPIRED);
+
+    // A stale, spent or invented handle answers the same whatever the credential is.
+    if (!(await bothPromptsOpen(ids, now))) throw new PasskeyError("CHALLENGE_EXPIRED", PROMPT_EXPIRED);
 
     const prisma = getPrisma();
     const credentialId = response.id;
