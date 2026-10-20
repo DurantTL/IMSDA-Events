@@ -18,6 +18,8 @@ import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { isSeminarPreferenceField } from "@/modules/attendee-accounts/registration-answer-policy";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
+import { ensureRegistrationPdf } from "@/modules/registration-pdf/repository";
+import { REGISTRANT_UPDATED_PDF_NOTE, queueStaffUpdatedRegistrationCopies } from "@/modules/registration-pdf/notices";
 import {
   addUndiscountedLine,
   calculationWithLine,
@@ -1526,7 +1528,11 @@ export async function amendRegistration(
     },
   });
   // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
-  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
+  const [notifyApprovers, staffCopyEnabled] = await Promise.all([
+    isNotificationEnabled("TEAM_APPROVAL_REQUESTED"),
+    // The staff copy's switch also decides the "Updated" staff copy with the new PDF (#1082).
+    isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY"),
+  ]);
   const prisma = getPrisma();
   for (let attempt = 0; attempt < maxRetryAttempts; attempt += 1) {
     try {
@@ -1899,12 +1905,26 @@ export async function amendRegistration(
           },
           pendingMessageIds: [...(freedSeatsAtLocation?.pendingMessageIds ?? [])],
         };
-        if (hasMeaningfulAttendeeVisibleChange(prepared, input)) {
+        // The registration PDF (#1082): a new version, marked "Updated", when this change altered what it says. Made from the
+        // rows just written plus the answers and pricing this amendment saved (its operation row does not exist yet).
+        const registrationPdf = await ensureRegistrationPdf(tx, {
+          eventId,
+          registrationId,
+          now,
+          markUpdated: true,
+          overrides: {
+            registrationResponses: prepared.prepared.registrationResponses,
+            pricingSnapshot: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
+          },
+        });
+        const newPdf = registrationPdf?.created ? registrationPdf.document : null;
+        if (hasMeaningfulAttendeeVisibleChange(prepared, input) || newPdf) {
           const queued = await enqueueRegistrationUpdatedMessage(tx, {
             eventId,
             registrationId,
             correlationId: input.clientRequestId,
             transitionKey: `registration-amendment:${amendmentId}`,
+            ...(newPdf ? { attachmentId: newPdf.attachmentId, leadNote: REGISTRANT_UPDATED_PDF_NOTE } : {}),
             // The operation holding the new pricing is created after this notice is queued.
             pricingSnapshot: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
             changeCategory: prepared.seminarPreferencesChanged
@@ -1935,6 +1955,19 @@ export async function amendRegistration(
               : undefined,
           });
           response.pendingMessageIds = [...response.pendingMessageIds, ...queued.pendingMessageIds];
+        }
+        if (newPdf) {
+          // The staff "new registration" copy again, marked Updated, with the same PDF (#1082).
+          const staffCopies = await queueStaffUpdatedRegistrationCopies(tx, {
+            eventId,
+            registrationId,
+            attachmentId: newPdf.attachmentId,
+            changeKey: `registration-amendment:${amendmentId}`,
+            correlationId: input.clientRequestId,
+            staffCopyEnabled,
+            pricingSnapshot: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
+          });
+          response.pendingMessageIds = [...response.pendingMessageIds, ...staffCopies.pendingMessageIds];
         }
         await tx.registrationOperation.create({
           data: {

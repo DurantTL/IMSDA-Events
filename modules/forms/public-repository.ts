@@ -12,6 +12,7 @@ import { admitToLocation } from "@/modules/event-locations/admission";
 import { locationWaitlistPlace, recordLocationWaitlistChange } from "@/modules/event-locations/waitlist";
 import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
+import { ensureRegistrationPdf } from "@/modules/registration-pdf/repository";
 import {
   enqueuePublicRegistrationMessages,
   processQueuedMessageIdsAfterCommit,
@@ -1531,6 +1532,11 @@ async function createPublicRegistrationTransaction(
     }
   }
   const submissionCorrelationId = randomUUID();
+  // The registration PDF (#1082), version 1: attached to the confirmation and the staff copy. Not for a waitlist notice,
+  // which is not a confirmation. Made from the rows just written, so it shows exactly what was saved.
+  const registrationPdf = isWaitlisted
+    ? null
+    : await ensureRegistrationPdf(tx, { eventId: form.eventId, registrationId: registration.id, now });
   const queuedMessages = isWaitlisted
     ? await enqueueWaitlistJoinedMessage(tx, {
         eventId: form.eventId,
@@ -1568,6 +1574,7 @@ async function createPublicRegistrationTransaction(
         billedToGroup: Boolean(group),
         ...(club?.confirmationNote ? { registrantNote: club.confirmationNote({ waitlisted: false }) } : {}),
         staffCopyEnabled: notifications.staffCopyEnabled,
+        registrationPdfAttachmentId: registrationPdf?.document.attachmentId ?? null,
       });
   await tx.auditLog.create({
     data: {

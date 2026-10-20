@@ -201,6 +201,11 @@ export type RegistrationMessageInput = {
    * visitor cannot become a link, an image or a token.
    */
   registrantNote?: string | null;
+  /**
+   * The registration PDF (#1082), a stored `MessageAttachment`, attached to the registrant's confirmation and to the staff
+   * copy. Absent when the registration has none (it was too large, or has no form to lay out): the messages go without it.
+   */
+  registrationPdfAttachmentId?: string | null;
   /** The "New public registration" switch (#1016), read before the transaction; false skips the staff copy only. */
   staffCopyEnabled: boolean;
 };
@@ -3450,7 +3455,10 @@ export async function enqueuePublicRegistrationMessages(
 ): Promise<QueuedRegistrationMessages> {
   const isDeferredOrganizationBilling = input.event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
   const billedToGroup = isDeferredOrganizationBilling && Boolean(input.billedToGroup);
-  const registrantNote = input.registrantNote ?? null;
+  // The registrant's one plain lead line: the club note (#931), then, when the PDF is attached, a line saying so (#1082).
+  const registrantNote = [input.registrantNote ?? null, input.registrationPdfAttachmentId ? "A PDF copy of your registration is attached." : null]
+    .filter((line): line is string => Boolean(line))
+    .join(" ") || null;
   const registrantTemplateKey = selectRegistrationMessageTemplate({
     isWorker: input.registration.attendeeType === "WORKER",
     balanceCents: input.calculation.totalCents,
@@ -3665,6 +3673,7 @@ export async function enqueuePublicRegistrationMessages(
         subjectSnapshot: rendered.subject,
         bodyTextSnapshot: shown.body,
         bodyHtmlSnapshot: shown.bodyHtml,
+        ...(input.registrationPdfAttachmentId ? { attachmentId: input.registrationPdfAttachmentId } : {}),
         metadata: {
           trigger: "PUBLIC_REGISTRATION_SUBMITTED",
           confirmationCode: input.registration.confirmationCode,
