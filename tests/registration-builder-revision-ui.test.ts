@@ -66,16 +66,24 @@ describe("registration builder revisions (#564)", () => {
     expect(markup).not.toContain("Withdraw from public page");
   });
 
-  it("holds v2 behind its own test even though v1 was published, and says why", () => {
+  it("lets a later draft publish without a test and says the test is optional (#1061)", () => {
     const markup = render([makeVersion(2, "DRAFT"), makeVersion(1, "ARCHIVED", true)]);
-    expect(buttonFor(markup, "Publish version")).toContain('disabled=""');
-    expect(markup).toContain("Run a test submission first");
-    expect(markup).toContain('href="#live-form-preview"');
-    expect(markup).not.toContain("Optional — this form is already published");
+    expect(buttonFor(markup, "Publish version")).not.toContain('disabled=""');
+    expect(markup).not.toContain("Run a test submission first");
+    expect(markup).toContain("A test is optional now that this form has been published");
+    expect(markup).toContain("Preview &amp; test");
   });
 
-  it("enables publishing once the selected draft has a valid test", () => {
-    const markup = render([makeVersion(2, "DRAFT", true), makeVersion(1, "ARCHIVED")]);
+  it("holds a form's first publish behind a valid test, and says why", () => {
+    const markup = render([makeVersion(1, "DRAFT")]);
+    expect(buttonFor(markup, "Publish version")).toContain('disabled=""');
+    expect(markup).toContain("Run a test submission first");
+    expect(markup).toContain("required only before a form&#x27;s first publish");
+    expect(markup).toContain('href="#live-form-preview"');
+  });
+
+  it("enables a first publish once the draft has a valid test", () => {
+    const markup = render([makeVersion(1, "DRAFT", true)]);
     expect(buttonFor(markup, "Publish version")).not.toContain('disabled=""');
     expect(markup).not.toContain("Run a test submission first");
   });

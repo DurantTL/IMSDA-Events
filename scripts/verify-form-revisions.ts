@@ -118,24 +118,21 @@ async function run() {
   assert((await prisma.registrationForm.findUniqueOrThrow({ where: { id: formId } })).status === "PUBLISHED", "the form stays PUBLISHED while a draft exists");
   await assertOpen(slug, event.id, v1.id, "draft beside live");
 
-  // v2 needs its own test; an edit deletes tests.
-  await rejectsWith(publishRegistrationForm(event.id, formId, userId), "TEST_REQUIRED", "v2 cannot publish on v1's publication");
+  // A test is required only before the first publish; an edit still deletes tests.
   const v2 = withDraft.activeVersion;
   await addValidTest(event.id, v2.id);
   const edited = structuredClone(revised);
   edited.title = "Revised title again";
   await updateRegistrationForm(event.id, formId, userId, { definition: edited, expectedUpdatedAt: v2.updatedAt });
   assert((await prisma.formTestSubmission.count({ where: { formVersionId: v2.id } })) === 0, "the edit deleted the draft's tests");
-  await rejectsWith(publishRegistrationForm(event.id, formId, userId), "TEST_REQUIRED", "publish is blocked after an edit until retested");
 
   // A promotion conditioned on a stale updatedAt (a save landed after the test
   // count) matches nothing, so the publish transaction rolls back.
-  await addValidTest(event.id, v2.id);
   const current = await prisma.registrationFormVersion.findUniqueOrThrow({ where: { id: v2.id } });
   const stale = await prisma.registrationFormVersion.updateMany({ where: { id: v2.id, status: "DRAFT", updatedAt: new Date(current.updatedAt.getTime() - 1000) }, data: { status: "PUBLISHED" } });
   assert(stale.count === 0, "a stale-updatedAt promotion matches nothing");
 
-  // Publish v2: v1 is archived, v2 serves, and v1's registrations keep v1.
+  // Publish v2 with no test (its tests were deleted by the edit): v1 is archived, v2 serves, and v1's registrations keep v1.
   await publishRegistrationForm(event.id, formId, userId);
   const afterV2 = (await getRegistrationForm(event.id, formId))!;
   assert(afterV2.versions.find((v) => v.versionNumber === 1)?.status === "ARCHIVED" && afterV2.activeVersion.versionNumber === 2, "v2 is live and v1 archived");
@@ -147,10 +144,10 @@ async function run() {
   const reloaded = (await getRegistrationForm(event.id, formId))!;
   assert(reloaded.status === "ARCHIVED" && reloaded.activeVersion.status === "ARCHIVED" && !reloaded.versions.some((v) => v.status === "PUBLISHED"), "the builder view shows the withdrawn state after reload");
 
-  // Republishing after a withdraw needs a fresh test against a new draft.
+  // Republishing after a withdraw needs no test: the form was published before.
   const back = await updateRegistrationForm(event.id, formId, userId, { definition: structuredClone(reloaded.activeVersion.definition), expectedUpdatedAt: reloaded.activeVersion.updatedAt });
   assert(back.activeVersion.status === "DRAFT" && back.activeVersion.versionNumber === 3, "an edit after withdraw creates draft v3");
-  await rejectsWith(publishRegistrationForm(event.id, formId, userId), "TEST_REQUIRED", "v3 needs its own test");
+  assert((await prisma.formTestSubmission.count({ where: { formVersionId: back.activeVersion.id } })) === 0, "v3 has no test");
   await assertClosed(slug, event.id, back.activeVersion.id, "withdrawn with draft");
 
   await races();
@@ -238,16 +235,19 @@ async function races() {
     const publish = publishFirst ? first : second;
     const v2 = await prisma.registrationFormVersion.findUniqueOrThrow({ where: { id: draft.id } });
     const v2Title = (v2.definition as { title: string }).title;
-    assert((v2.status === "PUBLISHED") === publishFirst, "the writer that queued first won");
-    if (v2.status === "PUBLISHED") {
+    // A later draft needs no test, so the publish succeeds either way: it
+    // publishes the tested definition when it queued first, or the saved edit
+    // (read under the lock) when the save did.
+    assert(publish.status === "fulfilled", "publish succeeds without a test, whichever writer queued first");
+    assert(v2.status === "PUBLISHED", "the draft ends up published");
+    if (publishFirst) {
       saveVsPublish.publishedFirst += 1;
-      assert(publish.status === "fulfilled", "publish won the race");
       assert(conflictCode(save) === "EDIT_CONFLICT", `the losing save is refused, not applied (got ${conflictCode(save) ?? save.status})`);
       assert(v2Title === `Race A${i} draft`, "the published version still has exactly the tested definition");
     } else {
       saveVsPublish.savedFirst += 1;
-      assert(save.status === "fulfilled" && conflictCode(publish) === "TEST_REQUIRED", `the save won, so publish is blocked for lack of a test (got ${conflictCode(publish) ?? publish.status})`);
-      assert(v2.status === "DRAFT" && v2Title === `Race A${i} edited`, "the save applied to the draft");
+      assert(save.status === "fulfilled", "the save that queued first applied");
+      assert(v2Title === `Race A${i} edited`, "the publish promoted the saved edit");
       assert((await prisma.formTestSubmission.count({ where: { formVersionId: draft.id } })) === 0, "the save deleted the draft's tests");
     }
     assert((await prisma.registrationFormVersion.count({ where: { formId, status: "PUBLISHED" } })) === 1, "exactly one version is published");
@@ -300,7 +300,6 @@ async function races() {
       testVsSave.savedFirst += 1;
     }
     assert((await prisma.formTestSubmission.count({ where: { formVersionId: draft.id, isValid: true } })) === 0, "no valid test remains against the edited draft");
-    await rejectsWith(publishRegistrationForm(event.id, formId, userId), "TEST_REQUIRED", "the edited draft cannot publish on a stale test");
   }
   assert(testVsSave.testedFirst > 0 && testVsSave.savedFirst > 0, `both test-vs-save orders happened (${JSON.stringify(testVsSave)})`);
   assert(saveVsPublish.publishedFirst > 0 && saveVsPublish.savedFirst > 0, `both save-vs-publish orders happened (${JSON.stringify(saveVsPublish)})`);

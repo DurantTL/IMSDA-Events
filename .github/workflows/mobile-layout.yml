@@ -4,9 +4,10 @@ name: Mobile layout
 # Actions minutes. See docs/RESPONSIVE.md.
 #
 # When it runs:
-#  - a pull request that changes the table-card or list-sort helpers or the
-#    audit itself: a quick run (the shared CSS changes in most pull requests,
-#    so it is covered by the label and the weekly run instead);
+#  - a pull request that changes the table-card or list-sort helpers: a quick
+#    run. Changes to the shared CSS and to the audit script itself happen in
+#    most pull requests, so they are covered by the `mobile-check` label and
+#    the weekly run instead, to save Actions minutes (Caleb, Oct 20, 2026);
 #  - a pull request carrying the `mobile-check` label: a quick run, started by
 #    mobile-layout-label.yml, which calls this workflow (a `paths` filter and a
 #    label cannot be OR'd in one workflow, so there are two small triggers
@@ -21,8 +22,6 @@ on:
     paths:
       - "components/table-card-labels.tsx"
       - "components/list-sort.tsx"
-      - "scripts/verify-mobile-layout.ts"
-      - "scripts/support/**"
       - ".github/workflows/mobile-layout.yml"
       - ".github/workflows/mobile-layout-label.yml"
   # Weekly safety run, so a change outside the paths above still gets caught.
