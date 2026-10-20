@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
 
@@ -34,11 +35,81 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
   };
 }
 
+export type SignInSwitchState = {
+  enabled: boolean;
+  linkCheck: { unlinkedPairs: number; linkedPairs: number };
+};
+
 export function PlatformSettingsWorkspace({
   initialSettings,
+  initialSignIn,
 }: {
   initialSettings: PlatformSettingsRecord;
+  initialSignIn: SignInSwitchState;
 }) {
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const [signIn, setSignIn] = useState(initialSignIn);
+  const [signInBusy, setSignInBusy] = useState(false);
+  const [signInError, setSignInError] = useState("");
+  const [signInNotice, setSignInNotice] = useState("");
+
+  async function changeSignIn(enabled: boolean) {
+    if (enabled) {
+      // Fresh counts, so the warning is not stale if someone linked people since the page loaded.
+      let counts = signIn.linkCheck;
+      try {
+        const fresh = await fetch("/api/admin/platform-settings/unified-sign-in");
+        const data = await fresh.json().catch(() => ({}));
+        if (fresh.ok && data.linkCheck) {
+          counts = data.linkCheck;
+          setSignIn((current) => ({ ...current, linkCheck: data.linkCheck }));
+        }
+      } catch {
+        // Fall back to the counts already on screen.
+      }
+      const unlinked = counts.unlinkedPairs;
+      const confirmed = await askConfirm({
+        title: "Turn on one sign-in",
+        confirmLabel: "Turn one sign-in on",
+        body: (
+          <>
+            {unlinked > 0 && (
+              <p>
+                {unlinked} {unlinked === 1 ? "person still has a separate account" : "people still have separate accounts"}; link
+                them on <Link className="text-button" href="/admin/accounts">Accounts</Link> first.
+              </p>
+            )}
+            <p>
+              <code>/login</code> and <code>/account/sign-in</code> will send everyone to the single <code>/sign-in</code> page, and
+              staff get both their staff and attendee sides. You can turn it off again; sessions that already exist stay valid.
+            </p>
+          </>
+        ),
+      });
+      if (!confirmed) return;
+    }
+    setSignInBusy(true);
+    setSignInError("");
+    setSignInNotice("");
+    try {
+      const response = await fetch("/api/admin/platform-settings/unified-sign-in", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || typeof result.enabled !== "boolean") {
+        throw new Error(result.message ?? "The switch could not be changed.");
+      }
+      setSignIn({ enabled: result.enabled, linkCheck: result.linkCheck ?? signIn.linkCheck });
+      setSignInNotice(result.enabled ? "One sign-in is on." : "One sign-in is off.");
+    } catch (caught) {
+      setSignInError(caught instanceof Error ? caught.message : "The switch could not be changed.");
+    } finally {
+      setSignInBusy(false);
+    }
+  }
+
   const [settings, setSettings] = useState(initialSettings);
   const [draft, setDraft] = useState(() => draftFrom(initialSettings));
   const [saving, setSaving] = useState(false);
@@ -87,6 +158,39 @@ export function PlatformSettingsWorkspace({
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
+
+      <section className="panel" aria-labelledby="one-sign-in-heading">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow"><KeyRound aria-hidden="true" size={14} /> One sign-in</p>
+            <h2 id="one-sign-in-heading">One sign-in for staff and attendees</h2>
+          </div>
+        </div>
+        <p className="field-help">
+          Turning this on sends <code>/login</code> and <code>/account/sign-in</code> to the single <code>/sign-in</code> page, and
+          staff get both their staff and attendee sides. Turning it off restores the separate pages. Sessions that already exist
+          stay valid either way.
+        </p>
+        <p className="field-help">
+          One sign-in is currently <strong>{signIn.enabled ? "on" : "off"}</strong>.
+        </p>
+        <ul className="field-help">
+          <li>Staff with a matching attendee account, not linked yet: <strong>{signIn.linkCheck.unlinkedPairs}</strong></li>
+          <li>Linked pairs: <strong>{signIn.linkCheck.linkedPairs}</strong></li>
+        </ul>
+        <p className="field-help">
+          Link people by hand on <Link className="text-button" href="/admin/accounts">System management → Accounts</Link>. You can
+          turn this on with unlinked pairs remaining; they keep separate accounts until linked.
+        </p>
+        {signInError && <p className="form-error" role="alert">{signInError}</p>}
+        {signInNotice && <p className="inline-notice" role="status">{signInNotice}</p>}
+        <div className="form-actions">
+          <button className="primary-button" type="button" disabled={signInBusy} onClick={() => void changeSignIn(!signIn.enabled)}>
+            {signIn.enabled ? "Turn one sign-in off" : "Turn one sign-in on"}
+          </button>
+        </div>
+        {confirmDialog}
+      </section>
 
       <form className="form-stack" onSubmit={save}>
         <section className="panel">

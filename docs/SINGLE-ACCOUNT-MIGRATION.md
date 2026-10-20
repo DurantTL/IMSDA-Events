@@ -321,9 +321,17 @@ Under the link model, **no row moves** in any slice. The only data written, in o
 4. Deploy slice (a)'s migration (human step). Verify with queries 6.1 and 6.2.
 5. Deploy slices (b) and (c) behind the switch, off. Turn the switch on for staff testers,
    then for everyone, when Caleb says.
-6. Apply links (slice (d)) one person per transaction, **clean pairs first**, then
-   `needs-review` pairs after a person has chosen what survives, never `blocked` pairs until
-   their blocker is resolved by hand.
+6. **Link the pairs by hand, then turn the switch on (Oct 20 update).** The production dry run
+   found only 2 staff/attendee pairs, both system administrators, both `needs-review` and none
+   blocked, so the bulk apply tool (slice (d)) is **not needed at the current scale**. The two
+   administrators link each other with the hand-link tool on System management → Accounts, one
+   person per transaction. Then a system administrator turns on **One sign-in** on System
+   management → Platform settings (#1083). The section shows a read-only link check (counts
+   only: staff with a matching attendee account who are not linked yet, and linked pairs); the
+   switch may be turned on with unlinked pairs remaining, and the confirmation warns about them.
+   Turning it off restores the separate pages; existing sessions stay valid either way. Any
+   `blocked` pair still waits for its blocker to be resolved by hand. Slice (d) would be
+   revisited only if many more pairs appear.
 7. Run section 6's queries after each batch. Keep the old sign-in pages for two weeks.
 8. Slice (e) only after the window, in its own PR.
 
