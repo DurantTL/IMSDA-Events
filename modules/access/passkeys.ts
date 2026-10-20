@@ -495,6 +495,18 @@ export async function beginPasskeySignIn(requestOrigin: string | null, now = new
   return { options, challengeId: challenge.id };
 }
 
+/**
+ * Spends a staff sign-in prompt without answering it (#1085). The combined
+ * sign-in stores one prompt on each side and must retire both whichever side
+ * the credential belongs to. Idempotent: an already-spent or unknown id is a no-op.
+ */
+export async function spendSignInChallenge(challengeId: string, now = new Date()) {
+  await getPrisma().userPasskeyChallenge.updateMany({
+    where: { id: challengeId, purpose: "SIGN_IN", usedAt: null },
+    data: { usedAt: now },
+  });
+}
+
 function decodeUserHandle(value: string | undefined) {
   if (!value) return null;
   try {
