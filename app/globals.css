@@ -1926,6 +1926,7 @@ input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], 
 input:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"])::-webkit-datetime-edit-fields-wrapper { padding: 0; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding-top: 15px; }
 .form-error { margin: 0; border-radius: 9px; background: #fff1ef; color: var(--coral); padding: 9px 11px; font-size: max(var(--type-floor, 0px), 0.68rem); }
+.form-notice { margin: 0; border: 1px solid var(--line); border-left: 4px solid var(--info-card-info-edge, #1d5f9c); border-radius: 9px; background: var(--surface-soft); color: var(--ink); padding: 9px 11px; font-size: max(var(--type-floor, 0px), 0.68rem); line-height: 1.45; overflow-wrap: anywhere; }
 .detail-stack { display: grid; gap: 17px; }
 .detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
 .detail-grid > span { border-radius: 11px; background: var(--paper); padding: 11px; }

@@ -1,29 +1,16 @@
-import { cookies } from "next/headers";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { revokeDatabaseSession, SESSION_COOKIE_NAME } from "@/modules/access/session-store";
-import { getCurrentSession } from "@/modules/access/current-session";
-import { endActiveActAsOnSignOut } from "@/modules/organizations/staff-act-as";
+import { signOutThisBrowser } from "@/modules/account-merge/sign-out";
 import { withRequestContext } from "@/lib/request-context";
 
 async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
 
-  // Signing out ends any active act-as (#442) — resolved before the session
-  // is revoked, since it's keyed by this session's id.
-  const { sessionId } = await getCurrentSession();
-  if (sessionId) await endActiveActAsOnSignOut(sessionId);
-
-  const cookieStore = await cookies();
-  await revokeDatabaseSession(cookieStore.get(SESSION_COOKIE_NAME)?.value);
-  cookieStore.set(SESSION_COOKIE_NAME, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
-  return Response.json({ ok: true });
+  // Ends the staff session and any active act-as (#442). With one sign-in on it
+  // also ends this browser's attendee session (#1092). See `signOutThisBrowser`.
+  const ok = await signOutThisBrowser("staff");
+  // Cookies are cleared either way; a failed revoke is reported after that.
+  return ok ? Response.json({ ok: true }) : Response.json({ ok: false }, { status: 500 });
 }
 
 export const POST = withRequestContext(postHandler);
