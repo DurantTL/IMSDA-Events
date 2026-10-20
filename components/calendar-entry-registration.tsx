@@ -26,15 +26,23 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
 
   if (entry.linkedEvent) {
     const event = entry.linkedEvent;
+    const shared = event.otherLinkedItems > 0;
     return (
       <div className="calendar-entry-link" data-testid="calendar-entry-linked">
         <p>
           Registration event: <strong>{event.name}</strong>
+          {shared ? ` (also linked: ${event.otherLinkedItems} other calendar ${event.otherLinkedItems === 1 ? "item" : "items"})` : ""}
           {" "}({event.isArchived ? "archived" : event.isPublished ? "published" : "draft"}, {formatDateRange(event.startsOn, event.endsOn)}).
           {event.isArchived
             ? " The event is archived and off the calendar, so this item shows on its own. Unarchive the event to put the pair back."
-            : <>{" "}The calendar shows this pair once{event.isPublished ? ", as the event with Register" : " (this item stands in until the event is published)"}.</>}
-          {entry.datesDifferFromEvent && !event.isArchived ?" This item's dates differ from the event's; the event's page asks staff to update or keep them." : ""}
+            : shared
+              ? <>{" "}{!event.isPublished ? "This item shows on its own until the event is published." : event.showsWithRegister ? "The calendar shows this item on its own date, with Register to the event." : "Several items share this event. Whether this one shows with Register depends on the event being on the calendar and on the item being public."}</>
+              : <>{" "}The calendar shows this pair once{event.isPublished ? ", as the event with Register" : " (this item stands in until the event is published)"}.</>}
+          {entry.datesDifferFromEvent && !event.isArchived
+            ? shared
+              ? " This item's dates differ from the event's; the event's page notes it, and staff can keep them."
+              : " This item's dates differ from the event's; the event's page asks staff to update or keep them."
+            : ""}
           {entry.sourceRemovedAt ? " Google no longer lists this item. The event was not changed." : ""}
         </p>
         {entry.linkedIneligible && (
@@ -58,7 +66,8 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
   if (!entry.canLinkToEvent) return null;
 
   const match = entry.possibleMatch;
-  const choices = events.filter((event) => event.linkedEntryId === null);
+  // An event that already has a linked item is offered too (#1086): one registration can have several calendar items.
+  const choices = events;
 
   return (
     <div className="calendar-entry-link" data-testid="calendar-entry-registration">
@@ -74,7 +83,7 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
             aria-label={`Link ${entry.title} to ${match.name}`}
             className="secondary-button"
             disabled={saving}
-            onClick={() => send(linkUrl, { action: "link", eventId: match.id }, "Linked. The calendar now shows the pair once.")}
+            onClick={() => send(linkUrl, { action: "link", eventId: match.id }, "Linked to the registration event.")}
             type="button"
           >
             Link
@@ -104,7 +113,7 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
               <option value="">Choose an event</option>
               {choices.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.name} ({formatDateRange(event.startsOn, event.endsOn)}{event.isPublished ? "" : ", draft"})
+                  {event.name} ({formatDateRange(event.startsOn, event.endsOn)}{event.isPublished ? "" : ", draft"}{event.linkedEntries.length > 0 ? `, ${event.linkedEntries.length} linked ${event.linkedEntries.length === 1 ? "item" : "items"}` : ""})
                 </option>
               ))}
             </select>
@@ -113,7 +122,7 @@ export function CalendarEntryRegistration({ entry, events, saving, send }: Props
             className="secondary-button"
             disabled={saving || eventId === ""}
             onClick={async () => {
-              if (await send(linkUrl, { action: "link", eventId }, "Linked. The calendar now shows the pair once.")) {
+              if (await send(linkUrl, { action: "link", eventId }, "Linked to the registration event.")) {
                 setPicking(false);
                 setEventId("");
               }

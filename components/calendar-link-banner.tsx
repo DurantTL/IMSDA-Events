@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEventSettingsDirty } from "@/components/event-settings-dirty";
-import type { CalendarLinkNotice } from "@/modules/calendar/event-links";
+import type { CalendarDatePrompt, CalendarLinkNotice } from "@/modules/calendar/event-links";
 import { formatDateRange } from "@/modules/calendar/domain";
 
 type CalendarLinkBannerProps = {
@@ -23,21 +23,20 @@ type CalendarLinkBannerProps = {
  */
 export function CalendarLinkBanner({ eventId, notice }: CalendarLinkBannerProps) {
   const router = useRouter();
-  const prompt = notice.datePrompt;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // Answering reloads the settings form below; with unsaved changes in it, that would discard them.
   const unsaved = useEventSettingsDirty();
+  const several = notice.linkedItems.length > 1;
 
-  async function answer(decision: "update" | "keep") {
-    if (!prompt) return;
+  async function answer(prompt: CalendarDatePrompt, decision: "update" | "keep") {
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/admin/calendar/events/${encodeURIComponent(eventId)}/date-change`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, startsOn: prompt.itemStartsOn, endsOn: prompt.itemEndsOn }),
+        body: JSON.stringify({ decision, startsOn: prompt.itemStartsOn, endsOn: prompt.itemEndsOn, entryId: prompt.entryId }),
       });
       const body = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) throw new Error(body.message ?? "That could not be saved.");
@@ -51,47 +50,67 @@ export function CalendarLinkBanner({ eventId, notice }: CalendarLinkBannerProps)
 
   return (
     <div className="calendar-link-banner-stack">
-      {notice.sourceRemoved && (
+      {several && (
+        <section className="inline-notice calendar-link-banner" aria-label="Linked calendar items" data-testid="calendar-linked-items">
+          <p><strong>{notice.linkedItems.length} calendar items are linked to this event.</strong> Each shows on the public calendar on its own date, with Register.</p>
+          <ul className="calendar-link-unchanged">
+            {notice.linkedItems.map((item) => (
+              <li key={item.id}>{item.title}: {formatDateRange(item.startsOn, item.endsOn)}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {notice.sourceRemoved.length > 0 && (
         <div className="inline-notice clone-warning calendar-link-banner" role="status" data-testid="calendar-source-removed-banner">
-          <p>This event&apos;s calendar item is no longer in Google Calendar. The registration event is unchanged: it was not removed or cancelled. Decide whether it should still go ahead.</p>
+          {several
+            ? <p>These calendar items are no longer in Google Calendar: {notice.sourceRemoved.join(", ")}. The registration event is unchanged: it was not removed or cancelled. Decide whether it should still go ahead.</p>
+            : <p>This event&apos;s calendar item is no longer in Google Calendar. The registration event is unchanged: it was not removed or cancelled. Decide whether it should still go ahead.</p>}
         </div>
       )}
-      {prompt && (
-        <section className="inline-notice clone-warning calendar-link-banner" role="region" aria-label="Calendar date change" data-testid="calendar-date-banner">
+      {notice.datePrompts.map((prompt) => (
+        <section className="inline-notice clone-warning calendar-link-banner" role="region" aria-label={several ? `Calendar date change: ${prompt.entryTitle}` : "Calendar date change"} data-testid="calendar-date-banner" key={prompt.entryId}>
+          {several && <p><strong>{prompt.entryTitle}</strong> ({formatDateRange(prompt.itemStartsOn, prompt.itemEndsOn)})</p>}
           <p><strong>{prompt.message}</strong></p>
-          <dl className="calendar-link-preview">
-            {prompt.preview.changes.map((change) => (
-              <div key={change.label}>
-                <dt>{change.label}</dt>
-                <dd>{change.from} becomes {change.to}</dd>
-              </div>
-            ))}
-          </dl>
-          {prompt.preview.unchanged.length > 0 && (
+          {prompt.preview && (
             <>
-              <p>These stay as they are. Update changes only the event dates.</p>
-              <ul className="calendar-link-unchanged">
-                {prompt.preview.unchanged.map((item) => (
-                  <li key={`${item.label}-${item.value}`} className={item.needsAttention ? "needs-attention" : ""}>
-                    {item.label}: {item.value}{item.note ? `. ${item.note}` : ""}
-                  </li>
+              <dl className="calendar-link-preview">
+                {prompt.preview.changes.map((change) => (
+                  <div key={change.label}>
+                    <dt>{change.label}</dt>
+                    <dd>{change.from} becomes {change.to}</dd>
+                  </div>
                 ))}
-              </ul>
+              </dl>
+              {prompt.preview.unchanged.length > 0 && (
+                <>
+                  <p>These stay as they are. Update changes only the event dates.</p>
+                  <ul className="calendar-link-unchanged">
+                    {prompt.preview.unchanged.map((item) => (
+                      <li key={`${item.label}-${item.value}`} className={item.needsAttention ? "needs-attention" : ""}>
+                        {item.label}: {item.value}{item.note ? `. ${item.note}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {prompt.preview.notes.map((note) => <p key={note}>{note}</p>)}
+              <p>{prompt.pricingNote}</p>
+              {prompt.preview.blockedReason && <p className="form-error" role="alert">{prompt.preview.blockedReason}</p>}
             </>
           )}
-          {prompt.preview.notes.map((note) => <p key={note}>{note}</p>)}
-          <p>{prompt.pricingNote}</p>
-          {prompt.preview.blockedReason && <p className="form-error" role="alert">{prompt.preview.blockedReason}</p>}
+          {!prompt.canUpdate && <p>The event&apos;s dates are {formatDateRange(prompt.eventStartsOn, prompt.eventEndsOn)}. With several linked items none of them sets the event&apos;s dates. Keep records that you have seen this.</p>}
           {error && <p className="form-error" role="alert">{error}</p>}
           {unsaved && <p role="status" data-testid="calendar-banner-unsaved">Save or discard your changes first. Answering reloads the settings below and would lose them.</p>}
           <div className="calendar-link-actions">
-            <button className="primary-button" disabled={busy || unsaved || prompt.preview.blockedReason !== null} onClick={() => answer("update")} type="button">
-              Update to {formatDateRange(prompt.itemStartsOn, prompt.itemEndsOn)}
-            </button>
-            <button className="secondary-button" disabled={busy || unsaved} onClick={() => answer("keep")} type="button">Keep current dates</button>
+            {prompt.canUpdate && (
+              <button className="primary-button" disabled={busy || unsaved || (prompt.preview?.blockedReason ?? null) !== null} onClick={() => answer(prompt, "update")} type="button">
+                Update to {formatDateRange(prompt.itemStartsOn, prompt.itemEndsOn)}
+              </button>
+            )}
+            <button className="secondary-button" disabled={busy || unsaved} onClick={() => answer(prompt, "keep")} type="button">Keep current dates</button>
           </div>
         </section>
-      )}
+      ))}
     </div>
   );
 }

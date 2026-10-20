@@ -48,7 +48,7 @@ const entry: CalendarAdminEntry = {
   possibleMatch: null,
 };
 const events: CalendarAdminEvent[] = [
-  { id: "event-1", name: "Women's Retreat 2026", startsOn: "2026-10-09", endsOn: "2026-10-11", isPublished: true, showOnCalendar: true, calendarCategory: "", linkedEntryId: null, linkedEntryTitle: null },
+  { id: "event-1", name: "Women's Retreat 2026", startsOn: "2026-10-09", endsOn: "2026-10-11", isPublished: true, showOnCalendar: true, calendarCategory: "", linkedEntries: [] },
 ];
 const send = async () => true;
 const render = (overrides: Partial<CalendarAdminEntry>) =>
@@ -75,7 +75,7 @@ describe("calendar item registration actions (#445)", () => {
   });
 
   it("warns, without unlinking, when a linked item has become a deadline, closure or repeating item", () => {
-    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" };
+    const linkedEvent = { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0, showsWithRegister: false };
     const html = render({ linkedEvent, linkedIneligible: true, canLinkToEvent: false, entryType: "DEADLINE" });
     expect(html).toContain("calendar-linked-ineligible");
     expect(html).toContain("stays linked until you unlink it");
@@ -85,7 +85,7 @@ describe("calendar item registration actions (#445)", () => {
 
   it("still shows the link to an archived event, marked archived, with Unlink", () => {
     const html = render({
-      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: true, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" },
+      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: true, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0, showsWithRegister: false },
       datesDifferFromEvent: true,
     });
     expect(html).toContain("archived, ");
@@ -97,7 +97,7 @@ describe("calendar item registration actions (#445)", () => {
 
   it("shows a linked item with its event and Unlink, and says the pair shows once", () => {
     const html = render({
-      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11" },
+      linkedEvent: { id: "event-1", name: "Women's Retreat 2026", slug: "womens-retreat-2026", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2026-10-09", endsOn: "2026-10-11", otherLinkedItems: 0, showsWithRegister: false },
       datesDifferFromEvent: true,
       sourceRemovedAt: "2026-10-10T00:00:00.000Z",
     });
@@ -117,9 +117,12 @@ describe("calendar item registration actions (#445)", () => {
 
 describe("the event's date banner (#445)", () => {
   const notice: CalendarLinkNotice = {
-    sourceRemoved: false,
-    datePrompt: {
+    linkedItems: [{ id: "entry-1", title: "Womens Retreat", startsOn: "2026-11-07", endsOn: "2026-11-09" }],
+    sourceRemoved: [],
+    datePrompts: [{
       entryId: "entry-1",
+      entryTitle: "Womens Retreat",
+      canUpdate: true,
       message: "Google Calendar moved this event to November 7–9, 2026. Update the registration dates?",
       itemStartsOn: "2026-11-07",
       itemEndsOn: "2026-11-09",
@@ -132,8 +135,9 @@ describe("the event's date banner (#445)", () => {
         blockedReason: null,
       },
       pricingNote: "Prices and any deadline written into a registration form stay as they are. Review them after updating.",
-    },
+    }],
   };
+  const prompt = notice.datePrompts[0];
   const banner = (props: Partial<{ notice: CalendarLinkNotice }> = {}) =>
     renderToStaticMarkup(createElement(CalendarLinkBanner, { eventId: "event-1", notice, ...props }));
 
@@ -159,14 +163,14 @@ describe("the event's date banner (#445)", () => {
   });
 
   it("disables Update, and says why, when the new dates can't work", () => {
-    const blocked = { ...notice, datePrompt: { ...notice.datePrompt!, preview: { ...notice.datePrompt!.preview, blockedReason: "Registration is set to open after the new last day." } } };
+    const blocked = { ...notice, datePrompts: [{ ...prompt, preview: { ...prompt.preview!, blockedReason: "Registration is set to open after the new last day." } }] };
     const html = banner({ notice: blocked });
     expect(html).toContain("Registration is set to open after the new last day.");
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Update to/);
   });
 
   it("warns, without any action, when the item is gone from Google", () => {
-    const html = banner({ notice: { datePrompt: null, sourceRemoved: true } });
+    const html = banner({ notice: { linkedItems: [], datePrompts: [], sourceRemoved: ["Womens Retreat"] } });
     expect(html).toContain("no longer in Google Calendar");
     expect(html).toContain("not removed or cancelled");
     expect(html).not.toContain("Keep current dates");

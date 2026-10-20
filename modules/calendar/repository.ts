@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
 import { logError } from "@/lib/logger";
 import { CalendarError } from "@/modules/calendar/errors";
 import { getPrisma } from "@/lib/prisma";
@@ -39,6 +40,25 @@ const publicEventSelect = {
   waitlistEnabled: true,
 } as const;
 
+/** A linked item that counts toward "several items share this event" (#1086): shown publicly, as the items below are. */
+const publicLinkedItemWhere = {
+  entryType: { not: "DEADLINE" },
+  isPublished: true,
+  isHiddenLocally: false,
+  sourceRemovedAt: null,
+} satisfies Prisma.CalendarEntryWhereInput;
+
+const publicEventWithLinksSelect = {
+  ...publicEventSelect,
+  showOnCalendar: true,
+  _count: { select: { calendarEntryLinks: { where: publicLinkedItemWhere } } },
+} satisfies Prisma.EventSelect;
+
+type PublicEventWithLinks = Prisma.EventGetPayload<{ select: typeof publicEventWithLinksSelect }>;
+
+/** How many public calendar items are linked to the event; tolerates a row read without the count. */
+const sharedItemCount = (event: Partial<Pick<PublicEventWithLinks, "_count">>) => event._count?.calendarEntryLinks ?? 0;
+
 /**
  * What anyone may see: published events an administrator hasn't hidden, and
  * published entries. Nothing else is ever read here, so nothing else can leak
@@ -62,7 +82,7 @@ export async function listPublicCalendarItems(
         startsAt: { lt: new Date(`${addDays(to, 2)}T00:00:00Z`) },
         endsAt: { gte: new Date(`${addDays(from, -1)}T00:00:00Z`) },
       },
-      select: publicEventSelect,
+      select: publicEventWithLinksSelect,
     }),
     prisma.calendarEntry.findMany({
       // A repeating entry can reach into the window from long before it, so
@@ -83,18 +103,28 @@ export async function listPublicCalendarItems(
   // the event is not published (a draft set up from it, or unpublished), and says nothing about the event then. A
   // published event that staff hid from the calendar stays off it, and so does its item. A deleted event unlinks the
   // item (the link is cleared with it), which then shows on its own.
+  // Several items linked to one published event (#1086) are the exception: each stays on its own date with its own
+  // Register button to the event, and the event is not shown a second time as a separate entry.
   const linkedEventIds = [...new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : [])))];
   const publishedLinked = linkedEventIds.length === 0
-    ? new Set<string>()
-    : new Set((await prisma.event.findMany({
+    ? new Map<string, PublicEventWithLinks>()
+    : new Map((await prisma.event.findMany({
       // An archived event is off the public calendar (#635), so it doesn't hide its item: the item shows on its own.
       where: { id: { in: linkedEventIds }, isPublished: true, archivedAt: null },
-      select: { id: true },
-    })).map((event) => event.id));
+      select: publicEventWithLinksSelect,
+    })).map((event) => [event.id, event]));
   const standalone = entries.filter((entry) => !entry.linkedEventId || !publishedLinked.has(entry.linkedEventId));
+  const registerItems = entries.flatMap((entry) => {
+    const event = entry.linkedEventId ? publishedLinked.get(entry.linkedEventId) : undefined;
+    if (!event || !event.showOnCalendar || sharedItemCount(event) < 2 || entry.entryType === "DEADLINE") return [];
+    const registrationOpen = evaluateEventRegistrationPhase(event, now) === "OPEN";
+    return entryItems(entry, from, to, expandRepeats).map((item): CalendarItem => item.isClosure || item.status === "CANCELLED"
+      ? item
+      : { ...item, kind: "EVENT", category: item.category || (event.calendarCategory ?? ""), href: `/events/${encodeURIComponent(event.slug)}`, registrationOpen });
+  });
 
   const items: CalendarItem[] = [
-    ...events.map((event) => ({
+    ...events.filter((event) => sharedItemCount(event) < 2).map((event) => ({
       key: `event-${event.id}`,
       kind: "EVENT" as const,
       title: event.name,
@@ -110,6 +140,7 @@ export async function listPublicCalendarItems(
     })),
     // The query already leaves Deadlines out; this keeps one that slips through (a changed query) off every public surface.
     ...standalone.filter((entry) => entry.entryType !== "DEADLINE").flatMap((entry) => entryItems(entry, from, to, expandRepeats)),
+    ...registerItems,
   ];
   return sortCalendarItems(items.filter((item) => item.recurrence || (item.startsOn <= to && item.endsOn >= from)));
 }
@@ -189,9 +220,8 @@ export async function listCalendarEntries(now = new Date()) {
     ? [[], []]
     : await Promise.all([
       prisma.event.findMany({
-        // An archived event is not a match candidate (#635). An event already linked to an item is not offered to
-        // another (also enforced by the database).
-        where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) }, calendarEntryLink: null },
+        // An archived event is not a match candidate (#635). An event that already has a linked item still is (#1086).
+        where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 32 * 86_400_000) } },
         select: { id: true, name: true, startsAt: true, endsAt: true, timezone: true, isPublished: true },
       }),
       prisma.calendarEventMatchDismissal.findMany({
@@ -221,8 +251,27 @@ export async function listCalendarEntries(now = new Date()) {
     })),
     [...eventsById.values()],
     new Set(dismissals.map((row) => dismissalKey(row.calendarEntryId, row.eventId))),
-    new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : []))),
   ).map((match) => [match.entryId, match.eventId]));
+
+  // How many items share each linked event (#1086), from the items listed.
+  // Counted in the database, not from the listed items, so the 1,000-item list limit can't skew them. "Public" uses
+  // the same filter as the public calendar.
+  const listedEventIds = [...new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : [])))];
+  const linkedRows = listedEventIds.length === 0
+    ? []
+    : await prisma.calendarEntry.findMany({
+      where: { linkedEventId: { in: listedEventIds } },
+      select: { linkedEventId: true, entryType: true, isPublished: true, isHiddenLocally: true, sourceRemovedAt: true },
+    });
+  const isPublicLinked = (row: { entryType: string; isPublished: boolean; isHiddenLocally: boolean; sourceRemovedAt: Date | null }) =>
+    row.entryType !== "DEADLINE" && row.isPublished && !row.isHiddenLocally && row.sourceRemovedAt === null;
+  const linkedCounts = new Map<string, number>();
+  const publicLinkedCounts = new Map<string, number>();
+  for (const row of linkedRows) {
+    if (!row.linkedEventId) continue;
+    linkedCounts.set(row.linkedEventId, (linkedCounts.get(row.linkedEventId) ?? 0) + 1);
+    if (isPublicLinked(row)) publicLinkedCounts.set(row.linkedEventId, (publicLinkedCounts.get(row.linkedEventId) ?? 0) + 1);
+  }
 
   return entries.map((entry) => {
     const linkedEvent = entry.linkedEvent
@@ -235,6 +284,11 @@ export async function listCalendarEntries(now = new Date()) {
         showOnCalendar: entry.linkedEvent.showOnCalendar,
         startsOn: calendarDateIn(entry.linkedEvent.startsAt, entry.linkedEvent.timezone),
         endsOn: calendarDateIn(entry.linkedEvent.endsAt, entry.linkedEvent.timezone),
+        /** Other calendar items linked to the same event (#1086). */
+        otherLinkedItems: Math.max(0, (linkedCounts.get(entry.linkedEvent.id) ?? 1) - 1),
+        /** The public calendar shows this item on its own date with Register: several public items share a published event that is on the calendar. */
+        showsWithRegister: entry.linkedEvent.isPublished && !entry.linkedEvent.archivedAt && entry.linkedEvent.showOnCalendar
+          && isPublicLinked(entry) && (publicLinkedCounts.get(entry.linkedEvent.id) ?? 0) >= 2,
       }
       : null;
     return {
@@ -278,7 +332,7 @@ export async function listCalendarEvents(now = new Date()) {
     // An archived event is not offered to link to (#635).
     where: { archivedAt: null, endsAt: { gte: new Date(now.getTime() - 31 * 86_400_000) } },
     orderBy: { startsAt: "asc" },
-    select: { ...publicEventSelect, showOnCalendar: true, calendarEntryLink: { select: { id: true, title: true } } },
+    select: { ...publicEventSelect, showOnCalendar: true, calendarEntryLinks: { select: { id: true, title: true }, orderBy: [{ startsOn: "asc" }, { title: "asc" }] } },
   });
   return events.map((event) => ({
     id: event.id,
@@ -288,9 +342,8 @@ export async function listCalendarEvents(now = new Date()) {
     isPublished: event.isPublished,
     showOnCalendar: event.showOnCalendar,
     calendarCategory: event.calendarCategory ?? "",
-    /** The calendar item linked to this event (#445), when there is one. */
-    linkedEntryId: event.calendarEntryLink?.id ?? null,
-    linkedEntryTitle: event.calendarEntryLink?.title ?? null,
+    /** The calendar items linked to this event (#445, #1086), by date. */
+    linkedEntries: event.calendarEntryLinks.map((link) => ({ id: link.id, title: link.title })),
   }));
 }
 

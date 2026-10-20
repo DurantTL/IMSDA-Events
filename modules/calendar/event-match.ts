@@ -94,23 +94,22 @@ export function entryCanBeLinked(entry: Pick<MatchEntry, "entryType" | "hasRepea
 }
 
 /**
- * Imported items that are not linked yet, whose dates overlap an event that is
- * not linked to another item and whose titles are similar, minus the pairs staff
- * said are not the same. One suggestion per item: the event with the closest
+ * Imported items that are not linked yet, whose dates overlap an event and whose
+ * titles are similar, minus the pairs staff said are not the same. An event that
+ * already has a linked item is still suggested (#1086): one registration can have
+ * several calendar items. One suggestion per item: the event with the closest
  * start date.
  */
 export function findPossibleMatches(
   entries: readonly MatchEntry[],
   events: readonly MatchEvent[],
   dismissed: ReadonlySet<string>,
-  linkedEventIds: ReadonlySet<string>,
 ): PossibleMatch[] {
   const matches: PossibleMatch[] = [];
   for (const entry of entries) {
     if (!entry.isImported || entry.linkedEventId || !entryCanBeLinked(entry) || entry.isHiddenLocally || entry.sourceRemoved) continue;
     const candidates = events
-      .filter((event) => !linkedEventIds.has(event.id)
-        && !dismissed.has(dismissalKey(entry.id, event.id))
+      .filter((event) => !dismissed.has(dismissalKey(entry.id, event.id))
         && datesOverlap(entry, event)
         && titlesSimilar(entry.title, event.name))
       .sort((a, b) => startGap(entry, a) - startGap(entry, b) || a.startsOn.localeCompare(b.startsOn) || a.name.localeCompare(b.name));

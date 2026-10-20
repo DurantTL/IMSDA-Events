@@ -18,7 +18,7 @@ import { feedLockKey } from "@/modules/calendar/feed-plan";
 /**
  * Calendar items and registration events are one thing (#445). A link is the
  * item's `linkedEventId`: a feed refresh never writes it, so it survives every
- * import. Nothing here ever links on its own, and a date change is only ever
+ * import. Several items can link to one event (#1086). Nothing here ever links on its own, and a date change is only ever
  * applied by a staff member's choice. Audit entries carry ids, enums and dates.
  */
 
@@ -46,6 +46,8 @@ function linkProblem(entry: { entryType: "STANDARD" | "CLOSURE" | "DEADLINE"; re
 
 /** Links inside the caller's transaction. `how` records whether the event was made from the item or already existed. */
 async function linkInTransaction(tx: Tx, entryId: string, eventId: string, actorUserId: string, how: "created" | "existing") {
+  // Event first, then the item: the same order as resolveCalendarDateChange, so a link and an Update can't interleave.
+  await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR NO KEY UPDATE`;
   const entry = await lockEntry(tx, entryId);
   const problem = linkProblem(entry);
   if (problem) throw new CalendarError("NOT_LINKABLE", problem);
@@ -55,8 +57,7 @@ async function linkInTransaction(tx: Tx, entryId: string, eventId: string, actor
   if (!event) throw new CalendarError("EVENT_NOT_FOUND", "That event could not be found.");
   // An archived event can't be linked to (#635): unarchive it first. Checked inside the same transaction as the link.
   if (event.archivedAt) throw new CalendarError("EVENT_ARCHIVED", "That event is archived. Unarchive it before linking a calendar item to it.");
-  const other = await tx.calendarEntry.findUnique({ where: { linkedEventId: eventId }, select: { id: true } });
-  if (other) throw new CalendarError("EVENT_ALREADY_LINKED", "That event is already linked to another calendar item. Unlink it first.");
+  // Other items may already be linked to this event (#1086): one registration can have several calendar items.
   // The baseline is the item's dates when they agree with the event's. If they already differ, there is no baseline:
   // the event asks about it straight away, and says "differs" rather than "moved".
   const agrees = entry.startsOn === calendarDateIn(event.startsAt, event.timezone) && entry.endsOn === calendarDateIn(event.endsAt, event.timezone);
@@ -84,20 +85,9 @@ async function linkInTransaction(tx: Tx, entryId: string, eventId: string, actor
   return linked;
 }
 
-function linkConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    throw new CalendarError("EVENT_ALREADY_LINKED", "That event is already linked to another calendar item. Unlink it first.");
-  }
-  throw error;
-}
-
 /** Link an item to an event that already exists. */
 export async function linkCalendarEntryToEvent(entryId: string, eventId: string, actorUserId: string) {
-  try {
-    await getPrisma().$transaction((tx) => linkInTransaction(tx, entryId, eventId, actorUserId, "existing"));
-  } catch (error) {
-    linkConflict(error);
-  }
+  await getPrisma().$transaction((tx) => linkInTransaction(tx, entryId, eventId, actorUserId, "existing"));
 }
 
 /** Unlink: the item shows on its own again, and nothing else about it or the event changes. */
@@ -178,19 +168,15 @@ export async function getCalendarEntryPrefill(entryId: string): Promise<
  * Returns the item's location, for a flow that doesn't take one from a form.
  */
 export async function linkNewEventToCalendarEntry(tx: Tx, input: { entryId: string; eventId: string; actorUserId: string }) {
-  try {
-    const entry = await linkInTransaction(tx, input.entryId, input.eventId, input.actorUserId, "created");
-    const description = entry.description.trim();
-    if (description) {
-      const last = await tx.eventContentSection.aggregate({ where: { eventId: input.eventId }, _max: { position: true } });
-      await tx.eventContentSection.create({
-        data: { eventId: input.eventId, kind: "RICH_TEXT", title: "About this event", body: description, position: (last._max.position ?? -1) + 1, isPublished: false },
-      });
-    }
-    return { location: entry.location.trim() || null };
-  } catch (error) {
-    return linkConflict(error);
+  const entry = await linkInTransaction(tx, input.entryId, input.eventId, input.actorUserId, "created");
+  const description = entry.description.trim();
+  if (description) {
+    const last = await tx.eventContentSection.aggregate({ where: { eventId: input.eventId }, _max: { position: true } });
+    await tx.eventContentSection.create({
+      data: { eventId: input.eventId, kind: "RICH_TEXT", title: "About this event", body: description, position: (last._max.position ?? -1) + 1, isPublished: false },
+    });
   }
+  return { location: entry.location.trim() || null };
 }
 
 /** Whether an item can still be linked, read inside a creation transaction before the event is written. */
@@ -205,20 +191,28 @@ export async function assertCalendarEntryLinkable(tx: Tx, entryId: string) {
 
 export type CalendarDatePrompt = {
   entryId: string;
+  entryTitle: string;
   message: string;
   itemStartsOn: string;
   itemEndsOn: string;
   eventStartsOn: string;
   eventEndsOn: string;
-  preview: DatePreview;
+  /** "Update the event's dates from this item" is offered only when exactly one item is linked (#1086). */
+  canUpdate: boolean;
+  /** Null when `canUpdate` is false: with several items the banner is informational and previews nothing. */
+  preview: DatePreview | null;
   pricingNote: string;
 };
 
+export type CalendarLinkedItem = { id: string; title: string; startsOn: string; endsOn: string };
+
 export type CalendarLinkNotice = {
-  /** Set when the date question is open. */
-  datePrompt: CalendarDatePrompt | null;
-  /** The item is gone from Google. The event is untouched; staff decide what to do. */
-  sourceRemoved: boolean;
+  /** Every calendar item linked to the event, by date. Shown as a list when there are several. */
+  linkedItems: CalendarLinkedItem[];
+  /** One question per linked item whose dates need a decision. */
+  datePrompts: CalendarDatePrompt[];
+  /** Titles of linked items that are gone from Google. The event is untouched; staff decide what to do. */
+  sourceRemoved: string[];
 };
 
 /** The last window ends of the current cancellation policy, read without trusting the stored JSON's exact shape. */
@@ -260,50 +254,68 @@ async function previewInputs(db: Tx | ReturnType<typeof getPrisma>, eventId: str
 }
 
 /**
- * What the event's page shows about its linked calendar item (#445): a banner
- * when the item's dates moved, and a warning when the item left Google. Null
+ * What the event's page shows about its linked calendar items (#445, #1086): a
+ * banner per item whose dates moved, and a warning for each item that left
+ * Google. With exactly one item the banner can update the event's dates; with
+ * several it only informs, because no one item owns the event's dates. Null
  * when nothing needs attention (or no item is linked).
  */
 export async function getCalendarLinkNotice(eventId: string): Promise<CalendarLinkNotice | null> {
   const prisma = getPrisma();
-  const entry = await prisma.calendarEntry.findUnique({ where: { linkedEventId: eventId } });
-  if (!entry) return null;
+  const entries = await prisma.calendarEntry.findMany({ where: { linkedEventId: eventId }, orderBy: [{ startsOn: "asc" }, { title: "asc" }, { id: "asc" }] });
+  if (entries.length === 0) return null;
   const event = await previewInputs(prisma, eventId);
   // An archived event (#635) is read-only history: no banner and no warning, so nothing invites a change to it.
   if (!event || event.isArchived) return null;
-  const sourceRemoved = entry.sourceRemovedAt !== null;
-  const needsDecision = datesNeedDecision({
-    itemStartsOn: entry.startsOn,
-    itemEndsOn: entry.endsOn,
-    eventStartsOn: event.startsOn,
-    eventEndsOn: event.endsOn,
-    baselineStartsOn: entry.baselineStartsOn,
-    baselineEndsOn: entry.baselineEndsOn,
-  });
-  // A removed item's dates are stale; asking staff to adopt them would be asking about a ghost.
-  const datePrompt: CalendarDatePrompt | null = needsDecision && !sourceRemoved
-    ? {
-      entryId: entry.id,
-      message: datePromptMessage({
-        imported: entry.sourceUid !== null,
-        kind: datePromptKind({ baselineStartsOn: entry.baselineStartsOn, baselineEndsOn: entry.baselineEndsOn }),
-        itemStartsOn: entry.startsOn,
-        itemEndsOn: entry.endsOn,
-      }),
+  const single = entries.length === 1;
+  const datePrompts: CalendarDatePrompt[] = [];
+  const sourceRemoved: string[] = [];
+  for (const entry of entries) {
+    if (entry.sourceRemovedAt !== null) sourceRemoved.push(entry.title);
+    const needsDecision = datesNeedDecision({
       itemStartsOn: entry.startsOn,
       itemEndsOn: entry.endsOn,
       eventStartsOn: event.startsOn,
       eventEndsOn: event.endsOn,
-      preview: buildDatePreview(event, { startsOn: entry.startsOn, endsOn: entry.endsOn }),
+      baselineStartsOn: entry.baselineStartsOn,
+      baselineEndsOn: entry.baselineEndsOn,
+    });
+    // A removed item's dates are stale; asking staff to adopt them would be asking about a ghost.
+    if (!needsDecision || entry.sourceRemovedAt !== null) continue;
+    datePrompts.push({
+      entryId: entry.id,
+      entryTitle: entry.title,
+      message: single
+        ? datePromptMessage({
+          imported: entry.sourceUid !== null,
+          kind: datePromptKind({ baselineStartsOn: entry.baselineStartsOn, baselineEndsOn: entry.baselineEndsOn }),
+          itemStartsOn: entry.startsOn,
+          itemEndsOn: entry.endsOn,
+        })
+        : "This item's dates differ from the event's.",
+      itemStartsOn: entry.startsOn,
+      itemEndsOn: entry.endsOn,
+      eventStartsOn: event.startsOn,
+      eventEndsOn: event.endsOn,
+      canUpdate: single,
+      preview: single ? buildDatePreview(event, { startsOn: entry.startsOn, endsOn: entry.endsOn }) : null,
       pricingNote: pricingDeadlineNote,
-    }
-    : null;
-  if (!datePrompt && !sourceRemoved) return null;
-  return { datePrompt, sourceRemoved };
+    });
+  }
+  // With several items the page always lists them; with one, nothing to show means nothing to ask.
+  if (datePrompts.length === 0 && sourceRemoved.length === 0 && single) return null;
+  return {
+    linkedItems: entries.map((entry) => ({ id: entry.id, title: entry.title, startsOn: entry.startsOn, endsOn: entry.endsOn })),
+    datePrompts,
+    sourceRemoved,
+  };
 }
 
 /**
- * Staff's answer to the banner. `expected` is the item's dates the staff member
+ * Staff's answer to the banner, for one linked item (`entryId`; optional only
+ * when exactly one item is linked). Update is refused unless exactly one item is
+ * linked (#1086): with several, no single item owns the event's dates, and Keep
+ * is the only answer. `expected` is the item's dates the staff member
  * saw: if Google moved them again meanwhile, nothing is applied and they decide
  * again. Update changes the event's first and last day only (see
  * `buildDatePreview`); Keep remembers these item dates so the banner stays away
@@ -314,10 +326,14 @@ export async function resolveCalendarDateChange(
   decision: DateDecision,
   expected: { startsOn: string; endsOn: string },
   actorUserId: string,
+  entryId?: string,
 ) {
   await getPrisma().$transaction(async (tx) => {
-    const found = await tx.calendarEntry.findUnique({ where: { linkedEventId: eventId }, select: { id: true, sourceFeedId: true } });
-    if (!found) throw new CalendarError("NOT_LINKED", "No calendar item is linked to this event.");
+    const linked = await tx.calendarEntry.findMany({ where: { linkedEventId: eventId }, select: { id: true, sourceFeedId: true } });
+    if (linked.length === 0) throw new CalendarError("NOT_LINKED", "No calendar item is linked to this event.");
+    if (!entryId && linked.length > 1) throw new CalendarError("ENTRY_REQUIRED", "Choose which calendar item you are answering about.");
+    const found = entryId ? linked.find((row) => row.id === entryId) : linked[0];
+    if (!found) throw new CalendarError("NOT_LINKED", "That calendar item isn't linked to this event.");
     // Wait out a refresh of the item's feed, then read again, so we never act on dates a refresh is about to change.
     if (found.sourceFeedId) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${feedLockKey(found.sourceFeedId)}))`;
     await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR NO KEY UPDATE`;
@@ -330,6 +346,13 @@ export async function resolveCalendarDateChange(
     if (!event) throw new CalendarError("EVENT_NOT_FOUND", "That event could not be found.");
     // Neither answer applies to an archived event (#635), read under the same lock as the dates.
     if (event.isArchived) throw new CalendarError("EVENT_ARCHIVED", "That event is archived, so its dates can't be changed. Unarchive it first.");
+    if (decision === "update") {
+      // Counted under the event's lock, so the answer matches what the staff member's page offered.
+      const linkedCount = await tx.calendarEntry.count({ where: { linkedEventId: eventId } });
+      if (linkedCount !== 1) {
+        throw new CalendarError("UPDATE_NEEDS_SINGLE_LINK", "Several calendar items are linked to this event, so none of them can set its dates. Change the event's dates in its settings, or choose Keep.");
+      }
+    }
     if (decision === "keep") {
       await tx.calendarEntry.update({ where: { id: entry.id }, data: { baselineStartsOn: entry.startsOn, baselineEndsOn: entry.endsOn } });
       await writeAuditLog({
