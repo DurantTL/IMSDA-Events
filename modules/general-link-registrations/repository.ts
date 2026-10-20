@@ -1,5 +1,6 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
@@ -347,7 +348,8 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
   const correlationId = randomUUID();
   const ids: string[] = [];
   for (const notice of input.notices) {
-    const suppressed = deliveryMode === "DISABLED";
+    const holdNote = suppressionNote(settings);
+    const suppressed = holdNote !== null;
     const idempotencyKey = notice.dedupeKey ?? `general-link:${notice.kind}:${input.submissionId}:${notice.email}`;
     if (notice.skipIfQueued && (await tx.messageOutbox.findUnique({ where: { idempotencyKey }, select: { id: true } }))) continue;
     const message = await tx.messageOutbox.upsert({
@@ -369,7 +371,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
         idempotencyKey,
         correlationId,
         status: suppressed ? "SUPPRESSED" : "PENDING",
-        lastError: suppressed ? "Delivery is disabled for this event." : null,
+        lastError: holdNote,
       },
       select: { id: true, status: true },
     });

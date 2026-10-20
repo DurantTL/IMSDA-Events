@@ -35,6 +35,7 @@ export const effectiveDeliveryDouble = {
     const mode = (row?.deliveryMode as string | undefined) ?? "LOCAL_CAPTURE";
     return { mode, reason: mode === "EXTERNAL_EMAIL" ? "ON" : "NOT_CONFIGURED", paused: false };
   },
+  isEmailEnvironmentConfigured: () => true,
   loadCentralSender: async () => ({ name: "IMSDA Events", email: null, replyTo: null }),
   isPlatformEmailConfigured: () => true,
   pauseFields: () => ({}),

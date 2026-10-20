@@ -31,7 +31,7 @@ export type OperationalReadinessFacts = {
     /** The EFFECTIVE mode from `modules/communications/effective-delivery.ts` (#1043), never the retired stored column. */
     deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
     /** Why capture-only: paused by a system administrator, or no email configured in this environment. */
-    deliveryReason?: "PAUSED" | "NOT_CONFIGURED" | "ON";
+    deliveryReason?: "PAUSED" | "NOT_CONFIGURED" | "SENDER_MISSING" | "ON";
     /** The central sender address. */
     senderEmail: string | null;
     replyToEmail: string | null;
@@ -136,7 +136,7 @@ export function checkOperationalReadiness(
     checks.push({ code: "MESSAGE_SETTINGS", label: "No message settings for this event", severity: "BLOCKER", detail: "The event has no sender identity, so no registrant message can be built at all." });
   } else {
     const { deliveryMode, deliveryReason, senderEmail, replyToEmail } = facts.messaging;
-    checks.push(deliveryMode === "EXTERNAL_EMAIL"
+    checks.push(deliveryMode === "EXTERNAL_EMAIL" && deliveryReason !== "SENDER_MISSING"
       ? facts.emailProvider.deliveryConfigured
         ? { code: "DELIVERY_MODE", label: "Email delivery is live", severity: "READY", detail: "Messages are handed to the external provider." }
         : {
@@ -144,6 +144,13 @@ export function checkOperationalReadiness(
             label: "Email delivery is live but the provider has no API key",
             severity: "BLOCKER",
             detail: "The event is set to external delivery while RESEND_API_KEY is unset, so every queue run fails with EXTERNAL_EMAIL_NOT_CONFIGURED and no message reaches anyone.",
+          }
+      : deliveryReason === "SENDER_MISSING"
+        ? {
+            code: "DELIVERY_MODE",
+            label: "Central sender not set; emails are waiting",
+            severity: "BLOCKER",
+            detail: "Real email is configured here but no central sender address is set, so confirmations and other messages queue and wait; nothing is sent or lost. Set the sender on System management > Email and they go out.",
           }
       : deliveryReason === "PAUSED"
         ? {

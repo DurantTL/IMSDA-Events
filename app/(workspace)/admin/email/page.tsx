@@ -8,7 +8,7 @@ import { NotificationsWorkspace } from "@/components/notifications-workspace";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listEventEmailStates } from "@/modules/communications/event-email-pause";
-import { isPlatformEmailConfigured } from "@/modules/communications/effective-delivery";
+import { isEmailEnvironmentConfigured, isPlatformEmailConfigured } from "@/modules/communications/effective-delivery";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { getEmailAvailability } from "@/integrations/email/provider";
 import { listEventStaffListSummaries } from "@/modules/notifications/event-lists";
@@ -56,6 +56,7 @@ export default async function EmailPage() {
       <EmailDeliverySection
         events={emailEvents}
         platformConfigured={isPlatformEmailConfigured(settings.defaultSenderEmail)}
+        senderMissing={isEmailEnvironmentConfigured() && !settings.defaultSenderEmail}
         sender={{
           name: settings.defaultSenderName,
           email: settings.defaultSenderEmail ?? "",

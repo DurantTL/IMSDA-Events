@@ -35,7 +35,7 @@ describe("passkey relying party", () => {
   });
 
   it("is saved lower-case from platform settings, and blank means off", () => {
-    const base = { organizationName: "IMSDA Events", defaultTimezone: "America/Chicago", defaultSenderName: "IMSDA Events" };
+    const base = { organizationName: "IMSDA Events", defaultTimezone: "America/Chicago" };
     expect(platformSettingsInputSchema.parse({ ...base, passkeyRpId: " Events.IMSDA.test " }).passkeyRpId).toBe("events.imsda.test");
     expect(platformSettingsInputSchema.parse({ ...base, passkeyRpId: "" }).passkeyRpId).toBeNull();
     expect(platformSettingsInputSchema.safeParse({ ...base, passkeyRpId: "https://events.imsda.test" }).success).toBe(false);

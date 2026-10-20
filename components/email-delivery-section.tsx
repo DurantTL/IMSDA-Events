@@ -29,11 +29,14 @@ export function EmailDeliverySection({
   sender: initialSender,
   events: initialEvents,
   platformConfigured,
+  senderMissing = false,
 }: {
   sender: CentralSenderView;
   events: EventEmailState[];
   /** Whether real email can leave this environment at all (provider, account sender and central sender address). */
   platformConfigured: boolean;
+  /** The environment can send but the central sender address is blank: messages are waiting, not sent and not lost. */
+  senderMissing?: boolean;
 }) {
   const [sender, setSender] = useState(initialSender);
   const [draft, setDraft] = useState(initialSender);
@@ -123,10 +126,18 @@ export function EmailDeliverySection({
             <h2>Real email is on for every event</h2>
           </div>
         </div>
-        <p className="field-help" data-email-environment={platformConfigured ? "configured" : "not-configured"}>
+        {senderMissing && (
+          <p className="inline-notice error" data-email-environment="sender-missing" role="alert">
+            Central sender not set; emails are waiting. Real email is configured here, but until a sender email is saved below no event can send.
+            Messages queue and are neither sent nor lost, and they go out once the sender is set.
+          </p>
+        )}
+        <p className="field-help" data-email-environment={platformConfigured ? "configured" : senderMissing ? "sender-missing" : "not-configured"}>
           {platformConfigured
             ? "Real email is configured in this environment. Every event sends real email unless it is paused below."
-            : "Real email is not configured in this environment (the email provider, the account email sender or the central sender address is missing), so every event captures email locally instead of sending it."}
+            : senderMissing
+              ? "Real email is configured in this environment, but the sender email below is blank."
+              : "Real email is not configured in this environment (the email provider or the account email sender is missing), so every event captures email locally instead of sending it."}
         </p>
         {senderError && <p className="form-error" role="alert">{senderError}</p>}
         <label>

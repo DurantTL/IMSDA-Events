@@ -38,7 +38,7 @@ export function InvoiceSendView({ preview, viewerName }: { preview: SendPreview;
             {preview.deliveryMode === "DISABLED"
               ? <><strong>Email is turned off for this event.</strong> Sending records the message as suppressed; nothing is emailed.</>
               : <><strong>This event captures email locally.</strong> Sending records the message but nothing leaves the system.</>}
-            {" "}Change this in the event’s communication settings.
+            {" "}A system administrator manages this on System management → Email.
           </p>
         </section>
       )}

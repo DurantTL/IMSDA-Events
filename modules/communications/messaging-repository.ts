@@ -281,7 +281,7 @@ function messageDedupeKey(
 
 function settingsRecord(settings: {
   deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
-  deliveryReason: "PAUSED" | "NOT_CONFIGURED" | "ON";
+  deliveryReason: "PAUSED" | "NOT_CONFIGURED" | "SENDER_MISSING" | "ON";
   senderName: string;
   senderEmail: string | null;
   replyToOverride: string | null;
@@ -1506,13 +1506,13 @@ export async function sendTestMessage(
   if (input.realDelivery && settings.deliveryMode !== "EXTERNAL_EMAIL") {
     throw new MessagingError(
       "DELIVERY_DISABLED",
-      "Set this event's delivery to real email, with its own verified sender, before sending a test to a real address. Switching does not send anything on its own.",
+      "Real email is not available for this event right now (it is paused by a system administrator, or email is not configured in this environment), so a test cannot be sent to a real address. A system administrator manages this on System management > Email.",
     );
   }
   if (input.realDelivery && !settings.senderEmail?.trim()) {
     throw new MessagingError(
       "EXTERNAL_EMAIL_NOT_CONFIGURED",
-      "This event has no sender address, so a real test would have nothing to send from.",
+      "The central sender address is not set, so a real test would have nothing to send from. A system administrator sets it on System management > Email.",
     );
   }
 
@@ -1623,8 +1623,8 @@ export async function sendTestMessage(
         correlationId: created.correlationId,
         summary: input.realDelivery
           ? source
-            ? `Sent a real test message to ${input.recipientEmail} using this event's sender, carrying a working private link to registration ${source.confirmationCode}.`
-            : `Sent a real test message to ${input.recipientEmail} using this event's sender.`
+            ? `Sent a real test message to ${input.recipientEmail} from the central sender, carrying a working private link to registration ${source.confirmationCode}.`
+            : `Sent a real test message to ${input.recipientEmail} from the central sender.`
           : source
             ? `Created a local test capture for ${input.recipientEmail} from registration ${source.confirmationCode}.`
             : `Created a local test capture for ${input.recipientEmail}.`,
@@ -2786,7 +2786,7 @@ export async function resendRegistrationConfirmation(
       if (repairMissingSenderSnapshot && !settings.senderEmail?.trim()) {
         throw new MessagingError(
           "EXTERNAL_EMAIL_NOT_CONFIGURED",
-          "This confirmation has no sender snapshot. Save a verified sender in this event's communication settings before creating a corrected copy.",
+          "This confirmation has no sender snapshot. Set the central sender on System management > Email before creating a corrected copy.",
         );
       }
       const message = await tx.messageOutbox.create({
@@ -3143,7 +3143,7 @@ export async function retryMessage(
       if (repairMissingSenderSnapshot && !settings.senderEmail?.trim()) {
         throw new MessagingError(
           "EXTERNAL_EMAIL_NOT_CONFIGURED",
-          "This failed message has no sender snapshot. Save a verified sender in this event's communication settings before creating a corrected copy.",
+          "This failed message has no sender snapshot. Set the central sender on System management > Email before creating a corrected copy.",
         );
       }
       const activeChild = await tx.messageOutbox.findFirst({

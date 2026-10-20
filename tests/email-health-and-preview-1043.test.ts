@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { EmailDeliverySection } from "@/components/email-delivery-section";
 import { buildAttentionSummary, type AttentionSignals } from "@/modules/system-admin/attention-model";
 import { buildEmailHealth } from "@/modules/system-admin/email-health";
 import { buildCentralEmailPreview, formatCentralEmailPreview } from "@/modules/communications/central-email-preview";
@@ -65,6 +68,17 @@ describe("central email migration preview (#1043)", () => {
     expect(preview.willBePaused.map((event) => event.slug)).toEqual(["camporee", "old-test", "fresh"]);
   });
 
+  it("reports due PENDING messages on events that stay on real email, so a backlog is not sent unreviewed", () => {
+    const preview = buildCentralEmailPreview([
+      { ...rows[0]!, pendingDueCount: 12 },
+      { ...rows[1]!, pendingDueCount: 5 },
+      { ...rows[4]!, pendingDueCount: 0 },
+    ], "events@imsda-events.test");
+    // Only the event that stays on real email: the paused ones will capture, not send.
+    expect(preview.pendingBacklog).toEqual([{ slug: "women-2026", name: "Women's Retreat", pendingDue: 12 }]);
+    expect(formatCentralEmailPreview(preview)).toContain("women-2026 (Women's Retreat): 12 pending");
+  });
+
   it("lists events whose own sender email differs from the central one, ignoring case", () => {
     const preview = buildCentralEmailPreview(rows, "events@imsda-events.test");
     expect(preview.senderEmailDiffers).toEqual([
@@ -77,5 +91,26 @@ describe("central email migration preview (#1043)", () => {
     expect(text).toContain("NOT SET");
     expect(text).toContain("read-only");
     expect(text).toContain("women-2026");
+  });
+});
+
+describe("Delivery & sender states on the Email page (#1043)", () => {
+  const render = (props: { platformConfigured: boolean; senderMissing?: boolean }) => renderToStaticMarkup(createElement(EmailDeliverySection, {
+    sender: { name: "IMSDA Events", email: "", replyTo: "" },
+    events: [],
+    ...props,
+  }));
+
+  it("says loudly that emails are waiting when the environment can send but the sender is blank", () => {
+    const html = render({ platformConfigured: false, senderMissing: true });
+    expect(html).toContain("Central sender not set; emails are waiting");
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('data-email-environment="sender-missing"');
+  });
+
+  it("does not raise that alarm in development or when email is on", () => {
+    expect(render({ platformConfigured: false })).not.toContain("emails are waiting");
+    expect(render({ platformConfigured: false })).toContain('data-email-environment="not-configured"');
+    expect(render({ platformConfigured: true })).toContain('data-email-environment="configured"');
   });
 });

@@ -873,7 +873,7 @@ export function CommunicationsWorkspace({
         }),
       },
       testRealDelivery
-        ? `A real test message was sent to ${form.get("recipientEmail")} from this event's sender. Check the Delivery log for the provider result.`
+        ? `A real test message was sent to ${form.get("recipientEmail")} from the central sender. Check the Delivery log for the provider result.`
         : "The test message was captured locally. No email was sent.",
     );
     setTestAcknowledgeExposure(false);
@@ -1425,7 +1425,7 @@ export function CommunicationsWorkspace({
             <span className="announcement-icon purple"><Send aria-hidden="true" size={20} /></span>
             <p className="eyebrow">Feed & email</p>
             <h2>Publish first, email deliberately</h2>
-            <p>Publishing updates the event page and attendee hub. A separate confirmed action emails active registration contacts using the event’s current delivery settings.</p>
+            <p>Publishing updates the event page and attendee hub. A separate confirmed action emails active registration contacts using the central sender and this event’s display name and reply-to.</p>
             <ul><li>Staff-reviewed drafts</li><li>No automatic email on publish</li><li>Audited, event-scoped broadcasts</li></ul>
             {canManage && (
               <section aria-label="Opted out of announcements">
@@ -1862,7 +1862,7 @@ export function CommunicationsWorkspace({
                 <h2>{testRealDelivery ? "Send a real test message" : "Capture a test message"}</h2>
                 <p>
                   {testRealDelivery
-                    ? "This sends one real email to the address below, from this event’s own sender and reply-to, so you can check what a registrant receives before a batch goes to everyone."
+                    ? "This sends one real email to the address below, from the central sender with this event’s display name and reply-to, so you can check what a registrant receives before a batch goes to everyone."
                     : "This creates a delivery-log row and attempt. It never contacts an email provider."}
                 </p>
                 {(selectedTemplate.activeVersion?.attachments.length ?? 0) > 0 && (
@@ -1892,7 +1892,7 @@ export function CommunicationsWorkspace({
                     <small>
                       {messaging.settings.deliveryMode === "EXTERNAL_EMAIL"
                         ? "Uses this event’s sender, reply-to, and domain — the parts a local capture cannot check."
-                        : "Available once this event’s delivery is set to real email with a verified sender."}
+                        : "Available once real email is on for this event and the central sender is set (System management → Email)."}
                     </small>
                   </span>
                 </label>
@@ -2110,8 +2110,8 @@ export function CommunicationsWorkspace({
                           <strong>The original sender snapshot is blank.</strong>
                           <small>
                             {senderRepairReady
-                              ? `A corrected copy can keep this subject and body while using the current event sender, ${messaging.settings.senderEmail}. The failed row remains unchanged for audit history.`
-                              : "Save a verified sender in Sender & notifications before creating a corrected copy."}
+                              ? `A corrected copy can keep this subject and body while using the central sender, ${messaging.settings.senderEmail}. The failed row remains unchanged for audit history.`
+                              : "Ask a system administrator to set the central sender on System management → Email before creating a corrected copy."}
                           </small>
                         </span>
                       </div>
@@ -2218,6 +2218,8 @@ export function CommunicationsWorkspace({
             <p className="message-delivery-state" data-state={messaging.settings.deliveryReason === "PAUSED" ? "paused" : messaging.settings.deliveryMode === "EXTERNAL_EMAIL" ? "on" : "capture"} role="status">
               {messaging.settings.deliveryReason === "PAUSED"
                 ? "Paused by a system administrator"
+                : messaging.settings.deliveryReason === "SENDER_MISSING"
+                  ? "Email is waiting: the central sender is not set (System management → Email)"
                 : messaging.settings.deliveryMode === "EXTERNAL_EMAIL"
                   ? "Email: on (set on System management → Email)"
                   : "Email: not sent from this environment (set on System management → Email)"}

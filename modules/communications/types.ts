@@ -121,8 +121,8 @@ export type MessageOutboxRecord = {
 export type MessagingSettingsRecord = {
   /** The effective mode (modules/communications/effective-delivery.ts), not a stored setting. */
   deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
-  /** Why: paused by a system administrator, no email configured in this environment, or on. */
-  deliveryReason: "PAUSED" | "NOT_CONFIGURED" | "ON";
+  /** Why: paused by a system administrator, no email configured in this environment, the central sender is blank (messages wait), or on. */
+  deliveryReason: "PAUSED" | "NOT_CONFIGURED" | "SENDER_MISSING" | "ON";
   /** The event's display name. */
   senderName: string;
   /** The central From address (read-only here). */

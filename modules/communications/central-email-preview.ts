@@ -20,6 +20,8 @@ export type PreviewEventRow = {
   /** Null when the event has no settings row at all. */
   deliveryMode: PreviewMode | null;
   senderEmail: string | null;
+  /** Outbox rows still PENDING and already due. Once the event is not paused and a sender is set, these go out on the next sweep. */
+  pendingDueCount?: number;
 };
 
 export type CentralEmailPreview = {
@@ -36,6 +38,12 @@ export type CentralEmailPreview = {
   };
   /** Events that will be paused by the migration, so an administrator knows what to resume. */
   willBePaused: Array<{ slug: string; name: string; from: PreviewMode | "NO_SETTINGS" }>;
+  /**
+   * Events that stay not paused and already hold due PENDING messages (for example ones that failed
+   * EXTERNAL_EMAIL_NOT_CONFIGURED before). They will be sent, from the central address, on the next sweep once a
+   * sender is set. Review this list before applying the migration.
+   */
+  pendingBacklog: Array<{ slug: string; name: string; pendingDue: number }>;
   /** Events whose own sender email differs from the central one. It is not used after the change. */
   senderEmailDiffers: Array<{ slug: string; name: string; deliveryMode: PreviewMode; senderEmail: string }>;
 };
@@ -47,14 +55,17 @@ export function buildCentralEmailPreview(rows: readonly PreviewEventRow[], centr
   const totals = { events: rows.length, notPaused: 0, pausedFromDisabled: 0, pausedFromLocalCapture: 0, pausedNoSettings: 0 };
   const willBePaused: CentralEmailPreview["willBePaused"] = [];
   const senderEmailDiffers: CentralEmailPreview["senderEmailDiffers"] = [];
+  const pendingBacklog: CentralEmailPreview["pendingBacklog"] = [];
   for (const row of rows) {
     if (row.deliveryMode === null) {
       totals.pausedNoSettings += 1;
       willBePaused.push({ slug: row.slug, name: row.name, from: "NO_SETTINGS" });
       continue;
     }
-    if (row.deliveryMode === "EXTERNAL_EMAIL") totals.notPaused += 1;
-    else {
+    if (row.deliveryMode === "EXTERNAL_EMAIL") {
+      totals.notPaused += 1;
+      if ((row.pendingDueCount ?? 0) > 0) pendingBacklog.push({ slug: row.slug, name: row.name, pendingDue: row.pendingDueCount! });
+    } else {
       if (row.deliveryMode === "DISABLED") totals.pausedFromDisabled += 1;
       else totals.pausedFromLocalCapture += 1;
       willBePaused.push({ slug: row.slug, name: row.name, from: row.deliveryMode });
@@ -64,7 +75,7 @@ export function buildCentralEmailPreview(rows: readonly PreviewEventRow[], centr
       senderEmailDiffers.push({ slug: row.slug, name: row.name, deliveryMode: row.deliveryMode, senderEmail: own });
     }
   }
-  return { centralSenderEmail: central, totals, willBePaused, senderEmailDiffers };
+  return { centralSenderEmail: central, totals, willBePaused, pendingBacklog, senderEmailDiffers };
 }
 
 export async function loadCentralEmailPreview(prisma: PrismaClient): Promise<CentralEmailPreview> {
@@ -72,13 +83,19 @@ export async function loadCentralEmailPreview(prisma: PrismaClient): Promise<Cen
     async (tx) => {
       // Must be the first statement of the transaction.
       await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-      const [events, platform] = await Promise.all([
+      const [events, platform, pending] = await Promise.all([
         tx.event.findMany({
           orderBy: [{ startsAt: "desc" }, { id: "asc" }],
           select: { id: true, slug: true, name: true, messageSettings: { select: { deliveryMode: true, senderEmail: true } } },
         }),
         tx.platformSettings.findUnique({ where: { id: "platform" }, select: { defaultSenderEmail: true } }),
+        tx.messageOutbox.groupBy({
+          by: ["eventId"],
+          where: { eventId: { not: null }, status: "PENDING", availableAt: { lte: new Date() } },
+          _count: { _all: true },
+        }),
       ]);
+      const pendingByEvent = new Map(pending.map((row) => [row.eventId, row._count._all]));
       return buildCentralEmailPreview(
         events.map((event) => ({
           eventId: event.id,
@@ -86,6 +103,7 @@ export async function loadCentralEmailPreview(prisma: PrismaClient): Promise<Cen
           name: event.name,
           deliveryMode: event.messageSettings?.deliveryMode ?? null,
           senderEmail: event.messageSettings?.senderEmail ?? null,
+          pendingDueCount: pendingByEvent.get(event.id) ?? 0,
         })),
         platform?.defaultSenderEmail ?? null,
       );
@@ -108,6 +126,9 @@ export function formatCentralEmailPreview(preview: CentralEmailPreview): string 
     "",
     `Events the migration will pause (${preview.willBePaused.length}); resume the real ones on System management > Email:`,
     ...preview.willBePaused.map((event) => `  - ${event.slug} (${event.name}) was ${event.from}`),
+    "",
+    `Events that stay on real email and already hold due PENDING messages (${preview.pendingBacklog.length}); these send from the central address on the next sweep once a sender is set, so review them before applying:`,
+    ...preview.pendingBacklog.map((event) => `  - ${event.slug} (${event.name}): ${event.pendingDue} pending`),
     "",
     `Events whose own sender email differs from the central one (${preview.senderEmailDiffers.length}); that address is not used after the change:`,
     ...preview.senderEmailDiffers.map((event) => `  - ${event.slug} (${event.name}): ${event.senderEmail} [was ${event.deliveryMode}]`),

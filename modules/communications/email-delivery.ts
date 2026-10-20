@@ -772,6 +772,7 @@ async function finalizeSuccessfulAttempt(
   providerMessageId: string,
   completedAt: Date,
   provider: EmailProviderName = getActiveEmailProviderName(),
+  fromEmail: string | null = null,
 ) {
   const attemptNumber = message.attemptCount + 1;
   const providerIdempotencyKey = `outbox:${message.id}`;
@@ -807,6 +808,8 @@ async function finalizeSuccessfulAttempt(
           providerDeliveryStatus: "ACCEPTED",
           idempotencyKey: providerIdempotencyKey,
           realDelivery: true,
+          // The From address actually used, recorded when the central sender replaced a stored one (#1043).
+          ...(fromEmail && fromEmail !== message.senderEmailSnapshot ? { fromEmail, fromReplacedStoredSender: true } : {}),
         },
         startedAt: message.startedAt,
         completedAt,
@@ -1126,6 +1129,7 @@ async function runDeliveryLoop(
         delivery.providerMessageId,
         now(),
         delivery.provider ?? configuredProvider,
+        centralFromEmail,
       )) {
         result.sentIds.push(message.id);
       }

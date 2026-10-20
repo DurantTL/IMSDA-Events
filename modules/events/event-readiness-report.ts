@@ -61,7 +61,7 @@ export async function collectEventReadinessReport(
   const [publishedFormCount, settings, templates, registrations] = await Promise.all([
     prisma.registrationFormVersion.count({ where: { form: { eventId: event.id }, status: "PUBLISHED" } }),
     // The one effective-delivery decision (#1043): paused and unconfigured both read as capture-only here.
-    loadEventEmailSettings(prisma, event.id),
+    loadEventEmailSettings(prisma, event.id, { fallback: false }),
     prisma.eventMessageTemplate.findMany({
       where: { eventId: event.id },
       select: { key: true, isEnabled: true, versions: { where: { status: "PUBLISHED" }, select: { id: true } } },

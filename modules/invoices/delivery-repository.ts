@@ -524,7 +524,7 @@ export async function sendInvoiceVersion(input: {
       }
       const settings = await loadEventEmailSettingsOrThrow(tx, input.eventId);
       if (settings.deliveryMode === "EXTERNAL_EMAIL" && !settings.senderEmail?.trim()) {
-        throw new InvoiceError("Add a verified sender email in this event's communication settings before sending real email.", "EXTERNAL_EMAIL_NOT_CONFIGURED");
+        throw new InvoiceError("The central sender address is not set. A system administrator sets it on System management > Email before real email can be sent.", "EXTERNAL_EMAIL_NOT_CONFIGURED");
       }
       const { candidates, contactChanged } = await computeRecipients(tx, { eventId: input.eventId, version, invoice: version.invoice }, new Date());
       if (recipientsFingerprint(candidates) !== input.recipientsFingerprint) {

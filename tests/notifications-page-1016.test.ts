@@ -34,7 +34,7 @@ vi.mock("@/modules/system-admin/platform-settings", async () => {
 });
 
 vi.mock("@/modules/communications/event-email-pause", () => ({ listEventEmailStates: mocks.listEventEmailStates }));
-vi.mock("@/modules/communications/effective-delivery", () => ({ isPlatformEmailConfigured: () => true }));
+vi.mock("@/modules/communications/effective-delivery", () => ({ isPlatformEmailConfigured: () => true, isEmailEnvironmentConfigured: () => true }));
 vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true }));
 vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: () => ({ deliveryConfigured: true, webhookConfigured: true }) }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: mocks.getAdminAttentionSummary }));

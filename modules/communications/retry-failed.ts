@@ -57,7 +57,13 @@ function summarizeSkips(counts: Map<RetryFailedSkipReason, number>): RetryFailed
     .sort((left, right) => right.count - left.count || left.reason.localeCompare(right.reason));
 }
 
-function deliveryBlocker(deliveryMode: DeliveryMode): Plan["blocker"] {
+function deliveryBlocker(deliveryMode: DeliveryMode, paused = false): Plan["blocker"] {
+  if (paused) {
+    return {
+      code: "DELIVERY_DISABLED",
+      message: "Email is paused for this event by a system administrator. Ask one to resume it on System management > Email before retrying.",
+    };
+  }
   if (deliveryMode === "DISABLED") {
     return {
       code: "DELIVERY_DISABLED",
@@ -268,7 +274,7 @@ async function buildPlan(
       queueMessageIds: queueIds,
       eligibleCount: eligibleIds.length,
     }),
-    blocker: deliveryBlocker(deliveryMode),
+    blocker: deliveryBlocker(deliveryMode, settings.deliveryReason === "PAUSED"),
     senderEmail: settings.senderEmail,
   };
 }

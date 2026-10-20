@@ -1,5 +1,6 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { createHash, randomUUID } from "node:crypto";
@@ -517,7 +518,8 @@ export async function sendInvitations(eventId: string, actorUserId: string, inpu
     }
     const settings = await loadEventEmailSettings(tx, eventId);
     const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
-    const suppressed = deliveryMode === "DISABLED";
+    const holdNote = suppressionNote(settings);
+    const suppressed = holdNote !== null;
     const correlationId = randomUUID();
     for (const invitation of toSend) {
       const content = invitationEmail({
@@ -548,7 +550,7 @@ export async function sendInvitations(eventId: string, actorUserId: string, inpu
           idempotencyKey: `staff-invitation:send:${invitation.id}:${invitation.sendCount + 1}`,
           correlationId,
           status: suppressed ? "SUPPRESSED" : "PENDING",
-          lastError: suppressed ? "Delivery is disabled for this event." : null,
+          lastError: holdNote,
         },
         select: { id: true },
       });
@@ -595,7 +597,8 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
   if (input.notices.length === 0) return [] as string[];
   const settings = await loadEventEmailSettings(tx, input.eventId);
   const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
-  const suppressed = deliveryMode === "DISABLED";
+  const holdNote = suppressionNote(settings);
+  const suppressed = holdNote !== null;
   const correlationId = randomUUID();
   const ids: string[] = [];
   for (const original of input.notices) {
@@ -638,7 +641,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
         correlationId,
         ...(notice.digestUntil ? { availableAt: notice.digestUntil } : {}),
         status: suppressed ? "SUPPRESSED" : "PENDING",
-        lastError: suppressed ? "Delivery is disabled for this event." : null,
+        lastError: holdNote,
       },
       select: { id: true, status: true },
     });

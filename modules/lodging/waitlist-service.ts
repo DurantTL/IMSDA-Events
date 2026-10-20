@@ -1,5 +1,6 @@
 import "server-only";
 
+import { startBlockedNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -263,9 +264,10 @@ export async function applyWaitlistAction(eventId: string, actorUserId: string, 
       // The preview only reads: it takes no lock and does not touch the capacity version. Only a confirmed offer does.
       if (input.confirm) await lockAll(tx, eventId);
       const state = await loadPlanningState(tx, eventId);
-      // With delivery disabled for the event the email is suppressed and the offer clock would run for nothing.
-      const deliveryDisabled = (await loadEventEmailSettings(tx, eventId))?.deliveryMode === "DISABLED";
-      const disabledReason = "Email delivery is disabled for this event, so the guest would never receive the offer. Turn delivery on in the event's communication settings first.";
+      // With email paused (or disabled, or no central sender) the offer email would not reach the guest and the clock would run for nothing.
+      const blockedNote = startBlockedNote(await loadEventEmailSettings(tx, eventId));
+      const deliveryDisabled = blockedNote !== null;
+      const disabledReason = blockedNote ?? "";
       const entries: EntryRow[] = [];
       // A confirmed offer takes each entry's row lock (in a fixed order) before it reads the entry, so a guest's answer that
       // committed first is seen here (an ACCEPTED entry is never overwritten) and two offers cannot both write.

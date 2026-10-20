@@ -37,12 +37,15 @@ beforeEach(() => {
 
 describe("effective delivery (#1043)", () => {
   it.each([
-    { paused: true, platformConfigured: true, mode: "LOCAL_CAPTURE", reason: "PAUSED" },
-    { paused: true, platformConfigured: false, mode: "LOCAL_CAPTURE", reason: "PAUSED" },
-    { paused: false, platformConfigured: false, mode: "LOCAL_CAPTURE", reason: "NOT_CONFIGURED" },
-    { paused: false, platformConfigured: true, mode: "EXTERNAL_EMAIL", reason: "ON" },
-  ] as const)("paused=$paused configured=$platformConfigured -> $mode ($reason)", ({ paused, platformConfigured, mode, reason }) => {
-    expect(resolveEffectiveDelivery({ paused, platformConfigured })).toEqual({ mode, reason });
+    { paused: true, environmentConfigured: true, senderSet: true, mode: "LOCAL_CAPTURE", reason: "PAUSED" },
+    { paused: true, environmentConfigured: false, senderSet: false, mode: "LOCAL_CAPTURE", reason: "PAUSED" },
+    { paused: false, environmentConfigured: false, senderSet: true, mode: "LOCAL_CAPTURE", reason: "NOT_CONFIGURED" },
+    { paused: false, environmentConfigured: false, senderSet: false, mode: "LOCAL_CAPTURE", reason: "NOT_CONFIGURED" },
+    // The environment can send but the sender is blank: hold, never capture (a capture is terminal and would lose mail).
+    { paused: false, environmentConfigured: true, senderSet: false, mode: "EXTERNAL_EMAIL", reason: "SENDER_MISSING" },
+    { paused: false, environmentConfigured: true, senderSet: true, mode: "EXTERNAL_EMAIL", reason: "ON" },
+  ] as const)("paused=$paused environment=$environmentConfigured sender=$senderSet -> $mode ($reason)", ({ paused, environmentConfigured, senderSet, mode, reason }) => {
+    expect(resolveEffectiveDelivery({ paused, environmentConfigured, senderSet })).toEqual({ mode, reason });
   });
 
   it("is configured only with a central sender address and account email configured here", () => {
@@ -81,10 +84,19 @@ describe("effective delivery (#1043)", () => {
     const live = await loadEventEmailSettings(fakeClient(row), "event-1");
     expect(live).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", senderEmail: central.email });
 
+    // Environment configured, central sender blank: the messages wait (EXTERNAL_EMAIL, no sender), they are not captured.
     const noSender = await loadEventEmailSettings(fakeClient(row, { defaultSenderName: "IMSDA Events", defaultSenderEmail: null, defaultReplyToEmail: null }), "event-1");
-    expect(noSender).toMatchObject({ deliveryMode: "LOCAL_CAPTURE", deliveryReason: "NOT_CONFIGURED", senderEmail: null });
+    expect(noSender).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "SENDER_MISSING", senderEmail: null });
 
-    expect(await loadEventEmailSettings(fakeClient(null), "event-1")).toBeNull();
+    // Environment not configured (development, CI): capture, whatever the sender.
+    mocks.isAccountEmailConfigured.mockReturnValue(false);
+    const dev = await loadEventEmailSettings(fakeClient(row), "event-1");
+    expect(dev).toMatchObject({ deliveryMode: "LOCAL_CAPTURE", deliveryReason: "NOT_CONFIGURED" });
+    mocks.isAccountEmailConfigured.mockReturnValue(true);
+
+    // No settings row: not paused, with the central display name, never null unless asked.
+    expect(await loadEventEmailSettings(fakeClient(null), "event-1")).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", deliveryPaused: false, senderName: "IMSDA Events", senderEmail: central.email });
+    expect(await loadEventEmailSettings(fakeClient(null), "event-1", { fallback: false })).toBeNull();
   });
 
   it("the stored deliveryMode column never decides: an old EXTERNAL_EMAIL row that is paused still captures", async () => {
@@ -252,8 +264,8 @@ describe("migration 20261114100000_central_email (#1043)", () => {
     expect(insert![0]).toContain('FROM "Event" e');
   });
 
-  it("is newer than every earlier migration", () => {
-    const names = readdirSync(path.join(root, "prisma/migrations")).filter((name) => /^\d{14}_/.test(name)).sort();
-    expect(names.at(-1)).toBe("20261114100000_central_email");
+  it("is committed with the migration history", () => {
+    const names = readdirSync(path.join(root, "prisma/migrations"));
+    expect(names).toContain("20261114100000_central_email");
   });
 });

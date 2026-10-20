@@ -83,22 +83,34 @@ export async function setEventEmailPaused(input: {
   });
 }
 
-/** Every event that is paused, plus the open (not archived) events, so an administrator can pause another one. */
-export async function listEventEmailStates(limit = 300): Promise<EventEmailState[]> {
+const EMAIL_STATE_SELECT = {
+  id: true,
+  name: true,
+  startsAt: true,
+  archivedAt: true,
+  messageSettings: { select: { deliveryPaused: true, deliveryPausedAt: true } },
+} as const;
+
+/**
+ * Every paused event, in full (a paused event can never be hidden by a cap, or it could not be resumed), plus the open
+ * (not archived) events that are not paused, newest first, up to `openLimit`, so an administrator can pause another.
+ */
+export async function listEventEmailStates(openLimit = 300): Promise<EventEmailState[]> {
   const prisma = getPrisma();
-  const events = await prisma.event.findMany({
-    where: { OR: [{ archivedAt: null }, { messageSettings: { is: { deliveryPaused: true } } }] },
-    orderBy: [{ startsAt: "desc" }, { id: "asc" }],
-    take: limit,
-    select: {
-      id: true,
-      name: true,
-      startsAt: true,
-      archivedAt: true,
-      messageSettings: { select: { deliveryPaused: true, deliveryPausedAt: true } },
-    },
-  });
-  return events.map((event) => ({
+  const [pausedEvents, openEvents] = await Promise.all([
+    prisma.event.findMany({
+      where: { messageSettings: { is: { deliveryPaused: true } } },
+      orderBy: [{ startsAt: "desc" }, { id: "asc" }],
+      select: EMAIL_STATE_SELECT,
+    }),
+    prisma.event.findMany({
+      where: { archivedAt: null, NOT: { messageSettings: { is: { deliveryPaused: true } } } },
+      orderBy: [{ startsAt: "desc" }, { id: "asc" }],
+      take: openLimit,
+      select: EMAIL_STATE_SELECT,
+    }),
+  ]);
+  return [...pausedEvents, ...openEvents].map((event) => ({
     eventId: event.id,
     eventName: event.name,
     startsAt: event.startsAt.toISOString(),

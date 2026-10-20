@@ -1,5 +1,6 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -182,7 +183,8 @@ async function queuePermissionRequest(
       "",
       "IMSDA Events",
     ].join("\n");
-    const suppressed = messageSettings.deliveryMode === "DISABLED";
+    const holdNote = suppressionNote(messageSettings);
+    const suppressed = holdNote !== null;
     const idempotencyKey = `team-permission:${input.registrationId}:${requestKey}:${email}`;
     const message = await tx.messageOutbox.upsert({
       where: { idempotencyKey },
@@ -203,7 +205,7 @@ async function queuePermissionRequest(
         idempotencyKey,
         correlationId: randomUUID(),
         status: suppressed ? "SUPPRESSED" : "PENDING",
-        lastError: suppressed ? "Delivery is disabled for this event." : null,
+        lastError: holdNote,
       },
       select: { id: true, status: true },
     });

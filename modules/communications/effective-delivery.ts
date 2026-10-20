@@ -10,8 +10,13 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
  * (the retired column), which `tests/effective-delivery-1043.test.ts` enforces.
  *
  * - Paused (`EventMessageSettings.deliveryPaused`, set only by a system administrator): capture only, nothing is sent.
- * - Otherwise the platform mode: real email where account and provider email is configured in this environment (the same
- *   checks account email uses) and the central sender address is set; capture locally where it is not (dev and CI).
+ * - Otherwise the platform mode:
+ *   - environment not configured (no provider key or account email sender: dev and CI): capture locally;
+ *   - environment configured but the central sender address is blank: `SENDER_MISSING`. Messages are NOT captured (a
+ *     capture is terminal and would lose them): they queue and stay PENDING, nothing is sent, and they go out once the
+ *     sender is set. The mode stays `EXTERNAL_EMAIL` so every path queues them, and delivery refuses with
+ *     EXTERNAL_EMAIL_NOT_CONFIGURED until then;
+ *   - otherwise real email (`ON`).
  *
  * The From address is always the platform's central sender. An event overrides only its display name and reply-to.
  *
@@ -20,7 +25,7 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
  */
 
 export type EffectiveDeliveryMode = "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
-export type EffectiveDeliveryReason = "PAUSED" | "NOT_CONFIGURED" | "ON";
+export type EffectiveDeliveryReason = "PAUSED" | "NOT_CONFIGURED" | "SENDER_MISSING" | "ON";
 
 export type EffectiveDelivery = { mode: EffectiveDeliveryMode; reason: EffectiveDeliveryReason };
 
@@ -30,21 +35,26 @@ export const FALLBACK_CENTRAL_SENDER_NAME = "IMSDA Events";
 
 type EmailSettingsClient = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
 
-/** Whether this environment can send real email at all: the account-email checks, plus a central sender address. */
-export function isPlatformEmailConfigured(centralSenderEmail: string | null | undefined): boolean {
-  if (!centralSenderEmail?.trim()) return false;
+/** Whether this environment can send real email at all: the existing account-email and provider checks. */
+export function isEmailEnvironmentConfigured(): boolean {
   try {
     return isAccountEmailConfigured();
   } catch {
-    // An invalid environment is "not configured"; failing closed (capture) is never an unexpected send.
+    // An invalid environment is "not configured": capture, never an unexpected send.
     return false;
   }
 }
 
-/** Pure decision. Paused wins over everything; unconfigured captures. */
-export function resolveEffectiveDelivery(input: { paused: boolean; platformConfigured: boolean }): EffectiveDelivery {
+/** Whether real email can go out now: the environment is configured and the central sender address is set. */
+export function isPlatformEmailConfigured(centralSenderEmail: string | null | undefined): boolean {
+  return Boolean(centralSenderEmail?.trim()) && isEmailEnvironmentConfigured();
+}
+
+/** Pure decision. Paused wins over everything; an unconfigured environment captures; a blank sender holds. */
+export function resolveEffectiveDelivery(input: { paused: boolean; environmentConfigured: boolean; senderSet: boolean }): EffectiveDelivery {
   if (input.paused) return { mode: "LOCAL_CAPTURE", reason: "PAUSED" };
-  if (!input.platformConfigured) return { mode: "LOCAL_CAPTURE", reason: "NOT_CONFIGURED" };
+  if (!input.environmentConfigured) return { mode: "LOCAL_CAPTURE", reason: "NOT_CONFIGURED" };
+  if (!input.senderSet) return { mode: "EXTERNAL_EMAIL", reason: "SENDER_MISSING" };
   return { mode: "EXTERNAL_EMAIL", reason: "ON" };
 }
 
@@ -83,10 +93,10 @@ type StoredSettings = Pick<EventMessageSettings, "deliveryPaused" | "senderName"
 export function resolveEventEmailSettings<Row extends StoredSettings>(
   row: Row,
   central: CentralSender,
-  platformConfigured = isPlatformEmailConfigured(central.email),
+  environmentConfigured = isEmailEnvironmentConfigured(),
 ): Omit<Row, "deliveryMode" | "senderName" | "senderEmail" | "replyToEmail">
   & Pick<EventEmailSettings, "deliveryMode" | "deliveryReason" | "senderName" | "senderEmail" | "replyToEmail" | "replyToOverride" | "central"> {
-  const { mode, reason } = resolveEffectiveDelivery({ paused: row.deliveryPaused, platformConfigured });
+  const { mode, reason } = resolveEffectiveDelivery({ paused: row.deliveryPaused, environmentConfigured, senderSet: Boolean(central.email) });
   return {
     ...row,
     deliveryMode: mode,
@@ -99,17 +109,41 @@ export function resolveEventEmailSettings<Row extends StoredSettings>(
   };
 }
 
-/** The event's settings, resolved; `null` when the event has no settings row yet (callers keep their capture fallback). */
-export async function loadEventEmailSettings(client: EmailSettingsClient, eventId: string): Promise<EventEmailSettings | null> {
+/**
+ * The event's settings, resolved. An event with no settings row yet is not paused, so it gets the same defaults a new
+ * event would (the central display name, no reply-to of its own) and the platform's effective mode. Pass
+ * `{ fallback: false }` to get `null` instead (readiness reports a missing row).
+ */
+export async function loadEventEmailSettings(
+  client: EmailSettingsClient,
+  eventId: string,
+  options: { fallback?: boolean } = {},
+): Promise<EventEmailSettings | null> {
   const [row, central] = await Promise.all([
     client.eventMessageSettings.findUnique({ where: { eventId } }),
     loadCentralSender(client),
   ]);
-  return row ? resolveEventEmailSettings(row, central) as EventEmailSettings : null;
+  if (row) return resolveEventEmailSettings(row, central) as EventEmailSettings;
+  if (options.fallback === false) return null;
+  const epoch = new Date(0);
+  return resolveEventEmailSettings({
+    id: "",
+    eventId,
+    deliveryMode: "LOCAL_CAPTURE" as const,
+    deliveryPaused: false,
+    deliveryPausedAt: null,
+    deliveryPausedByUserId: null,
+    senderName: central.name,
+    senderEmail: null,
+    replyToEmail: null,
+    internalNotificationEmails: [],
+    createdAt: epoch,
+    updatedAt: epoch,
+  }, central) as EventEmailSettings;
 }
 
 export async function loadEventEmailSettingsOrThrow(client: EmailSettingsClient, eventId: string): Promise<EventEmailSettings> {
-  const settings = await loadEventEmailSettings(client, eventId);
+  const settings = await loadEventEmailSettings(client, eventId, { fallback: false });
   if (!settings) throw new Error(`Event ${eventId} has no message settings.`);
   return settings;
 }
@@ -121,7 +155,7 @@ export async function getEffectiveDelivery(client: EmailSettingsClient, eventId:
     loadCentralSender(client),
   ]);
   const paused = row?.deliveryPaused ?? false;
-  return { ...resolveEffectiveDelivery({ paused, platformConfigured: isPlatformEmailConfigured(central.email) }), paused };
+  return { ...resolveEffectiveDelivery({ paused, environmentConfigured: isEmailEnvironmentConfigured(), senderSet: Boolean(central.email) }), paused };
 }
 
 /** The columns written when a system administrator pauses or resumes an event. */

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
@@ -231,7 +232,8 @@ async function queueNotice(
     : REGISTRATION_MANAGE_LINK_SENTINEL;
   const notice = notRestoredNotice({ directorName: name, eventName, items, link, changesOpen, ownerKind: owner.kind });
   const idempotencyKey = `honor-class-picks-not-restored:${input.registrationId}:${input.correlationId}`;
-  const suppressed = settings.deliveryMode === "DISABLED";
+  const holdNote = suppressionNote(settings);
+  const suppressed = holdNote !== null;
   const message = await tx.messageOutbox.upsert({
     where: { idempotencyKey },
     update: {},
@@ -258,7 +260,7 @@ async function queueNotice(
       idempotencyKey,
       correlationId: input.correlationId,
       status: suppressed ? "SUPPRESSED" : "PENDING",
-      lastError: suppressed ? "Delivery is disabled for this event." : null,
+      lastError: holdNote,
     },
     select: { id: true, status: true },
   });

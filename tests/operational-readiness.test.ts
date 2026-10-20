@@ -52,6 +52,14 @@ describe("checkOperationalReadiness", () => {
     expect(find(checks, "DELIVERY_MODE")?.detail).toContain("System management > Email");
   });
 
+  it("blocks, and says emails are waiting, when the environment can send but the central sender is blank (#1043)", () => {
+    const checks = checkOperationalReadiness(facts({
+      messaging: { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "SENDER_MISSING", senderEmail: null, replyToEmail: null },
+    }));
+    expect(find(checks, "DELIVERY_MODE")).toMatchObject({ severity: "BLOCKER", label: "Central sender not set; emails are waiting" });
+    expect(find(checks, "DELIVERY_MODE")?.detail).toContain("nothing is sent or lost");
+  });
+
   it("blocks, naming the environment, when real email is not configured here (#1043)", () => {
     const checks = checkOperationalReadiness(facts({
       messaging: {

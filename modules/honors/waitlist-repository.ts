@@ -1,5 +1,6 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -154,7 +155,8 @@ async function queueOfferEmail(tx: Tx, input: {
     "IMSDA Events",
   ].join("\n");
   const idempotencyKey = `honor-class-waitlist-offer:${input.entryId}:${input.offerCount}`;
-  const suppressed = settings.deliveryMode === "DISABLED";
+  const holdNote = suppressionNote(settings);
+  const suppressed = holdNote !== null;
   const message = await tx.messageOutbox.upsert({
     where: { idempotencyKey },
     update: {},
@@ -180,7 +182,7 @@ async function queueOfferEmail(tx: Tx, input: {
       idempotencyKey,
       correlationId: randomUUID(),
       status: suppressed ? "SUPPRESSED" : "PENDING",
-      lastError: suppressed ? "Delivery is disabled for this event." : null,
+      lastError: holdNote,
     },
     select: { id: true, status: true },
   });
