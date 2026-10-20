@@ -137,7 +137,7 @@ export function PlatformSettingsWorkspace({
           </div>
           <p className="field-help">
             The support contact, the security alert address and the new club application address are edited, with a switch for every
-            automatic alert, on <Link className="text-button" href="/admin/notifications">Notifications</Link>.
+            automatic alert, on <Link className="text-button" href="/admin/email">Email</Link>.
           </p>
         </section>
 

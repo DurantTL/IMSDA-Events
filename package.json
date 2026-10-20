@@ -130,6 +130,7 @@
     "event-audience:backfill": "tsx --require ./scripts/support/allow-server-only.cjs scripts/backfill-event-audience.ts",
     "issue:from-spec": "tsx scripts/spec-to-issue.ts",
     "accounts:dry-run": "tsx scripts/single-account-dry-run.ts",
+    "email:migration-preview": "tsx scripts/central-email-migration-preview.ts",
     "background-checks:migration-dry-run": "tsx scripts/background-check-migration-dry-run.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"

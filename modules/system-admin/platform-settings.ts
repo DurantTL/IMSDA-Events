@@ -24,7 +24,7 @@ function optionalField<T extends z.ZodType<string>>(inner: T) {
   ).nullable().optional().transform((value) => (value ? value : null));
 }
 
-const optionalEmail = optionalField(
+export const optionalEmail = optionalField(
   z.email().max(200).transform((value) => value.toLowerCase()),
 );
 

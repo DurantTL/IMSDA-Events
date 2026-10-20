@@ -311,6 +311,7 @@ const pages: PageSpec[] = [
   // The delivery log with a failed send and a queued message (#860): the Retry failed review and the refresh notice.
   staff("communications-deliveries", `/communications?event=${blocksEventId}&view=deliveries`, "system-admin"),
   // Scheduled email batches (#177): a waiting, an approved and a paused schedule with a long unbroken name, and the new-schedule form.
+  staff("communications-settings", `/communications?event=${blocksEventId}&view=settings`, "system-admin"),
   staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
   staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
@@ -330,7 +331,7 @@ const pages: PageSpec[] = [
   staff("team", "/admin/team", "system-admin"),
   staff("accounts", "/admin/accounts", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
-  staff("system-notifications", "/admin/notifications", "system-admin"),
+  staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
   staff("club-forms", "/admin/club-forms", "system-admin"),
