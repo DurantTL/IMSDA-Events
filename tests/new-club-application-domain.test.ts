@@ -55,8 +55,14 @@ describe("new club application input", () => {
     }
   });
 
-  it("is Pathfinder or Adventurer only", () => {
-    expect(newClubApplicationInputSchema.safeParse(valid({ clubType: "ADVENTURER" })).success).toBe(true);
+  it("is Pathfinder only: a missing type is Pathfinder and ADVENTURER is refused", () => {
+    const withoutType: Record<string, unknown> = valid();
+    delete withoutType.clubType;
+    expect(newClubApplicationInputSchema.parse(withoutType).clubType).toBe("PATHFINDER");
+    expect(newClubApplicationInputSchema.parse(valid({ clubType: undefined })).clubType).toBe("PATHFINDER");
+    const adventurer = newClubApplicationInputSchema.safeParse(valid({ clubType: "ADVENTURER" }));
+    expect(adventurer.success).toBe(false);
+    expect(adventurer.error?.issues[0]?.message).toBe("New club applications are for Pathfinder clubs only.");
     expect(newClubApplicationInputSchema.safeParse(valid({ clubType: "EAGLE" })).success).toBe(false);
     expect(newClubApplicationInputSchema.safeParse(valid({ clubType: "" })).success).toBe(false);
   });

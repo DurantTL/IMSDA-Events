@@ -29,7 +29,7 @@ export async function NewClubApplicationPage({ invite }: { invite?: { token: str
           <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>
           <h1>Register a new club</h1>
           <p>
-            Apply to start a Pathfinder or Adventurer club. This mirrors the conference&apos;s paper application. Nothing is set up until the
+            Apply to start a Pathfinder club. This mirrors the conference&apos;s paper application. Nothing is set up until the
             conference youth department approves it, and applications are open all year.
           </p>
           {invite && <p>You opened this from a private link, so your email is filled in. The link works once.</p>}

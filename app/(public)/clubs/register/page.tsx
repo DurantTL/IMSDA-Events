@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Register a new club",
-  description: "Apply to start a new Pathfinder or Adventurer club in the Iowa-Missouri Conference. Open all year.",
+  description: "Apply to start a new Pathfinder club in the Iowa-Missouri Conference. Open all year.",
   alternates: { canonical: "/clubs/register" },
   robots: { index: true, follow: true },
 };

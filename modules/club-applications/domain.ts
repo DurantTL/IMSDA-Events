@@ -21,6 +21,7 @@ export type NewClubApplicationStatusValue = (typeof NEW_CLUB_APPLICATION_STATUSE
 
 export const NEW_CLUB_TYPES = ["PATHFINDER", "ADVENTURER"] as const;
 export type NewClubTypeValue = (typeof NEW_CLUB_TYPES)[number];
+export const NEW_CLUB_PATHFINDER_ONLY_MESSAGE = "New club applications are for Pathfinder clubs only.";
 export const newClubTypeLabels: Record<NewClubTypeValue, string> = {
   PATHFINDER: "Pathfinder club",
   ADVENTURER: "Adventurer club",
@@ -72,7 +73,12 @@ export function cleanName(value: string) {
  */
 export const newClubApplicationInputSchema = z.strictObject({
   clubName: requiredText("The club name", 120),
-  clubType: z.enum(NEW_CLUB_TYPES, { error: "Choose Pathfinder or Adventurer." }),
+  // New applications are Pathfinder only until an official Adventurer version exists (#1095). Left out means
+  // Pathfinder; ADVENTURER stays a stored value so older applications still show and can be decided.
+  clubType: z
+    .enum(NEW_CLUB_TYPES, { error: NEW_CLUB_PATHFINDER_ONLY_MESSAGE })
+    .refine((type) => type === "PATHFINDER", { error: NEW_CLUB_PATHFINDER_ONLY_MESSAGE })
+    .default("PATHFINDER"),
   sponsoringChurchId: z.string().trim().max(60).nullish().transform((value) => value || null),
   sponsoringChurchOther: optionalText(160),
   pastorName: requiredText("The pastor's name", 120),

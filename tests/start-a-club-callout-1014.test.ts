@@ -13,7 +13,7 @@ describe("StartAClubCallout (#1014)", () => {
   it("renders the heading, the one-line explanation and a primary button to /clubs/register", () => {
     expect(markup).toContain("Start a new club");
     expect(markup).toContain(
-      "Apply to start a Pathfinder or Adventurer club. Applications are open all year; the conference youth department reviews each one.",
+      "Apply to start a Pathfinder club. Applications are open all year; the conference youth department reviews each one.",
     );
     expect(markup).toMatch(/<a class="[^"]*\bprimary-button\b[^"]*" href="\/clubs\/register">Register a new club<\/a>/);
   });

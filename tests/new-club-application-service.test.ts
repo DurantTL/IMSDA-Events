@@ -434,8 +434,10 @@ describe("approving", () => {
     expect([...db.organizations.values()].find((org) => org.name === "Typed Club")).toMatchObject({ parentOrganizationId: "group-1" });
   });
 
-  it("makes an Adventurer application an Adventurer club", async () => {
-    await submitNewClubApplication(input({ clubName: "Little Lambs", clubType: "ADVENTURER" }), { now: NOW });
+  it("still makes an older Adventurer application an Adventurer club", async () => {
+    // New submissions can no longer be Adventurer; this is an application saved before that rule.
+    await submitNewClubApplication(input({ clubName: "Little Lambs" }), { now: NOW });
+    db.applications[1].clubType = "ADVENTURER";
     await decideNewClubApplication(systemAdmin, db.applications[1].id, { decision: "approve" }, NOW);
     expect([...db.organizations.values()].find((org) => org.name === "Little Lambs")).toMatchObject({ sourceOrgType: "Adventurer Club" });
   });

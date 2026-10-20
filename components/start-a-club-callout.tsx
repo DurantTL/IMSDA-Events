@@ -13,7 +13,7 @@ export function StartAClubCallout({ headingId = "start-a-club-heading" }: { head
       <div className="start-a-club-body">
         <h2 id={headingId}>Start a new club</h2>
         <p>
-          Apply to start a Pathfinder or Adventurer club. Applications are open all year; the conference youth
+          Apply to start a Pathfinder club. Applications are open all year; the conference youth
           department reviews each one.
         </p>
       </div>

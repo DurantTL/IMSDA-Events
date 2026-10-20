@@ -191,7 +191,7 @@ export async function queueInviteLinkEmail(
       bodyTextSnapshot: [
         `Hello ${name},`,
         "",
-        "The Iowa-Missouri Conference has invited you to apply to start a new Pathfinder or Adventurer club. Open your private link to fill in the application:",
+        "The Iowa-Missouri Conference has invited you to apply to start a new Pathfinder club. Open your private link to fill in the application:",
         "",
         NEW_CLUB_APPLICATION_LINK_SENTINEL,
         "",

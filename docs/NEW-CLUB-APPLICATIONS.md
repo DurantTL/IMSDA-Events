@@ -11,8 +11,9 @@ How a new club gets started in IMSDA Events. Decisions are Caleb's, recorded on 
    pastor, the director's name, mailing address, email, home and work phone (at least one phone), the philosophy statement and church
    agreement exactly as written on the paper form (`modules/club-applications/domain.ts`), typed signatures (pastor, head elder, church
    clerk, director), an optional list of other board members, the date (stamped by the server), and an optional PDF or image
-   attachment (the signed paper page or the board minutes, 10 MB or less). Club name and type (Pathfinder or Adventurer) were kept from
-   the original proposal. An application creates **nothing**: no club, invite or account.
+   attachment (the signed paper page or the board minutes, 10 MB or less). The club name is kept from the original proposal. The form is **Pathfinder only** for now: it has no club type choice, and the server
+   rejects `ADVENTURER` ("New club applications are for Pathfinder clubs only.") and treats a missing type as Pathfinder. `ADVENTURER`
+   stays in the database enum so an older Adventurer application still shows in the queue and can be decided. An application creates **nothing**: no club, invite or account.
 3. **Notification.** The address in **System settings, "New club application notifications"** is emailed the club name, church and
    director name with a link, and nothing else. Blank means no notice. No address is in code.
 4. **Review.** System administrators approve or decline. Area Coordinators see the queue and the attachment, view only (their
