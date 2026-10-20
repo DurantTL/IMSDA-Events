@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettingsOrThrow } from "@/modules/communications/effective-delivery";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -381,7 +382,7 @@ export async function getInvoiceSendPreview(eventId: string, versionId: string):
   }
   await ensureEventMessagingDefaults(eventId);
   const [settings, newer, history, document, prior] = await Promise.all([
-    prisma.eventMessageSettings.findUniqueOrThrow({ where: { eventId }, select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true } }),
+    loadEventEmailSettingsOrThrow(prisma, eventId),
     version.status === "SUPERSEDED"
       ? prisma.invoiceVersion.findFirst({ where: { invoiceId: version.invoiceId, status: "FINALIZED" }, select: { id: true, number: true } })
       : Promise.resolve(null),
@@ -485,7 +486,7 @@ export async function sendInvoiceVersion(input: {
     delivery: { id: string; sequence: number; invoiceVersionId: string; invoiceVersion: { number: string | null }; document: { sha256: string }; recipients: Array<{ message: { id: string; status: string } }> },
     replayed: boolean,
   ): Promise<SendInvoiceResult> => {
-    const settings = await prisma.eventMessageSettings.findUniqueOrThrow({ where: { eventId: input.eventId }, select: { deliveryMode: true } });
+    const settings = await loadEventEmailSettingsOrThrow(prisma, input.eventId);
     if (!replayed) {
       // After the commit, never inside it: a delivery failure leaves the rows queued for the sweep and the record intact.
       try {
@@ -521,7 +522,7 @@ export async function sendInvoiceVersion(input: {
       if (version.status !== "FINALIZED") {
         throw new InvoiceError(version.status === "SUPERSEDED" ? "That version was replaced by a newer one and cannot be sent. Send the newer version." : "Only a finalized invoice can be sent.", "NOT_SENDABLE");
       }
-      const settings = await tx.eventMessageSettings.findUniqueOrThrow({ where: { eventId: input.eventId } });
+      const settings = await loadEventEmailSettingsOrThrow(tx, input.eventId);
       if (settings.deliveryMode === "EXTERNAL_EMAIL" && !settings.senderEmail?.trim()) {
         throw new InvoiceError("Add a verified sender email in this event's communication settings before sending real email.", "EXTERNAL_EMAIL_NOT_CONFIGURED");
       }

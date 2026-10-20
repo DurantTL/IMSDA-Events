@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
 import { loadOfferings, seatCounts, type SeatOwner, type Snapshot } from "@/modules/honors/enrollment-repository";
@@ -217,10 +218,7 @@ async function queueNotice(
         accountHolderPerson: { select: { firstName: true, lastName: true, normalizedEmail: true } },
       },
     }),
-    tx.eventMessageSettings.findUnique({
-      where: { eventId: input.eventId },
-      select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true },
-    }),
+    loadEventEmailSettings(tx, input.eventId),
   ]);
   if (!registration) return null;
   const { email, name } = contactOf(registration);

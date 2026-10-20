@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -475,7 +476,7 @@ export async function previewInvitationSend(eventId: string, ids: readonly strin
   const found = await invitationsById(getPrisma(), eventId, ids);
   const toSend = found.filter((row) => sendable(row, now));
   const first = toSend[0];
-  const settings = await getPrisma().eventMessageSettings.findUnique({ where: { eventId } });
+  const settings = await loadEventEmailSettings(getPrisma(), eventId);
   return {
     willSend: toSend.length,
     skipped: found.length - toSend.length,
@@ -514,7 +515,7 @@ export async function sendInvitations(eventId: string, actorUserId: string, inpu
     if (sendDigest(toSend) !== input.digest) {
       throw new StaffInvitationError("SEND_COUNT_CHANGED", "Who would be sent a link changed since the preview. Nothing was sent. Preview again.");
     }
-    const settings = await tx.eventMessageSettings.findUnique({ where: { eventId } });
+    const settings = await loadEventEmailSettings(tx, eventId);
     const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
     const suppressed = deliveryMode === "DISABLED";
     const correlationId = randomUUID();
@@ -592,7 +593,7 @@ type Notice = {
 /** Queues plain-text notices in the event's outbox inside the caller's transaction. Returns the ids still waiting to be sent. */
 async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; notices: Notice[] }) {
   if (input.notices.length === 0) return [] as string[];
-  const settings = await tx.eventMessageSettings.findUnique({ where: { eventId: input.eventId } });
+  const settings = await loadEventEmailSettings(tx, input.eventId);
   const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
   const suppressed = deliveryMode === "DISABLED";
   const correlationId = randomUUID();
@@ -648,7 +649,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
 }
 
 async function officeEmails(tx: Tx, eventId: string) {
-  const row = await tx.eventMessageSettings.findUnique({ where: { eventId }, select: { internalNotificationEmails: true } });
+  const row = await loadEventEmailSettings(tx, eventId);
   return [...new Set(stringArray(row?.internalNotificationEmails).map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)))];
 }
 

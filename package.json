@@ -119,7 +119,7 @@
     "admin:reset-mfa": "tsx scripts/reset-mfa.ts",
     "key:restore-check": "tsx --require ./scripts/support/allow-server-only.cjs scripts/backup/verify-key-restore.ts",
     "registrations:cleanup": "tsx scripts/cleanup-imported-duplicates.ts",
-    "event:readiness": "tsx scripts/event-readiness.ts",
+    "event:readiness": "tsx --require ./scripts/support/allow-server-only.cjs scripts/event-readiness.ts",
     "payments:reconcile": "tsx scripts/payments-reconcile.ts",
     "payments:hosted-sweep": "tsx --require ./scripts/support/allow-server-only.cjs scripts/payments-hosted-sweep.ts",
     "payments:match-audit": "tsx scripts/square-match-audit.ts",

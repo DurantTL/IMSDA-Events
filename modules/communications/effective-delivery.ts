@@ -71,6 +71,10 @@ export type EventEmailSettings = Omit<EventMessageSettings, "deliveryMode" | "se
   senderEmail: string | null;
   /** The event's reply-to, else the central one. */
   replyToEmail: string | null;
+  /** The event's own reply-to override, blank when it uses the central one (what the settings form edits). */
+  replyToOverride: string | null;
+  /** The central sender, for read-only display. */
+  central: CentralSender;
 };
 
 type StoredSettings = Pick<EventMessageSettings, "deliveryPaused" | "senderName" | "replyToEmail">;
@@ -81,7 +85,7 @@ export function resolveEventEmailSettings<Row extends StoredSettings>(
   central: CentralSender,
   platformConfigured = isPlatformEmailConfigured(central.email),
 ): Omit<Row, "deliveryMode" | "senderName" | "senderEmail" | "replyToEmail">
-  & Pick<EventEmailSettings, "deliveryMode" | "deliveryReason" | "senderName" | "senderEmail" | "replyToEmail"> {
+  & Pick<EventEmailSettings, "deliveryMode" | "deliveryReason" | "senderName" | "senderEmail" | "replyToEmail" | "replyToOverride" | "central"> {
   const { mode, reason } = resolveEffectiveDelivery({ paused: row.deliveryPaused, platformConfigured });
   return {
     ...row,
@@ -90,6 +94,8 @@ export function resolveEventEmailSettings<Row extends StoredSettings>(
     senderName: row.senderName?.trim() || central.name,
     senderEmail: central.email,
     replyToEmail: row.replyToEmail?.trim() || central.replyTo,
+    replyToOverride: row.replyToEmail?.trim() || null,
+    central,
   };
 }
 

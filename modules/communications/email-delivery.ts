@@ -27,6 +27,7 @@ import {
   REGISTRATION_MANAGE_LINK_SENTINEL,
 } from "@/modules/communications/manage-link";
 import { renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import {
   AccountEmailNotConfiguredError,
   getAccountEmailSender,
@@ -95,7 +96,7 @@ export const PROVIDER_QUOTA_MESSAGE = "The email provider's sending limit was re
 type DeliveryPrisma = Pick<
   PrismaClient,
   "$transaction" | "eventMessageSettings" | "messageOutbox" | "auditLog" | "invoiceDeliveryRecipient"
-> & Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement">>;
+> & Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings">>;
 
 export type ExternalEmailDeliveryDependencies = {
   prisma?: DeliveryPrisma;
@@ -967,6 +968,12 @@ async function runDeliveryLoop(
         : null),
   };
   const fileCache = new BoundedFileCache();
+  // The From address of event email is always the platform's central sender (#1043), even for a message queued
+  // before the change under an event's own address. Account email (no event) keeps its own sender.
+  const centralFromEmail = scope.eventId !== null && prisma.platformSettings
+    ? (await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { defaultSenderEmail: true } }))
+      ?.defaultSenderEmail?.trim() || null
+    : null;
   const uniqueMessageIds = options.messageIds
     ? [...new Set(options.messageIds)]
     : undefined;
@@ -1080,7 +1087,7 @@ async function runDeliveryLoop(
       const unsubscribe = await announcementUnsubscribeLinks(message, announcementPolicy);
       const delivery = await sendEmail({
         fromName: message.senderNameSnapshot,
-        fromEmail: message.senderEmailSnapshot ?? "",
+        fromEmail: centralFromEmail ?? message.senderEmailSnapshot ?? "",
         toEmail: message.recipientEmail,
         replyToEmail: message.replyToEmailSnapshot,
         subject: message.subjectSnapshot,
@@ -1258,20 +1265,20 @@ export async function processExternalEmailQueue(
   } = {},
 ): Promise<ExternalEmailQueueResult> {
   const prisma = resolvePrisma(options.dependencies ?? {});
-  const settings = await prisma.eventMessageSettings.findUnique({
-    where: { eventId },
-    select: { deliveryMode: true, senderEmail: true },
-  });
+  // The one effective-delivery decision (#1043): paused, or no email configured here, means nothing is sent.
+  const settings = await loadEventEmailSettings(prisma as Parameters<typeof loadEventEmailSettings>[0], eventId);
   if (settings?.deliveryMode !== "EXTERNAL_EMAIL") {
     throw new ExternalEmailDeliveryError(
       "EXTERNAL_EMAIL_NOT_ENABLED",
-      "Real email delivery is not enabled for this event."
+      settings?.deliveryReason === "PAUSED"
+        ? "Email is paused for this event by a system administrator."
+        : "Real email delivery is not enabled for this event."
     );
   }
   if (!settings.senderEmail?.trim()) {
     throw new ExternalEmailDeliveryError(
       "EXTERNAL_EMAIL_NOT_CONFIGURED",
-      "Add a verified sender email before sending real email."
+      "Set the central sender email on System management > Email before sending real email."
     );
   }
   return runDeliveryLoop({ eventId }, options);

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -136,10 +137,7 @@ async function queueOfferEmail(tx: Tx, input: {
 }) {
   const { email, name } = contactOf(input.registration);
   if (!email) return null;
-  const settings = await tx.eventMessageSettings.findUnique({
-    where: { eventId: input.event.id },
-    select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true },
-  }) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const settings = await loadEventEmailSettings(tx, input.event.id) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
   const base = getServerEnv().APP_BASE_URL;
   const link = input.organizationId ? `${base}/account/clubs/${input.organizationId}/events/${input.event.id}` : base;
   const where = input.sessionName ? `${input.className} (${input.sessionName})` : input.className;

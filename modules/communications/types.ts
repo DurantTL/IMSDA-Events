@@ -119,9 +119,18 @@ export type MessageOutboxRecord = {
 };
 
 export type MessagingSettingsRecord = {
+  /** The effective mode (modules/communications/effective-delivery.ts), not a stored setting. */
   deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
+  /** Why: paused by a system administrator, no email configured in this environment, or on. */
+  deliveryReason: "PAUSED" | "NOT_CONFIGURED" | "ON";
+  /** The event's display name. */
   senderName: string;
+  /** The central From address (read-only here). */
   senderEmail: string;
+  /** The central sender name and reply-to, shown beside the event's overrides. */
+  centralSenderName: string;
+  centralReplyToEmail: string;
+  /** The event's own reply-to override; blank means the central reply-to is used. */
   replyToEmail: string;
   internalNotificationEmails: string[];
   providerConfigured: boolean;

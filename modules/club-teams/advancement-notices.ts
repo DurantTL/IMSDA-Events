@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -115,7 +116,7 @@ export async function sendAdvancementNotices(eventId: string, toLevel: TeamLevel
     const [event, settings, messageSettings] = await Promise.all([
       tx.event.findUnique({ where: { id: eventId }, select: { name: true } }),
       tx.eventTeamSettings.findUnique({ where: { eventId }, select: { levelInfo: true } }),
-      tx.eventMessageSettings.findUnique({ where: { eventId }, select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true } }),
+      loadEventEmailSettings(tx, eventId),
     ]);
     if (!event || !settings) throw new ClubTeamError("RESULT_INVALID", "This event doesn't use team rules, so it has no team levels.");
     const delivery = messageSettings ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };

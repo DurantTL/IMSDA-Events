@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -156,10 +157,7 @@ async function queuePermissionRequest(
   }
   if (recipients.length === 0) return [];
 
-  const messageSettings = await tx.eventMessageSettings.findUnique({
-    where: { eventId: input.eventId },
-    select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true },
-  }) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const messageSettings = await loadEventEmailSettings(tx, input.eventId) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
   const label = teamLabel(registration.clubRegistration?.organization.name ?? "A club", registration.clubRegistration?.teamName ?? null);
   const dateText = settings?.ageAsOf ? formatCalendarDate(settings.ageAsOf) : "the event date";
   const baseUrl = getServerEnv().APP_BASE_URL;

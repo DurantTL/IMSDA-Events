@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -263,7 +264,7 @@ export async function applyWaitlistAction(eventId: string, actorUserId: string, 
       if (input.confirm) await lockAll(tx, eventId);
       const state = await loadPlanningState(tx, eventId);
       // With delivery disabled for the event the email is suppressed and the offer clock would run for nothing.
-      const deliveryDisabled = (await tx.eventMessageSettings.findUnique({ where: { eventId }, select: { deliveryMode: true } }))?.deliveryMode === "DISABLED";
+      const deliveryDisabled = (await loadEventEmailSettings(tx, eventId))?.deliveryMode === "DISABLED";
       const disabledReason = "Email delivery is disabled for this event, so the guest would never receive the offer. Turn delivery on in the event's communication settings first.";
       const entries: EntryRow[] = [];
       // A confirmed offer takes each entry's row lock (in a fixed order) before it reads the entry, so a guest's answer that

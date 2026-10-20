@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -341,7 +342,7 @@ type Notice = {
  */
 async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; submissionId: string; notices: Notice[] }) {
   if (input.notices.length === 0) return [] as string[];
-  const settings = await tx.eventMessageSettings.findUnique({ where: { eventId: input.eventId } });
+  const settings = await loadEventEmailSettings(tx, input.eventId);
   const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
   const correlationId = randomUUID();
   const ids: string[] = [];
@@ -378,7 +379,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
 }
 
 async function staffEmails(tx: Tx, eventId: string) {
-  const row = await tx.eventMessageSettings.findUnique({ where: { eventId }, select: { internalNotificationEmails: true } });
+  const row = await loadEventEmailSettings(tx, eventId);
   const value = row?.internalNotificationEmails;
   if (!Array.isArray(value)) return [] as string[];
   return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)))];

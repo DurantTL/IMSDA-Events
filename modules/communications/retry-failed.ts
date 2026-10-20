@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettingsOrThrow } from "@/modules/communications/effective-delivery";
 import { Prisma } from "@prisma/client";
 import { getEmailAvailability } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
@@ -87,7 +88,7 @@ async function buildPlan(
   requested: RetryFailedPreviewScope,
   now = new Date(),
 ): Promise<Plan> {
-  const settings = await db.eventMessageSettings.findUniqueOrThrow({ where: { eventId } });
+  const settings = await loadEventEmailSettingsOrThrow(db, eventId);
   const deliveryMode = settings.deliveryMode as DeliveryMode;
 
   if (requested.type === "BATCH") {
@@ -380,7 +381,7 @@ export async function retryFailedMessages(
         where: { id: { in: plan.queueIds }, eventId, status: "FAILED" },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       });
-      const settings = await tx.eventMessageSettings.findUniqueOrThrow({ where: { eventId } });
+      const settings = await loadEventEmailSettingsOrThrow(tx, eventId);
       const queuedIds: string[] = [];
       for (const source of sources) {
         const repairMissingSenderSnapshot = (

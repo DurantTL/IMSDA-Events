@@ -28,7 +28,11 @@ export type OperationalReadinessFacts = {
   isPublished: boolean;
   hasPublishedFormVersion: boolean;
   messaging: {
+    /** The EFFECTIVE mode from `modules/communications/effective-delivery.ts` (#1043), never the retired stored column. */
     deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
+    /** Why capture-only: paused by a system administrator, or no email configured in this environment. */
+    deliveryReason?: "PAUSED" | "NOT_CONFIGURED" | "ON";
+    /** The central sender address. */
     senderEmail: string | null;
     replyToEmail: string | null;
   } | null;
@@ -94,7 +98,9 @@ function addressCheck(
       code: `${role}_ADDRESS`,
       label: `${label} address is not set`,
       severity: role === "SENDER" ? "BLOCKER" : "WARNING",
-      detail: `No ${label.toLowerCase()} address is configured for this event.`,
+      detail: role === "SENDER"
+        ? "No central sender address is set. Add it on System management > Email."
+        : "No reply-to address is set. Add one on System management > Email, or give this event its own in Communications.",
     };
   }
   if (isUndeliverableSenderAddress(address)) {
@@ -102,7 +108,7 @@ function addressCheck(
       code: `${role}_ADDRESS`,
       label: `${label} address is a placeholder`,
       severity: "BLOCKER",
-      detail: "The configured address uses a reserved domain that cannot send or receive real mail. Replace it with an IMSDA address on a domain you control.",
+      detail: "The configured address uses a reserved domain that cannot send or receive real mail. Replace it with an IMSDA address on a domain you control (the sender on System management > Email).",
     };
   }
   return {
@@ -129,7 +135,7 @@ export function checkOperationalReadiness(
   if (!facts.messaging) {
     checks.push({ code: "MESSAGE_SETTINGS", label: "No message settings for this event", severity: "BLOCKER", detail: "The event has no sender identity, so no registrant message can be built at all." });
   } else {
-    const { deliveryMode, senderEmail, replyToEmail } = facts.messaging;
+    const { deliveryMode, deliveryReason, senderEmail, replyToEmail } = facts.messaging;
     checks.push(deliveryMode === "EXTERNAL_EMAIL"
       ? facts.emailProvider.deliveryConfigured
         ? { code: "DELIVERY_MODE", label: "Email delivery is live", severity: "READY", detail: "Messages are handed to the external provider." }
@@ -139,14 +145,21 @@ export function checkOperationalReadiness(
             severity: "BLOCKER",
             detail: "The event is set to external delivery while RESEND_API_KEY is unset, so every queue run fails with EXTERNAL_EMAIL_NOT_CONFIGURED and no message reaches anyone.",
           }
-      : {
-          code: "DELIVERY_MODE",
-          label: `Email delivery is ${deliveryMode === "DISABLED" ? "disabled" : "capturing locally"}`,
-          severity: "BLOCKER",
-          detail: deliveryMode === "DISABLED"
-            ? "Messages are not queued for delivery at all."
-            : "Messages are written to the local capture table and never reach a registrant. Confirmations, balance reminders, and shirt-size requests all report success while going nowhere.",
-        });
+      : deliveryReason === "PAUSED"
+        ? {
+            code: "DELIVERY_MODE",
+            label: "Email is paused for this event",
+            severity: "BLOCKER",
+            detail: "A system administrator paused email for this event, so messages are captured and never reach a registrant. Resume it on System management > Email.",
+          }
+        : {
+            code: "DELIVERY_MODE",
+            label: `Email delivery is ${deliveryMode === "DISABLED" ? "disabled" : "capturing locally"}`,
+            severity: "BLOCKER",
+            detail: deliveryMode === "DISABLED"
+              ? "Messages are not queued for delivery at all."
+              : "Real email is not configured in this environment (the email provider, the account email sender, or the central sender address is missing), so messages are written to the local capture table and never reach a registrant. Confirmations, balance reminders, and shirt-size requests all report success while going nowhere.",
+          });
     checks.push(addressCheck("SENDER", "Sender", senderEmail));
     checks.push(addressCheck("REPLY_TO", "Reply-to", replyToEmail));
 

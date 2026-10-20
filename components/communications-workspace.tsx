@@ -113,9 +113,7 @@ type ApiResult = {
 };
 
 type MessagingSettingsDraft = {
-  deliveryMode: MessagingWorkspaceData["settings"]["deliveryMode"];
   senderName: string;
-  senderEmail: string;
   replyToEmail: string;
   internalNotificationEmails: string;
 };
@@ -124,9 +122,7 @@ function settingsDraftFromMessaging(
   messaging: MessagingWorkspaceData | null,
 ): MessagingSettingsDraft {
   return {
-    deliveryMode: messaging?.settings.deliveryMode ?? "LOCAL_CAPTURE",
     senderName: messaging?.settings.senderName ?? "IMSDA Events",
-    senderEmail: messaging?.settings.senderEmail ?? "",
     replyToEmail: messaging?.settings.replyToEmail ?? "",
     internalNotificationEmails:
       messaging?.settings.internalNotificationEmails.join("\n") ?? "",
@@ -896,9 +892,7 @@ export function CommunicationsWorkspace({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          deliveryMode: settingsDraft.deliveryMode,
           senderName: settingsDraft.senderName,
-          senderEmail: settingsDraft.senderEmail,
           replyToEmail: settingsDraft.replyToEmail,
           internalNotificationEmails: recipients,
         }),
@@ -2221,25 +2215,20 @@ export function CommunicationsWorkspace({
         <div className="message-settings-layout">
           <form className="panel message-settings-form" onSubmit={saveSettings}>
             <div className="section-heading"><div><p className="eyebrow">Event-level configuration</p><h2>Sender & notifications</h2><p>These values are snapshotted onto future outbox rows.</p></div></div>
-            <fieldset className="message-delivery-mode">
-              <legend>Delivery mode</legend>
-              <label>
-                <input type="radio" name="deliveryMode" value="DISABLED" checked={settingsDraft.deliveryMode === "DISABLED"} onChange={() => setSettingsDraft((current) => ({ ...current, deliveryMode: "DISABLED" }))} />
-                <span><strong>Off</strong><small>Suppress future messages while keeping an audit row.</small></span>
-              </label>
-              <label>
-                <input type="radio" name="deliveryMode" value="LOCAL_CAPTURE" checked={settingsDraft.deliveryMode === "LOCAL_CAPTURE"} onChange={() => setSettingsDraft((current) => ({ ...current, deliveryMode: "LOCAL_CAPTURE" }))} />
-                <span><strong>Local preview</strong><small>Render and record messages without contacting an email provider.</small></span>
-              </label>
-              <label className={!messaging.settings.providerConfigured ? "disabled" : ""}>
-                <input type="radio" name="deliveryMode" value="EXTERNAL_EMAIL" checked={settingsDraft.deliveryMode === "EXTERNAL_EMAIL"} disabled={!messaging.settings.providerConfigured} onChange={() => setSettingsDraft((current) => ({ ...current, deliveryMode: "EXTERNAL_EMAIL" }))} />
-                <span><strong>Send real email</strong><small>{messaging.settings.providerConfigured ? "Send immutable message snapshots through the email provider." : "Finish the email provider setup on the server first."}</small></span>
-              </label>
-            </fieldset>
+            <p className="message-delivery-state" data-state={messaging.settings.deliveryReason === "PAUSED" ? "paused" : messaging.settings.deliveryMode === "EXTERNAL_EMAIL" ? "on" : "capture"} role="status">
+              {messaging.settings.deliveryReason === "PAUSED"
+                ? "Paused by a system administrator"
+                : messaging.settings.deliveryMode === "EXTERNAL_EMAIL"
+                  ? "Email: on (set on System management → Email)"
+                  : "Email: not sent from this environment (set on System management → Email)"}
+            </p>
+            <p className="field-help">
+              Email goes out from {messaging.settings.senderEmail ? <strong>{messaging.settings.senderEmail}</strong> : "the central sender address (not set yet)"}, the same for every event.
+              You can change only the display name and the reply-to for this event.
+            </p>
             <div className="form-grid two-column">
-              <label>Sender name<input name="senderName" value={settingsDraft.senderName} minLength={2} maxLength={120} required onChange={(event) => setSettingsDraft((current) => ({ ...current, senderName: event.target.value }))} /></label>
-              <label>Sender email<input name="senderEmail" type="email" value={settingsDraft.senderEmail} required={settingsDraft.deliveryMode === "EXTERNAL_EMAIL"} placeholder="registration@imsda.org" onChange={(event) => setSettingsDraft((current) => ({ ...current, senderEmail: event.target.value }))} /></label>
-              <label>Reply-to email<input name="replyToEmail" type="email" value={settingsDraft.replyToEmail} placeholder="registration@example.test" onChange={(event) => setSettingsDraft((current) => ({ ...current, replyToEmail: event.target.value }))} /></label>
+              <label>Display name<input name="senderName" value={settingsDraft.senderName} minLength={2} maxLength={120} required onChange={(event) => setSettingsDraft((current) => ({ ...current, senderName: event.target.value }))} /><small>Shown as the sender, for example &quot;IMSDA Women&apos;s Retreat&quot;. The platform name is {messaging.settings.centralSenderName}.</small></label>
+              <label>Reply-to email<input name="replyToEmail" type="email" value={settingsDraft.replyToEmail} placeholder={messaging.settings.centralReplyToEmail || "registration@example.test"} onChange={(event) => setSettingsDraft((current) => ({ ...current, replyToEmail: event.target.value }))} /><small>Leave blank to use the platform reply-to{messaging.settings.centralReplyToEmail ? ` (${messaging.settings.centralReplyToEmail})` : ""}.</small></label>
             </div>
             <label>Internal registration recipients<textarea name="internalNotificationEmails" value={settingsDraft.internalNotificationEmails} rows={5} placeholder={"registration@example.test\nfinance@example.test"} onChange={(event) => setSettingsDraft((current) => ({ ...current, internalNotificationEmails: event.target.value }))} /><small>One email per line. Every new public registration creates one internal-notice row per recipient.</small></label>
             <div className="builder-actions">{settingsDirty && <span className="unsaved-dot" role="status">Unsaved changes</span>}<button className="primary-button" type="submit" disabled={saving || !settingsDirty}><Save size={16} aria-hidden="true" /> {saving ? "Saving…" : "Save settings"}</button></div>
@@ -2248,7 +2237,7 @@ export function CommunicationsWorkspace({
             <span>{messaging.settings.providerConfigured ? <Send size={22} aria-hidden="true" /> : <FlaskConical size={22} aria-hidden="true" />}</span>
             <p className="eyebrow">Delivery readiness</p>
             <h2>{messaging.settings.providerConfigured ? "Email provider is configured" : "Real email is locked"}</h2>
-            <p>{messaging.settings.providerConfigured ? "Real delivery can be enabled after a verified sender is entered. Local template tests remain previews." : "Local preview exercises rendering, outbox idempotency, attempts, and staff review without transmitting attendee data."}</p>
+            <p>{messaging.settings.providerConfigured ? "Real delivery is on for every event unless a system administrator pauses it. Local template tests remain previews." : "Local preview exercises rendering, outbox idempotency, attempts, and staff review without transmitting attendee data."}</p>
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
           </aside>
         </div>

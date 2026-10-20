@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -294,15 +295,7 @@ async function enqueueTransactionalMessage(
   input: TransactionalMessageInput,
 ): Promise<QueuedTransactionalMessage> {
   const [settingsRow, template, registration] = await Promise.all([
-    tx.eventMessageSettings.findUnique({
-      where: { eventId: input.eventId },
-      select: {
-        deliveryMode: true,
-        senderName: true,
-        senderEmail: true,
-        replyToEmail: true,
-      },
-    }),
+    loadEventEmailSettings(tx, input.eventId),
     tx.eventMessageTemplate.findUnique({
       where: {
         eventId_key: {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -88,7 +89,7 @@ export async function enqueueLodgingMessage(tx: Tx, input: {
   metadata: Record<string, string | number | boolean | null>;
 }): Promise<EnqueuedLodgingMessage> {
   const [settingsRow, recipient] = await Promise.all([
-    tx.eventMessageSettings.findUnique({ where: { eventId: input.eventId }, select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true } }),
+    loadEventEmailSettings(tx, input.eventId),
     lodgingRecipient(tx, input.eventId, input.registrationId),
   ]);
   if (!recipient) return { messageId: null, pending: false, skipped: "NO_REGISTRATION", recipientMasked: null };
