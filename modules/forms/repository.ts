@@ -504,7 +504,7 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     // a draft still deletes its tests.
     // A draft saved before the meal plan's price changed would sell tickets at a price the plan no longer has (#210).
     if (mealPriceDrift(definition, await loadTicketPrices(tx, eventId)).length > 0) {
-      throw new FormOperationError("MEAL_PRICE_DRIFT", "The meal ticket prices on this form no longer match the event's meal plan. Open the form and save it again to bring them up to date, run a test submission, then publish.");
+      throw new FormOperationError("MEAL_PRICE_DRIFT", "The meal ticket prices on this form no longer match the event's meal plan. Open the form and save it again to bring them up to date, then publish.");
     }
     const everPublished = form.versions.some((version) => version.status === RegistrationFormStatus.PUBLISHED || version.status === RegistrationFormStatus.ARCHIVED);
     if (!everPublished) {
