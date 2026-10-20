@@ -1,4 +1,5 @@
 import "server-only";
+import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 
 import { createHash, randomUUID } from "node:crypto";
 import { ImportRecordStatus, ImportRunStatus, Prisma, type PrismaClient } from "@prisma/client";
@@ -677,7 +678,7 @@ async function syncImportedDetails(
   }
 }
 
-export async function commitImportRun(eventId: string, importRunId: string, actorUserId: string) {
+async function commitImportRunInner(eventId: string, importRunId: string, actorUserId: string) {
   const existing = await loadRun(eventId, importRunId);
   if (!existing) throw new ImportOperationError("IMPORT_NOT_FOUND", "That import preview no longer exists.");
   if (existing.status === ImportRunStatus.COMPLETED) return serializeRun(existing);
@@ -755,6 +756,10 @@ export async function commitImportRun(eventId: string, importRunId: string, acto
         // The preview refuses this too; checked again because the registration may have changed since (#880).
         if (importWouldReinstate(registration.status, data.status)) throw new ImportOperationError("IMPORT_CONFLICT", importReinstateRefusal(data.confirmationCode, registration.status));
         await tx.person.update({ where: { id: registration.accountHolderPersonId }, data: { firstName: data.firstName, lastName: data.lastName, normalizedEmail: data.email || null, phone: data.phone || null } });
+        // An update that cancels (or waitlists) an active registration takes its picks off every instructor's class list (#1098).
+        if (["SUBMITTED", "CONFIRMED"].includes(registration.status) && !["SUBMITTED", "CONFIRMED"].includes(data.status as string)) {
+          await recordRegistrationClassChanges(tx, registration.id, "LEFT");
+        }
         await tx.registration.update({ where: { id: registration.id }, data: { status: data.status, totalAmount: data.totalAmountCents / 100, submittedAt: data.submittedAt ? new Date(data.submittedAt) : null } });
         if (!data.attendees && registration.attendees[0]) {
           await tx.registrationAttendee.update({ where: { id: registration.attendees[0].id }, data: { attendeeType: data.attendeeType, profileSnapshot: { firstName: data.firstName, lastName: data.lastName, email: data.email || null, phone: data.phone || null, sourceId: data.sourceId } } });
@@ -830,3 +835,5 @@ export async function listImportExceptions(eventId: string, importRunId: string)
 }
 
 export { CsvImportError };
+
+export const commitImportRun: typeof commitImportRunInner = (...args) => withClassChangeKick(() => commitImportRunInner(...args));

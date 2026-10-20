@@ -218,7 +218,7 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     when: "When a youth joins or leaves a class an Honors Weekend instructor teaches: a daily summary (the default) or one email right away, as each instructor chooses. The email names the youth, club and age, never a birth date or an answer.",
     recipients: "The class's instructors who accepted their invite and haven't turned the emails off.",
     source: { kind: "roles" },
-    sourceNote: "Each instructor chooses daily, right away or off on their own classes page. Turning this off pauses every instructor's emails: changes are kept and go out, summarized, when it is turned back on (a right-away email older than a day is skipped).",
+    sourceNote: "Each instructor chooses daily, right away or off on their own classes page. Turning this off pauses every instructor's emails: changes are kept and go out, summarized, when it is turned back on (a right-away email older than a day is skipped). The log of who joined or left is deleted once an event's roster has closed, and after 8 days at the latest, so changes made while this was off for longer than that are not reported.",
     sentFrom: "modules/honors/class-change-emails.ts",
     switchReadIn: ["modules/honors/class-change-emails.ts"],
     built: true,

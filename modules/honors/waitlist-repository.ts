@@ -706,12 +706,12 @@ export async function acceptClassWaitlistOffer(organizationId: string, eventId: 
   let refusal: ClassSelectionError | null = null;
   let offeringOfEntry = "";
   let messageIds: string[] = [];
-  let classChangesLogged = 0;
+  let classChangesLogged: string[] = [];
   await runSerializable(async (tx) => {
     expired = false;
     refusal = null;
     messageIds = [];
-    classChangesLogged = 0;
+    classChangesLogged = [];
     const found = await tx.honorClassWaitlistEntry.findFirst({ where: { id: entryId, eventId, organizationId }, select: { id: true, offeringId: true } });
     if (!found) throw new ClassSelectionError("OFFER_NOT_FOUND", "That waitlist place wasn't found.");
     offeringOfEntry = found.offeringId;
@@ -797,14 +797,14 @@ export async function acceptClassWaitlistOffer(organizationId: string, eventId: 
       select: { id: true },
     });
     // The instructor's change log (#1098): a row only, in this transaction; their right-away email is kicked off after it commits.
-    classChangesLogged += await recordClassChanges(tx, [accepted.id], "JOINED", now);
+    classChangesLogged.push(...(await recordClassChanges(tx, [accepted.id], "JOINED", now)));
     await writeAuditLog({
       eventId, ...actorFields(actor), action: "HONOR_CLASS_WAITLIST_ACCEPTED", entityType: "HonorClassWaitlistEntry", entityId: entry.id,
       summary: "A club director accepted a seat offered from a class waitlist.",
       metadata: { organizationId, offeringId: offering.id, registrationAttendeeId: attendee.id, offerCount: entry.offerCount, ...actorMetadata(actor) },
     }, tx);
   });
-  if (classChangesLogged > 0) await (await import("@/modules/honors/class-change-emails")).kickClassChangeEmails(classChangesLogged);
+  if (classChangesLogged.length > 0) await (await import("@/modules/honors/class-change-emails")).kickClassChangeEmails(classChangesLogged);
   if (expired) {
     await deliverWaitlistOfferMessages(messageIds);
     throw new ClassSelectionError("OFFER_EXPIRED", "The time to accept this seat ran out, so it has gone to the next youth in line.");

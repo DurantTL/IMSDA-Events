@@ -32,7 +32,7 @@ import {
 } from "@/modules/events/lifecycle";
 import { getRegistrationById, type RegistrationRecord } from "@/modules/registrations/repository";
 import type { RestoredClassSeats } from "@/modules/honors/restore-seats";
-import { recordRegistrationClassChanges } from "@/modules/honors/class-change-log";
+import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
 
 export type RegistrationLifecycleErrorCode =
   | "REGISTRATION_NOT_FOUND"
@@ -795,7 +795,7 @@ export type CancelRegistrationResult = {
   pendingMessageIds: string[];
 };
 
-export async function cancelRegistration(
+async function cancelRegistrationInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -939,7 +939,7 @@ export async function cancelRegistration(
   };
 }
 
-export async function moveRegistrationToWaitlist(
+async function moveRegistrationToWaitlistInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -1011,7 +1011,7 @@ export async function moveRegistrationToWaitlist(
   };
 }
 
-export async function promoteRegistrationFromWaitlist(
+async function promoteRegistrationFromWaitlistInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -1060,7 +1060,7 @@ export async function promoteRegistrationFromWaitlist(
   };
 }
 
-export async function reactivateRegistration(
+async function reactivateRegistrationInner(
   eventId: string,
   registrationId: string,
   actorUserId: string,
@@ -1179,3 +1179,11 @@ export async function reactivateRegistration(
     pendingMessageIds: result.pendingMessageIds,
   };
 }
+
+export const cancelRegistration: typeof cancelRegistrationInner = (...args) => withClassChangeKick(() => cancelRegistrationInner(...args));
+
+export const moveRegistrationToWaitlist: typeof moveRegistrationToWaitlistInner = (...args) => withClassChangeKick(() => moveRegistrationToWaitlistInner(...args));
+
+export const promoteRegistrationFromWaitlist: typeof promoteRegistrationFromWaitlistInner = (...args) => withClassChangeKick(() => promoteRegistrationFromWaitlistInner(...args));
+
+export const reactivateRegistration: typeof reactivateRegistrationInner = (...args) => withClassChangeKick(() => reactivateRegistrationInner(...args));

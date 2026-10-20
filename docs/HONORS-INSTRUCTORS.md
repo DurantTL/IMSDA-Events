@@ -116,7 +116,9 @@ page (`/account/instructor`, one choice per event they teach at):
 - **Right away**: one email per change.
 - **No emails**.
 
-Staff see the choice on the instructors list but cannot change it; no staff route sets it. Choosing the daily summary again
+Staff see the choice on the instructors list but cannot change it; no staff route sets it. An instructor who leaves the daily
+summary (for right-away or no emails) is sent one last summary of what changed since their previous one, after the choice has
+committed; if nothing changed, only the summary point moves. Choosing the daily summary again
 starts it from that moment, so changes already emailed (or not wanted) do not come back in a summary.
 
 Only instructors who accepted their invite and were not removed get anything, and only while their roster is open (14 days
@@ -137,6 +139,8 @@ either writes a row to `HonorClassChange` (class, enrollment, youth, kind, time)
 | A registration is cancelled, or moved to the waitlist (`lifecycle-repository.ts`) | a leave for each pick (no enrollment row is deleted, but the pick leaves the instructor's list) |
 | A cancelled or waitlisted registration comes back (`restoreClassSeatsInTransaction`) | a join for each pick that still fits |
 | An attendee is removed in a registration amendment (`amendments-repository.ts`) | a leave for each of their picks (the picks go with the attendee) |
+| A registration import update cancels or waitlists an active registration (`imports/repository.ts`) | a leave for each pick |
+| A member transfer moves a pick between registrations whose status differs in being active (`club-transfers/repository.ts`) | a leave (the old one is active, the new one isn't) or a join (the reverse); nothing when both are active, since the class and the list are unchanged |
 
 Deliberately not logged, each with a test that names it: deleting a whole event, deleting a class (the class and its
 instructor assignments go too), and a pick dropped while a registration is brought back (it was never on a class list, since
@@ -147,7 +151,16 @@ Rows are written only for classes that have an instructor who has not been remov
 and age on the event date, because the enrollment or even the attendee can be gone by the time it is read. The birth date is
 never read, copied or emailed.
 
-Logging only writes a row. It never sends, so it is safe inside the serializable pick transaction (docs/MEALS.md).
+Logging only writes a row, so it is safe inside the serializable pick transaction (docs/MEALS.md). It reads the picks it logs and writes the rows in one statement; it does not read instructor assignments, so the pick transaction does not depend on them. Every change is logged, whether or not the class has an instructor yet.
+
+### Retention
+
+The rows hold a youth's name, club and age, so the sweep deletes them (`pruneClassChanges`, on every run, whatever the staff switch says):
+
+- every row of an event whose roster has closed (the event's end plus the 14-day roster window, the same rule that stops the emails), and
+- any row older than 8 days, which is past every daily window. If the staff switch was off for longer than that, those changes are not reported.
+
+The daily query also leaves closed rosters out, so they stop being read.
 
 ### Sending
 
@@ -161,10 +174,12 @@ rather than sent late.
   their classes, listing who joined and who left (name, club, age), the count against the class limit and a link to each
   class list. A youth who joined and left (or left and rejoined) the same class in the window is dropped: the first and last
   change decide. Nothing is sent, and nothing queued, on a day with no net change.
-- **Right away.** After the enrollment transaction commits, the save calls `kickClassChangeEmails`, which queues one email
-  per change for each right-away instructor of the class through the outbox and delivers after commit
-  (`processQueuedMessageIdsAfterCommit`). The sweep repeats this for anything a failed kick, or a lifecycle change (a
-  cancellation or reinstatement), left behind.
+- **Right away.** After the transaction commits, the caller kicks `kickClassChangeEmails` with the ids of the rows it wrote
+  and no others (`recordClassChanges` returns them). Nested paths (cancel, reinstate, waitlist move, amendment, import,
+  transfer) are wrapped in `withClassChangeKick`, which collects the ids and kicks once after the whole call. The kick queues
+  one email per change for each right-away instructor of the class through the outbox and delivers after commit
+  (`processQueuedMessageIdsAfterCommit`). When nobody teaching those classes is on right-away it only stamps the rows. The
+  backlog is left to the sweep, which repeats this for anything a failed kick left behind.
 
 ### Why a second sweep cannot send twice
 

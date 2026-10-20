@@ -20,7 +20,7 @@ vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: mock
 vi.mock("@/modules/communications/effective-delivery", () => ({ loadEventEmailSettings: mocks.loadEventEmailSettings }));
 vi.mock("@/modules/communications/messaging-repository", () => ({ processQueuedMessageIdsAfterCommit: mocks.processQueuedMessageIdsAfterCommit }));
 
-import { dispatchImmediateClassChangeEmails, kickClassChangeEmails, sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
+import { dispatchImmediateClassChangeEmails, kickClassChangeEmails, pruneClassChanges, sendDueClassChangeEmails, sendFinalClassChangeSummary } from "@/modules/honors/class-change-emails";
 
 // ---------------------------------------------------------------------------
 // A small in-memory stand-in for the handful of Prisma calls the sender makes.
@@ -76,6 +76,11 @@ function world() {
   ];
   const db: Row = {
     honorInstructor: {
+      count: vi.fn(async ({ where }: { where: Row }) => instructors.filter((row) => matches(row, where)).length),
+      findFirst: vi.fn(async ({ where }: { where: Row }) => {
+        const found = instructors.find((row) => matches(row, where));
+        return found ? { ...found } : null;
+      }),
       findMany: vi.fn(async ({ where, take }: { where: Row; take?: number }) => instructors.filter((row) => matches(row, where)).sort(byId).slice(0, take ?? 1000).map((row) => ({ ...row }))),
       updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
         const hit = instructors.filter((row) => matches(row, where));
@@ -84,6 +89,11 @@ function world() {
       }),
     },
     honorClassChange: {
+      deleteMany: vi.fn(async ({ where }: { where: Row }) => {
+        const doomed = changes.filter((row) => matches(row, where));
+        for (const row of doomed) changes.splice(changes.indexOf(row), 1);
+        return { count: doomed.length };
+      }),
       findMany: vi.fn(async ({ where, take }: { where: Row; take?: number }) => changes.filter((row) => matches(row, where)).sort(byAtThenId).slice(0, take ?? 1000).map((row) => ({ ...row }))),
       updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
         const hit = changes.filter((row) => matches(row, where));
@@ -147,6 +157,7 @@ function world() {
         ageOnEventDate: 12,
         at: new Date(at),
         immediateHandledAt: null,
+        event: { endsAt: new Date("2026-12-06T20:00:00Z") },
         ...overrides,
       };
       changes.push(row);
@@ -373,7 +384,7 @@ describe("right-away emails (#1098)", () => {
     await dispatchImmediateClassChangeEmails(morning);
     await dispatchImmediateClassChangeEmails(morning);
     await sendDueClassChangeEmails(morning);
-    await Promise.all([kickClassChangeEmails(1, morning), kickClassChangeEmails(1, morning)]);
+    await Promise.all([kickClassChangeEmails([String(w.changes[0]!.id)], morning), kickClassChangeEmails([String(w.changes[0]!.id)], morning)]);
     expect(w.outbox.size).toBe(1);
   });
 
@@ -416,14 +427,14 @@ describe("right-away emails (#1098)", () => {
   });
 
   it("a kick that logged nothing does no work at all", async () => {
-    await kickClassChangeEmails(0, morning);
+    await kickClassChangeEmails([], morning);
     expect(mocks.isNotificationEnabled).not.toHaveBeenCalled();
     expect(w.db.$transaction).not.toHaveBeenCalled();
   });
 
   it("a kick never throws: the enrollment is already saved", async () => {
     mocks.isNotificationEnabled.mockRejectedValue(new Error("settings unavailable"));
-    await expect(kickClassChangeEmails(2, morning)).resolves.toBeUndefined();
+    await expect(kickClassChangeEmails(["c-1", "c-2"], morning)).resolves.toBeUndefined();
     expect(mocks.logError).toHaveBeenCalled();
   });
 });
@@ -469,5 +480,93 @@ describe("the staff switch (#1016)", () => {
     expect(bodies()).toHaveLength(1);
     expect(bodies()[0]).toContain("Joined: Pat Example");
     expect(bodies()[0]).not.toContain("Sam Sample");
+  });
+});
+
+describe("a kick works on its own changes only (#1098)", () => {
+  it("leaves the backlog to the sweep", async () => {
+    w.addInstructor({ classChangeEmails: "IMMEDIATE" });
+    const backlog = w.addChange("JOINED", "2026-10-21T09:00:00Z");
+    const mine = w.addChange("JOINED", "2026-10-21T10:00:00Z", { registrationAttendeeId: "attendee-b", youthName: "Sam Sample" });
+    await kickClassChangeEmails([String(mine.id)], morning);
+    expect(w.outbox.size).toBe(1);
+    expect(backlog.immediateHandledAt).toBeNull();
+    expect(mine.immediateHandledAt).not.toBeNull();
+    await sendDueClassChangeEmails(morning);
+    expect(w.outbox.size).toBe(2);
+  });
+
+  it("opens no per-row transaction when nobody teaching those classes is on right-away: the rows are just stamped", async () => {
+    w.addInstructor({ classChangeEmails: "DAILY" });
+    const change = w.addChange("JOINED", "2026-10-21T10:00:00Z");
+    await kickClassChangeEmails([String(change.id)], morning);
+    expect(w.db.$transaction).not.toHaveBeenCalled();
+    expect(change.immediateHandledAt).not.toBeNull();
+    expect(w.outbox.size).toBe(0);
+  });
+});
+
+describe("retention of the change log (#1098)", () => {
+  it("deletes every row of an event whose roster has closed, and nothing of an open one", async () => {
+    // The roster closes 14 days after the event ends: this event ended 20 days before the sweep.
+    w.addChange("JOINED", "2026-10-20T10:00:00Z", { event: { endsAt: new Date("2026-10-01T20:00:00Z") } });
+    const open = w.addChange("JOINED", "2026-10-20T11:00:00Z");
+    expect(await pruneClassChanges(morning)).toBe(1);
+    expect(w.changes).toEqual([open]);
+  });
+
+  it("deletes rows older than eight days, whatever the event, and keeps the newer ones", async () => {
+    w.addChange("JOINED", "2026-10-12T10:00:00Z");
+    const recent = w.addChange("JOINED", "2026-10-14T10:00:00Z");
+    expect(await pruneClassChanges(morning)).toBe(1);
+    expect(w.changes).toEqual([recent]);
+  });
+
+  it("runs on every sweep, even with the staff switch off, and reports how many it deleted", async () => {
+    w.addChange("JOINED", "2026-10-01T10:00:00Z");
+    mocks.isNotificationEnabled.mockResolvedValue(false);
+    const result = await sendDueClassChangeEmails(morning);
+    expect(result).toMatchObject({ status: "SWITCHED_OFF", pruned: 1 });
+    expect(w.changes).toHaveLength(0);
+  });
+});
+
+describe("a closed roster is not read again (#1098)", () => {
+  it("bounds the daily query by the event's end plus the roster window", async () => {
+    w.addInstructor({ event: { name: "Old Weekend", endsAt: new Date("2026-10-01T20:00:00Z"), archivedAt: null } });
+    w.addChange("JOINED", "2026-10-20T15:00:00Z");
+    await sendDueClassChangeEmails(morning);
+    expect(w.outbox.size).toBe(0);
+    const query = (w.db.honorInstructor as { findMany: ReturnType<typeof vi.fn> }).findMany.mock.calls.find(([call]) => call.take === 100)![0];
+    expect(query.where.event.endsAt.gte.toISOString()).toBe("2026-10-07T11:05:00.000Z");
+  });
+});
+
+describe("leaving the daily summary (#1098)", () => {
+  it("sends one last summary of what changed since the previous one, and moves the point", async () => {
+    const instructor = w.addInstructor({ classChangeEmails: "IMMEDIATE", classChangeSummaryAt: new Date("2026-10-20T11:00:00Z") });
+    w.addChange("JOINED", "2026-10-20T15:00:00Z");
+    w.addChange("LEFT", "2026-10-20T10:00:00Z", { registrationAttendeeId: "attendee-b", youthName: "Before Summary" });
+    expect(await sendFinalClassChangeSummary(String(instructor.id), morning)).toEqual({ queued: true });
+    expect(w.outbox.size).toBe(1);
+    const text = bodies()[0]!;
+    expect(text).toContain("Joined: Pat Example");
+    expect(text).not.toContain("Before Summary");
+    expect((instructor.classChangeSummaryAt as Date).toISOString()).toBe(morning.toISOString());
+    // A second call has nothing left to summarize.
+    expect(await sendFinalClassChangeSummary(String(instructor.id), morning)).toEqual({ queued: false });
+    expect(w.outbox.size).toBe(1);
+  });
+
+  it("only moves the point when nothing changed, and sends nothing while the staff switch is off", async () => {
+    const instructor = w.addInstructor({ classChangeEmails: "OFF" });
+    expect(await sendFinalClassChangeSummary(String(instructor.id), morning)).toEqual({ queued: false });
+    expect(instructor.classChangeSummaryAt).not.toBeNull();
+    expect(w.outbox.size).toBe(0);
+    const other = w.addInstructor({ classChangeEmails: "OFF" });
+    w.addChange("JOINED", "2026-10-20T15:00:00Z");
+    mocks.isNotificationEnabled.mockResolvedValue(false);
+    expect(await sendFinalClassChangeSummary(String(other.id), morning)).toEqual({ queued: false });
+    expect(w.outbox.size).toBe(0);
   });
 });

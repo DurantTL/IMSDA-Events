@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), writeAuditLog: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), writeAuditLog: vi.fn(), sendFinalClassChangeSummary: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
+vi.mock("@/modules/honors/class-change-emails", () => ({ sendFinalClassChangeSummary: mocks.sendFinalClassChangeSummary }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/background-checks/repository", () => ({ currentCheckStateForPerson: vi.fn(), namesAgree: vi.fn() }));
 vi.mock("@/modules/background-checks/refresh-after-write", () => ({ refreshBackgroundCheckMatchesSafely: vi.fn() }));
@@ -63,6 +64,30 @@ describe("setting how an instructor hears about class list changes (#1098)", () 
     const db = database({ id: "ins-1", eventId: "event-1", classChangeEmails: "IMMEDIATE" });
     await setInstructorClassChangeEmails("acct-1", "ins-1", "DAILY", now);
     expect(db.honorInstructor.update).toHaveBeenCalledWith({ where: { id: "ins-1" }, data: { classChangeEmails: "DAILY", classChangeSummaryAt: now } });
+  });
+
+  it("sends one last summary, after the choice has committed, when the instructor leaves the daily summary", async () => {
+    const db = database({ id: "ins-1", eventId: "event-1", classChangeEmails: "DAILY" });
+    let committed = false;
+    db.$transaction.mockImplementation(async (work: (client: unknown) => unknown) => {
+      const result = await work(db);
+      committed = true;
+      return result;
+    });
+    mocks.sendFinalClassChangeSummary.mockImplementation(async () => {
+      expect(committed).toBe(true);
+    });
+    await setInstructorClassChangeEmails("acct-1", "ins-1", "IMMEDIATE", now);
+    expect(mocks.sendFinalClassChangeSummary).toHaveBeenCalledWith("ins-1", now);
+  });
+
+  it("sends no final summary for a change that doesn't leave the daily summary, or one that changes nothing", async () => {
+    database({ id: "ins-1", eventId: "event-1", classChangeEmails: "OFF" });
+    await setInstructorClassChangeEmails("acct-1", "ins-1", "DAILY", now);
+    await setInstructorClassChangeEmails("acct-1", "ins-1", "OFF", now);
+    database({ id: "ins-1", eventId: "event-1", classChangeEmails: "DAILY" });
+    await setInstructorClassChangeEmails("acct-1", "ins-1", "DAILY", now);
+    expect(mocks.sendFinalClassChangeSummary).not.toHaveBeenCalled();
   });
 
   it("does nothing when the choice is already that one", async () => {

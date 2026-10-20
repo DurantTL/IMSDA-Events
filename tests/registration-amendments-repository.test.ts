@@ -851,8 +851,7 @@ describe("registration amendments repository", () => {
               registrationAttendee: { profileSnapshot: { firstName: "Riley", lastName: "Sample", ageOnEventDate: 11 } },
             }])),
         },
-        honorInstructorClass: { findMany: vi.fn(async () => [{ offeringId: "class-knots" }]) },
-        honorClassChange: { createMany: vi.fn(async () => ({ count: 1 })) },
+        honorClassChange: { createManyAndReturn: vi.fn(async () => [{ id: "change-1" }]) },
       });
       const input = removalInput(registration);
       const preview = await previewRegistrationAmendment("event-1", "registration-1", input);
@@ -860,7 +859,7 @@ describe("registration amendments repository", () => {
       await amendRegistration("event-1", "registration-1", { ...input, previewOnly: false as const, quoteFingerprint: preview.quoteFingerprint }, actor, new Date("2026-08-04T13:00:00.000Z"));
       expect((tx.registrationAdjustment as unknown as { create: ReturnType<typeof vi.fn> }).create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "MEAL", amountCents: -800 }) });
       expect(registration.totalAmount).toBe(122);
-      const changeLog = (tx as unknown as { honorClassChange: { createMany: ReturnType<typeof vi.fn> } }).honorClassChange.createMany;
+      const changeLog = (tx as unknown as { honorClassChange: { createManyAndReturn: ReturnType<typeof vi.fn> } }).honorClassChange.createManyAndReturn;
       expect(changeLog).toHaveBeenCalledTimes(1);
       expect(changeLog.mock.calls[0]![0].data).toEqual([expect.objectContaining({
         enrollmentId: "pick-1", registrationAttendeeId: "attendee-2", kind: "LEFT", youthName: "Riley Sample", clubName: "Synthetic Pathfinders", ageOnEventDate: 11,

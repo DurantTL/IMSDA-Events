@@ -405,13 +405,13 @@ export async function listInstructorEmailPreferences(accountId: string, now = ne
  * it from now, so changes already emailed right away (or that they chose not to hear about) don't come back in a summary.
  */
 export async function setInstructorClassChangeEmails(accountId: string, instructorId: string, choice: ClassChangeEmailChoice, now = new Date()) {
-  return getPrisma().$transaction(async (tx) => {
+  const saved = await getPrisma().$transaction(async (tx) => {
     const row = await tx.honorInstructor.findFirst({
       where: { id: instructorId, attendeeAccountId: accountId, acceptedAt: { not: null }, revokedAt: null },
       select: { id: true, eventId: true, classChangeEmails: true },
     });
     if (!row) throw new HonorInstructorError("NOT_ASSIGNED", "That instructor assignment isn't yours.");
-    if (row.classChangeEmails === choice) return { classChangeEmails: choice };
+    if (row.classChangeEmails === choice) return { classChangeEmails: choice, leftDaily: false };
     await tx.honorInstructor.update({
       where: { id: row.id },
       data: { classChangeEmails: choice, ...(choice === "DAILY" ? { classChangeSummaryAt: now } : {}) },
@@ -424,8 +424,11 @@ export async function setInstructorClassChangeEmails(accountId: string, instruct
       summary: "An Honors Weekend instructor changed how they hear about their class list changes.",
       metadata: { eventId: row.eventId, actorAttendeeAccountId: accountId, from: row.classChangeEmails, to: choice },
     }, tx);
-    return { classChangeEmails: choice };
+    return { classChangeEmails: choice, leftDaily: row.classChangeEmails === "DAILY" };
   });
+  // Leaving the daily summary sends one last summary of what changed since the previous one, after the choice has committed (#1098).
+  if (saved.leftDaily) await (await import("@/modules/honors/class-change-emails")).sendFinalClassChangeSummary(instructorId, now);
+  return { classChangeEmails: saved.classChangeEmails };
 }
 
 /** Whether this account teaches any class: a cheap check for the account home page. */

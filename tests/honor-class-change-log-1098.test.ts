@@ -29,7 +29,7 @@ import { restoreClassSeatsInTransaction } from "@/modules/honors/restore-seats";
 const now = new Date("2026-10-15T15:00:00.000Z");
 
 /** A transaction client holding only what the change log reads and writes. */
-function logClient(options: { taught?: string[] } = {}) {
+function logClient() {
   const enrollment = (id: string, offeringId: string, attendee: string, extra: Record<string, unknown> = {}) => ({
     id, eventId: "event-1", offeringId, registrationAttendeeId: attendee,
     organization: { name: "Synthetic Pathfinders" },
@@ -46,51 +46,50 @@ function logClient(options: { taught?: string[] } = {}) {
         return [];
       }),
     },
-    honorInstructorClass: { findMany: vi.fn(async () => (options.taught ?? ["class-knots"]).map((offeringId) => ({ offeringId }))) },
-    honorClassChange: { createMany: vi.fn(async () => ({ count: 0 })) },
+    honorClassChange: {
+      createManyAndReturn: vi.fn(async ({ data }: { data: unknown[] }) => data.map((_row, index) => ({ id: `change-${index + 1}` }))),
+    },
   };
   return client;
 }
 
-const written = (client: ReturnType<typeof logClient>) => (client.honorClassChange.createMany.mock.calls as unknown as Array<[{ data: Array<Record<string, unknown>> }]>).flatMap(([call]) => call.data);
+const written = (client: ReturnType<typeof logClient>) => (client.honorClassChange.createManyAndReturn.mock.calls as unknown as Array<[{ data: Array<Record<string, unknown>> }]>).flatMap(([call]) => call.data);
 
 describe("the change log row (#1098)", () => {
   it("copies the youth's name, club and age, and never reads or stores a birth date", async () => {
     const client = logClient();
     const count = await recordClassChanges(client as never, ["e-knots"], "JOINED", now);
-    expect(count).toBe(1);
+    expect(count).toEqual(["change-1"]);
     expect(written(client)).toEqual([{
       eventId: "event-1", offeringId: "class-knots", enrollmentId: "e-knots", registrationAttendeeId: "att-1",
       kind: "JOINED", youthName: "Pat Example", clubName: "Synthetic Pathfinders", ageOnEventDate: 12, at: now,
     }]);
-    expect(JSON.stringify(client.honorClassChange.createMany.mock.calls)).not.toMatch(/birth|2014/i);
+    expect(JSON.stringify(client.honorClassChange.createManyAndReturn.mock.calls)).not.toMatch(/birth|2014/i);
     // The read asks only for the name, age and club it needs.
     const select = (client.honorEnrollment.findMany.mock.calls[0]![0] as unknown as { select: { registrationAttendee: { select: Record<string, boolean> } } }).select;
     expect(select.registrationAttendee.select).toEqual({ profileSnapshot: true });
   });
 
-  it("writes rows only for classes that have an instructor who hasn't been revoked, and none for the others", async () => {
-    const client = logClient({ taught: ["class-knots"] });
-    expect(await recordClassChanges(client as never, ["e-knots", "e-birds", "e-other"], "LEFT", now)).toBe(2);
-    expect(written(client).map((row) => row.enrollmentId)).toEqual(["e-knots", "e-other"]);
-    expect(client.honorInstructorClass.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ instructor: { revokedAt: null } }) }));
-    const none = logClient({ taught: [] });
-    expect(await recordClassChanges(none as never, ["e-knots"], "LEFT", now)).toBe(0);
-    expect(none.honorClassChange.createMany).not.toHaveBeenCalled();
+  it("logs every change, whether or not the class has an instructor yet, and returns the ids it wrote", async () => {
+    const client = logClient();
+    expect(await recordClassChanges(client as never, ["e-knots", "e-birds", "e-other"], "LEFT", now)).toEqual(["change-1", "change-2", "change-3"]);
+    expect(written(client).map((row) => row.enrollmentId)).toEqual(["e-knots", "e-birds", "e-other"]);
+    // The pick transaction reads no instructor assignment: nothing in the client could answer one.
+    expect(client).not.toHaveProperty("honorInstructorClass");
   });
 
   it("writes nothing and reads nothing for no enrollments", async () => {
     const client = logClient();
-    expect(await recordClassChanges(client as never, [], "JOINED", now)).toBe(0);
+    expect(await recordClassChanges(client as never, [], "JOINED", now)).toEqual([]);
     expect(client.honorEnrollment.findMany).not.toHaveBeenCalled();
   });
 
   it("logs every pick of a registration, and every pick of a removed attendee", async () => {
-    const forRegistration = logClient({ taught: ["class-knots", "class-birds"] });
-    expect(await recordRegistrationClassChanges(forRegistration as never, "registration-1", "LEFT", now)).toBe(3);
-    const forAttendee = logClient({ taught: ["class-knots", "class-birds"] });
-    expect(await recordAttendeeClassChanges(forAttendee as never, ["att-1"], "LEFT", now)).toBe(2);
-    expect(await recordAttendeeClassChanges(forAttendee as never, [], "LEFT", now)).toBe(0);
+    const forRegistration = logClient();
+    expect(await recordRegistrationClassChanges(forRegistration as never, "registration-1", "LEFT", now)).toHaveLength(3);
+    const forAttendee = logClient();
+    expect(await recordAttendeeClassChanges(forAttendee as never, ["att-1"], "LEFT", now)).toHaveLength(2);
+    expect(await recordAttendeeClassChanges(forAttendee as never, [], "LEFT", now)).toEqual([]);
   });
 });
 
@@ -136,17 +135,15 @@ function pickSaveDatabase() {
     honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
     honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue([]) },
-    honorInstructorClass: { findMany: vi.fn().mockResolvedValue([{ offeringId: "birds" }, { offeringId: "knots" }]) },
-    honorClassChange: { createMany: vi.fn(async () => { calls.push("log"); return { count: 1 }; }) },
+    honorClassChange: { createManyAndReturn: vi.fn(async ({ data }: { data: unknown[] }) => { calls.push("log"); return data.map((_row, index) => ({ id: `change-${calls.length}-${index}` })); }) },
     honorEnrollment: {
       groupBy: vi.fn().mockResolvedValue([]),
-      findMany: vi.fn(async ({ where }: { where: { OR?: unknown[]; id?: { in: string[] } } }) => {
-        if (where.OR) return [{ id: "e-knots" }];
+      findMany: vi.fn(async ({ where }: { where: { id?: { in: string[] } } }) => {
         if (where.id) return where.id.in.map((id) => logRow(id, id === "e-knots" ? "knots" : "birds"));
         return [{ id: "e-birds", registrationAttendeeId: "attendee-1", offeringId: "birds", adminPlacementReason: null }];
       }),
       deleteMany: vi.fn(async () => { calls.push("delete"); return { count: 1 }; }),
-      createMany: vi.fn(async () => { calls.push("create"); return { count: 1 }; }),
+      createManyAndReturn: vi.fn(async () => { calls.push("create"); return [{ id: "e-knots" }]; }),
     },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(db)),
@@ -168,7 +165,7 @@ describe("path: a director's pick save creates and deletes enrollments (#1098)",
     await setClassSelections("club-1", "event-1", { accountId: "director-1" }, { "attendee-1": ["knots"] }, now);
     expect(db.$transaction).toHaveBeenCalledTimes(1);
     expect(calls).toEqual(["log", "delete", "create", "log"]);
-    const rows = (db.honorClassChange.createMany.mock.calls as unknown as Array<[{ data: Array<Record<string, unknown>> }]>).flatMap(([call]) => call.data);
+    const rows = (db.honorClassChange.createManyAndReturn.mock.calls as unknown as Array<[{ data: Array<Record<string, unknown>> }]>).flatMap(([call]) => call.data);
     expect(rows).toEqual([
       expect.objectContaining({ kind: "LEFT", enrollmentId: "e-birds", offeringId: "birds", youthName: "Alex Youth", clubName: "Synthetic Pathfinders", ageOnEventDate: 12 }),
       expect.objectContaining({ kind: "JOINED", enrollmentId: "e-knots", offeringId: "knots" }),
@@ -187,14 +184,14 @@ describe("path: a director's pick save creates and deletes enrollments (#1098)",
       expect(committed).toBe(true);
     });
     await setClassSelections("club-1", "event-1", { accountId: "director-1" }, { "attendee-1": ["knots"] }, now);
-    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith(2);
+    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith([expect.any(String), expect.any(String)]);
   });
 
   it("logs nothing when the save changes nothing", async () => {
     const { db } = pickSaveDatabase();
     await setClassSelections("club-1", "event-1", { accountId: "director-1" }, { "attendee-1": ["birds"] }, now);
-    expect(db.honorClassChange.createMany).not.toHaveBeenCalled();
-    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith(0);
+    expect(db.honorClassChange.createManyAndReturn).not.toHaveBeenCalled();
+    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith([]);
   });
 });
 
@@ -217,8 +214,7 @@ describe("path: a system administrator removes a pick (#1098)", () => {
       },
       honorEnrollmentMark: { findUnique: vi.fn().mockResolvedValue(null) },
       honorWeekendCompletionLink: { findFirst: vi.fn().mockResolvedValue(null) },
-      honorInstructorClass: { findMany: vi.fn().mockResolvedValue([{ offeringId: "class-knots" }]) },
-      honorClassChange: { createMany: vi.fn(async () => { calls.push("log"); return { count: 1 }; }) },
+      honorClassChange: { createManyAndReturn: vi.fn(async () => { calls.push("log"); return [{ id: "change-9" }]; }) },
       $queryRaw: vi.fn().mockResolvedValue([]),
     };
     let committed = false;
@@ -237,8 +233,8 @@ describe("path: a system administrator removes a pick (#1098)", () => {
     await removePickAsAdministrator("event-1", "admin-1", { enrollmentId: "pick-1", reason: "Synthetic: family request" }, now);
 
     expect(calls).toEqual(["log", "delete"]);
-    expect(client.honorClassChange.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ kind: "LEFT", enrollmentId: "pick-1", youthName: "Pat Example", ageOnEventDate: 12 })] });
-    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith(1);
+    expect(client.honorClassChange.createManyAndReturn).toHaveBeenCalledWith({ data: [expect.objectContaining({ kind: "LEFT", enrollmentId: "pick-1", youthName: "Pat Example", ageOnEventDate: 12 })], select: { id: true } });
+    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith(["change-9"]);
   });
 });
 
@@ -264,15 +260,14 @@ describe("path: bringing a registration back re-takes its seats (#1098)", () => 
           return [];
         }),
       },
-      honorInstructorClass: { findMany: vi.fn().mockResolvedValue([{ offeringId: "class-knots" }]) },
-      honorClassChange: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      honorClassChange: { createManyAndReturn: vi.fn().mockResolvedValue([{ id: "change-1" }]) },
     };
 
     await restoreClassSeatsInTransaction(client as never, {
       eventId: "event-1", registrationId: "registration-1", now, actorUserId: "user-1", correlationId: "corr-1", trigger: "REGISTRATION_REACTIVATED",
     });
 
-    expect(client.honorClassChange.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ kind: "JOINED", enrollmentId: "pick-1", offeringId: "class-knots" })] });
+    expect(client.honorClassChange.createManyAndReturn).toHaveBeenCalledWith({ data: [expect.objectContaining({ kind: "JOINED", enrollmentId: "pick-1", offeringId: "class-knots" })], select: { id: true } });
   });
 });
 
@@ -291,7 +286,7 @@ function sourceFiles(dir: string): string[] {
 }
 
 const logCalls = ["recordClassChanges", "recordRegistrationClassChanges", "recordAttendeeClassChanges"];
-const enrollmentWrite = /\.honorEnrollment\.(create|createMany|delete|deleteMany|upsert)$/;
+const enrollmentWrite = /\.honorEnrollment\.(create|createMany|createManyAndReturn|delete|deleteMany|upsert)$/;
 
 type Site = { file: string; method: string; line: number; callPosition: number; logPositions: number[]; functionName: string };
 
@@ -370,7 +365,7 @@ describe("every path that creates or deletes an enrollment writes a change row (
 
   it("covers the paths by name: the pick save, a placement, a removal, and a waitlist acceptance", () => {
     const wrote = (file: string, method: string, fn: string) => sites.some((site) => site.file === file && site.method === method && site.functionName === fn);
-    expect(wrote("modules/honors/enrollment-repository.ts", "createMany", "setOwnerClassSelections")).toBe(true);
+    expect(wrote("modules/honors/enrollment-repository.ts", "createManyAndReturn", "setOwnerClassSelections")).toBe(true);
     expect(wrote("modules/honors/enrollment-repository.ts", "deleteMany", "setOwnerClassSelections")).toBe(true);
     expect(wrote("modules/honors/admin-placement.ts", "create", "placeYouthInClass")).toBe(true);
     expect(wrote("modules/honors/admin-placement.ts", "deleteMany", "removePickAsAdministrator")).toBe(true);
@@ -408,8 +403,56 @@ describe("every path that creates or deletes an enrollment writes a change row (
 
   it("logging never sends: the log module imports no email code and the sender is never called inside a transaction", () => {
     const log = readFileSync(path.join(root, "modules/honors/class-change-log.ts"), "utf8");
-    expect(log).not.toMatch(/communications|messageOutbox|isNotificationEnabled|class-change-emails/);
+    expect(log).not.toMatch(/communications|messageOutbox|isNotificationEnabled/);
+    // The only reference to the sender is the kick that withClassChangeKick makes after its work has returned.
+    expect(log.match(/class-change-emails/g)).toHaveLength(1);
+    expect(log.indexOf("collector.run(ids, work)")).toBeLessThan(log.indexOf('import("@/modules/honors/class-change-emails")'));
     const lifecycle = readFileSync(path.join(root, "modules/registrations/lifecycle-repository.ts"), "utf8");
     expect(lifecycle).not.toContain("class-change-emails");
+  });
+
+  it("starts the right-away emails after the transaction for the paths nested several calls deep, through withClassChangeKick", () => {
+    const wrapped = (file: string, names: string[]) => {
+      const text = readFileSync(path.join(root, file), "utf8");
+      for (const name of names) expect(text, file + " " + name).toContain("export const " + name + ": typeof " + name + "Inner = (...args) => withClassChangeKick(() => " + name + "Inner(...args));");
+    };
+    wrapped("modules/registrations/lifecycle-repository.ts", ["cancelRegistration", "moveRegistrationToWaitlist", "promoteRegistrationFromWaitlist", "reactivateRegistration"]);
+    wrapped("modules/registrations/amendments-repository.ts", ["amendRegistration"]);
+    wrapped("modules/imports/repository.ts", ["commitImportRun"]);
+    wrapped("modules/club-transfers/repository.ts", ["approveRegistrationMove"]);
+  });
+
+  it("logs an import that cancels an active registration, and a member transfer that changes whether the pick is on a list", () => {
+    const imports = readFileSync(path.join(root, "modules/imports/repository.ts"), "utf8");
+    expect(imports).toContain('recordRegistrationClassChanges(tx, registration.id, "LEFT")');
+    const transfers = readFileSync(path.join(root, "modules/club-transfers/repository.ts"), "utf8");
+    expect(transfers).toContain('recordAttendeeClassChanges(tx, [attendeeId], "LEFT", now)');
+    expect(transfers).toContain('recordAttendeeClassChanges(tx, [attendeeId], "JOINED", now)');
+    // When both registrations are active (or both inactive) the pick's class and visibility are unchanged: nothing to log.
+    expect(transfers).toMatch(/fromActive && !toActive/);
+    expect(transfers).toMatch(/!fromActive && toActive/);
+  });
+});
+
+describe("withClassChangeKick (#1098)", () => {
+  it("kicks once, after the work, with only the ids written under it, and never for work that wrote none", async () => {
+    const { withClassChangeKick } = await import("@/modules/honors/class-change-log");
+    const client = logClient();
+    let finished = false;
+    mocks.kickClassChangeEmails.mockImplementation(async () => {
+      expect(finished).toBe(true);
+    });
+    const result = await withClassChangeKick(async () => {
+      await recordClassChanges(client as never, ["e-knots"], "JOINED", now);
+      await recordAttendeeClassChanges(client as never, ["att-1"], "LEFT", now);
+      finished = true;
+      return "done";
+    });
+    expect(result).toBe("done");
+    expect(mocks.kickClassChangeEmails).toHaveBeenCalledTimes(1);
+    expect(mocks.kickClassChangeEmails).toHaveBeenCalledWith(["change-1", "change-1", "change-2"]);
+    mocks.kickClassChangeEmails.mockClear();
+    await withClassChangeKick(async () => undefined);
+    expect(mocks.kickClassChangeEmails).not.toHaveBeenCalled();
   });
 });

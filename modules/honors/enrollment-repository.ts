@@ -410,11 +410,11 @@ async function setOwnerClassSelections(
     // Offers the waitlist made in this save (#831), emailed once it commits.
     let waitlistMessageIds: string[] = [];
     // Joins and leaves logged for instructors (#1098); their right-away emails are kicked off once the save commits.
-    let classChangesLogged = 0;
+    let classChangesLogged: string[] = [];
     try {
       await prisma.$transaction(async (tx) => {
         waitlistMessageIds = [];
-        classChangesLogged = 0;
+        classChangesLogged = [];
         const registration = await loadRegistration(tx, owner, eventId);
         // The site's own close when it has one, else the event's: the same deadline the class waitlist uses (#831).
         if (!classChangesOpen(registration.event, registration.location, now)) {
@@ -522,10 +522,11 @@ async function setOwnerClassSelections(
           });
         }
         // The log row is written in this transaction, before the picks go: it reads them (#1098). Only a row is written here; nothing is sent.
-        if (toDelete.length > 0) classChangesLogged += await recordClassChanges(tx, toDelete, "LEFT", now);
+        if (toDelete.length > 0) classChangesLogged.push(...(await recordClassChanges(tx, toDelete, "LEFT", now)));
         if (toDelete.length > 0) await tx.honorEnrollment.deleteMany({ where: { id: { in: toDelete } } });
         if (toCreate.length > 0) {
-          await tx.honorEnrollment.createMany({
+          const created = await tx.honorEnrollment.createManyAndReturn({
+            select: { id: true },
             data: toCreate.map((row) => ({
               eventId,
               offeringId: row.offeringId,
@@ -540,11 +541,7 @@ async function setOwnerClassSelections(
               requirementOverriddenByUserId: row.overrideReason && "userId" in actor ? actor.userId : null,
             })),
           });
-          const created = await tx.honorEnrollment.findMany({
-            where: { registrationId: registration.registrationId, OR: toCreate.map((row) => ({ registrationAttendeeId: row.attendeeId, offeringId: row.offeringId })) },
-            select: { id: true },
-          });
-          classChangesLogged += await recordClassChanges(tx, created.map((row) => row.id), "JOINED", now);
+          classChangesLogged.push(...(await recordClassChanges(tx, created.map((row) => row.id), "JOINED", now)));
         }
 
         // An offer held for someone else keeps its seat: it counts with the seats taken (#831).

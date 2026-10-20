@@ -235,6 +235,29 @@ async function main() {
   assert(suppressed.length >= 1 && (await allMail()) > before, "a paused event's instructor emails are recorded as suppressed, never queued to send");
   console.log("ok  an instructor's choice is theirs alone; a paused event's emails are suppressed");
 
+  // ---------------------------------------------------------------- leaving the daily summary, and retention
+  await prisma.eventMessageSettings.deleteMany({ where: { eventId } });
+  const later = new Date(morning4.getTime() + 2 * DAY);
+  await prisma.honorClassChange.create({
+    data: { eventId, offeringId: knots, enrollmentId: `${P}_e2`, registrationAttendeeId: attendee.y3!, kind: "LEFT", youthName: "Kid y9", clubName: null, ageOnEventDate: 10, at: new Date(morning4.getTime() + DAY + HOUR) },
+  });
+  const stale = await prisma.honorClassChange.create({
+    data: { eventId, offeringId: knots, enrollmentId: `${P}_e3`, registrationAttendeeId: attendee.y3!, kind: "JOINED", youthName: "Kid old", clubName: null, ageOnEventDate: 10, at: new Date(real.getTime() - 9 * DAY), immediateHandledAt: real },
+    select: { id: true },
+  });
+  const summariesBefore = (await mail("HONOR_INSTRUCTOR_CLASS_SUMMARY", daily.email)).length;
+  await setInstructorClassChangeEmails(account.id, daily.id, "IMMEDIATE", later);
+  const afterSwitch = await mail("HONOR_INSTRUCTOR_CLASS_SUMMARY", daily.email);
+  assert(afterSwitch.length === summariesBefore + 1 && afterSwitch[afterSwitch.length - 1]!.bodyTextSnapshot.includes("Kid y9"), "leaving the daily summary sends one last summary of what changed since the previous one");
+  assert((await prisma.honorInstructor.findUniqueOrThrow({ where: { id: daily.id } })).classChangeSummaryAt!.getTime() === later.getTime(), "and moves the summary point");
+  await sendDueClassChangeEmails(later);
+  assert((await prisma.honorClassChange.count({ where: { id: stale.id } })) === 0, "the sweep deletes change rows older than eight days");
+  assert((await prisma.honorClassChange.count({ where: { eventId } })) > 0, "and keeps the recent ones");
+  await prisma.event.update({ where: { id: eventId }, data: { endsAt: new Date(later.getTime() - 20 * DAY), startsAt: new Date(later.getTime() - 22 * DAY) } });
+  const pruned = await sendDueClassChangeEmails(later);
+  assert(pruned.pruned > 0 && (await prisma.honorClassChange.count({ where: { eventId } })) === 0, "and every row of an event whose roster has closed");
+  console.log("ok  leaving the daily summary sends a final one; the sweep deletes old rows and those of a closed roster");
+
   await cleanup();
   console.log("honor class emails verified");
 }
