@@ -5,6 +5,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
+  CLUB_CONDITION_KEY,
   FORM_NOTIFICATIONS_MAX_PER_FORM,
   LOCATION_CONDITION_KEY,
   checkNotificationRecipients,
@@ -30,7 +31,11 @@ export class FormNotificationError extends Error {
 }
 
 /** A notification as the panel shows it, with what the staff member should know about it. */
-export type FormNotificationView = FormNotificationConfig & { warnings: string[] };
+export type FormNotificationView = FormNotificationConfig & {
+  warnings: string[];
+  /** The condition's club no longer exists (#1097): the panel shows "(club removed)" and the notification is skipped. */
+  clubRemoved: boolean;
+};
 
 export type FormNotificationsPanel = {
   notifications: FormNotificationView[];
@@ -38,6 +43,8 @@ export type FormNotificationsPanel = {
   fields: Array<{ key: string; label: string; options: string[] }>;
   sections: Array<{ id: string; title: string }>;
   locations: Array<{ id: string; name: string }>;
+  /** The clubs a Club condition can pick (#1097), by name: empty when the form's registrations carry no club. */
+  clubs: Array<{ id: string; name: string }>;
 };
 
 function toConfig(row: { id: string; name: string; recipients: string[]; conditionFieldKey: string | null; conditionOperator: string | null; conditionValue: string | null; sectionIds: string[] }): FormNotificationConfig {
@@ -99,13 +106,41 @@ function warningsFor(config: FormNotificationConfig, definition: RegistrationFor
   return warnings;
 }
 
-function panelFor(definition: RegistrationFormDefinition | null, published: RegistrationFormDefinition | null, notifications: FormNotificationConfig[], locations: Array<{ id: string; name: string }>): FormNotificationsPanel {
+type ClubData = { clubs: Array<{ id: string; name: string }>; existingIds: Set<string> };
+
+function panelFor(definition: RegistrationFormDefinition | null, published: RegistrationFormDefinition | null, notifications: FormNotificationConfig[], locations: Array<{ id: string; name: string }>, clubData: ClubData): FormNotificationsPanel {
   return {
-    notifications: notifications.map((config) => ({ ...config, warnings: warningsFor(config, definition, published) })),
+    notifications: notifications.map((config) => {
+      const warnings = warningsFor(config, definition, published);
+      const clubRemoved = config.condition?.fieldKey === CLUB_CONDITION_KEY && !clubData.existingIds.has(config.condition.value);
+      if (clubRemoved) warnings.push("This notification's club was removed, so it is not being sent. Choose another club or remove the condition.");
+      return { ...config, warnings, clubRemoved };
+    }),
+    clubs: clubData.clubs,
     fields: definition ? conditionFieldChoices(definition) : [],
     sections: definition ? definition.sections.map((section) => ({ id: section.id, title: section.title })) : [],
     locations,
   };
+}
+
+/**
+ * The clubs for the panel (#1097): the active clubs in the directory, offered only when the event is a club event (its
+ * registrations carry a club) or a notification already routes on one. A stored club that is inactive but still a club
+ * is kept in the list so its name shows; one that is gone from the directory is in neither, so the panel marks it removed.
+ */
+async function loadClubData(eventId: string, notifications: FormNotificationConfig[]): Promise<ClubData> {
+  const prisma = getPrisma();
+  const storedIds = [...new Set(notifications.flatMap((config) => (config.condition?.fieldKey === CLUB_CONDITION_KEY ? [config.condition.value] : [])))];
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { audience: true } });
+  const active = event?.audience === "CLUB" || storedIds.length > 0
+    ? await prisma.organization.findMany({ where: { type: "CLUB", isActive: true }, orderBy: [{ name: "asc" }, { id: "asc" }], select: { id: true, name: true } })
+    : [];
+  const activeIds = new Set(active.map((club) => club.id));
+  const stored = storedIds.length > 0
+    ? await prisma.organization.findMany({ where: { id: { in: storedIds }, type: "CLUB" }, select: { id: true, name: true } })
+    : [];
+  const clubs = [...active, ...stored.filter((club) => !activeIds.has(club.id))];
+  return { clubs, existingIds: new Set(stored.map((club) => club.id)) };
 }
 
 async function eventLocations(eventId: string) {
@@ -114,7 +149,8 @@ async function eventLocations(eventId: string) {
 
 export async function getFormNotificationsPanel(eventId: string, formId: string): Promise<FormNotificationsPanel> {
   const { form, definition, published } = await loadForm(eventId, formId);
-  return panelFor(definition, published, form.notifications.map(toConfig), await eventLocations(eventId));
+  const configs = form.notifications.map(toConfig);
+  return panelFor(definition, published, configs, await eventLocations(eventId), await loadClubData(eventId, configs));
 }
 
 /**
@@ -131,6 +167,9 @@ export async function replaceFormNotifications(eventId: string, formId: string, 
   const sectionIds = new Set(definition.sections.map((section) => section.id));
   const existingIds = new Set(form.notifications.map((row) => row.id));
   const allLocationIds = new Set((await getPrisma().eventLocation.findMany({ where: { eventId }, select: { id: true } })).map((row) => row.id));
+  // A Club condition's value is checked against the real club organizations (#1097), never trusted from the client.
+  const clubValues = [...new Set(parsed.data.notifications.flatMap((input) => (input.condition?.fieldKey === CLUB_CONDITION_KEY ? [input.condition.value] : [])))];
+  const realClubIds = new Set(clubValues.length === 0 ? [] : (await getPrisma().organization.findMany({ where: { id: { in: clubValues }, type: "CLUB" }, select: { id: true } })).map((row) => row.id));
 
   const namedIds = parsed.data.notifications.flatMap((input) => (input.id ? [input.id] : []));
   if (new Set(namedIds).size !== namedIds.length) {
@@ -147,6 +186,9 @@ export async function replaceFormNotifications(eventId: string, formId: string, 
       }
       if (input.condition.fieldKey === LOCATION_CONDITION_KEY && !allLocationIds.has(input.condition.value)) {
         throw new FormNotificationError(`${label}: choose one of this event's locations.`, "INVALID_NOTIFICATIONS");
+      }
+      if (input.condition.fieldKey === CLUB_CONDITION_KEY && !realClubIds.has(input.condition.value)) {
+        throw new FormNotificationError(`${label}: choose one of the clubs in the directory.`, "INVALID_NOTIFICATIONS");
       }
     }
     const chosenSections = [...new Set(input.sectionIds)];
@@ -207,5 +249,6 @@ export async function replaceFormNotifications(eventId: string, formId: string, 
     }
     throw error;
   });
-  return panelFor(definition, published, saved.map(toConfig), locations);
+  const savedConfigs = saved.map(toConfig);
+  return panelFor(definition, published, savedConfigs, locations, await loadClubData(eventId, savedConfigs));
 }

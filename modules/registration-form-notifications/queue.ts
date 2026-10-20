@@ -9,6 +9,8 @@ import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { registrationPdfHoldUntil } from "@/modules/registration-pdf/hold";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
+  CLUB_CONDITION_KEY,
+  clubConditionStillExists,
   conditionStillAllowed,
   includesText,
   notificationApplies,
@@ -59,6 +61,17 @@ export function renderNotificationEmail(input: NotificationEmailInput) {
 
 export function sectionTitlesOf(definition: RegistrationFormDefinition) {
   return new Map(definition.sections.map((section) => [section.id, section.title] as const));
+}
+
+/**
+ * The ids of the clubs that the given notifications route on and that still exist as club organizations (#1097). One
+ * query, and none at all when no notification routes on a club.
+ */
+export async function existingConditionClubIds(client: Pick<Prisma.TransactionClient, "organization">, rows: ReadonlyArray<Pick<NotificationRow, "conditionFieldKey" | "conditionValue">>) {
+  const ids = [...new Set(rows.flatMap((row) => (row.conditionFieldKey === CLUB_CONDITION_KEY && row.conditionValue ? [row.conditionValue] : [])))];
+  if (ids.length === 0) return new Set<string>();
+  const found = await client.organization.findMany({ where: { id: { in: ids }, type: "CLUB" }, select: { id: true } });
+  return new Set(found.map((club) => club.id));
 }
 
 export type QueueNotificationInput = {
@@ -145,6 +158,8 @@ export async function queueFormNotificationsForSubmission(
     definition: RegistrationFormDefinition;
     answers: Record<string, unknown>;
     locationId: string | null;
+    /** The registration's club (organization id); null for a registration with none. */
+    organizationId?: string | null;
     locationName: string | null;
     eventName: string;
     registrantName: string;
@@ -153,14 +168,20 @@ export async function queueFormNotificationsForSubmission(
   const none = { groups: [] as QueuedFormNotificationGroup[], pendingMessageIds: [] as string[] };
   if (!input.enabled) return none;
   const rows = await tx.registrationFormNotification.findMany({ where: { formId: input.formId }, orderBy: { position: "asc" } });
+  const clubIds = await existingConditionClubIds(tx, rows);
   const matching = rows.filter((row) => {
     if (row.recipients.length === 0) return false;
+    if (!clubConditionStillExists(row, clubIds)) {
+      // The club was removed since the condition was saved; skipped, never sent unconditioned. Id only.
+      logWarn("A form notification was skipped: its club no longer exists.", { notificationId: row.id });
+      return false;
+    }
     if (!conditionStillAllowed(input.definition, row)) {
       // The form changed since the condition was saved; skipped, never sent unconditioned. Id only.
       logWarn("A form notification was skipped: its condition looks at a question that is no longer allowed.", { notificationId: row.id });
       return false;
     }
-    return notificationApplies(conditionOf(row), input.answers, input.locationId);
+    return notificationApplies(conditionOf(row), input.answers, input.locationId, input.organizationId ?? null);
   });
   if (matching.length === 0) return none;
   const settings = await loadEventEmailSettings(tx, input.eventId);

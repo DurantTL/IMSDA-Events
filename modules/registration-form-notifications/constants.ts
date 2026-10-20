@@ -10,4 +10,7 @@ export const FORM_NOTIFICATION_MAX_RECIPIENTS = 10;
 /** The condition key for the registration's location: its value is an event location id. */
 export const LOCATION_CONDITION_KEY = "__location";
 
+/** The condition key for the registration's club (#1097): its value is a club organization id. */
+export const CLUB_CONDITION_KEY = "__club";
+
 export const notificationConditionOperators = ["EQUALS", "NOT_EQUALS"] as const;

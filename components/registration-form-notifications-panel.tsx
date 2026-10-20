@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import {
+  CLUB_CONDITION_KEY,
   FORM_NOTIFICATIONS_MAX_PER_FORM,
   FORM_NOTIFICATION_MAX_RECIPIENTS,
   LOCATION_CONDITION_KEY,
@@ -23,10 +24,12 @@ type PanelData = {
     condition: { fieldKey: string; operator: "EQUALS" | "NOT_EQUALS"; value: string } | null;
     sectionIds: string[];
     warnings: string[];
+    clubRemoved: boolean;
   }>;
   fields: Array<{ key: string; label: string; options: string[] }>;
   sections: Array<{ id: string; title: string }>;
   locations: Array<{ id: string; name: string }>;
+  clubs: Array<{ id: string; name: string }>;
 };
 
 type Draft = {
@@ -41,6 +44,10 @@ type Draft = {
   onlyTheseSections: boolean;
   sectionIds: string[];
   warnings: string[];
+  /** The stored club is gone from the directory: shown as "(club removed)". */
+  clubRemoved: boolean;
+  /** What the staff member typed to find a club. Never saved. */
+  clubSearch: string;
 };
 
 let localCounter = 0;
@@ -61,11 +68,13 @@ function toDraft(row: PanelData["notifications"][number]): Draft {
     onlyTheseSections: row.sectionIds.length > 0,
     sectionIds: row.sectionIds,
     warnings: row.warnings,
+    clubRemoved: row.clubRemoved,
+    clubSearch: "",
   };
 }
 
 function blankDraft(): Draft {
-  return { localKey: nextKey(), name: "", recipientsText: "", conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [] };
+  return { localKey: nextKey(), name: "", recipientsText: "", conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [], clubRemoved: false, clubSearch: "" };
 }
 
 export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventId: string; formId: string }) {
@@ -154,9 +163,9 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
       </div>
       <p className="field-help">
         Each notification emails the addresses you type when someone registers on this form, with the registration PDF attached.
-        Limit one to a location or another answer, and to only some sections. When a director or staff change the registration, a
-        notification is sent again, marked Updated, only if something in its sections changed; a location change also sends the new
-        location&apos;s notifications. The event&apos;s staff list and the registrant&apos;s confirmation are not changed by this. Answers marked
+        Limit one to a location, a club or another answer, and to only some sections. When a director or staff change the registration, a
+        notification is sent again, marked Updated, only if something in its sections changed; a location or club change also sends the new
+        location&apos;s or club&apos;s notifications. The event&apos;s staff list and the registrant&apos;s confirmation are not changed by this. Answers marked
         sensitive are never in the PDF. Saved on its own; it does not need a new form version.
       </p>
       {loadError && <div className="inline-notice error" role="alert">{loadError}</div>}
@@ -192,11 +201,12 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                 <label>
                   <span>Send</span>
                   <select
-                    onChange={(event) => update(draft.localKey, { conditionFieldKey: event.target.value, conditionValue: "", conditionOperator: "EQUALS" })}
+                    onChange={(event) => update(draft.localKey, { conditionFieldKey: event.target.value, conditionValue: "", conditionOperator: "EQUALS", clubRemoved: false, clubSearch: "" })}
                     value={draft.conditionFieldKey}
                   >
                     <option value="">Every time</option>
                     {data.locations.length > 0 && <option value={LOCATION_CONDITION_KEY}>Only when Location…</option>}
+                    {data.clubs.length > 0 && <option value={CLUB_CONDITION_KEY}>Only when Club…</option>}
                     {data.fields.map((candidate) => <option key={candidate.key} value={candidate.key}>Only when {candidate.label}…</option>)}
                   </select>
                 </label>
@@ -216,6 +226,24 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                           <option value="">Choose a location</option>
                           {data.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                         </select>
+                      ) : draft.conditionFieldKey === CLUB_CONDITION_KEY ? (
+                        <>
+                          <input
+                            aria-label={`Search clubs for notification ${index + 1}`}
+                            autoComplete="off"
+                            onChange={(event) => update(draft.localKey, { clubSearch: event.target.value })}
+                            placeholder="Search clubs by name"
+                            type="search"
+                            value={draft.clubSearch}
+                          />
+                          <select onChange={(event) => update(draft.localKey, { conditionValue: event.target.value, clubRemoved: false })} value={draft.conditionValue}>
+                            <option value="">Choose a club</option>
+                            {draft.clubRemoved && draft.conditionValue && <option value={draft.conditionValue}>(club removed)</option>}
+                            {data.clubs
+                              .filter((club) => club.id === draft.conditionValue || club.name.toLowerCase().includes(draft.clubSearch.trim().toLowerCase()))
+                              .map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
+                          </select>
+                        </>
                       ) : field && field.options.length > 0 ? (
                         <select onChange={(event) => update(draft.localKey, { conditionValue: event.target.value })} value={draft.conditionValue}>
                           <option value="">Choose an answer</option>

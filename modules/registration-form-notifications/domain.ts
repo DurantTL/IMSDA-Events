@@ -10,12 +10,13 @@ import { conditionMatches, type RegistrationFormDefinition } from "@/modules/for
 import { excludedFieldKeys } from "@/modules/registration-pdf/model";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import {
+  CLUB_CONDITION_KEY,
   FORM_NOTIFICATIONS_MAX_PER_FORM,
   LOCATION_CONDITION_KEY,
   notificationConditionOperators,
 } from "@/modules/registration-form-notifications/constants";
 
-export { FORM_NOTIFICATIONS_MAX_PER_FORM, LOCATION_CONDITION_KEY, notificationConditionOperators };
+export { CLUB_CONDITION_KEY, FORM_NOTIFICATIONS_MAX_PER_FORM, LOCATION_CONDITION_KEY, notificationConditionOperators };
 
 export type NotificationCondition = {
   fieldKey: string;
@@ -78,7 +79,7 @@ export function conditionFieldChoices(definition: RegistrationFormDefinition) {
 }
 
 export function isAllowedConditionKey(definition: RegistrationFormDefinition, key: string) {
-  return key === LOCATION_CONDITION_KEY || conditionFieldChoices(definition).some((choice) => choice.key === key);
+  return key === LOCATION_CONDITION_KEY || key === CLUB_CONDITION_KEY || conditionFieldChoices(definition).some((choice) => choice.key === key);
 }
 
 /**
@@ -102,10 +103,32 @@ export function resolveSections(definition: RegistrationFormDefinition, sectionI
   return { sectionIds: found, noMatch: found.length === 0 };
 }
 
-/** Whether a notification applies to a registration with these answers and this location. No condition always applies. */
-export function notificationApplies(condition: NotificationCondition | null, answers: Record<string, unknown>, locationId: string | null) {
+/**
+ * Whether a stored notification's club still exists (#1097). Not part of `conditionStillAllowed` because that is pure and
+ * synchronous; the callers look the clubs up and pass the answer. A notification that routes on a club that is gone is
+ * skipped, never sent unconditioned. Any other condition is not affected.
+ */
+export function clubConditionStillExists(row: { conditionFieldKey: string | null; conditionValue: string | null }, existingClubIds: ReadonlySet<string>) {
+  return row.conditionFieldKey !== CLUB_CONDITION_KEY || (row.conditionValue !== null && existingClubIds.has(row.conditionValue));
+}
+
+/**
+ * Whether a notification applies to a registration with these answers, this location and this club (an organization id).
+ * No condition always applies. A registration with no club (a Group registration, say) never matches "is" and always
+ * matches "is not".
+ */
+export function notificationApplies(
+  condition: NotificationCondition | null,
+  answers: Record<string, unknown>,
+  locationId: string | null,
+  organizationId: string | null = null,
+) {
   if (!condition) return true;
-  const responses = condition.fieldKey === LOCATION_CONDITION_KEY ? { [LOCATION_CONDITION_KEY]: locationId ?? "" } : answers;
+  const responses = condition.fieldKey === LOCATION_CONDITION_KEY
+    ? { [LOCATION_CONDITION_KEY]: locationId ?? "" }
+    : condition.fieldKey === CLUB_CONDITION_KEY
+    ? { [CLUB_CONDITION_KEY]: organizationId ?? "" }
+    : answers;
   return conditionMatches({ fieldKey: condition.fieldKey, operator: condition.operator, value: condition.value }, responses);
 }
 

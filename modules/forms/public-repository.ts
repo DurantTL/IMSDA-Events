@@ -1590,6 +1590,7 @@ async function createPublicRegistrationTransaction(
         definition,
         answers: prepared.responses,
         locationId: registrationLocationId ?? null,
+        organizationId: club?.organizationId ?? null,
         locationName: registrationLocation?.name ?? null,
         eventName: form.event.name,
         registrantName: `${identity.firstName} ${identity.lastName}`.trim(),
