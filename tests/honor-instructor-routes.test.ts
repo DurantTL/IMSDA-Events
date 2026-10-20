@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   setHonorInstructorClasses: vi.fn(),
   removeHonorInstructor: vi.fn(),
   resendHonorInstructorInvite: vi.fn(),
+  setInstructorClassChangeEmails: vi.fn(),
   attendeeSecondStepPending: vi.fn(),
 }));
 
@@ -34,6 +35,7 @@ vi.mock("@/modules/honors/instructor-repository", async () => {
     setHonorInstructorClasses: mocks.setHonorInstructorClasses,
     removeHonorInstructor: mocks.removeHonorInstructor,
     resendHonorInstructorInvite: mocks.resendHonorInstructorInvite,
+    setInstructorClassChangeEmails: mocks.setInstructorClassChangeEmails,
   };
 });
 
@@ -42,6 +44,7 @@ import { GET as roster } from "@/app/api/attendee/honor-instructor/classes/[offe
 import { POST as marks } from "@/app/api/attendee/honor-instructor/classes/[offeringId]/marks/route";
 import { GET as staffList, POST as staffInvite } from "@/app/api/events/[eventId]/honors/instructors/route";
 import { PATCH as staffClasses, DELETE as staffRemove } from "@/app/api/events/[eventId]/honors/instructors/[instructorId]/route";
+import { PUT as classEmails } from "@/app/api/attendee/honor-instructor/preferences/[instructorId]/route";
 import { POST as staffResend } from "@/app/api/events/[eventId]/honors/instructors/[instructorId]/resend/route";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { HonorInstructorError } from "@/modules/honors/instructor-repository";
@@ -254,5 +257,77 @@ describe("instructor read path never loads sensitive fields (#833)", () => {
     expect(source).toContain("attendeeAccountId: accountId, acceptedAt: { not: null }, revokedAt: null");
     // Rosters and marks are only ever reached through `loadAssignment`.
     expect(source.match(/await loadAssignment\(accountId, offeringId\)/g)?.length).toBe(2);
+  });
+});
+
+describe("how an instructor hears about class list changes (#1098)", () => {
+  const put = (body: unknown) => new Request("https://events.imsda.test/api/x", {
+    method: "PUT",
+    headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  beforeEach(() => {
+    mocks.setInstructorClassChangeEmails.mockResolvedValue({ classChangeEmails: "IMMEDIATE" });
+  });
+
+  it("saves the signed-in instructor's own choice, scoped to their account and the assignment in the path", async () => {
+    const response = await classEmails(put({ classChangeEmails: "IMMEDIATE" }), inviteContext);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, classChangeEmails: "IMMEDIATE" });
+    expect(mocks.setInstructorClassChangeEmails).toHaveBeenCalledWith("acct-1", "ins-1", "IMMEDIATE");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it.each(["DAILY", "OFF"])("accepts %s too", async (choice) => {
+    mocks.setInstructorClassChangeEmails.mockResolvedValue({ classChangeEmails: choice });
+    expect((await classEmails(put({ classChangeEmails: choice }), inviteContext)).status).toBe(200);
+  });
+
+  it("refuses anything but the three choices, and any extra field", async () => {
+    expect((await classEmails(put({ classChangeEmails: "WEEKLY" }), inviteContext)).status).toBe(400);
+    expect((await classEmails(put({}), inviteContext)).status).toBe(400);
+    expect((await classEmails(put({ classChangeEmails: "OFF", instructorId: "someone-else" }), inviteContext)).status).toBe(400);
+    expect(mocks.setInstructorClassChangeEmails).not.toHaveBeenCalled();
+  });
+
+  it("is only for the person themselves: a staff member switched into the account, or a signed-out visitor, is refused", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1", verifiedEmail: "ins@example.test", displayName: "Ins" }, via: "staff", sessionId: "s" });
+    expect((await classEmails(put({ classChangeEmails: "OFF" }), inviteContext)).status).toBe(401);
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: "attendee" });
+    expect((await classEmails(put({ classChangeEmails: "OFF" }), inviteContext)).status).toBe(401);
+    expect(mocks.setInstructorClassChangeEmails).not.toHaveBeenCalled();
+  });
+
+  it("waits for the second sign-in step, like every instructor route", async () => {
+    mocks.attendeeSecondStepPending.mockResolvedValue(true);
+    expect((await classEmails(put({ classChangeEmails: "OFF" }), inviteContext)).status).toBe(403);
+    expect(mocks.setInstructorClassChangeEmails).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cross-origin request before anything else", async () => {
+    mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({ error: "CROSS_ORIGIN" }, { status: 403 }));
+    expect((await classEmails(put({ classChangeEmails: "OFF" }), inviteContext)).status).toBe(403);
+    expect(mocks.getCurrentAttendee).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for an assignment that isn't theirs", async () => {
+    mocks.setInstructorClassChangeEmails.mockRejectedValue(new HonorInstructorError("NOT_ASSIGNED", "That instructor assignment isn't yours."));
+    expect((await classEmails(put({ classChangeEmails: "OFF" }), inviteContext)).status).toBe(404);
+  });
+
+  it("staff can see the choice but the staff routes can't set it: a class change request with the field is refused", async () => {
+    const body = { offeringIds: ["off-1"], classChangeEmails: "OFF" };
+    const response = await staffClasses(new Request("https://events.imsda.test/api/x", {
+      method: "PATCH",
+      headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }), staffInstructorContext);
+    expect(response.status).toBe(400);
+    expect(mocks.setHonorInstructorClasses).not.toHaveBeenCalled();
+    const staffSources = ["app/api/events/[eventId]/honors/instructors/route.ts", "app/api/events/[eventId]/honors/instructors/[instructorId]/route.ts", "app/api/events/[eventId]/honors/instructors/[instructorId]/resend/route.ts"]
+      .map((file) => readFileSync(path.join(__dirname, "..", file), "utf8")).join("\n");
+    expect(staffSources).not.toContain("setInstructorClassChangeEmails");
+    expect(staffSources).not.toContain("classChangeEmails");
   });
 });

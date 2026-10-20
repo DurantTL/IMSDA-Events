@@ -156,6 +156,9 @@ function fixture() {
     honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
     honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue([{ id: "sabbath", name: "Sabbath afternoon", locationId: null }]) },
+    // The instructor change log (#1098): this class has no instructor, so nothing is logged.
+    honorInstructorClass: { findMany: vi.fn().mockResolvedValue([]) },
+    honorClassChange: { createMany: vi.fn() },
     honorEnrollment: {
       findMany: vi.fn(async () => enrollments.map(({ id, registrationAttendeeId, offeringId }) => ({ id, registrationAttendeeId, offeringId }))),
       deleteMany: vi.fn(),

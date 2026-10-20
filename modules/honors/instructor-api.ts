@@ -7,6 +7,7 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
 import { HonorInstructorError } from "@/modules/honors/instructor-repository";
 import { BULK_MARK_ACTIONS } from "@/modules/honors/instructor-domain";
+import { classChangeEmailChoices } from "@/modules/honors/class-change-domain";
 
 /**
  * The signed-in instructor, and only the person themselves: a staff member
@@ -43,6 +44,8 @@ export const instructorInviteSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   offeringIds: z.array(z.string().min(1).max(100)).min(1).max(50),
 }).strict();
+
+export const instructorClassEmailsSchema = z.object({ classChangeEmails: z.enum(classChangeEmailChoices) }).strict();
 
 export const instructorClassesSchema = z.object({ offeringIds: z.array(z.string().min(1).max(100)).min(1).max(50) }).strict();
 

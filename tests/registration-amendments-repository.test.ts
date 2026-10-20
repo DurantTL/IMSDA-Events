@@ -254,6 +254,8 @@ function repositoryFixture() {
     $executeRaw: vi.fn(async () => 0),
     // Not a team registration (#809): the team-rule guard has nothing to check.
     clubEventRegistration: { findUnique: vi.fn().mockResolvedValue(null) },
+    // The instructor class change log (#1098) reads a removed attendee's picks; there are none.
+    honorEnrollment: { findMany: vi.fn().mockResolvedValue([]) },
     eventAttendeeType: {
       findMany: vi.fn(async () => []),
     },
@@ -837,12 +839,34 @@ describe("registration amendments repository", () => {
         eventMealLedgerEntry: { create: vi.fn(async () => ({})) },
       });
       (tx.registrationAdjustment as Record<string, unknown>).create = vi.fn(async () => ({ id: "adjustment-1" }));
+      // The removed attendee holds a pick in a class that has an instructor (#1098): their leave is logged before the attendee (and
+      // the pick, which goes with it) is deleted.
+      Object.assign(tx, {
+        honorEnrollment: {
+          findMany: vi.fn(async ({ where }: { where: { registrationAttendeeId?: { in: string[] } } }) => (where.registrationAttendeeId
+            ? [{ id: "pick-1" }]
+            : [{
+              id: "pick-1", eventId: "event-1", offeringId: "class-knots", registrationAttendeeId: "attendee-2",
+              organization: { name: "Synthetic Pathfinders" },
+              registrationAttendee: { profileSnapshot: { firstName: "Riley", lastName: "Sample", ageOnEventDate: 11 } },
+            }])),
+        },
+        honorInstructorClass: { findMany: vi.fn(async () => [{ offeringId: "class-knots" }]) },
+        honorClassChange: { createMany: vi.fn(async () => ({ count: 1 })) },
+      });
       const input = removalInput(registration);
       const preview = await previewRegistrationAmendment("event-1", "registration-1", input);
       expect(preview.totalCents).toBe(12200);
       await amendRegistration("event-1", "registration-1", { ...input, previewOnly: false as const, quoteFingerprint: preview.quoteFingerprint }, actor, new Date("2026-08-04T13:00:00.000Z"));
       expect((tx.registrationAdjustment as unknown as { create: ReturnType<typeof vi.fn> }).create).toHaveBeenCalledWith({ data: expect.objectContaining({ kind: "MEAL", amountCents: -800 }) });
       expect(registration.totalAmount).toBe(122);
+      const changeLog = (tx as unknown as { honorClassChange: { createMany: ReturnType<typeof vi.fn> } }).honorClassChange.createMany;
+      expect(changeLog).toHaveBeenCalledTimes(1);
+      expect(changeLog.mock.calls[0]![0].data).toEqual([expect.objectContaining({
+        enrollmentId: "pick-1", registrationAttendeeId: "attendee-2", kind: "LEFT", youthName: "Riley Sample", clubName: "Synthetic Pathfinders", ageOnEventDate: 11,
+      })]);
+      const removeAttendees = tx.registrationAttendee.deleteMany as unknown as ReturnType<typeof vi.fn>;
+      expect(changeLog.mock.invocationCallOrder[0]).toBeLessThan(removeAttendees.mock.invocationCallOrder[0]!);
       // Cancelling the removed attendee's selection retires their tickets (#916).
       expect(eventMealTicket.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["ticket-1"] } }, data: { cancelledAt: expect.any(Date) } });
     });

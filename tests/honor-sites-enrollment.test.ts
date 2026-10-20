@@ -59,6 +59,9 @@ function database(options: { registrationLocation: { id: string; name: string } 
     honorOfferingPrerequisite: { findMany: vi.fn().mockResolvedValue([]) },
     honorClassWaitlistEntry: { groupBy: vi.fn().mockResolvedValue([]), findMany: vi.fn().mockResolvedValue([]) },
     honorSession: { findMany: vi.fn().mockResolvedValue(sessions) },
+    // The instructor change log (#1098): no class here has an instructor, so nothing is written.
+    honorInstructorClass: { findMany: vi.fn().mockResolvedValue([]) },
+    honorClassChange: { createMany: vi.fn() },
     honorEnrollment: {
       groupBy: vi.fn().mockResolvedValue([]),
       findMany: vi.fn().mockResolvedValue([]),

@@ -30,6 +30,7 @@ import {
   type BulkMarkAction,
   type InstructorRosterRow,
 } from "@/modules/honors/instructor-domain";
+import { type ClassChangeEmailChoice } from "@/modules/honors/class-change-domain";
 import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import { WRITE_BACK_TRANSACTION, writeBackInstructorCompletions, type HonorsWeekendWriteBackResult } from "@/modules/honors/weekend-completion-repository";
 
@@ -287,6 +288,8 @@ export type StaffInstructorRow = {
   /** CURRENT, FLAGGED ("!" counts as not current here), EXPIRED, MISSING or NOT_COMPLIANT. */
   sterlingState: string;
   offeringIds: string[];
+  /** How the instructor hears about youth joining or leaving their classes (#1098). Staff see it; only the instructor sets it. */
+  classChangeEmails: ClassChangeEmailChoice;
 };
 
 export async function listHonorInstructors(eventId: string): Promise<{ instructors: StaffInstructorRow[]; classes: Array<{ id: string; label: string }> }> {
@@ -295,7 +298,7 @@ export async function listHonorInstructors(eventId: string): Promise<{ instructo
     prisma.honorInstructor.findMany({
       where: { eventId, revokedAt: null },
       orderBy: [{ name: "asc" }, { createdAt: "asc" }],
-      select: { id: true, name: true, email: true, personId: true, sentAt: true, acceptedAt: true, revokedAt: true, classes: { select: { offeringId: true } } },
+      select: { id: true, name: true, email: true, personId: true, sentAt: true, acceptedAt: true, revokedAt: true, classChangeEmails: true, classes: { select: { offeringId: true } } },
     }),
     prisma.honorOffering.findMany({
       where: { eventId },
@@ -314,6 +317,7 @@ export async function listHonorInstructors(eventId: string): Promise<{ instructo
     sterlingCurrent: sterlingIsCurrent(sterlingState),
     sterlingState,
     offeringIds: row.classes.map((entry) => entry.offeringId),
+    classChangeEmails: row.classChangeEmails,
   };
   }));
   return {
@@ -378,6 +382,49 @@ export async function acceptInstructorInvite(instructorId: string, account: { id
       metadata: { eventId: invite.eventId, actorAttendeeAccountId: account.id },
     }, tx);
     return { instructorId: invite.id };
+  });
+}
+
+export type InstructorEmailPreference = { instructorId: string; eventName: string; classChangeEmails: ClassChangeEmailChoice };
+
+/** How this account hears about class list changes, one entry per event they teach at (#1098). No person data. */
+export async function listInstructorEmailPreferences(accountId: string, now = new Date()): Promise<InstructorEmailPreference[]> {
+  const rows = await getPrisma().honorInstructor.findMany({
+    where: { attendeeAccountId: accountId, acceptedAt: { not: null }, revokedAt: null, classes: { some: {} } },
+    orderBy: [{ event: { startsAt: "asc" } }, { createdAt: "asc" }],
+    select: { id: true, classChangeEmails: true, event: { select: { name: true, endsAt: true } } },
+  });
+  return rows
+    .filter((row) => instructorMarksOpen(row.event.endsAt, now))
+    .map((row) => ({ instructorId: row.id, eventName: row.event.name, classChangeEmails: row.classChangeEmails }));
+}
+
+/**
+ * The instructor chooses how they hear about youth joining or leaving their classes (#1098). Only the signed-in person's own
+ * accepted, un-revoked row can change; staff can see the choice but never set it. Coming back to the daily summary starts
+ * it from now, so changes already emailed right away (or that they chose not to hear about) don't come back in a summary.
+ */
+export async function setInstructorClassChangeEmails(accountId: string, instructorId: string, choice: ClassChangeEmailChoice, now = new Date()) {
+  return getPrisma().$transaction(async (tx) => {
+    const row = await tx.honorInstructor.findFirst({
+      where: { id: instructorId, attendeeAccountId: accountId, acceptedAt: { not: null }, revokedAt: null },
+      select: { id: true, eventId: true, classChangeEmails: true },
+    });
+    if (!row) throw new HonorInstructorError("NOT_ASSIGNED", "That instructor assignment isn't yours.");
+    if (row.classChangeEmails === choice) return { classChangeEmails: choice };
+    await tx.honorInstructor.update({
+      where: { id: row.id },
+      data: { classChangeEmails: choice, ...(choice === "DAILY" ? { classChangeSummaryAt: now } : {}) },
+    });
+    await writeAuditLog({
+      eventId: row.eventId,
+      action: "HONOR_INSTRUCTOR_CLASS_EMAILS_CHANGED",
+      entityType: "HonorInstructor",
+      entityId: row.id,
+      summary: "An Honors Weekend instructor changed how they hear about their class list changes.",
+      metadata: { eventId: row.eventId, actorAttendeeAccountId: accountId, from: row.classChangeEmails, to: choice },
+    }, tx);
+    return { classChangeEmails: choice };
   });
 }
 

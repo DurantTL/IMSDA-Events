@@ -8,6 +8,7 @@ import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminder
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
+import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { runHealthSnapshotSweep } from "@/modules/health-records/snapshot-hooks";
 import { expireStalePendingTeams } from "@/modules/general-link-registrations/repository";
 import { runAlertScan } from "@/modules/operations/alert-scan";
@@ -85,6 +86,13 @@ async function postHandler(request: Request) {
       logError("The class waitlist sweep failed after a successful outbox sweep", error);
       return null;
     });
+    // Honors Weekend instructor class emails (#1098): right-away emails a failed send left behind, and from about 6:00 AM
+    // Central the daily summary of who joined or left each instructor's classes. At most one summary per instructor per
+    // Central date, so running it on every sweep is safe. Its failure must not make a successful sweep look failed.
+    const instructorClassEmails = await sendDueClassChangeEmails().catch((error) => {
+      logError("The instructor class email sweep failed after a successful outbox sweep", error);
+      return null;
+    });
     // Sealed health copies (#924): the event-start copies that are due, and the daily deletion of copies whose
     // keep-until date has passed (never one under a legal hold). A no-op with HEALTH_RECORDS_ENABLED off, safe on
     // every sweep, and it reports counts only. Its failure must not make a successful sweep look failed.
@@ -115,6 +123,7 @@ async function postHandler(request: Request) {
       deadlineReminders,
       hostedLinks,
       classWaitlists,
+      instructorClassEmails,
       healthSnapshots,
       generalLinkRetention,
       locationWaitlistDigest: locationWaitlistDigest && {

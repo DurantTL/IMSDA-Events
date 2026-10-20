@@ -6,7 +6,8 @@ import { InstructorInviteAccept } from "@/components/instructor-invite-accept";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { STERLING_WARNING_MESSAGE } from "@/modules/honors/instructor-domain";
-import { listInstructorClasses, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
+import { listInstructorClasses, listInstructorEmailPreferences, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
+import { InstructorClassEmailChoice } from "@/components/instructor-class-email-choice";
 
 export const metadata: Metadata = { title: "Your classes", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -22,9 +23,10 @@ export default async function InstructorClassesPage() {
   const { account, via } = await getCurrentAttendee();
   if (!account) redirect("/account/sign-in");
   if (via !== "attendee") redirect("/account");
-  const [invites, { classes, sterlingCurrent }] = await Promise.all([
+  const [invites, { classes, sterlingCurrent }, emailPreferences] = await Promise.all([
     listInstructorInvitesForAccount(account.verifiedEmail),
     listInstructorClasses(account.id),
+    listInstructorEmailPreferences(account.id),
   ]);
 
   return (
@@ -59,6 +61,7 @@ export default async function InstructorClassesPage() {
             </>
           )}
         </section>
+        {emailPreferences.length > 0 && <InstructorClassEmailChoice preferences={emailPreferences} />}
       </div>
     </>
   );

@@ -32,6 +32,7 @@ import {
 } from "@/modules/events/lifecycle";
 import { getRegistrationById, type RegistrationRecord } from "@/modules/registrations/repository";
 import type { RestoredClassSeats } from "@/modules/honors/restore-seats";
+import { recordRegistrationClassChanges } from "@/modules/honors/class-change-log";
 
 export type RegistrationLifecycleErrorCode =
   | "REGISTRATION_NOT_FOUND"
@@ -839,6 +840,8 @@ export async function cancelRegistration(
         },
       });
     }
+    // A cancelled registration's picks leave every instructor's class list (#1098): logged before the flip, in this transaction.
+    if (wasActive) await recordRegistrationClassChanges(tx, registration.id, "LEFT", now);
     await tx.registration.update({
       where: { id: registration.id },
       data: { status: "CANCELLED", cancelledAt: now },
@@ -956,6 +959,8 @@ export async function moveRegistrationToWaitlist(
     const correlationId = crypto.randomUUID();
     const released = await releaseOptionReservations(tx, registration.id, now);
     const eventPosition = await placeAtEndOfWaitlist(tx, registration, now);
+    // A registration moved to the waitlist holds no seats: its picks leave every instructor's class list (#1098).
+    await recordRegistrationClassChanges(tx, registration.id, "LEFT", now);
     await tx.registration.update({
       where: { id: registration.id },
       data: { status: "WAITLISTED", cancelledAt: null },

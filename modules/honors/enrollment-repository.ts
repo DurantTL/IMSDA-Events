@@ -26,6 +26,7 @@ import {
 import type { ClubClassLevel } from "@/modules/club-rosters/domain";
 import { completedHonorsByPerson } from "@/modules/honors/completed-honors";
 import { compareOfferingRows, offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
+import { recordClassChanges } from "@/modules/honors/class-change-log";
 import { picksByAttendeeId } from "@/modules/honors/registration-picks";
 
 /**
@@ -408,9 +409,12 @@ async function setOwnerClassSelections(
   for (let attempt = 0; ; attempt += 1) {
     // Offers the waitlist made in this save (#831), emailed once it commits.
     let waitlistMessageIds: string[] = [];
+    // Joins and leaves logged for instructors (#1098); their right-away emails are kicked off once the save commits.
+    let classChangesLogged = 0;
     try {
       await prisma.$transaction(async (tx) => {
         waitlistMessageIds = [];
+        classChangesLogged = 0;
         const registration = await loadRegistration(tx, owner, eventId);
         // The site's own close when it has one, else the event's: the same deadline the class waitlist uses (#831).
         if (!classChangesOpen(registration.event, registration.location, now)) {
@@ -517,6 +521,8 @@ async function setOwnerClassSelections(
             data: { status: "ACCEPTED", resolvedAt: now, resolution: "Took a seat in the class" },
           });
         }
+        // The log row is written in this transaction, before the picks go: it reads them (#1098). Only a row is written here; nothing is sent.
+        if (toDelete.length > 0) classChangesLogged += await recordClassChanges(tx, toDelete, "LEFT", now);
         if (toDelete.length > 0) await tx.honorEnrollment.deleteMany({ where: { id: { in: toDelete } } });
         if (toCreate.length > 0) {
           await tx.honorEnrollment.createMany({
@@ -534,6 +540,11 @@ async function setOwnerClassSelections(
               requirementOverriddenByUserId: row.overrideReason && "userId" in actor ? actor.userId : null,
             })),
           });
+          const created = await tx.honorEnrollment.findMany({
+            where: { registrationId: registration.registrationId, OR: toCreate.map((row) => ({ registrationAttendeeId: row.attendeeId, offeringId: row.offeringId })) },
+            select: { id: true },
+          });
+          classChangesLogged += await recordClassChanges(tx, created.map((row) => row.id), "JOINED", now);
         }
 
         // An offer held for someone else keeps its seat: it counts with the seats taken (#831).
@@ -610,6 +621,7 @@ async function setOwnerClassSelections(
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       // The offer emails go out after the save commits, one to each director; a failure leaves them queued (#831).
       if (waitlistMessageIds.length > 0) await (await import("@/modules/honors/waitlist-repository")).deliverWaitlistOfferMessages(waitlistMessageIds);
+      await (await import("@/modules/honors/class-change-emails")).kickClassChangeEmails(classChangesLogged);
       return getOwnerClassSelectionWorkspace(owner, eventId, now);
     } catch (error) {
       if (!isRetryableSeatConflict(error)) throw error;
