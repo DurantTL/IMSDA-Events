@@ -294,62 +294,76 @@ describe("re-evaluating a reviewed recipient at send time", () => {
     ...overrides,
   });
 
+  // `trigger` is required of the real function, so no caller can forget it; the older cases below run as a plain event-start batch.
+  const decide = (
+    who: Parameters<typeof decideRecipientEligibility>[0],
+    template: Parameters<typeof decideRecipientEligibility>[1],
+    current: CurrentAudienceView,
+    trigger: Parameters<typeof decideRecipientEligibility>[3] = "BEFORE_EVENT_START",
+  ) => decideRecipientEligibility(who, template, current, trigger);
+
+  it("the pre-send check of a payment-due custom message drops someone who paid after it was queued", () => {
+    const paidSinceQueued = view({ targets: new Map([[targetKey(email, registrationId), { balanceCents: 0, roles: ["REGISTRATION_CONTACT"] }]]) });
+    expect(decide(recipient, "CUSTOM_MESSAGE", paidSinceQueued, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", paidSinceQueued, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
+  });
+
   it("keeps an eligible recipient", () => {
-    expect(decideRecipientEligibility(recipient, "BALANCE_REMINDER", view())).toBeNull();
-    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", view())).toBeNull();
+    expect(decide(recipient, "BALANCE_REMINDER", view())).toBeNull();
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", view())).toBeNull();
   });
 
   it("payment before the reminder: a balance that was paid since review is dropped from a balance reminder only", () => {
     const paid = view({ targets: new Map([[targetKey(email, registrationId), { balanceCents: 0, roles: ["REGISTRATION_CONTACT"] }]]) });
-    expect(decideRecipientEligibility(recipient, "BALANCE_REMINDER", paid)).toBe("NO_BALANCE_DUE");
-    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", paid)).toBeNull();
+    expect(decide(recipient, "BALANCE_REMINDER", paid)).toBe("NO_BALANCE_DUE");
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", paid)).toBeNull();
   });
 
   it("'before payment due' sends only to a registration that still owes, whatever the template (#993)", () => {
     const owes = view();
     const paid = view({ targets: new Map([[targetKey(email, registrationId), { balanceCents: 0, roles: ["REGISTRATION_CONTACT"] }]]) });
     for (const template of ["BALANCE_REMINDER", "EVENT_ANNOUNCEMENT", "CUSTOM_MESSAGE"] as const) {
-      expect(decideRecipientEligibility(recipient, template, owes, "BEFORE_PAYMENT_DUE")).toBeNull();
-      expect(decideRecipientEligibility(recipient, template, paid, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
+      expect(decide(recipient, template, owes, "BEFORE_PAYMENT_DUE")).toBeNull();
+      expect(decide(recipient, template, paid, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
     }
     // Other triggers are unchanged: an announcement still goes to someone with no balance.
-    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", paid, "BEFORE_EVENT_START")).toBeNull();
-    expect(decideRecipientEligibility(recipient, "CUSTOM_MESSAGE", paid, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
-    expect(decideRecipientEligibility(recipient, "CUSTOM_MESSAGE", view({ isOrganizationBilled: true }), "BEFORE_PAYMENT_DUE")).toBe("ORGANIZATION_BILLED");
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", paid, "BEFORE_EVENT_START")).toBeNull();
+    expect(decide(recipient, "CUSTOM_MESSAGE", paid, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
+    expect(decide(recipient, "CUSTOM_MESSAGE", view({ isOrganizationBilled: true }), "BEFORE_PAYMENT_DUE")).toBe("ORGANIZATION_BILLED");
   });
 
   it("an organization-billed event never sends a balance reminder to an attendee", () => {
-    expect(decideRecipientEligibility(recipient, "BALANCE_REMINDER", view({ isOrganizationBilled: true }))).toBe("ORGANIZATION_BILLED");
+    expect(decide(recipient, "BALANCE_REMINDER", view({ isOrganizationBilled: true }))).toBe("ORGANIZATION_BILLED");
   });
 
   it("cancellation: a registration that is no longer submitted or confirmed is dropped", () => {
-    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", view({ registrations: new Map([[registrationId, { active: false }]]), targets: new Map() }))).toBe("REGISTRATION_NOT_ACTIVE");
-    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", view({ registrations: new Map(), targets: new Map() }))).toBe("REGISTRATION_NOT_FOUND");
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", view({ registrations: new Map([[registrationId, { active: false }]]), targets: new Map() }))).toBe("REGISTRATION_NOT_ACTIVE");
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", view({ registrations: new Map(), targets: new Map() }))).toBe("REGISTRATION_NOT_FOUND");
   });
 
   it("transfer: when the registration's contact moved to another address, the reviewed address is dropped", () => {
     const transferred = view({ targets: new Map([[targetKey("new.owner@example.test", registrationId), { balanceCents: 5000, roles: ["REGISTRATION_CONTACT"] }]]) });
-    expect(decideRecipientEligibility(recipient, "BALANCE_REMINDER", transferred)).toBe("ADDRESS_CHANGED");
+    expect(decide(recipient, "BALANCE_REMINDER", transferred)).toBe("ADDRESS_CHANGED");
   });
 
   it("a registration that no longer matches the approved audience is dropped", () => {
-    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", view({ targets: new Map(), registrationsWithOtherTarget: new Set() }))).toBe("NO_LONGER_MATCHES");
+    expect(decide(recipient, "EVENT_ANNOUNCEMENT", view({ targets: new Map(), registrationsWithOtherTarget: new Set() }))).toBe("NO_LONGER_MATCHES");
   });
 
   it("suppressed: an opt-out or bounce recorded since review is dropped with its reason", () => {
     for (const code of ["OPTED_OUT_EVENT", "OPTED_OUT_ALL", "PROVIDER_BOUNCED", "PROVIDER_COMPLAINED"] as const) {
-      expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", view({ targets: new Map(), exclusionByEmail: new Map([[email, code]]) }))).toBe(code);
+      expect(decide(recipient, "EVENT_ANNOUNCEMENT", view({ targets: new Map(), exclusionByEmail: new Map([[email, code]]) }))).toBe(code);
     }
   });
 
   it("youth: an address the independent check refuses is dropped even when the audience still lists it", () => {
     const minor = view({ minorTargets: new Set([targetKey(email, registrationId)]) });
-    expect(decideRecipientEligibility({ registrationId, email, roles: ["ATTENDEE"] }, "EVENT_ANNOUNCEMENT", minor)).toBe("MINOR_RECIPIENT");
-    expect(decideRecipientEligibility({ registrationId, email, roles: ["ATTENDEE"] }, "BALANCE_REMINDER", minor)).toBe("MINOR_RECIPIENT");
+    expect(decide({ registrationId, email, roles: ["ATTENDEE"] }, "EVENT_ANNOUNCEMENT", minor)).toBe("MINOR_RECIPIENT");
+    expect(decide({ registrationId, email, roles: ["ATTENDEE"] }, "BALANCE_REMINDER", minor)).toBe("MINOR_RECIPIENT");
   });
 
   it("matches addresses regardless of case or padding", () => {
-    expect(decideRecipientEligibility({ registrationId, email: "  PAT@Example.TEST ", roles: [] }, "EVENT_ANNOUNCEMENT", view())).toBeNull();
+    expect(decide({ registrationId, email: "  PAT@Example.TEST ", roles: [] }, "EVENT_ANNOUNCEMENT", view())).toBeNull();
   });
 });
 

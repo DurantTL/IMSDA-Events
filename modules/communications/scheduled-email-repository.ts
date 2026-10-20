@@ -1039,6 +1039,7 @@ export async function scheduledEmailObsoleteReason(messageId: string, now = new 
     { registrationId: recipient.registrationId, email: recipient.recipientEmail, roles: recipient.roles },
     batch.templateKey as ScheduledEmailTemplateKey,
     view,
+    batch.trigger,
   );
   return code ? drop(code) : null;
 }

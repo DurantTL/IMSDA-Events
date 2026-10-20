@@ -1441,7 +1441,8 @@ async function loadTestRegistrationContext(
         paidCents: netPaidCents,
         balanceCents,
         paymentInstructions: paymentInstructionsText,
-        paymentDueOn: registration.event?.paymentDueOn,
+        // A confirmation shows the due date; a balance reminder never does, so a test send matches the real one (#993).
+        paymentDueOn: isRegistrationConfirmation(templateKey ?? "") ? registration.event?.paymentDueOn : null,
         portalUrl: REGISTRATION_MANAGE_LINK_SENTINEL,
         // A test send of a confirmation shows the policy as the real one will (#891).
         refundPolicy: isRegistrationConfirmation(templateKey ?? "") ? registration.event?.refundPolicy : null,

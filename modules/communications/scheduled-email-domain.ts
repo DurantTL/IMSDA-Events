@@ -405,7 +405,7 @@ export function decideRecipientEligibility(
   recipient: ReviewedRecipient,
   template: ScheduledEmailTemplateKey,
   view: CurrentAudienceView,
-  trigger?: ScheduledEmailTrigger,
+  trigger: ScheduledEmailTrigger,
 ): ScheduleExclusionCode | null {
   const email = recipient.email.trim().toLowerCase();
   const registration = view.registrations.get(recipient.registrationId);
