@@ -222,16 +222,16 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
         <h3>Form details</h3>
         <div className="form-grid two-column">
           <label>Name
-            <input maxLength={120} onChange={(event) => edit((s) => ({ ...s, name: event.target.value }))} value={spec.name} />
+            <input autoComplete="off" name="builder-cb-field-1" maxLength={120} onChange={(event) => edit((s) => ({ ...s, name: event.target.value }))} value={spec.name} />
           </label>
           <label>Title shown on the form
-            <input maxLength={120} onChange={(event) => edit((s) => ({ ...s, definition: { ...s.definition, title: event.target.value } }))} value={spec.definition.title} />
+            <input autoComplete="off" name="builder-cb-field-2" maxLength={120} onChange={(event) => edit((s) => ({ ...s, definition: { ...s.definition, title: event.target.value } }))} value={spec.definition.title} />
           </label>
           <label>Description
-            <input maxLength={300} onChange={(event) => edit((s) => ({ ...s, description: event.target.value }))} value={spec.description} />
+            <input autoComplete="off" name="builder-cb-field-3" maxLength={300} onChange={(event) => edit((s) => ({ ...s, description: event.target.value }))} value={spec.description} />
           </label>
           <label>Message after a private-link submit
-            <input maxLength={500} onChange={(event) => edit((s) => ({ ...s, definition: { ...s.definition, confirmationMessage: event.target.value } }))} value={spec.definition.confirmationMessage} />
+            <input autoComplete="off" name="builder-cb-field-4" maxLength={500} onChange={(event) => edit((s) => ({ ...s, definition: { ...s.definition, confirmationMessage: event.target.value } }))} value={spec.definition.confirmationMessage} />
           </label>
           <label>Sort order
             <input max={10000} min={0} onChange={(event) => edit((s) => ({ ...s, sortOrder: Number(event.target.value) || 0 }))} type="number" value={spec.sortOrder} />
@@ -266,14 +266,14 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
             {issuesFor(`section:${section.id}`).map((issue, index) => <small className="club-report-problem" key={index} role="alert">{issue.message}</small>)}
             <div className="form-grid two-column">
               <label>Section title
-                <input maxLength={120} onChange={(event) => edit((s) => updateSection(s, section.id, { title: event.target.value }))} value={section.title} />
+                <input autoComplete="off" name="builder-cb-field-5" maxLength={120} onChange={(event) => edit((s) => updateSection(s, section.id, { title: event.target.value }))} value={section.title} />
               </label>
               <label>Section description
-                <input maxLength={500} onChange={(event) => edit((s) => updateSection(s, section.id, { description: event.target.value }))} value={section.description} />
+                <input autoComplete="off" name="builder-cb-field-6" maxLength={500} onChange={(event) => edit((s) => updateSection(s, section.id, { description: event.target.value }))} value={section.description} />
               </label>
             </div>
             <label>Notes shown above the questions (separate paragraphs with a blank line)
-              <textarea
+              <textarea autoComplete="off" name="builder-cb-note-7"
                 defaultValue={(spec.sectionNotes[section.id] ?? []).join("\n\n")}
                 key={`${section.id}-notes`}
                 onBlur={(event) => edit((s) => setSectionNotes(s, section.id, sectionNotesFromText(event.target.value)))}
@@ -398,7 +398,7 @@ function FieldEditor({
         <div className="form-stack">
           <div className="form-grid two-column">
             <label>Question
-              <input maxLength={120} onChange={(event) => edit((s) => updateField(s, field.id, { label: event.target.value }))} value={field.label} />
+              <input autoComplete="off" name="builder-cb-field-8" maxLength={120} onChange={(event) => edit((s) => updateField(s, field.id, { label: event.target.value }))} value={field.label} />
             </label>
             <label>Answer type
               <select onChange={(event) => edit((s) => updateField(s, field.id, { type: event.target.value as RegistrationFormField["type"] }))} value={field.type}>
@@ -406,10 +406,10 @@ function FieldEditor({
               </select>
             </label>
             <label>Help text
-              <input maxLength={500} onChange={(event) => edit((s) => updateField(s, field.id, { helpText: event.target.value }))} value={field.helpText} />
+              <input autoComplete="off" name="builder-cb-field-9" maxLength={500} onChange={(event) => edit((s) => updateField(s, field.id, { helpText: event.target.value }))} value={field.helpText} />
             </label>
             <label>Field key (letters, numbers, underscores)
-              <input
+              <input autoComplete="off" name="builder-cb-field-10"
                 disabled={keyLocked}
                 maxLength={60}
                 onChange={(event) => edit((s) => renameFieldKey(s, field.id, event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_")))}
@@ -432,7 +432,7 @@ function FieldEditor({
                 </label>
               )}
               <label>Choices (one per line)
-                <textarea
+                <textarea autoComplete="off" name="builder-cb-note-11"
                   defaultValue={field.options.join("\n")}
                   key={`${field.id}-options`}
                   onBlur={(event) => edit((s) => updateField(s, field.id, { options: optionsFromText(event.target.value) }))}
@@ -488,7 +488,7 @@ function FieldEditor({
                   </label>
                   {field.conditional.operator !== "NOT_EMPTY" && (
                     <label>Value
-                      <input maxLength={120} onChange={(event) => edit((s) => updateField(s, field.id, { conditional: field.conditional && { ...field.conditional, value: event.target.value } }))} value={field.conditional.value} />
+                      <input autoComplete="off" name="builder-cb-field-12" maxLength={120} onChange={(event) => edit((s) => updateField(s, field.id, { conditional: field.conditional && { ...field.conditional, value: event.target.value } }))} value={field.conditional.value} />
                     </label>
                   )}
                 </>

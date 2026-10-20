@@ -3361,6 +3361,8 @@ body:has(.auth-page) { padding-bottom: 0; }
   border-color: #9cc9b4;
   background: var(--green-soft);
 }
+.public-registration-step-hint { display: none; margin: 8px 0 0; color: var(--muted); font-size: var(--text-helper-min); text-align: center; }
+@media (max-width: 768px) { .public-registration-step-hint { display: block; } }
 /* #1042: steps already reached are buttons; they look like the plain items. */
 .public-registration-progress li > button {
   display: flex;
@@ -3823,9 +3825,13 @@ body:has(.auth-page) { padding-bottom: 0; }
   font-size: max(16px, 1rem);
   text-align: left;
 }
-.searchable-select-trigger > span { min-width: 0; overflow-wrap: anywhere; }
+.searchable-select-trigger > span { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.searchable-select-trigger > svg { flex: 0 0 auto; align-self: center; color: var(--imsda-purple); }
 .searchable-select-trigger > span.is-placeholder { color: var(--muted); }
-.searchable-select.is-phone-trigger .searchable-select-control { padding-right: 4px; padding-left: 11px; }
+.searchable-select.is-phone-trigger .searchable-select-control { min-height: 48px; border-width: 1.5px; padding-right: 4px; padding-left: 12px; }
+/* #1060: one focus ring. The wrapper draws it (outline from the shared rule); the trigger and the wrapper's own shadow add none. */
+.searchable-select.is-phone-trigger .searchable-select-control:focus-within { box-shadow: none; }
+:root:root:root .searchable-select.is-phone-trigger .searchable-select-control > button.searchable-select-trigger:focus-visible { outline: 0; box-shadow: none; }
 .searchable-select.is-phone-trigger .searchable-select-control > button.searchable-select-trigger { width: 100%; height: auto; place-items: unset; }
 .searchable-select.is-phone-trigger .searchable-select-control > button.searchable-select-clear { width: 44px; height: 44px; }
 .searchable-select-picker {
@@ -5776,6 +5782,22 @@ body:has(.auth-page) { padding-bottom: 0; }
      The label stays for screen readers, and "Step N of M" above names the current step. */
   .public-registration-progress li:not(.is-current) > button > small { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .public-registration-progress li:not(.is-current) > small { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  /* #1060: reached steps read as buttons, the current one is marked, and unreached ones look disabled. */
+  .public-registration-progress li > button {
+    min-height: 44px;
+    border: 1.5px solid var(--imsda-purple);
+    border-radius: 999px;
+    background: var(--imsda-purple-soft);
+    color: var(--imsda-purple);
+    transition: background-color 0.1s;
+  }
+  .public-registration-progress li > button:active { background: #dccdea; }
+  .public-registration-progress li.is-complete > button { border-color: var(--green); background: var(--green-soft); color: var(--green); }
+  .public-registration-progress li.is-complete > button:active { background: #cfe8dc; }
+  .public-registration-progress li.has-errors > button { border-color: #b42318; }
+  .public-registration-progress li.is-current { min-height: 44px; border: 2px solid var(--imsda-purple); border-radius: 999px; background: white; padding: 0 8px; justify-content: center; }
+  .public-registration-progress li:not(.is-current):not(:has(> button)) { opacity: 0.5; }
+  .public-registration-progress li:not(.is-current):not(:has(> button)) > span { border-style: dashed; }
   .public-registration-step-heading { padding: 18px; }
   .public-registration-section,
   .public-registration-roster { border-radius: 17px; }
