@@ -315,7 +315,8 @@ describe("billing contacts (#165): conference-wide, system administrators only",
     expect(group.contact).toMatchObject({ name: "Current Treasurer", email: "treasurer@example.test", roleLabel: "Treasurer" });
     expect(group.readiness).toBe("NOT_VERIFIED");
     const serialized = JSON.stringify(view);
-    expect(serialized).not.toContain("555");
+    // The phone numbers, not a bare "555": a timestamp such as ".555Z" may contain those digits.
+    expect(serialized).not.toContain("555-010");
     expect(serialized).not.toContain("Terry Treasurer");
     expect(serialized).not.toContain("history");
   });

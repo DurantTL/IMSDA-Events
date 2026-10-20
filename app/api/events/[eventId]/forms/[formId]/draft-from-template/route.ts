@@ -1,0 +1,31 @@
+import { z } from "zod";
+import { AccessDeniedError, requirePermission } from "@/modules/access/authorization";
+import { getCurrentSession } from "@/modules/access/current-session";
+import { rejectCrossOriginRequest } from "@/modules/access/request-security";
+import { findActiveMembership } from "@/modules/events/repository";
+import { createFormSchema } from "@/modules/forms/definition";
+import { FormOperationError, replaceRegistrationFormDraftFromTemplate } from "@/modules/forms/repository";
+import { logError } from "@/lib/logger";
+import { withRequestContext } from "@/lib/request-context";
+
+function apiError(error: unknown) {
+  if (error instanceof z.ZodError) return Response.json({ error: "INVALID_FORM", message: error.issues[0]?.message, issues: error.issues }, { status: 400 });
+  if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
+  if (error instanceof FormOperationError) return Response.json({ error: error.code, message: error.message }, { status: error.code.endsWith("NOT_FOUND") ? 404 : 409 });
+  logError("Registration form draft-from-template failed", error);
+  return Response.json({ error: "FORM_REQUEST_FAILED", message: "The draft could not be updated from the template." }, { status: 500 });
+}
+
+/** Replaces this form's draft with a template's current definition (#1056). The published version is untouched. */
+async function postHandler(request: Request, context: { params: Promise<{ eventId: string; formId: string }> }) {
+  const originError = rejectCrossOriginRequest(request);
+  if (originError) return originError;
+  try {
+    const { eventId, formId } = await context.params;
+    const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_FORMS", findActiveMembership);
+    const input = createFormSchema.parse(await request.json());
+    return Response.json({ form: await replaceRegistrationFormDraftFromTemplate(eventId, formId, access.user.id, input.templateKey) });
+  } catch (error) { return apiError(error); }
+}
+
+export const POST = withRequestContext(postHandler);

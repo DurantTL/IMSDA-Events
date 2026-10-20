@@ -299,6 +299,60 @@ export async function createRegistrationForm(eventId: string, actorUserId: strin
   return (await getRegistrationForm(eventId, created.id))!;
 }
 
+/**
+ * Replaces an existing form's DRAFT with a template's current definition (#1056), so an open event can pick up a
+ * changed template without a second form (a second form would split teams and break version comparison on one form id).
+ * The published version is never touched: registration stays on it until staff test and publish the draft as usual.
+ * With no draft a new one is created at the next version number; an existing draft is overwritten in place and its
+ * test submissions deleted, because they proved a definition that no longer exists. Runs under the form-row lock
+ * (#564) so a concurrent save or publish serializes with it. The form's name and slug are left alone (publish syncs the name).
+ * The audit entry carries ids and the template key only.
+ */
+export async function replaceRegistrationFormDraftFromTemplate(eventId: string, formId: string, actorUserId: string, templateKey: string) {
+  try {
+    await formWriteTransaction(async (tx) => {
+      const seeded = await loadSeededFormTemplate(tx, templateKey);
+      const template = seeded ?? getFormTemplate(templateKey);
+      if (!template) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
+      const definition = registrationFormDefinitionSchema.parse(structuredClone(template.definition));
+      assertNoReservedChoiceValues(definition);
+      const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(applyMealPricesToDefinition(definition, await loadTicketPrices(tx, eventId))));
+      const form = await tx.registrationForm.findFirst({ where: { id: formId, eventId }, include: { versions: { orderBy: { versionNumber: "desc" } } } });
+      if (!form) throw new FormOperationError("FORM_NOT_FOUND", "That registration form was not found.");
+      const draft = form.versions.find((version) => version.status === RegistrationFormStatus.DRAFT);
+      let versionId: string;
+      let versionNumber: number;
+      let invalidatedTestCount = 0;
+      if (draft) {
+        await tx.registrationFormVersion.update({ where: { id: draft.id }, data: { definition: storedDefinition as Prisma.InputJsonValue, createdByUserId: actorUserId } });
+        invalidatedTestCount = (await tx.formTestSubmission.deleteMany({ where: { formVersionId: draft.id } })).count;
+        versionId = draft.id; versionNumber = draft.versionNumber;
+      } else {
+        versionNumber = (form.versions[0]?.versionNumber ?? 0) + 1;
+        const created = await tx.registrationFormVersion.create({ data: {
+          formId, createdByUserId: actorUserId, versionNumber,
+          status: RegistrationFormStatus.DRAFT, definition: storedDefinition as Prisma.InputJsonValue,
+        } });
+        versionId = created.id;
+      }
+      // A live version keeps the form PUBLISHED (#564); only a form with none falls back to DRAFT.
+      const hasLiveVersion = form.versions.some((version) => version.status === RegistrationFormStatus.PUBLISHED);
+      await tx.registrationForm.update({ where: { id: formId }, data: { status: hasLiveVersion ? RegistrationFormStatus.PUBLISHED : RegistrationFormStatus.DRAFT } });
+      await tx.auditLog.create({ data: {
+        eventId, actorUserId, action: "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE", entityType: "RegistrationForm", entityId: formId,
+        correlationId: randomUUID(), summary: `Replaced the draft of ${form.name} with the ${template.name} template.`,
+        metadata: { templateKey, ...(seeded ? { templateVersion: seeded.version } : {}), versionId, versionNumber, replacedExistingDraft: Boolean(draft), invalidatedTestCount, productionWrite: false },
+      } });
+    }, formId, eventId);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new FormOperationError("EDIT_CONFLICT", "This form was just changed in another session. Reload it and try again.");
+    }
+    throw error;
+  }
+  return (await getRegistrationForm(eventId, formId))!;
+}
+
 export async function updateRegistrationForm(
   eventId: string,
   formId: string,

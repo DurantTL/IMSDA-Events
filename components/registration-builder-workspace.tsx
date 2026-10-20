@@ -181,7 +181,7 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
   const [responses, setResponses] = useState<Record<string, PreviewValue>>({});
   const [previewAttendees, setPreviewAttendees] = useState<PreviewAttendee[]>(() => blankPreviewAttendees(selectedVersion?.definition ?? null));
   const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | null>(null);
+  const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | "draft-template" | null>(null);
   const [notice, setNotice] = useState("");
   // Fields the builder just turned into a choice field that defaulted to radio cards (FB-9).
   const [autoRadioFieldIds, setAutoRadioFieldIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -193,6 +193,10 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
   const [showTemplates, setShowTemplates] = useState(initialForms.length === 0);
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [confirmingUnpublish, setConfirmingUnpublish] = useState(false);
+  // "Update draft from a template" (#1056): the picker, then a confirmation naming the chosen template.
+  const [showDraftTemplates, setShowDraftTemplates] = useState(false);
+  const [draftTemplateTarget, setDraftTemplateTarget] = useState<{ key: string; name: string } | null>(null);
+  const [draftTemplateError, setDraftTemplateError] = useState("");
   // The address the server offers when a renamed, never-published form's
   // slug no longer matches its title; null while no prompt is open.
   const [slugPrompt, setSlugPrompt] = useState<{ offeredSlug: string } | null>(null);
@@ -362,6 +366,19 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
       recordTemplateCleanupCreated(result.form.id, result.form.activeVersion.definition);
       setShowTemplates(false);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to create this form."); }
+    finally { setBusy(null); }
+  }
+
+  async function updateDraftFromTemplate() {
+    if (!selectedForm || !draftTemplateTarget) return;
+    setBusy("draft-template"); setDraftTemplateError(""); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/draft-from-template`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateKey: draftTemplateTarget.key }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Unable to update the draft from this template.");
+      syncForm(result.form, `The draft now matches the ${draftTemplateTarget.name} template. The published form is unchanged: run a test submission against this draft, then publish it.`);
+      setDraftTemplateTarget(null); setShowDraftTemplates(false);
+    } catch (caught) { setDraftTemplateError(caught instanceof Error ? caught.message : "Unable to update the draft from this template."); }
     finally { setBusy(null); }
   }
 
@@ -930,7 +947,8 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
   const { confirm: askConfirm, confirmDialog } = useConfirm();
 
   return <section className="page-stack builder-workspace">{confirmDialog}
-    <div className="page-intro"><div><p className="eyebrow">Public registration setup</p><h2 className="duplicate-page-title">{staffPageTitles.registrationForm}</h2><p>Create, arrange, preview, test, and publish versioned registration forms for {eventName} without code.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview &amp; test</button>}<button className="secondary-button" type="button" onClick={() => setShowTemplates((value) => !value)}><CopyPlus size={16} /> New from template</button></div></div>
+    <div className="page-intro"><div><p className="eyebrow">Public registration setup</p><h2 className="duplicate-page-title">{staffPageTitles.registrationForm}</h2><p>Create, arrange, preview, test, and publish versioned registration forms for {eventName} without code.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview &amp; test</button>}<button className="secondary-button" type="button" onClick={() => setShowTemplates((value) => !value)}><CopyPlus size={16} /> New from template</button>{selectedForm && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setShowDraftTemplates((value) => !value)} aria-expanded={showDraftTemplates}><Layers3 size={16} /> Update draft from a template</button>}</div></div>
+    {showDraftTemplates && selectedForm && <section className="panel builder-template-panel" aria-labelledby="draft-template-picker-title"><div className="section-heading"><div><p className="eyebrow">Keep the same form and web address</p><h2 id="draft-template-picker-title">Update the draft of {selectedForm.name} from a template</h2></div><button className="icon-button modal-close-button" aria-label="Close templates" type="button" onClick={() => setShowDraftTemplates(false)}><X size={18} /></button></div><div className="template-card-grid">{templatesForPicker(templates, eventAudience, eventBillingMode).map((template) => <article className="template-card" key={template.key}><span><Layers3 size={20} /></span><small>{template.audience}</small><h3>{template.name}</h3><p>{template.description}</p><div>{template.sectionCount} sections · {template.fieldCount} fields</div><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => { setDraftTemplateError(""); setDraftTemplateTarget({ key: template.key, name: template.name }); }}>Use for the draft <ChevronRight size={15} /></button></article>)}</div></section>}
 
     {showTemplates && <section className="panel builder-template-panel"><div className="section-heading"><div><p className="eyebrow">Start with a safe foundation</p><h2>Choose a template</h2></div><button className="icon-button modal-close-button" aria-label="Close templates" type="button" onClick={() => setShowTemplates(false)}><X size={18} /></button></div><div className="template-card-grid">{templatesForPicker(templates, eventAudience, eventBillingMode).map((template) => <article className="template-card" key={template.key}><span><Layers3 size={20} /></span><small>{template.audience}</small><h3>{template.name}</h3><p>{template.description}</p><div>{template.sectionCount} sections · {template.fieldCount} fields</div><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => createFromTemplate(template.key)}>Use template <ChevronRight size={15} /></button></article>)}</div></section>}
 
@@ -1311,6 +1329,24 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
 
     {confirmingPublish && selectedForm && selectedVersion && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmingPublish(false); }}><section className="modal-card confirm-import-modal" ref={publishDialogRef} role="dialog" aria-modal="true" aria-labelledby="publish-form-title" tabIndex={-1}><div className="modal-head"><div><p className="eyebrow">Publish registration form</p><h2 id="publish-form-title">Publish version {selectedVersion.versionNumber}?</h2></div><button className="icon-button modal-close-button" type="button" aria-label="Close dialog" onClick={() => setConfirmingPublish(false)}><X size={18} /></button></div><div className="boundary-callout"><ShieldCheck size={19} /><span><strong>This form will be ready for the public event page</strong><small>The event must also be published in Event settings before visitors can register.</small></span></div><p className="confirm-copy">This version is saved as the public version. Later edits create a new draft, so existing registrations always retain the exact questions and prices they submitted.</p><div className="form-actions"><button className="secondary-button" type="button" onClick={() => setConfirmingPublish(false)}>Review again</button><button className="primary-button" type="button" disabled={busy !== null} onClick={publish}>{busy === "publish" ? "Publishing…" : "Publish form"}</button></div></section></div>}
 
+    <ConfirmDialog
+      busy={busy === "draft-template"}
+      busyLabel="Updating the draft…"
+      cancelLabel="Keep my draft"
+      confirmLabel={draftTemplateTarget ? `Replace the draft with ${draftTemplateTarget.name}` : "Replace the draft"}
+      destructive
+      error={draftTemplateError}
+      onCancel={() => { if (busy === null) { setDraftTemplateTarget(null); setDraftTemplateError(""); } }}
+      onConfirm={updateDraftFromTemplate}
+      open={draftTemplateTarget !== null}
+      title={draftTemplateTarget && selectedForm ? `Replace the draft of ${selectedForm.name} with ${draftTemplateTarget.name}?` : "Replace the draft?"}
+    >
+      <ul>
+        <li>This replaces any unpublished draft changes, including edits you have not saved. Test submissions run against the old draft are removed.</li>
+        <li>The live form is unchanged until you test and publish the new draft.</li>
+        <li>Registrations already received keep their answers.</li>
+      </ul>
+    </ConfirmDialog>
     <ConfirmDialog
       busy={false}
       confirmLabel={removeFieldTarget ? `Remove "${removeFieldTarget.field.label}"` : "Remove field"}
