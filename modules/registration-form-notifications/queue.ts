@@ -10,10 +10,10 @@ import { registrationPdfHoldUntil } from "@/modules/registration-pdf/hold";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
   conditionStillAllowed,
-  effectiveSectionIds,
   includesText,
   notificationApplies,
   notificationEmailContent,
+  resolveSections,
   type NotificationEmailInput,
   type NotificationCondition,
 } from "@/modules/registration-form-notifications/domain";
@@ -169,15 +169,17 @@ export async function queueFormNotificationsForSubmission(
   const groups: QueuedFormNotificationGroup[] = [];
   const pendingMessageIds: string[] = [];
   for (const row of matching) {
+    const resolved = resolveSections(input.definition, row.sectionIds);
     const content = renderNotificationEmail({
       notificationName: row.name,
       eventName: input.eventName,
       formTitle: input.definition.title,
       registrantName: input.registrantName,
       locationName: input.locationName,
-      includes: includesText(effectiveSectionIds(input.definition, row.sectionIds), titles),
+      includes: resolved.noMatch ? "None of the chosen sections are in this registration's form" : includesText(resolved.sectionIds, titles),
       updated: false,
       hasPdf: false,
+      noMatchingSections: resolved.noMatch,
     });
     const queued = await queueNotificationMessages(tx, {
       eventId: input.eventId,

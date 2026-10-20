@@ -91,13 +91,15 @@ export function conditionStillAllowed(definition: RegistrationFormDefinition, ro
 }
 
 /**
- * The sections a notification includes in THIS form version: when none of the chosen sections exist in it (a registration
- * made on an older version), the full registration rather than an empty PDF.
+ * The chosen sections that exist in THIS form version. Never widened: when sections were chosen and none of them exist in
+ * the registration's version (it was made on an older one), `noMatch` is true and the notification goes as a summary with
+ * no PDF, never as the full registration.
  */
-export function effectiveSectionIds(definition: RegistrationFormDefinition, sectionIds: readonly string[]): string[] {
-  if (sectionIds.length === 0) return [];
+export function resolveSections(definition: RegistrationFormDefinition, sectionIds: readonly string[]): { sectionIds: string[]; noMatch: boolean } {
+  if (sectionIds.length === 0) return { sectionIds: [], noMatch: false };
   const present = new Set(definition.sections.map((section) => section.id));
-  return sectionIds.some((id) => present.has(id)) ? [...sectionIds] : [];
+  const found = sectionIds.filter((id) => present.has(id));
+  return { sectionIds: found, noMatch: found.length === 0 };
 }
 
 /** Whether a notification applies to a registration with these answers and this location. No condition always applies. */
@@ -129,6 +131,8 @@ export type NotificationEmailInput = {
   updated: boolean;
   /** False when the PDF could not be made: the email then says so. */
   hasPdf: boolean;
+  /** The chosen sections are not in this registration's form version: no PDF, and the email says why. */
+  noMatchingSections?: boolean;
 };
 
 function oneLine(value: string) {
@@ -153,7 +157,9 @@ export function notificationEmailContent(input: NotificationEmailInput, escape: 
     `Notification: ${e(input.notificationName)}`,
     `Includes: ${e(input.includes)}`,
     "",
-    input.hasPdf
+    input.noMatchingSections
+      ? "None of the sections chosen for this notification were in this registration's form version, so there is no PDF. Open the registration in IMSDA Events for the details."
+      : input.hasPdf
       ? (input.updated ? "The attached PDF is the updated copy." : "The details are in the attached PDF.")
       : "The PDF could not be attached. Open the registration in IMSDA Events for the details.",
   ];

@@ -59,9 +59,11 @@ question) and limited to chosen sections of the registration PDF. Decisions: Cal
   follows a sensitive question or is gone, that notification is skipped (its id is logged, nothing else) and the panel shows a
   warning on it. It is never sent unconditioned.
 - Sections and the condition's question are checked against the form's latest version when saved. The panel warns when they
-  exist only in an unpublished draft. At send time, if none of a notification's sections are in the version the registration
-  was made on, it includes the full registration rather than an empty PDF.
-- A notification with no section filter attaches the registration PDF (#1082) itself; filtered ones store one PDF per distinct
+  exist only in an unpublished draft. At send time a condition must be allowed in the registration's own version AND in the
+  latest published one, or the notification is skipped. If none of a notification's chosen sections are in the version the
+  registration was made on, the summary email goes with NO PDF and says so; it is never widened to the full registration.
+- A notification with no section filter attaches the stored registration PDF (#1082) only when its Updated mark and content match
+  this send (read only: this path never makes a #1082 version), else it renders its own copy; filtered ones store one PDF per distinct
   set of sections per send. A paused event, or a retry of the same change, stores no PDF.
 - The retry-failed guard (`modules/communications/retry-failed.ts`) keys a form notification by notification and address, so
   a later send of the staff copy or of another notification never counts as proof that this one was delivered, and the reverse.

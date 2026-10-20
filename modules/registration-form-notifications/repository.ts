@@ -79,8 +79,13 @@ async function loadForm(eventId: string, formId: string) {
 /** Why a stored notification may not do what its owner expects: a condition no longer allowed, or a draft-only part. */
 function warningsFor(config: FormNotificationConfig, definition: RegistrationFormDefinition | null, published: RegistrationFormDefinition | null) {
   const warnings: string[] = [];
-  if (definition && !conditionStillAllowed(definition, { conditionFieldKey: config.condition?.fieldKey ?? null })) {
+  const key = { conditionFieldKey: config.condition?.fieldKey ?? null };
+  if (published && !conditionStillAllowed(published, key)) {
     warnings.push("This condition looks at a question that is now sensitive or no longer in the form, so this notification is not being sent. Change or remove the condition.");
+  } else if (definition && !conditionStillAllowed(definition, key)) {
+    warnings.push(published
+      ? "This condition looks at a question that is sensitive or removed in the unpublished draft. This notification will stop being sent once the draft is published. Change or remove the condition."
+      : "This condition looks at a question that is now sensitive or no longer in the form, so this notification is not being sent. Change or remove the condition.");
   }
   if (published && definition) {
     const publishedSections = new Set(published.sections.map((section) => section.id));

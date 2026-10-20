@@ -15,12 +15,13 @@ import {
   type RegistrationPdfModel,
 } from "@/modules/registration-pdf/model";
 import { renderRegistrationPdf } from "@/modules/registration-pdf/render";
-import { ensureRegistrationPdfOutsideTransaction, loadRegistrationPdfSource } from "@/modules/registration-pdf/repository";
+import { loadRegistrationPdfSource } from "@/modules/registration-pdf/repository";
+import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
   conditionStillAllowed,
-  effectiveSectionIds,
   includesText,
   notificationApplies,
+  resolveSections,
   sectionSignature,
 } from "@/modules/registration-form-notifications/domain";
 import {
@@ -65,6 +66,24 @@ export function notificationContentHash(model: RegistrationPdfModel) {
   });
 }
 
+const NO_MATCHING_SECTIONS_HASH = "no-matching-sections";
+const NO_MATCHING_SECTIONS_SIGNATURE = "none";
+const NO_MATCH_INCLUDES = "None of the chosen sections are in this registration's form";
+
+/** The form's latest published definition that parses, or null. */
+async function loadPublishedDefinition(formId: string): Promise<RegistrationFormDefinition | null> {
+  const versions = await getPrisma().registrationFormVersion.findMany({
+    where: { formId, status: "PUBLISHED" },
+    orderBy: { versionNumber: "desc" },
+    select: { definition: true },
+  });
+  for (const version of versions) {
+    const parsed = registrationFormDefinitionSchema.safeParse(version.definition);
+    if (parsed.success) return parsed.data;
+  }
+  return null;
+}
+
 type Loaded = NonNullable<Awaited<ReturnType<typeof loadRegistrationPdfSource>>>;
 
 /** One model, hash and attachment per distinct set of sections in a run: notifications with the same sections share them. */
@@ -97,9 +116,17 @@ async function attachmentFor(input: {
   const entry = modelFor(input.loaded, input.sectionIds, input.cache);
   if (entry.attachments.has(input.updated)) return entry.attachments.get(input.updated) ?? null;
   let attachmentId: string | null;
-  if (input.sectionIds.length === 0) {
-    const ensured = await ensureRegistrationPdfOutsideTransaction({ eventId: input.eventId, registrationId: input.registrationId });
-    attachmentId = ensured?.document.attachmentId ?? null;
+  // The whole registration may reuse the stored #1082 PDF, read only (this path never makes a #1082 version), and only when
+  // it says what the registration says now and its Updated mark is the one this send needs. Otherwise it renders its own.
+  const stored = input.sectionIds.length === 0
+    ? await getPrisma().registrationPdfDocument.findFirst({
+        where: { registrationId: input.registrationId, eventId: input.eventId },
+        orderBy: { version: "desc" },
+        select: { attachmentId: true, updated: true, contentHash: true },
+      })
+    : null;
+  if (stored && stored.updated === input.updated && stored.contentHash === registrationPdfContentHash(entry.model)) {
+    attachmentId = stored.attachmentId;
   } else {
     attachmentId = await storeNotificationPdf({
       eventId: input.eventId,
@@ -107,7 +134,7 @@ async function attachmentFor(input: {
       model: entry.model,
       updated: input.updated,
       notificationName: input.notificationName,
-      filtered: true,
+      filtered: input.sectionIds.length > 0,
     });
   }
   entry.attachments.set(input.updated, attachmentId);
@@ -212,25 +239,28 @@ export async function finishFormNotificationsAfterSubmit(input: { eventId: strin
           const row = rows.find((candidate) => candidate.id === group.notificationId);
           if (!row) continue;
           // Chosen sections missing from the version this registration is on: the full registration, not an empty PDF.
-          const sectionIds = effectiveSectionIds(loaded.source.definition, row.sectionIds);
-          const { hash } = modelFor(loaded, sectionIds, cache);
+          const { sectionIds, noMatch } = resolveSections(loaded.source.definition, row.sectionIds);
+          const hash = noMatch ? NO_MATCHING_SECTIONS_HASH : modelFor(loaded, sectionIds, cache).hash;
           // The people are being told now, whether or not the PDF can be made, so this is the baseline either way.
-          await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature: sectionSignature(sectionIds), sent: false });
-          const attachmentId = await attachmentFor({ eventId: input.eventId, registrationId: input.registrationId, loaded, sectionIds, updated: false, notificationName: row.name, cache });
-          if (!attachmentId) continue;
+          await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature: noMatch ? NO_MATCHING_SECTIONS_SIGNATURE : sectionSignature(sectionIds), sent: false });
+          const attachmentId = noMatch
+            ? null
+            : await attachmentFor({ eventId: input.eventId, registrationId: input.registrationId, loaded, sectionIds, updated: false, notificationName: row.name, cache });
+          if (!attachmentId && !noMatch) continue;
           const content = renderNotificationEmail({
             notificationName: row.name,
             eventName: loaded.eventName,
             formTitle: loaded.source.formTitle,
             registrantName: loaded.registrantName,
             locationName: facts?.location?.name ?? null,
-            includes: includesText(sectionIds, titles),
+            includes: noMatch ? NO_MATCH_INCLUDES : includesText(sectionIds, titles),
             updated: false,
-            hasPdf: true,
+            hasPdf: attachmentId !== null,
+            noMatchingSections: noMatch,
           });
           await prisma.messageOutbox.updateMany({
             where: { id: { in: group.messageIds }, status: "PENDING" },
-            data: { attachmentId, subjectSnapshot: content.subject, bodyTextSnapshot: content.bodyText, bodyHtmlSnapshot: content.bodyHtml },
+            data: { ...(attachmentId ? { attachmentId } : {}), subjectSnapshot: content.subject, bodyTextSnapshot: content.bodyText, bodyHtmlSnapshot: content.bodyHtml },
           });
         } catch (error) {
           logError("A notification PDF could not be made; its message goes without it.", error, { registrationId: input.registrationId, notificationId: group.notificationId });
@@ -273,20 +303,23 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
     const titles = sectionTitlesOf(loaded.source.definition);
     const cache: RunCache = new Map();
     // Read once, outside any transaction: a paused event stores no PDFs at all.
+    const published = await loadPublishedDefinition(formId);
     const eventSettings = await loadEventEmailSettings(prisma, input.eventId);
     const paused = suppressionNote(eventSettings) !== null;
     for (const row of rows) {
       try {
         if (row.recipients.length === 0) continue;
-        if (!conditionStillAllowed(loaded.source.definition, row)) {
+        // Allowed in the registration's own version AND in the form's latest published one: a question that has since become
+        // sensitive must never route an email, even for a registration made before.
+        if (!conditionStillAllowed(loaded.source.definition, row) || (published && !conditionStillAllowed(published, row))) {
           // The form changed since the condition was saved; skipped, never sent unconditioned. Id only.
           logWarn("A form notification was skipped: its condition looks at a question that is no longer allowed.", { notificationId: row.id });
           continue;
         }
         if (!notificationApplies(conditionOf(row), answers, facts.locationId)) continue;
-        const sectionIds = effectiveSectionIds(loaded.source.definition, row.sectionIds);
-        const { hash } = modelFor(loaded, sectionIds, cache);
-        const signature = sectionSignature(sectionIds);
+        const { sectionIds, noMatch } = resolveSections(loaded.source.definition, row.sectionIds);
+        const hash = noMatch ? NO_MATCHING_SECTIONS_HASH : modelFor(loaded, sectionIds, cache).hash;
+        const signature = noMatch ? NO_MATCHING_SECTIONS_SIGNATURE : sectionSignature(sectionIds);
         const delivery = row.deliveries[0];
         let updated: boolean;
         if (!delivery) {
@@ -304,13 +337,14 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
         }
         // A retry of the same change finds its rows: nothing is rendered or stored again.
         const keys = row.recipients.map((email) => notificationMessageKey(row.id, input.registrationId, input.changeKey, email));
-        const already = await prisma.messageOutbox.findMany({ where: { idempotencyKey: { in: keys } }, select: { id: true } });
+        const already = await prisma.messageOutbox.findMany({ where: { idempotencyKey: { in: keys } }, select: { id: true, status: true } });
         if (already.length === keys.length) {
-          if (!paused) await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature, sent: false });
+          // Rows recorded as suppressed (a paused event) told nobody, so they do not advance the baseline.
+          if (!paused && already.every((message) => message.status !== "SUPPRESSED")) await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature, sent: false });
           continue;
         }
         // A paused event records suppressed rows with no PDF.
-        const attachmentId = paused
+        const attachmentId = paused || noMatch
           ? null
           : await attachmentFor({ eventId: input.eventId, registrationId: input.registrationId, loaded, sectionIds, updated, notificationName: row.name, cache });
         const content = renderNotificationEmail({
@@ -319,9 +353,10 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
           formTitle: loaded.source.formTitle,
           registrantName: loaded.registrantName,
           locationName: facts.location?.name ?? null,
-          includes: includesText(sectionIds, titles),
+          includes: noMatch ? NO_MATCH_INCLUDES : includesText(sectionIds, titles),
           updated,
           hasPdf: attachmentId !== null,
+          noMatchingSections: noMatch,
         });
         // Outside any transaction until now; one small one for the messages.
         const queued = await prisma.$transaction(async (tx) => {

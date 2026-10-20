@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   processQueued: vi.fn(),
   switchEnabled: vi.fn(),
   loadSource: vi.fn(),
-  ensure: vi.fn(),
+  latestDocument: vi.fn(),
+  versions: vi.fn(),
   render: vi.fn(),
   actualRender: null as unknown as (input: unknown) => Promise<Uint8Array>,
 }));
@@ -22,14 +23,14 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/communications/effective-delivery", () => ({ loadEventEmailSettings: mocks.loadEventEmailSettings }));
 vi.mock("@/modules/communications/messaging-repository", () => ({ processQueuedMessageIdsAfterCommit: mocks.processQueued }));
 vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: mocks.switchEnabled }));
-vi.mock("@/modules/registration-pdf/repository", () => ({ loadRegistrationPdfSource: mocks.loadSource, ensureRegistrationPdfOutsideTransaction: mocks.ensure }));
+vi.mock("@/modules/registration-pdf/repository", () => ({ loadRegistrationPdfSource: mocks.loadSource }));
 vi.mock("@/modules/registration-pdf/render", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/modules/registration-pdf/render")>();
   mocks.actualRender = actual.renderRegistrationPdf as never;
   return { ...actual, renderRegistrationPdf: mocks.render };
 });
 
-import { buildRegistrationPdfModel, type RegistrationPdfSource } from "@/modules/registration-pdf/model";
+import { buildRegistrationPdfModel, registrationPdfContentHash, type RegistrationPdfSource } from "@/modules/registration-pdf/model";
 import {
   FORM_NOTIFICATIONS_MAX_PER_FORM,
   LOCATION_CONDITION_KEY,
@@ -96,7 +97,9 @@ beforeEach(() => {
   mocks.processQueued.mockResolvedValue({});
   mocks.loadEventEmailSettings.mockResolvedValue(normalSettings);
   // The registration PDF (#1082) already stored for the whole registration.
-  mocks.ensure.mockResolvedValue({ document: { attachmentId: "registration-pdf" } });
+  // Read only: the registration PDF (#1082) already stored for the whole registration, unmarked, saying what it says now.
+  mocks.latestDocument.mockResolvedValue({ attachmentId: "registration-pdf", updated: false, contentHash: registrationPdfContentHash(buildRegistrationPdfModel(springCamporeeSource())) });
+  mocks.versions.mockResolvedValue([]);
 });
 
 describe("routing: which notifications apply (#1081)", () => {
@@ -276,6 +279,8 @@ describe("the PDFs are made after the commit and a failure never fails the regis
       },
       messageOutbox: outbox,
       registrationNotificationDelivery: deliveries,
+      registrationPdfDocument: { findFirst: mocks.latestDocument },
+      registrationFormVersion: { findMany: mocks.versions },
     };
     mocks.getPrisma.mockReturnValue(db);
     return { db, attachments, outbox, deliveries };
@@ -318,7 +323,7 @@ describe("the PDFs are made after the commit and a failure never fails the regis
 
   it("releases the held messages without a PDF when it cannot be made, and does not throw", async () => {
     const { outbox, attachments } = database();
-    mocks.ensure.mockRejectedValue(new Error("synthetic failure"));
+    mocks.latestDocument.mockRejectedValue(new Error("synthetic failure"));
     mocks.render.mockRejectedValue(new Error("synthetic render failure"));
     await expect(finishFormNotificationsAfterSubmit({ eventId: "event-1", registrationId: "registration-1", groups })).resolves.toBeUndefined();
     expect(attachments).toHaveLength(0);
@@ -368,6 +373,8 @@ describe("re-send on a later change (#1081)", () => {
       messageAttachment: { create: vi.fn(async () => ({ id: "attachment-1" })) },
       messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
       registrationNotificationDelivery: deliveries,
+      registrationPdfDocument: { findFirst: mocks.latestDocument },
+      registrationFormVersion: { findMany: mocks.versions },
       $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
     };
     mocks.getPrisma.mockReturnValue(db);
@@ -496,6 +503,8 @@ describe("review fixes (#1081)", () => {
       messageAttachment: { create: vi.fn(async () => ({ id: "stored-attachment" })) },
       messageOutbox: { findMany: vi.fn().mockResolvedValue(Array.from({ length: existingKeys }, (_, index) => ({ id: `old-${index}` }))) },
       registrationNotificationDelivery: deliveries,
+      registrationPdfDocument: { findFirst: mocks.latestDocument },
+      registrationFormVersion: { findMany: mocks.versions },
       $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
     };
     mocks.getPrisma.mockReturnValue(db);
@@ -526,13 +535,65 @@ describe("review fixes (#1081)", () => {
     expect(created.map((message) => message.recipientEmail)).toEqual(["fine@example.test"]);
   });
 
-  it("falls back to the full registration, not an empty PDF, when none of the chosen sections exist in the submitted version", async () => {
+  it("never widens: when none of the chosen sections are in the registration's version, it sends the summary with no PDF", async () => {
     const { created, db } = changeDatabase([row({ id: "stale", ...never(["section_from_a_draft"]) })]);
     await notifyFormNotificationsAfterChange(change);
     expect(created).toHaveLength(1);
-    expect(created[0]!.attachmentId).toBe("registration-pdf");
+    expect(created[0]!.attachmentId).toBeUndefined();
     expect(db.messageAttachment.create).not.toHaveBeenCalled();
-    expect(String(created[0]!.bodyTextSnapshot)).toContain("Includes: The full registration");
+    expect(mocks.latestDocument).not.toHaveBeenCalled();
+    expect(String(created[0]!.bodyTextSnapshot)).toContain("None of the sections chosen for this notification were in this registration's form version, so there is no PDF");
+    expect(String(created[0]!.bodyTextSnapshot)).not.toContain("The details are in the attached PDF");
+  });
+
+  it("skips a notification whose condition is sensitive in the form's latest published version, even for a registration on an older version", async () => {
+    const stricter = {
+      ...definition,
+      sections: definition.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => (field.key === "partner_club" ? { ...field, sensitive: true } : field)),
+      })),
+    };
+    const rows = [row({ id: "routed", conditionFieldKey: "partner_club", conditionOperator: "EQUALS", conditionValue: "Oak Ridge Adventurers" }), row({ id: "plain" })];
+    // Allowed in the registration's own version: sent.
+    const before = changeDatabase(rows);
+    await notifyFormNotificationsAfterChange(change);
+    expect(before.created.map((message) => message.recipientEmail)).toEqual(["routed@example.test", "plain@example.test"]);
+    // Sensitive in published v2: skipped.
+    mocks.versions.mockResolvedValue([{ definition: stricter }]);
+    const after = changeDatabase(rows);
+    mocks.versions.mockResolvedValue([{ definition: stricter }]);
+    await notifyFormNotificationsAfterChange(change);
+    expect(after.created.map((message) => message.recipientEmail)).toEqual(["plain@example.test"]);
+  });
+
+  it("reuses the registration PDF only when its Updated mark matches, and otherwise renders its own copy", async () => {
+    // The stored PDF is a first copy; an Updated send needs an UPDATED-marked one.
+    const changed = { ...sourceNow, registrationResponses: { ...sourceNow.registrationResponses, tents: "Nine tents" } };
+    const whole = notificationContentHash(buildRegistrationPdfModel(sourceNow));
+    const { created, db } = changeDatabase([row({ id: "whole", deliveries: [{ contentHash: whole, sectionSignature: "" }] })]);
+    mocks.loadSource.mockResolvedValue({ source: changed, timezone: "America/Chicago", eventName: "Synthetic Camporee", clubName: "Maple Grove Pathfinders", registrantName: "Dana Sample", formVersionId: "version-1" });
+    mocks.latestDocument.mockResolvedValue({ attachmentId: "registration-pdf", updated: false, contentHash: registrationPdfContentHash(buildRegistrationPdfModel(changed)) });
+    await notifyFormNotificationsAfterChange(change);
+    expect(String(created[0]!.subjectSnapshot)).toMatch(/^Updated: /);
+    expect(created[0]!.attachmentId).toBe("stored-attachment");
+    expect((db.messageAttachment.create.mock.calls[0] as unknown as [{ data: { filename: string } }])[0].data.filename).toMatch(/UPDATED\.pdf$/);
+
+    // A stored Updated copy that matches is reused, and nothing is stored.
+    mocks.latestDocument.mockResolvedValue({ attachmentId: "registration-pdf", updated: true, contentHash: registrationPdfContentHash(buildRegistrationPdfModel(changed)) });
+    const again = changeDatabase([row({ id: "whole", deliveries: [{ contentHash: whole, sectionSignature: "" }] })]);
+    mocks.loadSource.mockResolvedValue({ source: changed, timezone: "America/Chicago", eventName: "Synthetic Camporee", clubName: "Maple Grove Pathfinders", registrantName: "Dana Sample", formVersionId: "version-1" });
+    await notifyFormNotificationsAfterChange(change);
+    expect(again.created[0]!.attachmentId).toBe("registration-pdf");
+    expect(again.db.messageAttachment.create).not.toHaveBeenCalled();
+  });
+
+  it("does not advance the baseline when the rows found for the change were recorded as suppressed", async () => {
+    const suppressed = changeDatabase([row({ id: "a", ...never([CAMPING]) })]);
+    suppressed.db.messageOutbox.findMany.mockResolvedValue([{ id: "old-0", status: "SUPPRESSED" }]);
+    await notifyFormNotificationsAfterChange(change);
+    expect(suppressed.deliveries.upsert).not.toHaveBeenCalled();
+    expect(suppressed.created).toEqual([]);
   });
 
   it("stores one PDF per distinct set of sections, and reuses the registration PDF for an unfiltered notification", async () => {
@@ -545,7 +606,7 @@ describe("review fixes (#1081)", () => {
     expect(created).toHaveLength(3);
     expect(db.messageAttachment.create).toHaveBeenCalledTimes(1);
     expect(created.map((message) => message.attachmentId)).toEqual(["stored-attachment", "stored-attachment", "registration-pdf"]);
-    expect(mocks.ensure).toHaveBeenCalledTimes(1);
+    expect(mocks.latestDocument).toHaveBeenCalledTimes(1);
   });
 
   it("stores no PDF for a paused event, and none again for a retry of the same change", async () => {
@@ -553,7 +614,7 @@ describe("review fixes (#1081)", () => {
     const paused = changeDatabase([row({ id: "a", ...never([CAMPING]) }), row({ id: "b" })]);
     await notifyFormNotificationsAfterChange(change);
     expect(paused.db.messageAttachment.create).not.toHaveBeenCalled();
-    expect(mocks.ensure).not.toHaveBeenCalled();
+    expect(mocks.latestDocument).not.toHaveBeenCalled();
     expect(paused.created.every((message) => message.status === "SUPPRESSED" && message.attachmentId === undefined)).toBe(true);
 
     mocks.loadEventEmailSettings.mockResolvedValue(normalSettings);
@@ -593,6 +654,26 @@ describe("review fixes (#1081)", () => {
     expect(byId.get("sensitive")![0]).toContain("not being sent");
     expect(byId.get("draft")![0]).toContain("only in the unpublished draft");
     expect(byId.get("clean")).toEqual([]);
+  });
+
+  it("says a condition that only the draft disallows will stop being sent once the draft is published", async () => {
+    const { getFormNotificationsPanel } = await import("@/modules/registration-form-notifications/repository");
+    const stricter = {
+      ...definition,
+      sections: definition.sections.map((section) => ({ ...section, fields: section.fields.map((field) => (field.key === "partner_club" ? { ...field, sensitive: true } : field)) })),
+    };
+    mocks.getPrisma.mockReturnValue({
+      registrationForm: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "form-1",
+          versions: [{ definition: stricter, status: "DRAFT" }, { definition, status: "PUBLISHED" }],
+          notifications: [row({ id: "routed", conditionFieldKey: "partner_club", conditionOperator: "EQUALS", conditionValue: "Oak Ridge Adventurers" })],
+        }),
+      },
+      eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+    });
+    const panel = await getFormNotificationsPanel("event-1", "form-1");
+    expect(panel.notifications[0]!.warnings[0]).toContain("will stop being sent once the draft is published");
   });
 });
 
