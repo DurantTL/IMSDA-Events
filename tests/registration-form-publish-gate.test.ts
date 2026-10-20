@@ -46,7 +46,12 @@ function transactionClient(previouslyPublishedCount: number, validTests: number)
         id: "form-1",
         eventId: "event-1",
         name: "Retreat registration",
-        versions: [version()],
+        versions: [
+          version(),
+          ...(previouslyPublishedCount > 0
+            ? [version({ id: "version-1", versionNumber: 1, status: "ARCHIVED", publishedAt: new Date("2026-07-01T00:00:00.000Z") })]
+            : []),
+        ],
       }),
       update: vi.fn().mockResolvedValue({}),
     },
@@ -125,31 +130,45 @@ describe("registration form publish gate", () => {
     );
   });
 
-  it("gates a later version on its own valid test even after an earlier version was published (#564)", async () => {
+  it("publishes a later draft without a test once an earlier version was published or archived (#1061)", async () => {
     const tx = transactionClient(1, 0);
-    dependencies.getPrisma.mockReturnValue(prismaFor(tx));
-
-    await expect(
-      publishRegistrationForm("event-1", "form-1", "user-1"),
-    ).rejects.toMatchObject({ code: "TEST_REQUIRED" });
-    expect(tx.formTestSubmission.count).toHaveBeenCalledWith({
-      where: { formVersionId: "version-2", isValid: true },
-    });
-    expect(tx.registrationFormVersion.updateMany).not.toHaveBeenCalled();
-  });
-
-  it("publishes a later version once that version has a valid test", async () => {
-    const tx = transactionClient(1, 1);
     dependencies.getPrisma.mockReturnValue(prismaFor(tx));
 
     await publishRegistrationForm("event-1", "form-1", "user-1");
 
+    expect(tx.formTestSubmission.count).not.toHaveBeenCalled();
     expect(tx.registrationFormVersion.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: "ARCHIVED" } }),
     );
     expect(tx.registrationFormVersion.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ id: "version-2", status: "DRAFT" }) }),
     );
+  });
+
+  it("treats a form whose only earlier version is the live published one as already published (#1061)", async () => {
+    const tx = transactionClient(0, 0);
+    tx.registrationForm.findFirst.mockResolvedValue({
+      id: "form-1",
+      eventId: "event-1",
+      name: "Retreat registration",
+      versions: [version(), version({ id: "version-1", versionNumber: 1, status: "PUBLISHED", publishedAt: new Date("2026-07-01T00:00:00.000Z") })],
+    });
+    dependencies.getPrisma.mockReturnValue(prismaFor(tx));
+
+    await publishRegistrationForm("event-1", "form-1", "user-1");
+
+    expect(tx.formTestSubmission.count).not.toHaveBeenCalled();
+  });
+
+  it("checks the first publish's test against the draft itself", async () => {
+    const tx = transactionClient(0, 1);
+    dependencies.getPrisma.mockReturnValue(prismaFor(tx));
+
+    await publishRegistrationForm("event-1", "form-1", "user-1");
+
+    expect(tx.formTestSubmission.count).toHaveBeenCalledWith({
+      where: { formVersionId: "version-2", isValid: true },
+    });
   });
 
   it("refuses to publish when the draft changed after the test count (stale test)", async () => {

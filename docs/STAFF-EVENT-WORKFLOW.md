@@ -58,7 +58,7 @@ and from the draft-created banner) and build its registration form: attendee
 types, questions, pricing, and availability rules.
 
 Before a form version can go live, run at least one test submission against
-it. Current, confirmed behavior (2026-09-28): **only the first published
+it. Current, confirmed behavior (decided 2026-10-20, #1061): **only the first published
 version of a form needs a test submission.** Once a form has ever been
 published, later versions (a corrected label, an updated price) can publish
 without a fresh test run — testing every routine edit forever is not
