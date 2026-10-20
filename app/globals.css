@@ -9999,9 +9999,15 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 @media print {
   /* A printout lists every honor: no collapsing, no scroll box, no toggle. */
   .honor-pill-list, .honor-pill-list.expanded { max-height: none; overflow: visible; }
-  .honor-pill[hidden] { display: inline-flex !important; }
   .honor-pill-text, .honor-pill-list.expanded .honor-pill-text { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
   .honor-pill-toggle-screen { display: none !important; }
+/* A printout lists every honor, including ones the screen filter hid. The base layer's `[hidden] { display: none !important }`
+   beats any unlayered rule, so this one sits in the same layer with !important, where its higher specificity wins. */
+@layer base {
+  @media print {
+    .honor-pill[hidden] { display: inline-flex !important; }
+  }
+}
 }
 .honor-pill-toggle { min-height: 32px; padding: 2px 4px; }
 .roster-honors-cell { min-width: 0; max-width: 24rem; }
