@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PlatformSettingsWorkspace } from "@/components/platform-settings-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
+import { getSignInLinkCheck } from "@/modules/account-merge/sign-in-switch";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 
 export const metadata: Metadata = { title: "Platform settings" };
@@ -14,7 +16,10 @@ export default async function PlatformSettingsPage() {
 
   return (
     <>
-      <PlatformSettingsWorkspace initialSettings={await getPlatformSettings()} />
+      <PlatformSettingsWorkspace
+        initialSettings={await getPlatformSettings()}
+        initialSignIn={{ enabled: await isUnifiedSignInEnabled(), linkCheck: await getSignInLinkCheck() }}
+      />
     </>
   );
 }
