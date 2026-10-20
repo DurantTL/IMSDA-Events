@@ -153,7 +153,7 @@ describe("event settings stale-write guard (#445)", () => {
     const banner = readFileSync(path.join(process.cwd(), "components/calendar-link-banner.tsx"), "utf8");
     expect(banner).toContain("Save or discard your changes first");
     expect(banner).toContain("disabled={busy || unsaved ||");
-    expect(banner).toContain('disabled={busy || unsaved} onClick={() => answer("keep")}');
+    expect(banner).toContain('disabled={busy || unsaved} onClick={() => answer(prompt, "keep")}');
     const workspace = readFileSync(path.join(process.cwd(), "components/event-settings-workspace.tsx"), "utf8");
     expect(workspace).toContain("setEventSettingsDirty(dirty)");
   });
