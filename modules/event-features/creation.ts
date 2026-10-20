@@ -89,7 +89,7 @@ const flagCopy: Record<CreationFlagKey, { title: string; description: string }> 
   autoPromoteWaitlist: { title: "Automatic waitlist promotion", description: "The next eligible registration is promoted when capacity opens. Needs the waitlist." },
   collectsShirtSizes: { title: "Shirt sizes", description: "Registrants choose a size on their private page." },
   hostedPaymentLinkEnabled: { title: "Pay on Square", description: "A backup button that opens Square's own payment page. For events where attendees pay online." },
-  checksAdultBackgrounds: { title: "Sterling Volunteers check for adults", description: "Flags every adult registered until their Sterling Volunteers is current. Never blocks registration." },
+  checksAdultBackgrounds: { title: "Sterling Volunteers check for adults", description: "Flags every adult registered until their Sterling Volunteers is current; adults and staff who aren't current can't be checked in without a staff override. Never blocks registration." },
 };
 
 /**

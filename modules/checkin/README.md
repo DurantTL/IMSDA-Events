@@ -143,3 +143,16 @@ venue Wi-Fi.
   challenge live. Wrong codes still count and still lock after 3. Volunteers
   just wait for the next code; no recovery codes need handing out. The
   per-challenge attempt cap (5) and the sign-in rate limit still bound it.
+
+- **Sterling Volunteers hold (#874)**: at an event marked youth or children's
+  (`checksAdultBackgrounds`), `checkInAttendee` refuses an adult or staff
+  attendee who isn't current (`STERLING_CHECK_NEEDED`, HTTP 409, "Sterling
+  Volunteers check needed before check-in"). The rule is decided server-side
+  from `checkInBlocksForAttendees`, after the replay and already-checked-in
+  answers. A staff member with `MANAGE_CHECK_IN` overrides by sending
+  `sterlingOverrideReason` (3-300 characters) with the same request; it writes
+  the usual `ATTENDEE_CHECKED_IN` entry plus `STERLING_CHECK_IN_OVERRIDDEN`
+  (ids, the check's state and the typed reason). Bulk and whole-club check-in
+  are a series of single check-ins, so each held person is refused on its own
+  and the rest go through; the club view leaves them out up front and names
+  them. Registration, logins and roster access are never blocked.

@@ -22,7 +22,8 @@ import { loadDirectorClubAssignment } from "@/modules/club-registrations/directo
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { noCostPrice } from "@/modules/club-registrations/per-person-price";
 import { isChurchBilledStatus, notBilledLabel } from "@/modules/club-registrations/church-owed";
-import { clubPortalComplianceStatuses } from "@/modules/background-checks/repository";
+import { clubPortalComplianceStatuses, listEventBackgroundFlags } from "@/modules/background-checks/repository";
+import { DirectorSterlingFollowUp } from "@/components/director-sterling-followup";
 import { ClubRegistrationError, getClubEventWorkspace } from "@/modules/club-registrations/repository";
 import { activeRegistrationStatuses, registrationClosedMessage } from "@/modules/events/lifecycle";
 import { getClassSelectionWorkspaceIfRegistered, getRegistrationHonorsCatalog } from "@/modules/honors/enrollment-repository";
@@ -125,6 +126,12 @@ export default async function ClubEventRegistrationPage({
   const backgroundStates = complianceStatuses
     ? Object.fromEntries(Object.entries(complianceStatuses).map(([memberId, status]) => [memberId, status.state]))
     : undefined;
+
+  // The follow-up list (#874): this club's own registered adults and staff who aren't current, at a youth or children's
+  // event only, for a director or deputy (the people who see statuses elsewhere). Status only: no contact, dates or notes.
+  const sterlingFollowUp = workspace.registration && access.capabilities.seeBirthDates
+    ? await listEventBackgroundFlags(eventId, { organizationId })
+    : null;
 
   return (
     <>
@@ -371,6 +378,7 @@ export default async function ClubEventRegistrationPage({
           </Link>
         </section>
       )}
+      {sterlingFollowUp && <DirectorSterlingFollowUp people={sterlingFollowUp.people.map(({ attendeeId, firstName, lastName, attendeeType, state }) => ({ attendeeId, firstName, lastName, attendeeType, state }))} />}
       {showingTeam && !workspace.registration && workspace.problem && (
         <section className="public-manage-card">
           <p className="public-manage-empty">{workspace.problem} Let the event team know so they can fix the form.</p>

@@ -38,7 +38,7 @@ export default async function EventClubPage({
   const fromHere = `${query}&from=${encodeURIComponent(selfHref)}`;
   // The issues text is for system administrators only (#427, #544).
   const { user } = await getCurrentSession();
-  const backgroundFlags = await listEventBackgroundFlags(event.id, { organizationId, includeNotes: canSeeIssuesText(user) });
+  const backgroundFlags = await listEventBackgroundFlags(event.id, { organizationId, includeNotes: canSeeIssuesText(user), includeContact: true });
   const assignment = await getClubAssignmentForClub(event.id, organizationId);
   // Guardian contacts (#510): only for staff who hold the sensitive-data permission on this event.
   const guardianViewer = await resolveStaffGuardianViewer(event.id);

@@ -1589,7 +1589,8 @@ model Event {
   operationalPacketConfig Json?
   /// A youth or children's event, where parents aren't normally present (#388).
   /// Every adult registered is flagged until they have a current Sterling
-  /// Volunteers background check on file. Flags only: nothing is blocked.
+  /// Volunteers background check on file. Registration is never blocked; check-in holds a not-current
+  /// adult or staff member unless staff type an audited override (#874).
   checksAdultBackgrounds Boolean          @default(false)
   /// Offers "Pay on Square" (Square's hosted checkout page) next to the embedded card form (#327).
   /// Off by default; staff turn it on for attendee-paid events.

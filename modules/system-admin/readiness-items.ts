@@ -101,7 +101,7 @@ export const manualReadinessItems: readonly ManualReadinessItem[] = [
     key: "sterling-rules-signed-off",
     group: "go-live",
     title: "Sterling Volunteers check rules signed off",
-    detail: "The rules as built (only dates stored, non-clear statuses never stored, flags only, nothing blocked) are approved.",
+    detail: "The rules as built are approved: only dates stored, non-clear statuses never stored; registration and logins are never blocked; at youth and children's events an adult or staff member who isn't current can't be checked in without an audited staff override; each event has a follow-up list.",
     reference: "Issue #218",
   },
   {

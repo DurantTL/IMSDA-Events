@@ -13,6 +13,7 @@ import {
   offlineCheckInStorageKey,
   inspectOfflineCheckInQueue,
   offlineCheckInErrorMessage,
+  STERLING_CHECK_NEEDED_MESSAGE,
   queueItemForCheckIn,
   updateQueuedCheckIn,
   type OfflineCheckInErrorCode,
@@ -234,6 +235,15 @@ export function useOfflineCheckInQueue({
       }
 
       const errorCode = responseErrorCode(response, payload);
+      // #874: a refusal for want of a current Sterling Volunteers check isn't a saved action to retry
+      // (the override is a fresh, typed action), so it leaves the queue instead of sitting as "needs review".
+      if (errorCode === "STERLING_CHECK_NEEDED") {
+        discardQueueItem(item.idempotencyKey);
+        return {
+          status: "CONFLICT",
+          message: `${STERLING_CHECK_NEEDED_MESSAGE}.`,
+        };
+      }
       // A 401 means the staff session ended (idle sign-out), not that the
       // check-in is wrong: keep it queued so it retries on its own once staff
       // sign back in (#825). A 403 is a real refusal and still needs review.
@@ -292,6 +302,42 @@ export function useOfflineCheckInQueue({
     }
     return submitQueueItem(item);
   }, [submitQueueItem, upsertQueueItem]);
+
+  /**
+   * #874: checks in an adult or staff member who isn't current with Sterling Volunteers, with the reason
+   * staff typed. Sent straight to the server, never queued: an override is a deliberate, online decision,
+   * and the server audits it with the reason.
+   */
+  const requestSterlingOverrideCheckIn = useCallback(async (
+    attendeeId: string,
+    reason: string,
+  ): Promise<CheckInActionResult> => {
+    if (!navigator.onLine) {
+      return { status: "CONFLICT", message: "An override needs a connection. Reconnect, then try again." };
+    }
+    try {
+      const response = await fetch(
+        `/api/events/${encodeURIComponent(eventId)}/attendees/${encodeURIComponent(attendeeId)}/check-in`,
+        {
+          method: "POST",
+          cache: "no-store",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), sterlingOverrideReason: reason }),
+          signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+            ? AbortSignal.timeout(CHECK_IN_REQUEST_TIMEOUT_MS)
+            : undefined,
+        },
+      );
+      const payload = await response.json().catch(() => null) as CheckInResponse | null;
+      if (response.ok && payload?.checkedIn === true && payload.checkIn?.checkedInAt) {
+        onConfirmedRef.current(attendeeId, payload.checkIn.checkedInAt);
+        return { status: "CONFIRMED", checkedInAt: payload.checkIn.checkedInAt, message: "Checked in with a Sterling Volunteers override." };
+      }
+      return { status: "CONFLICT", message: payload?.message ?? "The override was not saved. Nothing was checked in." };
+    } catch {
+      return { status: "CONFLICT", message: "The server did not answer. Nothing was checked in; try again." };
+    }
+  }, [eventId]);
 
   const retryQueueItem = useCallback(async (
     idempotencyKey: string,
@@ -439,6 +485,7 @@ export function useOfflineCheckInQueue({
     unreadableItemCount,
     processingKeys,
     requestCheckIn,
+    requestSterlingOverrideCheckIn,
     retryQueueItem,
     retryAll,
     discardQueueItem,

@@ -110,12 +110,43 @@ describe("check-in route", () => {
       "attendee_123",
       "staff_1",
       idempotencyKey,
+      { sterlingOverrideReason: undefined },
     );
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(await response.json()).toMatchObject({
       checkedIn: true,
       disposition: "CREATED",
     });
+  });
+
+  it("forwards a typed Sterling Volunteers override reason (#874), still behind the check-in permission", async () => {
+    const response = await POST(request({ idempotencyKey, sterlingOverrideReason: "  verified current in Sterling portal " }), context);
+    expect(response.status).toBe(200);
+    expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event_123", "MANAGE_CHECK_IN", mocks.findActiveMembership);
+    expect(mocks.checkInAttendee).toHaveBeenCalledWith("event_123", "attendee_123", "staff_1", idempotencyKey, {
+      sterlingOverrideReason: "verified current in Sterling portal",
+    });
+  });
+
+  it("refuses an override from someone without check-in permission, and checks no one in (#874)", async () => {
+    mocks.requirePermission.mockRejectedValue(new mocks.AccessDeniedError("FORBIDDEN", 403, "No access."));
+    const response = await POST(request({ idempotencyKey, sterlingOverrideReason: "verified current in Sterling portal" }), context);
+    expect(response.status).toBe(403);
+    expect(mocks.checkInAttendee).not.toHaveBeenCalled();
+  });
+
+  it("answers a held adult with a 409 and the Sterling Volunteers message, and does not seal anything (#874)", async () => {
+    mocks.checkInAttendee.mockRejectedValue(new mocks.CheckInOperationError("STERLING_CHECK_NEEDED", "Sterling Volunteers check needed before check-in."));
+    const response = await POST(request({ idempotencyKey }), context);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "STERLING_CHECK_NEEDED", message: "Sterling Volunteers check needed before check-in." });
+    expect(mocks.sealHealthSnapshotAfterCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("rejects a too-short override reason (#874)", async () => {
+    const response = await POST(request({ idempotencyKey, sterlingOverrideReason: "ok" }), context);
+    expect(response.status).toBe(400);
+    expect(mocks.checkInAttendee).not.toHaveBeenCalled();
   });
 
   it("seals the person's health copy for the event after a successful check-in (#924), and not when the check-in fails", async () => {

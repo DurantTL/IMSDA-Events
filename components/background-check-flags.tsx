@@ -38,6 +38,7 @@ export function BackgroundCheckList({
   if (people.length === 0) {
     return <p className="report-empty">Every adult registered is current with Sterling Volunteers.</p>;
   }
+  const hasContact = people.some((person) => person.contactEmail);
   return (
     <div className="report-table-wrap">
       <table className="report-table roster-table">
@@ -46,6 +47,7 @@ export function BackgroundCheckList({
           <tr>
             <th scope="col">Person</th>
             {showClub && <th scope="col">Club</th>}
+            {hasContact && <th scope="col">Contact</th>}
             <th scope="col">Check</th>
             <th scope="col">Registration</th>
           </tr>
@@ -58,6 +60,7 @@ export function BackgroundCheckList({
                 <small className="quiet-copy"> · {person.attendeeType}</small>
               </th>
               {showClub && <td translate="no">{person.clubName ?? "—"}</td>}
+              {hasContact && <td translate="no">{person.contactEmail ?? "—"}</td>}
               <td>
                 <BackgroundCheckBadge state={person.state} />
                 <small className="quiet-copy"> {person.state === "EXPIRED" ? `Expired ${person.expiresOn}` : backgroundFlagLabels[person.state]}</small>

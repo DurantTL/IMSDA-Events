@@ -140,6 +140,7 @@ function makeFakeDb() {
     const endsAt = where.event as { endsAt?: { gte: Date } } | undefined;
     if (endsAt?.endsAt && !(event && (event.endsAt as Date) >= endsAt.endsAt.gte)) return false;
     if (where.eventId && attendee.eventId !== where.eventId) return false;
+    if (where.id !== undefined && !valueMatches(attendee.id, where.id)) return false;
     if (where.personId !== undefined && !valueMatches(attendee.personId, where.personId)) return false;
     const registration = attendee.registration as Row;
     const regWhere = where.registration as Row | undefined;
@@ -493,6 +494,7 @@ import {
   clubPortalComplianceStatuses,
   clubRosterComplianceStatuses,
   listBackgroundCheckReviews,
+  checkInBlocksForAttendees,
   listEventBackgroundFlags,
   listManualBackgroundCheckMatches,
   listNameOnlyBackgroundCheckMatches,
@@ -1441,6 +1443,48 @@ describe("flags at youth or children's events (#388, #527)", () => {
     const flags = await listEventBackgroundFlags("event-1");
     expect(flags?.adults).toBe(3);
     expect(flags?.people.map((flag) => [flag.attendeeId, flag.state])).toEqual([["expired", "EXPIRED"], ["none", "MISSING"]]);
+  });
+
+  function freshEvent(checks = true) {
+    const { client, seed } = makeFakeDb();
+    currentClient = client;
+    seed.events.set("event-1", { id: "event-1", checksAdultBackgrounds: checks, startsAt: new Date("2026-10-02T17:00:00Z"), endsAt: new Date("2026-10-04T17:00:00Z"), timezone: "America/Chicago" });
+    return seed;
+  }
+
+  it("gives staff a contact email on the follow-up list, and a director's list none (#874)", async () => {
+    const seed = freshEvent();
+    seed.attendees.push(attendee("none", null, { attendeeType: "Adult", profileSnapshot: { email: "pat.sample@example.test" } }));
+    expect((await listEventBackgroundFlags("event-1", { includeContact: true }))?.people[0]?.contactEmail).toBe("pat.sample@example.test");
+    expect((await listEventBackgroundFlags("event-1"))?.people[0]?.contactEmail).toBeNull();
+  });
+
+  describe("who check-in holds (#874)", () => {
+    it("holds only not-current adults and staff among the people asked about", async () => {
+      const seed = freshEvent();
+      seed.attendees.push(
+        attendee("expired", { expiresOn: "2026-10-03", complianceStatus: null }, { attendeeType: "Adult" }),
+        attendee("current", { expiresOn: "2026-10-04", complianceStatus: null }, { attendeeType: "Adult" }),
+        attendee("none-staff", null, { attendeeType: "Staff" }),
+        attendee("not-compliant", { expiresOn: null, complianceStatus: "NOT_COMPLIANT" }, { attendeeType: "Adult" }),
+        attendee("pathfinder", null, { profileSnapshot: { ageOnEventDate: 12 } }),
+        attendee("not-asked", null, { attendeeType: "Adult" }),
+      );
+      const blocks = await checkInBlocksForAttendees("event-1", ["expired", "current", "none-staff", "not-compliant", "pathfinder"]);
+      expect([...blocks.entries()]).toEqual([["expired", "EXPIRED"], ["none-staff", "MISSING"], ["not-compliant", "NOT_COMPLIANT"]]);
+    });
+
+    it("holds no one at an event that isn't marked youth or children's, however many adults lack a check", async () => {
+      const other = freshEvent(false);
+      other.attendees.push(attendee("none", null, { attendeeType: "Adult" }));
+      expect((await checkInBlocksForAttendees("event-1", ["none"])).size).toBe(0);
+    });
+
+    it("asks about no one when given no ids", async () => {
+      const seed = freshEvent();
+      seed.attendees.push(attendee("none", null, { attendeeType: "Adult" }));
+      expect((await checkInBlocksForAttendees("event-1", [])).size).toBe(0);
+    });
   });
 });
 

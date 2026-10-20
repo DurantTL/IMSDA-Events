@@ -25,7 +25,7 @@ export {
 /**
  * Sterling Volunteers (#388). Pure: reading the CSV a system
  * administrator uploads, and deciding who at a youth or children's event is an
- * adult who needs a current check. Flags only; nothing here blocks anyone.
+ * adult who needs a current check. Registration and logins are never blocked; check-in holds a not-current adult (#874).
  */
 
 export const STERLING_CSV_HEADERS = ["First name", "Last name", "Email", "Birth date", "Check date", "Expiration date", "Status"] as const;
@@ -782,14 +782,16 @@ export function backgroundFlagsCsv(people: Array<{
   confirmationCode: string;
   state: Exclude<BackgroundCheckState, "CURRENT">;
   expiresOn: string | null;
+  contactEmail?: string | null;
 }>) {
   return toCsv([
-    ["Last name", "First name", "Attendee type", "Club", "Confirmation code", "Sterling Volunteers", "Expired on"],
+    ["Last name", "First name", "Attendee type", "Club", "Contact email", "Confirmation code", "Sterling Volunteers", "Expired on"],
     ...people.map((person) => [
       person.lastName,
       person.firstName,
       person.attendeeType,
       person.clubName ?? "",
+      person.contactEmail ?? "",
       person.confirmationCode,
       backgroundFlagLabels[person.state],
       person.state === "EXPIRED" ? person.expiresOn ?? "" : "",

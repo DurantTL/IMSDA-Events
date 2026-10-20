@@ -59,7 +59,7 @@ describe("Sterling Volunteers wording (#443)", () => {
 
   it("uses Sterling Volunteers for the CSV headers, flags and download names", () => {
     const domain = readFileSync(path.join(root, "modules/background-checks/domain.ts"), "utf8");
-    expect(domain).toContain('"Confirmation code", "Sterling Volunteers", "Expired on"');
+    expect(domain).toContain('"Contact email", "Confirmation code", "Sterling Volunteers", "Expired on"');
     const flags = readFileSync(path.join(root, "components/background-check-flags.tsx"), "utf8");
     expect(flags).toContain("Sterling Volunteers needed");
     const template = readFileSync(path.join(root, "app/api/admin/background-checks/template/route.ts"), "utf8");

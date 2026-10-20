@@ -95,7 +95,8 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
       eventId,
       attendeeId,
       access.user.id,
-      input.idempotencyKey
+      input.idempotencyKey,
+      { sterlingOverrideReason: input.sterlingOverrideReason },
     );
     // The arrival is recorded first. Sealing the person's health copy for this event (#924) comes after it, is
     // a no-op with the health records switch off or without a record, and never fails the check-in.

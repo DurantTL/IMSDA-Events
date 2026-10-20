@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const checkInRequestSchema = z.strictObject({
   idempotencyKey: z.uuid(),
+  /** Staff's typed reason for checking in an adult or staff member who isn't current with Sterling Volunteers (#874). */
+  sterlingOverrideReason: z.string().trim().min(3).max(300).optional(),
 });
 
 export type CheckInRequest = z.infer<typeof checkInRequestSchema>;
@@ -12,6 +14,7 @@ export const offlineCheckInErrorCodeSchema = z.enum([
   "AUTHORIZATION_REQUIRED",
   "ATTENDEE_NOT_FOUND",
   "REGISTRATION_NOT_ELIGIBLE",
+  "STERLING_CHECK_NEEDED",
   "IDEMPOTENCY_KEY_REUSED",
   "CHECK_IN_OPERATION_REVERSED",
   "CHECK_IN_OPERATION_CONFLICT",
@@ -33,6 +36,9 @@ export const offlineCheckInQueueItemSchema = z.strictObject({
 
 export type OfflineCheckInQueueItem =
   z.infer<typeof offlineCheckInQueueItemSchema>;
+
+/** What check-in shows in place of the Check in button (#874). */
+export const STERLING_CHECK_NEEDED_MESSAGE = "Sterling Volunteers check needed before check-in";
 
 export function offlineCheckInStorageKey(eventId: string) {
   return `imsda-events:check-in-queue:v1:${eventId}`;
@@ -122,6 +128,8 @@ export function offlineCheckInErrorMessage(code: OfflineCheckInErrorCode) {
       return "This attendee is no longer available in the selected event. Verify the event before retrying or discarding.";
     case "REGISTRATION_NOT_ELIGIBLE":
       return "This registration is cancelled, waitlisted, or otherwise not eligible. Resolve the registration before retrying.";
+    case "STERLING_CHECK_NEEDED":
+      return `${STERLING_CHECK_NEEDED_MESSAGE}.`;
     case "IDEMPOTENCY_KEY_REUSED":
       return "This saved retry key conflicts with another attendee. Discard it and start a new check-in.";
     case "CHECK_IN_OPERATION_REVERSED":

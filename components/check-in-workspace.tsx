@@ -27,6 +27,7 @@ import {
 } from "react";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
+import { SterlingCheckInOverride } from "@/components/sterling-check-in-override";
 import { CheckInScanner } from "@/components/check-in-scanner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ListPager } from "@/components/list-pager";
@@ -242,6 +243,7 @@ export function CheckInWorkspace({
     unreadableItemCount,
     processingKeys,
     requestCheckIn,
+    requestSterlingOverrideCheckIn,
     retryQueueItem,
     retryAll,
     discardQueueItem,
@@ -427,7 +429,9 @@ export function CheckInWorkspace({
           paymentDueByConfirmationCode={paymentDueByConfirmationCode}
           backgroundFlaggedAttendeeIds={backgroundFlaggedAttendeeIds}
           clubsByConfirmationCode={Object.fromEntries(clubByConfirmationCode)}
-          onConfirmCheckIn={(attendee) => requestCheckIn(attendee.id)}
+          onConfirmCheckIn={(attendee, reason) => (
+            reason ? requestSterlingOverrideCheckIn(attendee.id, reason) : requestCheckIn(attendee.id)
+          )}
           savedQueueUnreadable={unreadableItemCount > 0}
           queuedAttendeeIds={queue
             .filter((item) => item.state === "QUEUED")
@@ -750,6 +754,17 @@ export function CheckInWorkspace({
                       ? (processing ? "Retrying…" : "Not saved — tap to retry")
                       : AWAITING_ARRIVAL_LABEL}
               </span>
+              {!arrival.checkedIn && backgroundFlaggedAttendeeIds.includes(arrival.id) ? (
+                <SterlingCheckInOverride
+                  canOverride={canCheckIn}
+                  disabled={processing || bulkBusyCode !== null || unreadableItemCount > 0 || !online}
+                  onOverride={(reason) => requestSterlingOverrideCheckIn(arrival.id, reason).then((result) => {
+                    setMessage(`${arrival.firstName} ${arrival.lastName}: ${result.message}`);
+                    return result;
+                  })}
+                  personLabel={`${arrival.firstName} ${arrival.lastName}`}
+                />
+              ) : (
               <button
                 className={arrival.checkedIn ? "undo-button" : ""}
                 disabled={
@@ -788,7 +803,7 @@ export function CheckInWorkspace({
                         : savedItem
                           ? "Retry queued"
                           : "Check in"}
-              </button>
+              </button>              )}
             </div>
           );
         })}

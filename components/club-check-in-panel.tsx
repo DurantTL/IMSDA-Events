@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
+import { SterlingCheckInOverride } from "@/components/sterling-check-in-override";
 
 /**
  * Q1 (#412): checking in a whole club at once. Shared between the arrival
@@ -53,7 +54,7 @@ function money(cents: number) {
 export function pendingAttendeeIds(attendees: ClubCheckInAttendeeView[]) {
   return attendees
     .filter((attendee) => (
-      !attendee.checkedIn && clubAttendeeStatusLabel(attendee) !== "Needs review"
+      !attendee.checkedIn && !attendee.backgroundFlagged && clubAttendeeStatusLabel(attendee) !== "Needs review"
     ))
     .map((attendee) => attendee.id);
 }
@@ -64,19 +65,23 @@ export function pendingAttendeeIds(attendees: ClubCheckInAttendeeView[]) {
  * checked in while the club view was open (e.g. confirmed by another
  * device) is dropped, matching "Check in all"'s repeat-safe behavior. A
  * ticked attendee that needs review is included: ticking is the explicit
- * choice to retry them.
+ * choice to retry them. Neither list includes an adult or staff member who
+ * isn't current with Sterling Volunteers at a youth or children's event (#874):
+ * the server refuses them in bulk, so they are left out up front and named,
+ * and staff check them in one at a time with a typed override.
  */
 export function selectedPendingAttendeeIds(
   attendees: ClubCheckInAttendeeView[],
   selected: ReadonlySet<string>,
 ) {
   return attendees
-    .filter((attendee) => !attendee.checkedIn && selected.has(attendee.id))
+    .filter((attendee) => !attendee.checkedIn && !attendee.backgroundFlagged && selected.has(attendee.id))
     .map((attendee) => attendee.id);
 }
 
 export function clubAttendeeStatusLabel(attendee: ClubCheckInAttendeeView) {
   if (attendee.checkedIn) return "Checked in";
+  if (attendee.backgroundFlagged) return "Sterling Volunteers check needed";
   if (attendee.savedState === "CONFLICT" || attendee.lastResult === "CONFLICT") return "Needs review";
   if (attendee.savedState === "QUEUED" || attendee.lastResult === "QUEUED") return "Queued — not confirmed";
   return "Not yet";
@@ -100,6 +105,7 @@ export function ClubCheckInPanel({
   headingLevel = 2,
   scannedAttendeeId,
   onCheckInScanned,
+  onOverrideScanned,
 }: {
   organizationName: string;
   /** The event location this club registered at (#413), when the event has locations. */
@@ -124,6 +130,8 @@ export function ClubCheckInPanel({
    */
   scannedAttendeeId?: string;
   onCheckInScanned?: (attendeeId: string) => void | Promise<void>;
+  /** Checks in the scanned person with a typed Sterling Volunteers override (#874). */
+  onOverrideScanned?: (attendeeId: string, reason: string) => Promise<{ status: "CONFIRMED" | "QUEUED" | "CONFLICT"; message: string }>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const pendingIds = useMemo(() => pendingAttendeeIds(attendees), [attendees]);
@@ -132,6 +140,7 @@ export function ClubCheckInPanel({
     [attendees, selected],
   );
   const flaggedCount = attendees.filter((attendee) => attendee.backgroundFlagged).length;
+  const sterlingHeldCount = attendees.filter((attendee) => attendee.backgroundFlagged && !attendee.checkedIn).length;
   const reviewCount = attendees.filter(
     (attendee) => clubAttendeeStatusLabel(attendee) === "Needs review",
   ).length;
@@ -189,6 +198,13 @@ export function ClubCheckInPanel({
           Check in selected ({selectedPendingIds.length})
         </button>
       </div>
+      {sterlingHeldCount > 0 && (
+        <p className="club-check-in-review-note" role="status">
+          {sterlingHeldCount} {sterlingHeldCount === 1 ? "person needs" : "people need"} a Sterling Volunteers
+          check before check-in and {sterlingHeldCount === 1 ? "is" : "are"} left out of the club check-in.
+          Staff can check them in one at a time with an override.
+        </p>
+      )}
       {reviewCount > 0 && (
         <p className="club-check-in-review-note">
           {reviewCount} {reviewCount === 1 ? "person needs" : "people need"} review
@@ -211,7 +227,7 @@ export function ClubCheckInPanel({
               <label className="club-check-in-attendee">
                 <input
                   checked={selected.has(attendee.id)}
-                  disabled={actionsDisabled || attendee.checkedIn}
+                  disabled={actionsDisabled || attendee.checkedIn || attendee.backgroundFlagged}
                   onChange={() => toggle(attendee.id)}
                   type="checkbox"
                 />
@@ -287,6 +303,13 @@ export function ClubCheckInPanel({
               <span className="club-check-in-status">
                 <CheckSquare aria-hidden="true" size={15} /> Checked in
               </span>
+            ) : scanned.backgroundFlagged ? (
+              <SterlingCheckInOverride
+                canOverride={canCheckIn && Boolean(onOverrideScanned)}
+                disabled={busy || savedQueueUnreadable}
+                onOverride={(reason) => onOverrideScanned!(scanned.id, reason)}
+                personLabel={`${scanned.firstName} ${scanned.lastName}`}
+              />
             ) : scanned.savedState === "QUEUED" && scanned.lastResult !== "CONFLICT" ? (
               <span className="club-check-in-status">Queued — not confirmed</span>
             ) : (
