@@ -18,6 +18,7 @@ import { renderRegistrationPdf } from "@/modules/registration-pdf/render";
 import { loadRegistrationPdfSource } from "@/modules/registration-pdf/repository";
 import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
+  clubConditionStillExists,
   conditionStillAllowed,
   includesText,
   notificationApplies,
@@ -26,6 +27,7 @@ import {
 } from "@/modules/registration-form-notifications/domain";
 import {
   conditionOf,
+  existingConditionClubIds,
   notificationMessageKey,
   queueNotificationMessages,
   renderNotificationEmail,
@@ -184,6 +186,7 @@ async function registrationFacts(eventId: string, registrationId: string) {
       locationId: true,
       submittedAt: true,
       location: { select: { name: true } },
+      clubRegistration: { select: { organizationId: true } },
       publicFormSubmission: { select: { formVersion: { select: { formId: true } } } },
     },
   });
@@ -306,9 +309,15 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
     const published = await loadPublishedDefinition(formId);
     const eventSettings = await loadEventEmailSettings(prisma, input.eventId);
     const paused = suppressionNote(eventSettings) !== null;
+    const clubIds = await existingConditionClubIds(prisma, rows);
     for (const row of rows) {
       try {
         if (row.recipients.length === 0) continue;
+        if (!clubConditionStillExists(row, clubIds)) {
+          // The club was removed since the condition was saved; skipped, never sent unconditioned. Id only.
+          logWarn("A form notification was skipped: its club no longer exists.", { notificationId: row.id });
+          continue;
+        }
         // Allowed in the registration's own version AND in the form's latest published one: a question that has since become
         // sensitive must never route an email, even for a registration made before.
         if (!conditionStillAllowed(loaded.source.definition, row) || (published && !conditionStillAllowed(published, row))) {
@@ -316,7 +325,7 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
           logWarn("A form notification was skipped: its condition looks at a question that is no longer allowed.", { notificationId: row.id });
           continue;
         }
-        if (!notificationApplies(conditionOf(row), answers, facts.locationId)) continue;
+        if (!notificationApplies(conditionOf(row), answers, facts.locationId, facts.clubRegistration?.organizationId ?? null)) continue;
         const { sectionIds, noMatch } = resolveSections(loaded.source.definition, row.sectionIds);
         const hash = noMatch ? NO_MATCHING_SECTIONS_HASH : modelFor(loaded, sectionIds, cache).hash;
         const signature = noMatch ? NO_MATCHING_SECTIONS_SIGNATURE : sectionSignature(sectionIds);

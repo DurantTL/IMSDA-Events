@@ -86,6 +86,11 @@ describe("registration form notification routes (#1081)", () => {
     mocks.replace.mockRejectedValue(new NotificationError("Notification 1: add at least one email address.", "INVALID_NOTIFICATIONS"));
     const bad = await PUT(put({ notifications: [] }), context);
     expect(bad.status).toBe(400);
+    // An unknown or non-club organization id (#1097) is refused by the repository, and the route reports it as 400.
+    mocks.replace.mockRejectedValue(new NotificationError("Notification 1: choose one of the clubs in the directory.", "INVALID_NOTIFICATIONS"));
+    const unknownClub = await PUT(put({ notifications: [{ name: "Club", recipients: ["a@example.test"], condition: { fieldKey: "__club", operator: "EQUALS", value: "not-a-club" }, sectionIds: [] }] }), context);
+    expect(unknownClub.status).toBe(400);
+    expect((await unknownClub.json()).message).toContain("clubs in the directory");
     mocks.getPanel.mockRejectedValue(new NotificationError("That registration form was not found.", "FORM_NOT_FOUND"));
     expect((await GET(new Request("http://localhost/x"), context)).status).toBe(404);
   });

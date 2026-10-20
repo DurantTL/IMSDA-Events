@@ -14,7 +14,8 @@ import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
 import { attachRegistrationPdfAfterCommit } from "@/modules/registration-pdf/after-commit";
 import { finishFormNotificationsAfterSubmit } from "@/modules/registration-form-notifications/after-commit";
-import { queueFormNotificationsForSubmission } from "@/modules/registration-form-notifications/queue";
+import { CLUB_CONDITION_KEY } from "@/modules/registration-form-notifications/constants";
+import { existingConditionClubIds, queueFormNotificationsForSubmission } from "@/modules/registration-form-notifications/queue";
 import {
   enqueuePublicRegistrationMessages,
   processQueuedMessageIdsAfterCommit,
@@ -742,7 +743,7 @@ async function createPublicRegistrationTransaction(
   now: Date,
   bulk: BulkSubmissionContext | undefined,
   requestContext: SubmissionRequestContext | undefined,
-  notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean; formNotificationsEnabled: boolean },
+  notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean; formNotificationsEnabled: boolean; existingClubIds: ReadonlySet<string> },
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -1590,6 +1591,8 @@ async function createPublicRegistrationTransaction(
         definition,
         answers: prepared.responses,
         locationId: registrationLocationId ?? null,
+        organizationId: club?.organizationId ?? null,
+        existingClubIds: notifications.existingClubIds,
         locationName: registrationLocation?.name ?? null,
         eventName: form.event.name,
         registrantName: `${identity.firstName} ${identity.lastName}`.trim(),
@@ -1744,10 +1747,21 @@ export async function submitPublicRegistration(
     isNotificationEnabled("TEAM_APPROVAL_REQUESTED"),
     isNotificationEnabled("REGISTRATION_FORM_NOTIFICATIONS"),
   ]);
+  // Also before the transaction (#1097): which clubs the form's Club notifications route on still exist. One notification read, plus one organization read only
+  // when some notification routes on a club. A club deleted between this read and the commit is accepted.
+  const existingClubIds = formNotificationsEnabled
+    ? await existingConditionClubIds(
+      prisma,
+      await prisma.registrationFormNotification.findMany({
+        where: { conditionFieldKey: CLUB_CONDITION_KEY, form: { slug: formSlug, event: { slug: eventSlug } } },
+        select: { conditionFieldKey: true, conditionValue: true },
+      }),
+    )
+    : new Set<string>();
   for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
     try {
       const result = await prisma.$transaction(
-        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers, formNotificationsEnabled }),
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers, formNotificationsEnabled, existingClubIds }),
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the

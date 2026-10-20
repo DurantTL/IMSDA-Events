@@ -153,6 +153,8 @@ describe("promo-code registration idempotency", () => {
       },
     };
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn(async (
         operation: (client: typeof tx) => unknown,
       ) => operation(tx)),

@@ -32,9 +32,11 @@ vi.mock("@/modules/registration-pdf/render", async (importOriginal) => {
 
 import { buildRegistrationPdfModel, registrationPdfContentHash, type RegistrationPdfSource } from "@/modules/registration-pdf/model";
 import {
+  CLUB_CONDITION_KEY,
   FORM_NOTIFICATIONS_MAX_PER_FORM,
   LOCATION_CONDITION_KEY,
   checkNotificationRecipients,
+  clubConditionStillExists,
   conditionFieldChoices,
   isAllowedConditionKey,
   notificationApplies,
@@ -71,6 +73,12 @@ type Row = {
   createdAt: Date;
   deliveries: Array<{ contentHash: string; sectionSignature: string }>;
 };
+
+/** The synthetic club directory (#1097): the organization lookup finds only these, as the real one filters on type CLUB. */
+const CLUB_IDS = new Set(["club-a", "club-b"]);
+const organizationLookup = () => ({
+  findMany: vi.fn(async ({ where }: { where: { id?: { in: string[] }; type?: string } }) => [...CLUB_IDS].filter((id) => !where.id || where.id.in.includes(id)).map((id) => ({ id, name: `Club ${id}` }))),
+});
 
 function row(overrides: Partial<Row> & { id: string }): Row {
   return {
@@ -118,6 +126,39 @@ describe("routing: which notifications apply (#1081)", () => {
     expect(notificationApplies(desMoines, {}, null)).toBe(false);
     // An answer that happens to be named like the location key cannot spoof the routing.
     expect(notificationApplies(desMoines, { [LOCATION_CONDITION_KEY]: "loc-des-moines" }, "loc-ames")).toBe(false);
+  });
+});
+
+describe("routing by club (#1097)", () => {
+  const isA = { fieldKey: CLUB_CONDITION_KEY, operator: "EQUALS" as const, value: "club-a" };
+  const isNotA = { ...isA, operator: "NOT_EQUALS" as const };
+
+  it("matches the registration's organization id: is, and is not", () => {
+    expect(notificationApplies(isA, {}, null, "club-a")).toBe(true);
+    expect(notificationApplies(isA, {}, null, "club-b")).toBe(false);
+    expect(notificationApplies(isNotA, {}, null, "club-b")).toBe(true);
+    expect(notificationApplies(isNotA, {}, null, "club-a")).toBe(false);
+  });
+
+  it("never matches \"is\" for a registration with no club (a Group registration), and always matches \"is not\"", () => {
+    expect(notificationApplies(isA, {}, null, null)).toBe(false);
+    expect(notificationApplies(isA, {}, null)).toBe(false);
+    expect(notificationApplies(isNotA, {}, null, null)).toBe(true);
+  });
+
+  it("cannot be spoofed by an answer named like the club key, and leaves the location and answer conditions alone", () => {
+    expect(notificationApplies(isA, { [CLUB_CONDITION_KEY]: "club-a" }, null, "club-b")).toBe(false);
+    const desMoines = { fieldKey: LOCATION_CONDITION_KEY, operator: "EQUALS" as const, value: "loc-des-moines" };
+    expect(notificationApplies(desMoines, {}, "loc-des-moines", "club-b")).toBe(true);
+  });
+
+  it("is an allowed condition key, and a stored club that is gone from the directory is not still allowed", () => {
+    expect(isAllowedConditionKey(definition, CLUB_CONDITION_KEY)).toBe(true);
+    expect(clubConditionStillExists({ conditionFieldKey: CLUB_CONDITION_KEY, conditionValue: "club-a" }, CLUB_IDS)).toBe(true);
+    expect(clubConditionStillExists({ conditionFieldKey: CLUB_CONDITION_KEY, conditionValue: "club-gone" }, CLUB_IDS)).toBe(false);
+    expect(clubConditionStillExists({ conditionFieldKey: CLUB_CONDITION_KEY, conditionValue: null }, CLUB_IDS)).toBe(false);
+    expect(clubConditionStillExists({ conditionFieldKey: LOCATION_CONDITION_KEY, conditionValue: "loc-1" }, new Set())).toBe(true);
+    expect(clubConditionStillExists({ conditionFieldKey: null, conditionValue: null }, new Set())).toBe(true);
   });
 });
 
@@ -207,6 +248,7 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     locationName: "Des Moines",
     eventName: "Synthetic Camporee",
     registrantName: "Dana Sample",
+    existingClubIds: new Set<string>() as ReadonlySet<string>,
   };
 
   it("queues only the notifications whose condition matches, one held message per address, with a retry-safe key", async () => {
@@ -236,6 +278,26 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     }
     expect(String(created[3]!.bodyTextSnapshot)).toContain("Includes: Camping");
     expect(result.pendingMessageIds).toHaveLength(4);
+  });
+
+  it("routes by club at submission, skips a removed club, and gives a registration with no club only the \"is not\" ones (#1097)", async () => {
+    const clubRows = () => [
+      row({ id: "is-a", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "EQUALS", conditionValue: "club-a" }),
+      row({ id: "is-b", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "EQUALS", conditionValue: "club-b" }),
+      row({ id: "not-a", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "NOT_EQUALS", conditionValue: "club-a" }),
+      row({ id: "removed", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "NOT_EQUALS", conditionValue: "club-gone" }),
+    ];
+    const run = async (organizationId: string | null) => {
+      const { tx } = fakeTx(clubRows());
+      // No organization table on the transaction's client: the existing clubs are read before it opens and passed in.
+      const result = await queueFormNotificationsForSubmission(tx as never, { ...base, enabled: true, organizationId, existingClubIds: CLUB_IDS });
+      expect(tx).not.toHaveProperty("organization");
+      return result.groups.map((group) => group.notificationId);
+    };
+    // The removed club's notification is skipped even though "is not" would otherwise match everyone.
+    expect(await run("club-a")).toEqual(["is-a"]);
+    expect(await run("club-b")).toEqual(["is-b", "not-a"]);
+    expect(await run(null)).toEqual(["not-a"]);
   });
 
   it("queues nothing, and reads nothing, when the platform switch is off", async () => {
@@ -346,7 +408,7 @@ describe("re-send on a later change (#1081)", () => {
   const hashOf = (source: RegistrationPdfSource, sections: string[]) => notificationContentHash(buildRegistrationPdfModel(source, { sectionIds: sections }));
   const delivered = (source: RegistrationPdfSource, sections: string[]) => ({ contentHash: hashOf(source, sections), sectionSignature: [...sections].sort().join(",") });
 
-  function database(rows: Row[], facts: Partial<{ status: string; locationId: string | null; submittedAt: Date }> = {}) {
+  function database(rows: Row[], facts: Partial<{ status: string; locationId: string | null; submittedAt: Date; clubRegistration: { organizationId: string } | null }> = {}) {
     const created: Array<Record<string, unknown>> = [];
     const deliveries = { upsert: vi.fn().mockResolvedValue({}) };
     const tx = {
@@ -372,6 +434,7 @@ describe("re-send on a later change (#1081)", () => {
       },
       messageAttachment: { create: vi.fn(async () => ({ id: "attachment-1" })) },
       messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
+      organization: organizationLookup(),
       registrationNotificationDelivery: deliveries,
       registrationPdfDocument: { findFirst: mocks.latestDocument },
       registrationFormVersion: { findMany: mocks.versions },
@@ -437,6 +500,20 @@ describe("re-send on a later change (#1081)", () => {
     ], { locationId: "loc-ames" });
     await notifyFormNotificationsAfterChange(change);
     expect(created.map((message) => message.recipientEmail)).toEqual(["ames@example.test"]);
+    expect(String(created[0]!.subjectSnapshot)).not.toMatch(/^Updated/);
+  });
+
+  it("on a club change sends the new club's notification as a first one, and not the old club's; a removed club sends nothing (#1097)", async () => {
+    currentSource(sourceNow);
+    const forClub = (id: string, clubId: string, operator = "EQUALS") => ({ conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: operator, conditionValue: clubId, id });
+    // The registration moved from club A to club B; club A's notification already sent for it.
+    const { created } = database([
+      row({ ...forClub("club-a", "club-a"), deliveries: [delivered(sourceNow, [])] }),
+      row(forClub("club-b", "club-b")),
+      row(forClub("club-gone", "club-gone", "NOT_EQUALS")),
+    ], { clubRegistration: { organizationId: "club-b" } });
+    await notifyFormNotificationsAfterChange(change);
+    expect(created.map((message) => message.recipientEmail)).toEqual(["club-b@example.test"]);
     expect(String(created[0]!.subjectSnapshot)).not.toMatch(/^Updated/);
   });
 
@@ -526,7 +603,7 @@ describe("review fixes (#1081)", () => {
     };
     const submitted = await queueFormNotificationsForSubmission(tx as never, {
       enabled: true, eventId: "event-1", formId: "form-1", registrationId: "registration-1", correlationId: "c", definition,
-      answers: {}, locationId: null, locationName: null, eventName: "Synthetic Camporee", registrantName: "Dana Sample",
+      answers: {}, locationId: null, locationName: null, eventName: "Synthetic Camporee", registrantName: "Dana Sample", existingClubIds: new Set<string>(),
     });
     expect(submitted.groups.map((group) => group.notificationId)).toEqual(["fine"]);
 
@@ -648,6 +725,8 @@ describe("review fixes (#1081)", () => {
         }),
       },
       eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+      event: { findUnique: vi.fn().mockResolvedValue({ audience: "GENERAL" }) },
+      organization: { findMany: vi.fn().mockResolvedValue([]) },
     });
     const panel = await getFormNotificationsPanel("event-1", "form-1");
     const byId = new Map(panel.notifications.map((entry) => [entry.id, entry.warnings]));
@@ -671,9 +750,55 @@ describe("review fixes (#1081)", () => {
         }),
       },
       eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+      event: { findUnique: vi.fn().mockResolvedValue({ audience: "GENERAL" }) },
+      organization: { findMany: vi.fn().mockResolvedValue([]) },
     });
     const panel = await getFormNotificationsPanel("event-1", "form-1");
     expect(panel.notifications[0]!.warnings[0]).toContain("will stop being sent once the draft is published");
+  });
+});
+
+describe("the panel's clubs (#1097)", () => {
+  it("offers the directory's active clubs on a club event, flags a stored club that no longer exists, and never exposes an id as a name", async () => {
+    const { getFormNotificationsPanel } = await import("@/modules/registration-form-notifications/repository");
+    mocks.getPrisma.mockReturnValue({
+      registrationForm: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "form-1",
+          versions: [{ definition, status: "PUBLISHED" }],
+          notifications: [
+            row({ id: "kept", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "EQUALS", conditionValue: "club-a" }),
+            row({ id: "gone", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "EQUALS", conditionValue: "club-gone" }),
+          ],
+        }),
+      },
+      eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+      event: { findUnique: vi.fn().mockResolvedValue({ audience: "CLUB" }) },
+      organization: {
+        findMany: vi.fn(async ({ where }: { where: { id?: { in: string[] }; isActive?: boolean } }) => (where.id
+          ? where.id.in.filter((id) => CLUB_IDS.has(id)).map((id) => ({ id, name: `Club ${id}` }))
+          : [{ id: "club-a", name: "Club club-a" }, { id: "club-b", name: "Club club-b" }])),
+      },
+    });
+    const panel = await getFormNotificationsPanel("event-1", "form-1");
+    expect(panel.clubs.map((club) => club.name)).toEqual(["Club club-a", "Club club-b"]);
+    const byId = new Map(panel.notifications.map((entry) => [entry.id, entry]));
+    expect(byId.get("kept")!.clubRemoved).toBe(false);
+    expect(byId.get("gone")!.clubRemoved).toBe(true);
+    expect(byId.get("gone")!.warnings.join(" ")).toContain("club was removed");
+  });
+
+  it("offers no clubs on an event whose registrations carry none", async () => {
+    const { getFormNotificationsPanel } = await import("@/modules/registration-form-notifications/repository");
+    const organization = { findMany: vi.fn().mockResolvedValue([]) };
+    mocks.getPrisma.mockReturnValue({
+      registrationForm: { findFirst: vi.fn().mockResolvedValue({ id: "form-1", versions: [{ definition, status: "PUBLISHED" }], notifications: [] }) },
+      eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+      event: { findUnique: vi.fn().mockResolvedValue({ audience: "GENERAL" }) },
+      organization,
+    });
+    expect((await getFormNotificationsPanel("event-1", "form-1")).clubs).toEqual([]);
+    expect(organization.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -692,6 +817,8 @@ describe("saving a form's notifications (#1081)", () => {
         findFirst: vi.fn().mockResolvedValue({ id: "form-1", versions: [{ definition }], notifications: options.existing ?? [row({ id: "existing-1" })] }),
       },
       eventLocation: { findMany: vi.fn().mockResolvedValue([{ id: "loc-des-moines", name: "Des Moines" }]) },
+      event: { findUnique: vi.fn().mockResolvedValue({ audience: "CLUB" }) },
+      organization: organizationLookup(),
       $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
     };
     mocks.getPrisma.mockReturnValue(db);
@@ -745,6 +872,34 @@ describe("saving a form's notifications (#1081)", () => {
     database();
     await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: Array.from({ length: 11 }, () => valid) })).rejects.toBeInstanceOf(FormNotificationError);
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("checks a Club condition's value against the real club organizations, never the client (#1097)", async () => {
+    const club = (value: string) => ({ ...valid, condition: { fieldKey: CLUB_CONDITION_KEY, operator: "EQUALS", value } });
+    // Not an organization at all, and an organization that is not a club (the lookup filters on type CLUB, so it is not found).
+    await fails(club("organization-that-does-not-exist"), /clubs in the directory/);
+    await fails(club("church-1"), /clubs in the directory/);
+    const { db, tx } = database();
+    await replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [club("club-a")] });
+    expect(db.organization.findMany).toHaveBeenCalledWith({ where: { id: { in: ["club-a"] }, type: "CLUB" }, select: { id: true } });
+    expect(tx.registrationFormNotification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ conditionFieldKey: CLUB_CONDITION_KEY, conditionValue: "club-a" }) }));
+    expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("club-a");
+  });
+
+  it("refuses a NEW Club condition on an event whose registrations carry no club, but lets a stored one be re-saved (#1097)", async () => {
+    const club = { ...valid, condition: { fieldKey: CLUB_CONDITION_KEY, operator: "EQUALS", value: "club-a" } };
+    const general = (existing: Row[]) => {
+      const { db } = database({ existing });
+      db.event.findUnique.mockResolvedValue({ audience: "GENERAL" });
+    };
+    general([row({ id: "existing-1" })]);
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [club] })).rejects.toThrow(/do not have a club/);
+    // A stored notification that already routes on a club (the event changed since) is not locked out of saving.
+    general([row({ id: "existing-1", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "EQUALS", conditionValue: "club-a" })]);
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...club, id: "existing-1" }] })).resolves.toBeDefined();
+    // An id naming a notification that is NOT a stored club one does not slip past.
+    general([row({ id: "existing-1" })]);
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...club, id: "existing-1" }] })).rejects.toThrow(/do not have a club/);
   });
 
   it("refuses a notification listed twice, and reports one deleted since the load as a handled error, not a crash", async () => {
