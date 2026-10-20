@@ -1463,7 +1463,8 @@ function hasValue(value: unknown) {
 
 type FieldCondition = NonNullable<RegistrationFormField["conditional"]>;
 
-function conditionMatches(condition: FieldCondition, responses: Record<string, unknown>) {
+/** One field condition (field / operator / value) against a set of answers; shared with form notification routing (#1081). */
+export function conditionMatches(condition: FieldCondition, responses: Record<string, unknown>) {
   const actual = responses[condition.fieldKey];
   const expected = condition.value;
   if (condition.operator === "NOT_EMPTY") return hasValue(actual);

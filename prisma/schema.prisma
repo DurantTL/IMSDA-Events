@@ -2997,6 +2997,7 @@ model Registration {
   billingResponsibilityChanges RegistrationBillingResponsibilityChange[]
   attendanceCorrections        AttendanceCorrection[]
   attendanceReviewAcknowledgements AttendanceReviewAcknowledgement[]
+  formNotificationDeliveries       RegistrationNotificationDelivery[]
   guardianAuthorities     GuardianAuthority[]
   acknowledgmentEvidence  AcknowledgmentEvidence[]
   acknowledgmentVoids AcknowledgmentVoid[]
@@ -4252,6 +4253,7 @@ model RegistrationForm {
   versions              RegistrationFormVersion[]
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
+  notifications         RegistrationFormNotification[]
 
   @@unique([eventId, slug])
   @@index([eventId, status, updatedAt])
@@ -9839,4 +9841,47 @@ model RegistrationPdfDocument {
 
   @@unique([registrationId, version])
   @@index([eventId])
+}
+
+/// One email notification of a registration form (#1081): who is told when someone registers, optionally only when one
+/// answer matches (`conditionFieldKey` is a registration-level field key, or `__location` with a location id), and
+/// optionally with only some of the form's sections in its PDF (`sectionIds`, empty = all). Staff-typed addresses only.
+model RegistrationFormNotification {
+  id                String   @id @default(cuid())
+  formId            String
+  position          Int
+  name              String
+  recipients        String[]
+  conditionFieldKey String?
+  /// EQUALS or NOT_EQUALS ("is" / "is not"), the existing field condition shape.
+  conditionOperator String?
+  conditionValue    String?
+  sectionIds        String[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  form       RegistrationForm                   @relation(fields: [formId], references: [id], onDelete: Cascade)
+  deliveries RegistrationNotificationDelivery[]
+
+  @@index([formId, position])
+}
+
+/// What a notification last sent for one registration (#1081): the hash of what its included sections said, so a later
+/// change is re-sent only when that content changed. No addresses or answers are stored here.
+model RegistrationNotificationDelivery {
+  id               String   @id @default(cuid())
+  notificationId   String
+  registrationId   String
+  contentHash      String
+  /// The included sections when it was sent, so editing the notification's sections starts a new baseline, not an "Updated".
+  sectionSignature String
+  sendCount        Int      @default(1)
+  lastSentAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  notification RegistrationFormNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  registration Registration                 @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, registrationId])
+  @@index([registrationId])
 }

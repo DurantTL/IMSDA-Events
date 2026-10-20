@@ -6,6 +6,7 @@ import { escapeHtml, withPlainLeadNote } from "@/modules/communications/email-ht
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { notifyFormNotificationsAfterChange } from "@/modules/registration-form-notifications/after-commit";
 import { ensureRegistrationPdfOutsideTransaction } from "@/modules/registration-pdf/repository";
 import { REGISTRANT_UPDATED_PDF_NOTE, queueStaffUpdatedRegistrationCopies } from "@/modules/registration-pdf/notices";
 
@@ -157,6 +158,13 @@ export async function finishRegistrationChange(input: {
       logError("Updated registration messages could not be delivered right now; they stay queued.", error, { registrationId: input.registrationId });
     }
   }
+  // The form's own notifications (#1081): each one whose included sections changed, and the new location's. Never throws.
+  await notifyFormNotificationsAfterChange({
+    eventId: input.eventId,
+    registrationId: input.registrationId,
+    changeKey: input.changeKey,
+    correlationId: input.correlationId,
+  });
 }
 
 export { CONFIRMATION_NOTE as REGISTRATION_PDF_CONFIRMATION_NOTE };

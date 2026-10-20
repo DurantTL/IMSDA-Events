@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RegistrationFormNotificationsPanel } from "@/components/registration-form-notifications-panel";
 import { AcknowledgmentFieldSettings, acknowledgmentTypePatch, useAcknowledgmentPolicyVersions } from "@/components/acknowledgment-field-settings";
 import { FormSlugDialog } from "@/components/form-slug-dialog";
 import { SearchableSelect } from "@/components/searchable-select";
@@ -164,7 +165,7 @@ const conditionLabels = {
   NOT_EMPTY: "Has any answer",
 } as const;
 
-export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, eventAudience, eventBillingMode, initialForms, templates, focusTarget = null }: { eventId: string; eventSlug: string; eventName: string; eventAudience?: string; eventBillingMode?: string; initialForms: FormView[]; templates: TemplateView[]; focusTarget?: { formId: string; fieldId: string } | null }) {
+export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, eventAudience, eventBillingMode, initialForms, templates, focusTarget = null, canEditNotifications = false }: { eventId: string; eventSlug: string; eventName: string; eventAudience?: string; eventBillingMode?: string; initialForms: FormView[]; templates: TemplateView[]; focusTarget?: { formId: string; fieldId: string } | null; canEditNotifications?: boolean }) {
   const [forms, setForms] = useState(initialForms);
   // A setup warning (#617) links here with the form and field to fix: open that form.
   const focusedForm = focusTarget ? initialForms.find((form) => form.id === focusTarget.formId) : undefined;
@@ -1259,6 +1260,7 @@ export function RegistrationBuilderWorkspace({ eventId, eventSlug, eventName, ev
           {scheduledPriceFields.length > 0 && <div className="pricing-preview-control"><label>Preview calculation date<input type="date" value={pricingPreviewDate} onInput={(event) => setPricingPreviewDate(event.currentTarget.value)} /></label><span><strong>{scheduledPriceFields.length} scheduled price{scheduledPriceFields.length === 1 ? "" : "s"}</strong><small>Change this test date to verify deadline pricing. A public checkout will recompute the date server-side.</small></span></div>}
           <div className="boundary-callout"><ShieldCheck size={18} /><span><strong>Square-ready, sandbox first</strong><small>Totals work now. Card details stay outside this builder and a Square Web Payments token is required before a charge can be submitted.</small></span></div>
         </section>
+        {canEditNotifications && selectedForm && <RegistrationFormNotificationsPanel key={selectedForm.id} eventId={eventId} formId={selectedForm.id} />}
         <section className="panel confirmation-editor"><label>Confirmation message<textarea autoComplete="off" name="builder-rb-note-19" disabled={!canEdit} value={definition.confirmationMessage} rows={3} maxLength={500} onChange={(event) => replaceDefinition({ ...definition, confirmationMessage: event.target.value })} /></label></section>
         {publishedVersion && selectedForm && (
           <DangerZone className="builder-danger-zone" heading="Withdraw this form">
