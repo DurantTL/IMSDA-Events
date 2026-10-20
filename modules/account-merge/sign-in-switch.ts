@@ -1,14 +1,13 @@
 import "server-only";
 
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
-import { normalizeEmail } from "./dry-run-domain";
 
 /**
  * The system administrator's one-sign-in switch and its link check (#554, #1083).
  *
- * The link check is READ-ONLY and returns counts only. Emails are read to pair
- * the two sides (the same normalisation the dry run uses) and are never
+ * The link check is READ-ONLY and returns counts only. Emails are compared inside
+ * the database (lower and trim, in SQL, as the dry run does) and are never
  * returned, logged or audited. It links nothing; hand-linking stays on
  * System management > Accounts.
  */
@@ -23,20 +22,19 @@ export type SignInLinkCheck = {
 };
 
 export async function getSignInLinkCheck(
-  client: Pick<PrismaClient, "user" | "attendeeAccount"> = getPrisma(),
+  client: Pick<PrismaClient, "user" | "$queryRaw"> = getPrisma(),
 ): Promise<SignInLinkCheck> {
-  const [users, accounts] = await Promise.all([
-    client.user.findMany({ select: { email: true, attendeeAccountId: true } }),
-    client.attendeeAccount.findMany({ select: { email: true } }),
-  ]);
-  const attendeeEmails = new Set(accounts.map((account) => normalizeEmail(account.email)));
-  let linkedPairs = 0;
-  let unlinkedPairs = 0;
-  for (const user of users) {
-    if (user.attendeeAccountId) linkedPairs += 1;
-    else if (attendeeEmails.has(normalizeEmail(user.email))) unlinkedPairs += 1;
-  }
-  return { unlinkedPairs, linkedPairs };
+  const linkedPairs = await client.user.count({ where: { attendeeAccountId: { not: null } } });
+  // One SQL count, same lower(btrim()) pairing as the dry run. No email leaves the database.
+  const rows = await client.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+    SELECT COUNT(*)::bigint AS count
+    FROM "User" u
+    WHERE u."attendeeAccountId" IS NULL
+      AND EXISTS (
+        SELECT 1 FROM "AttendeeAccount" a WHERE lower(btrim(a."email")) = lower(btrim(u."email"))
+      )
+  `);
+  return { unlinkedPairs: Number(rows[0]?.count ?? 0), linkedPairs };
 }
 
 /**

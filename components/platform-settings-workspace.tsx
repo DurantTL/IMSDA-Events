@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { Building2, FileText, KeyRound, Mail, Save } from "lucide-react";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
 
@@ -46,6 +47,7 @@ export function PlatformSettingsWorkspace({
   initialSettings: PlatformSettingsRecord;
   initialSignIn: SignInSwitchState;
 }) {
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const [signIn, setSignIn] = useState(initialSignIn);
   const [signInBusy, setSignInBusy] = useState(false);
   const [signInError, setSignInError] = useState("");
@@ -53,12 +55,38 @@ export function PlatformSettingsWorkspace({
 
   async function changeSignIn(enabled: boolean) {
     if (enabled) {
-      const unlinked = signIn.linkCheck.unlinkedPairs;
-      const warning = unlinked > 0
-        ? `${unlinked} ${unlinked === 1 ? "person still has a separate account" : "people still have separate accounts"}; link them on Accounts first. `
-        : "";
-      const message = `${warning}Turn on one sign-in? /login and /account/sign-in will send everyone to the single /sign-in page.`;
-      if (!window.confirm(message)) return;
+      // Fresh counts, so the warning is not stale if someone linked people since the page loaded.
+      let counts = signIn.linkCheck;
+      try {
+        const fresh = await fetch("/api/admin/platform-settings/unified-sign-in");
+        const data = await fresh.json().catch(() => ({}));
+        if (fresh.ok && data.linkCheck) {
+          counts = data.linkCheck;
+          setSignIn((current) => ({ ...current, linkCheck: data.linkCheck }));
+        }
+      } catch {
+        // Fall back to the counts already on screen.
+      }
+      const unlinked = counts.unlinkedPairs;
+      const confirmed = await askConfirm({
+        title: "Turn on one sign-in",
+        confirmLabel: "Turn one sign-in on",
+        body: (
+          <>
+            {unlinked > 0 && (
+              <p>
+                {unlinked} {unlinked === 1 ? "person still has a separate account" : "people still have separate accounts"}; link
+                them on <Link className="text-button" href="/admin/accounts">Accounts</Link> first.
+              </p>
+            )}
+            <p>
+              <code>/login</code> and <code>/account/sign-in</code> will send everyone to the single <code>/sign-in</code> page, and
+              staff get both their staff and attendee sides. You can turn it off again; sessions that already exist stay valid.
+            </p>
+          </>
+        ),
+      });
+      if (!confirmed) return;
     }
     setSignInBusy(true);
     setSignInError("");
@@ -143,7 +171,7 @@ export function PlatformSettingsWorkspace({
           staff get both their staff and attendee sides. Turning it off restores the separate pages. Sessions that already exist
           stay valid either way.
         </p>
-        <p className="field-help" role="status">
+        <p className="field-help">
           One sign-in is currently <strong>{signIn.enabled ? "on" : "off"}</strong>.
         </p>
         <ul className="field-help">
@@ -161,6 +189,7 @@ export function PlatformSettingsWorkspace({
             {signIn.enabled ? "Turn one sign-in off" : "Turn one sign-in on"}
           </button>
         </div>
+        {confirmDialog}
       </section>
 
       <form className="form-stack" onSubmit={save}>

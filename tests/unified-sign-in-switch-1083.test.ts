@@ -26,8 +26,13 @@ vi.mock("@/lib/prisma", () => {
       },
     },
     auditLog: { create: async (row: { data: Record<string, unknown> }) => { state.audit.push(row); return row; } },
-    user: { findMany: async () => state.users },
-    attendeeAccount: { findMany: async () => state.accounts },
+    // The link check is one SQL count; the fake mirrors its lower(btrim()) pairing.
+    user: { count: async () => state.users.filter((user) => user.attendeeAccountId).length },
+    $queryRaw: async () => {
+      const emails = new Set(state.accounts.map((account) => account.email.trim().toLowerCase()));
+      const count = state.users.filter((user) => !user.attendeeAccountId && emails.has(user.email.trim().toLowerCase())).length;
+      return [{ count: BigInt(count) }];
+    },
     $transaction: async (run: (tx: unknown) => Promise<unknown>) => run(client),
   };
   return { getPrisma: () => client };
