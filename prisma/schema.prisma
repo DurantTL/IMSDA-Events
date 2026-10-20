@@ -1711,6 +1711,7 @@ model Event {
   invoiceReceivables                  InvoiceReceivable[]
   invoiceNumberCounters               InvoiceNumberCounter[]
   invoiceDocuments                    InvoiceVersionDocument[]
+  registrationPdfDocuments            RegistrationPdfDocument[]
   invoiceDeliveries                   InvoiceDelivery[]
   invoiceArPostings                   InvoiceArPosting[]
   invoicePayments                     InvoicePayment[]
@@ -3013,6 +3014,7 @@ model Registration {
   scholarshipAwards       ScholarshipAward[]
   memberTransferMovesFrom MemberTransferRegistrationMove[] @relation("MemberTransferMoveFrom")
   memberTransferMovesTo   MemberTransferRegistrationMove[] @relation("MemberTransferMoveTo")
+  pdfDocuments            RegistrationPdfDocument[]
 
   @@unique([eventId, confirmationCode])
   @@index([eventId, status])
@@ -4689,6 +4691,7 @@ model MessageAttachment {
   event           Event?                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   messages        MessageOutbox[]
   invoiceDocument InvoiceVersionDocument?
+  registrationPdf RegistrationPdfDocument?
 
   @@index([eventId])
 }
@@ -9804,4 +9807,33 @@ model EventMealKitchenCount {
   supersededBy EventMealKitchenCount? @relation("KitchenCountSupersedes")
 
   @@index([eventId, serviceDate, mealType, kind, createdAt])
+}
+
+/// An easy-to-read PDF copy of a registration (#1082). One row per version: version 1 is made when the registration is
+/// submitted, and a later change by a director or staff adds the next version, marked "Updated". The bytes are a stored
+/// `MessageAttachment`, made once and never regenerated, so every email and download of a version is the same file;
+/// `sha256` is the hash of that file, checked again at send and at download. `contentHash` is the hash of what the PDF
+/// SAYS (no dates or version marks), so a save that changes nothing visible does not add a version.
+model RegistrationPdfDocument {
+  id               String   @id @default(cuid())
+  eventId          String
+  registrationId   String
+  version          Int
+  attachmentId     String   @unique
+  sha256           String
+  contentHash      String
+  /// The layout version of the generator, so a later layout change is visible on old documents.
+  generatorVersion Int
+  /// The published form version the registration was on when this copy was made (#1044/#1050).
+  formVersionId    String?
+  /// True from version 2 on: the PDF carries the "Updated" mark.
+  updated          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  event        Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registration Registration      @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  attachment   MessageAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, version])
+  @@index([eventId])
 }
