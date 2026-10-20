@@ -4447,9 +4447,18 @@ model EventPaymentInstructionVersion {
 model EventMessageSettings {
   id                         String              @id @default(cuid())
   eventId                    String              @unique
+  /// Retired (#1043). Read only by migration 20261114100000_central_email and the migration preview; every send path
+  /// uses modules/communications/effective-delivery.ts. Dropped in a later cleanup.
   deliveryMode               MessageDeliveryMode @default(LOCAL_CAPTURE)
+  /// Set only by a system administrator (#1043): capture only, nothing is sent for this event.
+  deliveryPaused             Boolean             @default(false)
+  deliveryPausedAt           DateTime?
+  deliveryPausedByUserId     String?
+  /// The event's display name (an override of the platform default name).
   senderName                 String
+  /// Retired (#1043): the From address is always the platform's central sender. Kept for the migration preview.
   senderEmail                String?
+  /// Optional override of the platform reply-to.
   replyToEmail               String?
   internalNotificationEmails Json                @default("[]")
   createdAt                  DateTime            @default(now())
