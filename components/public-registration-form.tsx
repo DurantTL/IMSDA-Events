@@ -3394,6 +3394,7 @@ export function PublicRegistrationForm({
       serverIssues,
     })
     : [];
+  const stepItems = clickableSteps(registrationSteps, visitedStepIds, currentStepIndex, errorStepIds);
   const Shell = club ? "div" : "main";
   return (
     <Shell className={club ? "public-registration-page club-registration-form" : "public-registration-page"}>
@@ -3476,7 +3477,7 @@ export function PublicRegistrationForm({
               />
             </div>
             <ol>
-              {clickableSteps(registrationSteps, visitedStepIds, currentStepIndex, errorStepIds).map((item) => {
+              {stepItems.map((item) => {
                 const inner = (
                   <>
                     <span>{item.index + 1}</span>
@@ -3503,6 +3504,9 @@ export function PublicRegistrationForm({
                 );
               })}
             </ol>
+            {stepItems.some((item) => item.clickable) && (
+              <p className="public-registration-step-hint">Tap a step to go back</p>
+            )}
           </section>
 
           {(error || issues.length > 0) && (
