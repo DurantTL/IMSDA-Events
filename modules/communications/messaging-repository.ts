@@ -1341,6 +1341,7 @@ async function loadTestRegistrationContext(
         select: {
           billingMode: true,
           refundPolicy: true,
+          paymentDueOn: true,
           paymentInstructionVersions: {
             orderBy: { versionNumber: "desc" },
             take: 1,
@@ -1440,6 +1441,7 @@ async function loadTestRegistrationContext(
         paidCents: netPaidCents,
         balanceCents,
         paymentInstructions: paymentInstructionsText,
+        paymentDueOn: registration.event?.paymentDueOn,
         portalUrl: REGISTRATION_MANAGE_LINK_SENTINEL,
         // A test send of a confirmation shows the policy as the real one will (#891).
         refundPolicy: isRegistrationConfirmation(templateKey ?? "") ? registration.event?.refundPolicy : null,
@@ -3482,6 +3484,7 @@ export async function enqueuePublicRegistrationMessages(
       select: {
         supportContact: true,
         refundPolicy: true,
+        paymentDueOn: true,
         billingMode: true,
         paymentInstructionVersions: {
           orderBy: { versionNumber: "desc" },
@@ -3575,6 +3578,7 @@ export async function enqueuePublicRegistrationMessages(
       paidCents: 0,
       balanceCents: input.calculation.totalCents,
       paymentInstructions: paymentInstructionsText,
+      paymentDueOn: eventDetails?.paymentDueOn,
       portalUrl: REGISTRATION_MANAGE_LINK_SENTINEL,
       organization: responsibleOrganization,
       billingContact: billingContactName,

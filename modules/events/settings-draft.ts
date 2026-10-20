@@ -34,6 +34,7 @@ export function draftFromEvent(event: EventSettingsRecord | null): EventSettings
     hotelInstructions: event?.hotelInstructions ?? null,
     registrationOpensOn: event?.registrationOpensOn ?? null,
     registrationClosesOn: event?.registrationClosesOn ?? null,
+    paymentDueOn: event?.paymentDueOn ?? null,
     collectsShirtSizes: event?.collectsShirtSizes ?? false,
     checksAdultBackgrounds: event?.checksAdultBackgrounds ?? false,
     hostedPaymentLinkEnabled: event?.hostedPaymentLinkEnabled ?? false,
@@ -66,6 +67,7 @@ export function eventSettingsRequestBody(draft: EventSettingsInput) {
     refundPolicy: draft.refundPolicy || null,
     registrationOpensOn: draft.registrationOpensOn || null,
     registrationClosesOn: draft.registrationClosesOn || null,
+    paymentDueOn: draft.paymentDueOn || null,
     capacity: draft.capacity || null,
   };
 }

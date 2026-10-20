@@ -324,6 +324,9 @@ export function ScheduledEmailsWorkspace({
                 <input type="number" min={0} max={365} value={form.daysBefore} onChange={(event) => change("daysBefore", event.target.value)} />
               </label>
             )}
+            {form.trigger === "BEFORE_PAYMENT_DUE" && (
+              <p className="field-help">Counts back from the event&apos;s payment due date (set in Event settings). Goes only to registrations that still owe a balance when it sends. Changing or clearing the due date pauses this schedule for a new review.</p>
+            )}
             <label>
               Time of day
               <input type="time" value={form.localTime} onChange={(event) => change("localTime", event.target.value)} />

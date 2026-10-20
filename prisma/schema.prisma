@@ -1575,6 +1575,8 @@ model Event {
   isPublished          Boolean            @default(false)
   registrationOpensOn  String?
   registrationClosesOn String?
+  /// The date balances are due by (#993), in the event's own calendar. Only a date that "N days before payment due" scheduled emails count back from: no late fee, nothing is blocked, and it changes no wording. Null means none.
+  paymentDueOn         String?
   waitlistEnabled      Boolean            @default(false)
   autoPromoteWaitlist  Boolean            @default(true)
   /// How many hours a club director has to accept a seat offered from an Honors Weekend class waitlist (#831); an offer not accepted in time passes to the next youth in line.
@@ -2113,6 +2115,7 @@ enum ScheduledEmailTrigger {
   ONE_TIME
   BEFORE_REGISTRATION_CLOSE
   BEFORE_EVENT_START
+  BEFORE_PAYMENT_DUE
 }
 
 /// SCHEDULED: written and reviewed, but not approved; nothing will send. ACTIVE: a person approved it, so the sweep

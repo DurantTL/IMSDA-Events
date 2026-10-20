@@ -19,8 +19,11 @@ import { z } from "zod";
  *
  * Anchors. EVENT_START is the event's start instant (its calendar date in the event's zone is the anchor day).
  * REGISTRATION_CLOSE is the event's `registrationClosesOn` calendar day: registration is open through that whole day
- * (see `evaluateEventRegistrationPhase`), so the close instant is local midnight at the end of it. A payment due date is
- * not an anchor yet: the event has no such date, and a schedule against one is refused rather than guessed.
+ * (see `evaluateEventRegistrationPhase`), so the close instant is local midnight at the end of it. PAYMENT_DUE (#993) is
+ * the event's `paymentDueOn` calendar day, treated the same way: "due by" a day means through that whole day, so it is
+ * past due at local midnight at the end of it. The date only anchors the count; it has no other effect (no late fee,
+ * nothing blocked). A batch counted from it goes only to registrations that still owe a balance when it sends.
+ * A schedule against an event with no due date is refused rather than guessed.
  */
 
 import {
@@ -74,6 +77,11 @@ export const scheduleRuleSchema = z.discriminatedUnion("trigger", [
   }),
   z.strictObject({
     trigger: z.literal("BEFORE_EVENT_START"),
+    daysBefore: z.number().int().min(0).max(365),
+    localTime: localTimeSchema,
+  }),
+  z.strictObject({
+    trigger: z.literal("BEFORE_PAYMENT_DUE"),
     daysBefore: z.number().int().min(0).max(365),
     localTime: localTimeSchema,
   }),
@@ -181,6 +189,8 @@ export type ScheduleEventFacts = {
   startsAt: Date;
   /** `Event.registrationClosesOn`: the last calendar day registration is open, or null. */
   registrationClosesOn: string | null;
+  /** `Event.paymentDueOn` (#993): the calendar day balances are due by, or null. */
+  paymentDueOn?: string | null;
 };
 
 export type ScheduleProjection = {
@@ -236,6 +246,13 @@ export function projectSchedule(rule: ScheduleRule, event: ScheduleEventFacts): 
   } else if (rule.trigger === "BEFORE_EVENT_START") {
     anchorAt = event.startsAt;
     sendDate = addCalendarDays(calendarDateInZone(event.startsAt, event.timezone), -rule.daysBefore);
+  } else if (rule.trigger === "BEFORE_PAYMENT_DUE") {
+    if (!event.paymentDueOn) {
+      throw new ScheduleProjectionError("This event has no payment due date, so a schedule cannot count back from it. Set one in Event settings, or choose another trigger.");
+    }
+    // Due "by" a day means through the whole day, so it is past due at the end of it.
+    anchorAt = wallTimeToInstant({ date: addCalendarDays(event.paymentDueOn, 1), time: "00:00" }, event.timezone).instant;
+    sendDate = addCalendarDays(event.paymentDueOn, -rule.daysBefore);
   } else {
     if (!event.registrationClosesOn) {
       throw new ScheduleProjectionError("This event has no registration close date, so a schedule cannot count back from it. Set one in Event settings, or choose another trigger.");
@@ -249,7 +266,9 @@ export function projectSchedule(rule: ScheduleRule, event: ScheduleEventFacts): 
     throw new ScheduleProjectionError(
       rule.trigger === "BEFORE_EVENT_START"
         ? "That time is after the event starts. Choose an earlier time or more days before."
-        : "That time is after registration closes. Choose an earlier time or more days before.",
+        : rule.trigger === "BEFORE_PAYMENT_DUE"
+          ? "That time is after payment is due. Choose an earlier time or more days before."
+          : "That time is after registration closes. Choose an earlier time or more days before.",
     );
   }
   const actual = partsInZone(instant.getTime(), event.timezone);
@@ -343,7 +362,7 @@ export const SCHEDULE_EXCLUSION_LABELS = {
   SCHEDULE_NOT_ACTIVE: "The schedule was paused or cancelled before this was sent",
   SCHEDULE_TOO_LATE: "It was not sent within six hours of its scheduled time, so it was not sent at all",
   FILTER_UNAVAILABLE: "A filter this schedule uses is no longer available (it changed, the audience grew too large, or the approver lost permission to use it)",
-  ANCHOR_PASSED: "The moment it was counting back from (registration close or event start) has passed",
+  ANCHOR_PASSED: "The moment it was counting back from (registration close, payment due date or event start) has passed",
   CONTACT_CHECK_FAILED: "Eligibility could not be confirmed, so nothing was sent",
 } as const;
 export type ScheduleExclusionCode = keyof typeof SCHEDULE_EXCLUSION_LABELS;
@@ -386,6 +405,7 @@ export function decideRecipientEligibility(
   recipient: ReviewedRecipient,
   template: ScheduledEmailTemplateKey,
   view: CurrentAudienceView,
+  trigger?: ScheduledEmailTrigger,
 ): ScheduleExclusionCode | null {
   const email = recipient.email.trim().toLowerCase();
   const registration = view.registrations.get(recipient.registrationId);
@@ -401,7 +421,9 @@ export function decideRecipientEligibility(
     if (view.registrationsWithOtherTarget.has(recipient.registrationId)) return "ADDRESS_CHANGED";
     return "NO_LONGER_MATCHES";
   }
-  if (template === "BALANCE_REMINDER") {
+  // A batch counted back from the payment due date (#993) is for people who still owe, whatever it says: decided now, from
+  // the balance as it stands at send time, the same one the balance reminder uses.
+  if (template === "BALANCE_REMINDER" || trigger === "BEFORE_PAYMENT_DUE") {
     if (view.isOrganizationBilled) return "ORGANIZATION_BILLED";
     if (target.balanceCents <= 0) return "NO_BALANCE_DUE";
   }

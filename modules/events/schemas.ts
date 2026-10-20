@@ -53,6 +53,9 @@ const lifecycleFields = {
   // stripped here and can never reach a settings save or its audit entry.
   registrationOpensOn: calendarDateSchema.nullable(),
   registrationClosesOn: calendarDateSchema.nullable(),
+  // Payment due date (#993): only a date scheduled emails count back from. Absent on update keeps the stored value, so a
+  // settings tab that predates the field can never clear it.
+  paymentDueOn: calendarDateSchema.nullable().optional(),
   waitlistEnabled: z.boolean(),
   autoPromoteWaitlist: z.boolean(),
 };

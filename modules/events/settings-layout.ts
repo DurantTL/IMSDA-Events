@@ -45,6 +45,7 @@ export const settingsFieldBlock: Record<string, SettingsBlockId> = {
   capacity: "basics",
   registrationOpensOn: "timing",
   registrationClosesOn: "timing",
+  paymentDueOn: "timing",
   waitlistEnabled: "timing",
   autoPromoteWaitlist: "timing",
   audience: "timing",
@@ -141,6 +142,7 @@ type SummaryValues = HotelValues & {
   location?: string | null;
   registrationOpensOn?: string | null;
   registrationClosesOn?: string | null;
+  paymentDueOn?: string | null;
   waitlistEnabled?: boolean;
   audience?: string;
   supportContact?: string | null;
@@ -162,6 +164,7 @@ export function blockSummary(id: SettingsBlockId, values: SummaryValues, extra?:
       return join([
         values.registrationOpensOn ? `Opens ${values.registrationOpensOn}` : "Opens when published",
         values.registrationClosesOn ? `closes ${values.registrationClosesOn}` : "no closing date",
+        values.paymentDueOn ? `payment due ${values.paymentDueOn}` : "",
         values.waitlistEnabled ? "Waitlist on" : "Waitlist off",
         values.audience === "CLUB" ? "Club or church event" : "General event",
       ]);

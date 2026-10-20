@@ -248,3 +248,25 @@ describe("check-in block", () => {
     expect(buildCheckinBlock({ confirmationCode: "" })).toBe("");
   });
 });
+
+describe("payment due date line (#993)", () => {
+  const balanceDue = { state: "BALANCE_DUE", totalCents: 12_500, paidCents: 2_500, balanceCents: 10_000 } as const;
+
+  it("adds one 'Payment due by' line under a balance that is due, and nothing else changes", () => {
+    const without = buildPaymentStatusBlock(balanceDue);
+    const withDate = buildPaymentStatusBlock({ ...balanceDue, paymentDueOn: "2027-03-01" });
+    expect(withDate).toContain("Payment due by: **March 1, 2027**");
+    expect(withDate.replace("\nPayment due by: **March 1, 2027**", "")).toBe(without);
+  });
+
+  it("is optional: no date, a blank date or an impossible date adds nothing", () => {
+    const without = buildPaymentStatusBlock(balanceDue);
+    for (const paymentDueOn of [null, undefined, "", "2027-02-30", "soon"]) {
+      expect(buildPaymentStatusBlock({ ...balanceDue, paymentDueOn })).toBe(without);
+    }
+  });
+
+  it("is not shown when nothing is owed", () => {
+    expect(buildPaymentStatusBlock({ state: "PAID", totalCents: 12_500, paidCents: 12_500, balanceCents: 0, paymentDueOn: "2027-03-01" })).not.toContain("due by");
+  });
+});

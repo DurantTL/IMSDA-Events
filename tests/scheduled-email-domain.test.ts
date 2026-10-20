@@ -156,6 +156,47 @@ describe("projecting a schedule in event time", () => {
     )).toThrow(/no registration close date/);
   });
 
+  describe("'before payment due' (#993)", () => {
+    const withDue = { ...event, paymentDueOn: "2027-03-01" };
+    const rule: ScheduleRule = { trigger: "BEFORE_PAYMENT_DUE", daysBefore: 7, localTime: "09:00" };
+
+    it("counts calendar days back from the due day, and the day is due through its end", () => {
+      const week = projectSchedule(rule, withDue);
+      expect(week.localDate).toBe("2027-02-22");
+      expect(week.sendAt).toEqual(new Date("2027-02-22T15:00:00Z")); // 09:00 CST
+      expect(week.anchorAt).toEqual(new Date("2027-03-02T06:00:00Z")); // midnight ending Mar 1 in CST
+      const sameDay = projectSchedule({ ...rule, daysBefore: 0 }, withDue);
+      expect(sameDay.localDate).toBe("2027-03-01");
+    });
+
+    it("keeps 9:00 local across a clock change between the send day and the due day", () => {
+      // Due Mar 20 (CDT); 7 days back is Mar 13 (CST). A 7 x 24 hour subtraction would land at 08:00 local.
+      const projection = projectSchedule(rule, { ...event, paymentDueOn: "2027-03-20" });
+      expect(projection.localDate).toBe("2027-03-13");
+      expect(projection.localTime).toBe("09:00");
+      expect(projection.sendAt).toEqual(new Date("2027-03-13T15:00:00Z"));
+      // A send time that does not exist that day (the jump) is moved to just after it.
+      const gap = projectSchedule({ trigger: "BEFORE_PAYMENT_DUE", daysBefore: 0, localTime: "02:30" }, { ...event, paymentDueOn: "2027-03-14" });
+      expect(gap.dstBehavior).toBe("GAP_SHIFTED");
+      expect(gap.localTime).toBe("03:30");
+    });
+
+    it("is refused when the event has no payment due date, and after the due day ends", () => {
+      expect(() => projectSchedule(rule, event)).toThrow(/no payment due date/);
+      expect(() => projectSchedule(rule, { ...event, paymentDueOn: null })).toThrow(ScheduleProjectionError);
+      expect(() => projectSchedule({ ...rule, daysBefore: 0, localTime: "23:59" }, withDue)).not.toThrow();
+    });
+
+    it("changing or clearing the due date makes an approved schedule stale (it pauses for a new review)", () => {
+      const reviewed = projectSchedule(rule, withDue);
+      const stored = { eventTimezone: reviewed.eventTimezone, anchorAt: reviewed.anchorAt, sendAt: reviewed.sendAt };
+      expect(eventTimingChanged(stored, projectSchedule(rule, withDue))).toBe(false);
+      expect(eventTimingChanged(stored, projectSchedule(rule, { ...withDue, paymentDueOn: "2027-03-02" }))).toBe(true);
+      // Cleared: it cannot be projected at all, which the sweep and the record treat as stale, never as send.
+      expect(() => projectSchedule(rule, { ...withDue, paymentDueOn: null })).toThrow(ScheduleProjectionError);
+    });
+  });
+
   it("refuses a time after its own anchor", () => {
     expect(() => projectSchedule({ trigger: "BEFORE_EVENT_START", daysBefore: 0, localTime: "23:00" }, event)).toThrow(/after the event starts/);
     expect(() => projectSchedule({ trigger: "BEFORE_EVENT_START", daysBefore: 0, localTime: "09:00" }, event)).toThrow(ScheduleProjectionError);
@@ -204,7 +245,9 @@ describe("rule and content validation", () => {
     expect(scheduleRuleSchema.safeParse({ trigger: "ONE_TIME", localDate: "2027-02-10", localTime: "24:00" }).success).toBe(false);
     expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_EVENT_START", daysBefore: -1, localTime: "09:00" }).success).toBe(false);
     expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_EVENT_START", daysBefore: 400, localTime: "09:00" }).success).toBe(false);
-    expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_PAYMENT_DUE", daysBefore: 3, localTime: "09:00" }).success).toBe(false);
+    expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_PAYMENT_DUE", daysBefore: 3, localTime: "09:00" }).success).toBe(true);
+    expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_PAYMENT_DUE", daysBefore: 366, localTime: "09:00" }).success).toBe(false);
+    expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_DEPOSIT_DUE", daysBefore: 3, localTime: "09:00" }).success).toBe(false);
     expect(scheduleRuleSchema.safeParse({ trigger: "BEFORE_EVENT_START", daysBefore: 3, localTime: "09:00", extra: 1 }).success).toBe(false);
   });
 
@@ -260,6 +303,19 @@ describe("re-evaluating a reviewed recipient at send time", () => {
     const paid = view({ targets: new Map([[targetKey(email, registrationId), { balanceCents: 0, roles: ["REGISTRATION_CONTACT"] }]]) });
     expect(decideRecipientEligibility(recipient, "BALANCE_REMINDER", paid)).toBe("NO_BALANCE_DUE");
     expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", paid)).toBeNull();
+  });
+
+  it("'before payment due' sends only to a registration that still owes, whatever the template (#993)", () => {
+    const owes = view();
+    const paid = view({ targets: new Map([[targetKey(email, registrationId), { balanceCents: 0, roles: ["REGISTRATION_CONTACT"] }]]) });
+    for (const template of ["BALANCE_REMINDER", "EVENT_ANNOUNCEMENT", "CUSTOM_MESSAGE"] as const) {
+      expect(decideRecipientEligibility(recipient, template, owes, "BEFORE_PAYMENT_DUE")).toBeNull();
+      expect(decideRecipientEligibility(recipient, template, paid, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
+    }
+    // Other triggers are unchanged: an announcement still goes to someone with no balance.
+    expect(decideRecipientEligibility(recipient, "EVENT_ANNOUNCEMENT", paid, "BEFORE_EVENT_START")).toBeNull();
+    expect(decideRecipientEligibility(recipient, "CUSTOM_MESSAGE", paid, "BEFORE_PAYMENT_DUE")).toBe("NO_BALANCE_DUE");
+    expect(decideRecipientEligibility(recipient, "CUSTOM_MESSAGE", view({ isOrganizationBilled: true }), "BEFORE_PAYMENT_DUE")).toBe("ORGANIZATION_BILLED");
   });
 
   it("an organization-billed event never sends a balance reminder to an attendee", () => {
