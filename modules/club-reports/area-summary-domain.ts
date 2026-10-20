@@ -109,15 +109,24 @@ export function parseClubQuery(value: string | string[] | undefined) {
 
 const normalizeName = (value: string) => value.toLocaleLowerCase("en-US").replace(/\s+/g, " ").trim();
 
-/** Keeps clubs whose name contains the search text, ignoring case and extra spaces. Blank keeps all. Never mutates the input. */
+/**
+ * Does the text start a word in `value`? Typing "de" finds "Des Moines" but not "Pathfinder": a search that matched
+ * inside words found nearly every club, since most names carry "Pathfinders". Punctuation counts as a word break.
+ */
+export function startsAWord(value: string, needle: string) {
+  const haystack = ` ${normalizeName(value).replace(/[^\p{L}\p{N}]+/gu, " ")}`;
+  return haystack.includes(` ${needle}`) || ` ${normalizeName(value)}`.includes(` ${needle}`);
+}
+
+/** Keeps clubs with a word in the name that starts with the search text, ignoring case and extra spaces. Blank keeps all. Never mutates the input. */
 export function filterClubsByName<T extends { name: string }>(clubs: readonly T[], query: string | undefined) {
   const needle = normalizeName(query ?? "");
-  return needle === "" ? [...clubs] : clubs.filter((club) => normalizeName(club.name).includes(needle));
+  return needle === "" ? [...clubs] : clubs.filter((club) => startsAWord(club.name, needle));
 }
 
 /**
  * The All clubs tab's search (#819): keeps clubs whose name, sponsoring church or
- * city contains the text, ignoring case and extra spaces. Blank keeps all.
+ * city has a word starting with the text, ignoring case and extra spaces. Blank keeps all.
  * Never mutates the input.
  */
 export function filterClubsByNameChurchOrCity<T extends { name: string; sponsoringChurch?: string | null; city?: string | null }>(
@@ -127,7 +136,7 @@ export function filterClubsByNameChurchOrCity<T extends { name: string; sponsori
   const needle = normalizeName(query ?? "");
   if (needle === "") return [...clubs];
   return clubs.filter((club) =>
-    [club.name, club.sponsoringChurch ?? "", club.city ?? ""].some((field) => normalizeName(field).includes(needle)));
+    [club.name, club.sponsoringChurch ?? "", club.city ?? ""].some((field) => startsAWord(field, needle)));
 }
 
 /** Plain-language description of a chart, for screen readers. */

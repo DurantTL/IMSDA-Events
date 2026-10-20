@@ -37,7 +37,7 @@ import OverviewPage from "@/app/(public)/account/(portal)/area-clubs/overview/pa
 import PointsPage from "@/app/(public)/account/(portal)/area-clubs/points/page";
 import ReportsPage from "@/app/(public)/account/(portal)/area-clubs/reports/page";
 import {
-  filterClubsByName,
+  filterClubsByName, filterClubsByNameChurchOrCity,
   parseClubQuery,
   parseLeaderboardSort,
   sortLeaderboard,
@@ -166,5 +166,23 @@ describe("points page default order (#791)", () => {
     const out = await html(PointsPage, {});
     expect(out).toContain("Sorted by total points, highest first.");
     expect(out.indexOf("Bay Trailblazers")).toBeLessThan(out.indexOf("Alpine Eagles"));
+  });
+});
+
+describe("club search matches the start of a word", () => {
+  const clubs = [{ name: "Des Moines Pathfinders" }, { name: "Cedar Rapids Pathfinders" }, { name: "Kansas City Latin-American Pathfinders" }, { name: "Delta Club" }];
+
+  it("finds 'de' at the start of a word, never inside 'Pathfinder' or 'Cedar'", () => {
+    expect(filterClubsByName(clubs, "de").map((club) => club.name)).toEqual(["Des Moines Pathfinders", "Delta Club"]);
+  });
+
+  it("treats punctuation as a word break and keeps multi-word searches", () => {
+    expect(filterClubsByName(clubs, "american").map((club) => club.name)).toEqual(["Kansas City Latin-American Pathfinders"]);
+    expect(filterClubsByName(clubs, "des moines").map((club) => club.name)).toEqual(["Des Moines Pathfinders"]);
+  });
+
+  it("applies the same rule to the church and city search", () => {
+    const listed = [{ name: "Eagles", sponsoringChurch: "Cedar Rapids SDA Church", city: "Cedar Rapids" }, { name: "Hawks", sponsoringChurch: "Denison SDA Church", city: "Denison" }];
+    expect(filterClubsByNameChurchOrCity(listed, "de").map((club) => club.name)).toEqual(["Hawks"]);
   });
 });
