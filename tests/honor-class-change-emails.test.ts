@@ -542,7 +542,34 @@ describe("a closed roster is not read again (#1098)", () => {
   });
 });
 
+describe("a change is never sent twice, in a final summary and then right away (#1098)", () => {
+  it("skips an instructor whose summary point is at or after the change", async () => {
+    w.addInstructor({ classChangeEmails: "IMMEDIATE", classChangeSummaryAt: new Date("2026-10-21T10:00:00Z") });
+    w.addInstructor({ classChangeEmails: "IMMEDIATE", classChangeSummaryAt: new Date("2026-10-21T09:00:00Z") });
+    w.addChange("JOINED", "2026-10-21T10:00:00Z");
+    await dispatchImmediateClassChangeEmails(morning);
+    expect(w.outbox.size).toBe(1);
+    expect([...w.outbox.values()][0]!.recipientEmail).toBe("instructor2@imsda-events.test");
+  });
+});
+
 describe("leaving the daily summary (#1098)", () => {
+  it("two concurrent final summaries send one: the claim is on the exact summary point that was read", async () => {
+    const instructor = w.addInstructor({ classChangeEmails: "OFF", classChangeSummaryAt: new Date("2026-10-20T11:00:00Z") });
+    w.addChange("JOINED", "2026-10-20T15:00:00Z");
+    await Promise.all([sendFinalClassChangeSummary(String(instructor.id), morning), sendFinalClassChangeSummary(String(instructor.id), morning)]);
+    expect(w.outbox.size).toBe(1);
+  });
+
+  it("never throws, whatever fails after the choice committed", async () => {
+    mocks.isNotificationEnabled.mockRejectedValue(new Error("settings unavailable"));
+    await expect(sendFinalClassChangeSummary("instructor-1", morning)).resolves.toEqual({ queued: false });
+    mocks.isNotificationEnabled.mockResolvedValue(true);
+    (w.db.honorInstructor as { findFirst: ReturnType<typeof vi.fn> }).findFirst.mockRejectedValue(new Error("database down"));
+    await expect(sendFinalClassChangeSummary("instructor-1", morning)).resolves.toEqual({ queued: false });
+    expect(mocks.logError).toHaveBeenCalledTimes(2);
+  });
+
   it("sends one last summary of what changed since the previous one, and moves the point", async () => {
     const instructor = w.addInstructor({ classChangeEmails: "IMMEDIATE", classChangeSummaryAt: new Date("2026-10-20T11:00:00Z") });
     w.addChange("JOINED", "2026-10-20T15:00:00Z");

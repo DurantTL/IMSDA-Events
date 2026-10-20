@@ -18,7 +18,7 @@ function database(row: Record<string, unknown> | null) {
     honorInstructor: {
       findFirst: vi.fn().mockResolvedValue(row),
       findMany: vi.fn().mockResolvedValue([]),
-      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     honorOffering: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(db)),
@@ -44,14 +44,14 @@ describe("setting how an instructor hears about class list changes (#1098)", () 
   it("refuses an assignment that isn't theirs, and changes nothing", async () => {
     const db = database(null);
     await expect(setInstructorClassChangeEmails("acct-1", "ins-other", "OFF", now)).rejects.toBeInstanceOf(HonorInstructorError);
-    expect(db.honorInstructor.update).not.toHaveBeenCalled();
+    expect(db.honorInstructor.updateMany).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it("saves the choice and audits it with ids only", async () => {
     const db = database({ id: "ins-1", eventId: "event-1", classChangeEmails: "DAILY" });
     expect(await setInstructorClassChangeEmails("acct-1", "ins-1", "OFF", now)).toEqual({ classChangeEmails: "OFF" });
-    expect(db.honorInstructor.update).toHaveBeenCalledWith({ where: { id: "ins-1" }, data: { classChangeEmails: "OFF" } });
+    expect(db.honorInstructor.updateMany).toHaveBeenCalledWith({ where: { id: "ins-1", classChangeEmails: "DAILY" }, data: { classChangeEmails: "OFF" } });
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       action: "HONOR_INSTRUCTOR_CLASS_EMAILS_CHANGED",
       eventId: "event-1",
@@ -63,7 +63,7 @@ describe("setting how an instructor hears about class list changes (#1098)", () 
   it("starts the daily summary from now when the instructor comes back to it, so old changes don't come back", async () => {
     const db = database({ id: "ins-1", eventId: "event-1", classChangeEmails: "IMMEDIATE" });
     await setInstructorClassChangeEmails("acct-1", "ins-1", "DAILY", now);
-    expect(db.honorInstructor.update).toHaveBeenCalledWith({ where: { id: "ins-1" }, data: { classChangeEmails: "DAILY", classChangeSummaryAt: now } });
+    expect(db.honorInstructor.updateMany).toHaveBeenCalledWith({ where: { id: "ins-1", classChangeEmails: "IMMEDIATE" }, data: { classChangeEmails: "DAILY", classChangeSummaryAt: now } });
   });
 
   it("sends one last summary, after the choice has committed, when the instructor leaves the daily summary", async () => {
@@ -81,6 +81,17 @@ describe("setting how an instructor hears about class list changes (#1098)", () 
     expect(mocks.sendFinalClassChangeSummary).toHaveBeenCalledWith("ins-1", now);
   });
 
+  it("two requests that read the same choice: only the one that changes it sends the final summary", async () => {
+    const db = database({ id: "ins-1", eventId: "event-1", classChangeEmails: "DAILY" });
+    db.honorInstructor.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    await Promise.all([
+      setInstructorClassChangeEmails("acct-1", "ins-1", "IMMEDIATE", now),
+      setInstructorClassChangeEmails("acct-1", "ins-1", "OFF", now),
+    ]);
+    expect(mocks.sendFinalClassChangeSummary).toHaveBeenCalledTimes(1);
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+  });
+
   it("sends no final summary for a change that doesn't leave the daily summary, or one that changes nothing", async () => {
     database({ id: "ins-1", eventId: "event-1", classChangeEmails: "OFF" });
     await setInstructorClassChangeEmails("acct-1", "ins-1", "DAILY", now);
@@ -93,7 +104,7 @@ describe("setting how an instructor hears about class list changes (#1098)", () 
   it("does nothing when the choice is already that one", async () => {
     const db = database({ id: "ins-1", eventId: "event-1", classChangeEmails: "OFF" });
     await setInstructorClassChangeEmails("acct-1", "ins-1", "OFF", now);
-    expect(db.honorInstructor.update).not.toHaveBeenCalled();
+    expect(db.honorInstructor.updateMany).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 });

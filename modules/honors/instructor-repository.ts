@@ -412,10 +412,13 @@ export async function setInstructorClassChangeEmails(accountId: string, instruct
     });
     if (!row) throw new HonorInstructorError("NOT_ASSIGNED", "That instructor assignment isn't yours.");
     if (row.classChangeEmails === choice) return { classChangeEmails: choice, leftDaily: false };
-    await tx.honorInstructor.update({
-      where: { id: row.id },
+    // Conditional on the value just read: of two requests that read the same choice, only one changes it (and so sees
+    // that it left the daily summary); the other changes nothing and sends nothing.
+    const changed = await tx.honorInstructor.updateMany({
+      where: { id: row.id, classChangeEmails: row.classChangeEmails },
       data: { classChangeEmails: choice, ...(choice === "DAILY" ? { classChangeSummaryAt: now } : {}) },
     });
+    if (changed.count === 0) return { classChangeEmails: choice, leftDaily: false };
     await writeAuditLog({
       eventId: row.eventId,
       action: "HONOR_INSTRUCTOR_CLASS_EMAILS_CHANGED",

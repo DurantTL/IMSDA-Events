@@ -419,6 +419,7 @@ describe("every path that creates or deletes an enrollment writes a change row (
     wrapped("modules/registrations/lifecycle-repository.ts", ["cancelRegistration", "moveRegistrationToWaitlist", "promoteRegistrationFromWaitlist", "reactivateRegistration"]);
     wrapped("modules/registrations/amendments-repository.ts", ["amendRegistration"]);
     wrapped("modules/imports/repository.ts", ["commitImportRun"]);
+    wrapped("modules/event-locations/repository.ts", ["updateEventLocation"]);
     wrapped("modules/club-transfers/repository.ts", ["approveRegistrationMove"]);
   });
 
@@ -454,5 +455,31 @@ describe("withClassChangeKick (#1098)", () => {
     mocks.kickClassChangeEmails.mockClear();
     await withClassChangeKick(async () => undefined);
     expect(mocks.kickClassChangeEmails).not.toHaveBeenCalled();
+  });
+
+  it("skips the kick when the work throws, and passes the error on", async () => {
+    const { withClassChangeKick } = await import("@/modules/honors/class-change-log");
+    const client = logClient();
+    mocks.kickClassChangeEmails.mockReset();
+    await expect(withClassChangeKick(async () => {
+      await recordClassChanges(client as never, ["e-knots"], "JOINED", now);
+      throw new Error("the transaction rolled back");
+    })).rejects.toThrow("the transaction rolled back");
+    expect(mocks.kickClassChangeEmails).not.toHaveBeenCalled();
+  });
+
+  it("keeps the ids of two concurrent calls apart", async () => {
+    const { withClassChangeKick } = await import("@/modules/honors/class-change-log");
+    mocks.kickClassChangeEmails.mockReset();
+    const slow = (id: string, wait: number) => async () => {
+      const client = logClient();
+      client.honorClassChange.createManyAndReturn.mockResolvedValue([{ id }]);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      await recordClassChanges(client as never, ["e-knots"], "JOINED", now);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    };
+    await Promise.all([withClassChangeKick(slow("only-a", 15)), withClassChangeKick(slow("only-b", 5))]);
+    const kicked = mocks.kickClassChangeEmails.mock.calls.map(([ids]) => ids).sort();
+    expect(kicked).toEqual([["only-a"], ["only-b"]]);
   });
 });

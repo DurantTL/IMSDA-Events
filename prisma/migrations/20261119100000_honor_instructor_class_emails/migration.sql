@@ -37,6 +37,9 @@ CREATE TABLE "HonorClassChange" (
 CREATE INDEX "HonorClassChange_offeringId_at_idx" ON "HonorClassChange"("offeringId", "at");
 
 -- CreateIndex
+CREATE INDEX "HonorClassChange_at_idx" ON "HonorClassChange"("at");
+
+-- CreateIndex
 CREATE INDEX "HonorClassChange_immediateHandledAt_at_idx" ON "HonorClassChange"("immediateHandledAt", "at");
 
 -- CreateIndex

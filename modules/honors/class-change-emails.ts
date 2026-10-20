@@ -234,6 +234,9 @@ export async function dispatchImmediateClassChangeEmails(now = new Date(), resul
               classChangeEmails: "IMMEDIATE",
               acceptedAt: { not: null, lte: change.at },
               revokedAt: null,
+              // A change at or before the instructor's summary point was covered by that summary (a final one, for an
+              // instructor who has since switched): it is not sent again.
+              OR: [{ classChangeSummaryAt: null }, { classChangeSummaryAt: { lt: change.at } }],
               classes: { some: { offeringId: change.offeringId } },
             },
             select: { id: true, email: true, name: true, event: { select: { name: true, endsAt: true, archivedAt: true } } },
@@ -427,20 +430,23 @@ export async function sendDueClassChangeEmails(now = new Date()): Promise<ClassC
  * daily run does, so it cannot double up with a sweep; if nothing changed it only moves the point.
  */
 export async function sendFinalClassChangeSummary(instructorId: string, now = new Date()) {
-  // The staff switch is read before the transaction below (#1016).
-  if (!await isNotificationEnabled("HONOR_INSTRUCTOR_CLASS_EMAILS")) return { queued: false };
-  const prisma = getPrisma();
-  const instructor = await prisma.honorInstructor.findFirst({
-    where: { id: instructorId, acceptedAt: { not: null }, revokedAt: null, classes: { some: {} } },
-    select: { id: true, email: true, name: true, acceptedAt: true, classChangeSummaryAt: true, eventId: true, event: { select: { name: true, endsAt: true, archivedAt: true } }, classes: { select: { offeringId: true } } },
-  });
-  if (!instructor?.acceptedAt || instructor.event.archivedAt || !instructorMarksOpen(instructor.event.endsAt, now)) return { queued: false };
-  const acceptedAt = instructor.acceptedAt;
+  // The staff switch is read before any transaction below (#1016). Everything runs under one catch: the choice has already
+  // committed, so a failure here must never turn into an error for the person who saved it.
   try {
+    if (!await isNotificationEnabled("HONOR_INSTRUCTOR_CLASS_EMAILS")) return { queued: false };
+    const prisma = getPrisma();
+    const instructor = await prisma.honorInstructor.findFirst({
+      where: { id: instructorId, acceptedAt: { not: null }, revokedAt: null, classes: { some: {} } },
+      select: { id: true, email: true, name: true, acceptedAt: true, classChangeSummaryAt: true, eventId: true, event: { select: { name: true, endsAt: true, archivedAt: true } }, classes: { select: { offeringId: true } } },
+    });
+    if (!instructor?.acceptedAt || instructor.event.archivedAt || !instructorMarksOpen(instructor.event.endsAt, now)) return { queued: false };
+    if (instructor.classChangeSummaryAt && instructor.classChangeSummaryAt.getTime() >= now.getTime()) return { queued: false };
+    const acceptedAt = instructor.acceptedAt;
     const settings = await settingsLoader()(instructor.eventId);
     const queued = await prisma.$transaction(async (tx) => {
+      // The claim is on the exact summary point that was read (or null): of two runs that read the same one, only one wins.
       const claimed = await tx.honorInstructor.updateMany({
-        where: { id: instructor.id, revokedAt: null, OR: [{ classChangeSummaryAt: null }, { classChangeSummaryAt: { lt: now } }] },
+        where: { id: instructor.id, revokedAt: null, classChangeSummaryAt: instructor.classChangeSummaryAt },
         data: { classChangeSummaryAt: now },
       });
       if (claimed.count === 0) return { messageId: null as string | null };
@@ -457,7 +463,7 @@ export async function sendFinalClassChangeSummary(instructorId: string, now = ne
     if (queued.messageId) await deliverAfterCommit([queued.messageId]);
     return { queued: queued.messageId !== null };
   } catch (error) {
-    logError("An instructor's final class change summary could not be queued.", error, { honorInstructorId: instructor.id });
+    logError("An instructor's final class change summary could not be queued.", error, { honorInstructorId: instructorId });
     return { queued: false };
   }
 }

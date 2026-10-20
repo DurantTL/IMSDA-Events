@@ -8700,6 +8700,7 @@ model HonorClassChange {
   offering HonorOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
 
   @@index([offeringId, at])
+  @@index([at])
   @@index([immediateHandledAt, at])
   @@index([eventId])
 }
