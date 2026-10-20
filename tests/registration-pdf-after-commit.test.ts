@@ -14,6 +14,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: mocks.getPrisma }));
 vi.mock("@/lib/logger", () => ({ logError: mocks.logError, logWarn: vi.fn(), logInfo: vi.fn() }));
 vi.mock("@/modules/registration-pdf/repository", () => ({ ensureRegistrationPdfOutsideTransaction: mocks.ensure }));
+// The form's own notifications (#1081) have their own tests; here a change only has to hand over to them.
+vi.mock("@/modules/registration-form-notifications/after-commit", () => ({ notifyFormNotificationsAfterChange: vi.fn() }));
 vi.mock("@/modules/communications/messaging-repository", () => ({ processQueuedMessageIdsAfterCommit: mocks.processQueued }));
 vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: mocks.staffCopySwitch }));
 vi.mock("@/modules/communications/effective-delivery", () => ({

@@ -50,7 +50,8 @@ Decisions: Caleb, Oct 20, 2026 (ages only; whole registration; Spring Camporee c
 - Known narrow race: if a download lands between an amendment's commit and its after-commit step, the download makes
   that version (unmarked) and the step then finds nothing new to announce.
 - Over 10 MB: no PDF is stored and the messages go without it (logged).
-- Not in scope here: the several-notifications-per-form hook and section filtering (#1081); it can attach the same PDF.
+- Form notifications (#1081) reuse this PDF with `buildRegistrationPdfModel(source, { sectionIds })`: the exclusion rules are
+  decided on the whole form first, and a filtered copy has no fees. See `docs/FORM-NOTIFICATIONS.md`.
 
 ## Download
 
