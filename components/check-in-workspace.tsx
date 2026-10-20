@@ -42,7 +42,7 @@ import {
   sequentialCheckInSummary,
   type SequentialCheckInStatus,
 } from "@/modules/checkin/bulk-check-in";
-import { arrivalMatchesSearch, offlineCheckInErrorMessage } from "@/modules/checkin/domain";
+import { arrivalMatchesSearch, mergeSterlingHeldIds, offlineCheckInErrorMessage } from "@/modules/checkin/domain";
 import type { CheckInArrival } from "@/modules/checkin/arrival-view";
 import {
   applyLiveCheckInChanges,
@@ -75,7 +75,7 @@ export function CheckInWorkspace({
   /** Server-projected arrivals (#757): only what this screen renders, never form answers. Balances are already 0 for events billed to an organization. */
   initialArrivals: CheckInArrival[];
   canCheckIn: boolean;
-  /** Adults at a youth or children's event without a current check (#388). Shown, never blocking. */
+  /** Adults at a youth or children's event without a current check (#388). Held from check-in until staff override (#874). */
   backgroundFlaggedAttendeeIds?: string[];
   /** Active club registrations for this event (#412): who to check in as a group, and what their church owes. */
   clubs?: ClubCheckInInfo[];
@@ -244,6 +244,9 @@ export function CheckInWorkspace({
     processingKeys,
     requestCheckIn,
     requestSterlingOverrideCheckIn,
+    heldAttendeeIds,
+    syncNotice,
+    dismissSyncNotice,
     retryQueueItem,
     retryAll,
     discardQueueItem,
@@ -252,6 +255,12 @@ export function CheckInWorkspace({
     eventId,
     onConfirmed: applyConfirmedCheckIn,
   });
+
+  // Held at page load, plus anyone the server held since (#874), so Override shows without a reload.
+  const sterlingHeldIds = useMemo(
+    () => mergeSterlingHeldIds(backgroundFlaggedAttendeeIds, heldAttendeeIds),
+    [backgroundFlaggedAttendeeIds, heldAttendeeIds],
+  );
 
   const clubByConfirmationCode = useMemo(() => new Map(
     clubs.map((club) => [club.confirmationCode, club]),
@@ -427,7 +436,8 @@ export function CheckInWorkspace({
           locationName={locationName}
           eventId={eventId}
           paymentDueByConfirmationCode={paymentDueByConfirmationCode}
-          backgroundFlaggedAttendeeIds={backgroundFlaggedAttendeeIds}
+          backgroundFlaggedAttendeeIds={sterlingHeldIds}
+          canCheckIn={canCheckIn}
           clubsByConfirmationCode={Object.fromEntries(clubByConfirmationCode)}
           onConfirmCheckIn={(attendee, reason) => (
             reason ? requestSterlingOverrideCheckIn(attendee.id, reason) : requestCheckIn(attendee.id)
@@ -455,6 +465,13 @@ export function CheckInWorkspace({
         </div>
       )}
 
+      {syncNotice && (
+        <div className="inline-notice error" role="alert">
+          {syncNotice}{" "}
+          <button className="secondary-button" onClick={dismissSyncNotice} type="button">Dismiss</button>
+        </div>
+      )}
+
       {matchedClubs.map((club) => {
         const clubAttendees = arrivals
           .filter((arrival) => arrival.confirmationCode === club.confirmationCode)
@@ -466,7 +483,7 @@ export function CheckInWorkspace({
               lastName: arrival.lastName,
               attendeeType: arrival.attendeeType,
               checkedIn: arrival.checkedIn,
-              backgroundFlagged: backgroundFlaggedAttendeeIds.includes(arrival.id),
+              backgroundFlagged: sterlingHeldIds.includes(arrival.id),
               savedState: savedItem?.state,
               lastResult: bulkResultById[arrival.id],
             };
@@ -727,7 +744,7 @@ export function CheckInWorkspace({
                   <span translate="no">{arrival.confirmationCode}</span> ·{" "}
                   {arrival.attendeeType.toLowerCase()}
                 </small>
-                {backgroundFlaggedAttendeeIds.includes(arrival.id) && <BackgroundCheckBadge />}
+                {sterlingHeldIds.includes(arrival.id) && <BackgroundCheckBadge />}
                 <CheckInPaymentDue
                   compact
                   balanceCents={arrival.balanceCents}
@@ -754,7 +771,7 @@ export function CheckInWorkspace({
                       ? (processing ? "Retrying…" : "Not saved — tap to retry")
                       : AWAITING_ARRIVAL_LABEL}
               </span>
-              {!arrival.checkedIn && backgroundFlaggedAttendeeIds.includes(arrival.id) ? (
+              {!arrival.checkedIn && sterlingHeldIds.includes(arrival.id) ? (
                 <SterlingCheckInOverride
                   canOverride={canCheckIn}
                   disabled={processing || bulkBusyCode !== null || unreadableItemCount > 0 || !online}

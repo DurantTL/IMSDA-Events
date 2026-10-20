@@ -59,7 +59,7 @@ export default async function EventClubPage({
             <div>
               <p className="eyebrow">Youth or children&apos;s event · the club doesn&apos;t see this</p>
               <h2>Sterling Volunteers needed</h2>
-              <p>Adults from this club who are not in compliance with Sterling Volunteers through {backgroundFlags.lastDay}. Nothing is blocked.</p>
+              <p>Adults from this club who are not in compliance with Sterling Volunteers through {backgroundFlags.lastDay}. Registration is never blocked; check-in is held for them unless staff override.</p>
             </div>
           </div>
           <BackgroundCheckList people={backgroundFlags.people} registrationHref={{ base: "/people", query: `event=${encodeURIComponent(event.id)}` }} showClub={false} />

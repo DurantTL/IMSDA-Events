@@ -127,6 +127,7 @@ function cameraMessage(state: CameraState) {
 
 export function CheckInScanner({
   eventId,
+  canCheckIn,
   onConfirmCheckIn,
   queuedAttendeeIds,
   conflictAttendeeIds,
@@ -138,6 +139,8 @@ export function CheckInScanner({
   locationName,
 }: {
   eventId: string;
+  /** Whether this staff member holds check-in permission; decides who may type a Sterling Volunteers override. */
+  canCheckIn: boolean;
   onConfirmCheckIn: (
     attendee: ResolvedAttendee,
     /** Staff's typed reason, for an adult or staff member without a current Sterling Volunteers check (#874). */
@@ -795,7 +798,7 @@ export function CheckInScanner({
                   lastResult: actionStateById[attendee.id],
                 }))}
                 busy={bulkBusy || Boolean(checkingInId)}
-                canCheckIn
+                canCheckIn={canCheckIn}
                 confirmationCode={resolution.confirmationCode}
                 headingLevel={3}
                 onCheckInMany={confirmCheckInMany}
@@ -870,7 +873,7 @@ export function CheckInScanner({
                           </span>
                         ) : backgroundFlaggedAttendeeIds.includes(attendee.id) ? (
                           <SterlingCheckInOverride
-                            canOverride
+                            canOverride={canCheckIn}
                             disabled={Boolean(checkingInId)}
                             onOverride={async (reason) => (
                               await confirmCheckIn(attendee, reason)

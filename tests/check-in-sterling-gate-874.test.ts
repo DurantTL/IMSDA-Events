@@ -42,10 +42,9 @@ function fixture(options: { alreadyCheckedIn?: boolean; replay?: boolean } = {})
       findFirst: vi.fn().mockResolvedValue(null),
     },
   };
-  dependencies.getPrisma.mockReturnValue({
-    $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
-  });
-  return { tx };
+  const transaction = vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx));
+  dependencies.getPrisma.mockReturnValue({ $transaction: transaction });
+  return { tx, transaction };
 }
 
 function blocked(state: "MISSING" | "EXPIRED" | "NOT_COMPLIANT" = "MISSING") {
@@ -115,13 +114,24 @@ describe("Sterling Volunteers check-in gate (#874)", () => {
     expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
-  it("never re-gates an already-checked-in attendee or a saved retry that already succeeded", async () => {
+  it("never refuses an already-checked-in attendee or a saved retry that already succeeded", async () => {
     fixture({ alreadyCheckedIn: true });
     blocked();
     await expect(checkInAttendee("event_1", "attendee_1", "staff_1", idempotencyKey)).resolves.toMatchObject({ disposition: "ALREADY_CHECKED_IN" });
     fixture({ replay: true });
     await expect(checkInAttendee("event_1", "attendee_1", "staff_1", idempotencyKey)).resolves.toMatchObject({ disposition: "IDEMPOTENT_REPLAY" });
-    expect(dependencies.checkInBlocksForAttendees).not.toHaveBeenCalled();
+  });
+
+  it("looks the Sterling state up before the transaction opens, never on a second connection inside it", async () => {
+    const { tx, transaction } = fixture();
+    const order: string[] = [];
+    dependencies.checkInBlocksForAttendees.mockImplementation(async () => { order.push("lookup"); return new Map(); });
+    transaction.mockImplementationOnce(async (operation) => {
+      order.push("transaction");
+      return operation(tx);
+    });
+    await checkInAttendee("event_1", "attendee_1", "staff_1", idempotencyKey);
+    expect(order).toEqual(["lookup", "transaction"]);
   });
 
   it("bulk check-in runs through the same single check-in, so each held person is refused by the server and the rest go through", async () => {

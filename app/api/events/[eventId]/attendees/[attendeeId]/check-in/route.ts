@@ -13,7 +13,8 @@ import { sealHealthSnapshotAfterCheckIn } from "@/modules/health-records/snapsho
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
-const maximumBodyBytes = 1_024;
+// Room for a 300-character override reason of multibyte or escaped characters (#874) beside the retry key.
+const maximumBodyBytes = 4_096;
 const privateHeaders = {
   "Cache-Control": "private, no-store, max-age=0",
   Pragma: "no-cache",
@@ -45,6 +46,12 @@ function apiError(error: unknown) {
       { error: error.code, message: error.message },
       { status: error.code === "ATTENDEE_NOT_FOUND" ? 404 : 409 }
     );
+  }
+  if (error instanceof z.ZodError && error.issues.some((issue) => issue.path[0] === "sterlingOverrideReason")) {
+    return json({
+      error: "INVALID_OVERRIDE_REASON",
+      message: "Enter a reason of 3 to 300 characters.",
+    }, { status: 400 });
   }
   if (error instanceof z.ZodError) {
     return json({

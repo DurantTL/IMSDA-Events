@@ -86,6 +86,10 @@ export async function checkInAttendee(
   options: { sterlingOverrideReason?: string } = {},
 ) {
   const prisma = getPrisma();
+  // #874: decided before the transaction opens, so no query runs on a second pool connection while the
+  // transaction holds its own (a deadlock with a one-connection pool, starvation at the arrival rush). A replay or
+  // an already-checked-in answer ignores it.
+  const sterlingState = (await checkInBlocksForAttendees(eventId, [attendeeId])).get(attendeeId) ?? null;
   for (let attempt = 0; attempt < CHECK_IN_MAX_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(async (tx) => {
@@ -138,9 +142,8 @@ export async function checkInAttendee(
         }
 
         // #874: at a youth or children's event an adult or staff attendee who isn't current with Sterling
-        // Volunteers can't be checked in, unless staff type a reason. Decided here, after the replay and
+        // Volunteers can't be checked in, unless staff type a reason. Applied here, after the replay and
         // already-checked-in answers (a check-in that already happened is never undone by a later lapse).
-        const sterlingState = (await checkInBlocksForAttendees(eventId, [attendeeId])).get(attendeeId) ?? null;
         const overrideReason = options.sterlingOverrideReason?.trim() || null;
         if (sterlingState && !overrideReason) {
           throw new CheckInOperationError("STERLING_CHECK_NEEDED");

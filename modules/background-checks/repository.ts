@@ -1987,7 +1987,7 @@ export type BackgroundFlag = {
 /**
  * Every adult registered for a youth or children's event who has no current
  * check through the event's last day. Null when the event doesn't check.
- * Staff and event managers only; never shown to clubs. `includeNotes` adds each
+ * Staff and event managers see everyone; a director gets only their own club (`organizationId`), status only. `includeNotes` adds each
  * person's issues text, and must be decided by the caller from who is asking.
  */
 export async function listEventBackgroundFlags(eventId: string, options: { organizationId?: string; includeNotes?: boolean; includeContact?: boolean; attendeeIds?: string[] } = {}) {

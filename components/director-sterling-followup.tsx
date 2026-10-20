@@ -1,12 +1,12 @@
 import { backgroundFlagLabels } from "@/modules/background-checks/display";
-import type { BackgroundFlag } from "@/modules/background-checks/repository";
+import type { DirectorSterlingPerson } from "@/modules/background-checks/director-follow-up";
 
 /**
  * A director's own club's Sterling Volunteers follow-up at a youth or
  * children's event (#874): who still needs a current check before they can be
  * checked in. Status only: no dates, contact details or staff-only notes.
  */
-export function DirectorSterlingFollowUp({ people }: { people: Pick<BackgroundFlag, "attendeeId" | "firstName" | "lastName" | "attendeeType" | "state">[] }) {
+export function DirectorSterlingFollowUp({ people }: { people: DirectorSterlingPerson[] }) {
   return (
     <section className="public-manage-card" id="sterling-follow-up">
       <h3>Sterling Volunteers follow-up</h3>

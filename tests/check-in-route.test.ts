@@ -143,9 +143,15 @@ describe("check-in route", () => {
     expect(mocks.sealHealthSnapshotAfterCheckIn).not.toHaveBeenCalled();
   });
 
+  it("accepts a 300-character multibyte override reason within the body limit (#874)", async () => {
+    const response = await POST(request({ idempotencyKey, sterlingOverrideReason: "é".repeat(300) }), context);
+    expect(response.status).toBe(200);
+  });
+
   it("rejects a too-short override reason (#874)", async () => {
     const response = await POST(request({ idempotencyKey, sterlingOverrideReason: "ok" }), context);
     expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "INVALID_OVERRIDE_REASON", message: "Enter a reason of 3 to 300 characters." });
     expect(mocks.checkInAttendee).not.toHaveBeenCalled();
   });
 

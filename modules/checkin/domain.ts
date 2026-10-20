@@ -40,6 +40,20 @@ export type OfflineCheckInQueueItem =
 /** What check-in shows in place of the Check in button (#874). */
 export const STERLING_CHECK_NEEDED_MESSAGE = "Sterling Volunteers check needed before check-in";
 
+/**
+ * Who check-in holds for Sterling Volunteers (#874): those held when the page loaded plus anyone the
+ * server refused since, so the Override control appears without a reload.
+ */
+export function mergeSterlingHeldIds(loaded: readonly string[], refusedSince: readonly string[]) {
+  return [...new Set([...loaded, ...refusedSince])];
+}
+
+/** The notice after automatic sync drops saved check-ins the server held; empty when none. */
+export function sterlingSyncDroppedNotice(count: number) {
+  if (count < 1) return "";
+  return `${count} saved ${count === 1 ? "check-in was" : "check-ins were"} not recorded: ${STERLING_CHECK_NEEDED_MESSAGE}. Use Override on the row if staff have verified them.`;
+}
+
 export function offlineCheckInStorageKey(eventId: string) {
   return `imsda-events:check-in-queue:v1:${eventId}`;
 }
