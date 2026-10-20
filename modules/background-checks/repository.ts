@@ -47,8 +47,8 @@ import {
  *
  * `MANUAL` (a staff decision) and `MIGRATED` (carried over by the #527
  * migration) matches are never recomputed — a refresh can't reproduce them,
- * so it never deletes them. Flags only: registration and check-in never wait
- * on a check.
+ * so it never deletes them. Registration never waits on a check; check-in at a
+ * youth or children's event does (#874).
  */
 
 const ROSTER_IMPORT_PROVIDER = "ROSTER_IMPORT";
@@ -1976,6 +1976,8 @@ export type BackgroundFlag = {
   registrationId: string;
   state: Exclude<BackgroundCheckState, "CURRENT">;
   expiresOn: string | null;
+  /** A contact email for staff to reach the person before the event (#874); null on a director's list, who already know their own people. */
+  contactEmail: string | null;
   /** The list's issues column as stored (#544): only when the caller asked for notes (`includeNotes`, system administrators only, #427); otherwise null. */
   issuesNote: string | null;
   /** The issues text as readable reasons for staff ("Marked Non-Driver", ...): same audience as `issuesNote`, empty otherwise. */
@@ -1985,10 +1987,10 @@ export type BackgroundFlag = {
 /**
  * Every adult registered for a youth or children's event who has no current
  * check through the event's last day. Null when the event doesn't check.
- * Staff and event managers only; never shown to clubs. `includeNotes` adds each
+ * Staff and event managers see everyone; a director gets only their own club (`organizationId`), status only. `includeNotes` adds each
  * person's issues text, and must be decided by the caller from who is asking.
  */
-export async function listEventBackgroundFlags(eventId: string, options: { organizationId?: string; includeNotes?: boolean } = {}) {
+export async function listEventBackgroundFlags(eventId: string, options: { organizationId?: string; includeNotes?: boolean; includeContact?: boolean; attendeeIds?: string[] } = {}) {
   const prisma = getPrisma();
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -2001,6 +2003,7 @@ export async function listEventBackgroundFlags(eventId: string, options: { organ
   const attendees = await prisma.registrationAttendee.findMany({
     where: {
       eventId,
+      ...(options.attendeeIds ? { id: { in: options.attendeeIds } } : {}),
       registration: {
         status: { in: [...activeRegistrationStatuses] },
         ...(options.organizationId ? { clubRegistration: { organizationId: options.organizationId } } : {}),
@@ -2085,11 +2088,31 @@ export async function listEventBackgroundFlags(eventId: string, options: { organ
       registrationId: attendee.registration.id,
       state,
       expiresOn: check?.expiresOn ?? null,
+      contactEmail: options.includeContact ? contactEmailFor(attendee) : null,
       issuesNote: options.includeNotes ? check?.issuesNote?.trim() || null : null,
       issueReasons: options.includeNotes ? describeIssues(check?.issuesNote, todayInChicago) : [],
     });
   }
   return { adults: adultAttendees.length, people, lastDay };
+}
+
+function contactEmailFor(attendee: { profileSnapshot: unknown; person: { normalizedEmail?: string | null; attendeeAccountLinks?: Array<{ account: { email: string } }> | null } }) {
+  const snapshot = (attendee.profileSnapshot ?? {}) as { email?: unknown };
+  if (typeof snapshot.email === "string" && snapshot.email.trim()) return snapshot.email.trim();
+  return [...personEmails(attendee.person)][0] ?? null;
+}
+
+/**
+ * Who among `attendeeIds` can't be checked in for want of a current Sterling
+ * Volunteers check (#874), as attendee id to state. Only adults and staff at an
+ * event marked youth or children's are ever in it: an adult event, a youth
+ * attendee, or a current check gives an empty map. The check-in routes call
+ * this server-side; the answer never depends on what the browser showed.
+ */
+export async function checkInBlocksForAttendees(eventId: string, attendeeIds: string[]) {
+  if (attendeeIds.length === 0) return new Map<string, Exclude<BackgroundCheckState, "CURRENT">>();
+  const flags = await listEventBackgroundFlags(eventId, { attendeeIds });
+  return new Map((flags?.people ?? []).map((person) => [person.attendeeId, person.state]));
 }
 
 /** Just the attendee IDs to flag, for rosters and check-in. Empty when the event doesn't check. */

@@ -85,6 +85,6 @@ describe("the event background-check CSV never carries the issues text (#427, #5
       state: "NOT_COMPLIANT", expiresOn: null,
     }]);
     expect(csv).not.toContain("Issues");
-    expect(csv.split(/\r?\n/)[0]).toBe(["Last name", "First name", "Attendee type", "Club", "Confirmation code", "Sterling Volunteers", "Expired on"].map((name) => `"${name}"`).join(","));
+    expect(csv.split(/\r?\n/)[0]).toBe(["Last name", "First name", "Attendee type", "Club", "Contact email", "Confirmation code", "Sterling Volunteers", "Expired on"].map((name) => `"${name}"`).join(","));
   });
 });

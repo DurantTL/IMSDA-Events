@@ -610,7 +610,8 @@ export function EventSettingsWorkspace({
         <small>
           For events where parents aren&apos;t normally there. Every adult registered, club
           staff or not, is flagged until they are in compliance with Sterling Volunteers.
-          Registration and check-in are never blocked.
+          Registration is never blocked. At check-in, adults and staff who are not current are held unless staff
+          type a reason to override.
         </small>
       {fieldNote("checksAdultBackgrounds")}</span>
     </label>

@@ -22,6 +22,7 @@ const flag = (overrides: Partial<BackgroundFlag> = {}): BackgroundFlag => ({
   registrationId: "registration-1",
   state: "NOT_COMPLIANT",
   expiresOn: null,
+  contactEmail: null,
   issuesNote: null,
   issueReasons: [],
   ...overrides,

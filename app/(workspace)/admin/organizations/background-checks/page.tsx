@@ -39,7 +39,7 @@ export default async function BackgroundChecksPage() {
         <p className="field-help">
           At events marked as youth or children&apos;s events (in Event settings), every adult with no check on file, an
           expired check, or a roster mark of not in compliance is flagged in red on the dashboard, People, rosters,
-          and check-in. Expiring soon is not flagged there, and nothing is blocked.
+          and check-in. Expiring soon is not flagged there, and registration is never blocked. At those events check-in is held for adults and staff who are not current unless staff override.
         </p>
         <p className="field-help">
           Each adult on a club&apos;s roster shows Clear, Expiring soon, Not in compliance, or No record. Club

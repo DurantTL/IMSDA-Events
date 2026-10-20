@@ -7,6 +7,8 @@ const dependencies = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
+// The Sterling Volunteers gate (#874) has its own tests; here no one is held.
+vi.mock("@/modules/background-checks/repository", () => ({ checkInBlocksForAttendees: vi.fn().mockResolvedValue(new Map()) }));
 
 import {
   CHECK_IN_MAX_ATTEMPTS,

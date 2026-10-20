@@ -29,6 +29,35 @@ function attendee(
   };
 }
 
+describe("Sterling Volunteers hold in a club check-in (#874)", () => {
+  const roster = [
+    attendee({ id: "youth" }),
+    attendee({ id: "adult-held", attendeeType: "ADULT", backgroundFlagged: true }),
+    attendee({ id: "adult-ok", attendeeType: "ADULT" }),
+  ];
+
+  it("leaves a held adult out of 'Check in all' and 'Check in selected', and says so", () => {
+    expect(pendingAttendeeIds(roster)).toEqual(["youth", "adult-ok"]);
+    expect(selectedPendingAttendeeIds(roster, new Set(["adult-held", "youth"]))).toEqual(["youth"]);
+    expect(clubAttendeeStatusLabel(roster[1]!)).toBe("Sterling Volunteers check needed");
+    const html = renderToStaticMarkup(createElement(ClubCheckInPanel, {
+      organizationName: "Sample Club", confirmationCode: "SC-1", amountOwedCents: null, attendees: roster, canCheckIn: true, busy: false, onCheckInMany: () => undefined,
+    }));
+    expect(html).toContain("1 person needs");
+    expect(html).toContain("Sterling Volunteers check");
+  });
+
+  it("shows the hold, not a Check in button, for a scanned held adult", () => {
+    const html = renderToStaticMarkup(createElement(ClubCheckInPanel, {
+      organizationName: "Sample Club", confirmationCode: "SC-1", amountOwedCents: null, attendees: roster, canCheckIn: true, busy: false,
+      onCheckInMany: () => undefined, scannedAttendeeId: "adult-held", onCheckInScanned: () => undefined,
+      onOverrideScanned: async () => ({ status: "CONFIRMED" as const, message: "" }),
+    }));
+    expect(html).toContain("Sterling Volunteers check needed before check-in");
+    expect(html).toContain("Override");
+  });
+});
+
 describe("who a bulk club check-in reaches (#412)", () => {
   it("checks in everyone not already checked in for 'Check in all'", () => {
     const roster = [
@@ -110,6 +139,8 @@ describe("club check-in panel markup (#412)", () => {
       attendees: [
         attendee({ id: "a1", firstName: "Riley", lastName: "Roamer", checkedIn: false, backgroundFlagged: true }),
         attendee({ id: "a2", firstName: "Sam", lastName: "Scout", checkedIn: true }),
+        // The flagged person is held from check-in (#874), so the bulk count is the one other person still to come.
+        attendee({ id: "a3", firstName: "Tess", lastName: "Trailblazer", checkedIn: false }),
       ],
     }));
 

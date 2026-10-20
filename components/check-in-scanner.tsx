@@ -21,6 +21,7 @@ import {
 } from "react";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
+import { SterlingCheckInOverride } from "@/components/sterling-check-in-override";
 import {
   ClubCheckInPanel,
   type ClubCheckInProgress,
@@ -126,6 +127,7 @@ function cameraMessage(state: CameraState) {
 
 export function CheckInScanner({
   eventId,
+  canCheckIn,
   onConfirmCheckIn,
   queuedAttendeeIds,
   conflictAttendeeIds,
@@ -137,13 +139,17 @@ export function CheckInScanner({
   locationName,
 }: {
   eventId: string;
+  /** Whether this staff member holds check-in permission; decides who may type a Sterling Volunteers override. */
+  canCheckIn: boolean;
   onConfirmCheckIn: (
     attendee: ResolvedAttendee,
+    /** Staff's typed reason, for an adult or staff member without a current Sterling Volunteers check (#874). */
+    sterlingOverrideReason?: string,
   ) => Promise<CheckInActionResult>;
   queuedAttendeeIds: string[];
   conflictAttendeeIds: string[];
   paymentDueByConfirmationCode?: Record<string, { balanceCents: number; partySize: number }>;
-  /** Adults at a youth or children's event without a current check (#388). Shown, never blocking. */
+  /** Adults at a youth or children's event without a current check (#388). Held from check-in until staff override (#874). */
   backgroundFlaggedAttendeeIds?: string[];
   /** Q1 (#412): scanning a club's code opens the same club view a name search finds. */
   clubsByConfirmationCode?: Record<string, ClubCheckInInfo>;
@@ -456,13 +462,13 @@ export function CheckInScanner({
     void resolveLookup("confirmation", matches.confirmationCodes[0] ?? query);
   }
 
-  async function confirmCheckIn(attendee: ResolvedAttendee) {
-    if (attendee.checkedIn || bulkBusy) return;
+  async function confirmCheckIn(attendee: ResolvedAttendee, sterlingOverrideReason?: string): Promise<CheckInActionResult | undefined> {
+    if (attendee.checkedIn || bulkBusy) return undefined;
     setCheckingInId(attendee.id);
     setError("");
     setNotice("");
     try {
-      const result = await onConfirmCheckIn(attendee);
+      const result = await onConfirmCheckIn(attendee, sterlingOverrideReason);
       setActionStateById((current) => ({
         ...current,
         [attendee.id]: result.status,
@@ -483,12 +489,14 @@ export function CheckInScanner({
       } else {
         setError(result.message);
       }
+      return result;
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : "The attendee could not be checked in.",
       );
+      return undefined;
     } finally {
       setCheckingInId(null);
     }
@@ -790,13 +798,18 @@ export function CheckInScanner({
                   lastResult: actionStateById[attendee.id],
                 }))}
                 busy={bulkBusy || Boolean(checkingInId)}
-                canCheckIn
+                canCheckIn={canCheckIn}
                 confirmationCode={resolution.confirmationCode}
                 headingLevel={3}
                 onCheckInMany={confirmCheckInMany}
+                onOverrideScanned={async (attendeeId, reason) => {
+                  const attendee = resolution.attendees.find((entry) => entry.id === attendeeId);
+                  const result = attendee ? await confirmCheckIn(attendee, reason) : undefined;
+                  return result ?? { status: "CONFLICT", message: "The override was not saved. Nothing was checked in." };
+                }}
                 onCheckInScanned={(attendeeId) => {
                   const attendee = resolution.attendees.find((entry) => entry.id === attendeeId);
-                  if (attendee) return confirmCheckIn(attendee);
+                  if (attendee) return confirmCheckIn(attendee).then(() => undefined);
                 }}
                 organizationName={clubsByConfirmationCode[resolution.confirmationCode].organizationName}
                 progress={bulkProgress}
@@ -858,6 +871,16 @@ export function CheckInScanner({
                             <RefreshCw size={16} aria-hidden="true" />
                             Queued — not confirmed
                           </span>
+                        ) : backgroundFlaggedAttendeeIds.includes(attendee.id) ? (
+                          <SterlingCheckInOverride
+                            canOverride={canCheckIn}
+                            disabled={Boolean(checkingInId)}
+                            onOverride={async (reason) => (
+                              await confirmCheckIn(attendee, reason)
+                              ?? { status: "CONFLICT" as const, message: "The override was not saved. Nothing was checked in." }
+                            )}
+                            personLabel={`${attendee.firstName} ${attendee.lastName}`}
+                          />
                         ) : (
                           <button
                             className="primary-button"

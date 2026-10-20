@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
+import { checkInBlocksForAttendees } from "@/modules/background-checks/repository";
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { Prisma } from "@prisma/client";
 
@@ -14,13 +15,16 @@ export class CheckInOperationError extends Error {
     public readonly code:
       | "ATTENDEE_NOT_FOUND"
       | "REGISTRATION_NOT_ELIGIBLE"
+      | "STERLING_CHECK_NEEDED"
       | "IDEMPOTENCY_KEY_REUSED"
       | "CHECK_IN_OPERATION_CONFLICT",
   ) {
     super(
       code === "REGISTRATION_NOT_ELIGIBLE"
         ? "Only submitted or confirmed registrations can be checked in."
-        : code === "IDEMPOTENCY_KEY_REUSED"
+        : code === "STERLING_CHECK_NEEDED"
+          ? "Sterling Volunteers check needed before check-in."
+          : code === "IDEMPOTENCY_KEY_REUSED"
           ? "This retry key was already used for another attendee."
           : code === "CHECK_IN_OPERATION_CONFLICT"
             ? "Another staff action changed this attendee at the same time. Retry to load the final result."
@@ -79,8 +83,13 @@ export async function checkInAttendee(
   attendeeId: string,
   actorUserId: string,
   idempotencyKey: string,
+  options: { sterlingOverrideReason?: string } = {},
 ) {
   const prisma = getPrisma();
+  // #874: decided before the transaction opens, so no query runs on a second pool connection while the
+  // transaction holds its own (a deadlock with a one-connection pool, starvation at the arrival rush). A replay or
+  // an already-checked-in answer ignores it.
+  const sterlingState = (await checkInBlocksForAttendees(eventId, [attendeeId])).get(attendeeId) ?? null;
   for (let attempt = 0; attempt < CHECK_IN_MAX_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(async (tx) => {
@@ -132,6 +141,14 @@ export async function checkInAttendee(
           };
         }
 
+        // #874: at a youth or children's event an adult or staff attendee who isn't current with Sterling
+        // Volunteers can't be checked in, unless staff type a reason. Applied here, after the replay and
+        // already-checked-in answers (a check-in that already happened is never undone by a later lapse).
+        const overrideReason = options.sterlingOverrideReason?.trim() || null;
+        if (sterlingState && !overrideReason) {
+          throw new CheckInOperationError("STERLING_CHECK_NEEDED");
+        }
+
         const checkIn = await tx.checkIn.create({
           data: {
             eventId,
@@ -139,6 +156,7 @@ export async function checkInAttendee(
             idempotencyKey,
           },
         });
+        const correlationId = crypto.randomUUID();
         await tx.auditLog.create({
           data: {
             eventId,
@@ -146,10 +164,25 @@ export async function checkInAttendee(
             action: "ATTENDEE_CHECKED_IN",
             entityType: "RegistrationAttendee",
             entityId: attendeeId,
-            correlationId: crypto.randomUUID(),
+            correlationId,
             summary: "Checked in an attendee.",
           },
         });
+        if (sterlingState && overrideReason) {
+          // Ids, the check's state and the reason staff typed; nothing else about the person.
+          await tx.auditLog.create({
+            data: {
+              eventId,
+              actorUserId,
+              action: "STERLING_CHECK_IN_OVERRIDDEN",
+              entityType: "RegistrationAttendee",
+              entityId: attendeeId,
+              correlationId,
+              summary: "Checked in an attendee without a current Sterling Volunteers check.",
+              metadata: { checkInId: checkIn.id, sterlingState, reason: overrideReason },
+            },
+          });
+        }
         return {
           checkIn,
           disposition: "CREATED" as const,

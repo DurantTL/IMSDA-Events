@@ -147,7 +147,7 @@ export default async function OperationalReportsPage({
   const { user } = await getCurrentSession();
   const [report, backgroundFlags] = await Promise.all([
     getOperationalReport(event.id),
-    listEventBackgroundFlags(event.id, { includeNotes: canSeeIssuesText(user) }),
+    listEventBackgroundFlags(event.id, { includeNotes: canSeeIssuesText(user), includeContact: true }),
   ]);
   const peopleQuery = `?event=${encodeURIComponent(event.id)}`;
   // Sections with nothing configured collapse into one line (#981), instead of eight empty panels.

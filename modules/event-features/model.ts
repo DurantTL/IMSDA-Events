@@ -123,8 +123,8 @@ const columnCopy = {
   },
   checksAdultBackgrounds: {
     title: "Sterling Volunteers check for adults",
-    description: "Every adult registered is flagged until their Sterling Volunteers is current. Never blocks registration.",
-    off: "Adults are no longer flagged for Sterling Volunteers. Registration and check-in are never blocked either way.",
+    description: "Every adult registered is flagged until their Sterling Volunteers is current, and adults and staff who aren't current can't be checked in without a staff override. Never blocks registration.",
+    off: "Adults are no longer flagged for Sterling Volunteers, and check-in no longer waits on it. Registration is never blocked either way.",
   },
 } as const;
 

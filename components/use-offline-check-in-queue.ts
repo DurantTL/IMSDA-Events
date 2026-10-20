@@ -13,6 +13,9 @@ import {
   offlineCheckInStorageKey,
   inspectOfflineCheckInQueue,
   offlineCheckInErrorMessage,
+  STERLING_CHECK_NEEDED_MESSAGE,
+  mergeSterlingHeldIds,
+  sterlingSyncDroppedNotice,
   queueItemForCheckIn,
   updateQueuedCheckIn,
   type OfflineCheckInErrorCode,
@@ -91,6 +94,11 @@ export function useOfflineCheckInQueue({
   const processingRef = useRef(new Set<string>());
   const onConfirmedRef = useRef(onConfirmed);
   const retryQueuedRef = useRef<() => Promise<void>>(async () => {});
+  // #874: people the server held for Sterling Volunteers after the page loaded, so their Override control shows
+  // without a reload; and a count of saved check-ins the automatic sync dropped for that reason.
+  const [heldAttendeeIds, setHeldAttendeeIds] = useState<string[]>([]);
+  const [syncDroppedCount, setSyncDroppedCount] = useState(0);
+  const autoSyncRef = useRef(false);
 
   useEffect(() => {
     onConfirmedRef.current = onConfirmed;
@@ -234,6 +242,17 @@ export function useOfflineCheckInQueue({
       }
 
       const errorCode = responseErrorCode(response, payload);
+      // #874: a refusal for want of a current Sterling Volunteers check isn't a saved action to retry
+      // (the override is a fresh, typed action), so it leaves the queue instead of sitting as "needs review".
+      if (errorCode === "STERLING_CHECK_NEEDED") {
+        discardQueueItem(item.idempotencyKey);
+        setHeldAttendeeIds((current) => mergeSterlingHeldIds(current, [item.attendeeId]));
+        if (autoSyncRef.current) setSyncDroppedCount((count) => count + 1);
+        return {
+          status: "CONFLICT",
+          message: `${STERLING_CHECK_NEEDED_MESSAGE}.`,
+        };
+      }
       // A 401 means the staff session ended (idle sign-out), not that the
       // check-in is wrong: keep it queued so it retries on its own once staff
       // sign back in (#825). A 403 is a real refusal and still needs review.
@@ -293,6 +312,46 @@ export function useOfflineCheckInQueue({
     return submitQueueItem(item);
   }, [submitQueueItem, upsertQueueItem]);
 
+  /**
+   * #874: checks in an adult or staff member who isn't current with Sterling Volunteers, with the reason
+   * staff typed. Sent straight to the server, never queued: an override is a deliberate, online decision,
+   * and the server audits it with the reason.
+   */
+  const requestSterlingOverrideCheckIn = useCallback(async (
+    attendeeId: string,
+    reason: string,
+  ): Promise<CheckInActionResult> => {
+    if (!navigator.onLine) {
+      return { status: "CONFLICT", message: "An override needs a connection. Reconnect, then try again." };
+    }
+    try {
+      const response = await fetch(
+        `/api/events/${encodeURIComponent(eventId)}/attendees/${encodeURIComponent(attendeeId)}/check-in`,
+        {
+          method: "POST",
+          cache: "no-store",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), sterlingOverrideReason: reason }),
+          signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+            ? AbortSignal.timeout(CHECK_IN_REQUEST_TIMEOUT_MS)
+            : undefined,
+        },
+      );
+      const payload = await response.json().catch(() => null) as CheckInResponse | null;
+      if (response.ok && payload?.checkedIn === true && payload.checkIn?.checkedInAt) {
+        // A saved check-in for the same person is now moot: it must not retry into a duplicate or a stale refusal.
+        for (const queued of queueRef.current.filter((entry) => entry.attendeeId === attendeeId)) {
+          discardQueueItem(queued.idempotencyKey);
+        }
+        onConfirmedRef.current(attendeeId, payload.checkIn.checkedInAt);
+        return { status: "CONFIRMED", checkedInAt: payload.checkIn.checkedInAt, message: "Checked in with a Sterling Volunteers override." };
+      }
+      return { status: "CONFLICT", message: payload?.message ?? "The override was not saved. Nothing was checked in." };
+    } catch {
+      return { status: "CONFLICT", message: "Not confirmed \u2014 check the row or try again." };
+    }
+  }, [discardQueueItem, eventId]);
+
   const retryQueueItem = useCallback(async (
     idempotencyKey: string,
   ) => {
@@ -342,7 +401,14 @@ export function useOfflineCheckInQueue({
   }, [storageKey]);
 
   useEffect(() => {
-    retryQueuedRef.current = () => retryAll(false);
+    retryQueuedRef.current = async () => {
+      autoSyncRef.current = true;
+      try {
+        await retryAll(false);
+      } finally {
+        autoSyncRef.current = false;
+      }
+    };
   }, [retryAll]);
 
   // A weak cellular link keeps `navigator.onLine` true, so the browser never
@@ -439,6 +505,10 @@ export function useOfflineCheckInQueue({
     unreadableItemCount,
     processingKeys,
     requestCheckIn,
+    requestSterlingOverrideCheckIn,
+    heldAttendeeIds,
+    syncNotice: sterlingSyncDroppedNotice(syncDroppedCount),
+    dismissSyncNotice: () => setSyncDroppedCount(0),
     retryQueueItem,
     retryAll,
     discardQueueItem,

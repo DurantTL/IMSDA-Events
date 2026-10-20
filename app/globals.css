@@ -12414,3 +12414,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .menu-anchor:has(.attention-bell) { position: static; }
   .attention-popover { position: absolute; top: 100%; right: 0; left: 0; width: auto; margin-top: 6px; }
 }
+
+/* Sterling Volunteers check-in hold and typed override (#874). */
+.sterling-check-in-override { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; max-width: 100%; }
+.sterling-check-in-override-form { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+.sterling-check-in-override-form input { width: 100%; min-width: 0; }
+.sterling-check-in-override .status-chip { white-space: normal; }

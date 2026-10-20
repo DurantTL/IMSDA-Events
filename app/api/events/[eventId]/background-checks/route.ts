@@ -11,7 +11,7 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
   try {
     const { eventId } = await context.params;
     await requirePermission(await getCurrentSession(), eventId, "VIEW_REPORTS", findActiveMembership);
-    const flags = await listEventBackgroundFlags(eventId);
+    const flags = await listEventBackgroundFlags(eventId, { includeContact: true });
     if (!flags) {
       return Response.json(
         { error: "BACKGROUND_CHECKS_OFF", message: "This event isn't marked as a youth or children's event." },
