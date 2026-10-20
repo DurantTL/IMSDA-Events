@@ -1646,8 +1646,9 @@ model Event {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  /// The calendar item this event was set up from or linked to (#445).
-  calendarEntryLink                   CalendarEntry?     @relation("CalendarEntryLinkedEvent")
+  /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
+  /// event (#1086): different dates or sites of one event, or a snow date.
+  calendarEntryLinks                  CalendarEntry[]    @relation("CalendarEntryLinkedEvent")
   calendarMatchDismissals             CalendarEventMatchDismissal[] @relation("CalendarMatchDismissalEvent")
   archivedBy                          User?              @relation("EventArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
 
@@ -6234,9 +6235,10 @@ model CalendarEntry {
   /// Hidden by staff here only; a refresh never unhides it.
   isHiddenLocally           Boolean             @default(false)
   /// The registration event this item is the placeholder for (#445). A linked pair shows once, as the event's own
-  /// entry with Register. Never touched by a feed refresh, so the link survives every import. An event links to at most
-  /// one item; deleting the event restores the item on its own.
-  linkedEventId             String?             @unique
+  /// entry with Register. Never touched by a feed refresh, so the link survives every import. Several items can link to
+  /// one event (#1086), and then each shows on its own date with Register. Deleting the event restores the items on
+  /// their own.
+  linkedEventId             String?
   linkedAt                  DateTime?
   linkedByUserId            String?
   /// The item's dates when staff last acknowledged them (#445): set when the item is linked, if they matched the
@@ -6257,6 +6259,7 @@ model CalendarEntry {
 
   @@unique([sourceFeedId, sourceUid, sourceRecurrenceId])
   @@index([isPublished, startsOn])
+  @@index([linkedEventId])
 }
 
 /// "Not the same" (#445): staff said this calendar item and this registration event are different things, so the

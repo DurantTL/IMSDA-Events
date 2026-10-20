@@ -512,7 +512,8 @@ export function CalendarAdminWorkspace({
                         <span className={`status-chip ${visible ? "green" : "gold"}`}>
                           {!event.isPublished ? "Not published" : event.showOnCalendar ? "On calendar" : "Hidden"}
                         </span>
-                        {event.linkedEntryTitle && <span className="status-chip">Linked to calendar item &ldquo;{event.linkedEntryTitle}&rdquo;</span>}
+                        {event.linkedEntries.length === 1 && <span className="status-chip">Linked to calendar item &ldquo;{event.linkedEntries[0].title}&rdquo;</span>}
+                        {event.linkedEntries.length > 1 && <span className="status-chip">Linked to {event.linkedEntries.length} calendar items</span>}
                       </span>
                     </div>
                     <form

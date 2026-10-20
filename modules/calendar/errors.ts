@@ -12,11 +12,12 @@ export class CalendarError extends Error {
       // Calendar items and registration events (#445)
       | "NOT_LINKABLE"
       | "ENTRY_ALREADY_LINKED"
-      | "EVENT_ALREADY_LINKED"
       | "NOT_LINKED"
       | "EVENT_ARCHIVED"
       | "DATES_CHANGED"
-      | "DATES_CONFLICT",
+      | "DATES_CONFLICT"
+      | "ENTRY_REQUIRED"
+      | "UPDATE_NEEDS_SINGLE_LINK",
     message: string,
   ) {
     super(message);

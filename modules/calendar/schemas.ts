@@ -156,6 +156,8 @@ export const calendarEventDateDecisionSchema = z.object({
   decision: z.enum(["update", "keep"]),
   startsOn: calendarDate("calendar item's start date"),
   endsOn: calendarDate("calendar item's end date"),
+  /** Which linked item the answer is about; needed when several items are linked (#1086). */
+  entryId: z.string().trim().min(1).max(100).optional(),
 }).strict();
 
 export type CalendarEntryEventLink = z.infer<typeof calendarEntryEventLinkSchema>;

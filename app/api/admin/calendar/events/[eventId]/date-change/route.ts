@@ -23,7 +23,7 @@ async function postHandler(request: Request, { params }: Context) {
     const { eventId } = await params;
     const access = await requirePermission(await getCurrentSession(), eventId, "CONFIGURE_EVENT", findActiveMembership);
     const input = calendarEventDateDecisionSchema.parse(await request.json());
-    await resolveCalendarDateChange(eventId, input.decision, { startsOn: input.startsOn, endsOn: input.endsOn }, access.user.id);
+    await resolveCalendarDateChange(eventId, input.decision, { startsOn: input.startsOn, endsOn: input.endsOn }, access.user.id, input.entryId);
     return Response.json({ decision: input.decision });
   } catch (error) {
     return calendarFeedApiError(error, "Answering the calendar date change");

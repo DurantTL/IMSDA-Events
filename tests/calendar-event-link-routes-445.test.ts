@@ -98,8 +98,16 @@ describe("calendar item and event link routes (#445)", () => {
     for (const writer of writers) expect(writer).not.toHaveBeenCalled();
   });
 
+  it("passes the item an answer is about when several are linked (#1086)", async () => {
+    const response = await DATE_CHANGE(request({ decision: "keep", ...dates, entryId: "entry-2" }), eventCtx);
+    expect(response.status).toBe(200);
+    expect(mocks.resolveCalendarDateChange).toHaveBeenLastCalledWith("event-1", "keep", dates, expect.any(String), "entry-2");
+    mocks.resolveCalendarDateChange.mockRejectedValueOnce(new CalendarError("UPDATE_NEEDS_SINGLE_LINK", "Several items."));
+    expect((await DATE_CHANGE(request({ decision: "update", ...dates, entryId: "entry-2" }), eventCtx)).status).toBe(409);
+  });
+
   it("reports a conflict or a missing item with its own status", async () => {
-    mocks.linkCalendarEntryToEvent.mockRejectedValueOnce(new CalendarError("EVENT_ALREADY_LINKED", "Taken."));
+    mocks.linkCalendarEntryToEvent.mockRejectedValueOnce(new CalendarError("ENTRY_ALREADY_LINKED", "Taken."));
     expect((await LINK(request({ action: "link", eventId: "event-1" }), entryCtx)).status).toBe(409);
     mocks.linkCalendarEntryToEvent.mockRejectedValueOnce(new CalendarError("ENTRY_NOT_FOUND", "Gone."));
     expect((await LINK(request({ action: "link", eventId: "event-1" }), entryCtx)).status).toBe(404);
@@ -112,7 +120,7 @@ describe("calendar item and event link routes (#445)", () => {
     mocks.requirePermission.mockResolvedValue({ user: { id: "event-admin-1", globalRole: null } });
     expect((await DATE_CHANGE(request({ decision: "keep", ...dates }), eventCtx)).status).toBe(200);
     expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "CONFIGURE_EVENT", expect.any(Function));
-    expect(mocks.resolveCalendarDateChange).toHaveBeenCalledWith("event-1", "keep", dates, "event-admin-1");
+    expect(mocks.resolveCalendarDateChange).toHaveBeenCalledWith("event-1", "keep", dates, "event-admin-1", undefined);
     // Anyone else is refused before anything is written.
     mocks.resolveCalendarDateChange.mockClear();
     mocks.requirePermission.mockRejectedValue(new AccessDeniedError("No.", 403, "PERMISSION_DENIED"));
@@ -126,9 +134,9 @@ describe("calendar item and event link routes (#445)", () => {
   it("applies a date decision only with the dates the staff member saw", async () => {
     const response = await DATE_CHANGE(request({ decision: "update", ...dates }), eventCtx);
     expect(response.status).toBe(200);
-    expect(mocks.resolveCalendarDateChange).toHaveBeenCalledWith("event-1", "update", dates, "admin-1");
+    expect(mocks.resolveCalendarDateChange).toHaveBeenCalledWith("event-1", "update", dates, "admin-1", undefined);
     await DATE_CHANGE(request({ decision: "keep", ...dates }), eventCtx);
-    expect(mocks.resolveCalendarDateChange).toHaveBeenLastCalledWith("event-1", "keep", dates, "admin-1");
+    expect(mocks.resolveCalendarDateChange).toHaveBeenLastCalledWith("event-1", "keep", dates, "admin-1", undefined);
     for (const body of [{ decision: "update" }, { decision: "maybe", ...dates }, { decision: "keep", startsOn: "soon", endsOn: "later" }, { decision: "keep", ...dates, extra: 1 }]) {
       expect((await DATE_CHANGE(request(body), eventCtx)).status).toBe(400);
     }

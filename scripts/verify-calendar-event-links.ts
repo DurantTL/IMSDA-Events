@@ -149,7 +149,7 @@ async function main() {
   await links.linkCalendarEntryToEvent(retreatEntry.id, retreatEvent.id, userId);
   assert((await entryRow(retreatEntry.id)).linkedEventId === retreatEvent.id, "the item is linked to the existing event");
   assert(await prisma.calendarEventMatchDismissal.count({ where: { calendarEntryId: retreatEntry.id, eventId: retreatEvent.id } }) === 0, "choosing to link clears an earlier Not the same for the pair");
-  assert((await listCalendarEvents(now)).find((event) => event.id === retreatEvent.id)?.linkedEntryId === retreatEntry.id, "the events list says which item is linked");
+  assert((await listCalendarEvents(now)).find((event) => event.id === retreatEvent.id)?.linkedEntries[0]?.id === retreatEntry.id, "the events list says which item is linked");
   await prisma.event.update({ where: { id: retreatEvent.id }, data: { isPublished: true } });
   const pairKeys = await publicKeys("2026-10-01", "2026-10-31");
   assert(pairKeys.includes(`event-${retreatEvent.id}`) && !pairKeys.includes(`entry-${retreatEntry.id}`), "the published pair shows once, as the event");
@@ -160,7 +160,15 @@ async function main() {
   assert(!feedKeys.includes(`entry-${retreatEntry.id}`) && feedKeys.includes(`event-${retreatEvent.id}`), "the feed (.ics) data shows the pair once too");
   await rejectsWith(links.linkCalendarEntryToEvent(retreatEntry.id, (await createEvent(settings("Other Retreat", `${P}-other-retreat`, "2026-10-09", "2026-10-11"), userId))!.id, userId), "ENTRY_ALREADY_LINKED", "an item already linked can't be linked to a second event");
   const spare = await prisma.calendarEntry.create({ data: { title: "Spare item", startsOn: "2026-10-09", endsOn: "2026-10-11", isPublished: true, createdByUserId: userId, updatedByUserId: userId } });
-  await rejectsWith(links.linkCalendarEntryToEvent(spare.id, retreatEvent.id, userId), "EVENT_ALREADY_LINKED", "an event already linked can't take a second item");
+  // Several items can share one event (#1086): each shows on its own date with Register, and the event isn't shown twice.
+  await links.linkCalendarEntryToEvent(spare.id, retreatEvent.id, userId);
+  assert(await prisma.calendarEntry.count({ where: { linkedEventId: retreatEvent.id } }) === 2, "an event can take a second linked item");
+  const sharedItems = await listPublicCalendarItems("2026-10-01", "2026-10-31", now);
+  const sharedKeys = sharedItems.map((item) => item.key);
+  assert(sharedKeys.includes(`entry-${retreatEntry.id}`) && sharedKeys.includes(`entry-${spare.id}`) && !sharedKeys.includes(`event-${retreatEvent.id}`), "with two linked items each shows on its own and the event does not show again");
+  assert(sharedItems.filter((item) => item.href === `/events/${retreatEvent.slug}`).length === 2, "each linked item carries Register to the event");
+  await links.unlinkCalendarEntry(spare.id, userId);
+  assert((await entryRow(retreatEntry.id)).linkedEventId === retreatEvent.id, "unlinking one item leaves the other linked");
   await rejectsWith(links.unlinkCalendarEntry(spare.id, userId), "NOT_LINKED", "unlinking an unlinked item says so");
   await links.unlinkCalendarEntry(retreatEntry.id, userId);
   const restored = await publicKeys("2026-10-01", "2026-10-31");
@@ -168,24 +176,14 @@ async function main() {
   assert((await entryRow(retreatEntry.id)).linkedEventId === null && (await entryRow(retreatEntry.id)).title === "Evlink Gathering", "an unlinked item is whole: nothing else about it changed");
   console.log("ok  link to existing event shows the pair once; unlink restores the item on its own");
 
-  // 4. The database allows one item per event, and a racing pair of links leaves exactly one.
-  let uniqueRefused = false;
-  try {
-    await prisma.calendarEntry.update({ where: { id: retreatEntry.id }, data: { linkedEventId: retreatEvent.id } });
-    await prisma.calendarEntry.update({ where: { id: spare.id }, data: { linkedEventId: retreatEvent.id } });
-  } catch {
-    uniqueRefused = true;
-  }
-  assert(uniqueRefused, "the database refuses a second item linked to the same event");
-  await prisma.calendarEntry.update({ where: { id: retreatEntry.id }, data: { linkedEventId: null } });
+  // 4. The database allows several items per event, and racing links both land.
+  await links.unlinkCalendarEntry(retreatEntry.id, userId);
   const racers = await Promise.allSettled([
     links.linkCalendarEntryToEvent(retreatEntry.id, retreatEvent.id, userId),
     links.linkCalendarEntryToEvent(spare.id, retreatEvent.id, userId),
   ]);
-  assert(racers.filter((racer) => racer.status === "fulfilled").length === 1, "of two racing links to one event, exactly one wins");
-  const loser = racers.find((racer) => racer.status === "rejected") as PromiseRejectedResult;
-  assert((loser.reason as { code?: string }).code === "EVENT_ALREADY_LINKED", "the loser is told the event is already linked");
-  assert(await prisma.calendarEntry.count({ where: { linkedEventId: retreatEvent.id } }) === 1, "one item is linked");
+  assert(racers.every((racer) => racer.status === "fulfilled"), "two racing links to one event both succeed");
+  assert(await prisma.calendarEntry.count({ where: { linkedEventId: retreatEvent.id } }) === 2, "both items are linked");
   await prisma.calendarEntry.updateMany({ where: { linkedEventId: retreatEvent.id }, data: { linkedEventId: null } });
   await prisma.calendarEntry.updateMany({ where: { id: spare.id }, data: { baselineStartsOn: null, baselineEndsOn: null } });
   let pairedRefused = false;
@@ -268,8 +266,8 @@ async function main() {
   assert(event.startsAt.toISOString().startsWith("2026-11-07") && event.endsAt.toISOString().startsWith("2026-11-09"), "the event's dates did not change by themselves");
   assert((await publicKeys("2026-11-01", "2026-11-30")).join() === `event-${created.id}`, "the public calendar still shows the pair once, on the event's dates");
   const notice = await links.getCalendarLinkNotice(created.id);
-  assert(notice?.datePrompt?.message === "Google Calendar moved this event to November 14–16, 2026. Update the registration dates?", `the banner asks the owner's question (${notice?.datePrompt?.message})`);
-  assert(notice.datePrompt.preview.changes[0]?.from === "November 7–9, 2026" && notice.datePrompt.preview.changes[0]?.to === "November 14–16, 2026", "the preview shows the old and new dates");
+  assert(notice?.datePrompts[0]?.message === "Google Calendar moved this event to November 14–16, 2026. Update the registration dates?", `the banner asks the owner's question (${notice?.datePrompts[0]?.message})`);
+  assert(notice.datePrompts[0]!.preview!.changes[0]?.from === "November 7–9, 2026" && notice.datePrompts[0]!.preview!.changes[0]?.to === "November 14–16, 2026", "the preview shows the old and new dates");
   assert((await listed(conferenceEntry.id))?.datesDifferFromEvent === true, "the calendar admin list shows the item's dates differ from its event's");
 
   // Stale answer refused; nothing applied.
@@ -283,7 +281,7 @@ async function main() {
   assert(await links.getCalendarLinkNotice(created.id) === null, "and stays away after the next refresh with the same dates");
   feedBody = ics([retreat, { ...conference, start: "2026-11-21", end: "2026-11-23" }, unrelated]);
   await refresh();
-  assert((await links.getCalendarLinkNotice(created.id))?.datePrompt?.itemStartsOn === "2026-11-21", "the banner returns when the item moves again");
+  assert((await links.getCalendarLinkNotice(created.id))?.datePrompts[0]?.itemStartsOn === "2026-11-21", "the banner returns when the item moves again");
   const keptAudit = await prisma.auditLog.findMany({ where: { action: "CALENDAR_EVENT_DATES_KEPT", entityId: created.id } });
   assert(keptAudit.length === 1 && keptAudit[0]!.actorUserId === userId, "Keep is audited, once, by the staff member");
 
@@ -324,7 +322,7 @@ async function main() {
   await refresh();
   await rejectsWith(links.resolveCalendarDateChange(created.id, "update", { startsOn: "2026-11-23", endsOn: "2026-11-24" }, userId), "DATES_CONFLICT", "Update is refused when registration would open after the event");
   const conflict = await links.getCalendarLinkNotice(created.id);
-  assert(conflict?.datePrompt?.preview.blockedReason !== null, "the banner says why Update is unavailable");
+  assert((conflict?.datePrompts[0]?.preview?.blockedReason ?? null) !== null, "the banner says why Update is unavailable");
   await prisma.event.update({ where: { id: created.id }, data: { registrationOpensOn: null } });
   console.log("ok  the link survives refreshes; a moved item never changes the event; Keep and Update are staff's choice, previewed, audited, and refuse stale or conflicting answers");
 
@@ -339,7 +337,7 @@ async function main() {
   assert(await links.getCalendarLinkNotice(aside.id) === null, "the event changed and the item didn't: no banner");
   await prisma.calendarEntry.update({ where: { id: asideItem.id }, data: { startsOn: "2026-12-19", endsOn: "2026-12-20" } });
   const asideMoved = await links.getCalendarLinkNotice(aside.id);
-  assert(asideMoved?.datePrompt?.message === "The calendar item for this event was moved to December 19–20, 2026. Update the registration dates?", `the item really moving brings the banner (${asideMoved?.datePrompt?.message})`);
+  assert(asideMoved?.datePrompts[0]?.message === "The calendar item for this event was moved to December 19–20, 2026. Update the registration dates?", `the item really moving brings the banner (${asideMoved?.datePrompts[0]?.message})`);
 
   // An item that already differs from its event when linked says "differs", not "moved", and the preview is complete.
   const differs = await createEvent(settings("Evlink Differs", `${P}-differs`, "2026-12-05", "2026-12-07"), userId);
@@ -357,11 +355,11 @@ async function main() {
   await prisma.registration.create({ data: { eventId: differs.id, accountHolderPersonId: `${P}_person`, confirmationCode: `${P.toUpperCase()}-0001`, status: "CONFIRMED", totalAmount: 0 } });
   await prisma.registration.create({ data: { eventId: differs.id, accountHolderPersonId: `${P}_person`, confirmationCode: `${P.toUpperCase()}-0002`, status: "DRAFT", totalAmount: 0 } });
   const differsNotice = await links.getCalendarLinkNotice(differs.id);
-  assert(differsNotice?.datePrompt?.message === "The calendar item for this event shows December 19–20, 2026, which differs from the registration dates. Update the registration dates?", `a differing item is worded as differs (${differsNotice?.datePrompt?.message})`);
-  assert(!/moved/.test(differsNotice.datePrompt.message), "and never says moved");
-  const meals = differsNotice.datePrompt.preview.unchanged.find((row) => row.label === "Meal services");
+  assert(differsNotice?.datePrompts[0]?.message === "The calendar item for this event shows December 19–20, 2026, which differs from the registration dates. Update the registration dates?", `a differing item is worded as differs (${differsNotice?.datePrompts[0]?.message})`);
+  assert(!/moved/.test(differsNotice.datePrompts[0]!.message), "and never says moved");
+  const meals = differsNotice.datePrompts[0]!.preview!.unchanged.find((row) => row.label === "Meal services");
   assert(meals?.value === "2 services" && meals.needsAttention && /1 fall outside/.test(meals.note), `the preview lists the active meal services, flagging the one outside the new dates (${meals?.value}; ${meals?.note})`);
-  assert(differsNotice.datePrompt.preview.notes.length === 1 && /has 1 registration\./.test(differsNotice.datePrompt.preview.notes[0]!) && /minor/.test(differsNotice.datePrompt.preview.notes[0]!), "the preview says the event has a registration (a draft doesn't count) and mentions minor status");
+  assert(differsNotice.datePrompts[0]!.preview!.notes.length === 1 && /has 1 registration\./.test(differsNotice.datePrompts[0]!.preview!.notes[0]!) && /minor/.test(differsNotice.datePrompts[0]!.preview!.notes[0]!), "the preview says the event has a registration (a draft doesn't count) and mentions minor status");
   await links.resolveCalendarDateChange(differs.id, "keep", { startsOn: "2026-12-19", endsOn: "2026-12-20" }, userId);
   const differsKept = await entryRow(differsItem.id);
   assert(differsKept.baselineStartsOn === "2026-12-19" && await links.getCalendarLinkNotice(differs.id) === null, "Keep records the baseline and ends the question");
@@ -382,7 +380,7 @@ async function main() {
   await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: null, archivedByUserId: null } });
   await prisma.calendarEntry.update({ where: { id: archivedCandidate.id }, data: { startsOn: "2026-12-12", endsOn: "2026-12-13" } });
   await links.linkCalendarEntryToEvent(archivedCandidate.id, archivable.id, userId);
-  assert((await links.getCalendarLinkNotice(archivable.id))?.datePrompt?.message.includes("differs"), "unarchived, the differing item asks");
+  assert((await links.getCalendarLinkNotice(archivable.id))?.datePrompts[0]?.message.includes("differs"), "unarchived, the differing item asks");
   await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: new Date(), archivedByUserId: userId } });
   assert(await links.getCalendarLinkNotice(archivable.id) === null, "an archived event shows no date banner");
   assert((await listed(archivedCandidate.id))?.linkedEvent?.isArchived === true, "the calendar list still shows the link, marked archived");
@@ -395,7 +393,7 @@ async function main() {
   const archivedKeys = await publicKeys("2026-12-01", "2026-12-31");
   assert(archivedKeys.includes(`entry-${archivedCandidate.id}`) && !archivedKeys.includes(`event-${archivable.id}`), "an archived published event is off the public calendar and its item shows on its own");
   await prisma.event.update({ where: { id: archivable.id }, data: { archivedAt: null, archivedByUserId: null } });
-  assert(Boolean((await links.getCalendarLinkNotice(archivable.id))?.datePrompt), "unarchived, the banner returns");
+  assert(Boolean((await links.getCalendarLinkNotice(archivable.id))?.datePrompts[0]), "unarchived, the banner returns");
   console.log("ok  archived events: not suggested, not offered, can't be linked, no banner, Update and Keep refused, link still shown");
 
   // 8. Gone from Google: never deleted, the event never removed or cancelled; staff are warned. It comes back linked.
@@ -406,7 +404,7 @@ async function main() {
   const afterGone = await prisma.event.findUniqueOrThrow({ where: { id: created.id } });
   assert(afterGone.isPublished, "the registration event was not unpublished or cancelled");
   const goneNotice = await links.getCalendarLinkNotice(created.id);
-  assert(goneNotice?.sourceRemoved === true && goneNotice.datePrompt === null, "staff get a warning, not a date question about a ghost");
+  assert(goneNotice?.sourceRemoved.length === 1 && goneNotice.datePrompts.length === 0, "staff get a warning, not a date question about a ghost");
   assert((await publicKeys("2026-11-01", "2026-11-30")).join() === `event-${created.id}`, "the public calendar still shows the event");
   feedBody = ics([retreat, { ...conference, start: "2026-11-21", end: "2026-11-23" }, unrelated]);
   await refresh();

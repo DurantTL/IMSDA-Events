@@ -74,14 +74,14 @@ describe("title similarity (#445)", () => {
 
 describe("possible matches (#445)", () => {
   it("flags an imported item whose dates overlap an event with a similar title", () => {
-    expect(findPossibleMatches([entry()], [event()], none, none)).toEqual([{ entryId: "entry-1", eventId: "event-1" }]);
+    expect(findPossibleMatches([entry()], [event()], none)).toEqual([{ entryId: "entry-1", eventId: "event-1" }]);
     // Overlap, not equality: a day of the retreat is enough.
-    expect(findPossibleMatches([entry({ startsOn: "2026-10-11", endsOn: "2026-10-11" })], [event()], none, none)).toHaveLength(1);
+    expect(findPossibleMatches([entry({ startsOn: "2026-10-11", endsOn: "2026-10-11" })], [event()], none)).toHaveLength(1);
   });
 
   it("needs both overlapping dates and a similar title", () => {
-    expect(findPossibleMatches([entry({ startsOn: "2026-11-09", endsOn: "2026-11-11" })], [event()], none, none)).toEqual([]);
-    expect(findPossibleMatches([entry({ title: "Spring Camporee" })], [event()], none, none)).toEqual([]);
+    expect(findPossibleMatches([entry({ startsOn: "2026-11-09", endsOn: "2026-11-11" })], [event()], none)).toEqual([]);
+    expect(findPossibleMatches([entry({ title: "Spring Camporee" })], [event()], none)).toEqual([]);
   });
 
   it("never flags staff-made items, linked items, closures, deadlines, repeating, hidden or removed items", () => {
@@ -94,30 +94,30 @@ describe("possible matches (#445)", () => {
       { isHiddenLocally: true },
       { sourceRemoved: true },
     ]) {
-      expect(findPossibleMatches([entry(overrides)], [event()], none, none)).toEqual([]);
+      expect(findPossibleMatches([entry(overrides)], [event()], none)).toEqual([]);
     }
   });
 
-  it("leaves out an event already linked to another item", () => {
-    expect(findPossibleMatches([entry()], [event()], none, new Set(["event-1"]))).toEqual([]);
+  it("still suggests an event that already has a linked item (#1086): one registration can have several items", () => {
+    expect(findPossibleMatches([entry()], [event()], none)).toEqual([{ entryId: "entry-1", eventId: "event-1" }]);
   });
 
   it("\"Not the same\" removes that pair only, for good", () => {
     const other = event({ id: "event-2", name: "Womens Retreat Overflow" });
     const dismissed = new Set([dismissalKey("entry-1", "event-1")]);
-    expect(findPossibleMatches([entry()], [event()], dismissed, none)).toEqual([]);
-    expect(findPossibleMatches([entry()], [event(), other], dismissed, none)).toEqual([{ entryId: "entry-1", eventId: "event-2" }]);
+    expect(findPossibleMatches([entry()], [event()], dismissed)).toEqual([]);
+    expect(findPossibleMatches([entry()], [event(), other], dismissed)).toEqual([{ entryId: "entry-1", eventId: "event-2" }]);
   });
 
   it("suggests one event per item: the one whose start date is closest", () => {
     const later = event({ id: "event-2", startsOn: "2026-10-10" });
     const same = event({ id: "event-3", startsOn: "2026-10-09" });
-    expect(findPossibleMatches([entry()], [later, same], none, none)).toEqual([{ entryId: "entry-1", eventId: "event-3" }]);
+    expect(findPossibleMatches([entry()], [later, same], none)).toEqual([{ entryId: "entry-1", eventId: "event-3" }]);
     // Neither starts on the item's day: the nearer one wins, whichever side of it.
     const earlyItem = entry({ startsOn: "2026-10-09", endsOn: "2026-10-14" });
     const far = event({ id: "event-4", startsOn: "2026-10-13", endsOn: "2026-10-14" });
     const near = event({ id: "event-5", startsOn: "2026-10-07", endsOn: "2026-10-10" });
-    expect(findPossibleMatches([earlyItem], [far, near], none, none)).toEqual([{ entryId: "entry-1", eventId: "event-5" }]);
+    expect(findPossibleMatches([earlyItem], [far, near], none)).toEqual([{ entryId: "entry-1", eventId: "event-5" }]);
   });
 
   it("doesn't flag the false positives the review found", () => {
@@ -129,7 +129,7 @@ describe("possible matches (#445)", () => {
       ["Retreat", "Women's Retreat"],
     ];
     for (const [itemTitle, eventName] of pairs) {
-      expect(findPossibleMatches([entry({ title: itemTitle })], [event({ name: eventName })], none, none)).toEqual([]);
+      expect(findPossibleMatches([entry({ title: itemTitle })], [event({ name: eventName })], none)).toEqual([]);
     }
   });
 

@@ -1372,6 +1372,7 @@ async function seedCalendarEventPairs(prisma: PrismaClient) {
     { key: "match", title: "Mobilecheck Womens Retreat", start: 20, end: 22, uid: "mobilecheck-uid-match", linked: null },
     { key: "open", title: "Mobilecheck Youth Rally with a Long Imported Title the Calendar Might Bring In", start: 25, end: 25, uid: "mobilecheck-uid-open", linked: null },
     { key: "linked", title: "Mobilecheck Spring Conference", start: 47, end: 49, uid: "mobilecheck-uid-linked", linked: `${P}_calpair_event_linked` },
+    { key: "linked2", title: "Mobilecheck Spring Conference Second Site", start: 54, end: 56, uid: "mobilecheck-uid-linked2", linked: `${P}_calpair_event_linked` },
   ];
   for (const row of entries) {
     const data = {

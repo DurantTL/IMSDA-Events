@@ -160,8 +160,26 @@ and uses the same permission as event creation.
 
 `npm run test:calendar-event-links` proves this against a real local PostgreSQL.
 Migration `20261030100000_calendar_event_links` is additive: five nullable columns
-on `CalendarEntry`, a unique `linkedEventId` (cleared if the event is deleted) and the
+on `CalendarEntry`, a `linkedEventId` (cleared if the event is deleted) and the
 `CalendarEventMatchDismissal` table.
+
+**Several items, one event (#1086).** Migration `20261117100000_calendar_multi_link` drops
+the unique constraint on `linkedEventId` (a plain index replaces it), so one registration
+event can have several calendar items: Honors Weekend sites, or an Area event and its snow
+date. Existing links are unchanged. With exactly one linked item everything above holds.
+With several:
+
+- The public calendar, the `.ics` feed and the home page show each linked item on its own
+  date, titled as the item, with Register (or Details) to the event. The event is not shown
+  a second time. A draft, archived or hidden event behaves as before (items on their own, or
+  off the calendar).
+- The event's page lists the linked items. Each item whose dates differ from the event's
+  gets an informational note with Keep; "Update" is offered only when exactly one item is
+  linked, and the server refuses it otherwise.
+- The link picker lists events that already have linked items, and matching suggestions may
+  name them. Deadline items still can't be linked and are never public (#910).
+- Cloning an event copies no links. Archiving keeps every link; the items show on their own
+  until the event is unarchived. Deleting the event unlinks all its items.
 
 Deleting an event clears the item's link, but `linkedAt`, `linkedByUserId` and the baseline dates stay on the item until it is linked again; they have no effect while it is unlinked.
 
