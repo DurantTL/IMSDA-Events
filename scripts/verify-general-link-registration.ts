@@ -768,9 +768,12 @@ async function main() {
   console.log("ok  a team name typed as a link, an image or HTML is plain text in every email");
 
   // 15e. The cap on waiting teams per rolling hour: over it, a matching and a non-matching email are refused alike.
+  // The direct calls below pass this script's fixed `now`, but the route uses the real clock. Place the rows five minutes
+  // before whichever is later, so they fall inside both one-hour windows (the cap counts rows newer than an hour ago).
+  const capRowCreatedAt = new Date(Math.max(now.getTime(), Date.now()) - 5 * 60 * 1000);
   const capRows = Array.from({ length: 60 }, (_, index) => ({
     eventId, confirmationCode: `PBE-CAP${P.slice(3)}${index}`.slice(0, 40), idempotencyKey: `${P}-cap-${index}`, requestHash: "x", clubNameAsEntered: "x", directorEmail: "cap@example.test",
-    directorName: "x", teamName: "", teamKey: "", attendeeCount: 1, payload: {}, createdAt: new Date(now.getTime() - 5 * 60 * 1000),
+    directorName: "x", teamName: "", teamKey: "", attendeeCount: 1, payload: {}, createdAt: capRowCreatedAt,
   }));
   await prisma.generalLinkSubmission.createMany({ data: capRows });
   const capped = await Promise.all([true, false].map((matching) => caught(link.submitGeneralLinkRegistration(eventSlug, request(youth("Cap"), { club_name: clubName("a"), email: matching ? emailOf("dira") : emailOf("regc") }), { locationId: missouri!.id, teamName: "Cap Team" }, now))));
