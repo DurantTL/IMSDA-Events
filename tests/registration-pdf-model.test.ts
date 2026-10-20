@@ -165,6 +165,26 @@ describe("registration PDF content (#1082)", () => {
   });
 });
 
+describe("registration PDF and section titles (#1082)", () => {
+  it("keeps an unflagged question out of a health-titled section, as the staff views do, and still prints the photo release", () => {
+    const definition = registrationFormDefinitionSchema.parse({
+      title: "Titles", description: "", confirmationMessage: "Received.",
+      sections: [
+        { id: "sec_health", title: "Health information", description: "", fields: [
+          { id: "fld_a", key: "favorite_snack", label: "Favorite snack", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] },
+        ] },
+        { id: "sec_release", title: "Release & Sterling Volunteers", description: "", fields: [
+          { id: "fld_b", key: "photo_video_release", label: "Photo and video release", helpText: "", type: "CHECKBOX", scope: "REGISTRATION", required: false, options: [] },
+          { id: "fld_c", key: "t_shirt", label: "T-shirt size", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] },
+        ] },
+      ],
+    });
+    expect([...excludedFieldKeys(definition)].sort()).toEqual(["favorite_snack", "t_shirt"].sort());
+    const model = buildRegistrationPdfModel({ ...selfPaySource(), definition, attendees: [], registrationResponses: { favorite_snack: "pretzels", photo_video_release: true, t_shirt: "M" } });
+    expect(model.sections.flatMap((section) => section.rows.map((row) => row.label))).toEqual(["Photo and video release"]);
+  });
+});
+
 describe("registration PDF on the Fall Camporee form (#1082)", () => {
   it("prints the photo and video release, whose section title mentions Sterling, and drops the Sterling question itself", () => {
     const definition = getFormTemplate("fall_camporee")!.definition as RegistrationFormDefinition;

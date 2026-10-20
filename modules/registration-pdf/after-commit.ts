@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
-import { withPlainLeadNote } from "@/modules/communications/email-html";
+import { escapeHtml, withPlainLeadNote } from "@/modules/communications/email-html";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
@@ -20,6 +20,24 @@ import { REGISTRANT_UPDATED_PDF_NOTE, queueStaffUpdatedRegistrationCopies } from
 
 const CONFIRMATION_NOTE = "A PDF copy of your registration is attached.";
 
+/**
+ * Adds one plain line to a rendered message. When the message already starts with a plain lead note (the club
+ * confirmation note, #931) the new line joins that paragraph after it ("Club note. A PDF copy ... is attached."), so the
+ * club note stays first; otherwise it leads the message.
+ */
+function withNoteAfterLeadNote(rendered: { body: string; bodyHtml: string }, note: string) {
+  const firstBreak = rendered.body.indexOf("\n\n");
+  const firstParagraph = firstBreak === -1 ? rendered.body : rendered.body.slice(0, firstBreak);
+  // A lead note is one plain line; a template starts with a heading or a greeting line instead.
+  const startsWithLeadNote = firstBreak !== -1 && !/^(#|\*|-|>|!|\[|Hello|Hi\b|Dear)/.test(firstParagraph) && !firstParagraph.includes("\n");
+  if (!startsWithLeadNote) return withPlainLeadNote(rendered, note);
+  return {
+    body: `${firstParagraph} ${note}${rendered.body.slice(firstBreak)}`,
+    // The html of that one paragraph, with the line added inside it.
+    bodyHtml: rendered.bodyHtml.replace(/<\/p>/, ` ${escapeHtml(note)}</p>`),
+  };
+}
+
 async function attachToMessages(messageIds: readonly string[], attachmentId: string, registrantNote: string) {
   if (messageIds.length === 0) return;
   const prisma = getPrisma();
@@ -28,9 +46,10 @@ async function attachToMessages(messageIds: readonly string[], attachmentId: str
     select: { id: true, recipientKind: true, bodyTextSnapshot: true, bodyHtmlSnapshot: true },
   });
   for (const row of rows) {
-    // The line saying a PDF is attached goes only into the registrant's message, and only now that the file exists.
+    // The line saying a PDF is attached goes only into the registrant's message, and only now that the file exists. It
+    // follows the club note (the message's first plain line), so the note stays first.
     const shown = row.recipientKind === "REGISTRANT"
-      ? withPlainLeadNote({ body: row.bodyTextSnapshot, bodyHtml: row.bodyHtmlSnapshot ?? "" }, registrantNote)
+      ? withNoteAfterLeadNote({ body: row.bodyTextSnapshot, bodyHtml: row.bodyHtmlSnapshot ?? "" }, registrantNote)
       : { body: row.bodyTextSnapshot, bodyHtml: row.bodyHtmlSnapshot ?? "" };
     await prisma.messageOutbox.update({
       where: { id: row.id },

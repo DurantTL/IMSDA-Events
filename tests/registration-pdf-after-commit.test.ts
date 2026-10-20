@@ -25,6 +25,7 @@ vi.mock("@/modules/communications/transactional-messages", () => ({
 }));
 
 import { attachRegistrationPdfAfterCommit, finishRegistrationChange } from "@/modules/registration-pdf/after-commit";
+import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { REGISTRANT_UPDATED_PDF_NOTE, STAFF_UPDATED_PDF_NOTE } from "@/modules/registration-pdf/notices";
 
 /**
@@ -143,6 +144,17 @@ describe("the confirmation's PDF made after the submit commits (#1082)", () => {
     expect(registrant.data.bodyTextSnapshot).toBe("A PDF copy of your registration is attached.\n\nThanks.");
     expect(staff.data).toEqual({ attachmentId: "attachment-2", bodyTextSnapshot: "New registration.", bodyHtmlSnapshot: null });
     expect(updateMany).toHaveBeenCalledOnce();
+  });
+
+  it("puts the attached line after the club confirmation note, which stays first", async () => {
+    const rendered = withPlainLeadNote({ body: "# Registration received\n\nThanks.", bodyHtml: "<h1>Registration received</h1>" }, "Registered for Maple Grove Pathfinders.");
+    const { update } = database([{ id: "m-registrant", recipientKind: "REGISTRANT", bodyTextSnapshot: rendered.body, bodyHtmlSnapshot: rendered.bodyHtml }]);
+    mocks.ensure.mockResolvedValue({ created: true, previousVersion: null, document: { ...document, version: 1, updated: false } });
+    await attachRegistrationPdfAfterCommit({ eventId: "event-1", registrationId: "registration-1", messageIds: ["m-registrant"] });
+    const data = update.mock.calls[0]![0].data;
+    expect(data.bodyTextSnapshot).toBe("Registered for Maple Grove Pathfinders. A PDF copy of your registration is attached.\n\n# Registration received\n\nThanks.");
+    expect(data.bodyHtmlSnapshot).toContain("Registered for Maple Grove Pathfinders. A PDF copy of your registration is attached.</p>");
+    expect(data.bodyHtmlSnapshot.indexOf("Maple Grove")).toBeLessThan(data.bodyHtmlSnapshot.indexOf("<h1>"));
   });
 
   it("never throws: when the PDF cannot be made the messages are released without it, and the body does not claim one", async () => {

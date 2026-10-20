@@ -51,6 +51,8 @@ const registrationSelect = {
     // The profile snapshot is read only for the person's name and the age the registration saved; never a birth date.
     select: { profileSnapshot: true, formResponses: true, person: { select: { firstName: true, lastName: true } } },
   },
+  // A promoted waitlist registration records its card fee here and leaves the pricing snapshot alone (as the cancellation policy reads it).
+  paymentChoiceOperations: { orderBy: { sequence: "desc" as const }, take: 1, select: { processingFeeCents: true } },
   payments: { where: { status: "SUCCEEDED" as const }, select: { amount: true, refunds: { where: { status: "SUCCEEDED" as const }, select: { amount: true } } } },
   clubRegistration: { select: { teamName: true, organization: { select: { name: true } } } },
   groupRegistration: { select: { id: true } },
@@ -90,6 +92,8 @@ function feesFor(input: {
   churchBilled: boolean;
   rosterEnabled: boolean;
   attendeeNames: string[];
+  /** The latest payment choice's fee, which wins over the snapshot's. */
+  choiceFeeCents?: number;
 }): RegistrationPdfFees {
   if (input.churchBilled) {
     return churchBilledFees(perPersonPriceFromSnapshot(input.snapshot, input.rosterEnabled, input.attendeeNames));
@@ -104,7 +108,9 @@ function feesFor(input: {
   }
   const discount = typeof input.snapshot.discountAmountCents === "number" ? input.snapshot.discountAmountCents : 0;
   if (discount > 0) lines.push({ label: "Promo code discount", amountCents: -discount });
-  const processing = typeof input.snapshot.processingFeeCents === "number" ? input.snapshot.processingFeeCents : 0;
+  const processing = typeof input.choiceFeeCents === "number"
+    ? input.choiceFeeCents
+    : typeof input.snapshot.processingFeeCents === "number" ? input.snapshot.processingFeeCents : 0;
   if (processing > 0) lines.push({ label: CARD_PROCESSING_LABEL, amountCents: processing });
   // Whatever else moved the total (a lodging charge, a staff adjustment) is one line, so the table always adds up.
   const listed = lines.reduce((sum, line) => sum + line.amountCents, 0);
@@ -168,6 +174,7 @@ export async function loadRegistrationPdfSource(
       churchBilled,
       rosterEnabled: getAttendeeRosterConfig(definition).enabled,
       attendeeNames: attendees.map((attendee) => attendee.name),
+      ...(typeof registration.paymentChoiceOperations[0]?.processingFeeCents === "number" ? { choiceFeeCents: registration.paymentChoiceOperations[0].processingFeeCents } : {}),
     }),
   };
   return { source, formVersionId: submission.formVersionId, timezone: registration.event.timezone, eventName: registration.event.name, clubName, registrantName };

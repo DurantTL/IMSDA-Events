@@ -17,9 +17,8 @@ Decisions: Caleb, Oct 20, 2026 (ages only; whole registration; Spring Camporee c
 
 ## What it never shows
 
-- A field whose sensitive flag is on (explicit, or the default from the field's own wording; the section title is not
-  consulted), and any follow-up question that depends on one. An explicit "not sensitive" prints, like in the staff views.
-- Owner decision (Caleb, Oct 20, 2026): the fields `medical_personnel`, `dietary_needs` and `dietary_restrictions` ALWAYS
+- A field whose sensitive flag is on (explicit, or the default from the field's own wording and its section title, as in the staff views), and any follow-up question that depends on one. An explicit "not sensitive" prints, like in the staff views.
+- Owner decision (Caleb, Oct 20, 2026): the fields `medical_personnel`, `dietary_needs`, `dietary_restrictions` and `photo_video_release` (photo consent, not health data) ALWAYS
   print, on every form, even while sensitive. This is a PDF-only list (`PRINT_EVEN_IF_SENSITIVE` in
   `modules/registration-pdf/model.ts`); the flags stay as they are, so staff protected views are unchanged. Other
   sensitive answers (a medical or accessibility need, first-floor need, emergency contacts, guardian, health record

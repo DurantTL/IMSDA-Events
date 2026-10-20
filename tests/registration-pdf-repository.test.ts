@@ -35,13 +35,15 @@ function fixture(options: { billingMode?: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATIO
       { profileSnapshot: { firstName: "Avery", lastName: "Example", ageOnEventDate: 12, birthDate: "2015-04-01" }, formResponses: { first_name: "Avery", last_name: "Example", attendee_age: 12, birth_date: "2015-04-01", allergies: "Synthetic peanut", class_choice: "Knots" }, person: { firstName: "Avery", lastName: "Example" } },
     ],
     payments: [] as Array<{ amount: string; refunds: Array<{ amount: string }> }>,
+    paymentChoiceOperations: [] as Array<{ processingFeeCents: number }>,
+    total: "40.00",
   };
   const registrationFindFirst = vi.fn(async () => (options.withSubmission === false
     ? { id: "registration-1", publicFormSubmission: null }
     : {
       id: "registration-1",
       eventId: "event-1",
-      totalAmount: "40.00",
+      totalAmount: state.total,
       submittedAt: new Date("2027-09-01T15:00:00.000Z"),
       contactSnapshot: { firstName: "Pat", lastName: "Example" },
       accountHolderPerson: { firstName: "Pat", lastName: "Example" },
@@ -56,6 +58,7 @@ function fixture(options: { billingMode?: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATIO
       operations: [],
       attendees: state.attendees,
       payments: state.payments,
+      paymentChoiceOperations: state.paymentChoiceOperations,
       clubRegistration: null,
       groupRegistration: null,
     }));
@@ -178,6 +181,23 @@ describe("registration PDF storage and versions (#1082)", () => {
     expect(select).not.toContain("confirmationCode");
     expect(loaded?.source.attendees[0]).toMatchObject({ name: "Avery Example", ageOnEventDate: 12 });
     expect(loaded?.source.fees).toEqual({ kind: "CHURCH_BILLED", lines: ["$40 per person. Your church is billed after the event."] });
+  });
+
+  it("takes the card fee from the latest payment choice of a promoted registration, so it is neither an \"other charge\" nor a new version", async () => {
+    const { client, state } = fixture();
+    const before = await loadRegistrationPdfSource(client as never, "event-1", "registration-1");
+    await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1" });
+    // The choice records the fee and leaves the snapshot alone; the registration total moves with it.
+    state.paymentChoiceOperations.push({ processingFeeCents: 130 });
+    state.total = "41.30";
+    const loaded = await loadRegistrationPdfSource(client as never, "event-1", "registration-1");
+    expect(before?.source.fees).toMatchObject({ processingFeeCents: 0 });
+    expect(loaded?.source.fees).toMatchObject({ kind: "AMOUNTS", processingFeeCents: 130 });
+    const labels = loaded?.source.fees?.kind === "AMOUNTS" ? loaded.source.fees.lines.map((line) => line.label) : [];
+    expect(labels).toContain("Card processing");
+    expect(labels).not.toContain("Other charges and adjustments");
+    // The fee moved, nothing the registrant said changed: no new version, so no false "Updated" email.
+    expect(await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1" })).toMatchObject({ created: false });
   });
 
   it("lists the fees so they add up to the total, with what was paid when the copy was made", async () => {

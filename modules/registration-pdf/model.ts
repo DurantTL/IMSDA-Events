@@ -37,11 +37,12 @@ export const REGISTRATION_PDF_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
  * Owner decision (Caleb, Oct 20, 2026): these answers print on every form, even while the field is sensitive (by its
- * wording or an explicit flag). The flags themselves are NOT changed, so staff protected views still treat the fields as
+ * wording, its section title or an explicit flag). `photo_video_release` is photo consent, not health data, and is part of the
+ * same decision to print the whole registration (its Fall Camporee section is titled "Release & Sterling Volunteers"). The flags themselves are NOT changed, so staff protected views still treat the fields as
  * sensitive; this list is PDF-only. Everything else that is sensitive stays out (a medical or accessibility need, a
  * first-floor need, emergency contacts, a guardian, a health record acknowledgment).
  */
-export const PRINT_EVEN_IF_SENSITIVE: ReadonlySet<string> = new Set(["medical_personnel", "dietary_needs", "dietary_restrictions"]);
+export const PRINT_EVEN_IF_SENSITIVE: ReadonlySet<string> = new Set(["medical_personnel", "dietary_needs", "dietary_restrictions", "photo_video_release"]);
 
 /** The label of the card processing fee line. */
 export const CARD_PROCESSING_LABEL = "Card processing";
@@ -130,14 +131,15 @@ function isBirthDateField(field: RegistrationFormField) {
  */
 export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<string> {
   const allFields = definition.sections.flatMap((section) => section.fields);
+  const sectionTitleByField = new Map<RegistrationFormField, string>();
+  for (const section of definition.sections) for (const field of section.fields) sectionTitleByField.set(field, section.title);
   const paymentKey = definition.payment?.paymentMethodFieldKey ?? null;
   const excluded = new Set<string>();
   for (const field of allFields) {
-    // The section title is left out of the flag decision on purpose: a field is judged by its own wording, so a question
-    // is not dropped because its section is titled "Release & Sterling Volunteers". (The form builder writes an explicit
-    // flag on a health-type field when it saves, with the title in view.)
+    // The real section title is part of the decision, exactly as in the staff views, so an unflagged question in a
+    // "Health information" section stays out.
     if (
-      (resolveFieldFlags(field, { sectionTitle: "", paymentMethodFieldKey: paymentKey }).sensitive && !PRINT_EVEN_IF_SENSITIVE.has(field.key))
+      (resolveFieldFlags(field, { sectionTitle: sectionTitleByField.get(field) ?? "", paymentMethodFieldKey: paymentKey }).sensitive && !PRINT_EVEN_IF_SENSITIVE.has(field.key))
       || isBirthDateField(field)
       || (paymentKey && field.key === paymentKey)
       || field.key === "promo_code"
