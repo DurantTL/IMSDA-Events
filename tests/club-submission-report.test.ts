@@ -98,6 +98,7 @@ function replayTransaction(status: "SUBMITTED" | "WAITLISTED") {
     messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
   };
   return {
+    registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
   };
 }
@@ -128,6 +129,7 @@ describe("the club submission report (#618)", () => {
 
   it("reports a fresh waitlisted commit as waitlisted and not replayed", async () => {
     dependencies.getPrisma.mockReturnValue({
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn().mockResolvedValue({
         confirmation: { confirmationCode: "REG-NEW", registrationStatus: "WAITLISTED", notificationStatus: "DISABLED" },
         pendingMessageIds: [], registrantMessageIds: [], pdfMessageIds: [], formNotificationGroups: [], eventId: "event-1", registrationId: "registration_2", replayed: false,
@@ -139,7 +141,7 @@ describe("the club submission report (#618)", () => {
   });
 
   it("does not call it at all when the transaction fails", async () => {
-    dependencies.getPrisma.mockReturnValue({ $transaction: vi.fn().mockRejectedValue(new Error("Synthetic failure")) });
+    dependencies.getPrisma.mockReturnValue({ registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) }, $transaction: vi.fn().mockRejectedValue(new Error("Synthetic failure")) });
     const report = vi.fn();
     await expect(submitPublicRegistration("club-event", "clubs", input, now, club(report))).rejects.toThrow("Synthetic failure");
     expect(report).not.toHaveBeenCalled();

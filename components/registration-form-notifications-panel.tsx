@@ -206,7 +206,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                   >
                     <option value="">Every time</option>
                     {data.locations.length > 0 && <option value={LOCATION_CONDITION_KEY}>Only when Location…</option>}
-                    {data.clubs.length > 0 && <option value={CLUB_CONDITION_KEY}>Only when Club…</option>}
+                    {(data.clubs.length > 0 || draft.conditionFieldKey === CLUB_CONDITION_KEY) && <option value={CLUB_CONDITION_KEY}>Only when Club…</option>}
                     {data.fields.map((candidate) => <option key={candidate.key} value={candidate.key}>Only when {candidate.label}…</option>)}
                   </select>
                 </label>

@@ -230,6 +230,8 @@ describe("server-side enforcement", () => {
       registration: { create: vi.fn() },
     };
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
     });
 
@@ -244,6 +246,8 @@ describe("server-side enforcement", () => {
 
   it("refuses a promo quote after the last day", async () => {
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       registrationForm: { findFirst: vi.fn().mockResolvedValue(formRow()) },
     });
     const quoteInput = {
@@ -264,6 +268,8 @@ describe("server-side enforcement", () => {
     // One instant earlier the request gets past the closed check and fails
     // on the unknown promo code instead.
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       registrationForm: { findFirst: vi.fn().mockResolvedValue(formRow()) },
       promoCode: { findUnique: vi.fn().mockResolvedValue(null) },
     });
@@ -283,6 +289,8 @@ describe("server-side enforcement", () => {
       allowed: true, decisions: [],
     });
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       registrationForm: { findFirst: vi.fn().mockResolvedValue(formRow()) },
     });
     vi.useFakeTimers();
@@ -337,6 +345,8 @@ describe("server-side enforcement", () => {
         event: { findUnique: eventLookup },
       };
       dependencies.getPrisma.mockReturnValue({
+        // The form's Club notifications, read before the transaction opens (#1097): none.
+        registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
         $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
         registration: { findMany: vi.fn().mockResolvedValue([created]) },
       });
@@ -382,6 +392,8 @@ describe("other paths that follow the phase", () => {
       eventLocation: { count: vi.fn().mockResolvedValue(0) },
     };
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
     });
 
@@ -411,6 +423,8 @@ describe("other paths that follow the phase", () => {
       waitlistEnabled: false,
     };
     dependencies.getPrisma.mockReturnValue({
+      // The form's Club notifications, read before the transaction opens (#1097): none.
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
       event: { findMany: vi.fn().mockResolvedValue([row]) },
       calendarEntry: { findMany: vi.fn().mockResolvedValue([]) },
     });

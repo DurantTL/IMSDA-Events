@@ -141,6 +141,7 @@ function transactionFixture() {
     },
   };
   const prisma = {
+    registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
   };
   return { prisma, tx };
@@ -164,6 +165,22 @@ beforeEach(() => {
 });
 
 describe("public event waitlist transaction", () => {
+  it("reads which Club-notification clubs still exist before the transaction, and never queries organizations inside it (#1097)", async () => {
+    const { prisma, tx } = transactionFixture();
+    const outer = prisma as unknown as Record<string, unknown>;
+    outer.registrationFormNotification = { findMany: vi.fn().mockResolvedValue([{ conditionFieldKey: "__club", conditionValue: "club-1" }]) };
+    const organization = { findMany: vi.fn().mockResolvedValue([{ id: "club-1" }]) };
+    outer.organization = organization;
+    dependencies.getPrisma.mockReturnValue(prisma);
+
+    await submitPublicRegistration("summer-retreat", "attendee", input, new Date("2026-08-10T12:00:00.000Z"));
+
+    // One lookup, outside the gated transaction. The transaction's client has no organization table at all, so any read there would throw.
+    expect(organization.findMany).toHaveBeenCalledTimes(1);
+    expect(organization.findMany).toHaveBeenCalledWith({ where: { id: { in: ["club-1"] }, type: "CLUB" }, select: { id: true } });
+    expect(tx).not.toHaveProperty("organization");
+  });
+
   it("decides event waitlisting before full-choice validation and creates no option or payment claim", async () => {
     const { prisma, tx } = transactionFixture();
     dependencies.getPrisma.mockReturnValue(prisma);

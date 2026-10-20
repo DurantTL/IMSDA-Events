@@ -288,8 +288,9 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     ];
     const run = async (organizationId: string | null) => {
       const { tx } = fakeTx(clubRows());
-      (tx as Record<string, unknown>).organization = organizationLookup();
-      const result = await queueFormNotificationsForSubmission(tx as never, { ...base, enabled: true, organizationId });
+      // No organization table on the transaction's client: the existing clubs are read before it opens and passed in.
+      const result = await queueFormNotificationsForSubmission(tx as never, { ...base, enabled: true, organizationId, existingClubIds: CLUB_IDS });
+      expect(tx).not.toHaveProperty("organization");
       return result.groups.map((group) => group.notificationId);
     };
     // The removed club's notification is skipped even though "is not" would otherwise match everyone.
@@ -882,6 +883,22 @@ describe("saving a form's notifications (#1081)", () => {
     expect(db.organization.findMany).toHaveBeenCalledWith({ where: { id: { in: ["club-a"] }, type: "CLUB" }, select: { id: true } });
     expect(tx.registrationFormNotification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ conditionFieldKey: CLUB_CONDITION_KEY, conditionValue: "club-a" }) }));
     expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("club-a");
+  });
+
+  it("refuses a NEW Club condition on an event whose registrations carry no club, but lets a stored one be re-saved (#1097)", async () => {
+    const club = { ...valid, condition: { fieldKey: CLUB_CONDITION_KEY, operator: "EQUALS", value: "club-a" } };
+    const general = (existing: Row[]) => {
+      const { db } = database({ existing });
+      db.event.findUnique.mockResolvedValue({ audience: "GENERAL" });
+    };
+    general([row({ id: "existing-1" })]);
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [club] })).rejects.toThrow(/do not have a club/);
+    // A stored notification that already routes on a club (the event changed since) is not locked out of saving.
+    general([row({ id: "existing-1", conditionFieldKey: CLUB_CONDITION_KEY, conditionOperator: "EQUALS", conditionValue: "club-a" })]);
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...club, id: "existing-1" }] })).resolves.toBeDefined();
+    // An id naming a notification that is NOT a stored club one does not slip past.
+    general([row({ id: "existing-1" })]);
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...club, id: "existing-1" }] })).rejects.toThrow(/do not have a club/);
   });
 
   it("refuses a notification listed twice, and reports one deleted since the load as a handled error, not a crash", async () => {

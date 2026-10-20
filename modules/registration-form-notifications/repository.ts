@@ -169,6 +169,9 @@ export async function replaceFormNotifications(eventId: string, formId: string, 
   const allLocationIds = new Set((await getPrisma().eventLocation.findMany({ where: { eventId }, select: { id: true } })).map((row) => row.id));
   // A Club condition's value is checked against the real club organizations (#1097), never trusted from the client.
   const clubValues = [...new Set(parsed.data.notifications.flatMap((input) => (input.condition?.fieldKey === CLUB_CONDITION_KEY ? [input.condition.value] : [])))];
+  const storedClubKeys = new Set(form.notifications.filter((row) => row.conditionFieldKey === CLUB_CONDITION_KEY).map((row) => row.id));
+  const clubsAllowed = clubValues.length === 0
+    || (await getPrisma().event.findUnique({ where: { id: eventId }, select: { audience: true } }))?.audience === "CLUB";
   const realClubIds = new Set(clubValues.length === 0 ? [] : (await getPrisma().organization.findMany({ where: { id: { in: clubValues }, type: "CLUB" }, select: { id: true } })).map((row) => row.id));
 
   const namedIds = parsed.data.notifications.flatMap((input) => (input.id ? [input.id] : []));
@@ -186,6 +189,10 @@ export async function replaceFormNotifications(eventId: string, formId: string, 
       }
       if (input.condition.fieldKey === LOCATION_CONDITION_KEY && !allLocationIds.has(input.condition.value)) {
         throw new FormNotificationError(`${label}: choose one of this event's locations.`, "INVALID_NOTIFICATIONS");
+      }
+      // Only club events carry a club; a notification already routing on one may still be re-saved.
+      if (input.condition.fieldKey === CLUB_CONDITION_KEY && !clubsAllowed && !(input.id && storedClubKeys.has(input.id))) {
+        throw new FormNotificationError(`${label}: this event's registrations do not have a club, so a club condition is not available.`, "INVALID_NOTIFICATIONS");
       }
       if (input.condition.fieldKey === CLUB_CONDITION_KEY && !realClubIds.has(input.condition.value)) {
         throw new FormNotificationError(`${label}: choose one of the clubs in the directory.`, "INVALID_NOTIFICATIONS");

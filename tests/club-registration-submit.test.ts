@@ -148,6 +148,8 @@ function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CL
     guardianAuthorityConflict: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "conflict-1" }) },
   };
   dependencies.getPrisma.mockReturnValue({
+    // The form's Club notifications, read before the transaction opens (#1097): none.
+    registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
     // Directory reads during submit must go through the transaction (#482).
     organization: {
       findUnique: vi.fn(() => { throw new Error("read the organization through the transaction"); }),
@@ -489,6 +491,17 @@ describe("club registration submit", () => {
     const tx = fixture({ registrationClosesOn: "2026-10-10" });
     await expect(submit()).rejects.toMatchObject({ code: "REGISTRATION_CLOSED" });
     expect(tx.registration.create).not.toHaveBeenCalled();
+  });
+
+  it("reads which Club-notification clubs still exist before the transaction, and never inside it, on a bulk (club) submission (#1097)", async () => {
+    const tx = fixture();
+    const outer = dependencies.getPrisma() as Record<string, unknown>;
+    outer.registrationFormNotification = { findMany: vi.fn().mockResolvedValue([{ conditionFieldKey: "__club", conditionValue: "club-1" }]) };
+    const outerOrganization = { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([{ id: "club-1" }]) };
+    outer.organization = outerOrganization;
+    await submit();
+    expect(outerOrganization.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.organization.findMany).not.toHaveBeenCalled();
   });
 
   it("locks the club directory field to the club's own Organization record, ignoring whatever the client sent (#482)", async () => {

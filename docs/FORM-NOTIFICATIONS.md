@@ -57,7 +57,10 @@ question) and limited to chosen sections of the registration PDF. Decisions: Cal
 - **A club that no longer exists** (the organization was deleted, or is no longer a club): the panel shows "(club removed)" and
   a warning, and the notification is **skipped** (its id is logged), never sent unconditioned, the same as
   `conditionStillAllowed`. `existingConditionClubIds` looks the stored clubs up in one query, and none when no notification
-  routes on a club. An inactive club that still exists keeps routing.
+  routes on a club. "Removed" means the organization was deleted or is no longer a club. A **deactivated** club (still a club)
+  keeps routing. The lookup runs before the submission's transaction opens, never inside it (docs/MEALS.md); a club deleted in
+  the gap before the commit is accepted. A new Club condition is refused (400) unless the event's audience is `CLUB`; a
+  notification already routing on a club can still be re-saved.
 
 ## Delivery and privacy
 
