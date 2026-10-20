@@ -13,6 +13,8 @@ import { locationWaitlistPlace, recordLocationWaitlistChange } from "@/modules/e
 import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
 import { attachRegistrationPdfAfterCommit } from "@/modules/registration-pdf/after-commit";
+import { finishFormNotificationsAfterSubmit } from "@/modules/registration-form-notifications/after-commit";
+import { queueFormNotificationsForSubmission } from "@/modules/registration-form-notifications/queue";
 import {
   enqueuePublicRegistrationMessages,
   processQueuedMessageIdsAfterCommit,
@@ -722,6 +724,7 @@ async function findExistingConfirmation(
     registrantMessageIds: messages.map((message) => message.id),
     // A replay queues nothing new, so nothing waits for a PDF (#1082).
     pdfMessageIds: [] as string[],
+    formNotificationGroups: [] as Array<{ notificationId: string; messageIds: string[] }>,
     eventId: existing.eventId,
     registrationId: existing.registrationId,
     replayed: true,
@@ -739,7 +742,7 @@ async function createPublicRegistrationTransaction(
   now: Date,
   bulk: BulkSubmissionContext | undefined,
   requestContext: SubmissionRequestContext | undefined,
-  notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean },
+  notifications: { staffCopyEnabled: boolean; notifyApprovers: boolean; formNotificationsEnabled: boolean },
 ) {
   const group = bulk && "group" in bulk ? bulk : undefined;
   const club = bulk && !("group" in bulk) ? bulk : undefined;
@@ -1575,6 +1578,22 @@ async function createPublicRegistrationTransaction(
         // The PDF is made after the commit, never inside this gated transaction (#1082): the messages are held until then.
         holdForRegistrationPdf: true,
       });
+  // The form's own notifications (#1081): queued held, with their PDFs attached after the commit. None for a waitlist notice.
+  const formNotifications = isWaitlisted
+    ? { groups: [] as Array<{ notificationId: string; messageIds: string[] }>, pendingMessageIds: [] as string[] }
+    : await queueFormNotificationsForSubmission(tx, {
+        enabled: notifications.formNotificationsEnabled,
+        eventId: form.eventId,
+        formId: form.id,
+        registrationId: registration.id,
+        correlationId: submissionCorrelationId,
+        definition,
+        answers: prepared.responses,
+        locationId: registrationLocationId ?? null,
+        locationName: registrationLocation?.name ?? null,
+        eventName: form.event.name,
+        registrantName: `${identity.firstName} ${identity.lastName}`.trim(),
+      });
   await tx.auditLog.create({
     data: {
       eventId: form.eventId,
@@ -1640,10 +1659,11 @@ async function createPublicRegistrationTransaction(
       managePath: access.managePath,
       manageLinkExpiresAt: access.expiresAt.toISOString(),
     },
-    pendingMessageIds: [...queuedMessages.pendingMessageIds, ...teamPermissionMessageIds],
+    pendingMessageIds: [...queuedMessages.pendingMessageIds, ...formNotifications.pendingMessageIds, ...teamPermissionMessageIds],
     registrantMessageIds: queuedMessages.registrantMessageIds,
     // The confirmation and staff copy that wait for the PDF; none for a waitlist notice (#1082).
     pdfMessageIds: isWaitlisted ? [] : queuedMessages.pendingMessageIds,
+    formNotificationGroups: formNotifications.groups,
     eventId: form.eventId,
     registrationId: registration.id,
     replayed: false,
@@ -1719,14 +1739,15 @@ export async function submitPublicRegistration(
 ) {
   const prisma = getPrisma();
   // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
-  const [staffCopyEnabled, notifyApprovers] = await Promise.all([
+  const [staffCopyEnabled, notifyApprovers, formNotificationsEnabled] = await Promise.all([
     isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY"),
     isNotificationEnabled("TEAM_APPROVAL_REQUESTED"),
+    isNotificationEnabled("REGISTRATION_FORM_NOTIFICATIONS"),
   ]);
   for (let attempt = 0; attempt < submitAttempts; attempt += 1) {
     try {
       const result = await prisma.$transaction(
-        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers }),
+        (tx) => createPublicRegistrationTransaction(tx, eventSlug, formSlug, input, now, bulk, requestContext, { staffCopyEnabled, notifyApprovers, formNotificationsEnabled }),
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           // A club or group may wait up to 5s on its location's row lock (#413); the
@@ -1743,6 +1764,8 @@ export async function submitPublicRegistration(
       await refreshBackgroundCheckMatchesForRegistrations([result.registrationId]);
       // The registration PDF, made now that the transaction is over; a failure sends the messages without it (#1082).
       await attachRegistrationPdfAfterCommit({ eventId: result.eventId, registrationId: result.registrationId, messageIds: result.pdfMessageIds });
+      // The form notifications get their filtered PDFs the same way, then are released with the rest (#1081).
+      await finishFormNotificationsAfterSubmit({ eventId: result.eventId, registrationId: result.registrationId, groups: result.formNotificationGroups });
       let processed = {
         capturedIds: [] as string[],
         sentIds: [] as string[],

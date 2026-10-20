@@ -17,6 +17,6 @@ export default async function RegistrationBuilderPage({ searchParams }: { search
   }
   return <>
     <BuilderPhoneNotice eventId={event.id} />
-    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} /></div>
+    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} /></div>
   </>;
 }

@@ -203,8 +203,18 @@ function ageText(attendee: RegistrationPdfAttendee, ageKey: string | null) {
   return age === null || !Number.isFinite(age) ? "" : String(age);
 }
 
-export function buildRegistrationPdfModel(source: RegistrationPdfSource): RegistrationPdfModel {
+export type RegistrationPdfBuildOptions = {
+  /**
+   * Only these sections of the form (#1081 notifications). The exclusion rules are decided on the WHOLE form first, so a
+   * follow-up question in a chosen section that depends on a sensitive answer in another section stays out. A filtered
+   * copy has no fees and no roster-only fallback section; empty or absent means the whole registration.
+   */
+  sectionIds?: readonly string[];
+};
+
+export function buildRegistrationPdfModel(source: RegistrationPdfSource, options: RegistrationPdfBuildOptions = {}): RegistrationPdfModel {
   const { definition } = source;
+  const only = options.sectionIds && options.sectionIds.length > 0 ? new Set(options.sectionIds) : null;
   const excluded = excludedFieldKeys(definition);
   const roster = getAttendeeRosterConfig(definition);
   const rosterTitle = pluralizeAttendeeLabel(roster.attendeeLabel);
@@ -212,6 +222,7 @@ export function buildRegistrationPdfModel(source: RegistrationPdfSource): Regist
   const sections: RegistrationPdfSection[] = [];
 
   for (const section of definition.sections) {
+    if (only && !only.has(section.id)) continue;
     const rows: Array<{ label: string; value: string }> = [];
     for (const field of section.fields) {
       if (field.scope !== "REGISTRATION" || excluded.has(field.key)) continue;
@@ -254,7 +265,7 @@ export function buildRegistrationPdfModel(source: RegistrationPdfSource): Regist
   }
 
   // A roster form whose people are not asked anything beyond a name still lists who is going.
-  if (roster.enabled && source.attendees.length > 0 && !sections.some((section) => section.roster)) {
+  if (!only && roster.enabled && source.attendees.length > 0 && !sections.some((section) => section.roster)) {
     sections.push({
       title: rosterTitle.charAt(0).toUpperCase() + rosterTitle.slice(1),
       description: "",
@@ -278,7 +289,7 @@ export function buildRegistrationPdfModel(source: RegistrationPdfSource): Regist
     registrantName: source.registrantName,
     submittedOn: source.submittedOn,
     sections,
-    fees: source.fees,
+    fees: only ? null : source.fees,
   };
 }
 

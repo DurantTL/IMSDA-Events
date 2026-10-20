@@ -11,6 +11,7 @@ const dependencies = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 // The registration PDF (#1082) is made after the commit and has its own tests. This fake database has no PDF tables.
 vi.mock("@/modules/registration-pdf/after-commit", () => ({ attachRegistrationPdfAfterCommit: vi.fn(), finishRegistrationChange: vi.fn() }));
+vi.mock("@/modules/registration-form-notifications/after-commit", () => ({ finishFormNotificationsAfterSubmit: vi.fn(), notifyFormNotificationsAfterChange: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getServerEnv: dependencies.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/communications/messaging-repository", () => ({
@@ -137,6 +138,8 @@ function fixture({ billingMode = "DEFERRED_ORGANIZATION_INVOICE", audience = "CL
     registrationWaitlistEntry: { aggregate: vi.fn(), create: vi.fn(), findUnique: vi.fn().mockResolvedValue(null), count: vi.fn().mockResolvedValue(0) },
     locationWaitlistChange: { create: vi.fn().mockResolvedValue({ id: "change-1" }) },
     messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
+    // The form's own notifications (#1081): none configured.
+    registrationFormNotification: { findMany: vi.fn().mockResolvedValue([]) },
     auditLog: { create: vi.fn().mockResolvedValue({ id: "audit-1" }) },
     // Responsible-adult declarations (#131): none exist yet, so each one is the first for its minor.
     $executeRaw: vi.fn().mockResolvedValue(0),

@@ -23,6 +23,7 @@ export const notificationKeys = [
   "MEMBER_TRANSFER_STARTED",
   "MEMBER_TRANSFER_COMPLETED",
   "CLUB_FORM_SUBMITTED",
+  "REGISTRATION_FORM_NOTIFICATIONS",
 ] as const;
 
 export type NotificationKey = (typeof notificationKeys)[number];
@@ -38,6 +39,8 @@ export type NotificationRecipientSource =
   | { kind: "event-list" }
   /** A list kept per club form, on that form's settings page; the club forms list is where to choose one. */
   | { kind: "club-form-list" }
+  /** A list kept per registration form, in that form's Notifications panel in the registration form builder (#1081). */
+  | { kind: "registration-form-list" }
   /** Worked out from people's roles; there is no list to edit. */
   | { kind: "roles" };
 
@@ -195,6 +198,17 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     sourceNote: "Set on each club form's settings page, under \"Email these addresses when this form is submitted\". An empty list sends nothing.",
     sentFrom: "modules/club-forms/submission-alert.ts",
     switchReadIn: ["modules/club-forms/links.ts", "modules/club-forms/submissions.ts"],
+    built: true,
+  },
+  {
+    key: "REGISTRATION_FORM_NOTIFICATIONS",
+    name: "Registration form notifications",
+    when: "When someone registers, and again (marked Updated) when a director or staff change the registration. Each notification can go only for one answer, such as a location, and can include only some sections. The email is a short summary with the registration PDF attached.",
+    recipients: "Set on each registration form.",
+    source: { kind: "registration-form-list" },
+    sourceNote: "Set in the registration form builder, in the form's Notifications panel. The event's staff list and the registrant's confirmation are separate and keep their own switch. A form with no notifications sends nothing here.",
+    sentFrom: "modules/registration-form-notifications/queue.ts",
+    switchReadIn: ["modules/forms/public-repository.ts", "modules/registration-form-notifications/after-commit.ts"],
     built: true,
   },
 ];

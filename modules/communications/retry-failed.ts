@@ -177,6 +177,16 @@ async function buildPlan(
   // (a corrected address still reached the person). A queued one counts whenever it was created.
   const registrationIds = [...new Set(failed.flatMap((message) => message.registrationId ? [message.registrationId] : []))];
   const templateKeys = [...new Set(failed.map((message) => message.templateKey))];
+  // A registration form notification (#1081) shares its template key with the staff copy, so its guard key also names the
+  // notification and the address: a later send of another notification, or of the staff copy, proves nothing for it, and
+  // the reverse.
+  const guardKey = (send: { registrationId: string | null; templateKey: string; recipientEmail: string; metadata: unknown }) => {
+    const base = `${send.registrationId}|${send.templateKey}`;
+    const metadata = send.metadata && typeof send.metadata === "object" ? send.metadata as Record<string, unknown> : {};
+    return metadata.trigger === "REGISTRATION_FORM_NOTIFICATION"
+      ? `${base}|notification:${String(metadata.notificationId)}|${send.recipientEmail.toLowerCase()}`
+      : base;
+  };
   const laterSends = registrationIds.length === 0
     ? []
     : await db.messageOutbox.findMany({
@@ -186,11 +196,11 @@ async function buildPlan(
           registrationId: { in: registrationIds },
           templateKey: { in: templateKeys },
         },
-        select: { registrationId: true, templateKey: true, createdAt: true, status: true },
+        select: { registrationId: true, templateKey: true, createdAt: true, status: true, recipientEmail: true, metadata: true },
       });
   const laterByRecipient = new Map<string, Array<{ createdAt: Date; queued: boolean }>>();
   for (const send of laterSends) {
-    const key = `${send.registrationId}|${send.templateKey}`;
+    const key = guardKey(send);
     laterByRecipient.set(key, [
       ...(laterByRecipient.get(key) ?? []),
       { createdAt: send.createdAt, queued: send.status === "PENDING" || send.status === "PROCESSING" },
@@ -236,7 +246,7 @@ async function buildPlan(
         : best,
       null,
     );
-    const recipientKey = `${message.registrationId}|${message.templateKey}`;
+    const recipientKey = guardKey(message);
     const reason = classifyFailedMessage({
       templateKey: message.templateKey,
       treeStatuses: members.filter((member) => member.id !== message.id).map((member) => member.status),
