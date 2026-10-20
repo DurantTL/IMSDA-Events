@@ -10198,6 +10198,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
     font-size: var(--type-button-cta);
   }
   :root :is(.form-actions, .page-intro-actions, .intro-actions, .builder-actions, .registration-management-actions) > .secondary-button { min-height: var(--target-touch, 44px); }
+  :root .builder-actions > .primary-button { min-height: var(--target-touch, 44px); }
 }
 
 /* --- Heading hierarchy ------------------------------------------------------
