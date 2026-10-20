@@ -81,6 +81,25 @@ export function isAllowedConditionKey(definition: RegistrationFormDefinition, ke
   return key === LOCATION_CONDITION_KEY || conditionFieldChoices(definition).some((choice) => choice.key === key);
 }
 
+/**
+ * Whether a stored notification may still route on its condition (#1081). A condition is checked when it is saved, but the
+ * form can change afterwards: the question may now be sensitive, sit in a health section, follow a sensitive question, or be
+ * gone. Such a notification is skipped (never sent unconditioned), because who gets an email would reveal the answer.
+ */
+export function conditionStillAllowed(definition: RegistrationFormDefinition, row: { conditionFieldKey: string | null }) {
+  return !row.conditionFieldKey || isAllowedConditionKey(definition, row.conditionFieldKey);
+}
+
+/**
+ * The sections a notification includes in THIS form version: when none of the chosen sections exist in it (a registration
+ * made on an older version), the full registration rather than an empty PDF.
+ */
+export function effectiveSectionIds(definition: RegistrationFormDefinition, sectionIds: readonly string[]): string[] {
+  if (sectionIds.length === 0) return [];
+  const present = new Set(definition.sections.map((section) => section.id));
+  return sectionIds.some((id) => present.has(id)) ? [...sectionIds] : [];
+}
+
 /** Whether a notification applies to a registration with these answers and this location. No condition always applies. */
 export function notificationApplies(condition: NotificationCondition | null, answers: Record<string, unknown>, locationId: string | null) {
   if (!condition) return true;

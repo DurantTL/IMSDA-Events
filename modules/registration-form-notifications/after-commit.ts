@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { getPrisma } from "@/lib/prisma";
 import { logError, logWarn } from "@/lib/logger";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
+import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import {
@@ -14,10 +15,17 @@ import {
   type RegistrationPdfModel,
 } from "@/modules/registration-pdf/model";
 import { renderRegistrationPdf } from "@/modules/registration-pdf/render";
-import { loadRegistrationPdfSource } from "@/modules/registration-pdf/repository";
-import { includesText, notificationApplies, sectionSignature } from "@/modules/registration-form-notifications/domain";
+import { ensureRegistrationPdfOutsideTransaction, loadRegistrationPdfSource } from "@/modules/registration-pdf/repository";
+import {
+  conditionStillAllowed,
+  effectiveSectionIds,
+  includesText,
+  notificationApplies,
+  sectionSignature,
+} from "@/modules/registration-form-notifications/domain";
 import {
   conditionOf,
+  notificationMessageKey,
   queueNotificationMessages,
   renderNotificationEmail,
   sectionTitlesOf,
@@ -59,17 +67,51 @@ export function notificationContentHash(model: RegistrationPdfModel) {
 
 type Loaded = NonNullable<Awaited<ReturnType<typeof loadRegistrationPdfSource>>>;
 
-type RunCache = Map<string, { model: RegistrationPdfModel; hash: string }>;
+/** One model, hash and attachment per distinct set of sections in a run: notifications with the same sections share them. */
+type RunCache = Map<string, { model: RegistrationPdfModel; hash: string; attachments: Map<boolean, string | null> }>;
 
 function modelFor(loaded: Loaded, sectionIds: readonly string[], cache: RunCache) {
   const signature = sectionSignature(sectionIds);
   let entry = cache.get(signature);
   if (!entry) {
     const model = buildRegistrationPdfModel(loaded.source, { sectionIds });
-    entry = { model, hash: notificationContentHash(model) };
+    entry = { model, hash: notificationContentHash(model), attachments: new Map() };
     cache.set(signature, entry);
   }
   return entry;
+}
+
+/**
+ * The attachment for a notification: the registration PDF itself (#1082, already stored) when it includes every section, else
+ * one filtered PDF stored once per distinct set of sections and Updated mark in this run. Null when it cannot be made.
+ */
+async function attachmentFor(input: {
+  eventId: string;
+  registrationId: string;
+  loaded: Loaded;
+  sectionIds: readonly string[];
+  updated: boolean;
+  notificationName: string;
+  cache: RunCache;
+}) {
+  const entry = modelFor(input.loaded, input.sectionIds, input.cache);
+  if (entry.attachments.has(input.updated)) return entry.attachments.get(input.updated) ?? null;
+  let attachmentId: string | null;
+  if (input.sectionIds.length === 0) {
+    const ensured = await ensureRegistrationPdfOutsideTransaction({ eventId: input.eventId, registrationId: input.registrationId });
+    attachmentId = ensured?.document.attachmentId ?? null;
+  } else {
+    attachmentId = await storeNotificationPdf({
+      eventId: input.eventId,
+      loaded: input.loaded,
+      model: entry.model,
+      updated: input.updated,
+      notificationName: input.notificationName,
+      filtered: true,
+    });
+  }
+  entry.attachments.set(input.updated, attachmentId);
+  return attachmentId;
 }
 
 function nameSlug(name: string) {
@@ -169,10 +211,12 @@ export async function finishFormNotificationsAfterSubmit(input: { eventId: strin
         try {
           const row = rows.find((candidate) => candidate.id === group.notificationId);
           if (!row) continue;
-          const { model, hash } = modelFor(loaded, row.sectionIds, cache);
+          // Chosen sections missing from the version this registration is on: the full registration, not an empty PDF.
+          const sectionIds = effectiveSectionIds(loaded.source.definition, row.sectionIds);
+          const { hash } = modelFor(loaded, sectionIds, cache);
           // The people are being told now, whether or not the PDF can be made, so this is the baseline either way.
-          await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature: sectionSignature(row.sectionIds), sent: false });
-          const attachmentId = await storeNotificationPdf({ eventId: input.eventId, loaded, model, updated: false, notificationName: row.name, filtered: row.sectionIds.length > 0 });
+          await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature: sectionSignature(sectionIds), sent: false });
+          const attachmentId = await attachmentFor({ eventId: input.eventId, registrationId: input.registrationId, loaded, sectionIds, updated: false, notificationName: row.name, cache });
           if (!attachmentId) continue;
           const content = renderNotificationEmail({
             notificationName: row.name,
@@ -180,7 +224,7 @@ export async function finishFormNotificationsAfterSubmit(input: { eventId: strin
             formTitle: loaded.source.formTitle,
             registrantName: loaded.registrantName,
             locationName: facts?.location?.name ?? null,
-            includes: includesText(row.sectionIds, titles),
+            includes: includesText(sectionIds, titles),
             updated: false,
             hasPdf: true,
           });
@@ -228,11 +272,21 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
     const answers = loaded.source.registrationResponses;
     const titles = sectionTitlesOf(loaded.source.definition);
     const cache: RunCache = new Map();
+    // Read once, outside any transaction: a paused event stores no PDFs at all.
+    const eventSettings = await loadEventEmailSettings(prisma, input.eventId);
+    const paused = suppressionNote(eventSettings) !== null;
     for (const row of rows) {
       try {
-        if (row.recipients.length === 0 || !notificationApplies(conditionOf(row), answers, facts.locationId)) continue;
-        const { model, hash } = modelFor(loaded, row.sectionIds, cache);
-        const signature = sectionSignature(row.sectionIds);
+        if (row.recipients.length === 0) continue;
+        if (!conditionStillAllowed(loaded.source.definition, row)) {
+          // The form changed since the condition was saved; skipped, never sent unconditioned. Id only.
+          logWarn("A form notification was skipped: its condition looks at a question that is no longer allowed.", { notificationId: row.id });
+          continue;
+        }
+        if (!notificationApplies(conditionOf(row), answers, facts.locationId)) continue;
+        const sectionIds = effectiveSectionIds(loaded.source.definition, row.sectionIds);
+        const { hash } = modelFor(loaded, sectionIds, cache);
+        const signature = sectionSignature(sectionIds);
         const delivery = row.deliveries[0];
         let updated: boolean;
         if (!delivery) {
@@ -248,14 +302,24 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
         } else {
           updated = true;
         }
-        const attachmentId = await storeNotificationPdf({ eventId: input.eventId, loaded, model, updated, notificationName: row.name, filtered: row.sectionIds.length > 0 });
+        // A retry of the same change finds its rows: nothing is rendered or stored again.
+        const keys = row.recipients.map((email) => notificationMessageKey(row.id, input.registrationId, input.changeKey, email));
+        const already = await prisma.messageOutbox.findMany({ where: { idempotencyKey: { in: keys } }, select: { id: true } });
+        if (already.length === keys.length) {
+          if (!paused) await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature, sent: false });
+          continue;
+        }
+        // A paused event records suppressed rows with no PDF.
+        const attachmentId = paused
+          ? null
+          : await attachmentFor({ eventId: input.eventId, registrationId: input.registrationId, loaded, sectionIds, updated, notificationName: row.name, cache });
         const content = renderNotificationEmail({
           notificationName: row.name,
           eventName: loaded.eventName,
           formTitle: loaded.source.formTitle,
           registrantName: loaded.registrantName,
           locationName: facts.location?.name ?? null,
-          includes: includesText(row.sectionIds, titles),
+          includes: includesText(sectionIds, titles),
           updated,
           hasPdf: attachmentId !== null,
         });
@@ -276,7 +340,7 @@ export async function notifyFormNotificationsAfterChange(input: { eventId: strin
         });
         toProcess.push(...queued.pendingMessageIds);
         // Nothing left (a paused event): the people were not told, so the baseline stays and a later change tells them.
-        if (!queued.suppressed) {
+        if (!queued.suppressed && queued.created > 0) {
           await recordDelivery({ notificationId: row.id, registrationId: input.registrationId, contentHash: hash, signature, sent: true });
         }
       } catch (error) {

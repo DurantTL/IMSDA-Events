@@ -2,12 +2,15 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { logWarn } from "@/lib/logger";
 import { escapeMarkdown, plainTextFromEscapedMarkdown, renderEmailBodyHtml } from "@/modules/communications/email-html";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { registrationPdfHoldUntil } from "@/modules/registration-pdf/hold";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
+  conditionStillAllowed,
+  effectiveSectionIds,
   includesText,
   notificationApplies,
   notificationEmailContent,
@@ -36,6 +39,11 @@ type NotificationRow = {
   conditionValue: string | null;
   sectionIds: string[];
 };
+
+/** One message per notification, registration, send and address, so a retry finds its rows. */
+export function notificationMessageKey(notificationId: string, registrationId: string, keyScope: string, email: string) {
+  return `form-notification:${notificationId}:${registrationId}:${keyScope}:${email}`;
+}
 
 export function conditionOf(row: Pick<NotificationRow, "conditionFieldKey" | "conditionOperator" | "conditionValue">): NotificationCondition | null {
   return row.conditionFieldKey
@@ -74,12 +82,18 @@ export async function queueNotificationMessages(tx: Prisma.TransactionClient, in
   const suppressed = note !== null;
   const messageIds: string[] = [];
   const pendingMessageIds: string[] = [];
+  let created = 0;
   for (const email of input.notification.recipients) {
-    const key = `form-notification:${input.notification.id}:${input.registrationId}:${input.keyScope}:${email}`;
-    const message = await tx.messageOutbox.upsert({
-      where: { idempotencyKey: key },
-      update: {},
-      create: {
+    const key = notificationMessageKey(input.notification.id, input.registrationId, input.keyScope, email);
+    const existing = await tx.messageOutbox.findUnique({ where: { idempotencyKey: key }, select: { id: true, status: true } });
+    if (existing) {
+      messageIds.push(existing.id);
+      if (existing.status === "PENDING") pendingMessageIds.push(existing.id);
+      continue;
+    }
+    created += 1;
+    const message = await tx.messageOutbox.create({
+      data: {
         eventId: input.eventId,
         registrationId: input.registrationId,
         templateKey: "INTERNAL_NEW_REGISTRATION",
@@ -112,7 +126,7 @@ export async function queueNotificationMessages(tx: Prisma.TransactionClient, in
     messageIds.push(message.id);
     if (message.status === "PENDING") pendingMessageIds.push(message.id);
   }
-  return { messageIds, pendingMessageIds, suppressed };
+  return { messageIds, pendingMessageIds, suppressed, created };
 }
 
 /**
@@ -139,7 +153,15 @@ export async function queueFormNotificationsForSubmission(
   const none = { groups: [] as QueuedFormNotificationGroup[], pendingMessageIds: [] as string[] };
   if (!input.enabled) return none;
   const rows = await tx.registrationFormNotification.findMany({ where: { formId: input.formId }, orderBy: { position: "asc" } });
-  const matching = rows.filter((row) => row.recipients.length > 0 && notificationApplies(conditionOf(row), input.answers, input.locationId));
+  const matching = rows.filter((row) => {
+    if (row.recipients.length === 0) return false;
+    if (!conditionStillAllowed(input.definition, row)) {
+      // The form changed since the condition was saved; skipped, never sent unconditioned. Id only.
+      logWarn("A form notification was skipped: its condition looks at a question that is no longer allowed.", { notificationId: row.id });
+      return false;
+    }
+    return notificationApplies(conditionOf(row), input.answers, input.locationId);
+  });
   if (matching.length === 0) return none;
   const settings = await loadEventEmailSettings(tx, input.eventId);
   if (!settings) return none;
@@ -153,7 +175,7 @@ export async function queueFormNotificationsForSubmission(
       formTitle: input.definition.title,
       registrantName: input.registrantName,
       locationName: input.locationName,
-      includes: includesText(row.sectionIds, titles),
+      includes: includesText(effectiveSectionIds(input.definition, row.sectionIds), titles),
       updated: false,
       hasPdf: false,
     });

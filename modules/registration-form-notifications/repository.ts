@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
@@ -8,6 +9,7 @@ import {
   LOCATION_CONDITION_KEY,
   checkNotificationRecipients,
   conditionFieldChoices,
+  conditionStillAllowed,
   isAllowedConditionKey,
   notificationsPutSchema,
   type FormNotificationConfig,
@@ -27,8 +29,11 @@ export class FormNotificationError extends Error {
   }
 }
 
+/** A notification as the panel shows it, with what the staff member should know about it. */
+export type FormNotificationView = FormNotificationConfig & { warnings: string[] };
+
 export type FormNotificationsPanel = {
-  notifications: FormNotificationConfig[];
+  notifications: FormNotificationView[];
   /** What a condition may look at, and what a notification may include. Nothing sensitive is offered. */
   fields: Array<{ key: string; label: string; options: string[] }>;
   sections: Array<{ id: string; title: string }>;
@@ -52,25 +57,46 @@ async function loadForm(eventId: string, formId: string) {
     where: { id: formId, eventId },
     select: {
       id: true,
-      versions: { orderBy: { versionNumber: "desc" }, select: { definition: true } },
+      versions: { orderBy: { versionNumber: "desc" }, select: { definition: true, status: true } },
       notifications: { orderBy: { position: "asc" } },
     },
   });
   if (!form) throw new FormNotificationError("That registration form was not found.", "FORM_NOT_FOUND");
   let definition: RegistrationFormDefinition | null = null;
+  let published: RegistrationFormDefinition | null = null;
   for (const version of form.versions) {
     const parsed = registrationFormDefinitionSchema.safeParse(version.definition);
-    if (parsed.success) {
-      definition = parsed.data;
+    if (!parsed.success) continue;
+    definition ??= parsed.data;
+    if (version.status === "PUBLISHED") {
+      published = parsed.data;
       break;
     }
   }
-  return { form, definition };
+  return { form, definition, published };
 }
 
-function panelFor(definition: RegistrationFormDefinition | null, notifications: FormNotificationConfig[], locations: Array<{ id: string; name: string }>): FormNotificationsPanel {
+/** Why a stored notification may not do what its owner expects: a condition no longer allowed, or a draft-only part. */
+function warningsFor(config: FormNotificationConfig, definition: RegistrationFormDefinition | null, published: RegistrationFormDefinition | null) {
+  const warnings: string[] = [];
+  if (definition && !conditionStillAllowed(definition, { conditionFieldKey: config.condition?.fieldKey ?? null })) {
+    warnings.push("This condition looks at a question that is now sensitive or no longer in the form, so this notification is not being sent. Change or remove the condition.");
+  }
+  if (published && definition) {
+    const publishedSections = new Set(published.sections.map((section) => section.id));
+    const draftOnlySection = config.sectionIds.some((id) => !publishedSections.has(id));
+    const draftOnlyCondition = Boolean(config.condition) && !isAllowedConditionKey(published, config.condition!.fieldKey)
+      && isAllowedConditionKey(definition, config.condition!.fieldKey);
+    if (draftOnlySection || draftOnlyCondition) {
+      warnings.push("Part of this notification (a section or the condition's question) exists only in the unpublished draft. Until that version is published, registrations on the live form do not have it: a notification whose sections are all missing includes the full registration, and a missing condition question does not match.");
+    }
+  }
+  return warnings;
+}
+
+function panelFor(definition: RegistrationFormDefinition | null, published: RegistrationFormDefinition | null, notifications: FormNotificationConfig[], locations: Array<{ id: string; name: string }>): FormNotificationsPanel {
   return {
-    notifications,
+    notifications: notifications.map((config) => ({ ...config, warnings: warningsFor(config, definition, published) })),
     fields: definition ? conditionFieldChoices(definition) : [],
     sections: definition ? definition.sections.map((section) => ({ id: section.id, title: section.title })) : [],
     locations,
@@ -82,8 +108,8 @@ async function eventLocations(eventId: string) {
 }
 
 export async function getFormNotificationsPanel(eventId: string, formId: string): Promise<FormNotificationsPanel> {
-  const { form, definition } = await loadForm(eventId, formId);
-  return panelFor(definition, form.notifications.map(toConfig), await eventLocations(eventId));
+  const { form, definition, published } = await loadForm(eventId, formId);
+  return panelFor(definition, published, form.notifications.map(toConfig), await eventLocations(eventId));
 }
 
 /**
@@ -94,13 +120,17 @@ export async function getFormNotificationsPanel(eventId: string, formId: string)
 export async function replaceFormNotifications(eventId: string, formId: string, actorUserId: string, body: unknown): Promise<FormNotificationsPanel> {
   const parsed = notificationsPutSchema.safeParse(body);
   if (!parsed.success) throw new FormNotificationError(parsed.error.issues[0]?.message ?? "The notifications could not be read.", "INVALID_NOTIFICATIONS");
-  const { form, definition } = await loadForm(eventId, formId);
+  const { form, definition, published } = await loadForm(eventId, formId);
   if (!definition) throw new FormNotificationError("Fix this form's questions and save it before adding notifications.", "INVALID_NOTIFICATIONS");
   const locations = await eventLocations(eventId);
   const sectionIds = new Set(definition.sections.map((section) => section.id));
   const existingIds = new Set(form.notifications.map((row) => row.id));
   const allLocationIds = new Set((await getPrisma().eventLocation.findMany({ where: { eventId }, select: { id: true } })).map((row) => row.id));
 
+  const namedIds = parsed.data.notifications.flatMap((input) => (input.id ? [input.id] : []));
+  if (new Set(namedIds).size !== namedIds.length) {
+    throw new FormNotificationError("A notification is listed twice. Reload the page and try again.", "INVALID_NOTIFICATIONS");
+  }
   const checked = parsed.data.notifications.map((input: NotificationInput, index) => {
     const label = `Notification ${index + 1}`;
     const recipients = checkNotificationRecipients(input.recipients);
@@ -165,6 +195,12 @@ export async function replaceFormNotifications(eventId: string, formId: string, 
       },
     }, tx);
     return tx.registrationFormNotification.findMany({ where: { formId }, orderBy: { position: "asc" } });
+  }).catch((error: unknown) => {
+    // A notification (or the form) deleted by someone else between the load and this save is a conflict, not a server error.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2025" || error.code === "P2003")) {
+      throw new FormNotificationError("A notification was changed or removed by someone else. Reload the page and try again.", "INVALID_NOTIFICATIONS");
+    }
+    throw error;
   });
-  return panelFor(definition, saved.map(toConfig), locations);
+  return panelFor(definition, published, saved.map(toConfig), locations);
 }

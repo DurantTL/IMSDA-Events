@@ -22,6 +22,7 @@ type PanelData = {
     recipients: string[];
     condition: { fieldKey: string; operator: "EQUALS" | "NOT_EQUALS"; value: string } | null;
     sectionIds: string[];
+    warnings: string[];
   }>;
   fields: Array<{ key: string; label: string; options: string[] }>;
   sections: Array<{ id: string; title: string }>;
@@ -39,6 +40,7 @@ type Draft = {
   conditionValue: string;
   onlyTheseSections: boolean;
   sectionIds: string[];
+  warnings: string[];
 };
 
 let localCounter = 0;
@@ -58,11 +60,12 @@ function toDraft(row: PanelData["notifications"][number]): Draft {
     conditionValue: row.condition?.value ?? "",
     onlyTheseSections: row.sectionIds.length > 0,
     sectionIds: row.sectionIds,
+    warnings: row.warnings,
   };
 }
 
 function blankDraft(): Draft {
-  return { localKey: nextKey(), name: "", recipientsText: "", conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [] };
+  return { localKey: nextKey(), name: "", recipientsText: "", conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [] };
 }
 
 export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventId: string; formId: string }) {
@@ -167,6 +170,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
             return (
               <fieldset className="panel form-stack form-notification-item" key={draft.localKey}>
                 <legend>Notification {index + 1}</legend>
+                {draft.warnings.map((warning) => <div className="inline-notice error" key={warning} role="alert">{warning}</div>)}
                 <label>
                   <span>Name</span>
                   <input autoComplete="off" maxLength={80} onChange={(event) => update(draft.localKey, { name: event.target.value })} placeholder="Camping coordinator" value={draft.name} />

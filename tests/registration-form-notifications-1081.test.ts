@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   processQueued: vi.fn(),
   switchEnabled: vi.fn(),
   loadSource: vi.fn(),
+  ensure: vi.fn(),
   render: vi.fn(),
   actualRender: null as unknown as (input: unknown) => Promise<Uint8Array>,
 }));
@@ -21,7 +22,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/communications/effective-delivery", () => ({ loadEventEmailSettings: mocks.loadEventEmailSettings }));
 vi.mock("@/modules/communications/messaging-repository", () => ({ processQueuedMessageIdsAfterCommit: mocks.processQueued }));
 vi.mock("@/modules/notifications/settings", () => ({ isNotificationEnabled: mocks.switchEnabled }));
-vi.mock("@/modules/registration-pdf/repository", () => ({ loadRegistrationPdfSource: mocks.loadSource }));
+vi.mock("@/modules/registration-pdf/repository", () => ({ loadRegistrationPdfSource: mocks.loadSource, ensureRegistrationPdfOutsideTransaction: mocks.ensure }));
 vi.mock("@/modules/registration-pdf/render", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/modules/registration-pdf/render")>();
   mocks.actualRender = actual.renderRegistrationPdf as never;
@@ -94,6 +95,8 @@ beforeEach(() => {
   mocks.switchEnabled.mockResolvedValue(true);
   mocks.processQueued.mockResolvedValue({});
   mocks.loadEventEmailSettings.mockResolvedValue(normalSettings);
+  // The registration PDF (#1082) already stored for the whole registration.
+  mocks.ensure.mockResolvedValue({ document: { attachmentId: "registration-pdf" } });
 });
 
 describe("routing: which notifications apply (#1081)", () => {
@@ -180,9 +183,10 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     const tx = {
       registrationFormNotification: { findMany: vi.fn().mockResolvedValue(rows) },
       messageOutbox: {
-        upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => {
-          created.push(create);
-          return { id: `message-${created.length}`, status: create.status };
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return { id: `message-${created.length}`, status: data.status };
         }),
       },
     };
@@ -236,7 +240,7 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     const result = await queueFormNotificationsForSubmission(tx as never, { ...base, enabled: false });
     expect(result.groups).toEqual([]);
     expect(tx.registrationFormNotification.findMany).not.toHaveBeenCalled();
-    expect(tx.messageOutbox.upsert).not.toHaveBeenCalled();
+    expect(tx.messageOutbox.create).not.toHaveBeenCalled();
   });
 
   it("records a paused event's messages as suppressed and never holds them", async () => {
@@ -296,14 +300,14 @@ describe("the PDFs are made after the commit and a failure never fails the regis
   it("attaches a PDF per notification, filtered to its sections, records the baseline, and releases the hold", async () => {
     const { attachments, outbox, deliveries } = database();
     await finishFormNotificationsAfterSubmit({ eventId: "event-1", registrationId: "registration-1", groups });
-    expect(attachments).toHaveLength(2);
-    expect(attachments.every((attachment) => attachment.contentType === "application/pdf" && Buffer.isBuffer(attachment.content))).toBe(true);
-    expect(String(attachments[0]!.filename)).not.toContain("Camping-coordinator");
-    expect(String(attachments[1]!.filename)).toContain("Camping-coordinator");
-    // The camping copy is smaller than the whole registration.
-    expect((attachments[1]!.content as Buffer).length).toBeLessThan((attachments[0]!.content as Buffer).length);
+    // The whole-registration notification reuses the #1082 PDF; only the camping copy is stored.
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]!.contentType).toBe("application/pdf");
+    expect(Buffer.isBuffer(attachments[0]!.content)).toBe(true);
+    expect(String(attachments[0]!.filename)).toContain("Camping-coordinator");
     const attachCalls = outbox.updateMany.mock.calls.filter(([call]) => (call as { data: Record<string, unknown> }).data.attachmentId);
     expect(attachCalls.map(([call]) => (call as { where: { id: { in: string[] } } }).where.id.in)).toEqual([["m1"], ["m2", "m3"]]);
+    expect(attachCalls.map(([call]) => (call as { data: { attachmentId: string } }).data.attachmentId)).toEqual(["registration-pdf", "attachment-1"]);
     expect(String((attachCalls[1]![0] as { data: { bodyTextSnapshot: string } }).data.bodyTextSnapshot)).toContain("The details are in the attached PDF.");
     expect(deliveries.upsert).toHaveBeenCalledTimes(2);
     // The last call releases every held message.
@@ -314,6 +318,7 @@ describe("the PDFs are made after the commit and a failure never fails the regis
 
   it("releases the held messages without a PDF when it cannot be made, and does not throw", async () => {
     const { outbox, attachments } = database();
+    mocks.ensure.mockRejectedValue(new Error("synthetic failure"));
     mocks.render.mockRejectedValue(new Error("synthetic render failure"));
     await expect(finishFormNotificationsAfterSubmit({ eventId: "event-1", registrationId: "registration-1", groups })).resolves.toBeUndefined();
     expect(attachments).toHaveLength(0);
@@ -341,9 +346,10 @@ describe("re-send on a later change (#1081)", () => {
     const deliveries = { upsert: vi.fn().mockResolvedValue({}) };
     const tx = {
       messageOutbox: {
-        upsert: vi.fn(async ({ create }: { create: Record<string, unknown> }) => {
-          created.push(create);
-          return { id: `message-${created.length}`, status: create.status };
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return { id: `message-${created.length}`, status: data.status };
         }),
       },
     };
@@ -360,6 +366,7 @@ describe("re-send on a later change (#1081)", () => {
         }),
       },
       messageAttachment: { create: vi.fn(async () => ({ id: "attachment-1" })) },
+      messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
       registrationNotificationDelivery: deliveries,
       $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
     };
@@ -467,6 +474,128 @@ describe("re-send on a later change (#1081)", () => {
   });
 });
 
+describe("review fixes (#1081)", () => {
+  const change = { eventId: "event-1", registrationId: "registration-1", changeKey: "amendment:op-9", correlationId: "correlation-9" };
+  const sourceNow = springCamporeeSource();
+
+  function changeDatabase(rows: Row[], existingKeys = 0) {
+    const created: Array<Record<string, unknown>> = [];
+    const deliveries = { upsert: vi.fn().mockResolvedValue({}) };
+    const tx = {
+      messageOutbox: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          created.push(data);
+          return { id: `message-${created.length}`, status: data.status };
+        }),
+      },
+    };
+    const db = {
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue(rows) },
+      registration: { findFirst: vi.fn().mockResolvedValue({ status: "CONFIRMED", locationId: null, submittedAt: new Date("2027-02-01T00:00:00Z"), location: null, publicFormSubmission: { formVersion: { formId: "form-1" } } }) },
+      messageAttachment: { create: vi.fn(async () => ({ id: "stored-attachment" })) },
+      messageOutbox: { findMany: vi.fn().mockResolvedValue(Array.from({ length: existingKeys }, (_, index) => ({ id: `old-${index}` }))) },
+      registrationNotificationDelivery: deliveries,
+      $transaction: vi.fn(async (callback: (client: unknown) => unknown) => callback(tx)),
+    };
+    mocks.getPrisma.mockReturnValue(db);
+    mocks.loadSource.mockResolvedValue({ source: sourceNow, timezone: "America/Chicago", eventName: "Synthetic Camporee", clubName: "Maple Grove Pathfinders", registrantName: "Dana Sample", formVersionId: "version-1" });
+    return { db, created, deliveries, tx };
+  }
+
+  const never = (sections: string[] = []) => ({ createdAt: new Date("2027-01-01T00:00:00Z"), sectionIds: sections });
+
+  it("skips a stored condition that is no longer allowed (a sensitive or removed question), at submit and on a change", async () => {
+    const rows = [
+      row({ id: "now-sensitive", conditionFieldKey: "medical_or_accessibility_need", conditionOperator: "NOT_EQUALS", conditionValue: "zzz" }),
+      row({ id: "removed", conditionFieldKey: "gone_field", conditionOperator: "NOT_EQUALS", conditionValue: "zzz" }),
+      row({ id: "fine" }),
+    ];
+    const tx = {
+      registrationFormNotification: { findMany: vi.fn().mockResolvedValue(rows) },
+      messageOutbox: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: `m-${String(data.recipientEmail)}`, status: "PENDING" })) },
+    };
+    const submitted = await queueFormNotificationsForSubmission(tx as never, {
+      enabled: true, eventId: "event-1", formId: "form-1", registrationId: "registration-1", correlationId: "c", definition,
+      answers: {}, locationId: null, locationName: null, eventName: "Synthetic Camporee", registrantName: "Dana Sample",
+    });
+    expect(submitted.groups.map((group) => group.notificationId)).toEqual(["fine"]);
+
+    const { created } = changeDatabase(rows);
+    await notifyFormNotificationsAfterChange(change);
+    expect(created.map((message) => message.recipientEmail)).toEqual(["fine@example.test"]);
+  });
+
+  it("falls back to the full registration, not an empty PDF, when none of the chosen sections exist in the submitted version", async () => {
+    const { created, db } = changeDatabase([row({ id: "stale", ...never(["section_from_a_draft"]) })]);
+    await notifyFormNotificationsAfterChange(change);
+    expect(created).toHaveLength(1);
+    expect(created[0]!.attachmentId).toBe("registration-pdf");
+    expect(db.messageAttachment.create).not.toHaveBeenCalled();
+    expect(String(created[0]!.bodyTextSnapshot)).toContain("Includes: The full registration");
+  });
+
+  it("stores one PDF per distinct set of sections, and reuses the registration PDF for an unfiltered notification", async () => {
+    const { created, db } = changeDatabase([
+      row({ id: "a", ...never([CAMPING]) }),
+      row({ id: "b", ...never([CAMPING]) }),
+      row({ id: "c" }),
+    ]);
+    await notifyFormNotificationsAfterChange(change);
+    expect(created).toHaveLength(3);
+    expect(db.messageAttachment.create).toHaveBeenCalledTimes(1);
+    expect(created.map((message) => message.attachmentId)).toEqual(["stored-attachment", "stored-attachment", "registration-pdf"]);
+    expect(mocks.ensure).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores no PDF for a paused event, and none again for a retry of the same change", async () => {
+    mocks.loadEventEmailSettings.mockResolvedValue(pausedSettings);
+    const paused = changeDatabase([row({ id: "a", ...never([CAMPING]) }), row({ id: "b" })]);
+    await notifyFormNotificationsAfterChange(change);
+    expect(paused.db.messageAttachment.create).not.toHaveBeenCalled();
+    expect(mocks.ensure).not.toHaveBeenCalled();
+    expect(paused.created.every((message) => message.status === "SUPPRESSED" && message.attachmentId === undefined)).toBe(true);
+
+    mocks.loadEventEmailSettings.mockResolvedValue(normalSettings);
+    const retry = changeDatabase([row({ id: "a", ...never([CAMPING]) })], 1);
+    await notifyFormNotificationsAfterChange(change);
+    expect(retry.db.messageAttachment.create).not.toHaveBeenCalled();
+    expect(retry.created).toEqual([]);
+  });
+
+  it("records the notification as sent only when a new message was actually created", async () => {
+    const raced = changeDatabase([row({ id: "a", ...never([CAMPING]) })]);
+    raced.tx.messageOutbox.findUnique.mockResolvedValue({ id: "already-there", status: "PENDING" });
+    await notifyFormNotificationsAfterChange(change);
+    expect(raced.created).toEqual([]);
+    expect(raced.deliveries.upsert).not.toHaveBeenCalled();
+  });
+
+  it("shows a warning on a notification whose condition is no longer allowed, or that exists only in a draft", async () => {
+    const { getFormNotificationsPanel } = await import("@/modules/registration-form-notifications/repository");
+    const draftOnly = { ...definition, sections: [...definition.sections, { ...definition.sections[0]!, id: "section_draft_only", title: "Draft only" }] };
+    mocks.getPrisma.mockReturnValue({
+      registrationForm: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "form-1",
+          versions: [{ definition: draftOnly, status: "DRAFT" }, { definition, status: "PUBLISHED" }],
+          notifications: [
+            row({ id: "sensitive", conditionFieldKey: "medical_or_accessibility_need", conditionOperator: "EQUALS", conditionValue: "Yes" }),
+            row({ id: "draft", sectionIds: ["section_draft_only"] }),
+            row({ id: "clean", sectionIds: [CAMPING] }),
+          ],
+        }),
+      },
+      eventLocation: { findMany: vi.fn().mockResolvedValue([]) },
+    });
+    const panel = await getFormNotificationsPanel("event-1", "form-1");
+    const byId = new Map(panel.notifications.map((entry) => [entry.id, entry.warnings]));
+    expect(byId.get("sensitive")![0]).toContain("not being sent");
+    expect(byId.get("draft")![0]).toContain("only in the unpublished draft");
+    expect(byId.get("clean")).toEqual([]);
+  });
+});
+
 describe("saving a form's notifications (#1081)", () => {
   function database(options: { existing?: Row[] } = {}) {
     const tx = {
@@ -535,6 +664,15 @@ describe("saving a form's notifications (#1081)", () => {
     database();
     await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: Array.from({ length: 11 }, () => valid) })).rejects.toBeInstanceOf(FormNotificationError);
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("refuses a notification listed twice, and reports one deleted since the load as a handled error, not a crash", async () => {
+    database();
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...valid, id: "existing-1" }, { ...valid, id: "existing-1" }] })).rejects.toThrow(/listed twice/);
+    const { Prisma } = await import("@prisma/client");
+    const { tx } = database();
+    tx.registrationFormNotification.update.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("missing", { code: "P2025", clientVersion: "test" }));
+    await expect(replaceFormNotifications("event-1", "form-1", "user-1", { notifications: [{ ...valid, id: "existing-1" }] })).rejects.toBeInstanceOf(FormNotificationError);
   });
 });
 

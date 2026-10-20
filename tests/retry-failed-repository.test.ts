@@ -430,6 +430,43 @@ describe("retry failed messages", () => {
     expect(preview.skipped).toEqual([expect.objectContaining({ reason: "LATER_DELIVERY", count: 1 })]);
   });
 
+  it("does not treat the staff copy and a registration form notification as proof for each other, or one notification for another (#1081)", async () => {
+    const hour = 3600_000;
+    const notification = (id: string, notificationId: string, email: string, status: string, ago: number) => row(id, {
+      status,
+      registrationId: "registration-1",
+      templateKey: "INTERNAL_NEW_REGISTRATION",
+      recipientEmail: email,
+      metadata: { trigger: "REGISTRATION_FORM_NOTIFICATION", notificationId },
+      correlationId: `c-${id}`,
+      createdAt: new Date(Date.now() - ago * hour),
+    });
+    const staffCopy = (id: string, status: string, ago: number) => row(id, {
+      status,
+      registrationId: "registration-1",
+      templateKey: "INTERNAL_NEW_REGISTRATION",
+      recipientEmail: "team@example.test",
+      metadata: { trigger: "INTERNAL_NEW_REGISTRATION" },
+      correlationId: `c-${id}`,
+      createdAt: new Date(Date.now() - ago * hour),
+    });
+    fixture([
+      // A failed camping notification, then an unrelated Updated send to the staff copy, another notification, and the same notification to another address.
+      notification("camping-failed", "n-camping", "camping@example.test", "FAILED", 5),
+      staffCopy("staff-later", "SENT", 4),
+      notification("roster-later", "n-roster", "camping@example.test", "SENT", 3),
+      notification("camping-other-address", "n-camping", "someone-else@example.test", "SENT", 2),
+      // And the reverse: a failed staff copy, then a later notification send.
+      staffCopy("staff-failed", "FAILED", 2.5),
+      notification("camping-later", "n-camping", "team@example.test", "SENT", 1),
+    ]);
+    const preview = await previewFailedMessagesRetry("event-1", { type: "EVENT" });
+    expect(preview.failedCount).toBe(2);
+    // Both stay retryable: nothing later was the same notification to the same address, or the same staff copy.
+    expect(preview.eligibleCount).toBe(2);
+    expect(preview.skipped).toEqual([]);
+  });
+
   it("skips a failed message when a later send of the same email to the same person is still queued", async () => {
     fixture([
       row("failed-1", { createdAt: new Date(Date.now() - 3 * 3600_000) }),

@@ -49,6 +49,23 @@ question) and limited to chosen sections of the registration PDF. Decisions: Cal
   an answer. The PDF follows `docs/REGISTRATION-PDF.md`: sensitive fields (by `resolveFieldFlags` with the real section
   title, except the `PRINT_EVEN_IF_SENSITIVE` allowlist), birth dates, card details, codes and links are never in it.
 
+## Known behavior
+
+- A registration that was never announced (a waitlist registration that is later promoted; promotion sends no notice) gets its
+  first notification on a later change that sends, not at promotion.
+- A location switched A, then B, then A does not notify A again: A's notification already sent for this registration and its
+  sections did not change. Only a change in A's included sections re-sends it.
+- A stored condition is re-checked when the email is queued. If its question is now sensitive, sits in a health section,
+  follows a sensitive question or is gone, that notification is skipped (its id is logged, nothing else) and the panel shows a
+  warning on it. It is never sent unconditioned.
+- Sections and the condition's question are checked against the form's latest version when saved. The panel warns when they
+  exist only in an unpublished draft. At send time, if none of a notification's sections are in the version the registration
+  was made on, it includes the full registration rather than an empty PDF.
+- A notification with no section filter attaches the registration PDF (#1082) itself; filtered ones store one PDF per distinct
+  set of sections per send. A paused event, or a retry of the same change, stores no PDF.
+- The retry-failed guard (`modules/communications/retry-failed.ts`) keys a form notification by notification and address, so
+  a later send of the staff copy or of another notification never counts as proof that this one was delivered, and the reverse.
+
 ## Not built
 
 - All/Any conditions (#1072); more than one condition per notification.
