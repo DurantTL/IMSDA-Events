@@ -47,6 +47,7 @@ const baseEventFields = {
   isPublished: true, archivedAt: null,
   registrationOpensOn: "2027-05-01",
   registrationClosesOn: "2027-10-01",
+  paymentDueOn: null,
   waitlistEnabled: false,
   collectsShirtSizes: false,
   checksAdultBackgrounds: false,

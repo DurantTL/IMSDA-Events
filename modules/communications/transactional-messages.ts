@@ -349,6 +349,7 @@ async function enqueueTransactionalMessage(
             location: true,
             supportContact: true,
             refundPolicy: true,
+            paymentDueOn: true,
             billingMode: true,
             paymentInstructionVersions: {
               orderBy: { versionNumber: "desc" },
@@ -583,6 +584,8 @@ async function enqueueTransactionalMessage(
       portalUrl: REGISTRATION_MANAGE_LINK_SENTINEL,
       cancellationNote: input.cancellationNote ?? cancellationPaymentWording({ paidCents, refundedCents }),
       perPersonNotice,
+      // The confirmation shows the payment due date (#993); other messages do not.
+      paymentDueOn: isRegistrationConfirmation(input.templateKey) ? registration.event.paymentDueOn : null,
       // The confirmation carries the event's refund policy (#891); other messages do not.
       refundPolicy: isRegistrationConfirmation(input.templateKey) ? registration.event.refundPolicy : null,
     }),

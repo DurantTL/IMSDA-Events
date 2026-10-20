@@ -843,6 +843,9 @@ export function EventSettingsWorkspace({
               <label>Registration opens<input id={settingsFieldDomId("registrationOpensOn")} {...fieldAria("registrationOpensOn")} type="date" value={draft.registrationOpensOn ?? ""} onChange={(event) => update("registrationOpensOn", event.target.value || null)} />{fieldNote("registrationOpensOn")}</label>
               <label>Registration closes<input id={settingsFieldDomId("registrationClosesOn")} {...fieldAria("registrationClosesOn")} type="date" min={draft.registrationOpensOn || undefined} value={draft.registrationClosesOn ?? ""} onChange={(event) => update("registrationClosesOn", event.target.value || null)} />{fieldNote("registrationClosesOn")}</label>
             </div>
+            <div className="form-grid two-column">
+              <label>Payment due by<input id={settingsFieldDomId("paymentDueOn")} {...fieldAria("paymentDueOn")} type="date" value={draft.paymentDueOn ?? ""} onChange={(event) => update("paymentDueOn", event.target.value || null)} /><small>Optional. Only a date that &quot;days before payment due&quot; scheduled emails count back from, and that the confirmation and balance reminder may mention. It adds no late fee and blocks nothing; people can still pay at the event. Changing or clearing it pauses any approved schedule that uses it.</small>{fieldNote("paymentDueOn")}</label>
+            </div>
             <label className="event-setting-toggle">
               <input id={settingsFieldDomId("waitlistEnabled")} {...fieldAria("waitlistEnabled")}
                 type="checkbox"

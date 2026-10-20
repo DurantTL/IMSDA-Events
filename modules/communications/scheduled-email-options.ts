@@ -3,13 +3,14 @@
  * that reaches `node:` here (#550). `scheduled-email-domain.ts` re-exports these.
  */
 
-export const SCHEDULED_EMAIL_TRIGGERS = ["ONE_TIME", "BEFORE_REGISTRATION_CLOSE", "BEFORE_EVENT_START"] as const;
+export const SCHEDULED_EMAIL_TRIGGERS = ["ONE_TIME", "BEFORE_REGISTRATION_CLOSE", "BEFORE_EVENT_START", "BEFORE_PAYMENT_DUE"] as const;
 export type ScheduledEmailTrigger = (typeof SCHEDULED_EMAIL_TRIGGERS)[number];
 
 export const SCHEDULED_EMAIL_TRIGGER_LABELS: Record<ScheduledEmailTrigger, string> = {
   ONE_TIME: "On a date and time",
   BEFORE_REGISTRATION_CLOSE: "Days before registration closes",
   BEFORE_EVENT_START: "Days before the event starts",
+  BEFORE_PAYMENT_DUE: "Days before payment is due",
 };
 
 /** What a scheduled batch may send. Each describes the registration as it stands at send time. */

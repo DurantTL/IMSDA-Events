@@ -148,7 +148,7 @@ export function toReviewView(review: ScheduledEmailReview): ScheduledEmailReview
 async function loadEventFacts(client: Client, eventId: string) {
   const event = await client.event.findUnique({
     where: { id: eventId },
-    select: { id: true, timezone: true, startsAt: true, registrationClosesOn: true, billingMode: true },
+    select: { id: true, timezone: true, startsAt: true, registrationClosesOn: true, paymentDueOn: true, billingMode: true },
   });
   if (!event) throw new MessagingError("MESSAGE_NOT_FOUND", "That event is no longer available.");
   return event;
@@ -319,7 +319,8 @@ export async function buildScheduledEmailReview(
   })));
 
   const isOrganizationBilled = event.billingMode === "DEFERRED_ORGANIZATION_INVOICE";
-  if (content.templateKey === "BALANCE_REMINDER") {
+  // Owing a balance is what a balance reminder is for, and what a batch counted back from the payment due date requires (#993).
+  if (content.templateKey === "BALANCE_REMINDER" || content.rule.trigger === "BEFORE_PAYMENT_DUE") {
     const kept: ScheduleTarget[] = [];
     for (const target of candidates) {
       if (isOrganizationBilled) addExclusion("ORGANIZATION_BILLED");
@@ -451,7 +452,7 @@ async function toRecord(client: Client, row: BatchRow): Promise<ScheduledEmailRe
     client.scheduledEmailRecipient.groupBy({ by: ["status"], where: { batchId: row.id }, _count: { _all: true } }),
     client.scheduledEmailRecipient.groupBy({ by: ["exclusionCode"], where: { batchId: row.id, status: "EXCLUDED" }, _count: { _all: true } }),
     client.messageOutbox.groupBy({ by: ["status"], where: { scheduledEmailRecipient: { batchId: row.id } }, _count: { _all: true } }),
-    client.event.findUnique({ where: { id: row.eventId }, select: { timezone: true, startsAt: true, registrationClosesOn: true } }),
+    client.event.findUnique({ where: { id: row.eventId }, select: { timezone: true, startsAt: true, registrationClosesOn: true, paymentDueOn: true } }),
   ]);
   const recipientCounts = { PLANNED: 0, QUEUED: 0, EXCLUDED: 0, CANCELLED: 0 };
   for (const entry of byStatus) recipientCounts[entry.status] = entry._count._all;
@@ -1038,6 +1039,7 @@ export async function scheduledEmailObsoleteReason(messageId: string, now = new 
     { registrationId: recipient.registrationId, email: recipient.recipientEmail, roles: recipient.roles },
     batch.templateKey as ScheduledEmailTemplateKey,
     view,
+    batch.trigger,
   );
   return code ? drop(code) : null;
 }
@@ -1191,7 +1193,7 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
     stale = true;
   }
   if (stale) {
-    const stopped = await releaseAndPause(prisma, batch, claimToken, "The event's time zone or dates changed after this was approved, so its send time is no longer the one that was reviewed. Review the new time and approve it again.");
+    const stopped = await releaseAndPause(prisma, batch, claimToken, "The event's time zone, dates or payment due date changed after this was approved, so its send time is no longer the one that was reviewed. Review the new time and approve it again.");
     return { ...result, outcome: stopped, reason: "EVENT_TIMING_CHANGED" };
   }
   const template = await loadTemplateSource(prisma, batch.eventId, batch.templateKey as ScheduledEmailTemplateKey).catch(() => null);
@@ -1227,6 +1229,7 @@ export async function runScheduledEmailBatch(batchId: string, options: { now?: D
       { registrationId: recipient.registrationId, email: recipient.recipientEmail, roles: recipient.roles },
       batch.templateKey as ScheduledEmailTemplateKey,
       view,
+      batch.trigger,
     );
     if (!code) {
       keep.push(recipient);

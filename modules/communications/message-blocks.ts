@@ -109,6 +109,11 @@ export type PaymentStatusBlockInput = {
   paymentInstructions?: string | null;
   /** Rendered as a link when a balance remains. Usually the private portal URL. */
   portalUrl?: string | null;
+  /**
+   * The event's payment due date (#993), a YYYY-MM-DD calendar day. Shown as one extra line under a balance that is due,
+   * and only there. It is informational: no late fee, nothing is blocked, and a missing or invalid date adds nothing.
+   */
+  paymentDueOn?: string | null;
   /** Refund and payment wording for a cancelled registration. */
   cancellationNote?: string | null;
   /** The club/church responsible for a deferred-organization registration. */
@@ -163,6 +168,14 @@ export function buildRefundPolicyBlock(policy: string | null | undefined) {
     paragraph.split("\n").map((line) => escapeMarkdown(line)).join("  \n"),
     "",
   ])].join("\n").trimEnd();
+}
+
+/** "March 1, 2027" for a YYYY-MM-DD calendar day, or null when there is none or it is not a real date. */
+export function paymentDueLabel(value: string | null | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const moment = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(moment.valueOf()) || moment.toISOString().slice(0, 10) !== value) return null;
+  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" }).format(moment);
 }
 
 export function buildPaymentStatusBlock(input: PaymentStatusBlockInput) {
@@ -266,6 +279,8 @@ function buildPaymentStatusSection(input: PaymentStatusBlockInput) {
     `Payments received: **${paid}**`,
     `Balance due: **${balance}**`,
   ];
+  const dueLabel = paymentDueLabel(input.paymentDueOn);
+  if (dueLabel && input.balanceCents > 0) lines.push(`Payment due by: **${dueLabel}**`);
   if (instructions) lines.push("", instructions);
   if (portalUrl) lines.push("", `[Pay your balance](${portalUrl})`);
   return lines.join("\n");

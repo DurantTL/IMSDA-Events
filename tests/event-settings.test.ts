@@ -48,6 +48,14 @@ describe("event settings", () => {
     ).toBeNull();
   });
 
+  it("payment due date is an optional calendar date, and an omitted one is not a cleared one (#993)", () => {
+    expect(eventSettingsInputSchema.parse(validEvent).paymentDueOn).toBeUndefined();
+    expect(eventSettingsInputSchema.parse({ ...validEvent, paymentDueOn: "2027-09-15" }).paymentDueOn).toBe("2027-09-15");
+    expect(eventSettingsInputSchema.parse({ ...validEvent, paymentDueOn: null }).paymentDueOn).toBeNull();
+    expect(eventSettingsInputSchema.safeParse({ ...validEvent, paymentDueOn: "2027-02-30" }).success).toBe(false);
+    expect(eventSettingsInputSchema.safeParse({ ...validEvent, paymentDueOn: "09/15/2027" }).success).toBe(false);
+  });
+
   it("normalizes a valid event payload", () => {
     const parsed = eventSettingsInputSchema.parse({
       ...validEvent,
