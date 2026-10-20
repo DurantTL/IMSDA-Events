@@ -32,8 +32,8 @@ export function springCamporeeAttendees(count = 12): RegistrationPdfAttendee[] {
         attendee_type: role,
         first_time_camper: index % 3 === 0,
         ...(role === "Staff" ? { medical_personnel: index === 5, master_guide_investiture: index === 9 } : {}),
-        // Answers a person gave that must stay out of the PDF.
-        dietary_needs: "Synthetic: no peanuts (must never print)",
+        // Dietary needs print (owner decision, Caleb, Oct 20, 2026); a medical or accessibility need never does.
+        dietary_needs: index === 0 ? "Synthetic: no peanuts" : "",
         medical_or_accessibility_need: "Yes",
       },
     };

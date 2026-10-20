@@ -17,8 +17,13 @@ Decisions: Caleb, Oct 20, 2026 (ages only; whole registration; Spring Camporee c
 
 ## What it never shows
 
-- A field marked sensitive, a field that reads as health, medical, insurance, dietary, guardian or custody wording (even if
-  staff turned "sensitive" off), and any follow-up question that depends on one.
+- A field whose sensitive flag is on (explicit, or the default from the field's own wording; the section title is not
+  consulted), and any follow-up question that depends on one. An explicit "not sensitive" prints, like in the staff views.
+- Owner decision (Caleb, Oct 20, 2026): the fields `medical_personnel`, `dietary_needs` and `dietary_restrictions` ALWAYS
+  print, on every form, even while sensitive. This is a PDF-only list (`PRINT_EVEN_IF_SENSITIVE` in
+  `modules/registration-pdf/model.ts`); the flags stay as they are, so staff protected views are unchanged. Other
+  sensitive answers (a medical or accessibility need, first-floor need, emergency contacts, guardian, health record
+  acknowledgment) stay out.
 - A birth date. Only the age the registration saved (the age field, else the roster's age on the event date).
 - The payment-method answer, the promo code, calculated prices (they are in Fees), the confirmation code, private links,
   card details. Protected health records are never read.
@@ -28,17 +33,30 @@ Decisions: Caleb, Oct 20, 2026 (ages only; whole registration; Spring Camporee c
 - `RegistrationPdfDocument`: one row per version; the bytes are a `MessageAttachment` made once and never regenerated.
   `sha256` is checked at send (the outbox) and at download. A version is added only when what the PDF says changes
   (`contentHash`, which ignores payments), so a no-op save sends nothing.
-- Version 1 is made in the submit transaction and attached to the registrant's confirmation and the staff copy (not to a
-  waitlist notice). Every amendment (`amendRegistration`: director, staff, group contact, cancellation execution) makes
-  the next version marked **UPDATED**, attaches it to the registrant's "Registration updated" email, and re-sends the
-  staff copy ("Updated: New registration ...") to the same team addresses. The staff-copy switch
-  (`NEW_REGISTRATION_STAFF_COPY`) governs the Updated staff copy too.
-- Every send goes through the effective delivery decision (#1043): a paused event captures the messages, nothing is sent.
+- **The PDF is made after the commit, never inside a registration transaction** (docs/MEALS.md: no slow work under the
+  submit gate, and a PDF failure must not fail a registration). The submit and the amendment queue their messages
+  **held** (`availableAt` two minutes ahead, `modules/registration-pdf/hold.ts`), so neither the post-commit send nor the
+  sweep can send one early. `modules/registration-pdf/after-commit.ts` then builds the PDF, sets `attachmentId` on the
+  held rows (the registrant's one gets the line "A PDF copy of your registration is attached." only now), releases the
+  hold and sends. Any failure is caught, logs ids only, releases the hold, and the messages go without the PDF; if the
+  process dies the hold simply runs out.
+- Version 1 is attached to the registrant's confirmation and the staff copy (not to a waitlist notice). Every announced
+  change (`amendRegistration`: director, staff, group contact, cancellation execution; staff add attendee, attendee edit,
+  substitution) makes the next version marked **UPDATED**, attaches it to the registrant's "Registration updated" email,
+  and re-sends the staff copy ("Updated: New registration ...") to the same team addresses. An Updated copy is sent only
+  when the change was meaningful or an earlier version exists, so a no-op save on a registration made before PDFs sends
+  nothing. The staff-copy switch (`NEW_REGISTRATION_STAFF_COPY`) governs the Updated staff copy too.
+- A version made at download time is never marked Updated; the card processing fee and payments are not part of the
+  content hash, so they never add a version.
+- Known narrow race: if a download lands between an amendment's commit and its after-commit step, the download makes
+  that version (unmarked) and the step then finds nothing new to announce.
 - Over 10 MB: no PDF is stored and the messages go without it (logged).
 - Not in scope here: the several-notifications-per-form hook and section filtering (#1081); it can attach the same PDF.
 
 ## Download
 
+- Both downloads are audited (`REGISTRATION_PDF_DOWNLOADED`: actor id, registration id, version) and refuse with no-store
+  headers. A director can download only an active (submitted or confirmed) registration.
 - Staff (MANAGE_REGISTRATION): `GET /api/events/{eventId}/registrations/{registrationId}/pdf`, the registration's Download
   registration PDF button. A registration changed by a path that sends no notice (a self-service answer) gets its new
   version on the first download.

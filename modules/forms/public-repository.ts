@@ -12,7 +12,7 @@ import { admitToLocation } from "@/modules/event-locations/admission";
 import { locationWaitlistPlace, recordLocationWaitlistChange } from "@/modules/event-locations/waitlist";
 import { locationTransactionTimeoutMs } from "@/modules/event-locations/errors";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
-import { ensureRegistrationPdf } from "@/modules/registration-pdf/repository";
+import { attachRegistrationPdfAfterCommit } from "@/modules/registration-pdf/after-commit";
 import {
   enqueuePublicRegistrationMessages,
   processQueuedMessageIdsAfterCommit,
@@ -720,6 +720,9 @@ async function findExistingConfirmation(
     ),
     pendingMessageIds: messages.filter((message) => message.status === "PENDING").map((message) => message.id),
     registrantMessageIds: messages.map((message) => message.id),
+    // A replay queues nothing new, so nothing waits for a PDF (#1082).
+    pdfMessageIds: [] as string[],
+    eventId: existing.eventId,
     registrationId: existing.registrationId,
     replayed: true,
   };
@@ -1532,11 +1535,6 @@ async function createPublicRegistrationTransaction(
     }
   }
   const submissionCorrelationId = randomUUID();
-  // The registration PDF (#1082), version 1: attached to the confirmation and the staff copy. Not for a waitlist notice,
-  // which is not a confirmation. Made from the rows just written, so it shows exactly what was saved.
-  const registrationPdf = isWaitlisted
-    ? null
-    : await ensureRegistrationPdf(tx, { eventId: form.eventId, registrationId: registration.id, now });
   const queuedMessages = isWaitlisted
     ? await enqueueWaitlistJoinedMessage(tx, {
         eventId: form.eventId,
@@ -1574,7 +1572,8 @@ async function createPublicRegistrationTransaction(
         billedToGroup: Boolean(group),
         ...(club?.confirmationNote ? { registrantNote: club.confirmationNote({ waitlisted: false }) } : {}),
         staffCopyEnabled: notifications.staffCopyEnabled,
-        registrationPdfAttachmentId: registrationPdf?.document.attachmentId ?? null,
+        // The PDF is made after the commit, never inside this gated transaction (#1082): the messages are held until then.
+        holdForRegistrationPdf: true,
       });
   await tx.auditLog.create({
     data: {
@@ -1643,6 +1642,9 @@ async function createPublicRegistrationTransaction(
     },
     pendingMessageIds: [...queuedMessages.pendingMessageIds, ...teamPermissionMessageIds],
     registrantMessageIds: queuedMessages.registrantMessageIds,
+    // The confirmation and staff copy that wait for the PDF; none for a waitlist notice (#1082).
+    pdfMessageIds: isWaitlisted ? [] : queuedMessages.pendingMessageIds,
+    eventId: form.eventId,
     registrationId: registration.id,
     replayed: false,
   };
@@ -1739,6 +1741,8 @@ export async function submitPublicRegistration(
       // #527: a registrant already on the Sterling Volunteers list is matched
       // now, after commit; best effort, never fails the submission.
       await refreshBackgroundCheckMatchesForRegistrations([result.registrationId]);
+      // The registration PDF, made now that the transaction is over; a failure sends the messages without it (#1082).
+      await attachRegistrationPdfAfterCommit({ eventId: result.eventId, registrationId: result.registrationId, messageIds: result.pdfMessageIds });
       let processed = {
         capturedIds: [] as string[],
         sentIds: [] as string[],

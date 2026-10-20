@@ -122,6 +122,8 @@ type TransactionalMessageInput = {
   leadNote?: string | null;
   /** The one file sent with the message: the registration PDF (#1082), a stored `MessageAttachment` the caller already made. */
   attachmentId?: string | null;
+  /** Hold the message (not claimable until then) while its registration PDF is made after the commit (#1082). */
+  holdUntil?: Date;
   /** The staff copy of a changed registration (#1082): the subject starts "Updated:" and the default heading says "Updated registration". */
   updatedCopy?: boolean;
 };
@@ -666,6 +668,7 @@ async function enqueueTransactionalMessage(
       bodyTextSnapshot: shown.body,
       bodyHtmlSnapshot: shown.bodyHtml,
       ...(input.attachmentId ? { attachmentId: input.attachmentId } : {}),
+      ...(input.holdUntil && !suppressed ? { availableAt: input.holdUntil } : {}),
       metadata: {
         trigger: input.templateKey,
         transitionKey: input.transitionKey,

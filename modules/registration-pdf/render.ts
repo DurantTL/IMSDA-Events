@@ -27,7 +27,7 @@ export type RegistrationPdfRenderInput = {
 
 const ACCENT = rgb(0.1, 0.32, 0.5);
 const BAND = rgb(0.94, 0.96, 0.97);
-const MAX_TABLE_COLUMNS = 6;
+const MAX_TABLE_COLUMNS = 9;
 const CONTENT_WIDTH = PAGE.width - MARGIN * 2;
 
 function formatDate(date: Date, timezone: string) {
@@ -39,24 +39,36 @@ function formatDate(date: Date, timezone: string) {
   }
 }
 
-/** Column widths for the table: the name column and short columns get what they need, long text shares the rest. */
+/**
+ * Column widths for the table. Each column wants room for its longest answer (up to a limit) but never less than its
+ * longest single word, so "Female" is never broken. When the wanted widths do not fit, the columns that want more than
+ * their minimum give up room in proportion to how much extra they want.
+ */
 function columnWidths(roster: RegistrationPdfRoster, font: PDFFont, bold: PDFFont, width: number) {
   const padding = 10;
-  const natural = roster.columns.map((column, index) => {
-    const longest = Math.max(
-      bold.widthOfTextAtSize(column, 8.5),
-      ...roster.rows.map((row) => font.widthOfTextAtSize((row[index] ?? "").slice(0, 60), 9)),
-    );
-    return Math.max(34, Math.min(longest + padding, index === 0 ? 170 : 150));
-  });
-  const total = natural.reduce((sum, value) => sum + value, 0);
+  const longestWord = (text: string, face: PDFFont, size: number) => Math.max(0, ...text.split(/\s+/).map((word) => face.widthOfTextAtSize(word, size)));
+  const minimum = roster.columns.map((column, index) => Math.max(
+    longestWord(column, bold, 8),
+    ...roster.rows.map((row) => longestWord((row[index] ?? "").slice(0, 60), index === 0 ? bold : font, 9)),
+  ) + padding);
+  const wanted = roster.columns.map((column, index) => Math.max(
+    minimum[index]!,
+    Math.min(Math.max(...roster.rows.map((row) => (index === 0 ? bold : font).widthOfTextAtSize((row[index] ?? "").slice(0, 60), 9))) + padding, index === 0 ? 150 : 130),
+  ));
+  const total = wanted.reduce((sum, value) => sum + value, 0);
   if (total <= width) {
-    // Spread the spare room over the columns in proportion, so the table fills the page.
     const spare = width - total;
-    return natural.map((value) => value + (spare * value) / total);
+    return wanted.map((value) => value + (spare * value) / total);
   }
-  const scale = width / total;
-  return natural.map((value) => value * scale);
+  const extra = wanted.map((value, index) => value - minimum[index]!);
+  const extraTotal = extra.reduce((sum, value) => sum + value, 0);
+  const need = total - width;
+  // Even the minimums may not fit (many columns): scale everything, as a last resort.
+  if (extraTotal < need) {
+    const scale = width / minimum.reduce((sum, value) => sum + value, 0);
+    return minimum.map((value) => value * scale);
+  }
+  return wanted.map((value, index) => value - (need * extra[index]!) / extraTotal);
 }
 
 /** Renders the registration. The same input always yields the same bytes. */
@@ -176,14 +188,15 @@ export async function renderRegistrationPdf(input: RegistrationPdfRenderInput): 
       cursor += width;
     }
     const header = () => {
-      w.ensure(40);
-      w.page.drawRectangle({ x: MARGIN, y: w.y - 16, width: CONTENT_WIDTH, height: 18, color: BAND });
-      w.page.drawText("#", { x: MARGIN + 4, y: w.y - 12, size: 8.5, font: bold, color: MUTED });
-      roster.columns.forEach((column, index) => {
-        const lines = w.wrap(column, bold, 8.5, widths[index]! - 8);
-        w.page.drawText(lines[0] ?? "", { x: xs[index]!, y: w.y - 12, size: 8.5, font: bold, color: MUTED });
-      });
-      w.y -= 20;
+      const headings = roster.columns.map((column, index) => w.wrap(column, bold, 8, widths[index]! - 6));
+      const lineCount = Math.max(1, ...headings.map((lines) => lines.length));
+      w.ensure(lineCount * 10 + 30);
+      w.page.drawRectangle({ x: MARGIN, y: w.y - (lineCount * 10 + 8), width: CONTENT_WIDTH, height: lineCount * 10 + 8, color: BAND });
+      w.page.drawText("#", { x: MARGIN + 4, y: w.y - 11, size: 8, font: bold, color: MUTED });
+      headings.forEach((lines, index) => lines.forEach((line, lineIndex) => (
+        w.page.drawText(line, { x: xs[index]!, y: w.y - 11 - lineIndex * 10, size: 8, font: bold, color: MUTED })
+      )));
+      w.y -= lineCount * 10 + 10;
     };
     header();
     roster.rows.forEach((row, rowIndex) => {

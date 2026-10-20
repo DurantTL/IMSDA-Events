@@ -18,8 +18,8 @@ import { isSerializationFailure, pauseBeforeRetry } from "@/lib/prisma-errors";
 import { refreshBackgroundCheckMatchesForRegistrations } from "@/modules/background-checks/refresh-after-write";
 import { isSeminarPreferenceField } from "@/modules/attendee-accounts/registration-answer-policy";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
-import { ensureRegistrationPdf } from "@/modules/registration-pdf/repository";
-import { REGISTRANT_UPDATED_PDF_NOTE, queueStaffUpdatedRegistrationCopies } from "@/modules/registration-pdf/notices";
+import { finishRegistrationChange } from "@/modules/registration-pdf/after-commit";
+import { registrationPdfHoldUntil } from "@/modules/registration-pdf/hold";
 import {
   addUndiscountedLine,
   calculationWithLine,
@@ -1528,16 +1528,20 @@ export async function amendRegistration(
     },
   });
   // Read before any transaction opens (#1016): a read inside one would need a second pool connection.
-  const [notifyApprovers, staffCopyEnabled] = await Promise.all([
-    isNotificationEnabled("TEAM_APPROVAL_REQUESTED"),
-    // The staff copy's switch also decides the "Updated" staff copy with the new PDF (#1082).
-    isNotificationEnabled("NEW_REGISTRATION_STAFF_COPY"),
-  ]);
+  const notifyApprovers = await isNotificationEnabled("TEAM_APPROVAL_REQUESTED");
   const prisma = getPrisma();
   for (let attempt = 0; attempt < maxRetryAttempts; attempt += 1) {
     try {
       const permissionMessageIds: string[] = [];
+      // The registrant's update notice, queued held while its PDF is made after the commit (#1082); and whether this
+      // transaction only replayed an earlier request (nothing new to announce).
+      const heldMessageIds: string[] = [];
+      let meaningfulChange = false;
+      let replayedRequest = false;
       const amended = await prisma.$transaction(async (tx) => {
+        heldMessageIds.length = 0;
+        meaningfulChange = false;
+        replayedRequest = false;
         // The registration's lodging lock is the FIRST statement, before any read, so an amendment and a staff lodging edit take
         // their locks in one order: lodging lock, then units, then the redemption row FOR UPDATE (#813).
         await lockRegistrationLodging(tx, registrationId);
@@ -1566,6 +1570,7 @@ export async function amendRegistration(
               "That amendment request ID was already used for different changes. Start a new review.",
             );
           }
+          replayedRequest = true;
           return existing.responseSnapshot as unknown as {
             registration: NonNullable<Awaited<ReturnType<typeof getRegistrationByIdWithClient>>>;
             amendment: ReturnType<typeof amendmentPreview> & {
@@ -1905,26 +1910,15 @@ export async function amendRegistration(
           },
           pendingMessageIds: [...(freedSeatsAtLocation?.pendingMessageIds ?? [])],
         };
-        // The registration PDF (#1082): a new version, marked "Updated", when this change altered what it says. Made from the
-        // rows just written plus the answers and pricing this amendment saved (its operation row does not exist yet).
-        const registrationPdf = await ensureRegistrationPdf(tx, {
-          eventId,
-          registrationId,
-          now,
-          markUpdated: true,
-          overrides: {
-            registrationResponses: prepared.prepared.registrationResponses,
-            pricingSnapshot: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
-          },
-        });
-        const newPdf = registrationPdf?.created ? registrationPdf.document : null;
-        if (hasMeaningfulAttendeeVisibleChange(prepared, input) || newPdf) {
+        meaningfulChange = hasMeaningfulAttendeeVisibleChange(prepared, input);
+        if (meaningfulChange) {
           const queued = await enqueueRegistrationUpdatedMessage(tx, {
             eventId,
             registrationId,
             correlationId: input.clientRequestId,
             transitionKey: `registration-amendment:${amendmentId}`,
-            ...(newPdf ? { attachmentId: newPdf.attachmentId, leadNote: REGISTRANT_UPDATED_PDF_NOTE } : {}),
+            // Held until the PDF is attached after the commit (#1082).
+            holdUntil: registrationPdfHoldUntil(),
             // The operation holding the new pricing is created after this notice is queued.
             pricingSnapshot: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
             changeCategory: prepared.seminarPreferencesChanged
@@ -1955,19 +1949,7 @@ export async function amendRegistration(
               : undefined,
           });
           response.pendingMessageIds = [...response.pendingMessageIds, ...queued.pendingMessageIds];
-        }
-        if (newPdf) {
-          // The staff "new registration" copy again, marked Updated, with the same PDF (#1082).
-          const staffCopies = await queueStaffUpdatedRegistrationCopies(tx, {
-            eventId,
-            registrationId,
-            attachmentId: newPdf.attachmentId,
-            changeKey: `registration-amendment:${amendmentId}`,
-            correlationId: input.clientRequestId,
-            staffCopyEnabled,
-            pricingSnapshot: { ...prepared.nextPricingSnapshot, attendeeNames: undefined },
-          });
-          response.pendingMessageIds = [...response.pendingMessageIds, ...staffCopies.pendingMessageIds];
+          heldMessageIds.push(...queued.pendingMessageIds);
         }
         await tx.registrationOperation.create({
           data: {
@@ -2041,6 +2023,18 @@ export async function amendRegistration(
         // The registration's location row lock may be waited on for up to 5s (#413).
         timeout: locationTransactionTimeoutMs,
       });
+      // The registration PDF (#1082), after the commit and never failing it: the next version marked Updated, attached to
+      // the held update notice, and the staff copy re-sent. Nothing for a replay of an earlier request.
+      if (!replayedRequest) {
+        await finishRegistrationChange({
+          eventId,
+          registrationId,
+          changeKey: `amendment:${amended.amendment.id}`,
+          correlationId: input.clientRequestId,
+          meaningful: meaningfulChange,
+          heldMessageIds,
+        });
+      }
       // #527: a new or renamed attendee on the Sterling Volunteers list is
       // matched after commit; best effort, never fails the amendment.
       await refreshBackgroundCheckMatchesForRegistrations([registrationId]);

@@ -28,7 +28,10 @@ vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown)
 vi.mock("@/modules/access/authorization", () => ({ AccessDeniedError: FakeAccessDeniedError, requirePermission: mocks.requirePermission }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn().mockResolvedValue({ user: { id: "staff-1" } }) }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
-vi.mock("@/modules/club-rosters/access", () => ({ requireRosterAccess: mocks.requireRosterAccess }));
+vi.mock("@/modules/club-rosters/access", () => ({
+  requireRosterAccess: mocks.requireRosterAccess,
+  actorAttribution: (actor: { accountId: string }) => ({ accountId: actor.accountId }),
+}));
 vi.mock("@/modules/club-registrations/api-errors", () => ({
   clubRegistrationApiError: (error: unknown) => Response.json({ error: "CLUB_ERROR", message: (error as Error).message }, { status: 403 }),
 }));
@@ -59,6 +62,7 @@ describe("staff registration PDF download (#1082)", () => {
   it("requires MANAGE_REGISTRATION on the event in the URL, and serves the stored file privately", async () => {
     const response = await staffGet(new Request("http://localhost/pdf"), staffContext);
     expect(mocks.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_REGISTRATION", expect.anything());
+    expect(mocks.readRegistrationPdfForDownload).toHaveBeenCalledWith("event-1", "registration-1", { userId: "staff-1" });
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("application/pdf");
     expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="Registration-Synthetic-Event-Club.pdf"');
@@ -70,12 +74,15 @@ describe("staff registration PDF download (#1082)", () => {
     mocks.requirePermission.mockRejectedValue(new FakeAccessDeniedError("FORBIDDEN", 403, "No."));
     const response = await staffGet(new Request("http://localhost/pdf"), staffContext);
     expect(response.status).toBe(403);
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
     expect(mocks.readRegistrationPdfForDownload).not.toHaveBeenCalled();
   });
 
   it("answers 404 for a registration with no PDF and 409 for a file that fails its hash", async () => {
     mocks.readRegistrationPdfForDownload.mockRejectedValueOnce(new FakeRegistrationPdfError("none", "NOT_AVAILABLE"));
-    expect((await staffGet(new Request("http://localhost/pdf"), staffContext)).status).toBe(404);
+    const missing = await staffGet(new Request("http://localhost/pdf"), staffContext);
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("Cache-Control")).toContain("no-store");
     mocks.readRegistrationPdfForDownload.mockRejectedValueOnce(new FakeRegistrationPdfError("corrupt", "DOCUMENT_CORRUPT"));
     expect((await staffGet(new Request("http://localhost/pdf"), staffContext)).status).toBe(409);
   });
@@ -85,7 +92,7 @@ describe("director registration PDF download (#1082)", () => {
   it("checks the director's access to the club first, then serves only that club's registration", async () => {
     const response = await directorGet(new Request("http://localhost/pdf?team=maple-team"), directorContext);
     expect(mocks.requireRosterAccess).toHaveBeenCalledWith("club-1", expect.any(Date), "registerForEvents");
-    expect(mocks.readClubRegistrationPdfForDownload).toHaveBeenCalledWith({ organizationId: "club-1", eventId: "event-1", teamKey: "maple-team" });
+    expect(mocks.readClubRegistrationPdfForDownload).toHaveBeenCalledWith({ organizationId: "club-1", eventId: "event-1", teamKey: "maple-team", actor: { accountId: "account-1" } });
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("application/pdf");
   });
@@ -94,11 +101,14 @@ describe("director registration PDF download (#1082)", () => {
     mocks.requireRosterAccess.mockRejectedValue(new Error("Not a director of this club."));
     const response = await directorGet(new Request("http://localhost/pdf"), directorContext);
     expect(response.status).toBe(403);
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
     expect(mocks.readClubRegistrationPdfForDownload).not.toHaveBeenCalled();
   });
 
   it("answers 404 when the club has no registration for the event", async () => {
     mocks.readClubRegistrationPdfForDownload.mockRejectedValueOnce(new FakeRegistrationPdfError("none", "NOT_AVAILABLE"));
-    expect((await directorGet(new Request("http://localhost/pdf"), directorContext)).status).toBe(404);
+    const missing = await directorGet(new Request("http://localhost/pdf"), directorContext);
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("Cache-Control")).toContain("no-store");
   });
 });

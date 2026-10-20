@@ -130,7 +130,7 @@ describe("the club submission report (#618)", () => {
     dependencies.getPrisma.mockReturnValue({
       $transaction: vi.fn().mockResolvedValue({
         confirmation: { confirmationCode: "REG-NEW", registrationStatus: "WAITLISTED", notificationStatus: "DISABLED" },
-        pendingMessageIds: [], registrantMessageIds: [], registrationId: "registration_2", replayed: false,
+        pendingMessageIds: [], registrantMessageIds: [], pdfMessageIds: [], eventId: "event-1", registrationId: "registration_2", replayed: false,
       }),
     });
     const report = vi.fn();

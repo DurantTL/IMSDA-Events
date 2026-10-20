@@ -109,43 +109,37 @@ const created = (upsert: ReturnType<typeof vi.fn>) => upsert.mock.calls.map(([ca
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("registration PDF on the confirmation and the staff copy (#1082)", () => {
-  it("attaches the stored PDF to the registrant's confirmation and the staff copy, and says so in the confirmation only", async () => {
+describe("registration messages wait for the PDF, made after the commit (#1082)", () => {
+  it("queues the confirmation and the staff copy held and without an attachment: the PDF is not made inside the transaction", async () => {
     const { tx, create } = submitFixture(false);
-    await enqueuePublicRegistrationMessages(tx as never, submitInput({ registrationPdfAttachmentId: "attachment-1" }));
+    await enqueuePublicRegistrationMessages(tx as never, submitInput({ holdForRegistrationPdf: true }));
     const rows = create.mock.calls.map(([call]) => call.data);
-    const registrant = rows.find((row) => row.recipientKind === "REGISTRANT")!;
-    const internal = rows.find((row) => row.recipientKind === "INTERNAL")!;
-    expect(registrant.attachmentId).toBe("attachment-1");
-    expect(internal.attachmentId).toBe("attachment-1");
-    expect(String(registrant.bodyTextSnapshot)).toContain("A PDF copy of your registration is attached.");
-    expect(String(internal.bodyTextSnapshot)).not.toContain("A PDF copy of your registration is attached.");
-  });
-
-  it("sends exactly what it did before when there is no PDF", async () => {
-    const { tx, create } = submitFixture(false);
-    await enqueuePublicRegistrationMessages(tx as never, submitInput());
-    for (const [call] of create.mock.calls) {
-      expect(call.data).not.toHaveProperty("attachmentId");
-      expect(String(call.data.bodyTextSnapshot)).not.toContain("PDF");
+    expect(rows.map((row) => row.recipientKind)).toEqual(expect.arrayContaining(["INTERNAL", "REGISTRANT"]));
+    for (const row of rows) {
+      expect(row).not.toHaveProperty("attachmentId");
+      expect((row.availableAt as Date).getTime()).toBeGreaterThan(Date.now() + 60_000);
+      // The line saying a PDF is attached is added only once the file exists.
+      expect(String(row.bodyTextSnapshot)).not.toContain("PDF");
     }
   });
 
-  it("keeps the club note and adds the attachment line after it", async () => {
+  it("holds nothing when the PDF is not expected, so the messages go exactly as before", async () => {
     const { tx, create } = submitFixture(false);
-    await enqueuePublicRegistrationMessages(tx as never, submitInput({ registrationPdfAttachmentId: "attachment-1", registrantNote: "Registered for Maple Grove Pathfinders." }));
-    const registrant = create.mock.calls.map(([call]) => call.data).find((row) => row.recipientKind === "REGISTRANT")!;
-    expect(String(registrant.bodyTextSnapshot).startsWith("Registered for Maple Grove Pathfinders. A PDF copy of your registration is attached.")).toBe(true);
+    await enqueuePublicRegistrationMessages(tx as never, submitInput());
+    for (const [call] of create.mock.calls) {
+      expect(call.data).not.toHaveProperty("availableAt");
+      expect(call.data).not.toHaveProperty("attachmentId");
+    }
   });
 
   it("a paused event still queues the messages, but as capture only: nothing is marked for real delivery", async () => {
     const paused = submitFixture(true);
-    await enqueuePublicRegistrationMessages(paused.tx as never, submitInput({ registrationPdfAttachmentId: "attachment-1" }));
+    await enqueuePublicRegistrationMessages(paused.tx as never, submitInput({ holdForRegistrationPdf: true }));
     for (const [call] of paused.create.mock.calls) {
       expect(call.data.metadata).toMatchObject({ deliveryMode: "LOCAL_CAPTURE", realDelivery: false });
     }
     const live = submitFixture(false);
-    await enqueuePublicRegistrationMessages(live.tx as never, submitInput({ registrationPdfAttachmentId: "attachment-1" }));
+    await enqueuePublicRegistrationMessages(live.tx as never, submitInput({ holdForRegistrationPdf: true }));
     for (const [call] of live.create.mock.calls) {
       expect(call.data.metadata).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", realDelivery: true });
     }

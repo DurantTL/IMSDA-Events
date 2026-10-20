@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument } from "pdf-lib";
-import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { getFormTemplate, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
   buildRegistrationPdfModel,
   excludedFieldKeys,
@@ -46,9 +46,9 @@ describe("registration PDF content (#1082)", () => {
     expect(club.roster).toBeNull();
 
     const roster = model.sections[2]!.roster!;
-    expect(roster.columns).toEqual(["Name", "Age", "Gender", "Roster role", "First time at Camporee?", "Master Guide investiture?"]);
+    expect(roster.columns).toEqual(["Name", "Age", "Gender", "Roster role", "First time at Camporee?", "Medical personnel?", "Master Guide investiture?", "Dietary restrictions"]);
     expect(roster.rows).toHaveLength(12);
-    expect(roster.rows[0]).toEqual(["Avery Example", "10", "Female", "Pathfinder", "Yes", ""]);
+    expect(roster.rows[0]).toEqual(["Avery Example", "10", "Female", "Pathfinder", "Yes", "", "", "Synthetic: no peanuts"]);
     expect(roster.countLabel).toBe("12 club members");
 
     // A question that depends on another answer is shown only when that answer applies.
@@ -62,10 +62,11 @@ describe("registration PDF content (#1082)", () => {
 
   it("never includes sensitive answers, health-type wording, a birth date, the payment choice or the promo code", () => {
     const camporee = JSON.stringify(buildRegistrationPdfModel(springCamporeeSource()));
-    expect(camporee).not.toContain("peanuts");
-    expect(camporee).not.toContain("Dietary");
+    // Owner decision (Caleb, Oct 20, 2026): dietary needs and "Medical personnel?" always print, flag or not.
+    expect(camporee).toContain("Synthetic: no peanuts");
+    expect(camporee).toContain("Medical personnel?");
+    // Every other sensitive answer stays out.
     expect(camporee).not.toContain("medical or accessibility");
-    expect(camporee).not.toContain("Medical personnel");
     expect(camporee).not.toContain("SYNTHETIC10");
 
     const selfPay = JSON.stringify(buildRegistrationPdfModel(selfPaySource()));
@@ -108,19 +109,23 @@ describe("registration PDF content (#1082)", () => {
         { id: "fld_one", key: "favorite_color", label: "Favorite color", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [], sensitive: true },
         { id: "fld_two", key: "color_why", label: "Why that color", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [], conditional: { fieldKey: "favorite_color", operator: "NOT_EMPTY", value: "" } },
         { id: "fld_three", key: "nickname", label: "Nickname", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] },
-        // Reads as a health question, so it stays out even though staff turned "sensitive" off.
+        // Staff turned "sensitive" off, so it prints (the PDF follows the flag, like the staff views).
         { id: "fld_four", key: "medication_notes", label: "Medication notes", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [], sensitive: false },
+        // Reads as a health question and has no flag, so the default keeps it out.
+        { id: "fld_five", key: "allergies", label: "Allergies", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [] },
+        // Always prints, even when explicitly sensitive (owner decision).
+        { id: "fld_six", key: "dietary_needs", label: "Dietary needs", helpText: "", type: "TEXT", scope: "REGISTRATION", required: false, options: [], sensitive: true },
       ] }],
     });
-    expect([...excludedFieldKeys(definition)].sort()).toEqual(["color_why", "favorite_color", "medication_notes"]);
+    expect([...excludedFieldKeys(definition)].sort()).toEqual(["allergies", "color_why", "favorite_color"]);
     const model = buildRegistrationPdfModel({
       ...selfPaySource(), definition, attendees: [],
-      registrationResponses: { favorite_color: "teal", color_why: "calm", nickname: "Pat", medication_notes: "none" },
+      registrationResponses: { favorite_color: "teal", color_why: "calm", nickname: "Pat", medication_notes: "none", allergies: "x", dietary_needs: "none" },
     });
     // color_why is a plain question, but it is asked only because of a sensitive answer, so (as in the answer filter) it
     // counts as sensitive too.
     const labels = model.sections[0]!.rows.map((row) => row.label);
-    expect(labels).toEqual(["Nickname"]);
+    expect(labels).toEqual(["Nickname", "Medication notes", "Dietary needs"]);
   });
 
   it("renders each form version it is on: an older version has its own questions and none of the newer ones", () => {
@@ -160,6 +165,20 @@ describe("registration PDF content (#1082)", () => {
   });
 });
 
+describe("registration PDF on the Fall Camporee form (#1082)", () => {
+  it("prints the photo and video release, whose section title mentions Sterling, and drops the Sterling question itself", () => {
+    const definition = getFormTemplate("fall_camporee")!.definition as RegistrationFormDefinition;
+    const model = buildRegistrationPdfModel(springCamporeeSource({
+      definition,
+      registrationResponses: { photo_video_release: true, background_check_acknowledgment: true, tents: "Two tents" },
+      attendees: [],
+    }));
+    const labels = model.sections.flatMap((section) => section.rows.map((row) => row.label));
+    expect(labels).toContain("Photo and video release");
+    expect(labels).not.toContain("Adult Sterling Volunteers");
+  });
+});
+
 describe("registration PDF versions and names (#1082)", () => {
   it("changes its content hash when what it says changes, and not when only a payment posts", () => {
     const base = buildRegistrationPdfModel(selfPaySource());
@@ -173,6 +192,9 @@ describe("registration PDF versions and names (#1082)", () => {
     expect(registrationPdfContentHash(removed)).not.toBe(registrationPdfContentHash(base));
     const edited = buildRegistrationPdfModel(selfPaySource({ registrationResponses: { email: "other@example.test" } }));
     expect(registrationPdfContentHash(edited)).not.toBe(registrationPdfContentHash(base));
+    // A card choice moves the processing fee without the registration changing: not a new version.
+    const withCardFee = buildRegistrationPdfModel(selfPaySource({ fees: { kind: "AMOUNTS", lines: [{ label: "Honors Weekend fee (Avery Example)", amountCents: 4000 }, { label: "Honors Weekend fee (Blake Sample)", amountCents: 4000 }, { label: "Card processing", amountCents: 270 }], totalCents: 8270, paidCents: 0, owedCents: 8270, processingFeeCents: 270 } }));
+    expect(registrationPdfContentHash(withCardFee)).toBe(registrationPdfContentHash(base));
     const repriced = buildRegistrationPdfModel(selfPaySource({ fees: { kind: "AMOUNTS", lines: [], totalCents: 4000, paidCents: 0, owedCents: 4000 } }));
     expect(registrationPdfContentHash(repriced)).not.toBe(registrationPdfContentHash(base));
   });

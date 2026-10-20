@@ -9,9 +9,8 @@ const dependencies = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-// The registration PDF (#1082) has its own tests. This fake database has no PDF tables, so no PDF is made here.
-vi.mock("@/modules/registration-pdf/repository", () => ({ ensureRegistrationPdf: vi.fn().mockResolvedValue(null) }));
-vi.mock("@/modules/registration-pdf/notices", () => ({ REGISTRANT_UPDATED_PDF_NOTE: "", queueStaffUpdatedRegistrationCopies: vi.fn() }));
+// The registration PDF (#1082) is made after the commit and has its own tests. This fake database has no PDF tables.
+vi.mock("@/modules/registration-pdf/after-commit", () => ({ attachRegistrationPdfAfterCommit: vi.fn(), finishRegistrationChange: vi.fn() }));
 vi.mock("@/lib/env", () => ({ getServerEnv: dependencies.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/communications/messaging-repository", () => ({
@@ -26,6 +25,7 @@ import { clubAttendeePreparer, clubSubmissionAttribution } from "@/modules/club-
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { publicRegistrationInputSchema } from "@/modules/forms/public-domain";
 import { submitPublicRegistration, type ClubSubmissionContext } from "@/modules/forms/public-repository";
+import { attachRegistrationPdfAfterCommit } from "@/modules/registration-pdf/after-commit";
 
 const field = (id: string, key: string, label: string, type: string, scope: "ATTENDEE" | "REGISTRATION", required = false) => (
   { id, key, label, helpText: "", type, scope, required, options: [] }
@@ -596,6 +596,18 @@ describe("club registration submit at an event location (#413)", () => {
     expect(dependencies.enqueuePublicRegistrationMessages.mock.calls[0]![1].location).toBeNull();
   });
 
+  it("queues the confirmation held, then makes the PDF after the commit for exactly those messages (#1082)", async () => {
+    located({ rows: [], activeLocations: 0 });
+    await at(null);
+    expect(dependencies.enqueuePublicRegistrationMessages.mock.calls[0]![1]).toMatchObject({ holdForRegistrationPdf: true });
+    expect(dependencies.enqueuePublicRegistrationMessages.mock.calls[0]![1]).not.toHaveProperty("registrationPdfAttachmentId");
+    expect(attachRegistrationPdfAfterCommit).toHaveBeenCalledOnce();
+    expect(attachRegistrationPdfAfterCommit).toHaveBeenCalledWith({ eventId: expect.any(String), registrationId: "registration-1", messageIds: ["m"] });
+    // The PDF step runs before the messages are processed, so they are released first.
+    expect(vi.mocked(attachRegistrationPdfAfterCommit).mock.invocationCallOrder[0]!)
+      .toBeLessThan(dependencies.processQueuedMessageIdsAfterCommit.mock.invocationCallOrder[0]!);
+  });
+
   it("locks the location row (5s wait only), records it on the registration, and names it in the confirmation", async () => {
     const { tx, queryRaw, executeRaw } = located({ rows: [row({ capacity: 10 })], seatsAtLocation: 3 });
     await at("loc-1");
@@ -642,6 +654,12 @@ describe("club registration submit at an event location (#413)", () => {
       expect(tx.registration.create.mock.calls[0]![0].data).toMatchObject({ status: "WAITLISTED", locationId: "loc-1" });
       expect(tx.registrationWaitlistEntry.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventId: "event-1", registrationId: "registration-1", position: 7, attendeeCount: 2 }) });
       expect(tx.registrationCapacityReservation.createMany).not.toHaveBeenCalled();
+    });
+
+    it("waits for no PDF: a waitlist notice is not a confirmation (#1082)", async () => {
+      waitlistedAt();
+      await at("loc-1");
+      expect(attachRegistrationPdfAfterCommit).toHaveBeenCalledWith(expect.objectContaining({ messageIds: [] }));
     });
 
     it("says the club's place in line at its location, not the event-wide position", async () => {

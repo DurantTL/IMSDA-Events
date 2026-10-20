@@ -13,6 +13,8 @@ import {
   substituteRegistrationAttendee,
 } from "@/modules/registrations/operations-repository";
 import { attendeeSubstitutionInputSchema } from "@/modules/registrations/schemas";
+import { finishRegistrationChange } from "@/modules/registration-pdf/after-commit";
+import { randomUUID } from "node:crypto";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -115,6 +117,8 @@ async function postHandler(
     } catch (error) {
       logError("Substitution notice processing failed after commit", error);
     }
+    // The updated PDF (the new person's name), marked Updated; a replay of the same request changes nothing (#1082).
+    await finishRegistrationChange({ eventId, registrationId, changeKey: `staff-substitution:${result.response.operation?.id ?? attendeeId}:${randomUUID()}`, correlationId: randomUUID(), meaningful: true });
     return Response.json(result.response, {
       status: 200,
       headers: noStoreHeaders,

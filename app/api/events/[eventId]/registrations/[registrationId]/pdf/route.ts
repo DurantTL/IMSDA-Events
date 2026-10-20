@@ -10,11 +10,13 @@ import { withRequestContext } from "@/lib/request-context";
  * another event is a 404. The bytes are the stored document for the registration's current version, verified against its
  * recorded hash. Never public, and the response is not cacheable.
  */
+const noStore = { "Cache-Control": "private, no-store, max-age=0" };
+
 async function getHandler(_request: Request, context: { params: Promise<{ eventId: string; registrationId: string }> }) {
   try {
     const { eventId, registrationId } = await context.params;
-    await requirePermission(await getCurrentSession(), eventId, "MANAGE_REGISTRATION", findActiveMembership);
-    const pdf = await readRegistrationPdfForDownload(eventId, registrationId);
+    const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_REGISTRATION", findActiveMembership);
+    const pdf = await readRegistrationPdfForDownload(eventId, registrationId, { userId: access.user.id });
     return new Response(Buffer.from(pdf.bytes), {
       headers: {
         "Content-Type": "application/pdf",
@@ -24,10 +26,10 @@ async function getHandler(_request: Request, context: { params: Promise<{ eventI
       },
     });
   } catch (error) {
-    if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
-    if (error instanceof RegistrationPdfError) return Response.json({ error: error.code, message: error.message }, { status: error.code === "NOT_AVAILABLE" ? 404 : 409 });
+    if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
+    if (error instanceof RegistrationPdfError) return Response.json({ error: error.code, message: error.message }, { status: error.code === "NOT_AVAILABLE" ? 404 : 409, headers: noStore });
     logError("Unable to download a registration PDF", error);
-    return Response.json({ error: "REGISTRATION_PDF_FAILED" }, { status: 500 });
+    return Response.json({ error: "REGISTRATION_PDF_FAILED" }, { status: 500, headers: noStore });
   }
 }
 

@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const hoisted = vi.hoisted(() => ({ getPrisma: vi.fn(), render: vi.fn() }));
+const hoisted = vi.hoisted(() => ({ getPrisma: vi.fn(), render: vi.fn(), audit: vi.fn() }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: hoisted.audit }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: hoisted.getPrisma }));
 vi.mock("@/modules/registration-pdf/render", async () => {
   const actual = await vi.importActual<typeof import("@/modules/registration-pdf/render")>("@/modules/registration-pdf/render");
@@ -22,9 +23,11 @@ import { selfPayDefinition } from "./support/registration-pdf-fixture";
 
 /** Making, versioning, storing and reading back the registration PDF (#1082). Synthetic data only. */
 
+const staff = { userId: "staff-1" };
+
 type Stored = { id: string; version: number; attachmentId: string; sha256: string; contentHash: string; updated: boolean; createdAt: Date; filename: string; sizeBytes: number; content: Buffer; eventId: string; registrationId: string };
 
-function fixture(options: { billingMode?: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE"; withSubmission?: boolean } = {}) {
+function fixture(options: { billingMode?: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATION_INVOICE"; withSubmission?: boolean; badDefinition?: boolean } = {}) {
   const documents: Stored[] = [];
   const state = {
     responses: { email: "pat@example.test", payment_method: "Card", promo_code: "SYNTHETIC10" } as Record<string, unknown>,
@@ -48,7 +51,7 @@ function fixture(options: { billingMode?: "ATTENDEE_PAY" | "DEFERRED_ORGANIZATIO
         formVersionId: "form-version-1",
         responses: state.responses,
         pricingSnapshot: { lineItems: [{ key: "fee.0", label: "Honors Weekend fee", amountCents: 4000, attendeeIndex: 0, attendeeLabel: "Avery Example" }], totalCents: 4000, rosterEnabled: true },
-        formVersion: { definition: selfPayDefinition() },
+        formVersion: { definition: options.badDefinition ? { title: 1 } : selfPayDefinition() },
       },
       operations: [],
       attendees: state.attendees,
@@ -110,7 +113,7 @@ describe("registration PDF storage and versions (#1082)", () => {
     expect((await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1" }))?.created).toBe(false);
 
     state.attendees.push({ profileSnapshot: { firstName: "Blake", lastName: "Sample", ageOnEventDate: 15 }, formResponses: { first_name: "Blake", last_name: "Sample", attendee_age: 15, class_choice: "Birds" }, person: { firstName: "Blake", lastName: "Sample" } } as never);
-    const second = await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1", now: new Date("2027-09-05T15:00:00.000Z") });
+    const second = await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1", now: new Date("2027-09-05T15:00:00.000Z"), notifiedChange: { meaningful: true } });
     expect(second).toMatchObject({ created: true, document: { version: 2, updated: true, filename: "Registration-Synthetic-Honors-Weekend-Pat-Example-UPDATED.pdf" } });
     expect(documents.map((document) => document.version)).toEqual([1, 2]);
     // Version 1 is untouched: its bytes are what was sent.
@@ -123,13 +126,35 @@ describe("registration PDF storage and versions (#1082)", () => {
     const result = await ensureRegistrationPdf(client as never, {
       eventId: "event-1",
       registrationId: "registration-1",
-      markUpdated: true,
+      notifiedChange: { meaningful: true },
       overrides: { registrationResponses: { email: "new-contact@example.test" } },
     });
     expect(result).toMatchObject({ created: true, document: { version: 1, updated: true } });
     expect(documents[0]!.filename).toContain("-UPDATED");
     const loaded = await loadRegistrationPdfSource(client as never, "event-1", "registration-1", { registrationResponses: { email: "new-contact@example.test" } });
     expect(loaded?.source.registrationResponses).toEqual({ email: "new-contact@example.test" });
+  });
+
+  it("a version made at download time (no announced change) is never marked Updated, and a card fee alone adds no version", async () => {
+    const { client, state, documents } = fixture();
+    await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1" });
+    state.responses.email = "changed@example.test";
+    const second = await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1" });
+    expect(second).toMatchObject({ created: true, previousVersion: 1, document: { version: 2, updated: false } });
+    expect(documents[1]!.filename).not.toContain("UPDATED");
+  });
+
+  it("a first copy of an older registration is marked Updated only when the change was meaningful", async () => {
+    const quiet = fixture();
+    expect(await ensureRegistrationPdf(quiet.client as never, { eventId: "event-1", registrationId: "registration-1", notifiedChange: { meaningful: false } })).toMatchObject({ previousVersion: null, document: { updated: false } });
+    const loud = fixture();
+    expect(await ensureRegistrationPdf(loud.client as never, { eventId: "event-1", registrationId: "registration-1", notifiedChange: { meaningful: true } })).toMatchObject({ previousVersion: null, document: { updated: true } });
+  });
+
+  it("makes no PDF, and does not throw, when the stored form definition no longer parses", async () => {
+    const { client, documents } = fixture({ badDefinition: true });
+    expect(await ensureRegistrationPdf(client as never, { eventId: "event-1", registrationId: "registration-1" })).toBeNull();
+    expect(documents).toHaveLength(0);
   });
 
   it("makes no PDF for a registration with no form to lay out", async () => {
@@ -159,7 +184,7 @@ describe("registration PDF storage and versions (#1082)", () => {
     const { client, state } = fixture();
     state.payments.push({ amount: "15.00", refunds: [{ amount: "5.00" }] });
     const loaded = await loadRegistrationPdfSource(client as never, "event-1", "registration-1");
-    expect(loaded?.source.fees).toEqual({ kind: "AMOUNTS", lines: [{ label: "Honors Weekend fee (Avery Example)", amountCents: 4000 }], totalCents: 4000, paidCents: 1000, owedCents: 3000 });
+    expect(loaded?.source.fees).toEqual({ kind: "AMOUNTS", lines: [{ label: "Honors Weekend fee (Avery Example)", amountCents: 4000 }], totalCents: 4000, paidCents: 1000, owedCents: 3000, processingFeeCents: 0 });
   });
 });
 
@@ -167,35 +192,55 @@ describe("registration PDF download (#1082)", () => {
   it("serves the stored bytes after checking the recorded hash", async () => {
     const { client, documents } = fixture();
     hoisted.getPrisma.mockReturnValue(client);
-    const pdf = await readRegistrationPdfForDownload("event-1", "registration-1");
+    const pdf = await readRegistrationPdfForDownload("event-1", "registration-1", staff);
     expect(pdf.version).toBe(1);
     expect(Buffer.from(pdf.bytes).equals(documents[0]!.content)).toBe(true);
     expect(pdf.contentType).toBe("application/pdf");
   });
 
+  it("audits each download with ids only: who, which registration, which version", async () => {
+    const { client } = fixture();
+    hoisted.getPrisma.mockReturnValue(client);
+    await readRegistrationPdfForDownload("event-1", "registration-1", staff);
+    expect(hoisted.audit).toHaveBeenCalledWith({
+      eventId: "event-1",
+      actorUserId: "staff-1",
+      action: "REGISTRATION_PDF_DOWNLOADED",
+      entityType: "Registration",
+      entityId: "registration-1",
+      summary: "Downloaded version 1 of a registration PDF.",
+      metadata: { registrationId: "registration-1", version: 1 },
+    });
+  });
+
   it("refuses a stored file whose hash no longer matches", async () => {
     const { client, documents } = fixture();
     hoisted.getPrisma.mockReturnValue(client);
-    await readRegistrationPdfForDownload("event-1", "registration-1");
+    await readRegistrationPdfForDownload("event-1", "registration-1", staff);
     documents[0]!.content = Buffer.from("not the file that was recorded");
-    await expect(readRegistrationPdfForDownload("event-1", "registration-1")).rejects.toMatchObject({ code: "DOCUMENT_CORRUPT" });
+    await expect(readRegistrationPdfForDownload("event-1", "registration-1", staff)).rejects.toMatchObject({ code: "DOCUMENT_CORRUPT" });
   });
 
   it("says plainly when a registration has no PDF", async () => {
     const { client } = fixture({ withSubmission: false });
     hoisted.getPrisma.mockReturnValue(client);
-    await expect(readRegistrationPdfForDownload("event-1", "registration-1")).rejects.toBeInstanceOf(RegistrationPdfError);
+    await expect(readRegistrationPdfForDownload("event-1", "registration-1", staff)).rejects.toBeInstanceOf(RegistrationPdfError);
   });
 
   it("gives a director only the club's own registration for the event", async () => {
     const { client } = fixture();
     hoisted.getPrisma.mockReturnValue(client);
     client.clubEventRegistration.findUnique.mockResolvedValueOnce(null);
-    await expect(readClubRegistrationPdfForDownload({ organizationId: "club-2", eventId: "event-1" })).rejects.toMatchObject({ code: "NOT_AVAILABLE" });
+    await expect(readClubRegistrationPdfForDownload({ organizationId: "club-2", eventId: "event-1", actor: { accountId: "account-1" } })).rejects.toMatchObject({ code: "NOT_AVAILABLE" });
     expect(client.clubEventRegistration.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { eventId_organizationId_teamKey: { eventId: "event-1", organizationId: "club-2", teamKey: "" } } }));
 
-    client.clubEventRegistration.findUnique.mockResolvedValueOnce({ registrationId: "registration-1" });
-    const pdf = await readClubRegistrationPdfForDownload({ organizationId: "club-1", eventId: "event-1", teamKey: null });
+    // A cancelled registration has no director download, matching the page that offers it.
+    client.clubEventRegistration.findUnique.mockResolvedValueOnce({ registrationId: "registration-1", registration: { status: "CANCELLED" } });
+    await expect(readClubRegistrationPdfForDownload({ organizationId: "club-1", eventId: "event-1", actor: { accountId: "account-1" } })).rejects.toMatchObject({ code: "NOT_AVAILABLE" });
+
+    client.clubEventRegistration.findUnique.mockResolvedValueOnce({ registrationId: "registration-1", registration: { status: "CONFIRMED" } });
+    const pdf = await readClubRegistrationPdfForDownload({ organizationId: "club-1", eventId: "event-1", teamKey: null, actor: { accountId: "account-1" } });
     expect(pdf.filename).toMatch(/\.pdf$/);
+    expect(hoisted.audit).toHaveBeenLastCalledWith(expect.objectContaining({ action: "REGISTRATION_PDF_DOWNLOADED", entityId: "registration-1", metadata: { registrationId: "registration-1", version: 1, actorAttendeeAccountId: "account-1" } }));
   });
 });

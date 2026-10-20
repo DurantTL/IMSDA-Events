@@ -7,9 +7,8 @@
  * label and value rows, and each section's attendee questions as a roster table (one row per person), then the fees.
  *
  * What never gets in, whatever the form says:
- * - a field marked sensitive, or one that reads as health, medical, insurance, dietary or custody wording
- *   (`resolveFieldFlags` and `isHealthTypeField`, the decisions the answer filter and the staff views use), and any
- *   follow-up question that depends on such a field, so health answers stay in their protected views;
+ * - a field that is sensitive by its flag (`resolveFieldFlags`, the decision the staff views use), and any follow-up
+ *   question that depends on one, so health answers stay in their protected views;
  * - a birth date, in any field: only an AGE appears, as of the event (the age the registration saved, never computed
  *   here from a date);
  * - the payment-method answer and the promo code, the confirmation code, and anything that is a private link.
@@ -25,7 +24,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 import { formatAddressDisplay } from "@/modules/forms/address";
-import { isHealthTypeField, resolveFieldFlags } from "@/modules/forms/field-flags";
+import { resolveFieldFlags } from "@/modules/forms/field-flags";
 import { pluralizeAttendeeLabel } from "@/modules/forms/attendee-label";
 import { formatTypedDate } from "@/modules/forms/typed-date";
 import { perPersonPriceText, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
@@ -35,6 +34,17 @@ export const REGISTRATION_PDF_GENERATOR_VERSION = 1;
 
 /** The largest PDF that is attached to an email (the same cap as the invoice PDF). */
 export const REGISTRATION_PDF_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Owner decision (Caleb, Oct 20, 2026): these answers print on every form, even while the field is sensitive (by its
+ * wording or an explicit flag). The flags themselves are NOT changed, so staff protected views still treat the fields as
+ * sensitive; this list is PDF-only. Everything else that is sensitive stays out (a medical or accessibility need, a
+ * first-floor need, emergency contacts, a guardian, a health record acknowledgment).
+ */
+export const PRINT_EVEN_IF_SENSITIVE: ReadonlySet<string> = new Set(["medical_personnel", "dietary_needs", "dietary_restrictions"]);
+
+/** The label of the card processing fee line. */
+export const CARD_PROCESSING_LABEL = "Card processing";
 
 export type RegistrationPdfAttendee = {
   /** The person's name as the registration holds it. */
@@ -53,6 +63,8 @@ export type RegistrationPdfFees =
     /** Succeeded payments less refunds when this copy was made. Not part of the content hash. */
     paidCents: number;
     owedCents: number;
+    /** The card processing line inside `lines` and `totalCents`, if any. Not part of the content hash. */
+    processingFeeCents?: number;
   };
 
 export type RegistrationPdfSource = {
@@ -110,22 +122,22 @@ function isBirthDateField(field: RegistrationFormField) {
 }
 
 /**
- * The keys of every field the PDF must never show, from the whole form. A field's own flags decide (`resolveFieldFlags`:
- * the explicit "sensitive" flag, else the health-type default) plus `isHealthTypeField` even when staff turned the flag off.
- * A question that is only asked because of an excluded answer is excluded too (a follow-up to a sensitive question would
- * reveal that answer by being there); the question a sensitive one depends on, like a roster role, is not.
+ * The keys of every field the PDF must never show, from the whole form. The PDF follows each field's sensitive flag
+ * exactly like the staff views, except the `PRINT_EVEN_IF_SENSITIVE` keys (`resolveFieldFlags`: the explicit flag, else the health-type default from the field's own
+ * wording), plus birth dates, the payment method, the promo code and calculated prices. A question that is only asked
+ * because of an excluded answer is excluded too (a follow-up would reveal that answer by being there); the question a
+ * sensitive one depends on, like a roster role, is not.
  */
 export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<string> {
   const allFields = definition.sections.flatMap((section) => section.fields);
-  const sectionTitleByField = new Map<RegistrationFormField, string>();
-  for (const section of definition.sections) for (const field of section.fields) sectionTitleByField.set(field, section.title);
   const paymentKey = definition.payment?.paymentMethodFieldKey ?? null;
   const excluded = new Set<string>();
   for (const field of allFields) {
-    const sectionTitle = sectionTitleByField.get(field) ?? "";
+    // The section title is left out of the flag decision on purpose: a field is judged by its own wording, so a question
+    // is not dropped because its section is titled "Release & Sterling Volunteers". (The form builder writes an explicit
+    // flag on a health-type field when it saves, with the title in view.)
     if (
-      resolveFieldFlags(field, { sectionTitle, paymentMethodFieldKey: paymentKey }).sensitive
-      || isHealthTypeField(field, sectionTitle)
+      (resolveFieldFlags(field, { sectionTitle: "", paymentMethodFieldKey: paymentKey }).sensitive && !PRINT_EVEN_IF_SENSITIVE.has(field.key))
       || isBirthDateField(field)
       || (paymentKey && field.key === paymentKey)
       || field.key === "promo_code"
@@ -287,11 +299,21 @@ function stableJson(value: unknown): string {
 
 /**
  * A hash of what the PDF says. Payments posted so far are left out (a payment is not a change to the registration, and
- * the paid line is only as of when the copy was made), so paying does not add an "Updated" version.
+ * the paid line is only as of when the copy was made), and so is the card processing fee (a card choice moves it without
+ * the registration changing), so neither adds an "Updated" version.
  */
 export function registrationPdfContentHash(model: RegistrationPdfModel): string {
-  const comparable = model.fees?.kind === "AMOUNTS"
-    ? { ...model, fees: { kind: model.fees.kind, lines: model.fees.lines, totalCents: model.fees.totalCents } }
+  const fees = model.fees;
+  const processing = fees?.kind === "AMOUNTS" ? fees.processingFeeCents ?? 0 : 0;
+  const comparable = fees?.kind === "AMOUNTS"
+    ? {
+      ...model,
+      fees: {
+        kind: fees.kind,
+        lines: processing > 0 ? fees.lines.filter((line) => !(line.label === CARD_PROCESSING_LABEL && line.amountCents === processing)) : fees.lines,
+        totalCents: fees.totalCents - processing,
+      },
+    }
     : model;
   return createHash("sha256").update(stableJson(comparable)).digest("hex");
 }
