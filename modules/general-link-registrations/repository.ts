@@ -1,5 +1,7 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -341,12 +343,13 @@ type Notice = {
  */
 async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; submissionId: string; notices: Notice[] }) {
   if (input.notices.length === 0) return [] as string[];
-  const settings = await tx.eventMessageSettings.findUnique({ where: { eventId: input.eventId } });
+  const settings = await loadEventEmailSettings(tx, input.eventId);
   const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
   const correlationId = randomUUID();
   const ids: string[] = [];
   for (const notice of input.notices) {
-    const suppressed = deliveryMode === "DISABLED";
+    const holdNote = suppressionNote(settings);
+    const suppressed = holdNote !== null;
     const idempotencyKey = notice.dedupeKey ?? `general-link:${notice.kind}:${input.submissionId}:${notice.email}`;
     if (notice.skipIfQueued && (await tx.messageOutbox.findUnique({ where: { idempotencyKey }, select: { id: true } }))) continue;
     const message = await tx.messageOutbox.upsert({
@@ -368,7 +371,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
         idempotencyKey,
         correlationId,
         status: suppressed ? "SUPPRESSED" : "PENDING",
-        lastError: suppressed ? "Delivery is disabled for this event." : null,
+        lastError: holdNote,
       },
       select: { id: true, status: true },
     });
@@ -378,7 +381,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
 }
 
 async function staffEmails(tx: Tx, eventId: string) {
-  const row = await tx.eventMessageSettings.findUnique({ where: { eventId }, select: { internalNotificationEmails: true } });
+  const row = await loadEventEmailSettings(tx, eventId);
   const value = row?.internalNotificationEmails;
   if (!Array.isArray(value)) return [] as string[];
   return [...new Set(value.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)))];

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import {
@@ -74,10 +75,7 @@ async function loadAnnouncementBroadcastState(
         accountHolderPerson: { select: { normalizedEmail: true } },
       },
     }),
-    client.eventMessageSettings.findUnique({
-      where: { eventId: input.eventId },
-      select: { deliveryMode: true },
-    }),
+    loadEventEmailSettings(client, input.eventId),
     client.eventMessageTemplate.findUnique({
       where: { eventId_key: { eventId: input.eventId, key: "EVENT_ANNOUNCEMENT" } },
       select: {

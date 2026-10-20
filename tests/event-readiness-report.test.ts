@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+vi.mock("@/modules/communications/effective-delivery", async () => (await import("./support/effective-delivery-double")).effectiveDeliveryDouble);
 import { collectEventReadinessReport } from "@/modules/events/event-readiness-report";
 
 const readyEnv = {

@@ -2,29 +2,26 @@ import { describe, expect, it } from "vitest";
 import { messagingSettingsInputSchema } from "@/modules/communications/schemas";
 
 const base = {
-  senderName: "IMSDA Events",
-  senderEmail: "",
+  senderName: "IMSDA Women's Retreat",
   replyToEmail: "",
   internalNotificationEmails: [],
 };
 
-describe("messaging delivery settings", () => {
-  it.each(["DISABLED", "LOCAL_CAPTURE"] as const)("accepts the %s UI mode", (deliveryMode) => {
-    expect(messagingSettingsInputSchema.parse({
-      ...base,
-      deliveryMode,
-    }).deliveryMode).toBe(deliveryMode);
+describe("event email settings (#1043)", () => {
+  it("lets an event override its display name and reply-to", () => {
+    const parsed = messagingSettingsInputSchema.parse({ ...base, replyToEmail: "retreat@example.test" });
+    expect(parsed.senderName).toBe("IMSDA Women's Retreat");
+    expect(parsed.replyToEmail).toBe("retreat@example.test");
   });
 
-  it("accepts real email only with a sender address", () => {
-    expect(messagingSettingsInputSchema.safeParse({
-      ...base,
-      deliveryMode: "EXTERNAL_EMAIL",
-    }).success).toBe(false);
-    expect(messagingSettingsInputSchema.parse({
-      ...base,
-      deliveryMode: "EXTERNAL_EMAIL",
-      senderEmail: "registration@imsda.org",
-    }).deliveryMode).toBe("EXTERNAL_EMAIL");
+  it("does not let an event change the From address", () => {
+    expect(messagingSettingsInputSchema.safeParse({ ...base, senderEmail: "other@example.test" }).success).toBe(false);
+  });
+
+  it("has no delivery switch for event staff", () => {
+    for (const deliveryMode of ["DISABLED", "LOCAL_CAPTURE", "EXTERNAL_EMAIL"]) {
+      expect(messagingSettingsInputSchema.safeParse({ ...base, deliveryMode }).success).toBe(false);
+    }
+    expect(messagingSettingsInputSchema.safeParse({ ...base, deliveryPaused: false }).success).toBe(false);
   });
 });

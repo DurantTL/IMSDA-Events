@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettingsOrThrow } from "@/modules/communications/effective-delivery";
 import { Prisma } from "@prisma/client";
 import { getEmailAvailability } from "@/integrations/email/provider";
 import { getPrisma } from "@/lib/prisma";
@@ -56,7 +57,13 @@ function summarizeSkips(counts: Map<RetryFailedSkipReason, number>): RetryFailed
     .sort((left, right) => right.count - left.count || left.reason.localeCompare(right.reason));
 }
 
-function deliveryBlocker(deliveryMode: DeliveryMode): Plan["blocker"] {
+function deliveryBlocker(deliveryMode: DeliveryMode, paused = false): Plan["blocker"] {
+  if (paused) {
+    return {
+      code: "DELIVERY_DISABLED",
+      message: "Email is paused for this event by a system administrator. Ask one to resume it on System management > Email before retrying.",
+    };
+  }
   if (deliveryMode === "DISABLED") {
     return {
       code: "DELIVERY_DISABLED",
@@ -87,7 +94,7 @@ async function buildPlan(
   requested: RetryFailedPreviewScope,
   now = new Date(),
 ): Promise<Plan> {
-  const settings = await db.eventMessageSettings.findUniqueOrThrow({ where: { eventId } });
+  const settings = await loadEventEmailSettingsOrThrow(db, eventId);
   const deliveryMode = settings.deliveryMode as DeliveryMode;
 
   if (requested.type === "BATCH") {
@@ -267,7 +274,7 @@ async function buildPlan(
       queueMessageIds: queueIds,
       eligibleCount: eligibleIds.length,
     }),
-    blocker: deliveryBlocker(deliveryMode),
+    blocker: deliveryBlocker(deliveryMode, settings.deliveryReason === "PAUSED"),
     senderEmail: settings.senderEmail,
   };
 }
@@ -380,7 +387,7 @@ export async function retryFailedMessages(
         where: { id: { in: plan.queueIds }, eventId, status: "FAILED" },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       });
-      const settings = await tx.eventMessageSettings.findUniqueOrThrow({ where: { eventId } });
+      const settings = await loadEventEmailSettingsOrThrow(tx, eventId);
       const queuedIds: string[] = [];
       for (const source of sources) {
         const repairMissingSenderSnapshot = (

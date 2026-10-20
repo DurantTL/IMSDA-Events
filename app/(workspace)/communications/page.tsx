@@ -13,8 +13,11 @@ export const metadata: Metadata = { title: staffPageTitles.emails };
 const emptyMessaging: MessagingWorkspaceData = {
   settings: {
     deliveryMode: "LOCAL_CAPTURE",
+    deliveryReason: "NOT_CONFIGURED",
     senderName: "IMSDA Events",
     senderEmail: "",
+    centralSenderName: "IMSDA Events",
+    centralReplyToEmail: "",
     replyToEmail: "",
     internalNotificationEmails: [],
     providerConfigured: false,

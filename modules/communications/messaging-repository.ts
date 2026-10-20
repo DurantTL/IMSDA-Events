@@ -1,5 +1,11 @@
 import "server-only";
 
+import {
+  getEffectiveDelivery,
+  loadEventEmailSettings,
+  loadEventEmailSettingsOrThrow,
+  type EffectiveDeliveryMode,
+} from "@/modules/communications/effective-delivery";
 import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { MessagingError } from "@/modules/communications/messaging-error";
 
@@ -275,17 +281,22 @@ function messageDedupeKey(
 
 function settingsRecord(settings: {
   deliveryMode: "DISABLED" | "LOCAL_CAPTURE" | "EXTERNAL_EMAIL";
+  deliveryReason: "PAUSED" | "NOT_CONFIGURED" | "SENDER_MISSING" | "ON";
   senderName: string;
   senderEmail: string | null;
-  replyToEmail: string | null;
+  replyToOverride: string | null;
+  central: { name: string; replyTo: string | null };
   internalNotificationEmails: Prisma.JsonValue;
 }) {
   const availability = getEmailAvailability();
   return {
     deliveryMode: settings.deliveryMode,
+    deliveryReason: settings.deliveryReason,
     senderName: settings.senderName,
     senderEmail: settings.senderEmail ?? "",
-    replyToEmail: settings.replyToEmail ?? "",
+    centralSenderName: settings.central.name,
+    centralReplyToEmail: settings.central.replyTo ?? "",
+    replyToEmail: settings.replyToOverride ?? "",
     internalNotificationEmails: stringArrayFromJson(settings.internalNotificationEmails),
     providerConfigured: availability.deliveryConfigured,
     webhookConfigured: availability.webhookConfigured,
@@ -469,11 +480,7 @@ export async function ensureEventMessagingDefaults(eventId: string) {
   // because somebody edited the platform later.
   const platform = await prisma.platformSettings.findUnique({
     where: { id: "platform" },
-    select: {
-      defaultSenderName: true,
-      defaultSenderEmail: true,
-      defaultReplyToEmail: true,
-    },
+    select: { defaultSenderName: true },
   });
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -484,12 +491,9 @@ export async function ensureEventMessagingDefaults(eventId: string) {
           create: {
             eventId,
             senderName: platform?.defaultSenderName || fallbackSettings.senderName,
-            senderEmail: platform?.defaultSenderEmail ?? null,
-            replyToEmail: platform?.defaultReplyToEmail ?? null,
-            // Still LOCAL_CAPTURE. Inheriting an address is a convenience;
-            // inheriting live delivery would mean a newly created event could
-            // mail registrants before anyone reviewed a single template.
-            deliveryMode: fallbackSettings.deliveryMode,
+            // The reply-to is the event's own override (#1043); blank follows the platform's. Not paused: real email is on
+            // for a new event wherever this environment has email configured.
+            replyToEmail: null,
             internalNotificationEmails: [],
           },
         });
@@ -565,7 +569,7 @@ async function loadBalanceReminderState(
         ...EVENT_LODGING_SELECT,
       },
     }),
-    client.eventMessageSettings.findUnique({ where: { eventId } }),
+    loadEventEmailSettings(client, eventId),
     client.eventMessageTemplate.findUnique({
       where: {
         eventId_key: {
@@ -725,7 +729,7 @@ async function loadShirtSizeRequestState(
         ...EVENT_LODGING_SELECT,
       },
     }),
-    client.eventMessageSettings.findUnique({ where: { eventId } }),
+    loadEventEmailSettings(client, eventId),
     client.eventMessageTemplate.findUnique({
       where: {
         eventId_key: {
@@ -860,7 +864,7 @@ export async function getMessagingWorkspace(eventId: string): Promise<MessagingW
     reminderState,
     shirtSizeState,
   ] = await Promise.all([
-    prisma.eventMessageSettings.findUniqueOrThrow({ where: { eventId } }),
+    loadEventEmailSettingsOrThrow(prisma, eventId),
     prisma.eventMessageTemplate.findMany({
       where: { eventId },
       include: {
@@ -922,31 +926,19 @@ export async function updateMessagingSettings(
   input: MessagingSettingsInput,
   actorUserId: string,
 ) {
-  if (
-    input.deliveryMode === "EXTERNAL_EMAIL"
-    && !getEmailAvailability().deliveryConfigured
-  ) {
-    throw new MessagingError(
-      "EXTERNAL_EMAIL_NOT_CONFIGURED",
-      "Finish the email provider setup on the server before enabling real email delivery.",
-    );
-  }
   const prisma = getPrisma();
   await prisma.$transaction(async (tx) => {
+    // The delivery switch and the From address are not editable here (#1043). A new row is not paused: real email is on.
     await tx.eventMessageSettings.upsert({
       where: { eventId },
       update: {
-        deliveryMode: input.deliveryMode,
         senderName: input.senderName,
-        senderEmail: input.senderEmail || null,
         replyToEmail: input.replyToEmail || null,
         internalNotificationEmails: input.internalNotificationEmails,
       },
       create: {
         eventId,
-        deliveryMode: input.deliveryMode,
         senderName: input.senderName,
-        senderEmail: input.senderEmail || null,
         replyToEmail: input.replyToEmail || null,
         internalNotificationEmails: input.internalNotificationEmails,
       },
@@ -959,13 +951,10 @@ export async function updateMessagingSettings(
         entityType: "EventMessageSettings",
         entityId: eventId,
         correlationId: randomUUID(),
-        summary: `Updated event message settings in ${input.deliveryMode.toLowerCase().replaceAll("_", " ")} mode.`,
+        summary: "Updated event message settings.",
         metadata: {
           internalRecipientCount: input.internalNotificationEmails.length,
-          senderEmailConfigured: Boolean(input.senderEmail),
           replyToConfigured: Boolean(input.replyToEmail),
-          providerConfigured: getEmailAvailability().deliveryConfigured,
-          realDelivery: input.deliveryMode === "EXTERNAL_EMAIL",
         },
       },
     });
@@ -1061,11 +1050,9 @@ async function captureOneMessageLocally(messageId: string, eventId?: string, sch
         templateKey: true,
         metadata: true,
         attemptCount: true,
-        event: { select: { messageSettings: { select: { deliveryMode: true } } } },
       },
     });
     if (!message || message.status !== "PENDING") return false;
-    if (message.event?.messageSettings?.deliveryMode === "DISABLED") return false;
     // An invoice email whose version was replaced is cancelled, never captured (#168).
     if (message.templateKey === "INVOICE_DELIVERY") {
       const replaced = await tx.invoiceDeliveryRecipient.findFirst({
@@ -1191,13 +1178,13 @@ export async function captureMessageIdsLocally(messageIds: string[], options: { 
 
 export async function processPendingMessagesLocally(eventId: string, actorUserId?: string) {
   const prisma = getPrisma();
-  const settings = await prisma.eventMessageSettings.findUnique({ where: { eventId } });
+  const settings = await loadEventEmailSettings(prisma, eventId);
   if (settings?.deliveryMode !== "LOCAL_CAPTURE") {
     throw new MessagingError(
       "DELIVERY_DISABLED",
       settings?.deliveryMode === "EXTERNAL_EMAIL"
         ? "This event is configured for real email. Use the delivery processor instead."
-        : "Local message capture is disabled for this event.",
+        : "Local message capture is not available for this event.",
     );
   }
   const pending = await prisma.messageOutbox.findMany({
@@ -1249,10 +1236,7 @@ export async function processPendingMessages(
 ) {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
-  const settings = await prisma.eventMessageSettings.findUniqueOrThrow({
-    where: { eventId },
-    select: { deliveryMode: true },
-  });
+  const settings = { deliveryMode: (await getEffectiveDelivery(prisma, eventId)).mode };
   if (settings.deliveryMode === "DISABLED") {
     throw new MessagingError(
       "DELIVERY_DISABLED",
@@ -1500,7 +1484,7 @@ export async function sendTestMessage(
         ...EVENT_LODGING_SELECT,
       },
     }),
-    prisma.eventMessageSettings.findUnique({ where: { eventId } }),
+    loadEventEmailSettings(prisma, eventId),
     prisma.eventMessageTemplate.findFirst({
       where: { id: templateId, eventId },
       include: {
@@ -1522,13 +1506,13 @@ export async function sendTestMessage(
   if (input.realDelivery && settings.deliveryMode !== "EXTERNAL_EMAIL") {
     throw new MessagingError(
       "DELIVERY_DISABLED",
-      "Set this event's delivery to real email, with its own verified sender, before sending a test to a real address. Switching does not send anything on its own.",
+      "Real email is not available for this event right now (it is paused by a system administrator, or email is not configured in this environment), so a test cannot be sent to a real address. A system administrator manages this on System management > Email.",
     );
   }
   if (input.realDelivery && !settings.senderEmail?.trim()) {
     throw new MessagingError(
       "EXTERNAL_EMAIL_NOT_CONFIGURED",
-      "This event has no sender address, so a real test would have nothing to send from.",
+      "The central sender address is not set, so a real test would have nothing to send from. A system administrator sets it on System management > Email.",
     );
   }
 
@@ -1639,8 +1623,8 @@ export async function sendTestMessage(
         correlationId: created.correlationId,
         summary: input.realDelivery
           ? source
-            ? `Sent a real test message to ${input.recipientEmail} using this event's sender, carrying a working private link to registration ${source.confirmationCode}.`
-            : `Sent a real test message to ${input.recipientEmail} using this event's sender.`
+            ? `Sent a real test message to ${input.recipientEmail} from the central sender, carrying a working private link to registration ${source.confirmationCode}.`
+            : `Sent a real test message to ${input.recipientEmail} from the central sender.`
           : source
             ? `Created a local test capture for ${input.recipientEmail} from registration ${source.confirmationCode}.`
             : `Created a local test capture for ${input.recipientEmail}.`,
@@ -2273,7 +2257,7 @@ async function loadClubAssignmentState(
       where: { id: eventId },
       select: { id: true, name: true, supportContact: true },
     }),
-    client.eventMessageSettings.findUnique({ where: { eventId } }),
+    loadEventEmailSettings(client, eventId),
     client.eventMessageTemplate.findUnique({
       where: { eventId_key: { eventId, key: "CLUB_ASSIGNMENTS" } },
       include: {
@@ -2696,7 +2680,7 @@ export async function resendRegistrationConfirmation(
             },
           },
         }),
-        tx.eventMessageSettings.findUniqueOrThrow({ where: { eventId } }),
+        loadEventEmailSettingsOrThrow(tx, eventId),
       ]);
       if (!source) {
         throw new MessagingError(
@@ -2802,7 +2786,7 @@ export async function resendRegistrationConfirmation(
       if (repairMissingSenderSnapshot && !settings.senderEmail?.trim()) {
         throw new MessagingError(
           "EXTERNAL_EMAIL_NOT_CONFIGURED",
-          "This confirmation has no sender snapshot. Save a verified sender in this event's communication settings before creating a corrected copy.",
+          "This confirmation has no sender snapshot. Set the central sender on System management > Email before creating a corrected copy.",
         );
       }
       const message = await tx.messageOutbox.create({
@@ -3081,9 +3065,7 @@ export async function retryMessage(
         tx.messageOutbox.findFirst({
           where: { id: messageId, eventId },
         }),
-        tx.eventMessageSettings.findUniqueOrThrow({
-          where: { eventId },
-        }),
+        loadEventEmailSettingsOrThrow(tx, eventId),
       ]);
       if (!source) {
         throw new MessagingError(
@@ -3161,7 +3143,7 @@ export async function retryMessage(
       if (repairMissingSenderSnapshot && !settings.senderEmail?.trim()) {
         throw new MessagingError(
           "EXTERNAL_EMAIL_NOT_CONFIGURED",
-          "This failed message has no sender snapshot. Save a verified sender in this event's communication settings before creating a corrected copy.",
+          "This failed message has no sender snapshot. Set the central sender on System management > Email before creating a corrected copy.",
         );
       }
       const activeChild = await tx.messageOutbox.findFirst({
@@ -3372,18 +3354,19 @@ export async function processQueuedMessageIdsAfterCommit(
     select: {
       id: true,
       eventId: true,
-      event: {
-        select: {
-          messageSettings: {
-            select: { deliveryMode: true },
-          },
-        },
-      },
       // Whether the message carries any file (attachment or picture), for the rule below.
       files: { select: { fileId: true }, take: 1 },
     },
   });
   const externalByEvent = new Map<string, string[]>();
+  const modeByEvent = new Map<string, EffectiveDeliveryMode>();
+  const modeFor = async (eventId: string) => {
+    const known = modeByEvent.get(eventId);
+    if (known) return known;
+    const { mode } = await getEffectiveDelivery(prisma, eventId);
+    modeByEvent.set(eventId, mode);
+    return mode;
+  };
   for (const message of messages) {
     // Account email has no event and no per-event delivery mode. It is
     // delivered by processAccountEmailQueue, not from here.
@@ -3391,7 +3374,7 @@ export async function processQueuedMessageIdsAfterCommit(
       result.skippedIds.push(message.id);
       continue;
     }
-    const mode = message.event?.messageSettings?.deliveryMode ?? "LOCAL_CAPTURE";
+    const mode = await modeFor(message.eventId);
     if (mode === "LOCAL_CAPTURE") {
       if (await captureOneMessageLocally(message.id, message.eventId)) {
         result.capturedIds.push(message.id);
@@ -3474,7 +3457,7 @@ export async function enqueuePublicRegistrationMessages(
     isDeferredOrganizationBilling,
   });
   const [settingsRow, templates, eventDetails, registrationAttendees] = await Promise.all([
-    tx.eventMessageSettings.findUnique({ where: { eventId: input.event.id } }),
+    loadEventEmailSettings(tx, input.event.id),
     tx.eventMessageTemplate.findMany({
       where: {
         eventId: input.event.id,
@@ -3743,7 +3726,7 @@ async function loadSelectedAudienceState(
       where: { id: eventId },
       select: { id: true, name: true, supportContact: true, billingMode: true },
     }),
-    client.eventMessageSettings.findUnique({ where: { eventId } }),
+    loadEventEmailSettings(client, eventId),
     client.eventMessageTemplate.findMany({
       where: { eventId, key: { in: sourceKeys } },
       include: {

@@ -24,7 +24,7 @@ function optionalField<T extends z.ZodType<string>>(inner: T) {
   ).nullable().optional().transform((value) => (value ? value : null));
 }
 
-const optionalEmail = optionalField(
+export const optionalEmail = optionalField(
   z.email().max(200).transform((value) => value.toLowerCase()),
 );
 
@@ -35,9 +35,8 @@ export const platformSettingsInputSchema = z.object({
   logoUrl: optionalUrl,
   publicWebsiteUrl: optionalUrl,
   defaultTimezone: z.string().trim().min(1).max(60),
-  defaultSenderName: z.string().trim().min(2).max(120),
-  defaultSenderEmail: optionalEmail,
-  defaultReplyToEmail: optionalEmail,
+  // The central email sender (name, address, reply-to) is edited on System management > Email only (#1043), so the
+  // platform settings form cannot send it and `.strict()` refuses it.
   defaultAttendeeEditPolicy: z
     .enum(["TIERED", "VERIFY_EVERY_EDIT"])
     .default("VERIFY_EVERY_EDIT"),
@@ -80,6 +79,10 @@ export const platformAddressesInputSchema = z.object({
 export type PlatformAddressesInput = z.infer<typeof platformAddressesInputSchema>;
 
 export type PlatformSettingsRecord = PlatformSettingsInput & PlatformAddressesInput & {
+  /** The central sender, read-only here; `central-sender.ts` writes it. */
+  defaultSenderName: string;
+  defaultSenderEmail: string | null;
+  defaultReplyToEmail: string | null;
   updatedAt: string;
   updatedByName: string | null;
 };
@@ -194,8 +197,6 @@ export async function updatePlatformSettings(
           before: before
             ? {
               organizationName: before.organizationName,
-              defaultSenderEmail: before.defaultSenderEmail,
-              defaultReplyToEmail: before.defaultReplyToEmail,
               defaultTimezone: before.defaultTimezone,
               defaultAttendeeEditPolicy: before.defaultAttendeeEditPolicy,
               passkeyRpId: before.passkeyRpId,
@@ -207,8 +208,6 @@ export async function updatePlatformSettings(
             : null,
           after: {
             organizationName: input.organizationName,
-            defaultSenderEmail: input.defaultSenderEmail,
-            defaultReplyToEmail: input.defaultReplyToEmail,
             defaultTimezone: input.defaultTimezone,
             defaultAttendeeEditPolicy: input.defaultAttendeeEditPolicy,
             passkeyRpId: input.passkeyRpId ?? null,

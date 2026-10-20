@@ -44,10 +44,13 @@ export function NotificationsWorkspace({
   switches: initialSwitches,
   addresses: initialAddresses,
   events,
+  embedded = false,
 }: {
   switches: NotificationSwitch[];
   addresses: Addresses;
   events: EventStaffListSummary[];
+  /** Drawn inside the Email page (#1043): no page header or wrapper of its own. */
+  embedded?: boolean;
 }) {
   const [switches, setSwitches] = useState(initialSwitches);
   const [addresses, setAddresses] = useState(initialAddresses);
@@ -131,20 +134,23 @@ export function NotificationsWorkspace({
     };
   }
 
+  const Wrapper = embedded ? "div" : "section";
   return (
-    <section className="page-stack notifications-page">
-      <StaffPageHeader
-        description={(
-          <>
-            Every automatic email to staff and club leaders, who gets it, and a switch for each. Everything is on until you turn it off.{" "}
-            <Link className="text-button" href="/communications">Open the delivery log</Link>
-          </>
-        )}
-      />
+    <Wrapper className={embedded ? "notifications-embedded" : "page-stack notifications-page"}>
+      {!embedded && (
+        <StaffPageHeader
+          description={(
+            <>
+              Every automatic email to staff and club leaders, who gets it, and a switch for each. Everything is on until you turn it off.{" "}
+              <Link className="text-button" href="/communications">Open the delivery log</Link>
+            </>
+          )}
+        />
+      )}
 
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 
-      <section className="panel">
+      <section className="panel" id="staff-alerts">
         <div className="section-heading">
           <div>
             <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Staff alerts</p>
@@ -299,6 +305,6 @@ export function NotificationsWorkspace({
       >
         <p>{pending?.confirmBeforeOff?.message}</p>
       </ConfirmDialog>
-    </section>
+    </Wrapper>
   );
 }

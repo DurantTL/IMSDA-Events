@@ -295,9 +295,8 @@ async function main() {
     data: {
       id: settingsId,
       eventId: event.id,
-      deliveryMode: "LOCAL_CAPTURE",
+      deliveryPaused: true,
       senderName: "IMSDA Roster Verification",
-      senderEmail: "roster.sender@example.test",
       replyToEmail: "roster.reply@example.test",
       internalNotificationEmails: [internalEmail],
     },

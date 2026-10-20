@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   setNotificationEnabled: vi.fn(),
   listEventStaffListSummaries: vi.fn(),
   getPlatformSettings: vi.fn(),
+  listEventEmailStates: vi.fn(),
+  getAdminAttentionSummary: vi.fn(),
   updatePlatformAddresses: vi.fn(),
   logError: vi.fn(),
   redirect: vi.fn((path: string) => { throw new Error(`REDIRECT:${path}`); }),
@@ -31,7 +33,14 @@ vi.mock("@/modules/system-admin/platform-settings", async () => {
   return { ...actual, getPlatformSettings: mocks.getPlatformSettings, updatePlatformAddresses: mocks.updatePlatformAddresses };
 });
 
-import NotificationsPage from "@/app/(workspace)/admin/notifications/page";
+vi.mock("@/modules/communications/event-email-pause", () => ({ listEventEmailStates: mocks.listEventEmailStates }));
+vi.mock("@/modules/communications/effective-delivery", () => ({ isPlatformEmailConfigured: () => true, isEmailEnvironmentConfigured: () => true }));
+vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true }));
+vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: () => ({ deliveryConfigured: true, webhookConfigured: true }) }));
+vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: mocks.getAdminAttentionSummary }));
+
+import EmailPage from "@/app/(workspace)/admin/email/page";
+import OldNotificationsPage from "@/app/(workspace)/admin/notifications/page";
 import { GET, PATCH } from "@/app/api/admin/notifications/route";
 import { NotificationsWorkspace } from "@/components/notifications-workspace";
 import { notificationCatalog } from "@/modules/notifications/catalog";
@@ -69,7 +78,9 @@ beforeEach(() => {
     { eventId: "event-1", eventName: "Synthetic Camporee", addressCount: 2 },
     { eventId: "event-2", eventName: "Synthetic Retreat", addressCount: 0 },
   ]);
-  mocks.getPlatformSettings.mockResolvedValue(addresses);
+  mocks.getPlatformSettings.mockResolvedValue({ ...addresses, defaultSenderName: "IMSDA Events", defaultSenderEmail: "events@imsda-events.test", defaultReplyToEmail: null });
+  mocks.listEventEmailStates.mockResolvedValue([]);
+  mocks.getAdminAttentionSummary.mockResolvedValue({ generatedAt: "2026-10-20T00:00:00.000Z", partial: false, truncated: false, total: 0, groups: [] });
   mocks.setNotificationEnabled.mockResolvedValue({ changed: true });
   mocks.updatePlatformAddresses.mockImplementation(async (input) => input);
 });
@@ -95,7 +106,7 @@ describe("notifications routes: system administrators only (#1016)", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.switches).toHaveLength(notificationCatalog.length);
-    expect(body.addresses).toEqual(addresses);
+    expect(body.addresses).toMatchObject(addresses);
   });
 
   it("turns a switch off for the signed-in administrator", async () => {
@@ -146,18 +157,27 @@ describe("notifications routes: system administrators only (#1016)", () => {
   });
 });
 
-describe("notifications page (#1016)", () => {
+describe("email page, with the staff alerts (#1016, #1043)", () => {
   it("sends a signed-out visitor to sign in and anyone but a system administrator to no-access", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: null });
-    await expect(NotificationsPage()).rejects.toThrow("REDIRECT:/login");
+    await expect(EmailPage()).rejects.toThrow("REDIRECT:/login");
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-2", globalRole: "STAFF" } });
-    await expect(NotificationsPage()).rejects.toThrow("REDIRECT:/no-access");
+    await expect(EmailPage()).rejects.toThrow("REDIRECT:/no-access");
     expect(mocks.listNotificationSwitches).not.toHaveBeenCalled();
+    expect(mocks.listEventEmailStates).not.toHaveBeenCalled();
   });
 
-  it("renders for a system administrator", async () => {
-    const element = await NotificationsPage();
-    expect(element.props).toMatchObject({ addresses, switches: allOn });
+  it("renders the three sections for a system administrator, in order", async () => {
+    const element = await EmailPage();
+    const children = (element as { props: { children: Array<{ type: unknown; props: Record<string, unknown> }> } }).props.children
+      .filter((child) => child && typeof child === "object" && "type" in child && typeof child.type === "function");
+    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection"]);
+    expect(children[2]!.props).toMatchObject({ addresses, switches: allOn, embedded: true });
+    expect(children[1]!.props).toMatchObject({ sender: { name: "IMSDA Events", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
+  });
+
+  it("keeps the old Notifications address working by sending it to Email", () => {
+    expect(() => OldNotificationsPage()).toThrow("REDIRECT:/admin/email#staff-alerts");
   });
 
   it("shows every alert with its recipients and a switch that starts on", () => {
@@ -197,10 +217,12 @@ describe("notifications page (#1016)", () => {
     expect(html).toContain("There are no active events.");
   });
 
-  it("is in the System management navigation with its own title", () => {
+  it("is in the System management navigation as Email, with its own title", () => {
     const labels = systemNavGroups.flatMap((group) => group.items.map((item) => item.href));
-    expect(labels).toContain("/admin/notifications");
-    expect(systemNavActiveItem("/admin/notifications")?.label).toBe("Notifications");
-    expect(systemSubpageTitle("/admin/notifications")).toBe("Notifications");
+    expect(labels).toContain("/admin/email");
+    expect(labels).not.toContain("/admin/notifications");
+    expect(systemNavActiveItem("/admin/email")?.label).toBe("Email");
+    expect(systemNavActiveItem("/admin/notifications")?.label).toBe("Email");
+    expect(systemSubpageTitle("/admin/email")).toBe("Email");
   });
 });

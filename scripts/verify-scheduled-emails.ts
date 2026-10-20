@@ -22,6 +22,7 @@
  *
  *   npm run test:scheduled-emails
  */
+import { configureSyntheticEmailEnvironment, setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
@@ -32,6 +33,7 @@ import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
+configureSyntheticEmailEnvironment();
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-scheduled-emails-synthetic-key-not-a-secret");
 fillBlankSyntheticEnv("MANAGE_LINK_DERIVATION_SECRET", "verify-scheduled-emails-synthetic-derivation-secret-01");
 fillBlankSyntheticEnv("ATTENDEE_PASS_SIGNING_SECRET", "verify-scheduled-emails-synthetic-pass-signing-secret-01");
@@ -70,6 +72,7 @@ function startProviderStub() {
 }
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   const eventIds = [ids.event, ids.other];
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId: { in: eventIds } }, { actorUserId: { in: [ids.admin, ids.comms] } }] } });
   await prisma.scheduledEmailBatch.deleteMany({ where: { eventId: { in: eventIds } } });
@@ -120,9 +123,10 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
     ],
   });
   await ensureEventMessagingDefaults(ids.event);
+  await setSyntheticCentralSender(prisma);
   await prisma.eventMessageSettings.update({
     where: { eventId: ids.event },
-    data: { deliveryMode: "EXTERNAL_EMAIL", senderName: "Synthetic Events", senderEmail: "events@example.test" },
+    data: { deliveryPaused: false, senderName: "Synthetic Events" },
   });
   const typeIds = { ADULT: `${P}_type_adult`, YOUTH: `${P}_type_youth` };
   await prisma.eventAttendeeType.createMany({
@@ -610,7 +614,7 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
 
   // 12i. Local capture: a scheduled message is checked right before it is captured. A failing check leaves it PENDING, an
   //      obsolete one is cancelled, and a captured one is never captured twice. Past the time budget the rest stay queued.
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryMode: "LOCAL_CAPTURE" } });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryPaused: true } });
   const { captureMessageIdsLocally } = await import("@/modules/communications/messaging-repository");
   const capture = await createAndActivate({
     name: "Capture", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.",
@@ -646,7 +650,7 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
     },
   });
   assert((await captureMessageIdsLocally([unlinkedLocal.id])).length === 0 && (await prisma.messageOutbox.findUniqueOrThrow({ where: { id: unlinkedLocal.id } })).status === "CANCELLED", "an unlinked scheduled message is cancelled, not captured");
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryMode: "EXTERNAL_EMAIL" } });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.event }, data: { deliveryPaused: false } });
 
   // 12j. The sweep's dispatch honours its batch limit and its time budget; what it leaves stays due.
   const dueOne = await createAndActivate({ name: "Due one", templateKey: "EVENT_ANNOUNCEMENT", announcementTitle: "Synthetic", announcementBody: "Synthetic.", rule: { trigger: "ONE_TIME", localDate: "2027-07-01", localTime: "09:00" }, query: { roles: ["REGISTRATION_CONTACT"] } });

@@ -17,7 +17,6 @@ function validInput(overrides: Record<string, unknown> = {}) {
   return {
     organizationName: "IMSDA",
     defaultTimezone: "America/Chicago",
-    defaultSenderName: "IMSDA Events",
     defaultAttendeeEditPolicy: "VERIFY_EVERY_EDIT",
     ...overrides,
   };
@@ -56,27 +55,19 @@ describe("platform settings invoice header (#780)", () => {
 
 describe("platform settings input", () => {
   it("treats a cleared field as unset rather than an empty string", () => {
-    const parsed = platformSettingsInputSchema.parse(validInput({
-      defaultSenderEmail: "",
-      logoUrl: "",
-    }));
+    const parsed = platformSettingsInputSchema.parse(validInput({ logoUrl: "" }));
     // Null, not "". Inheritance asks whether a default exists, and an empty
     // string would answer yes while supplying nothing.
-    expect(parsed.defaultSenderEmail).toBeNull();
     expect(parsed.logoUrl).toBeNull();
   });
 
-  it("normalises an address the way the rest of the system stores one", () => {
-    const parsed = platformSettingsInputSchema.parse(validInput({
-      defaultSenderEmail: "  Notifications@IMSDA.org ",
-    }));
-    expect(parsed.defaultSenderEmail).toBe("notifications@imsda.org");
+  it("does not edit the central email sender: that is System management > Email only (#1043)", () => {
+    for (const field of ["defaultSenderName", "defaultSenderEmail", "defaultReplyToEmail"]) {
+      expect(platformSettingsInputSchema.safeParse(validInput({ [field]: "IMSDA Events" })).success).toBe(false);
+    }
   });
 
   it("rejects a malformed address and a malformed URL", () => {
-    expect(platformSettingsInputSchema.safeParse(
-      validInput({ defaultSenderEmail: "not-an-address" }),
-    ).success).toBe(false);
     expect(platformSettingsInputSchema.safeParse(
       validInput({ logoUrl: "imsda.org/logo.png" }),
     ).success).toBe(false);
@@ -88,9 +79,6 @@ describe("platform settings input", () => {
     ).success).toBe(false);
     expect(platformSettingsInputSchema.safeParse(
       validInput({ defaultTimezone: "" }),
-    ).success).toBe(false);
-    expect(platformSettingsInputSchema.safeParse(
-      validInput({ defaultSenderName: "" }),
     ).success).toBe(false);
   });
 

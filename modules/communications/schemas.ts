@@ -6,21 +6,16 @@ const optionalEmail = z.string().trim().max(254).refine(
   "Enter a valid email address or leave this blank.",
 );
 
+/**
+ * The event's own email settings (#1043): display name, reply-to and staff alert addresses. There is no delivery mode
+ * and no sender email: the From address is the platform's central sender, and pausing is a system administrator's
+ * action on System management > Email. `.strict()` rejects either if a client sends one.
+ */
 export const messagingSettingsInputSchema = z.object({
-  deliveryMode: z.enum(["DISABLED", "LOCAL_CAPTURE", "EXTERNAL_EMAIL"]),
   senderName: z.string().trim().min(2).max(120),
-  senderEmail: optionalEmail,
   replyToEmail: optionalEmail,
   internalNotificationEmails: z.array(z.email().transform((value) => value.trim().toLowerCase())).max(20),
-}).strict().superRefine((input, context) => {
-  if (input.deliveryMode === "EXTERNAL_EMAIL" && !input.senderEmail) {
-    context.addIssue({
-      code: "custom",
-      path: ["senderEmail"],
-      message: "A verified sender email is required for real email delivery.",
-    });
-  }
-}).transform((input) => ({
+}).strict().transform((input) => ({
   ...input,
   internalNotificationEmails: [...new Set(input.internalNotificationEmails)],
 }));

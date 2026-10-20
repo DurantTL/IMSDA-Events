@@ -1,5 +1,7 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -136,10 +138,7 @@ async function queueOfferEmail(tx: Tx, input: {
 }) {
   const { email, name } = contactOf(input.registration);
   if (!email) return null;
-  const settings = await tx.eventMessageSettings.findUnique({
-    where: { eventId: input.event.id },
-    select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true },
-  }) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const settings = await loadEventEmailSettings(tx, input.event.id) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
   const base = getServerEnv().APP_BASE_URL;
   const link = input.organizationId ? `${base}/account/clubs/${input.organizationId}/events/${input.event.id}` : base;
   const where = input.sessionName ? `${input.className} (${input.sessionName})` : input.className;
@@ -156,7 +155,8 @@ async function queueOfferEmail(tx: Tx, input: {
     "IMSDA Events",
   ].join("\n");
   const idempotencyKey = `honor-class-waitlist-offer:${input.entryId}:${input.offerCount}`;
-  const suppressed = settings.deliveryMode === "DISABLED";
+  const holdNote = suppressionNote(settings);
+  const suppressed = holdNote !== null;
   const message = await tx.messageOutbox.upsert({
     where: { idempotencyKey },
     update: {},
@@ -182,7 +182,7 @@ async function queueOfferEmail(tx: Tx, input: {
       idempotencyKey,
       correlationId: randomUUID(),
       status: suppressed ? "SUPPRESSED" : "PENDING",
-      lastError: suppressed ? "Delivery is disabled for this event." : null,
+      lastError: holdNote,
     },
     select: { id: true, status: true },
   });

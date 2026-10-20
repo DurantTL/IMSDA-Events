@@ -19,6 +19,7 @@
  *
  *   npm run test:custom-message
  */
+import { configureSyntheticEmailEnvironment, setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
 import { loadEnvConfig } from "@next/env";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -32,6 +33,7 @@ import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
+configureSyntheticEmailEnvironment();
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-custom-message-synthetic-key-not-a-secret");
 fillBlankSyntheticEnv("MANAGE_LINK_DERIVATION_SECRET", "verify-custom-message-synthetic-derivation-secret-01");
 fillBlankSyntheticEnv("ATTENDEE_PASS_SIGNING_SECRET", "verify-custom-message-synthetic-pass-signing-secret-01");
@@ -126,6 +128,7 @@ const eventIds = [ids.event, ids.other, ids.fresh, ids.scale];
 const SCALE_COUNT = 250;
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId: { in: eventIds } }, { actorUserId: ids.staff }] } });
   await prisma.publicRegistrationSubmission.deleteMany({ where: { eventId: { in: eventIds } } });
   const inEvents = { eventId: { in: eventIds } };
@@ -322,9 +325,10 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
     isEnabled: true,
     attachmentFileIds: [agendaFile.id],
   }, ids.staff);
+  await setSyntheticCentralSender(prisma);
   await prisma.eventMessageSettings.update({
     where: { eventId: ids.event },
-    data: { deliveryMode: "EXTERNAL_EMAIL", senderEmail: "events@example.test", senderName: "Synthetic Events" },
+    data: { deliveryPaused: false, senderName: "Synthetic Events" },
   });
 
   // 5. Email selected: active registrations only, the same review, files and worker-delivery rule.

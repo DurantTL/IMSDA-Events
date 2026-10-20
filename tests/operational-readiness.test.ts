@@ -39,6 +39,40 @@ describe("checkOperationalReadiness", () => {
     expect(summary).toEqual({ blockers: 0, warnings: 0, isReady: true });
   });
 
+  it("blocks a paused event and says an administrator can resume it (#1043)", () => {
+    const checks = checkOperationalReadiness(facts({
+      messaging: {
+        deliveryMode: "LOCAL_CAPTURE",
+        deliveryReason: "PAUSED",
+        senderEmail: "notifications@imsda.org",
+        replyToEmail: "registration@imsda.org",
+      },
+    }));
+    expect(find(checks, "DELIVERY_MODE")).toMatchObject({ severity: "BLOCKER", label: "Email is paused for this event" });
+    expect(find(checks, "DELIVERY_MODE")?.detail).toContain("System management > Email");
+  });
+
+  it("blocks, and says emails are waiting, when the environment can send but the central sender is blank (#1043)", () => {
+    const checks = checkOperationalReadiness(facts({
+      messaging: { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "SENDER_MISSING", senderEmail: null, replyToEmail: null },
+    }));
+    expect(find(checks, "DELIVERY_MODE")).toMatchObject({ severity: "BLOCKER", label: "Central sender not set; emails are waiting" });
+    expect(find(checks, "DELIVERY_MODE")?.detail).toContain("nothing is sent or lost");
+  });
+
+  it("blocks, naming the environment, when real email is not configured here (#1043)", () => {
+    const checks = checkOperationalReadiness(facts({
+      messaging: {
+        deliveryMode: "LOCAL_CAPTURE",
+        deliveryReason: "NOT_CONFIGURED",
+        senderEmail: null,
+        replyToEmail: null,
+      },
+    }));
+    expect(find(checks, "DELIVERY_MODE")?.detail).toContain("not configured in this environment");
+    expect(find(checks, "SENDER_ADDRESS")?.detail).toContain("System management > Email");
+  });
+
   it("blocks when messages only capture locally", () => {
     const checks = checkOperationalReadiness(facts({
       messaging: {

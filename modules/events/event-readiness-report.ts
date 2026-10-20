@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { getEventPublishReadiness } from "@/modules/events/readiness";
 import { collectEventReadinessWarnings } from "@/modules/events/readiness-warnings";
 import {
@@ -59,7 +60,8 @@ export async function collectEventReadinessReport(
 
   const [publishedFormCount, settings, templates, registrations] = await Promise.all([
     prisma.registrationFormVersion.count({ where: { form: { eventId: event.id }, status: "PUBLISHED" } }),
-    prisma.eventMessageSettings.findFirst({ where: { eventId: event.id }, select: { deliveryMode: true, senderEmail: true, replyToEmail: true } }),
+    // The one effective-delivery decision (#1043): paused and unconfigured both read as capture-only here.
+    loadEventEmailSettings(prisma, event.id, { fallback: false }),
     prisma.eventMessageTemplate.findMany({
       where: { eventId: event.id },
       select: { key: true, isEnabled: true, versions: { where: { status: "PUBLISHED" }, select: { id: true } } },
@@ -123,7 +125,9 @@ export async function collectEventReadinessReport(
   const facts: OperationalReadinessFacts = {
     isPublished: event.isPublished,
     hasPublishedFormVersion: publishedFormCount > 0,
-    messaging: settings,
+    messaging: settings
+      ? { deliveryMode: settings.deliveryMode, deliveryReason: settings.deliveryReason, senderEmail: settings.senderEmail, replyToEmail: settings.replyToEmail }
+      : null,
     templates: templates.map((template) => ({ key: template.key, isEnabled: template.isEnabled, hasPublishedVersion: template.versions.length > 0 })),
     requiredTemplateKeys: [...requiredReadinessTemplateKeys(event.billingMode)],
     emailProvider: { deliveryConfigured: Boolean(env.RESEND_API_KEY?.trim()), webhookConfigured: Boolean(env.RESEND_WEBHOOK_SECRET?.trim()) },

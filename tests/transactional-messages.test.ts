@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/modules/communications/effective-delivery", async () => (await import("./support/effective-delivery-double")).effectiveDeliveryDouble);
 import { REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
 
 vi.mock("server-only", () => ({}));

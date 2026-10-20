@@ -41,52 +41,40 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("new event messaging defaults", () => {
-  it("inherits the platform sender identity when the row is created", async () => {
-    const { tx } = harness({
-      defaultSenderName: "IMSDA Events",
-      defaultSenderEmail: "notifications@imsda.org",
-      defaultReplyToEmail: "registration@imsda.org",
-    });
+describe("new event messaging defaults (#1043)", () => {
+  const platform = {
+    defaultSenderName: "IMSDA Events",
+    defaultSenderEmail: "notifications@imsda.org",
+    defaultReplyToEmail: "registration@imsda.org",
+  };
+
+  it("starts with the platform display name, and no sender email or reply-to of its own", async () => {
+    const { tx } = harness(platform);
 
     await ensureEventMessagingDefaults("event-1");
 
-    expect(tx.eventMessageSettings.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { eventId: "event-1" },
-      create: expect.objectContaining({
-        senderName: "IMSDA Events",
-        senderEmail: "notifications@imsda.org",
-        replyToEmail: "registration@imsda.org",
-      }),
-    }));
+    const create = tx.eventMessageSettings.upsert.mock.calls[0]?.[0].create;
+    expect(create).toMatchObject({ eventId: "event-1", senderName: "IMSDA Events", replyToEmail: null });
+    // The From address is the central one; an event never stores its own (#1043).
+    expect(create).not.toHaveProperty("senderEmail");
   });
 
-  it("still starts on local capture, so a new event cannot mail anyone unreviewed", async () => {
-    const { tx } = harness({
-      defaultSenderName: "IMSDA Events",
-      defaultSenderEmail: "notifications@imsda.org",
-      defaultReplyToEmail: "registration@imsda.org",
-    });
+  it("is not paused: real email is on for a new event wherever it is configured", async () => {
+    const { tx } = harness(platform);
 
     await ensureEventMessagingDefaults("event-1");
 
-    // Inheriting an address is a convenience. Inheriting live delivery would
-    // let a newly created event send before anyone reviewed a template.
-    expect(tx.eventMessageSettings.upsert.mock.calls[0]?.[0].create.deliveryMode)
-      .toBe("LOCAL_CAPTURE");
+    const create = tx.eventMessageSettings.upsert.mock.calls[0]?.[0].create;
+    expect(create).not.toHaveProperty("deliveryMode");
+    expect(create.deliveryPaused).toBeUndefined();
   });
 
-  it("never rewrites an event whose settings already exist", async () => {
-    const { tx } = harness({
-      defaultSenderName: "IMSDA Events",
-      defaultSenderEmail: "notifications@imsda.org",
-      defaultReplyToEmail: "registration@imsda.org",
-    });
+  it("never rewrites an event whose settings already exist, so a pause survives", async () => {
+    const { tx } = harness(platform);
 
     await ensureEventMessagingDefaults("event-1");
 
-    // An empty update is what makes this safe: a staff member who chose a
-    // sender for their event keeps it when the platform default changes later.
+    // An empty update keeps what staff set (display name, reply-to) and what an administrator set (the pause).
     expect(tx.eventMessageSettings.upsert.mock.calls[0]?.[0].update).toEqual({});
   });
 
@@ -96,12 +84,7 @@ describe("new event messaging defaults", () => {
     await ensureEventMessagingDefaults("event-1");
 
     expect(tx.eventMessageSettings.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({
-        senderName: "IMSDA Events",
-        senderEmail: null,
-        replyToEmail: null,
-        deliveryMode: "LOCAL_CAPTURE",
-      }),
+      create: expect.objectContaining({ senderName: "IMSDA Events", replyToEmail: null }),
     }));
   });
 });

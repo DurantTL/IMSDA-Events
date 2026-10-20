@@ -1,5 +1,7 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -115,14 +117,15 @@ export async function sendAdvancementNotices(eventId: string, toLevel: TeamLevel
     const [event, settings, messageSettings] = await Promise.all([
       tx.event.findUnique({ where: { id: eventId }, select: { name: true } }),
       tx.eventTeamSettings.findUnique({ where: { eventId }, select: { levelInfo: true } }),
-      tx.eventMessageSettings.findUnique({ where: { eventId }, select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true } }),
+      loadEventEmailSettings(tx, eventId),
     ]);
     if (!event || !settings) throw new ClubTeamError("RESULT_INVALID", "This event doesn't use team rules, so it has no team levels.");
     const delivery = messageSettings ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
     const info = levelInfoFor(levelInfoFromJson(settings.levelInfo), toLevel);
     const teams = await advancedTeams(tx, eventId, toLevel);
     const base = getServerEnv().APP_BASE_URL;
-    const suppressed = delivery.deliveryMode === "DISABLED";
+    const holdNote = suppressionNote(delivery);
+    const suppressed = holdNote !== null;
     const summary: SendNoticesResult = { level: toLevel, toSend: 0, alreadyQueued: 0, noEmail: 0, date: info?.date ?? null, place: info?.place.trim() ?? "", queued: 0, messageIds: [] };
     const queuedTeamIds: string[] = [];
     for (const team of teams) {
@@ -164,7 +167,7 @@ export async function sendAdvancementNotices(eventId: string, toLevel: TeamLevel
           idempotencyKey: key,
           correlationId: randomUUID(),
           status: suppressed ? "SUPPRESSED" : "PENDING",
-          lastError: suppressed ? "Delivery is disabled for this event." : null,
+          lastError: holdNote,
         },
         select: { id: true, status: true },
       });

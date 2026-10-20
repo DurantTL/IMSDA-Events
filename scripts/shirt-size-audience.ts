@@ -17,6 +17,7 @@
  */
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
+import { loadEventEmailSettings } from "../modules/communications/effective-delivery";
 import {
   computeShirtSizeRequestPreview,
   shirtSizeAttendeeSummary,
@@ -58,7 +59,8 @@ async function main() {
     if (!event) usage(`No event has the slug "${slug}".`);
 
     const [settings, allTemplates, registrations] = await Promise.all([
-      prisma.eventMessageSettings.findFirst({ where: { eventId: event.id } }),
+      // The effective delivery (#1043): paused or unconfigured reads as capture only.
+      loadEventEmailSettings(prisma, event.id),
       // Filtered in memory rather than by `key` so the script still runs
       // against a client generated before the SHIRT_SIZE_REQUEST migration —
       // it then reports the template as unavailable, which is the truth.

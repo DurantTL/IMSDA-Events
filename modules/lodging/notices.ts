@@ -1,5 +1,7 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -88,14 +90,15 @@ export async function enqueueLodgingMessage(tx: Tx, input: {
   metadata: Record<string, string | number | boolean | null>;
 }): Promise<EnqueuedLodgingMessage> {
   const [settingsRow, recipient] = await Promise.all([
-    tx.eventMessageSettings.findUnique({ where: { eventId: input.eventId }, select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true } }),
+    loadEventEmailSettings(tx, input.eventId),
     lodgingRecipient(tx, input.eventId, input.registrationId),
   ]);
   if (!recipient) return { messageId: null, pending: false, skipped: "NO_REGISTRATION", recipientMasked: null };
   if (!recipient.email) return { messageId: null, pending: false, skipped: "NO_RECIPIENT", recipientMasked: null };
   const settings = settingsRow ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
   const rendered = renderLodgingMessage(input.content, recipient.name);
-  const suppressed = settings.deliveryMode === "DISABLED";
+  const holdNote = suppressionNote(settings);
+  const suppressed = holdNote !== null;
   const message = await tx.messageOutbox.upsert({
     where: { idempotencyKey: input.idempotencyKey },
     update: {},
@@ -116,7 +119,7 @@ export async function enqueueLodgingMessage(tx: Tx, input: {
       idempotencyKey: input.idempotencyKey,
       correlationId: randomUUID(),
       status: suppressed ? "SUPPRESSED" : "PENDING",
-      lastError: suppressed ? "Delivery is disabled for this event." : null,
+      lastError: holdNote,
     },
     select: { id: true, status: true },
   });

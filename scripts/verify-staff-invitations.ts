@@ -87,7 +87,7 @@ async function main() {
   await prisma.event.create({ data: eventData(clubEventId, { audience: "CLUB" }) });
   await prisma.event.create({ data: eventData(draftEventId, { isPublished: false }) });
   await ensureEventMessagingDefaults(eventId);
-  await prisma.eventMessageSettings.update({ where: { eventId }, data: { internalNotificationEmails: [officeEmail], deliveryMode: "LOCAL_CAPTURE" } });
+  await prisma.eventMessageSettings.update({ where: { eventId }, data: { internalNotificationEmails: [officeEmail], deliveryPaused: false } });
   const meals = await applyCampMeetingMealPreset(eventId, userId);
   assert(meals.plans === 2, "the Camp Meeting meals (with the conference-paid plan) exist");
 
@@ -490,10 +490,10 @@ async function main() {
   await expectCode(repo.approveRegistrations(eventId, userId, Array.from({ length: 201 }, (_, index) => `x${index}`)), "BATCH_TOO_LARGE", "an approval batch over 200");
 
   // ---- Delivery settings are respected, and the table's own constraints --------------------------------------------------
-  await prisma.eventMessageSettings.update({ where: { eventId }, data: { deliveryMode: "DISABLED" } });
+  await prisma.eventMessageSettings.update({ where: { eventId }, data: { deliveryPaused: true } });
   const fresh = await prisma.staffInvitation.create({ data: { eventId, email: email("fresh"), group: "VOLUNTEER" } });
   const disabled = await repo.sendInvitations(eventId, userId, { ids: [fresh.id], digest: (await repo.previewInvitationSend(eventId, [fresh.id])).digest });
-  assert(disabled.deliveryMode === "DISABLED" && (await prisma.messageOutbox.findFirstOrThrow({ where: { eventId, recipientEmail: email("fresh") } })).status === "SUPPRESSED", "a disabled event suppresses the email");
+  assert(disabled.deliveryMode === "LOCAL_CAPTURE" && (await prisma.messageOutbox.findFirstOrThrow({ where: { eventId, recipientEmail: email("fresh") } })).status === "SUPPRESSED", "a paused event records the email as suppressed and sends nothing");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("fresh").toUpperCase(), group: "STAFF" } })), "an address that is not normalized is refused by the table");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("fresh"), group: "STAFF" } })), "a second invitation for one address is refused");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("zed"), group: "STAFF", approval: "WAITING" } })), "an approval without a registration is refused");

@@ -41,7 +41,7 @@ const readers = new Set<string>([
 /** The Notifications page, its route and component use the list and set functions (and a type), never the helper. */
 const adminSurface = new Set<string>([
   "app/api/admin/notifications/route.ts",
-  "app/(workspace)/admin/notifications/page.tsx",
+  "app/(workspace)/admin/email/page.tsx",
   "components/notifications-workspace.tsx",
 ]);
 

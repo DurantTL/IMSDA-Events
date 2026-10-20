@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -172,7 +173,8 @@ async function loadTemplateSource(client: Client, eventId: string, templateKey: 
 }
 
 async function loadDeliveryMode(client: Client, eventId: string) {
-  const settings = await client.eventMessageSettings.findUnique({ where: { eventId }, select: { deliveryMode: true } });
+  // The one effective-delivery decision (#1043). An event with no settings row keeps the capture-only fallback.
+  const settings = await loadEventEmailSettings(client, eventId);
   return settings?.deliveryMode ?? "LOCAL_CAPTURE";
 }
 

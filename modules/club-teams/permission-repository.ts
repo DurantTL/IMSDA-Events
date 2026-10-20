@@ -1,5 +1,7 @@
 import "server-only";
 
+import { suppressionNote } from "@/modules/communications/delivery-hold";
+import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -156,10 +158,7 @@ async function queuePermissionRequest(
   }
   if (recipients.length === 0) return [];
 
-  const messageSettings = await tx.eventMessageSettings.findUnique({
-    where: { eventId: input.eventId },
-    select: { deliveryMode: true, senderName: true, senderEmail: true, replyToEmail: true },
-  }) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const messageSettings = await loadEventEmailSettings(tx, input.eventId) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
   const label = teamLabel(registration.clubRegistration?.organization.name ?? "A club", registration.clubRegistration?.teamName ?? null);
   const dateText = settings?.ageAsOf ? formatCalendarDate(settings.ageAsOf) : "the event date";
   const baseUrl = getServerEnv().APP_BASE_URL;
@@ -184,7 +183,8 @@ async function queuePermissionRequest(
       "",
       "IMSDA Events",
     ].join("\n");
-    const suppressed = messageSettings.deliveryMode === "DISABLED";
+    const holdNote = suppressionNote(messageSettings);
+    const suppressed = holdNote !== null;
     const idempotencyKey = `team-permission:${input.registrationId}:${requestKey}:${email}`;
     const message = await tx.messageOutbox.upsert({
       where: { idempotencyKey },
@@ -205,7 +205,7 @@ async function queuePermissionRequest(
         idempotencyKey,
         correlationId: randomUUID(),
         status: suppressed ? "SUPPRESSED" : "PENDING",
-        lastError: suppressed ? "Delivery is disabled for this event." : null,
+        lastError: holdNote,
       },
       select: { id: true, status: true },
     });

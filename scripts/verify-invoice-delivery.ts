@@ -8,7 +8,7 @@
  * - a send queues one outbox message per ticked recipient with the stored attachment (billing contact now + club directors),
  *   records a delivery with the version, sequence, actor and recipients, refuses none ticked, an unknown recipient, a changed
  *   recipient list and a superseded version (the database refuses it too), replays a retry with the same key, and records
- *   a bounce, a suppression (event email off) and the attachment handed to the provider on real delivery;
+ *   a bounce, a paused event and the attachment handed to the provider on real delivery;
  * - "Posted to AR" is once per finalized version and corrected only by a superseding record; payments are append-only, partial
  *   payments leave an outstanding balance, a void is a reversal, an overpayment is flagged, and a revision carries what was paid;
  * - statements, the finance report and the treasurer CSV are scoped to the event in the URL (never another event's invoices), and
@@ -19,6 +19,8 @@
  *
  *   npm run test:invoice-delivery
  */
+import { configureSyntheticEmailEnvironment, setSyntheticCentralSender, clearSyntheticCentralSender } from "./support/central-email";
+import { getEffectiveDelivery } from "../modules/communications/effective-delivery";
 import { loadEnvConfig } from "@next/env";
 import { createHash, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
@@ -53,6 +55,9 @@ import { toCsv } from "@/modules/reporting/csv";
 loadEnvConfig(process.cwd());
 // Local-only, before any Prisma client or connection exists.
 assertLocalDatabase(process.env, "run this verification");
+configureSyntheticEmailEnvironment();
+// Real email in this script goes to an address nothing listens on: a send is refused at the connection and stays queued.
+process.env.RESEND_API_URL = "http://127.0.0.1:9";
 fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-invoice-delivery-synthetic-key-not-a-secret");
 
 const prisma = new PrismaClient();
@@ -99,6 +104,7 @@ const key = (label: string) => `${label}-${P}-${randomUUID()}`;
 const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 async function cleanup() {
+  await clearSyntheticCentralSender(prisma);
   await prisma.auditLog.deleteMany({ where: { OR: [{ eventId: { in: events } }, { actorUserId: { in: [ids.staff, ids.clerk, ids.treasurer] } }] } });
   await prisma.publicRegistrationSubmission.deleteMany({ where: { eventId: { in: events } } });
   await prisma.event.deleteMany({ where: { id: { in: events } } });
@@ -255,7 +261,8 @@ async function main() {
   // Preview: the exact recipients
   // ---------------------------------------------------------------------------------------------
   await ensureEventMessagingDefaults(ids.eventA);
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "LOCAL_CAPTURE", senderName: "Verify Conference", senderEmail: `${P}.sender@conference.test`, replyToEmail: `${P}.reply@conference.test` } });
+  await setSyntheticCentralSender(prisma, { name: "Verify Conference", email: `${P}.sender@conference.test` });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: true, senderName: "Verify Conference", replyToEmail: `${P}.reply@conference.test` } });
   const preview = await getInvoiceSendPreview(ids.eventA, v1);
   assert(preview.canSend && preview.version.number === numA1 && preview.version.status === "FINALIZED" && preview.blockedReason === null, "a finalized version can be sent");
   assert(preview.recipients.map((recipient) => `${recipient.kind}:${recipient.email}`).join() === `BILLING_CONTACT:${EMAIL.tina},CLUB_DIRECTOR:${EMAIL.dir1},CLUB_DIRECTOR:${EMAIL.dir2}`, "recipients: the billing contact, then the active directors of the invoice's clubs (no deputy, no revoked grant, none from another church)");
@@ -352,20 +359,19 @@ async function main() {
   assert(afterBounce.recipients.find((recipient) => recipient.key === tinaKey)?.priorProblem?.includes("bounced") === true && afterBounce.isResend, "the preview warns that the last email to that address bounced, and calls it a resend");
   assert(afterBounce.recipients.length === 3, "a bounce does not remove the recipient: staff decide");
 
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "DISABLED" } });
-  const suppressed = await send(ids.eventA, v1, { selected: [dir1Key] });
-  assert(suppressed.deliveryMode === "DISABLED" && suppressed.outcome.suppressed === 1, "with event email off the message is recorded as suppressed, not sent");
-  const suppressedRow = await prisma.messageOutbox.findFirstOrThrow({ where: { recipientEmail: EMAIL.dir1, status: "SUPPRESSED" } });
-  assert(suppressedRow.attachmentId === doc.attachmentId && suppressedRow.lastError !== null, "the suppressed message is on record with its attachment");
-
   // Real delivery hands the provider the stored PDF.
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "EXTERNAL_EMAIL", senderEmail: null } });
-  assert(code(await failure(send(ids.eventA, v1, { selected: [dir1Key] }))) === "EXTERNAL_EMAIL_NOT_CONFIGURED", "real email needs a sender address");
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { senderEmail: `${P}.sender@conference.test` } });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: false } });
+  await setSyntheticCentralSender(prisma, { name: "Verify Conference", email: null });
+  const noSender = await getEffectiveDelivery(prisma, ids.eventA);
+  assert(noSender.mode === "EXTERNAL_EMAIL" && noSender.reason === "SENDER_MISSING", "without the central sender address the event waits, it does not capture");
+  assert(code(await failure(send(ids.eventA, v1, { selected: [dir1Key] }))) === "EXTERNAL_EMAIL_NOT_CONFIGURED", "real email needs the central sender address");
+  await setSyntheticCentralSender(prisma, { name: "Verify Conference", email: `${P}.sender@conference.test` });
   const external = await send(ids.eventA, v1, { selected: [dir2Key] });
   const pendingRows = await prisma.messageOutbox.findMany({ where: { id: { in: (await prisma.invoiceDeliveryRecipient.findMany({ where: { deliveryId: external.deliveryId } })).map((row) => row.messageOutboxId) } } });
   assert(external.deliveryMode === "EXTERNAL_EMAIL" && pendingRows.every((row) => row.status === "PENDING" || row.status === "FAILED" || row.status === "SENT"), "real email is queued through the outbox");
   const provided: Array<{ filename: string; contentType: string; sha: string }> = [];
+  // The send above already tried the unreachable provider once and backed off; make the row due again for this run's stub.
+  await prisma.messageOutbox.updateMany({ where: { id: { in: pendingRows.map((row) => row.id) }, status: "PENDING" }, data: { availableAt: new Date() } });
   const processed = await processExternalEmailQueue(ids.eventA, {
     messageIds: pendingRows.filter((row) => row.status === "PENDING").map((row) => row.id),
     dependencies: {
@@ -378,7 +384,7 @@ async function main() {
   });
   assert(processed.sentIds.length === pendingRows.filter((row) => row.status === "PENDING").length && provided.length === processed.sentIds.length, "the provider was handed an attachment for each message");
   assert(provided.every((entry) => entry.filename === `Invoice-${numA1}.pdf` && entry.contentType === "application/pdf" && entry.sha === doc.sha256), "the attachment is the stored PDF, byte for byte");
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "LOCAL_CAPTURE" } });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: true } });
 
   // ---------------------------------------------------------------------------------------------
   // A contact changed after finalization: recipients follow the current contact, the PDF the snapshot
@@ -402,26 +408,26 @@ async function main() {
   // ---------------------------------------------------------------------------------------------
   // A revision supersedes: the old version cannot be sent
   // ---------------------------------------------------------------------------------------------
-  // An email still queued when a revision replaces its version must never go out (real email, no provider key here: it stays PENDING).
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "EXTERNAL_EMAIL" } });
+  // An email still queued when a revision replaces its version must never go out (real email, the provider unreachable here: it stays PENDING).
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: false } });
   const stillQueued = await send(ids.eventA, v1, { selected: [dir2Key] });
   const queuedRows = await prisma.messageOutbox.findMany({ where: { id: { in: (await prisma.invoiceDeliveryRecipient.findMany({ where: { deliveryId: stillQueued.deliveryId } })).map((row) => row.messageOutboxId) } } });
-  assert(queuedRows.length === 1 && queuedRows[0]!.status === "PENDING", "real email with no provider key stays queued");
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "LOCAL_CAPTURE" } });
+  assert(queuedRows.length === 1 && queuedRows[0]!.status === "PENDING", "real email the provider could not take stays queued");
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: true } });
   const rev = await reviseInvoice({ eventId: ids.eventA, invoiceId: invA1.id, mode: "CONTACT_ONLY", reason: "New treasurer", actorUserId: ids.staff });
   assert(code(await failure(send(ids.eventA, rev.versionId))) === "VERSION_NOT_FOUND", "an unfinalized revision cannot be previewed or sent");
   await finalizeInvoiceVersion({ eventId: ids.eventA, versionId: rev.versionId, actorUserId: ids.staff, idempotencyKey: key("rev"), confirm: true, canFinalizeInvoices: false });
   assert((await prisma.messageOutbox.findUniqueOrThrow({ where: { id: queuedRows[0]!.id } })).status === "CANCELLED", "finalizing the revision cancels the replaced version's queued invoice email");
   // Belt and braces: even a message that is queued again is not sent by the delivery worker, because its version is no longer FINALIZED.
-  await prisma.messageOutbox.update({ where: { id: queuedRows[0]!.id }, data: { status: "PENDING", lastError: null } });
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "EXTERNAL_EMAIL" } });
+  await prisma.messageOutbox.update({ where: { id: queuedRows[0]!.id }, data: { status: "PENDING", lastError: null, availableAt: new Date() } });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: false } });
   let workerSent = 0;
   await processExternalEmailQueue(ids.eventA, { messageIds: [queuedRows[0]!.id], dependencies: { configuration: { apiKey: "synthetic-not-a-key", apiUrl: "http://127.0.0.1:9" }, sendEmail: async () => { workerSent += 1; return { provider: "RESEND", providerMessageId: `synthetic-${randomUUID()}` }; } } });
   assert(workerSent === 0 && (await prisma.messageOutbox.findUniqueOrThrow({ where: { id: queuedRows[0]!.id } })).status === "CANCELLED", "the delivery worker cancels, and never sends, an invoice email whose version was replaced");
-  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryMode: "LOCAL_CAPTURE" } });
+  await prisma.eventMessageSettings.update({ where: { eventId: ids.eventA }, data: { deliveryPaused: true } });
   assert((await prisma.auditLog.count({ where: { eventId: ids.eventA, action: "INVOICE_MESSAGE_CANCELLED", entityId: queuedRows[0]!.id } })) === 1, "the worker's cancellation is audited with ids only");
   // The local capture path cancels instead of capturing.
-  await prisma.messageOutbox.update({ where: { id: queuedRows[0]!.id }, data: { status: "PENDING", lastError: null } });
+  await prisma.messageOutbox.update({ where: { id: queuedRows[0]!.id }, data: { status: "PENDING", lastError: null, availableAt: new Date() } });
   assert((await captureMessageIdsLocally([queuedRows[0]!.id])).length === 0 && (await prisma.messageOutbox.findUniqueOrThrow({ where: { id: queuedRows[0]!.id } })).status === "CANCELLED", "local capture cancels, and never captures, an invoice email whose version was replaced");
   const oldPreview = await getInvoiceSendPreview(ids.eventA, v1);
   assert(!oldPreview.canSend && oldPreview.newerVersion?.id === rev.versionId && oldPreview.blockedReason?.includes("replaced"), "a superseded version shows a notice and the newer version");
@@ -436,7 +442,7 @@ async function main() {
   const revSend = await send(ids.eventA, v1r);
   const revDoc = await prisma.invoiceVersionDocument.findUniqueOrThrow({ where: { invoiceVersionId: v1r } });
   assert(revSend.sequence === 1 && revDoc.sha256 !== doc.sha256 && revSend.documentSha256 === revDoc.sha256, "the revision has its own document and its own first send");
-  assert((await getInvoiceDeliveryHistory(ids.eventA, invA1.id)).length === 8, "the invoice's history holds every send of every version");
+  assert((await getInvoiceDeliveryHistory(ids.eventA, invA1.id)).length === 7, "the invoice's history holds every send of every version");
 
   // ---------------------------------------------------------------------------------------------
   // Posted to AR

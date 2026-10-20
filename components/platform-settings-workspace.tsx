@@ -11,9 +11,6 @@ type Draft = {
   logoUrl: string;
   publicWebsiteUrl: string;
   defaultTimezone: string;
-  defaultSenderName: string;
-  defaultSenderEmail: string;
-  defaultReplyToEmail: string;
   defaultAttendeeEditPolicy: "TIERED" | "VERIFY_EVERY_EDIT";
   passkeyRpId: string;
   invoiceHeaderDepartment: string;
@@ -28,9 +25,6 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
     logoUrl: settings.logoUrl ?? "",
     publicWebsiteUrl: settings.publicWebsiteUrl ?? "",
     defaultTimezone: settings.defaultTimezone,
-    defaultSenderName: settings.defaultSenderName,
-    defaultSenderEmail: settings.defaultSenderEmail ?? "",
-    defaultReplyToEmail: settings.defaultReplyToEmail ?? "",
     defaultAttendeeEditPolicy: settings.defaultAttendeeEditPolicy,
     passkeyRpId: settings.passkeyRpId ?? "",
     invoiceHeaderDepartment: settings.invoiceHeaderDepartment ?? "",
@@ -137,7 +131,7 @@ export function PlatformSettingsWorkspace({
           </div>
           <p className="field-help">
             The support contact, the security alert address and the new club application address are edited, with a switch for every
-            automatic alert, on <Link className="text-button" href="/admin/notifications">Notifications</Link>.
+            automatic alert, on <Link className="text-button" href="/admin/email">Email</Link>.
           </p>
         </section>
 
@@ -182,16 +176,12 @@ export function PlatformSettingsWorkspace({
             </div>
           </div>
           <p className="field-help">
-            These fill in when an event is created. Changing them here never rewrites an event that already exists — an event’s own settings stay whatever its staff chose.
+            These fill in when an event is created. Changing them here never rewrites an event that already exists.
           </p>
           <label>Default timezone<input required maxLength={60} {...field("defaultTimezone")} /></label>
-          <label>Default sender name<input required minLength={2} maxLength={120} {...field("defaultSenderName")} /></label>
-          <label>
-            Default sender address
-            <input type="email" placeholder="notifications@imsda.org" {...field("defaultSenderEmail")} />
-            <small>Must be verified with the email provider before an event can send real mail.</small>
-          </label>
-          <label>Default reply-to address<input type="email" placeholder="registration@imsda.org" {...field("defaultReplyToEmail")} /></label>
+          <p className="field-help">
+            The sender name, address and reply-to every event&apos;s email uses are set on <Link className="text-button" href="/admin/email">System management → Email</Link>.
+          </p>
           <label>
             Default attendee edit verification
             <select
