@@ -1,0 +1,201 @@
+{
+  "scope": "Synthetic static reference examples",
+  "date": "2026-10-21",
+  "page_width_cases": [
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "brokenImages": [],
+      "page": "registrations",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "brokenImages": [],
+      "page": "registrations",
+      "passed": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "brokenImages": [],
+      "page": "registrations",
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "brokenImages": [],
+      "page": "registrations",
+      "passed": true
+    },
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "brokenImages": [],
+      "page": "roster",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "brokenImages": [],
+      "page": "roster",
+      "passed": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "brokenImages": [],
+      "page": "roster",
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "brokenImages": [],
+      "page": "roster",
+      "passed": true
+    },
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "brokenImages": [],
+      "page": "calendar",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "brokenImages": [],
+      "page": "calendar",
+      "passed": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "brokenImages": [],
+      "page": "calendar",
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "brokenImages": [],
+      "page": "calendar",
+      "passed": true
+    },
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "brokenImages": [],
+      "page": "clubs",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "brokenImages": [],
+      "page": "clubs",
+      "passed": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "brokenImages": [],
+      "page": "clubs",
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "brokenImages": [],
+      "page": "clubs",
+      "passed": true
+    },
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "brokenImages": [],
+      "page": "event-editor",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "brokenImages": [],
+      "page": "event-editor",
+      "passed": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "brokenImages": [],
+      "page": "event-editor",
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "brokenImages": [],
+      "page": "event-editor",
+      "passed": true
+    },
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "brokenImages": [],
+      "page": "event-public",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "documentWidth": 390,
+      "brokenImages": [],
+      "page": "event-public",
+      "passed": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "brokenImages": [],
+      "page": "event-public",
+      "passed": true
+    },
+    {
+      "width": 1440,
+      "documentWidth": 1440,
+      "brokenImages": [],
+      "page": "event-public",
+      "passed": true
+    }
+  ],
+  "javascript_errors": [],
+  "gallery": [
+    {
+      "width": 390,
+      "doc": 390,
+      "images": true
+    },
+    {
+      "width": 768,
+      "doc": 768,
+      "images": true
+    },
+    {
+      "width": 1440,
+      "doc": 1440,
+      "images": true
+    }
+  ],
+  "independent_interaction_bundles_passed": 6,
+  "independent_open_findings": 0,
+  "dialog_names_and_focus_return": "checked",
+  "ordinary_interface_text_floor": "14px; scaled mini-browser excepted",
+  "phone_action_targets": "44px",
+  "archive_integrity": "passed",
+  "archive_relative_html_css_links_checked": 87,
+  "pdf_pages": 7,
+  "production_implementation_verified": false
+}
