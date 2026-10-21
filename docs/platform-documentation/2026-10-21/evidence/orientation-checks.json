@@ -1,10 +1,38 @@
 {
-  "source_commit": "47cd5c00780d0c2dd9e618b56c32e2fbd04b041a",
-  "slides": 31,
-  "speaker_notes": "All 31 slides have Say, with Show/Ask as appropriate",
-  "picture_shapes": 0,
-  "step_illustrations": "Current labels; not product mockups",
-  "source_file_references": 40,
+  "source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
+  "slides": 25,
+  "speaker_notes": "All 25 slides have Say, with Show/Ask as appropriate",
+  "picture_shapes": 42,
+  "screenshot_alt_descriptions": true,
+  "visuals": "Current local application with fictional training records; annotations are presentation overlays",
+  "visible_words_per_slide": [
+    41,
+    58,
+    52,
+    48,
+    68,
+    48,
+    52,
+    55,
+    69,
+    62,
+    80,
+    57,
+    70,
+    57,
+    66,
+    66,
+    67,
+    53,
+    72,
+    50,
+    56,
+    49,
+    61,
+    46,
+    56
+  ],
+  "source_file_references": 47,
   "unrelated_reference_files_unchanged": 20,
   "office_packages_valid": true,
   "shape_bounds_valid": true,
@@ -36,8 +64,8 @@
     },
     {
       "file": "IMSDA-Events-platform-briefing.pdf",
-      "pages": 31,
-      "toc_entries": 31,
+      "pages": 25,
+      "toc_entries": 25,
       "tagged": true
     },
     {
@@ -54,9 +82,11 @@
     },
     {
       "file": "06-presenter-notes.pdf",
-      "pages": 13,
-      "toc_entries": 125,
+      "pages": 14,
+      "toc_entries": 122,
       "tagged": true
     }
-  ]
+  ],
+  "registered_screenshot_examples": 34,
+  "unique_capture_images": 33
 }

@@ -6,15 +6,18 @@ This pack explains the current system, consolidates accessibility/usability find
 
 ## Start with the user orientation
 
-- [Getting started PowerPoint — 31 slides with spoken presenter notes](exports/IMSDA-Events-platform-briefing.pptx)
+- [Getting started PowerPoint — 25 visual slides with spoken presenter notes](exports/IMSDA-Events-platform-briefing.pptx)
 - [Getting started presentation PDF](exports/IMSDA-Events-platform-briefing.pdf)
 - [Presenter notes: PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Markdown](content/06-presenter-notes.md)
+- [Screenshot gallery — 34 fictional training capture examples](exports/IMSDA-Events-training-screenshot-gallery.html)
 
 - [Quick-start handout — 3 pages](exports/07-club-quick-start.pdf) · [Editable Word](exports/07-club-quick-start.docx) · [Markdown](content/07-club-quick-start.md)
 
-The presentation explains what IMSDA Events does, why the club and event records work together, how to sign in, and how directors and Area Coordinators use their current tools. Presenter notes provide a spoken explanation, optional demonstration and questions for the group.
+The presentation follows a fictional club through the current application: director Jordan Ellis adds Morgan Reed to Riverton Pathfinders, records an October meeting and registers people for Fall Camporee. Area Coordinator Alex Morgan then reviews club progress, report statuses and event participation. Screenshots use fictional records in an isolated local application; short annotations show where to act and how to recognize a saved result. Presenter notes carry the fuller explanation, optional demonstration and questions.
 
-**Choose a route:** slides 1–10 introduce the system and sign-in; 11–19 cover club directors; 20–27 cover Area Coordinators; 28–31 cover routines, help and finishing safely. A single-role session can use its section after the common introduction. Training labels and paths were checked against [main `47cd5c00`](https://github.com/DurantTL/IMSDA-Events/commit/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a), whose application source matches the earlier baseline.
+**Choose a route:** slides 1–7 introduce the system and sign-in; 8–16 follow the director; 17–22 follow the Area Coordinator; 23–25 cover specific follow-up, help and sign-out. A single-role session can use its section after the common introduction. Screenshots and current labels use [source `7f77c1df`](https://github.com/DurantTL/IMSDA-Events/commit/7f77c1dfeadd004deb51f91e2bae1b6c4754638b), whose application source matches the earlier baseline. The capture/source register is [screenshot-capture.json](evidence/screenshot-capture.json).
+
+**Training scenario:** October 21, 2026, club year 2026–27. September records illustrate overdue status differences; October's record is still within its submission period. Fall Camporee takes place November 6–8. Names, clubs, contacts, figures and event records are fictional. These local captures verify repository behavior, not the configuration or data currently serving on the public production site.
 
 The technical evidence, future-feature planning and camp discovery remain in the separate documents below.
 
@@ -34,7 +37,7 @@ The technical evidence, future-feature planning and camp discovery remain in the
 
 **Implemented** means present in the reviewed repository. **Gated/setup** means code exists with remaining activation/configuration/evidence prerequisites. **Accepted design** means accepted presentation direction awaiting the applicable implementation. **Planned** means future tracked scope with its existing decisions and dependencies. These labels do not establish the serving production state.
 
-The agreed System navigation and distinct attendee, director, coordinator and administrator roles remain authoritative. The orientation uses numbered teaching illustrations of current task paths and labels. These are presentation aids, not app screenshots or new menu designs. Existing rehearsal plans, decision records and JSON/CSV/PDF examples are indexed in the feature guide rather than duplicated.
+The agreed System navigation and distinct attendee, director, coordinator and administrator roles remain authoritative. The orientation uses current application screenshots with numbered instructional annotations; those annotations are presentation aids, not product controls or new menu designs. Accepted future design mockups are not presented as shipped screens. Existing rehearsal plans, decision records and JSON/CSV/PDF examples are indexed in the feature guide rather than duplicated.
 
 UltraCamp's public REST documentation is recorded in the project's prior research; medical/form-readiness API coverage remains unconfirmed. The report explicitly dates that evidence. Fresh vendor verification was unavailable under the execution environment's network policy. All UltraCamp implementation remains Phase 5 under the existing roadmap; the report is discovery material, not a new rollout plan.
 
@@ -50,9 +53,13 @@ The help/message examples are prepared drafts. Square-bracket placeholders are e
 - [Independent content review](evidence/independent-content-qa.md)
 - [Export and visual verification](evidence/export-verification.md)
 - [User-orientation source and content checks](evidence/orientation-verification.md)
+- [Screenshot capture/source register](evidence/screenshot-capture.json)
+- [Visual-training review checklist](evidence/visual-training-qa-plan.md)
+- [Independent visual-training review](evidence/visual-training-independent-qa.md)
+- [Fictional dataset and before/after story](evidence/synthetic-training-dataset.md)
 
 The technical report records **13,504 tests passed and one skipped across 1,015 files** in the exact current-main CI run. It distinguishes main smoke from the separately observed extended application, mobile and badge checks, and from human/physical production verification. No new application test run was started for this documentation task.
 
-The presentation contains editable text/shapes and numbered task illustrations. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. PDFs include text/tag structures and the document PDFs have heading outlines; this is not a PDF/UA or WCAG certification.
+The PowerPoint contains embedded screenshot images with editable titles, captions and callout shapes. Screenshots are raster captures rather than editable application components. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. Export-check results are recorded separately in the evidence files; PDF tags alone do not establish PDF/UA or WCAG conformance.
 
 Only documentation and export assets are delivered. Application behavior, menus, permissions, issue labels/states, build order and production switches are unchanged. Follow [#98](https://github.com/DurantTL/IMSDA-Events/issues/98) for implementation order and [#844](https://github.com/DurantTL/IMSDA-Events/issues/844) for the preceding issue review.

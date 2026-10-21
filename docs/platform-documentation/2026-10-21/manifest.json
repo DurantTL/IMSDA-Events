@@ -1,7 +1,7 @@
 {
   "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
-  "orientation_source_commit": "47cd5c00780d0c2dd9e618b56c32e2fbd04b041a",
-  "presentation": "31-slide practical user orientation",
+  "orientation_source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
+  "presentation": "25-slide visual user orientation with fictional training records",
   "files": [
     {
       "path": ".gitattributes",
@@ -10,8 +10,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 7025,
-      "sha256": "588bc1892553ed14497ad52be2ab0c4cf288806384c80747061d4d222a910a51"
+      "bytes": 8412,
+      "sha256": "2f5295fbead01850b4cb5337bb5f1a068fb7990e02e02cefa3b0e3fe647f8969"
     },
     {
       "path": "assets/FONT-LICENSE.txt",
@@ -37,6 +37,356 @@
       "path": "assets/director-desktop.png",
       "bytes": 131148,
       "sha256": "5f213379dcf7433ede474a082d4c44297230f0f0f81f87d9c1f31c50e8278e75"
+    },
+    {
+      "path": "assets/training/account-sign-out.png",
+      "bytes": 971599,
+      "sha256": "3bb9202cc92aa58e4dc9c254e7561990edc912a5efc71530af35d8960112240c"
+    },
+    {
+      "path": "assets/training/coordinator-account.png",
+      "bytes": 719509,
+      "sha256": "d014472972aa5678f28f9509a86629f6f415af2c40e0d12e98b0c39aac3e0ce1"
+    },
+    {
+      "path": "assets/training/coordinator-all-clubs.png",
+      "bytes": 585601,
+      "sha256": "52126c64f7919b5c60c5bcfdb3f9fb8de026317dc44f54c6a9472c7ac02a1ad4"
+    },
+    {
+      "path": "assets/training/coordinator-club-view.png",
+      "bytes": 1179140,
+      "sha256": "75455cbe251d73a3fec11761b06849788f0399d63f6d5e85b6548ce5b15f3ff0"
+    },
+    {
+      "path": "assets/training/coordinator-events.png",
+      "bytes": 629932,
+      "sha256": "2cb2e1b410e98190fec7f06973d27bb86113c7f86c2731ceee312ef643362ca1"
+    },
+    {
+      "path": "assets/training/coordinator-overview.png",
+      "bytes": 707191,
+      "sha256": "d973497012f416e9f0083a72c81a74db588aae51dca6ad679082f74b2ef9f206"
+    },
+    {
+      "path": "assets/training/coordinator-points.png",
+      "bytes": 679318,
+      "sha256": "81cfe03b094c9f8d7e51c1eaed714f90c290d8820ce17082f0b5a19e0c611220"
+    },
+    {
+      "path": "assets/training/coordinator-report-detail.png",
+      "bytes": 931154,
+      "sha256": "7f5c3a961e708d0fdb7d30becc7602dd85a5a614046118d20f25280a42eb9f36"
+    },
+    {
+      "path": "assets/training/coordinator-reports-draft.png",
+      "bytes": 627332,
+      "sha256": "70938bdb85eade069cc78a907f4c450e4a18c2cb465789619f352156e4e70270"
+    },
+    {
+      "path": "assets/training/coordinator-reports.png",
+      "bytes": 627389,
+      "sha256": "81d0c31cbe1b509440d8cab2087be3cfbe36e9a3483a855112f066636b8c638d"
+    },
+    {
+      "path": "assets/training/details/account-sign-out-ad36035a.png",
+      "bytes": 3385,
+      "sha256": "bcd7bcea5fa9eb5fa974fbfe5f2439961dee2cc6264d1fe941d98aa11e76e199"
+    },
+    {
+      "path": "assets/training/details/coordinator-account-ce11f08f.png",
+      "bytes": 348562,
+      "sha256": "eaf224eb5d63c3d1d48b2da10c4441b18d78d8d86f952add1670b3e5d9bed7d7"
+    },
+    {
+      "path": "assets/training/details/coordinator-all-clubs-98cdab1b.png",
+      "bytes": 151822,
+      "sha256": "0464ffaa16297bd9594bc195598cc42b6aee895139a273b537483afcbe52bea8"
+    },
+    {
+      "path": "assets/training/details/coordinator-club-view-f44d48c1.png",
+      "bytes": 612544,
+      "sha256": "50a7d2b0a955517fee9e8c5f9230625ed9f42c444b96c53f6bbd68294b3818dd"
+    },
+    {
+      "path": "assets/training/details/coordinator-events-43bf9019.png",
+      "bytes": 96324,
+      "sha256": "61b3f074bf3c2917cb9544e33234556429136f9f98a31c4975b71cb90895d328"
+    },
+    {
+      "path": "assets/training/details/coordinator-overview-0d61ad1e.png",
+      "bytes": 140809,
+      "sha256": "70e190e0ffa796cd0b707984cd774a108868ed26a9b4dcf2a9bbbe1f58bc53c7"
+    },
+    {
+      "path": "assets/training/details/coordinator-overview-f01016ff.png",
+      "bytes": 446329,
+      "sha256": "dbfa2a4921744f7fe27206f539cd12504d811c90e9dc12ed97400910f903d4eb"
+    },
+    {
+      "path": "assets/training/details/coordinator-points-aa7daa88.png",
+      "bytes": 124371,
+      "sha256": "c4909d138de8c9159070b63f33e9227ff70474cc7ce3799b94a677a01ad511b5"
+    },
+    {
+      "path": "assets/training/details/coordinator-report-detail-b371f943.png",
+      "bytes": 211189,
+      "sha256": "8fd0e2916f301cd8d5f83c2619aad48e851f8776f4214772f071bf9ea113de8b"
+    },
+    {
+      "path": "assets/training/details/coordinator-reports-a1d522b3.png",
+      "bytes": 50273,
+      "sha256": "cf3505d05819a7bf629a0fba087bd2fbdb8fd06a843fbc7ed0a8e71dc2698808"
+    },
+    {
+      "path": "assets/training/details/coordinator-reports-draft-a1d522b3.png",
+      "bytes": 50380,
+      "sha256": "71b370ebe6986bd50ae7bb96709a0f960a4edcb90c46e2acf138525f9aa0a1e6"
+    },
+    {
+      "path": "assets/training/details/director-account-d3de7c66.png",
+      "bytes": 308446,
+      "sha256": "629810585d6b55dfc93bcbabe3736bf054160839f1cdaaf95ae848558ca30861"
+    },
+    {
+      "path": "assets/training/details/director-home-cb4597d0.png",
+      "bytes": 544535,
+      "sha256": "b1f8745a025b13159bd148b9f7178eede46ba510a002e7ab1480507d39a94e3e"
+    },
+    {
+      "path": "assets/training/details/email-verification-81aa5a30.png",
+      "bytes": 66673,
+      "sha256": "da090bb8bef388c6c6de6af962da7586804c20e31856ceada78d7c7a6541b629"
+    },
+    {
+      "path": "assets/training/details/event-attendees-1ef97212.png",
+      "bytes": 29207,
+      "sha256": "6037f33fd3fa57eeb96a8ddafbad1b796e9815d60938c863edb00af0fb880d1e"
+    },
+    {
+      "path": "assets/training/details/event-attendees-5ef8b8e1.png",
+      "bytes": 33404,
+      "sha256": "9a58e46f0e9d00fb79eba6774792832ba9d1e89969c0acc9c5153b9a7a00381f"
+    },
+    {
+      "path": "assets/training/details/event-review-01ec8d41.png",
+      "bytes": 9102,
+      "sha256": "5a544fb88cb57394aada9f33a6eed8181b9ad4c2a40417a178dcf3bd813f48c4"
+    },
+    {
+      "path": "assets/training/details/event-review-02fbf625.png",
+      "bytes": 67478,
+      "sha256": "7794c43ae062c85857d50ea0023299ebf3670c3c2834dd551a121c3689d7a02b"
+    },
+    {
+      "path": "assets/training/details/event-saved-75a76ff4.png",
+      "bytes": 11933,
+      "sha256": "fad7a8cea1108063f6114d6e34076daee2fe5ac1430082e6113bd89247e28263"
+    },
+    {
+      "path": "assets/training/details/forms-6b5fa84c.png",
+      "bytes": 31869,
+      "sha256": "579eeae842da2e29f0a98eaf7e57fc773f2679f7dc5556d524ff9a480b0ee5f4"
+    },
+    {
+      "path": "assets/training/details/forms-filled-a40a2aac.png",
+      "bytes": 22817,
+      "sha256": "808c93fee7d2bb21d7c0f0197c10ed2b4fe339314abca1c1b0a33d3978118b58"
+    },
+    {
+      "path": "assets/training/details/honors-358e100f.png",
+      "bytes": 139778,
+      "sha256": "ea016b1c7c44e3dc4081a6724b20d316880577aa3ec3ec490066ce36f192c9e9"
+    },
+    {
+      "path": "assets/training/details/meeting-note-f1f3f0e3.png",
+      "bytes": 111517,
+      "sha256": "e867437a53ff4c22d3ff41e31d6308c4552bb83b46d271025e6d0fa8f19544eb"
+    },
+    {
+      "path": "assets/training/details/new-clubs-98a4a652.png",
+      "bytes": 208555,
+      "sha256": "792a170f6d33412e52b5dbead063a5e6a97ab135e817e529ec4d507d6ee36494"
+    },
+    {
+      "path": "assets/training/details/public-calendar-3349a6f3.png",
+      "bytes": 652894,
+      "sha256": "f5a157db1c4e05b1810b4fe8ff53cc690c06cd741f3eecfb5276f3ea01ceb1f5"
+    },
+    {
+      "path": "assets/training/details/public-home-fcc33105.png",
+      "bytes": 640249,
+      "sha256": "e754f8b35519a0c292329a632624e15ca854c098b44150edcc93164ab44effca"
+    },
+    {
+      "path": "assets/training/details/report-draft-2232ae44.png",
+      "bytes": 14430,
+      "sha256": "7b05f5ecfb6b5a5339d5045a4a59ae0c7c11df2a564e643c9416dc8676804e29"
+    },
+    {
+      "path": "assets/training/details/report-submitted-6178d545.png",
+      "bytes": 6615,
+      "sha256": "80a678d7017c9efd23aa31672fe6e318a92a3ba02422b0330680ac1da8244ac0"
+    },
+    {
+      "path": "assets/training/details/roster-add-dc855a89.png",
+      "bytes": 33978,
+      "sha256": "4ab752ae4d942a26a781332d767b4287494352473054ac18a79ea413b369363a"
+    },
+    {
+      "path": "assets/training/details/roster-add-save-dfe9bce2.png",
+      "bytes": 5472,
+      "sha256": "fb28ce8ff711f0b9b5ad9967da2240b0b0aa5cb17057b0bc66c1633da693819c"
+    },
+    {
+      "path": "assets/training/details/roster-added-83eef072.png",
+      "bytes": 36313,
+      "sha256": "0266f5940c108c7ffe440654ca065ac0714c772a1fde0c43195ac2dda6a0964f"
+    },
+    {
+      "path": "assets/training/details/roster-edit-9f1786d2.png",
+      "bytes": 41027,
+      "sha256": "7c13bdda6d45a20bc459969ff78823e91feafe886e6e54dafa9e01cdc597c7d6"
+    },
+    {
+      "path": "assets/training/details/roster-edit-top-9bcefb13.png",
+      "bytes": 109581,
+      "sha256": "8e1f494797942b8cbc980fdf111df6f0dd0ce697c98ea9f1918da21b57400e61"
+    },
+    {
+      "path": "assets/training/details/roster-export-4a5129aa.png",
+      "bytes": 30788,
+      "sha256": "468dde5fdd360a577f20e7abd8a6df7b247c9ee778d2ed7e50f530d2cbfef91b"
+    },
+    {
+      "path": "assets/training/details/sign-in-677dee22.png",
+      "bytes": 56448,
+      "sha256": "c4226fef65ef463c40ba610bbd28f3cc1a539adadf70441fabf4edaae2411c97"
+    },
+    {
+      "path": "assets/training/details/two-step-1cd28248.png",
+      "bytes": 417316,
+      "sha256": "1508867846bb4aa7c7690567141d53ff449f20c66cf66ffff52c7fca6da9ea20"
+    },
+    {
+      "path": "assets/training/director-account.png",
+      "bytes": 611501,
+      "sha256": "cbf5b40752eb0666e6fa264494f55f43c34d26c51ffb4397959a657f891f661d"
+    },
+    {
+      "path": "assets/training/director-home.png",
+      "bytes": 779016,
+      "sha256": "8d380fcf7077ed235b57882a3e7d3d9d08c321563f426b74b53fd5894b2d28a6"
+    },
+    {
+      "path": "assets/training/email-verification.png",
+      "bytes": 1225347,
+      "sha256": "ca7043d7c169aafbe7e98ced408245592d56f113e146d6af7ae0cec3aaa92019"
+    },
+    {
+      "path": "assets/training/event-attendees.png",
+      "bytes": 827828,
+      "sha256": "2bd04b70d54d5682c6c4b2146712acf1ab9c76864c8e3bd3378808058af58bfe"
+    },
+    {
+      "path": "assets/training/event-review.png",
+      "bytes": 1423541,
+      "sha256": "e7e13946907be3e44e08362d4f4e65bb95add0fcfbca3e6ac339d2ddc08c5350"
+    },
+    {
+      "path": "assets/training/event-saved-confirmation.png",
+      "bytes": 62030,
+      "sha256": "a60fae578c6986cc5f80fb56796250f114f8707e61bf5623b7ac5709851f2f62"
+    },
+    {
+      "path": "assets/training/forms-filled.png",
+      "bytes": 867857,
+      "sha256": "a5f679f5a9f2eea52700a1fdc3065f79e84bccdc0e23a27acc5ff007c62f0c0a"
+    },
+    {
+      "path": "assets/training/forms.png",
+      "bytes": 867857,
+      "sha256": "a5f679f5a9f2eea52700a1fdc3065f79e84bccdc0e23a27acc5ff007c62f0c0a"
+    },
+    {
+      "path": "assets/training/honors.png",
+      "bytes": 763266,
+      "sha256": "0485171177dd1bb8f25b525dc68968cc7cb2f406c459b4b8775f592de2ed825f"
+    },
+    {
+      "path": "assets/training/invite-card-focus.png",
+      "bytes": 41492,
+      "sha256": "d734274d5053285feba446eaf4f01fe32699ed425ad95d624846a956b6c7d40e"
+    },
+    {
+      "path": "assets/training/meeting-note.png",
+      "bytes": 427859,
+      "sha256": "e2884612946ab638d5524875fb24fa48d6e1df9cba8109507a5816f5486e185e"
+    },
+    {
+      "path": "assets/training/new-clubs.png",
+      "bytes": 793227,
+      "sha256": "987fb68abdc7ebd6be12163f385610a2cebe1360a90fb5121c46bc44c9906ff2"
+    },
+    {
+      "path": "assets/training/public-calendar.png",
+      "bytes": 726369,
+      "sha256": "3d1911c63cf742e2e7363c4e726ae178f15efda986a74c3ecc01ac3dc9da1dc2"
+    },
+    {
+      "path": "assets/training/public-home.png",
+      "bytes": 696318,
+      "sha256": "58bc015da2f1cb425ff82b9002b5b4869092236eb666b55e5009b394a54bc5a0"
+    },
+    {
+      "path": "assets/training/report-draft.png",
+      "bytes": 462491,
+      "sha256": "c777b4e71ff2c8e35cd6061642bed290affd688641346c4fbf252f1fa12c1b87"
+    },
+    {
+      "path": "assets/training/report-submitted.png",
+      "bytes": 896324,
+      "sha256": "6f852e2d0534789b0b12d11069bda306c2886847c9d6b7fbb82a274f97ba71d4"
+    },
+    {
+      "path": "assets/training/roster-add-save.png",
+      "bytes": 553763,
+      "sha256": "6c4a7b4f6c03efbfc3d08989892eb8c6b1c2c32d405894248e4d2cd88f583d53"
+    },
+    {
+      "path": "assets/training/roster-add.png",
+      "bytes": 586570,
+      "sha256": "51b9e356cd586aa18889f92668da4cf4a0a7a82fe589532010268e7fd6734143"
+    },
+    {
+      "path": "assets/training/roster-added.png",
+      "bytes": 998359,
+      "sha256": "520c21f2b2a72cd8d7caa3059b7822ea3d449888f372ee6e8c45a919b4c3e189"
+    },
+    {
+      "path": "assets/training/roster-edit-top.png",
+      "bytes": 550890,
+      "sha256": "e8f09974872f801b70b1cfa0ce4343c069a78ead80394744a16a51954ff18c1b"
+    },
+    {
+      "path": "assets/training/roster-edit.png",
+      "bytes": 521268,
+      "sha256": "055b7c4536175d87a2c75f34493097b9315aee5eee750a19054c6990c35804e6"
+    },
+    {
+      "path": "assets/training/roster-export.png",
+      "bytes": 762648,
+      "sha256": "465880b2eca1350f1432b4ee0801b999eb117987525a1c78122c3631f63f6483"
+    },
+    {
+      "path": "assets/training/sign-in.png",
+      "bytes": 1189764,
+      "sha256": "9f13036d9699159707997073cde71987edf924ec02d654ffb463ce0f74278d88"
+    },
+    {
+      "path": "assets/training/two-step.png",
+      "bytes": 560456,
+      "sha256": "04c54bee1c2c5b51995803620bc228f32307da8b05337315abd6121709fc328a"
     },
     {
       "path": "content/01-current-and-future-features.md",
@@ -65,8 +415,8 @@
     },
     {
       "path": "content/06-presenter-notes.md",
-      "bytes": 34124,
-      "sha256": "ab40a5df855e2cbd29a54ab47d15d8553d81a2462d92e9962f06f81e9c89ad77"
+      "bytes": 38981,
+      "sha256": "882a12b72e41bf3756ee3788c2b00b7569255586e55efcf449db4507a43bb5a7"
     },
     {
       "path": "content/07-club-quick-start.md",
@@ -75,13 +425,13 @@
     },
     {
       "path": "evidence/deck-source.json",
-      "bytes": 154475,
-      "sha256": "eceabadba04d1ad4a5478d3d84a9f99a876d362aa1f7a6fef9bd5510ff97f9f2"
+      "bytes": 113511,
+      "sha256": "9bcc58e46644544252f18e7f0e2c2cdeafc07ed2a7d96ef8eb4422b25b0c0a81"
     },
     {
       "path": "evidence/export-verification.md",
-      "bytes": 2583,
-      "sha256": "19de814a4a94421cc0c9171d928ec53d400126baeb38586beab7cb1e13a3a215"
+      "bytes": 3941,
+      "sha256": "7155fd772127610931e32076db23a0e6fc5eebcd115ec4e048c5ccc8c9c6129e"
     },
     {
       "path": "evidence/feature-matrix.json",
@@ -101,17 +451,17 @@
     {
       "path": "evidence/local-link-checks.json",
       "bytes": 115,
-      "sha256": "103efd940f36cb202d30943bface5047c77672b341f0523d478d55297cdb9d13"
+      "sha256": "2be5b51847741412fa3f8858f8bfcc7898627acf83abb8c848629d3a6ec0f958"
     },
     {
       "path": "evidence/office-pdf-structure-checks.json",
-      "bytes": 1436,
-      "sha256": "25e2820b5eebc5118f520639c76baf5a469621b75aee61836610f4bd55d3c99d"
+      "bytes": 1832,
+      "sha256": "a62d6871f5961c6f6aefad7537a5af1b421a08eb87af252efac79d859bea484d"
     },
     {
       "path": "evidence/orientation-checks.json",
-      "bytes": 1436,
-      "sha256": "25e2820b5eebc5118f520639c76baf5a469621b75aee61836610f4bd55d3c99d"
+      "bytes": 1832,
+      "sha256": "a62d6871f5961c6f6aefad7537a5af1b421a08eb87af252efac79d859bea484d"
     },
     {
       "path": "evidence/orientation-coordinator.md",
@@ -130,18 +480,28 @@
     },
     {
       "path": "evidence/orientation-verification.md",
-      "bytes": 3614,
-      "sha256": "989ba57fde4306fd15296aa9909c1204f55a049460e56ebad5ff3437289a661a"
+      "bytes": 6285,
+      "sha256": "e27c070c51b989fdfebf8b33ccdbe92dfdeeda921da8dba8f38212b1f466571b"
     },
     {
       "path": "evidence/pdf-manifest.json",
       "bytes": 979,
-      "sha256": "c53fae269b58ff2ac6c2f14cf20e268267afa0ab3cc57dad1e797a495bd1b832"
+      "sha256": "225b1428883be1cfbc4d3102677e342d126b86566d9852775377e67ae76e89b9"
     },
     {
       "path": "evidence/render-checks.json",
-      "bytes": 321,
-      "sha256": "f2eb2df000ae63e57209415181a6fab17bc59b9dec457e371f09bdbdb984b7b8"
+      "bytes": 257,
+      "sha256": "085cd88ee94a876bcceb3e9255f39c37f6ef9dfb2c7b9c58db268a7f693371ee"
+    },
+    {
+      "path": "evidence/screenshot-capture.json",
+      "bytes": 22703,
+      "sha256": "938c51dfc6c8b024a4caf75d488e0238bd5bb051e30a0fb80125b5267e77bce4"
+    },
+    {
+      "path": "evidence/synthetic-training-dataset.md",
+      "bytes": 5044,
+      "sha256": "5d6cc95609d6f7eb43c2f36aad24e2940d19a0c322de27af45012ea93c5c8b7f"
     },
     {
       "path": "evidence/technical-checks.json",
@@ -167,6 +527,16 @@
       "path": "evidence/usability-findings.json",
       "bytes": 17987,
       "sha256": "8723cc7a4ba009d581ae0580b29ecc2bae675f11c2c2a67bf4c27f6cd5c6ad3e"
+    },
+    {
+      "path": "evidence/visual-training-independent-qa.md",
+      "bytes": 7544,
+      "sha256": "7fc82d12d85862ff7e976e80aff63a877fba848550d746b8d863477aaebf019f"
+    },
+    {
+      "path": "evidence/visual-training-qa-plan.md",
+      "bytes": 8481,
+      "sha256": "e69b0f462d97da58ccca127889a66cc1beb822ef0bd455fcd3de17550e1eff36"
     },
     {
       "path": "exports/01-current-and-future-features.docx",
@@ -245,18 +615,18 @@
     },
     {
       "path": "exports/06-presenter-notes.docx",
-      "bytes": 37345,
-      "sha256": "1199c88e76cf11c41cd6747062134b69697af1fa6ca4e5745b59adb59d5691ea"
+      "bytes": 39201,
+      "sha256": "bd9fbc3850ac68ce60f573ae5394b3639cb5576f4f5afdb7e7ac62b798694063"
     },
     {
       "path": "exports/06-presenter-notes.html",
-      "bytes": 42872,
-      "sha256": "b4b6b6abb35c833c1cd2c323eb6925885985d5225f9dd94c257335fdadae24c8"
+      "bytes": 47966,
+      "sha256": "467d9ad36fe27fbce15eadd79550573f41e15f391fd48fb011ba051e10762ef2"
     },
     {
       "path": "exports/06-presenter-notes.pdf",
-      "bytes": 246843,
-      "sha256": "4296665bea0f1747bf86a901b7aa11098b314bc4cc5d0f571e8a8b5c230b7357"
+      "bytes": 278088,
+      "sha256": "8b9a5e78ebc0c721b681bac109015a8208d43e81ea325e305b483b0aa609843f"
     },
     {
       "path": "exports/07-club-quick-start.docx",
@@ -275,23 +645,28 @@
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.html",
-      "bytes": 118600,
-      "sha256": "449028620d77551b54b2d981a4bebb8a094b4fb5c52d8d4f8ba72e062df830b2"
+      "bytes": 92266,
+      "sha256": "286d9502edd3e23217e97e63cb00ad06767d72d19bd91136984728da6272ba80"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pdf",
-      "bytes": 359720,
-      "sha256": "daaebd3d32c4caaf57d5c9e245d17c4acec55f6babe232afc09d0803d8721ece"
+      "bytes": 4774377,
+      "sha256": "d29c6de0cf49de7553e29e7a84b8fb6b97b57115fc970bfec50e4f747ff952df"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pptx",
-      "bytes": 145337,
-      "sha256": "0aabb676de5cb8721fa7de59742b757c4df98933d40c9a2657fbc465b97a63a7"
+      "bytes": 5813735,
+      "sha256": "40f3e07d26eb500e9cfe5111ae6cf1757d4b6973b2c40e323e8cd0fe146896a5"
+    },
+    {
+      "path": "exports/IMSDA-Events-training-screenshot-gallery.html",
+      "bytes": 15422,
+      "sha256": "48561af5119684a0b317f4afca625d8c3c41d1bd978e9335d4c5e51e17266b59"
     },
     {
       "path": "previews/deck-overview.png",
-      "bytes": 640771,
-      "sha256": "dc8dc434d9510e7ec172aeb6591bfa71bf7f11c7832fcdfa573a990de79e8a5e"
+      "bytes": 492991,
+      "sha256": "b878af8ecb5ca87972314ef9dec0890fd44abdbd3edaf881f359e8e776d6f60d"
     }
   ]
 }

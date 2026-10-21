@@ -1,20 +1,27 @@
 # Export verification — October 21, 2026
 
-The pack contains five reference documents, a 31-slide user orientation, spoken presenter notes and a three-page quick-start handout. Markdown is the editable text source; Word and PowerPoint provide editable Office copies; PDF companions support sharing. The five reference reports retain their original content and exports.
+The revised pack contains five reference documents, a **25-slide screenshot-led user orientation**, spoken presenter notes and a three-page quick-start handout. Markdown is the editable text source. Word and PowerPoint provide editable Office copies; PDF companions support sharing. PowerPoint titles, captions and callouts remain editable; captured app screens are embedded raster images. The five reference reports retain their original content and exports.
 
-## Content checks
+## Retained reference-document evidence
 
-The original independent review checked all five reference documents and the earlier briefing. It verified 324 Markdown HTTPS references against the pinned repository paths, nine runtime help-template tokens against the current allowlist, and valid JSON evidence. Those unchanged reports retain their review evidence. The revised user orientation has a separate source/content record in `orientation-verification.md` and `orientation-checks.json`.
+The original independent review checked reports 01–05 and the earlier briefing. It verified 324 Markdown HTTPS references against pinned repository paths, nine runtime help-template tokens against the allowlist and valid JSON evidence. The unchanged reports retain that historical review evidence. It does not automatically validate the new screenshots or revised slide exports.
 
-Deck copy spacing and directory-link refinements identified by that review were corrected before final exports. Current/gated/future claims and source references were rechecked while producing the slide deck.
+The prior pack's eight PDFs and seven Word packages passed their recorded structure/integrity checks. Those results remain applicable to unchanged files. Newly generated presentation and notes files require fresh checks. The user-orientation source review is `orientation-verification.md`; its screenshot acceptance checklist is `visual-training-qa-plan.md`.
 
-## Export checks
+## Screenshot provenance
 
-- All eight PDF files opened successfully and contain extractable text and a tagged structure. Document/notes PDFs have heading outlines; the revised presentation has slide-title bookmarks. Tagging alone does not certify accessible reading order or PDF/UA.
-- The presentation has 31 slides, spoken notes on every slide, valid Office package structure and shapes within slide bounds.
-- All seven Word packages passed ZIP integrity checks; the documents retain headings, tables and hyperlinks.
-- The revised HTML presentation was checked after font loading: zero overflowing text boxes. The revised notes and quick-start HTML fit the tested 1280px viewport without horizontal document overflow; the five unchanged reference documents retain the original checks.
-- Page contact sheets were generated for every PDF. The deck, feature/camp/technical contact sheets and full-size usability, help and deck detail pages were visually inspected for obvious clipping, overlap, broken glyphs and layout problems. Table widths were adjusted before final export.
-- These checks validate the generated documentation assets. They are separate from the actual application CI evidence in the technical report and do not constitute a live production, assistive-technology or physical printer audit.
+The source application revision is `7f77c1dfeadd004deb51f91e2bae1b6c4754638b`. Captures use a local instance with fictional clubs, people, reports and event registrations. They do not establish public production configuration or contain production records. The capture ledger is `screenshot-capture.json`.
 
-Machine-readable records: `render-checks.json`, `pdf-manifest.json` and `office-pdf-structure-checks.json`. The technical report records actual GitHub Actions evidence by revision/run rather than treating configured checks as passed.
+## Final export checks
+
+- **25 slides, 42 embedded screenshot placements, 34 registered capture examples from 33 unique images.** All slides contain spoken notes and all pictures have alternative descriptions. Office ZIP integrity and PowerPoint shape bounds pass; screenshots are embedded rather than dependent on a network image URL.
+- All eight PDFs open and contain extractable text and tagged structures. Notes/document heading outlines remain present; the presentation has 25 slide-title bookmarks. Notes are 14 pages and the retained quick-start is three pages. Tags alone do not certify reading order, PDF/UA or WCAG conformance.
+- All seven Word packages pass ZIP integrity checks. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
+- The final HTML deck has zero overflowing text boxes and zero failed images after fonts/images load. Regenerated presenter notes fit the tested 1280px viewport without horizontal document overflow. All 47 distinct source-file references exist.
+- The full contact sheet, enlarged task/detail slides and spoken notes were inspected. Independent review checked role permissions, fictional-data chronology and before/after states. Initial crops and annotations were refined to expose the relevant controls without covering values. The shared confirmation gallery crop omits the local check-in QR.
+- The capture register records source revision, screenshot hashes, routes, synthetic context and any published crop. The gallery opens each shared capture at full resolution. Local document links and the final ZIP are checked at packaging.
+- The final Git changes contain documentation and export assets only. Runtime scripts, session cookies, local database configuration and application source are excluded. All training mutations were confined to a separate synthetic database.
+
+Observed results: `orientation-checks.json`, `render-checks.json`, `pdf-manifest.json`, `office-pdf-structure-checks.json` and `visual-training-independent-qa.md`.
+
+These checks validate documentation assets. They remain separate from application CI evidence in the technical report and do not constitute a live production, assistive-technology or physical-printer audit. No new application test run was started for this documentation-only revision.

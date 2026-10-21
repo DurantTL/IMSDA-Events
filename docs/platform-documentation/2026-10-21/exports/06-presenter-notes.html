@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events: getting started — presenter notes</title><style>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events: see it, try it — presenter notes</title><style>
 @font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
 @font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
 *{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
@@ -18,320 +18,380 @@ td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywh
 td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
 img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
 hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
-</style></head><body><div class="coverline">IMSDA EVENTS / GETTING STARTED</div><h1 id="imsda-events-getting-started--presenter-notes">IMSDA Events: getting started — presenter notes</h1><div class="baseline">A practical guide for club directors and Area Coordinators · October 2026<br>Start at <a href="https://events.imsda.org">events.imsda.org</a>. Use the tools assigned to your account.</div>
-<p>Use this spoken guide with the 31-slide presentation for club directors and Area Coordinators. Introduce why the system helps, show how to sign in, then follow the tasks for the audience's role. The technical review, code checks and future planning remain in the separate reports.</p>
-<p><strong>Suggested route:</strong> slides 1–10 introduce the system and sign-in; 11–19 cover directors; 20–27 cover Area Coordinators; 28–31 cover routines, help and finishing safely. For a single-role group, use its section after the common introduction.</p>
-<p><strong>Before presenting:</strong> check the current website labels and use an approved training account with fictitious records. The numbered task illustrations are teaching aids, not product screenshots or proposed menus. Keep live invitations, setup keys, recovery codes, private links and member information out of the demonstration. Stop before a real submission, erasure or approval unless it is part of an authorized training exercise.</p>
-<p><strong>How to use the notes:</strong> read or adapt the Say paragraph. Show or demonstrate gives an optional screen action. Ask the group is an optional check for understanding. Preparation references support the trainer and do not need to be read aloud.</p>
-<h2 id="1-imsda-events-getting-started">1. IMSDA Events Getting started</h2>
+</style></head><body><div class="coverline">IMSDA EVENTS / GETTING STARTED</div><h1 id="imsda-events-see-it-try-it--presenter-notes">IMSDA Events: see it, try it — presenter notes</h1><div class="baseline">A practical guide for club directors and Area Coordinators · October 2026<br>Start at <a href="https://events.imsda.org">events.imsda.org</a>. Use the tools assigned to your account.</div>
+<p>A visual orientation for club directors and Area Coordinators. The presentation follows fictional Riverton Pathfinders through ordinary tasks, then changes to a coordinator's view of the same records. These are screenshots of an isolated local copy of the current app, populated only with invented training records. They show implemented behavior at the source version recorded below; production configuration may affect which tools appear.</p>
+<p><strong>How to present:</strong> show the screenshot, point to the numbered controls or visible result, then use the Say paragraph in your own words. Keep the detailed steps in these notes instead of reading long lists on screen. Pause for the question or a short practice task. For a single-role group, use the shared opening and its role section.</p>
+<p><strong>Our fictional story:</strong> Jordan Ellis directs Riverton Pathfinders. Morgan Reed is a fictional roster member. Alex Morgan is an Area Coordinator reviewing several fictional clubs. The program year is 2026–27. September records illustrate past submissions and unfinished work; October illustrates the director's current task. All names, contacts, counts and event registrations are examples, not real ministry records.</p>
+<p><strong>Training setup:</strong> screenshots were captured locally with synthetic accounts and records. No real invitations, emails, submissions or approvals were sent. Authentication examples exclude usable passwords, setup keys, recovery codes and private links. A saved draft is not a submitted report or confirmed event place. The coordinator's ordinary club oversight remains view only.</p>
+<p><strong>Source version:</strong> <a href="https://github.com/DurantTL/IMSDA-Events/commit/7f77c1dfeadd004deb51f91e2bae1b6c4754638b">7f77c1df</a>. See the screenshot capture register for individual routes, states and any crops. Crops enlarge the app's own pixels; annotations belong to the presentation and do not change app controls.</p>
+<h2 id="1-follow-a-club-through-a-real-task">1. Follow a club through a real task</h2>
 <h3 id="say">Say</h3>
-<p>IMSDA Events is our shared place for club records and event participation. Today we will follow the tasks you are most likely to need: signing in, keeping a club's information up to date, registering for an event and reviewing clubs as a coordinator. You do not need to understand the software behind it. Start with your own account and the job you are doing.</p>
-<h3 id="show-or-demonstrate">Show or demonstrate</h3>
-<p>Open events.imsda.org. For demonstrations, use an approved training account and fictitious records. The step illustrations in this deck are teaching aids, not screenshots or proposed menus.</p>
+<p>Today we are going to follow two people rather than read a list of features. Jordan directs Riverton Pathfinders. Alex is an Area Coordinator. We will see Jordan update the club, prepare a Monthly Record and choose who is going to Fall Camporee. Then we will see how Alex uses those saved records to offer help. Every person, club and event record in these screenshots is fictional. These are teaching examples from the current application, and your own assigned tools may differ.</p>
+<h3 id="point-to-or-demonstrate">Point to or demonstrate</h3>
+<p>Point to the role labels on the two real application views. Keep the fictional-data label visible throughout the presentation.</p>
+<h3 id="visual-example">Visual example</h3>
+<ul>
+<li>Jordan’s club Home: Riverton Home before the story:9active people,1report filed, FallCamporee open to register.</li>
+<li>Alex’s coordinator Overview: 2026–27 summaries for four fictional clubs after Jordan’s roster/report work.</li>
+</ul>
 <h3 id="preparation-references--not-spoken">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/page.tsx">app/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-subnav.tsx">components/area-clubs-subnav.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/page.tsx">app/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/area-clubs-subnav.tsx">components/area-clubs-subnav.tsx</a></li>
 </ul>
-<h2 id="2-why-we-use-imsda-events">2. Why we use IMSDA Events</h2>
+<h2 id="2-keep-the-people-choose-the-trip">2. Keep the people. Choose the trip.</h2>
 <h3 id="say-1">Say</h3>
-<p>The purpose is to make ongoing club work and event work easier to connect. A director maintains the club's information. When an event opens, that roster is available for choosing who will attend. Coordinators use the same recorded work to understand progress and offer help. Returning to the saved record is more useful than keeping several different versions of a list.</p>
+<p>The first useful idea is the difference between belonging to the club and going to an event. Morgan appears on Riverton's roster. Jordan can choose Morgan for Fall Camporee without typing the same person again. Jordan still has to decide who is actually going and complete the event's choices. Adding someone to the roster does not register them for every event. Reports, forms and achievements also stay with their own saved records, so we can return to the information instead of asking for another copy.</p>
 <h3 id="ask-the-group">Ask the group</h3>
-<p>Which task currently makes you re-enter information or ask for another copy of a record?</p>
+<p>If Morgan is on the roster but not selected for Fall Camporee, is Morgan registered for the event?</p>
+<h3 id="visual-example-1">Visual example</h3>
+<ul>
+<li>Club roster · who belongs: Actual roster after Add to roster saved Morgan Reed:10activepeople.</li>
+<li>Fall Camporee · who is going: Six fictional club members selected for Fall Camporee; actual Draft saved state.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-1">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/page.tsx">app/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/docs/CLUB-MINISTRY-AND-HONORS-WEEKEND-PLAN.md">docs/CLUB-MINISTRY-AND-HONORS-WEEKEND-PLAN.md</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-roster-workspace.tsx">components/club-roster-workspace.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-registration-workspace.tsx">components/club-registration-workspace.tsx</a></li>
 </ul>
-<h2 id="3-know-which-job-you-are-doing">3. Know which job you are doing</h2>
+<h2 id="3-one-website-several-useful-starting-points">3. One website, several useful starting points</h2>
 <h3 id="say-2">Say</h3>
-<p>These ideas are related, but they answer different questions. Putting someone on the roster does not register that person for every event. A report being submitted does not mean an event registration is paid or checked in. Your account connects you to the responsibilities assigned to you. If you are both a director and a coordinator, choose the workspace for the task you are doing.</p>
-<h3 id="ask-the-group-1">Ask the group</h3>
-<p>If a new member is on the roster, are they automatically registered for Honors Weekend? The answer is no.</p>
+<p>Everyone can begin at events dot imsda dot org. The homepage brings together the calendar, Find a club, My account and My club. You can look for an upcoming date without opening the director's workspace. When you need your own registrations or club tools, use Sign in on the page. The website chooses the available sign-in route, so you do not need to remember a special director or coordinator login address. A signed-in person may see My account instead.</p>
+<h3 id="point-to-or-demonstrate-1">Point to or demonstrate</h3>
+<p>Optional: open Find a club from the homepage. Do not make a new club application for an already-established invited club.</p>
+<h3 id="visual-example-2">Visual example</h3>
+<ul>
+<li>events.imsda.org: Public home in the current local application; fictional training records.</li>
+<li>Conference calendar: Public calendar in the current local application; fictional training records.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-2">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-reports/area-summary-domain.ts">modules/club-reports/area-summary-domain.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/page.tsx">app/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/public-header-links.tsx">components/public-header-links.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/calendar/page.tsx">app/(public)/calendar/page.tsx</a></li>
 </ul>
-<h2 id="4-begin-at-the-same-website">4. Begin at the same website</h2>
+<h2 id="4-use-the-account-you-already-have">4. Use the account you already have</h2>
 <h3 id="say-3">Say</h3>
-<p>Everyone can start at events dot imsda dot org. Use the Sign in button on the website; it takes you to the sign-in page available on the system. You do not need a special director or coordinator login address. If you are already signed in, the page can show My account instead. Use the account that received your invitation or was assigned your coordinator access.</p>
-<h3 id="show-or-demonstrate-1">Show or demonstrate</h3>
-<p>Point to Sign in, My account and My club on the current homepage. A configured passkey may also be offered. Do not teach a fixed /login or /sign-in path.</p>
+<p>Jordan already has an account, so Jordan enters the existing email address and password and chooses Sign in. If you received a club invitation, use the account with that same address. If you have forgotten the password, choose Forgot password, request a code and keep this browser open while you check your email. Return here to enter the email code and new password. A passkey may also be offered if one is configured. Making a second account does not restore a missing club assignment.</p>
+<h3 id="point-to-or-demonstrate-2">Point to or demonstrate</h3>
+<p>Use a blank password field. Never put a password, usable email code or private registration link in the capture.</p>
+<h3 id="visual-example-3">Visual example</h3>
+<ul>
+<li>Account sign-in: Account sign-in with Jordan Ellis’s fictional email entered; password blank; no sign-in attempt sent.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-3">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/page.tsx">app/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/public-header-links.tsx">components/public-header-links.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/attendee-sign-in-form.tsx">components/attendee-sign-in-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/attendee-sign-in-form.tsx">components/attendee-sign-in-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/attendee-password-reset-form.tsx">components/attendee-password-reset-form.tsx</a></li>
 </ul>
-<h2 id="5-new-director-accept-the-club-invitation">5. New director? Accept the club invitation</h2>
+<h2 id="5-an-invitation-connects-the-account-to-the-club">5. An invitation connects the account to the club</h2>
 <h3 id="say-4">Say</h3>
-<p>The invitation is what connects your account to a club. Creating an account by itself does not complete that connection. If you already have an account at the invited address, sign in to it. If you are new, create and verify the account first. On your account page, find You're invited to manage a club, check the club name and role, and choose Accept. If the invitation is missing, ask the office to check the address rather than making another account or applying to create the club again.</p>
-<h3 id="show-or-demonstrate-2">Show or demonstrate</h3>
-<p>Point out the invitation card and Accept label using a training example. Do not accept a real invitation as a general demonstration.</p>
+<p>For a new director, there are two different jobs. Creating and verifying an account confirms the email address. Accepting the invitation connects that account to the club. Create an account only if you do not have one already. Keep the same browser open while checking the emailed six-digit code, then Verify and continue. On the account page, check the club and role beside You're invited to manage a club, then Accept. If the invitation is absent, ask the office to check the address; do not apply to create the established club again. The grey digits in the empty verification box are a placeholder. The real email code must come from the message sent to your own address.</p>
+<h3 id="point-to-or-demonstrate-3">Point to or demonstrate</h3>
+<p>The verification field stays empty. The invitation shown is an isolated fictional local fixture, with no reusable token or live link visible.</p>
+<h3 id="visual-example-4">Visual example</h3>
+<ul>
+<li>New account · verify your email: Actual new-account email verification step, six-digit-code field left empty. Development-only code panel excluded.</li>
+<li>Account Overview · club invitation: The current invitation card for Riverton, captured in a600px-wide local browser so its club name and Accept action can be read together. Fictional invitation; not accepted.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-4">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-imports/invites.ts">modules/club-imports/invites.ts</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/club-invite-accept.tsx">components/club-invite-accept.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/attendee-sign-up-form.tsx">components/attendee-sign-up-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-invite-accept.tsx">components/club-invite-accept.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-imports/invites.ts">modules/club-imports/invites.ts</a></li>
 </ul>
-<h2 id="6-creating-an-account-verify-your-email">6. Creating an account: verify your email</h2>
+<h2 id="6-the-extra-step-protects-club-information">6. The extra step protects club information</h2>
 <h3 id="say-5">Say</h3>
-<p>Create an account asks for your name, email and a password that meets the checklist. The system emails a six-digit code. Keep the same browser open, then return to enter that code and choose Verify and continue. The current email code expires after twenty minutes. This confirms that you control the address. It is not the authenticator code we will use for the club's extra sign-in protection.</p>
-<h3 id="show-or-demonstrate-3">Show or demonstrate</h3>
-<p>Explain the same-browser verification step without displaying a real code or inbox. After verification, return to the club invitation and accept it.</p>
+<p>Club and coordinator tools can open information about young people. The extra step helps protect that information if someone learns a password. If setup is needed, choose Set up an authenticator and follow the displayed instructions. Enter Code from your authenticator, then Confirm and turn on. Save the recovery codes privately and choose I've saved these codes. One supported method is enough; a passkey can also meet the requirement when offered. The email-verification code proves your address. The authenticator code is the extra sign-in protection. Neither is an event confirmation code. The grey 123456 in the empty box is a placeholder, not a code to copy from this slide. Use the current code from your own authenticator.</p>
+<h3 id="point-to-or-demonstrate-4">Point to or demonstrate</h3>
+<p>Capture the challenge or pre-secret setup introduction only. Do not capture a setup key, QR secret, recovery codes or populated authenticator field. Which app should I use? can be demonstrated separately.</p>
+<h3 id="ask-the-group-1">Ask the group</h3>
+<p>Where does the email-verification code come from? Where does the authenticator code come from?</p>
+<h3 id="visual-example-5">Visual example</h3>
+<ul>
+<li>Two-step sign-in: Current two-step challenge with an empty authenticator or recovery-code field.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-5">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/attendee-sign-up-form.tsx">components/attendee-sign-up-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/two-step/page.tsx">app/(public)/account/two-step/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/two-step-setup.tsx">components/two-step-setup.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/mfa-manager.tsx">components/mfa-manager.tsx</a></li>
 </ul>
-<h2 id="7-returning-users-sign-in-and-continue">7. Returning users: sign in and continue</h2>
+<h2 id="7-open-the-tools-for-the-job-you-are-doing">7. Open the tools for the job you are doing</h2>
 <h3 id="say-6">Say</h3>
-<p>When you return, use the account you already set up. Sign in, then complete Confirm it's you if asked. That might be your authenticator code or a supported passkey. An unused recovery code can help if you cannot use the authenticator. Once the system has confirmed you, open the club or coordinator tools for the work you need to do.</p>
-<h3 id="show-or-demonstrate-4">Show or demonstrate</h3>
-<p>Point to the actual sign-in labels. Explain a passkey as the device fingerprint, face or PIN prompt when the system offers that option.</p>
+<p>The system shows the tools assigned to the signed-in account. Jordan uses My club, or My clubs if more than one club is assigned. Alex uses Clubs overview on the Area coordinator card; Clubs in the account navigation opens the club list. A person who has both assignments can see both kinds of tools. The coordinator side is not the system administrator dashboard, and it does not give every coordinator editing access to every club. If the expected option is missing, check the signed-in email and ask the office to verify the assignment.</p>
+<h3 id="visual-example-6">Visual example</h3>
+<ul>
+<li>Jordan · director: Director Jordan Ellis’s account entry into the Riverton club workspace.</li>
+<li>Alex · Area Coordinator: Alex Morgan’s fictional account overview and Area coordinator entry after the training tasks.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-6">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/attendee-sign-in-form.tsx">components/attendee-sign-in-form.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/two-step/page.tsx">app/(public)/account/two-step/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/layout.tsx">app/(public)/account/(portal)/layout.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-reports/area-card-domain.ts">modules/club-reports/area-card-domain.ts</a></li>
 </ul>
-<h2 id="8-why-the-extra-sign-in-step-matters">8. Why the extra sign-in step matters</h2>
+<h2 id="8-jordan-starts-with-the-next-task">8. Jordan starts with the next task</h2>
 <h3 id="say-7">Say</h3>
-<p>The extra step protects club information if someone learns a password. You only need one supported method. An authenticator app generates a short code. A passkey asks your device for a fingerprint, face or PIN. The email verification code confirms the email address; the authenticator or passkey protects access to the club and coordinator tools. Saving recovery codes now can prevent a lost phone from becoming a long interruption later.</p>
-<h3 id="ask-the-group-2">Ask the group</h3>
-<p>Which code comes from your email, and which comes from your authenticator app?</p>
+<p>Jordan checks Riverton Pathfinders and the year shown at the top before changing anything. Home is a starting point rather than another form to complete. It brings together the next task, deadlines and summaries, with links such as Open roster and Open Monthly Records. Jordan can go directly to the work that needs attention. A deputy has the director's capabilities; a registrar or reporter may correctly see fewer sections. There is no universal year dropdown to search for on every page.</p>
+<h3 id="visual-example-7">Visual example</h3>
+<ul>
+<li>Riverton Pathfinders · Home: Riverton Home before the story:9active people,1report filed, FallCamporee open to register.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-7">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/two-step/page.tsx">app/(public)/account/two-step/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/two-step-setup.tsx">components/two-step-setup.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-year-tiles.tsx">components/club-year-tiles.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
 </ul>
-<h2 id="9-set-up-an-authenticator-when-prompted">9. Set up an authenticator when prompted</h2>
+<h2 id="9-add-morgan-once-then-check-the-saved-row">9. Add Morgan once, then check the saved row</h2>
 <h3 id="say-8">Say</h3>
-<p>Choose Set up an authenticator. The help link explains suitable apps, including Google Authenticator and Microsoft Authenticator. Follow the screen to add the account to your app using the setup information shown. Then enter the code from the app and choose Confirm and turn on. Save the recovery codes somewhere private and choose I've saved these codes. Continue when setup is complete. A passkey is another method if the site offers it; you do not have to set up both.</p>
-<h3 id="show-or-demonstrate-5">Show or demonstrate</h3>
-<p>Use the help page to explain adding an account. The current setup component shows a text key; do not promise a QR image on every setup screen. Never display a usable setup key or recovery code in a presentation.</p>
+<p>A new member, Morgan Reed, joins Riverton. Jordan first checks that Morgan is not already on the roster, then opens Add to roster. Jordan enters the requested information and saves it with Add to roster. The important part of the second screenshot is the result: Morgan now appears in the saved list. The application also explains that this person can be chosen when the club registers for an event. That is our next use of the record later in the story; it is not automatic event enrollment.</p>
+<h3 id="point-to-or-demonstrate-5">Point to or demonstrate</h3>
+<p>Use only the synthetic fixture. Birth-date and age presentation follow the actual account permissions. Do not replace the current row icons with proposed labelled actions.</p>
+<h3 id="visual-example-8">Visual example</h3>
+<ul>
+<li>Add to roster · fictional member: Filled fictional Morgan Reed fields in the actual Add to roster dialog.</li>
+<li>Morgan Reed is now listed: Actual roster after Add to roster saved Morgan Reed:10activepeople.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-8">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/mfa-manager.tsx">components/mfa-manager.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/two-step-setup.tsx">components/two-step-setup.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/help/authenticator/page.tsx">app/(public)/account/help/authenticator/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-roster-workspace.tsx">components/club-roster-workspace.tsx</a></li>
 </ul>
-<h2 id="10-open-the-workspace-for-your-responsibility">10. Open the workspace for your responsibility</h2>
+<h2 id="10-correct-the-existing-person">10. Correct the existing person</h2>
 <h3 id="say-9">Say</h3>
-<p>The tools follow your actual responsibilities. A director works inside the club. An Area Coordinator has a Clubs section and a Clubs overview link on the account card. Your personal registrations are separate from running a club. Someone with both responsibilities may see both sets of tools. If the expected option is missing, check which email is signed in and ask the office about access; making a duplicate account is unlikely to solve it.</p>
-<h3 id="show-or-demonstrate-6">Show or demonstrate</h3>
-<p>Explain My club/My clubs versus the coordinator Clubs navigation. Current club and coordinator headings show the working year; do not invent a year dropdown.</p>
+<p>If Morgan's information changes, Jordan uses the person-specific Edit control rather than adding Morgan again. Save corrects the existing record. Deactivate has a different purpose: it keeps the person on file while omitting them from new registrations. Show inactive and Reactivate can bring that person back later. Remove is an erasure action with a warning that the birth date and details cannot be restored. It is not the ordinary way to mark someone absent or temporarily away.</p>
+<h3 id="point-to-or-demonstrate-6">Point to or demonstrate</h3>
+<p>Show Edit and Deactivate. If explaining Remove, read the warning and cancel; the teaching story does not need to erase a person.</p>
+<h3 id="visual-example-9">Visual example</h3>
+<ul>
+<li>Edit · Morgan’s existing record: Morgan Reed’s existing roster record, with current name, type and class visible.</li>
+<li>Finish · Save or Deactivate: Existing member dialog scrolled to Save and Deactivate actions; current member details are retained.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-9">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/layout.tsx">app/(public)/account/(portal)/layout.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-reports/area-card-domain.ts">modules/club-reports/area-card-domain.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-roster-workspace.tsx">components/club-roster-workspace.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-rosters/repository.ts">modules/club-rosters/repository.ts</a></li>
 </ul>
-<h2 id="11-directors-start-at-your-club-home">11. Directors: start at your club Home</h2>
+<h2 id="11-a-form-can-be-started-sent-or-submitted">11. A form can be started, sent or submitted</h2>
 <h3 id="say-10">Say</h3>
-<p>Home is the starting point for the club's work. It is not another form to complete. Check the club name and year at the top, especially if you manage more than one club. The next-task card and summaries help you decide where to go. Our example club is Riverton Pathfinders. A deputy has the director's capabilities; registrar and reporter roles are narrower, so their menus can correctly look different.</p>
-<h3 id="show-or-demonstrate-7">Show or demonstrate</h3>
-<p>Point to the current club header, next task and Open roster/Open Monthly Records links. These are current labels, not the separate accepted redesign.</p>
+<p>Forms shows the forms the conference has enabled for the club. A director or deputy can fill in for a member from the proper source or use the available private-link process. Jordan returns to Filled forms to see the result. Open continues a draft; View and print opens a submitted form. A sent request is not proof that the person submitted a response. Waiting, expired and submitted states mean different things. We are showing fictional names and state labels rather than personal health answers.</p>
+<h3 id="point-to-or-demonstrate-7">Point to or demonstrate</h3>
+<p>Crop away any private URL or access token. Do not send a real request or show member health answers as part of the presentation.</p>
+<h3 id="visual-example-10">Visual example</h3>
+<ul>
+<li>Start · choose the required form: Available club forms with a saved draft for Morgan Reed and a submitted transportation list.</li>
+<li>Return · read the saved state: Filled forms table distinguishes a Draft/Open permission slip from Submitted/View and print transportation list.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-10">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/forms/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-forms/domain.ts">modules/club-forms/domain.ts</a></li>
 </ul>
-<h2 id="12-add-a-member-to-the-roster">12. Add a member to the roster</h2>
+<h2 id="12-capture-the-october-meeting-while-it-is-fresh">12. Capture the October meeting while it is fresh</h2>
 <h3 id="say-11">Say</h3>
-<p>Add regular members to the roster so they are available for future event choices. For a demonstration, use a fictitious member such as Morgan Reed. First check that Morgan is not already there. Enter the requested details, choose Add to roster and check the saved row. This has put Morgan on the club's list; it has not registered Morgan for an event. If Morgan is already listed, correct the existing record instead of adding a duplicate.</p>
-<h3 id="show-or-demonstrate-8">Show or demonstrate</h3>
-<p>Use an approved training roster only. Explain that age and birth-date fields follow the viewer’s permitted access; no real birth date is needed for the teaching example.</p>
+<p>It is October in our example, and Jordan records a recent club meeting. From Monthly Records, Jordan opens October and chooses Add meeting note. The date, head counts and short notes are easier to enter while they are fresh. Take attendance is optional for someone who has roster access; a reporter with narrower access should not expect a named attendance list. Saving a meeting note does not by itself submit the month's report. October's current due date is November tenth, so Jordan can keep gathering notes before finishing it.</p>
+<h3 id="point-to-or-demonstrate-8">Point to or demonstrate</h3>
+<p>Show the saved October seventeenth example in Edit meeting note. Point to the date, head counts, optional attendance and useful note. Explain that Add meeting note starts the same kind of record; Save is lower in the dialog.</p>
+<h3 id="visual-example-11">Visual example</h3>
+<ul>
+<li>October · an existing meeting note: Fictional October17 meeting note: headcounts, Camping Skills I and a short activity note.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-11">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/club-roster-workspace.tsx">components/club-roster-workspace.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/records/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/records/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-meeting-notes.tsx">components/club-meeting-notes.tsx</a></li>
 </ul>
-<h2 id="13-update-a-member-without-losing-their-history">13. Update a member without losing their history</h2>
+<h2 id="13-draft-is-a-stopping-point-submitted-is-a-result">13. Draft is a stopping point. Submitted is a result.</h2>
 <h3 id="say-12">Say</h3>
-<p>These actions have different purposes. Edit corrects the existing person. Deactivate keeps the person in your records but stops them being selected for new registrations. Show inactive lets you find that person, and Reactivate can bring them back. Remove is an erasure action. If someone may return, keeping the record is generally the useful path. Read the explanation before any removal and ask the office if you are unsure what should be retained.</p>
-<h3 id="show-or-demonstrate-9">Show or demonstrate</h3>
-<p>Point out the pencil/Edit action, Save and Deactivate inside the editor. If showing Remove, stop at its explanation and cancel; do not erase a real person for training.</p>
+<p>For this isolated training exercise, Jordan has complete fictional October records and an October report saved as a draft. A draft preserves unfinished work, but it has not been submitted. Jordan reviews the details and uses Submit report, then checks for the submitted result. This demonstrates the controls; it does not establish a policy to submit a real month before its records are complete. October is due November tenth. If meeting notes changed after the report was saved, Refresh from meeting notes is a deliberate action rather than a silent overwrite. September is already closed on our October twenty-first example date, so it is not the report to use for a submission demonstration.</p>
+<h3 id="point-to-or-demonstrate-9">Point to or demonstrate</h3>
+<p>Both states must be captures of the same isolated fictional October report before and after submission. Mark this as an exercise with complete fictional records. Do not imply September can still be submitted after its closing date.</p>
+<h3 id="ask-the-group-2">Ask the group</h3>
+<p>Which screenshot proves that the report was submitted?</p>
+<h3 id="visual-example-12">Visual example</h3>
+<ul>
+<li>October · draft still unfinished: Saved October draft; actual Save draft and Submit report ·410 points buttons.</li>
+<li>October · submitted result: Freshly loaded October record after actual submission:410 points,2320yearpoints and2submittedreports.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-12">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/club-roster-workspace.tsx">components/club-roster-workspace.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/repository.ts">modules/club-rosters/repository.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-report-form.tsx">components/club-report-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/records/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/records/page.tsx</a></li>
 </ul>
-<h2 id="14-collect-and-find-club-forms">14. Collect and find club forms</h2>
+<h2 id="14-choose-the-people-going-to-fall-camporee">14. Choose the people going to Fall Camporee</h2>
 <h3 id="say-13">Say</h3>
-<p>Forms keeps the club's enabled forms together. A director or deputy can fill in for a member from an appropriate approved source or use the available private-link process. Return to Filled forms to see what came back. Open continues a draft; View and print opens a submitted form. A link can be waiting, expired or submitted, and an email saying sent does not mean the form has been completed.</p>
-<h3 id="show-or-demonstrate-10">Show or demonstrate</h3>
-<p>Use an empty or fictitious example without health content. Explain the link option without sending a real request during the presentation.</p>
+<p>Now we use the roster for a different task. Jordan opens Club events and chooses Register or Continue for Fall Camporee. The current steps are Who's going, Each person's details and Review. Jordan selects the people attending, including Morgan if Morgan is going, then completes the location, class or other choices the event asks for. Some choices save automatically as a draft. That helps Jordan continue later, but it does not mean the registration is complete. Read full, waitlist and deadline messages before expecting a place.</p>
+<h3 id="visual-example-13">Visual example</h3>
+<ul>
+<li>Fall Camporee · Who’s going: Six fictional club members selected for Fall Camporee; actual Draft saved state.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-13">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/forms/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-forms/domain.ts">modules/club-forms/domain.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-registration-workspace.tsx">components/club-registration-workspace.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/events/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/events/page.tsx</a></li>
 </ul>
-<h2 id="15-after-a-meeting-record-it-while-it-is-fresh">15. After a meeting: record it while it is fresh</h2>
+<h2 id="15-review-then-return-to-the-saved-registration">15. Review, then return to the saved registration</h2>
 <h3 id="say-14">Say</h3>
-<p>Short notes after a meeting are easier than rebuilding the whole month from memory. Open Monthly Records, choose the month and add a meeting note. Record the date and counts you know. People with roster access may also take name-by-name attendance; that is optional and is not promised to a reporter who cannot open the roster. Save the note so the information is there when you prepare the monthly report.</p>
-<h3 id="show-or-demonstrate-11">Show or demonstrate</h3>
-<p>Show Add meeting note and the optional Take attendance control. Keep the distinction between head counts and a named attendance list clear.</p>
+<p>The Review page is Jordan's chance to check the people and choices before submitting. The second view is the saved registration, reached again through View in Club events. Jordan checks the status rather than assuming every saved draft is registered. Save changes appears only when the event permits editing. Print club packet or Download registration PDF can provide an authorized working copy. For a church-billed event, the sponsoring church follows the office billing process; this is not a new personal payment obligation for the director. Keep copies within their intended audience.</p>
+<h3 id="point-to-or-demonstrate-10">Point to or demonstrate</h3>
+<p>Capture a local fictional event submission only. If a confirmation code is visible, it must belong solely to the isolated demo fixture; no private edit/manage link should appear.</p>
+<h3 id="visual-example-14">Visual example</h3>
+<ul>
+<li>Before submitting · Review: Final current-app review for six fictional Fall Camporee attendees, with church invoice facts and Submit registration.</li>
+<li>After submitting · saved registration: Existing Fall Camporee registration after actual local submission, with six attendees and editing/printing controls. Published crop shows confirmation and billing text; the local check-in QR is excluded.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-14">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/records/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/records/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/events/%5BeventId%5D/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-registration-editor.tsx">components/club-registration-editor.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/docs/INVOICES.md">docs/INVOICES.md</a></li>
 </ul>
-<h2 id="16-finish-and-submit-the-monthly-record">16. Finish and submit the Monthly Record</h2>
+<h2 id="16-turn-club-records-into-useful-follow-up">16. Turn club records into useful follow-up</h2>
 <h3 id="say-15">Say</h3>
-<p>Saving a draft and submitting are different actions. Open or continue the Monthly Record, review its details and check the month and due date. The current rule is the tenth of the following month. Meeting notes can help fill the record. If you have already saved the report, changing a note does not silently replace that saved report; use Refresh from meeting notes deliberately if offered. Once you are ready, Submit report and confirm the submitted result. Contact the office if a closed report needs attention.</p>
-<h3 id="show-or-demonstrate-12">Show or demonstrate</h3>
-<p>Point out Save draft versus Submit report, and the displayed status. Do not submit a real report as a demonstration.</p>
+<p>Jordan can record a completed honor through Honors, including Add honors to several members when appropriate. Class tracking handles the supported earned class and award items; it is not a generic checklist for every curriculum requirement. Orders helps prepare supply lists, check stock and track hand-outs. It is not an online store checkout. For a roster file, Jordan uses Build a roster export, checks Preview and downloads the columns needed for the task. These are working copies of the records, so the recipient and fields still matter.</p>
+<h3 id="point-to-or-demonstrate-11">Point to or demonstrate</h3>
+<p>If Honors and export cannot both fit legibly, use one large export preview and an optional Honors inset; keep menu references in the spoken notes.</p>
+<h3 id="visual-example-15">Visual example</h3>
+<ul>
+<li>Honors · fictional earned records: Honor records with4completed and4inprogress entries across fictional members.</li>
+<li>Roster export · preview first: Real roster export Preview:first5of10fictionalrows, before DownloadCSV.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-15">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/records/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/records/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/club-report-form.tsx">components/club-report-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-honors-workspace.tsx">components/club-honors-workspace.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/roster-export-builder.tsx">components/roster-export-builder.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-order-workspace.tsx">components/club-order-workspace.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/class-tracking/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/class-tracking/page.tsx</a></li>
 </ul>
-<h2 id="17-register-the-people-who-are-going">17. Register the people who are going</h2>
+<h2 id="17-alex-finds-riverton-and-opens-a-view-only-record">17. Alex finds Riverton and opens a view-only record</h2>
 <h3 id="say-16">Say</h3>
-<p>This is where the roster saves time. Open Club events and use Register or Continue for the event. Choose the people attending rather than assuming everyone on the roster is going. The flow is Who's going, Each person's details and Review. Some draft choices save as you work, but the draft is not a confirmed registration. Review the final state and any full or waitlist explanation. Team events may use Your teams and an additional team form.</p>
-<h3 id="show-or-demonstrate-13">Show or demonstrate</h3>
-<p>Use a fictitious training event. Stop at Review unless a training submission has been authorized. Point to the three current step labels.</p>
+<p>Now we follow Alex. All clubs is the place to find a known club by its name, church or city. Alex searches for Riverton and chooses Open. The club view says View only and shows the information this role is permitted to read, such as ages instead of full birth dates. Coordinator access does not turn into a director's editing menu. Someone who separately directs their own club can have actual editing authority there, but that is a separate assignment. The current club list contains active clubs; do not expect an enforced my-area filter.</p>
+<h3 id="visual-example-16">Visual example</h3>
+<ul>
+<li>All clubs · search by club, church or city: All clubs with four fictional club records.</li>
+<li>Riverton · coordinator view: Riverton Pathfinders opened in the coordinator’s view-only workspace after Jordan’s tasks.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-16">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/events/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/events/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/events/%5BeventId%5D/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/page.tsx">app/(public)/account/(portal)/clubs/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area/%5BorganizationId%5D/layout.tsx">app/(public)/account/(portal)/area/[organizationId]/layout.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
 </ul>
-<h2 id="18-return-to-a-registration-you-already-made">18. Return to a registration you already made</h2>
+<h2 id="18-use-overview-to-decide-where-help-is-needed">18. Use Overview to decide where help is needed</h2>
 <h3 id="say-17">Say</h3>
-<p>Return to the saved registration instead of starting another one just to check it. The page shows what was recorded and whether changes are still permitted. If Save changes is offered, use it and check the result. If the edit window is closed, contact the event team. Church-billed events use the sponsoring church's office billing process; submitting as director does not make the director personally responsible for an online balance. The packet and PDF are useful authorized working copies; keep them within the intended audience.</p>
-<h3 id="show-or-demonstrate-14">Show or demonstrate</h3>
-<p>Point out View, Save changes if available, Print club packet and Download registration PDF on a fictitious record.</p>
+<p>Overview helps Alex decide where to look first. Alex checks the year in the heading, then reads the roster counts, reports submitted, total points and last report. Different rows deliberately show different fictional clubs, so we can compare their situations. Sterling Volunteers appears as summary counts; a count by itself does not tell the whole person's story. Alex opens the relevant club before contacting its director. Clicking a summary does not clear the underlying task, and there is no general Send reminder action established by this screen.</p>
+<h3 id="visual-example-17">Visual example</h3>
+<ul>
+<li>2026–27 · club summaries: 2026–27 summaries for four fictional clubs after Jordan’s roster/report work.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-17">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/events/%5BeventId%5D/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/docs/INVOICES.md">docs/INVOICES.md</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area-clubs/overview/page.tsx">app/(public)/account/(portal)/area-clubs/overview/page.tsx</a></li>
 </ul>
-<h2 id="19-use-achievements-and-supply-tools-when-needed">19. Use achievements and supply tools when needed</h2>
+<h2 id="19-read-the-status-before-asking-for-a-report">19. Read the status before asking for a report</h2>
 <h3 id="say-18">Say</h3>
-<p>These tools help turn the club's records into useful follow-up. Honors records supported earned honors. Class tracking covers the current class and award items, not a generic checklist of every possible curriculum requirement. Orders is a supply helper and stock/hand-out workflow, not an online store checkout. When you need a roster file, build the export, preview the selected columns and download only the information needed for the task. The options depend on the helper's actual role.</p>
-<h3 id="show-or-demonstrate-15">Show or demonstrate</h3>
-<p>Point to Honors → Export CSV or Print report, Orders → Export list (CSV) or Printable list, and Roster → Build a roster export.</p>
+<p>Alex uses Monthly Records to identify a particular club and month. A points value links to a submitted report, which Alex can read rather than asking for another copy. Riverton's September report was submitted October eighth. Another fictional club's overdue September draft and a third club's missing September report show different follow-up situations. Draft means started but not submitted. Due is not the same as Missing: Missing means the due date has passed without submission. A saved draft can still say Draft after the due date. Future months are not yet due, and late submissions are labelled late. In our October twenty-first example, September was due October tenth; October is due November tenth. Read the actual state before asking the director what is missing.</p>
+<h3 id="point-to-or-demonstrate-12">Point to or demonstrate</h3>
+<p>Use multiple fictional rows: at least one overdue draft, one missing prior month and one submitted/late month. Do not label October Missing on October21.</p>
+<h3 id="ask-the-group-3">Ask the group</h3>
+<p>Which club has already submitted the month? Which has started but still needs to finish?</p>
+<h3 id="visual-example-18">Visual example</h3>
+<ul>
+<li>Monthly Records · compare club/month states: Monthly Records grid after Jordan submits October: Riverton September410 and October410.</li>
+<li>A submitted month · read the saved report: Riverton’s submitted September Monthly Record.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-18">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/honors/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/honors/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/class-tracking/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/class-tracking/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/orders/page.tsx">app/(public)/account/(portal)/clubs/[organizationId]/orders/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-reports/area-summary-domain.ts">modules/club-reports/area-summary-domain.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area-clubs/reports/page.tsx">app/(public)/account/(portal)/area-clubs/reports/page.tsx</a></li>
 </ul>
-<h2 id="20-area-coordinators-see-progress-and-offer-help">20. Area Coordinators: see progress and offer help</h2>
+<h2 id="20-explain-a-total-rather-than-guessing">20. Explain a total rather than guessing</h2>
 <h3 id="say-19">Say</h3>
-<p>The coordinator side helps you understand how clubs are doing and where a director may need support. You use the recorded information rather than requesting another copy of every spreadsheet. Most club detail is view-only. The director maintains their own club records; you review the work, understand the status and follow up on the specific item. Your coordinator tools are not the director's editing menu.</p>
-<h3 id="show-or-demonstrate-16">Show or demonstrate</h3>
-<p>From the Area coordinator card choose Clubs overview. Health information is a separate restricted workflow and is not required for this introductory tour.</p>
+<p>The chart gives Alex a quick comparison, and the table explains the same totals. Submitted-report points and yearly registration points are shown separately. The current rule adds fifteen hundred points for an on-time yearly registration. Alex can sort by points or club name. A name search narrows the visible rows, while ranking is based on the full list. Download points CSV includes the whole year's authorized clubs, not just the name search on screen. Check the file before sharing it, especially if you expected one club's record.</p>
+<h3 id="visual-example-19">Visual example</h3>
+<ul>
+<li>Points · chart and table: Points chart and table after both Riverton reports are submitted.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-19">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-reports/area-card-domain.ts">modules/club-reports/area-card-domain.ts</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-subnav.tsx">components/area-clubs-subnav.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area-clubs/points/page.tsx">app/(public)/account/(portal)/area-clubs/points/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-reports/area-export.ts">modules/club-reports/area-export.ts</a></li>
 </ul>
-<h2 id="21-find-a-club-and-open-its-information">21. Find a club and open its information</h2>
+<h2 id="21-club-membership-is-not-event-participation">21. Club membership is not event participation</h2>
 <h3 id="say-20">Say</h3>
-<p>All clubs is useful when you know the club you want. Search by the club name, church or city and choose Open. When you are reviewing another club, the page tells you it is view-only. It shows permitted information such as ages rather than full birth dates. If you are also a director of your own club, that separate director assignment can provide editing there; coordinator access by itself does not provide it. The current list contains active clubs rather than an enforced area-only filter.</p>
-<h3 id="show-or-demonstrate-17">Show or demonstrate</h3>
-<p>Search for the fictitious Riverton Pathfinders. Do not show Orders, Club settings or other director-only tools as coordinator options.</p>
+<p>Before Fall Camporee, Alex opens Club events. The useful question is which clubs are participating and how many people are included. The rows show deliberately varied fictional states. Draft is not a completed registration, waitlisted is not a confirmed place, and cancelled is historical. A search can narrow the club rows while the event total continues to describe all registered clubs. Alex uses the specific event state for follow-up; this page does not let every coordinator submit or edit every club's registration.</p>
+<h3 id="visual-example-20">Visual example</h3>
+<ul>
+<li>Fall Camporee · clubs and headcounts: Fall Camporee club registrations: Registered, Draft, Waitlisted and Cancelled.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-20">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/clubs/page.tsx">app/(public)/account/(portal)/clubs/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area-clubs/events/page.tsx">app/(public)/account/(portal)/area-clubs/events/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-reports/area-summary-domain.ts">modules/club-reports/area-summary-domain.ts</a></li>
 </ul>
-<h2 id="22-use-overview-to-choose-your-follow-up">22. Use Overview to choose your follow-up</h2>
+<h2 id="22-read-a-new-club-application-without-approving-it">22. Read a new-club application without approving it</h2>
 <h3 id="say-21">Say</h3>
-<p>Overview is a starting point, not a list you have to clear by clicking. Check the year in the heading. Review submitted reports, points and the other summaries. Sterling Volunteers is shown as counts here; open the club to understand the permitted adult information. Follow up after you know which month, record or event needs attention. There is no visible year dropdown on these pages, so use the year shown or ask for the appropriate link if it is not the year you need.</p>
-<h3 id="show-or-demonstrate-18">Show or demonstrate</h3>
-<p>Point to the year heading, a report count, last report and a club link. Do not invent a Send reminder button or area filter.</p>
+<p>Alex can read the fictional Harbor Adventurers application and understand what the applicant supplied. New clubs is a view-only review page for coordinators; a system administrator approves or declines the application. Team approvals is a separate, narrow exception: a coordinator may decide the eligible requests assigned to that coordinator under the event rules. Neither exception gives general editing rights to every club.</p>
+<h3 id="point-to-or-demonstrate-13">Point to or demonstrate</h3>
+<p>Point to New clubs, the Harbor Adventurers application and the view-only heading. There is no coordinator approval action on this page. Mention Team approvals only if relevant to the audience; use its own event rules and permitted requests.</p>
+<h3 id="ask-the-group-4">Ask the group</h3>
+<p>Who makes the decision on this new-club application?</p>
+<h3 id="visual-example-21">Visual example</h3>
+<ul>
+<li>New clubs · fictional pending application: Harbor Adventurers’ fictional pending application in the coordinator’s view-only New clubs page.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-21">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/area-clubs/overview/page.tsx">app/(public)/account/(portal)/area-clubs/overview/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area-clubs/team-permissions/page.tsx">app/(public)/account/(portal)/area-clubs/team-permissions/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-teams/permission-domain.ts">modules/club-teams/permission-domain.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/area-clubs/applications/page.tsx">app/(public)/account/(portal)/area-clubs/applications/page.tsx</a></li>
 </ul>
-<h2 id="23-read-monthly-records-and-spot-unfinished-work">23. Read Monthly Records and spot unfinished work</h2>
+<h2 id="23-make-the-follow-up-specific">23. Make the follow-up specific</h2>
 <h3 id="say-22">Say</h3>
-<p>The monthly grid shows what is on file. A points value links to a submitted report, and a late submission is labelled late. Draft means started but not submitted. Due is not the same as Missing: Missing means the due date has passed without a submitted record. A draft can still display Draft after that date. Future months are not yet due. Read a submitted record when you need the detail, and ask the director about the specific unfinished month rather than entering their report for them.</p>
-<h3 id="show-or-demonstrate-19">Show or demonstrate</h3>
-<p>Use a fictitious club/month and contrast Draft with a submitted points link. Explain that the current due date is the tenth of the next month.</p>
+<p>This is the practical connection between the two roles. Alex sees Riverton's October draft and asks Jordan a precise question: Riverton's October record is in progress; do you need help preparing it? October is not overdue on October twenty-first. In this exercise Jordan has complete fictional records, reviews the report and submits through the club workspace; Alex can then read that result. The conversation happens through the normal conference process. Opening Overview has not sent an automatic reminder, and Alex has not taken over the director's report. The screenshots represent before and after moments in the same fictional story. An older closed missing month needs follow-up with the director or office; do not promise Alex can reopen it.</p>
+<h3 id="point-to-or-demonstrate-14">Point to or demonstrate</h3>
+<p>Mark the two screenshots Before follow-up and After director submission to avoid contradictory state expectations. Any speech bubble is an instructor caption, not an app messaging feature.</p>
+<h3 id="visual-example-22">Visual example</h3>
+<ul>
+<li>Before · Alex sees October in progress: Before Jordan finishes October: coordinator grid shows Riverton September410points and OctoberDraft.</li>
+<li>After · Jordan submits the complete example: Freshly loaded October record after actual submission:410 points,2320yearpoints and2submittedreports.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-22">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/area-clubs/reports/page.tsx">app/(public)/account/(portal)/area-clubs/reports/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-reports/area-summary-domain.ts">modules/club-reports/area-summary-domain.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-report-form.tsx">components/club-report-form.tsx</a></li>
 </ul>
-<h2 id="24-understand-points-and-the-downloaded-file">24. Understand points and the downloaded file</h2>
+<h2 id="24-when-something-is-missing-check-the-account-first">24. When something is missing, check the account first</h2>
 <h3 id="say-23">Say</h3>
-<p>Points gives you a chart and a table. Submitted report points and the yearly registration points are shown separately so a total can be explained. Under the current rule, an on-time yearly registration contributes fifteen hundred points. Search can narrow what you see, while the rank is based on the full list. Download points CSV includes the whole year's authorized clubs. Do not send that file expecting it to contain only the name search shown on your screen.</p>
-<h3 id="show-or-demonstrate-20">Show or demonstrate</h3>
-<p>Point out the separate points components, sort controls and Download points CSV. Overview also offers the summary and points downloads.</p>
+<p>If sign-in works but the club or Clubs section is missing, first check the signed-in email. The office can verify the invitation or coordinator assignment. If the password is the problem, use Forgot password instead. If an authenticator is unavailable, use a saved recovery code or configured passkey when offered; ask the office if neither is available. For a page or save problem, give support the club and year, or the event, the page, what you tried and the visible error. Do not include passwords, codes, private links or member health details in a screenshot. The existing quick-start guide can help you describe the exact step.</p>
+<h3 id="visual-example-23">Visual example</h3>
+<ul>
+<li>Account Overview · signed-in identity: Director Jordan Ellis’s account entry into the Riverton club workspace.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-23">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/area-clubs/points/page.tsx">app/(public)/account/(portal)/area-clubs/points/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-reports/area-export.ts">modules/club-reports/area-export.ts</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/attendee-password-reset-form.tsx">components/attendee-password-reset-form.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/help/authenticator/page.tsx">app/(public)/account/help/authenticator/page.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/layout.tsx">app/(public)/account/(portal)/layout.tsx</a></li>
 </ul>
-<h2 id="25-check-which-clubs-are-going-to-an-event">25. Check which clubs are going to an event</h2>
+<h2 id="25-check-the-result-sign-out-return-to-the-same-place">25. Check the result. Sign out. Return to the same place.</h2>
 <h3 id="say-24">Say</h3>
-<p>Club events helps you see participation. The roster tells you who belongs to a club; this view tells you whether a club is registered for an event and the number included. Read the actual state. A draft is not a completed registration, a waitlist is not a confirmed place and a cancelled record is history. If you search the club rows, the event total can still describe the whole event. This is oversight of participation, not permission to submit every club's registration.</p>
-<h3 id="show-or-demonstrate-21">Show or demonstrate</h3>
-<p>Point out status, headcount and event total using fictitious records. Use the director’s normal process for corrections.</p>
+<p>The aim is not to memorize every menu. Use your own account, choose the right club or coordinator view and check the result of the work. A saved draft, a submitted report and an event registration confirmation mean different things. Choose one realistic task to practice next: a director can find the roster or a Monthly Record; a coordinator can find a club and read one month. Then choose Sign out, especially on a shared device. Closing a tab is not the same action. Next time, return to events dot imsda dot org and sign in with the account you already have.</p>
+<h3 id="ask-the-group-5">Ask the group</h3>
+<p>Which one task will you practice first? Use the quick-start handout when you need the steps.</p>
+<h3 id="visual-example-24">Visual example</h3>
+<ul>
+<li>Example · a saved registration: Existing Fall Camporee registration after actual local submission, with six attendees and editing/printing controls. Published crop shows confirmation and billing text; the local check-in QR is excluded.</li>
+<li>Use Sign out before leaving: Account Profile and the actual Sign out control in the portal header.</li>
+</ul>
 <h3 id="preparation-references--not-spoken-24">Preparation references — not spoken</h3>
 <ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/area-clubs/events/page.tsx">app/(public)/account/(portal)/area-clubs/events/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
-</ul>
-<h2 id="26-know-the-two-special-review-pages">26. Know the two special review pages</h2>
-<h3 id="say-25">Say</h3>
-<p>Most coordinator work is view-only. Team approvals is a specific exception. It concerns the team-member requests for your event locations, with the current event's age and eligibility rules shown on the page. Read the request before approving or declining. A decline tells the director what needs correction; it does not automatically remove the person. New clubs is a different review page. You may read the application, but the conference administrator approves or declines it.</p>
-<h3 id="show-or-demonstrate-22">Show or demonstrate</h3>
-<p>Use a fictitious team request and stop before a real decision. A staff support act-as view cannot substitute for the real coordinator’s decision authority.</p>
-<h3 id="preparation-references--not-spoken-25">Preparation references — not spoken</h3>
-<ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/area-clubs/team-permissions/page.tsx">app/(public)/account/(portal)/area-clubs/team-permissions/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/%28portal%29/area-clubs/applications/page.tsx">app/(public)/account/(portal)/area-clubs/applications/page.tsx</a></li>
-</ul>
-<h2 id="27-a-coordinator-example-follow-one-missing-item">27. A coordinator example: follow one missing item</h2>
-<h3 id="say-26">Say</h3>
-<p>Imagine Overview suggests that Riverton needs attention. I open Monthly Records and find October. I check whether it is a draft, missing, or a submitted report I can read. Then I contact the director about that particular record and ask what help is needed. Before an event, I can use the same habit in Club events. This follow-up is a conversation through the normal conference process; the overview has not automatically sent a reminder or completed the report.</p>
-<h3 id="ask-the-group-3">Ask the group</h3>
-<p>If the record says Draft, what is the useful next question for the director?</p>
-<h3 id="preparation-references--not-spoken-26">Preparation references — not spoken</h3>
-<ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-views.tsx">components/area-clubs-views.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-reports/area-summary-domain.ts">modules/club-reports/area-summary-domain.ts</a></li>
-</ul>
-<h2 id="28-build-a-simple-working-rhythm">28. Build a simple working rhythm</h2>
-<h3 id="say-27">Say</h3>
-<p>You do not need to explore every page every day. A director can keep the roster current, add notes while meetings are fresh and make time to finish the Monthly Record. Before an event, review who is going. A coordinator can begin with the summaries, open the item that needs attention and make a focused follow-up. These are suggested working habits, not a new reporting policy or an automatic schedule.</p>
-<h3 id="ask-the-group-4">Ask the group</h3>
-<p>Which part of this routine would be easiest to build into your normal club work?</p>
-<h3 id="preparation-references--not-spoken-27">Preparation references — not spoken</h3>
-<ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-subnav.tsx">components/area-clubs-subnav.tsx</a></li>
-</ul>
-<h2 id="29-if-something-is-missing-or-not-working">29. If something is missing or not working</h2>
-<h3 id="say-28">Say</h3>
-<p>If you cannot remember the password, use Forgot password and request the email code. Return in the same browser, enter the code and new password, then Set new password. If sign-in works but your club is missing, check the email shown and ask the office about the invitation or assignment; do not create another account. If you need support for a page, describe the task and visible error. Leave passwords, codes, private links and member health details out of screenshots and messages.</p>
-<h3 id="show-or-demonstrate-23">Show or demonstrate</h3>
-<p>Point to Forgot password? and the authenticator help link. Use the conference’s existing support route; no new support address is introduced by this deck.</p>
-<h3 id="preparation-references--not-spoken-28">Preparation references — not spoken</h3>
-<ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/attendee-password-reset-form.tsx">components/attendee-password-reset-form.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/%28public%29/account/help/authenticator/page.tsx">app/(public)/account/help/authenticator/page.tsx</a></li>
-</ul>
-<h2 id="30-finish-safely-and-return-next-time">30. Finish safely and return next time</h2>
-<h3 id="say-29">Say</h3>
-<p>Before leaving, check the result of the task you were doing. A saved draft means you can continue; Submitted means the report was sent; an event registration has its own confirmation and status. Then choose Sign out, especially on a shared computer. Closing the browser tab is not the same action. Next time, return to the website and use the account you already have.</p>
-<h3 id="show-or-demonstrate-24">Show or demonstrate</h3>
-<p>Point to Sign out without displaying another person’s session or credentials.</p>
-<h3 id="preparation-references--not-spoken-29">Preparation references — not spoken</h3>
-<ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/attendee-sign-out-button.tsx">components/attendee-sign-out-button.tsx</a></li>
-</ul>
-<h2 id="31-the-three-things-to-remember">31. The three things to remember</h2>
-<h3 id="say-30">Say</h3>
-<p>The goal is not to memorize every menu today. Remember your own account, the right club or coordinator context, and the result of the task. Directors keep the club's information up to date. Coordinators use that information to understand progress and offer help. You can come back to the guides when you need the exact steps.</p>
-<h3 id="ask-the-group-5">Ask the group</h3>
-<p>Invite questions about a task people need to do next. Use the quick-start handout for sign-in and role-specific reminders.</p>
-<h3 id="preparation-references--not-spoken-30">Preparation references — not spoken</h3>
-<ul>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/app/page.tsx">app/page.tsx</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/modules/club-rosters/portal-nav.ts">modules/club-rosters/portal-nav.ts</a></li>
-<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a/components/area-clubs-subnav.tsx">components/area-clubs-subnav.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/attendee-sign-out-button.tsx">components/attendee-sign-out-button.tsx</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/page.tsx">app/page.tsx</a></li>
 </ul>
 </body></html>
