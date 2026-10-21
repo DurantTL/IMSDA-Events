@@ -1,0 +1,377 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events help and communication kit</title><style>
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
+*{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
+.coverline{font-size:9pt;letter-spacing:1.7px;color:#582c83;font-weight:700;border-bottom:4px solid #f0b323;padding-bottom:14px;margin-bottom:18px}
+.baseline{font-size:8.4pt;color:#536b78;background:#f4f7f8;padding:12px 14px;border-left:3px solid #003b5c;margin:0 0 22px}
+h1{font-size:27pt;line-height:1.15;color:#003b5c;letter-spacing:-.5px;margin:0 0 18px}
+h2{font-size:17pt;line-height:1.25;color:#003b5c;margin:24px 0 10px;break-after:avoid}
+h3{font-size:12pt;line-height:1.3;color:#582c83;margin:17px 0 8px;break-after:avoid}
+h4{font-size:10.8pt;break-after:avoid}p,ul,ol{margin:0 0 10px}li{margin:3px 0}li p{margin:0 0 5px}
+a{color:#003b5c;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+strong{font-weight:700}code{font:9pt/1.35 'DejaVu Sans Mono',monospace;overflow-wrap:anywhere;background:#f4f7f8;padding:0 2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f7f8;border:1px solid #dce6ea;font-size:8.8pt}
+blockquote{border-left:3px solid #f0b323;padding:8px 14px;margin:12px 0;background:#fbf8ee}
+table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:8.7pt;line-height:1.4;margin:12px 0 18px}
+th{background:#003b5c;color:white;text-align:left;padding:8px;border:1px solid #003b5c;font-weight:700}
+td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywhere}
+td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
+img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
+hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
+</style></head><body><div class="coverline">IMSDA EVENTS  /  REVIEW &amp; ENABLEMENT PACK</div><h1 id="imsda-events-help-and-communication-kit">IMSDA Events help and communication kit</h1><div class="baseline">Prepared October 21, 2026 · Repository baseline <strong>5e367b7c</strong><br>Current implementation, gated capabilities, accepted design and future plans are distinguished in the text. Repository evidence does not establish the serving production state.</div>
+
+<p>This kit contains ready-to-edit guidance and message drafts. It describes features present in the repository and identifies future presentation work separately. It does not establish which release is serving, enable a feature, change the agreed menus or send a message. Review the applicable event configuration before publishing any instructions.</p>
+<h2 id="1-how-to-use-this-kit">1. How to use this kit</h2>
+<p>Give each person the guide for their actual job. An attendee needs personal registration help; a director needs a club and year; a coordinator needs oversight; a system administrator needs platform and event context. Sharing the same visual style does not make their navigation or authority interchangeable.</p>
+<p>Use the task instructions below alongside the existing <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md">Staff event workflow</a>, operational runbooks and approved rehearsal material. This kit adds explanations and reusable wording rather than replacing the existing rehearsals, decision records or import examples.</p>
+<p>Two kinds of placeholders appear in this document:</p>
+<ul>
+<li><strong>Editorial placeholders</strong>, such as <code>[CLUB NAME]</code> or <code>[SUPPORT CONTACT]</code>, must be replaced by a person. They are not IMSDA Events template tokens.</li>
+<li><strong>Supported template tokens</strong>, such as <code>{{event_name}}</code>, are named in the current application token allowlist. They still need to be available in the selected message context and checked in its preview. Do not paste an editorial placeholder into a live template unchanged.</li>
+</ul>
+<p>Templates, preview and delivery are separate. A saved draft is not published; a preview sends nothing; a queued message is not evidence of delivery. Human review and the existing send permissions remain part of each actual send.</p>
+<h2 id="2-quick-starts-for-the-current-roles">2. Quick starts for the current roles</h2>
+<h3 id="attendee-find-and-manage-your-registration">Attendee: find and manage your registration</h3>
+<ol type="1">
+<li>Open the public event page and read its dates, location, registration choices and current availability.</li>
+<li>After registering, keep the confirmation message. Its private management link provides access to that registration. Do not share the link publicly or paste it into a support screenshot.</li>
+<li>If you use an account, sign in with the address associated with your registration and complete email verification when requested. Open <strong>My registrations</strong> to find accessible registrations.</li>
+<li>Open the specific registration before changing details or continuing a permitted payment. Read the registration state and payment explanation separately.</li>
+<li>If an action is unavailable, use the event's support contact. A cancellation request is a request for review; it does not by itself cancel attendance or issue a refund.</li>
+</ol>
+<p><strong>Remember:</strong> several attendees on one registration do not create a permanent family account or guardian authority over other records. A missing registration can be an email/access mismatch; creating another registration may create a duplicate. Waitlisted and cancelled records need their own status explanation rather than an automatic instruction to pay. Account display correction is tracked in <a href="https://github.com/DurantTL/IMSDA-Events/issues/1100">#1100</a>.</p>
+<h3 id="club-director-or-deputy-keep-the-clubs-work-together">Club director or deputy: keep the club's work together</h3>
+<ol type="1">
+<li>Complete the personal invitation and sign-in prompts, including the required second step for club access. The existing <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/%28public%29/account/help/authenticator/page.tsx">authenticator guide</a> explains the authenticator option.</li>
+<li>Open your club and confirm its identity and the working year before editing records.</li>
+<li>Read the next task on <strong>Home</strong>. Use <strong>Roster</strong> for members, <strong>Club events</strong> for participation, <strong>Forms</strong> for available club forms and <strong>Monthly Records</strong> for the club's records.</li>
+<li>For an event, review who is attending, the location and any required class or event choices. Annual roster membership and event attendance are different records.</li>
+<li>Review the submitted registration and any staff assignments. On a church-billed event, the sponsoring church is billed; the director should not be told to pay a personal online balance.</li>
+<li>Save before leaving an editor and confirm its result. If saving fails, keep the page open and correct the named problem. Broader dirty-editor protection is tracked separately in <a href="https://github.com/DurantTL/IMSDA-Events/issues/1101">#1101</a>.</li>
+</ol>
+<p><strong>Role differences matter:</strong> deputies have the director capability set. A registrar maintains the roster and registers the club but lacks the director's full birth-date, guardian, team, profile and report authority. A reporter has Home and Monthly Records, without roster or event access. Do not use “club administrator” as a blanket promise of every capability.</p>
+<h3 id="area-coordinator-review-and-follow-up">Area Coordinator: review and follow up</h3>
+<ol type="1">
+<li>Sign in to your own account and complete the required second step. Open the coordinator workspace offered to that account.</li>
+<li>Confirm the selected year and the scope shown. Current source selects all active clubs available to the role; future ministry scoping belongs to the Adventurer work, not a current area selector.</li>
+<li>Use <strong>Overview</strong>, <strong>Monthly Records</strong>, <strong>Points</strong> and <strong>Club events</strong> to identify follow-up work. Open a club or record to understand a count before contacting someone.</li>
+<li>Treat club detail as oversight: the coordinator view does not become the director's editor.</li>
+<li>Use <strong>Team approvals</strong> only for the existing requests and event locations your real coordinator account may decide. New-club applications are view-only for coordinators; system administrators make those decisions.</li>
+<li>Read the export label. The existing full-year summary CSV does not become a filtered export merely because a name search is visible.</li>
+</ol>
+<p><strong>Remember:</strong> a staff “act as” view is a distinct temporary support mechanism. It does not inherit a real coordinator's decision authority. Readiness/report counts, screening summaries and access to protected records are separate concepts.</p>
+<h3 id="system-administrator-keep-system-and-event-context-visible">System administrator: keep System and Event context visible</h3>
+<ol type="1">
+<li>Start in <strong>System management</strong> for platform work: accounts, team, directory, catalogs, central Email, platform settings and readiness.</li>
+<li>Enter a selected event deliberately for its settings, forms, people, finance, check-in and event communications. Confirm the event name before acting.</li>
+<li>Use the existing readiness checklist and runbooks as evidence records. A tick does not send invitations, deploy a release, apply a migration, enable sign-in or activate health records.</li>
+<li>For event setup, follow the existing seven-step workflow. The first publication of a registration form needs a test submission; later published versions do not acquire a new per-version test requirement merely because a label changed.</li>
+<li>Preview the actual audience and content before sending. Event Email and central Email settings have different responsibilities.</li>
+<li>When support requires another person's context, use the explicit authorized mechanism and its audit trail. Do not share credentials or make another role's menu visible as a workaround.</li>
+</ol>
+<p><strong>Important exception:</strong> a kitchen-only staff role intentionally lacks general event/registration access. A missing People or finance destination can be correct access behavior, not a broken navigation item.</p>
+<h2 id="3-answers-people-are-likely-to-need">3. Answers people are likely to need</h2>
+<table><colgroup><col style="width:29%"><col style="width:71%"></colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Suggested answer</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Must I create an account to register?</td>
+<td>Guest registration remains available. An account can help you return to accessible registrations; it is separate from the private link for one registration.</td>
+</tr>
+<tr class="even">
+<td>Why can I not see my registration?</td>
+<td>Check the event and the verified address on your account against the registration's contact address. Use the supported recovery route or event support before registering again.</td>
+</tr>
+<tr class="odd">
+<td>Does my club roster register everyone for an event?</td>
+<td>No. The roster keeps club membership; the event registration records who is attending that event and their choices.</td>
+</tr>
+<tr class="even">
+<td>Why does another club helper see fewer pages?</td>
+<td>Pages follow the person's actual role. Registrar and reporter access differ from director/deputy access.</td>
+</tr>
+<tr class="odd">
+<td>Does “submitted” mean paid, checked in and approved?</td>
+<td>Those are separate states. Read the specific registration, payment, arrival or approval status shown for the task.</td>
+</tr>
+<tr class="even">
+<td>Should I pay a church-billed camporee balance online?</td>
+<td>Follow the event's organization-billed instructions. The responsible church is billed through the office process; a director's submission does not make the director the debtor.</td>
+</tr>
+<tr class="odd">
+<td>I asked to cancel. Is my refund complete?</td>
+<td>A request begins review. Cancellation, refund approval, refund execution and successful refund recording are different steps. Follow the status message and contact the office when needed.</td>
+</tr>
+<tr class="even">
+<td>An email says queued or accepted. Did the person receive it?</td>
+<td>That records a delivery stage. It does not establish inbox arrival or that the person read it. Use the available delivery evidence and support process.</td>
+</tr>
+<tr class="odd">
+<td>Does a registration PDF contain exactly what every screen/export shows?</td>
+<td>No. It is a versioned document with its own documented field/redaction rules, including the approved PDF-only exceptions. It is not a general health-record export. Share it only through its authorized workflow.</td>
+</tr>
+<tr class="even">
+<td>Why is a health or finance action unavailable to an administrator?</td>
+<td>Some domains have dedicated permissions, purpose limits, time windows or break-glass requirements beyond an ordinary page link. Follow the approved workflow rather than changing roles to bypass it.</td>
+</tr>
+<tr class="odd">
+<td>Are the new mockup screens available now?</td>
+<td>They show accepted direction or proposals as labelled. The corresponding implementation issue must be delivered and available in the serving release before training calls it a current feature.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-proposed-short-help-and-recovery-copy">4. Proposed short help and recovery copy</h2>
+<p>The following is <strong>editorial copy for review</strong>, not a claim that these messages or a new Help &amp; learning page have been installed. <a href="https://github.com/DurantTL/IMSDA-Events/issues/1077">#1077</a> remains the owner of future task-based help presentation.</p>
+<table><colgroup><col style="width:29%"><col style="width:71%"></colgroup>
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Ready-to-edit wording</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Event context</td>
+<td><strong>Working in [EVENT NAME].</strong> Changes on this page apply to this event.</td>
+</tr>
+<tr class="even">
+<td>Club context</td>
+<td><strong>[CLUB NAME] · [CLUB YEAR].</strong> Check the year before changing this roster.</td>
+</tr>
+<tr class="odd">
+<td>Empty personal registrations</td>
+<td><strong>No registrations are available to this account yet.</strong> Check your verified email address or use the private link from your confirmation.</td>
+</tr>
+<tr class="even">
+<td>Empty club roster</td>
+<td><strong>No members are on this year's roster yet.</strong> Add members before choosing who will attend an event.</td>
+</tr>
+<tr class="odd">
+<td>No search matches</td>
+<td><strong>No matches for these filters.</strong> Clear a filter or change your search.</td>
+</tr>
+<tr class="even">
+<td>Save failure</td>
+<td><strong>Your changes were not saved.</strong> If fields are highlighted, review them and try again. Keep this page open to continue editing.</td>
+</tr>
+<tr class="odd">
+<td>Unsaved changes</td>
+<td><strong>You have unsaved changes.</strong> Stay to finish, or discard them before leaving.</td>
+</tr>
+<tr class="even">
+<td>Read-only coordinator record</td>
+<td><strong>This is a view-only club record.</strong> Ask the club's director or the conference office to correct it.</td>
+</tr>
+<tr class="odd">
+<td>Restricted destination</td>
+<td><strong>This page is not available with your current access.</strong> Return to your workspace or ask the office to check your assignment.</td>
+</tr>
+<tr class="even">
+<td>Saved public link</td>
+<td><strong>Copy the saved public event link.</strong> Unsaved address changes are not published or ready to share.</td>
+</tr>
+<tr class="odd">
+<td>Queue or history count</td>
+<td><strong>[N] unread alerts.</strong> Reading an alert does not complete the task it describes.</td>
+</tr>
+<tr class="even">
+<td>Map coverage</td>
+<td><strong>[N] clubs found; [M] shown on the map.</strong> Clubs without a map location remain in the list.</td>
+</tr>
+<tr class="odd">
+<td>Full-year export</td>
+<td><strong>Download the full [YEAR] summary.</strong> This export includes all clubs in your authorized scope, regardless of the visible name search.</td>
+</tr>
+<tr class="even">
+<td>Wrong kind of link</td>
+<td><strong>This is a private registration link.</strong> Share the public event page when inviting other people.</td>
+</tr>
+</tbody>
+</table>
+<p>Keep the action beside the explanation, retain entered values after recoverable errors and name the destination of a back link. An icon can support a label; it should not carry the whole explanation for a new user.</p>
+<h2 id="5-a-practical-support-handoff">5. A practical support handoff</h2>
+<p>Start with context rather than requesting a data export. Ask for the role, event or club/year, page title, approximate time and time zone, the visible error text and the intended action. Ask the person to omit private links, birth dates, health information, credentials and card details from screenshots or messages.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Reported problem</th>
+<th>First useful check</th>
+<th>Handoff</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Club or workspace missing</td>
+<td>Correct account, current grant, second step and selected context</td>
+<td>Office access administrator</td>
+</tr>
+<tr class="even">
+<td>Registration missing</td>
+<td>Correct verified email/event; existing recovery path</td>
+<td>Event registration support</td>
+</tr>
+<tr class="odd">
+<td>Save or validation problem</td>
+<td>Field name, changed versus untouched value, retained draft, reproducible steps</td>
+<td>Owning form/profile/roster issue</td>
+</tr>
+<tr class="even">
+<td>Amount or church invoice question</td>
+<td>Direct versus organization billing; registration/payment/invoice state</td>
+<td>Authorized finance staff</td>
+</tr>
+<tr class="odd">
+<td>Check-in refused</td>
+<td>Correct event/person and actual refusal category</td>
+<td>Authorized check-in lead; existing override process where permitted</td>
+</tr>
+<tr class="even">
+<td>Email not received</td>
+<td>Intended audience, current address, queued/suppressed/failed/accepted evidence</td>
+<td>Communications lead or system Email administrator</td>
+</tr>
+<tr class="odd">
+<td>Public link does not open</td>
+<td>Public event/form link versus private link; saved/published/window state</td>
+<td>Event setup support; #1115 if unsaved-link behavior is reproduced</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Support ticket starter</strong></p>
+<p><strong>Task:</strong> [WHAT THE PERSON WAS TRYING TO DO]<br />
+<strong>Context:</strong> [ROLE], [EVENT OR CLUB/YEAR], [PAGE TITLE]<br />
+<strong>When:</strong> [DATE/TIME/TIME ZONE]<br />
+<strong>Expected result:</strong> [EXPECTED VISIBLE BEHAVIOR]<br />
+<strong>Actual result:</strong> [ERROR TEXT OR DESCRIPTION, WITHOUT PRIVATE DATA]<br />
+<strong>Steps:</strong> [SHORT REPRODUCTION]<br />
+<strong>Reference:</strong> [EXISTING ISSUE OR RESTRICTED SUPPORT REFERENCE]</p>
+<p>The office can use its authorized tools to investigate identifiers internally. A public issue does not need a copy of an attendee record to explain the defect.</p>
+<h2 id="6-draft-communication-content">6. Draft communication content</h2>
+<p>All examples below are <strong>prepared drafts, not sent messages</strong>. Review audience, event, current state, contact details and links before use. An email mentioning a feature does not enable it. Keep reasons, health details, payment credentials and internal staff notes out of the message.</p>
+<h3 id="a-club-director-welcome--editorial-draft">A. Club director welcome — editorial draft</h3>
+<p><strong>Audience:</strong> a newly invited director or deputy. <strong>Use:</strong> the existing individual invitation/onboarding process. Do not send a working invitation link to a shared mailing list.</p>
+<p><strong>Subject:</strong> Getting started with [CLUB NAME] in IMSDA Events</p>
+<p>Hello [FIRST NAME],</p>
+<p>Your invitation gives you access to [CLUB NAME] for your approved role. Open your personal invitation and complete the account and second-step prompts.</p>
+<p>Once you are signed in, confirm the club and year on Home. Begin with the next task shown there. Review the roster, then use Club events to choose who will attend an event. Monthly Records and other tools appear according to your role.</p>
+<p>For [CHURCH-BILLED EVENT], the sponsoring church is billed through the office process. Please do not send a personal payment unless the office specifically instructs you to do so.</p>
+<p>Questions or a missing club? Contact [OFFICE SUPPORT CONTACT]. Please describe the page and problem without sending a password, private link or member's health details.</p>
+<h3 id="b-registration-confirmation--supported-token-draft">B. Registration confirmation — supported-token draft</h3>
+<p><strong>Template context:</strong> <code>REGISTRATION_CONFIRMATION_PAID</code> or <code>REGISTRATION_CONFIRMATION_UNPAID</code>, chosen by the existing current-state logic. <strong>Condition:</strong> an eligible direct-billed registration, not a waitlist or cancelled-record blast.</p>
+<p><strong>Subject:</strong> Your {{event_name}} registration</p>
+<p>Hello {{recipient_name}},</p>
+<p>Your registration for {{event_name}} is recorded. Your confirmation code is <strong>{{confirmation_code}}</strong>.</p>
+<p><strong>When:</strong> {{event_dates}}<br />
+<strong>Where:</strong> {{event_location}}</p>
+<p>{{payment_status_block}}</p>
+<p><a href="{{portal_url}}">View your registration</a> to review the people included and the actions currently available to you. Keep that link private.</p>
+<p>Questions? Contact {{contact_email}}.</p>
+<h3 id="c-balance-reminder--supported-token-draft">C. Balance reminder — supported-token draft</h3>
+<p><strong>Template context:</strong> <code>BALANCE_REMINDER</code>. <strong>Condition:</strong> the reviewed current amount-due audience and existing reminder workflow. Recheck eligibility at execution; exclude waitlisted/cancelled records and organization-billed registrations where no personal online payment is due.</p>
+<p><strong>Subject:</strong> A balance remains for {{event_name}}</p>
+<p>Hello {{recipient_name}},</p>
+<p>The current recorded balance for registration <strong>{{confirmation_code}}</strong> is <strong>{{balance_amount}}</strong>.</p>
+<p><a href="{{portal_url}}">Review your registration and payment options</a>. If you recently paid, the payment may still be processing. Contact {{contact_email}} if the amount or status does not look right.</p>
+<p>Do not add a late-fee or blocked-access warning: the recorded payment-due feature is a reminder, not an automatic penalty.</p>
+<h3 id="d-organization-billed-registration--supported-token-draft">D. Organization-billed registration — supported-token draft</h3>
+<p><strong>Template context:</strong> <code>REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED</code>. <strong>Condition:</strong> an actual deferred-organization-billing event. This is not the separate finalized invoice delivery.</p>
+<p><strong>Subject:</strong> Registration recorded for {{event_name}}</p>
+<p>Hello {{recipient_name}},</p>
+<p>Registration <strong>{{confirmation_code}}</strong> is recorded for {{event_name}}. This event bills the responsible organization through the office process. <strong>No personal online payment is due for this registration.</strong></p>
+<p><a href="{{portal_url}}">Review the registration</a> and check the people attending and their event choices. The office will follow the event's reconciliation and invoicing process separately.</p>
+<p>Questions about registration or billing responsibility? Contact {{contact_email}}.</p>
+<h3 id="e-event-information-update--editorial-draft">E. Event information update — editorial draft</h3>
+<p><strong>Audience:</strong> the reviewed applicable event audience. <strong>Use:</strong> the existing event announcement/custom-message workflow; saved public content alone does not send this message.</p>
+<p><strong>Subject:</strong> [EVENT NAME]: [SHORT DESCRIPTION OF CHANGE]</p>
+<p>Hello,</p>
+<p>The following information for [EVENT NAME] has changed:</p>
+<p><strong>What changed:</strong> [APPROVED NEW INFORMATION]<br />
+<strong>When it applies:</strong> [DATE/TIME/TIME ZONE]<br />
+<strong>What you need to do:</strong> [ONE CLEAR ACTION, OR “NO ACTION IS NEEDED”]</p>
+<p>Read the current event information at [PUBLIC EVENT URL]. For questions, contact [EVENT SUPPORT CONTACT].</p>
+<p>Choose the audience deliberately if the change applies only to one location, group or class. Avoid a generic “everyone” message when only one subset needs to act.</p>
+<h3 id="f-waitlist-acknowledgment--supported-token-draft">F. Waitlist acknowledgment — supported-token draft</h3>
+<p><strong>Template context:</strong> <code>WAITLIST_JOINED</code>. <strong>Condition:</strong> an actual waitlisted registration. Promotion has its own message and eligibility rules.</p>
+<p><strong>Subject:</strong> You are on the {{event_name}} waitlist</p>
+<p>Hello {{recipient_name}},</p>
+<p>Registration <strong>{{confirmation_code}}</strong> is on the waitlist for {{event_name}}. This message does not confirm a place, and <strong>no payment is due while you are waitlisted</strong>.</p>
+<p><a href="{{portal_url}}">Review your waitlist registration</a>. If a place becomes available, the event's promotion process will explain the next step.</p>
+<p>Questions? Contact {{contact_email}}.</p>
+<h3 id="g-cancellation-request-received--supported-token-draft">G. Cancellation request received — supported-token draft</h3>
+<p><strong>Template context:</strong> <code>CANCELLATION_REQUEST_RECEIVED</code>. <strong>Condition:</strong> the request was successfully recorded. Do not include the person's reason, staff notes, refund amount or a promised outcome.</p>
+<p><strong>Subject:</strong> Cancellation request received for {{event_name}}</p>
+<p>Hello {{recipient_name}},</p>
+<p>We received a cancellation request for registration <strong>{{confirmation_code}}</strong>. The request is waiting for review; this acknowledgment does not itself change the registration or issue a refund.</p>
+<p><a href="{{portal_url}}">View the request and current registration status</a>. Contact {{contact_email}} if you need help.</p>
+<h3 id="h-new-feature-announcement--editorial-draft">H. New-feature announcement — editorial draft</h3>
+<p><strong>Audience:</strong> the roles that will actually use the feature. <strong>Condition:</strong> a named feature is delivered, enabled as appropriate and verified in the serving release. An accepted mockup or merged documentation PR is insufficient.</p>
+<p><strong>Subject:</strong> [FEATURE NAME] is available for [ROLE/AUDIENCE]</p>
+<p>You can now [SPECIFIC TASK] in [EXISTING DESTINATION]. This helps you [PRACTICAL BENEFIT].</p>
+<p><strong>Start here:</strong> [CURRENT VERIFIED INSTRUCTIONS OR HELP LINK]<br />
+<strong>Who can use it:</strong> [ACTUAL ROLE/GRANT]<br />
+<strong>What you need to do:</strong> [ACTION OR “NOTHING UNTIL YOUR NEXT TASK”]</p>
+<p>If your screen or access differs, contact [SUPPORT CONTACT] with your role and the page title.</p>
+<h2 id="7-describe-future-features-without-promising-them">7. Describe future features without promising them</h2>
+<p>Use wording that matches the evidence:</p>
+<table><colgroup><col style="width:29%"><col style="width:71%"></colgroup>
+<thead>
+<tr class="header">
+<th>Evidence</th>
+<th>Wording to use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Feature present in source, serving availability not verified</td>
+<td>“Implemented in the repository; availability depends on the serving release and configuration.”</td>
+</tr>
+<tr class="even">
+<td>Implemented but intentionally gated</td>
+<td>“Prepared behind an activation or policy gate; not announced as generally available.”</td>
+</tr>
+<tr class="odd">
+<td>Accepted design, implementation open</td>
+<td>“The design direction is accepted. The implementation issue remains open.”</td>
+</tr>
+<tr class="even">
+<td>Planned or exploratory issue</td>
+<td>“A future possibility being planned; scope and timing are not committed.”</td>
+</tr>
+<tr class="odd">
+<td>Vendor capability or access unconfirmed</td>
+<td>“Requires confirmation from the provider before an integration can be promised.”</td>
+</tr>
+</tbody>
+</table>
+<p>Apply that language to the form-builder redesign, task-based Help &amp; learning, future Adventurer scope, wallets, native mobile, broad site building, installment charging, incident/personnel systems and UltraCamp exchange. Do not convert their presence in a feature deck into a launch date or approval. Use <a href="https://github.com/DurantTL/IMSDA-Events/issues/98">#98</a> for delivery order and the owning issue for its actual scope.</p>
+<h2 id="8-training-facilitator-notes-and-slide-talking-points">8. Training facilitator notes and slide talking points</h2>
+<p>Use these as an orientation around the already-prepared rehearsal scenarios, not a replacement rehearsal plan.</p>
+<ol type="1">
+<li><strong>One system, different jobs.</strong> Show the four role examples, clearly labelled as current or accepted/proposed design. Ask learners to identify the record scope before choosing an action.</li>
+<li><strong>Where am I working?</strong> Point to the event or club/year. Demonstrate the existing return links and authorized context switch without introducing another menu.</li>
+<li><strong>What does this state mean?</strong> Compare registration, payment, invoice, email delivery and check-in. Avoid a single green badge as shorthand for all five.</li>
+<li><strong>Where do I start?</strong> Attendee: own registration; director: club Home and next task; coordinator: record follow-up; administrator: System or selected event task.</li>
+<li><strong>How do I recover?</strong> Show a safe synthetic example of a validation or access problem, then use the support ticket starter. Never demonstrate with a real private link or protected record.</li>
+<li><strong>What is coming later?</strong> Show separate “implemented,” “gated,” “accepted design” and “planned” labels. Invite task feedback without turning proposed screens into commitments.</li>
+</ol>
+<p>Before distributing a training document, replace editorial placeholders, check every public destination and menu label against the serving release, label screenshots with their capture date/status and use synthetic records. Keep private links out of shared slides. Record the document version so a future screen change can update the instructions without rewriting the whole guide.</p>
+<h2 id="9-existing-material-to-reuse">9. Existing material to reuse</h2>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/NAVIGATION.md">Navigation conventions and current destinations</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md">Existing staff event workflow</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">Role/source contract and accepted design package</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/organizations/director-grants-domain.ts">Current role capability rules</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/templates.ts">Message keys, token allowlist and template meanings</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BILLING-RESPONSIBILITY.md">Organization billing responsibility</a> and <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md">invoice workflow</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-INVITATIONS.md">Staff/pastor/volunteer invitation workflow</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/REGISTRATION-PDF.md">Registration PDF content, versions and channel-specific exceptions</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/README.md">Existing reference CSV/JSON material</a> and <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/samples/registration-pdf-sample.pdf">sample registration PDF</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/844">Current implementation-preparation index</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1109">accepted role issue index</a> and <a href="https://github.com/DurantTL/IMSDA-Events/issues/1077">Help &amp; learning owner</a>.</li>
+</ul>
+<p>No application, permission, menu, template or delivery setting was changed in preparing this kit. The proposed microcopy and communication drafts remain editorial artifacts for review.</p>
+</body></html>

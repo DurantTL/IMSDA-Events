@@ -1,0 +1,431 @@
+{
+  "prepared": "2026-10-21",
+  "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "scope": "Representative current-source consolidation and existing specification review; no production inspection, new browser/AT audit, code changes or new tests.",
+  "priority_note": "Impact is not roadmap priority or claimable readiness.",
+  "wcag_note": "WCAG 2.2 references are guidance only; no conformance assessment claimed. Product 44px targets/14px text conventions are not themselves WCAG compliance.",
+  "findings": [
+    {
+      "id": "UX-01",
+      "title": "Roster changes can be discarded through inconsistent dialog close paths",
+      "classification": "source-confirmed",
+      "impact": "high",
+      "owners": [
+        1101
+      ],
+      "paths": [
+        "components/club-roster-workspace.tsx",
+        "components/use-accessible-dialog.ts"
+      ],
+      "recommendation": "Use one dirty/saving dismissal path for Close, Cancel, Escape and backdrop; keep edits after failure.",
+      "acceptance": "Keep editing preserves exact permitted input and focus; only successful save or deliberate discard resets.",
+      "wcag": [
+        "2.1.1",
+        "2.4.3",
+        "3.3.4",
+        "4.1.2"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/club-roster-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/use-accessible-dialog.ts"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1101"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-02",
+      "title": "Announcement and schedule editors need consistent unsaved-work recovery",
+      "classification": "source-confirmed",
+      "impact": "high",
+      "owners": [
+        1104
+      ],
+      "paths": [
+        "components/communications-workspace.tsx",
+        "components/use-unsaved-changes-guard.ts"
+      ],
+      "recommendation": "Track all edited content and attachments; separate save, publication, approval and sending.",
+      "acceptance": "Every dismissal/editor switch preserves dirty work or asks for explicit discard; failed saves retain content.",
+      "wcag": [
+        "2.4.3",
+        "3.3.1",
+        "3.3.4"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/communications-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/use-unsaved-changes-guard.ts"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1104"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-03",
+      "title": "Account amount-due and next-event projections do not consistently honor registration lifecycle",
+      "classification": "source-confirmed",
+      "impact": "high",
+      "owners": [
+        1100
+      ],
+      "paths": [
+        "app/(public)/account/(portal)/page.tsx",
+        "modules/attendee-accounts/registrations-repository.ts",
+        "modules/public-access/domain.ts"
+      ],
+      "recommendation": "Reuse lifecycle-aware payable-state projections; keep historical money separately visible.",
+      "acceptance": "Cancelled/refunded and waitlisted records have accurate non-payable meaning; cancelled records do not become active next-event recommendations.",
+      "wcag": [
+        "3.3.2",
+        "3.3.4"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(public)/account/(portal)/page.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/attendee-accounts/registrations-repository.ts",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/public-access/domain.ts"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1100"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-04",
+      "title": "Public event addresses and embed code use unsaved draft settings",
+      "classification": "source-confirmed",
+      "impact": "high",
+      "owners": [
+        1115
+      ],
+      "paths": [
+        "components/event-settings-workspace.tsx"
+      ],
+      "recommendation": "Build public outputs from persisted saved settings; label draft preview separately.",
+      "acceptance": "Unsaved/failed-save slug edits leave public outputs intact; successful save updates them; clipboard failure remains recoverable.",
+      "wcag": [
+        "2.4.4",
+        "3.3.2",
+        "4.1.3"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/event-settings-workspace.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1115"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-05",
+      "title": "Report email action silently truncates registration selection to 250",
+      "classification": "source-confirmed",
+      "impact": "high",
+      "owners": [
+        1103
+      ],
+      "paths": [
+        "components/email-registrations-button.tsx"
+      ],
+      "recommendation": "Disclose matched/selected/omitted counts while preserving existing limit and reviewed send semantics.",
+      "acceptance": "250/251 cases make scope explicit; reviewed recipients exactly match the bounded selection; shared-address registration semantics stay intact.",
+      "wcag": [
+        "3.3.2",
+        "3.3.4",
+        "4.1.3"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/email-registrations-button.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1103"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-06",
+      "title": "Merchandise editors omit shared dialog keyboard handling; audience preview can mislabel stale results",
+      "classification": "source-confirmed",
+      "impact": "medium",
+      "owners": [
+        1108
+      ],
+      "paths": [
+        "components/merchandise-admin-workspace.tsx",
+        "components/use-accessible-dialog.ts"
+      ],
+      "recommendation": "Apply shared dialog behavior and tie preview results to evaluated audience with loading/error states.",
+      "acceptance": "Tab/Escape/focus return work; failed/out-of-order responses cannot display previous results as current audience.",
+      "wcag": [
+        "2.1.1",
+        "2.1.2",
+        "2.4.3",
+        "4.1.2",
+        "4.1.3"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/merchandise-admin-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/use-accessible-dialog.ts"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1108"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-07",
+      "title": "Registration order note can disagree with active server sort",
+      "classification": "source-confirmed",
+      "impact": "medium",
+      "owners": [
+        1116
+      ],
+      "paths": [
+        "components/people-workspace.tsx",
+        "app/(workspace)/people/page.tsx"
+      ],
+      "recommendation": "Render readable order from effective canonical sort.",
+      "acceptance": "Name ascending and submitted ascending/descending notes match actual results without changing query ordering.",
+      "wcag": [
+        "1.3.1",
+        "3.3.2"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/people-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(workspace)/people/page.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1116"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-08",
+      "title": "Saved device queue and arrival row use contradictory check-in labels",
+      "classification": "source-confirmed",
+      "impact": "medium",
+      "owners": [
+        1102
+      ],
+      "paths": [
+        "components/check-in-workspace.tsx",
+        "app/(workspace)/more/reports/page.tsx"
+      ],
+      "recommendation": "Use one truthful vocabulary for local save, retry, review and server confirmation; align screening guidance with delivered policy.",
+      "acceptance": "Offline saved row and queue agree; announcements and confirmed counts never imply local queue equals arrival confirmation.",
+      "wcag": [
+        "3.3.2",
+        "4.1.3"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/check-in-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(workspace)/more/reports/page.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1102"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-09",
+      "title": "Crowded calendar day lacks a direct action to all its items",
+      "classification": "source-confirmed",
+      "impact": "medium",
+      "owners": [
+        1117
+      ],
+      "paths": [
+        "app/(public)/calendar/page.tsx",
+        "components/calendar-month-chip.tsx"
+      ],
+      "recommendation": "Use a full-date View all action leading to complete dated agenda while preserving filters.",
+      "acceptance": "Five-item day exposes all five; category/month remain; phone dots stay noninteractive and agenda remains usable.",
+      "wcag": [
+        "2.1.1",
+        "2.4.4",
+        "2.4.6"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(public)/calendar/page.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/calendar-month-chip.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1117"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-10",
+      "title": "Finder underexplains supported search and map coverage",
+      "classification": "source-confirmed",
+      "impact": "medium",
+      "owners": [
+        1118
+      ],
+      "paths": [
+        "components/public-club-directory.tsx",
+        "modules/organizations/public-club-directory.ts"
+      ],
+      "recommendation": "Name town/ZIP/club/church search; show result/map counts, Clear search and honest unavailable states.",
+      "acceptance": "Unmapped clubs remain list results; no-match recovery and status feedback work without adding private public fields.",
+      "wcag": [
+        "2.4.6",
+        "3.3.2",
+        "4.1.3"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/public-club-directory.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/organizations/public-club-directory.ts"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1118"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-11",
+      "title": "Staff invitation tables overflow at intermediate 861px width without scroll cue",
+      "classification": "recorded-layout-finding-not-remeasured",
+      "impact": "medium",
+      "owners": [
+        1045
+      ],
+      "paths": [
+        "app/(workspace)/people/staff-invitations/page.tsx",
+        "app/(workspace)/people/staff-invitations/approvals/page.tsx"
+      ],
+      "recommendation": "Use suitable cards or shared discoverable horizontal-scroll pattern at affected widths.",
+      "acceptance": "Affected eight-width audit and keyboard checks keep data/actions reachable.",
+      "wcag": [
+        "1.4.10",
+        "2.1.1",
+        "2.4.7"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(workspace)/people/staff-invitations/page.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(workspace)/people/staff-invitations/approvals/page.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1045"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-12",
+      "title": "Task columns and visibly labelled roster actions can reduce scanning and memorization",
+      "classification": "proposal",
+      "impact": "medium",
+      "owners": [
+        181,
+        1112
+      ],
+      "paths": [
+        "modules/registrations/attendee-listing.ts",
+        "components/club-roster-workspace.tsx"
+      ],
+      "recommendation": "Preserve populations and current permissions; use stable-ID task columns and visible Edit/Actions vocabulary.",
+      "acceptance": "Phone cards retain labels/sort; reset works; no protected access is gained through column choice.",
+      "wcag": [
+        "1.3.1",
+        "2.4.6",
+        "2.5.3"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/registrations/attendee-listing.ts",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/club-roster-workspace.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/181",
+        "https://github.com/DurantTL/IMSDA-Events/issues/1112"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-13",
+      "title": "System/Event context, settings impact and task help need consistent accepted presentation",
+      "classification": "accepted-design-direction-not-implemented",
+      "impact": "medium",
+      "owners": [
+        1074,
+        1075,
+        1076,
+        1077
+      ],
+      "paths": [
+        "components/system-navigation.ts",
+        "docs/design/role-workspaces/specs/admin-1077.md"
+      ],
+      "recommendation": "Preserve accepted menu, actual grants and distinct role shells; give context, consequence and task help without losing work.",
+      "acceptance": "New/limited-role users can identify scope, find authorized help and return; learning does not imply operational approval.",
+      "wcag": [
+        "2.4.6",
+        "3.2.3",
+        "3.2.4",
+        "3.3.2"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/system-navigation.ts",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/specs/admin-1077.md"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/1074",
+        "https://github.com/DurantTL/IMSDA-Events/issues/1075",
+        "https://github.com/DurantTL/IMSDA-Events/issues/1076",
+        "https://github.com/DurantTL/IMSDA-Events/issues/1077"
+      ],
+      "manual_verification_outstanding": true
+    },
+    {
+      "id": "UX-14",
+      "title": "Public page/content/form/sharing workflow needs a connected organizer presentation",
+      "classification": "proposal",
+      "impact": "medium",
+      "owners": [
+        448,
+        283,
+        284
+      ],
+      "paths": [
+        "components/event-content-workspace.tsx",
+        "components/event-settings-workspace.tsx",
+        "app/(public)/events/[eventSlug]/page.tsx"
+      ],
+      "recommendation": "Connect existing editors and previews within accepted event scope; keep saved/public/draft/private links distinct.",
+      "acceptance": "State/device previews are labelled and share correct rules; no extra System menu or premature multi-page builder is inferred.",
+      "wcag": [
+        "2.4.4",
+        "3.2.3",
+        "3.3.2"
+      ],
+      "source_links": [
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/event-content-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/event-settings-workspace.tsx",
+        "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(public)/events/%5BeventSlug%5D/page.tsx"
+      ],
+      "issue_links": [
+        "https://github.com/DurantTL/IMSDA-Events/issues/448",
+        "https://github.com/DurantTL/IMSDA-Events/issues/283",
+        "https://github.com/DurantTL/IMSDA-Events/issues/284"
+      ],
+      "manual_verification_outstanding": true
+    }
+  ],
+  "existing_strengths": [
+    "Top-most dialog Escape/Tab/focus return helper",
+    "Native Actions disclosure and visible trigger focus return",
+    "Sortable column aria-sort and readable order notes",
+    "Event-settings first-error focus and independent save/publish controls",
+    "Responsive type/target/focus conventions"
+  ],
+  "image_inspected": {
+    "path": "docs/design/public-journeys-and-lists/mockups/screenshots/roster-phone.png",
+    "classification": "proposed synthetic mockup, not deployed screenshot"
+  },
+  "historical_validation": {
+    "record": "docs/design/public-journeys-and-lists/validation.md",
+    "tests": 137,
+    "files": 8,
+    "statement": "Earlier existing-contract test results, not run again for this document; do not establish these fixes or WCAG conformance."
+  }
+}

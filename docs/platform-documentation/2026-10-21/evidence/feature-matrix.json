@@ -1,0 +1,1716 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-10-21",
+  "repository": "https://github.com/DurantTL/IMSDA-Events",
+  "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "basis": "Source and existing documentation review; no production session, deployment verification or new application tests performed by this feature inventory.",
+  "status_definitions": {
+    "implemented in repository": "Capability is implemented in the reviewed repository; actual event configuration and serving release may differ.",
+    "implemented but gated or needs setup": "Implementation exists, but operation needs configuration, a switch, external provider or recorded human prerequisites. No live state was inspected.",
+    "accepted design not implemented": "The presentation direction was accepted; implementation remains open.",
+    "later planned": "Tracked future scope or a proposed extension; approval, timing and completion vary by owner issue.",
+    "unknown": "Evidence insufficient; do not infer either implementation or absence."
+  },
+  "features": [
+    {
+      "id": "public-entry",
+      "group": "current",
+      "feature": "Public front door, calendar and club finder",
+      "status": "implemented in repository",
+      "capability": "The homepage connects My account, My club, conference calendar and Find a club; calendar has informational entries, ICS feeds/import, recurrence and links to registration.",
+      "boundary": "The full searchable/filterable event directory and embeddable calendar remain broader scope. Crowded-day/finder feedback changes are proposed, not shipped.",
+      "evidence": [
+        {
+          "path": "app/page.tsx",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/page.tsx"
+        },
+        {
+          "path": "docs/CALENDAR-IMPORT.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/CALENDAR-IMPORT.md"
+        },
+        {
+          "path": "docs/design/public-journeys-and-lists/review.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/review.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 99,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/99"
+        },
+        {
+          "number": 106,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/106"
+        },
+        {
+          "number": 107,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/107"
+        },
+        {
+          "number": 1117,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1117"
+        },
+        {
+          "number": 1118,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1118"
+        }
+      ]
+    },
+    {
+      "id": "event-public-pages",
+      "group": "current",
+      "feature": "Event pages, content and links",
+      "status": "implemented in repository",
+      "capability": "Event landing pages compose published content, registration choices, resources and lifecycle-aware actions; editors manage assets and sections.",
+      "boundary": "The proposed composed Public page & links workspace and preview refinements are not the current UI. Saved-link correction remains open.",
+      "evidence": [
+        {
+          "path": "modules/events/public-repository.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/events/public-repository.ts"
+        },
+        {
+          "path": "docs/design/public-journeys-and-lists/review.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/review.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 448,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/448"
+        },
+        {
+          "number": 1115,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1115"
+        },
+        {
+          "number": 283,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/283"
+        },
+        {
+          "number": 284,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/284"
+        }
+      ]
+    },
+    {
+      "id": "registration",
+      "group": "current",
+      "feature": "Individual, family, club and group registration",
+      "status": "implemented in repository",
+      "capability": "Versioned forms support registration/person scope, repeating attendees, directories, validation, pricing, review, capacity and waitlists; club directors select roster members.",
+      "boundary": "One multi-person booking does not establish permanent household identity, guardian authority or staff access.",
+      "evidence": [
+        {
+          "path": "modules/forms/definition.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/definition.ts"
+        },
+        {
+          "path": "modules/forms/public-repository.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/public-repository.ts"
+        },
+        {
+          "path": "docs/GENERAL-REGISTRATION-LINK.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/GENERAL-REGISTRATION-LINK.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 73,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/73"
+        },
+        {
+          "number": 161,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/161"
+        },
+        {
+          "number": 162,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/162"
+        },
+        {
+          "number": 163,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/163"
+        }
+      ]
+    },
+    {
+      "id": "form-authoring",
+      "group": "current",
+      "feature": "Draft/publish form authoring",
+      "status": "implemented in repository",
+      "capability": "Save explicit drafts, preview/test, publish versions and replace an unpublished draft from a template; submissions keep their own published version. A test submission is required before the first publication only.",
+      "boundary": "The three-zone editor, complete phone editor, All/Any groups and saved question library remain future work.",
+      "evidence": [
+        {
+          "path": "docs/STAFF-EVENT-WORKFLOW.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md"
+        },
+        {
+          "path": "modules/forms/repository.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/repository.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 1062,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1062"
+        },
+        {
+          "number": 1063,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1063"
+        },
+        {
+          "number": 1069,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1069"
+        },
+        {
+          "number": 1070,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1070"
+        },
+        {
+          "number": 1071,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1071"
+        },
+        {
+          "number": 1072,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1072"
+        }
+      ]
+    },
+    {
+      "id": "templates-clone",
+      "group": "current",
+      "feature": "Event starters, form starters and annual copy",
+      "status": "implemented in repository",
+      "capability": "Data-backed event templates/starters and seeded form templates are applied as copies; annual event cloning can copy selected configuration without operational history.",
+      "boundary": "Event template administration is currently technical/raw JSON. App-editable Form templates and source-change notices are not yet implemented; saving an event as a template remains separate scope.",
+      "evidence": [
+        {
+          "path": "modules/event-templates/domain.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/event-templates/domain.ts"
+        },
+        {
+          "path": "modules/forms/seeded-templates.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/seeded-templates.ts"
+        },
+        {
+          "path": "docs/STAFF-EVENT-WORKFLOW.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 137,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/137"
+        },
+        {
+          "number": 154,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/154"
+        },
+        {
+          "number": 1064,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1064"
+        },
+        {
+          "number": 1065,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1065"
+        }
+      ]
+    },
+    {
+      "id": "self-service",
+      "group": "current",
+      "feature": "Registration management and attendee accounts",
+      "status": "implemented in repository",
+      "capability": "Private management access and verified attendee accounts provide eligible registration details, permitted edits, balances, assignments, published messages and owned QR passes.",
+      "boundary": "Editing depends on the field and policy. Cancelled/waitlisted account summaries have a focused lifecycle correction open; the accepted new attendee layout is not built.",
+      "evidence": [
+        {
+          "path": "docs/ATTENDEE-ACCOUNT-RELEASE.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md"
+        },
+        {
+          "path": "modules/attendee-accounts/registration-answer-policy.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/attendee-accounts/registration-answer-policy.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 61,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/61"
+        },
+        {
+          "number": 109,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/109"
+        },
+        {
+          "number": 1100,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1100"
+        },
+        {
+          "number": 1111,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1111"
+        }
+      ]
+    },
+    {
+      "id": "linked-signin",
+      "group": "current",
+      "feature": "Linked account and one sign-in foundation",
+      "status": "implemented but gated or needs setup",
+      "capability": "User and AttendeeAccount are linked 1:1 behind a sign-in switch; combined entry, hand-link tooling, passkey entry and both-side sign-out foundations exist.",
+      "boundary": "The two tables/session boundaries remain. The switch defaults off; production enablement/linking and actual serving state are not established by this report.",
+      "evidence": [
+        {
+          "path": "docs/decisions/0013-one-account-per-person.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0013-one-account-per-person.md"
+        },
+        {
+          "path": "docs/SINGLE-ACCOUNT-MIGRATION.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/SINGLE-ACCOUNT-MIGRATION.md"
+        },
+        {
+          "path": "modules/account-merge/sign-in-switch.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/account-merge/sign-in-switch.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 554,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/554"
+        },
+        {
+          "number": 108,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/108"
+        },
+        {
+          "number": 160,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/160"
+        }
+      ]
+    },
+    {
+      "id": "staff-roles",
+      "group": "current",
+      "feature": "Staff permissions and workspace context",
+      "status": "implemented in repository",
+      "capability": "Server-side event memberships, named permissions, global administration, staff invitations and authorized workspace routing are implemented.",
+      "boundary": "Only genuine grants/sessions permit entry. Kitchen-only staff do not gain ordinary event/registration access; protected records use narrower domain guards.",
+      "evidence": [
+        {
+          "path": "modules/access/authorization.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/access/authorization.ts"
+        },
+        {
+          "path": "modules/access/permissions.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/access/permissions.ts"
+        },
+        {
+          "path": "docs/STAFF-INVITATIONS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-INVITATIONS.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 108,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/108"
+        },
+        {
+          "number": 160,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/160"
+        },
+        {
+          "number": 1045,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1045"
+        }
+      ]
+    },
+    {
+      "id": "event-features",
+      "group": "current",
+      "feature": "Event feature/settings inventory",
+      "status": "implemented in repository",
+      "capability": "Event features shows module and feature state, permitted switches and links to owning settings; event creation can select supported feature configuration.",
+      "boundary": "A feature row or module switch is not evidence that every capability in that domain is finished. Settings require the current server permission.",
+      "evidence": [
+        {
+          "path": "docs/EVENT-FEATURES.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EVENT-FEATURES.md"
+        },
+        {
+          "path": "modules/event-features/model.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/event-features/model.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 1076,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1076"
+        }
+      ]
+    },
+    {
+      "id": "payments",
+      "group": "current",
+      "feature": "Payments, adjustments and cancellation workflows",
+      "status": "implemented but gated or needs setup",
+      "capability": "Square integration, manual cash/check/card records, payment attempts, refunds, adjustment history, promo codes, scholarship matching and cancellation requests are present.",
+      "boundary": "Processor configuration and real-provider rehearsal are operational evidence. Refund execution, real pricing/capacity changes and production activity retain human controls; generalized ledger/credits remain later work.",
+      "evidence": [
+        {
+          "path": "docs/CANCELLATION-POLICY.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/CANCELLATION-POLICY.md"
+        },
+        {
+          "path": "modules/payments/repository.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/payments/repository.ts"
+        },
+        {
+          "path": "modules/promo-codes/repository.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/promo-codes/repository.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 101,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/101"
+        },
+        {
+          "number": 102,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/102"
+        },
+        {
+          "number": 117,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/117"
+        },
+        {
+          "number": 118,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/118"
+        },
+        {
+          "number": 119,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/119"
+        },
+        {
+          "number": 120,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/120"
+        },
+        {
+          "number": 121,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/121"
+        },
+        {
+          "number": 122,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/122"
+        },
+        {
+          "number": 123,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/123"
+        }
+      ]
+    },
+    {
+      "id": "church-finance",
+      "group": "current",
+      "feature": "Church billing and invoices",
+      "status": "implemented in repository",
+      "capability": "Responsible organizations, reviewed billable units, immutable drafts/finalization/revisions, invoice PDFs, receivables, payments and statements exist.",
+      "boundary": "A director who submits a church-billed registration is not the personal debtor. Invoice finalization has its own permission; it is not inherited by every finance role.",
+      "evidence": [
+        {
+          "path": "docs/BILLING-RESPONSIBILITY.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BILLING-RESPONSIBILITY.md"
+        },
+        {
+          "path": "docs/ATTENDANCE-RECONCILIATION.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDANCE-RECONCILIATION.md"
+        },
+        {
+          "path": "docs/INVOICES.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 194,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/194"
+        },
+        {
+          "number": 977,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/977"
+        }
+      ]
+    },
+    {
+      "id": "checkin",
+      "group": "current",
+      "feature": "Check-in, passes and badges",
+      "status": "implemented in repository",
+      "capability": "Signed attendee passes, scanner/desk check-in, undo, whole-club workflows, printable rosters and Avery badge sheets are implemented.",
+      "boundary": "A dedicated staff-run event station is still planned. Single-name label printing waits on printer/device decisions; the current station proposal excludes printing.",
+      "evidence": [
+        {
+          "path": "modules/checkin/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/checkin/README.md"
+        },
+        {
+          "path": "docs/BADGE-PRINT-CHECK.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BADGE-PRINT-CHECK.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 892,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/892"
+        },
+        {
+          "number": 894,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/894"
+        }
+      ]
+    },
+    {
+      "id": "screening",
+      "group": "current",
+      "feature": "Screening evidence and check-in rules",
+      "status": "implemented but gated or needs setup",
+      "capability": "The imported CSV/date list is matched at lookup. Registration/login/roster access stay available; applicable youth/children’s adult/staff check-in follows the delivered gate and audited override.",
+      "boundary": "Serving-release sign-off, mapping, human import review and fallback evidence remain distinct. Instructor roster access uses the specifically recorded warning behavior.",
+      "evidence": [
+        {
+          "path": "docs/decisions/0009-sterling-readiness-gate-policy.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0009-sterling-readiness-gate-policy.md"
+        },
+        {
+          "path": "docs/BACKGROUND-CHECK-LIST-MIGRATION.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BACKGROUND-CHECK-LIST-MIGRATION.md"
+        },
+        {
+          "path": "docs/HONORS-INSTRUCTORS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HONORS-INSTRUCTORS.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 70,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/70"
+        },
+        {
+          "number": 113,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/113"
+        },
+        {
+          "number": 115,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/115"
+        },
+        {
+          "number": 218,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/218"
+        }
+      ]
+    },
+    {
+      "id": "club-rosters",
+      "group": "current",
+      "feature": "Club rosters and yearly work",
+      "status": "implemented in repository",
+      "capability": "Club grants, encrypted birth dates, roster edits/import/carry-forward, club forms, Monthly Records, points, honors/classes, orders and export formats exist.",
+      "boundary": "Director/deputy, registrar and reporter capabilities differ. Current new-club applications are Pathfinder-only; future Adventurer parity is a separate project.",
+      "evidence": [
+        {
+          "path": "modules/club-rosters/access.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/club-rosters/access.ts"
+        },
+        {
+          "path": "docs/CLUB-IMPORT-RUNBOOK.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/CLUB-IMPORT-RUNBOOK.md"
+        },
+        {
+          "path": "docs/reference/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/README.md"
+        },
+        {
+          "path": "docs/NEW-CLUB-APPLICATIONS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/NEW-CLUB-APPLICATIONS.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 41,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/41"
+        },
+        {
+          "number": 184,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/184"
+        },
+        {
+          "number": 185,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/185"
+        },
+        {
+          "number": 840,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/840"
+        }
+      ]
+    },
+    {
+      "id": "coordinator",
+      "group": "current",
+      "feature": "Coordinator club oversight",
+      "status": "implemented in repository",
+      "capability": "The existing coordinator workspace supports available-club oversight, Monthly Records/points, view-only club data and narrow permitted reviews.",
+      "boundary": "Current source queries all active clubs. Future ministry-scoped grants are decided in direction but not implemented by the accepted layout; ordinary club/report oversight is read-only.",
+      "evidence": [
+        {
+          "path": "docs/design/role-workspaces/evidence/role-contract.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/evidence/role-contract.md"
+        },
+        {
+          "path": "modules/club-rosters/access.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/club-rosters/access.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 843,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/843"
+        },
+        {
+          "number": 1113,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1113"
+        }
+      ]
+    },
+    {
+      "id": "honors",
+      "group": "current",
+      "feature": "Honors Weekend operations",
+      "status": "implemented in repository",
+      "capability": "Catalogs, scheduled class offerings, live seats, prerequisites, class waitlists, staff schedule board, instructor rosters, attendance/completion write-back and class-change email options exist.",
+      "boundary": "Teachers see only assigned roster fields, subject to their second-step and edit window; completion correction/voiding keeps existing authority.",
+      "evidence": [
+        {
+          "path": "docs/HONORS-INSTRUCTORS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HONORS-INSTRUCTORS.md"
+        },
+        {
+          "path": "docs/HONORS-WEEKEND-CLASS-WAITLIST.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HONORS-WEEKEND-CLASS-WAITLIST.md"
+        },
+        {
+          "path": "docs/HONORS-WEEKEND-SCHEDULE-BOARD.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HONORS-WEEKEND-SCHEDULE-BOARD.md"
+        },
+        {
+          "path": "docs/MULTI-HONOR-CLASSES.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MULTI-HONOR-CLASSES.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 197,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/197"
+        },
+        {
+          "number": 207,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/207"
+        },
+        {
+          "number": 208,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/208"
+        },
+        {
+          "number": 209,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/209"
+        }
+      ]
+    },
+    {
+      "id": "lodging",
+      "group": "current",
+      "feature": "Lodging inventory, requests and assignments",
+      "status": "implemented but gated or needs setup",
+      "capability": "Camp Heritage/Sunnydale templates, event layout snapshots, night availability, holds/rates, requests, assignments, moves and lodging waitlists exist.",
+      "boundary": "A request is not an assignment. Exact property layout, inventory, prices and event configuration need operational verification. This is not proof of a complete residential youth-camp model.",
+      "evidence": [
+        {
+          "path": "docs/LODGING.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LODGING.md"
+        },
+        {
+          "path": "modules/lodging/domain.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/lodging/domain.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 779,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/779"
+        }
+      ]
+    },
+    {
+      "id": "meals",
+      "group": "current",
+      "feature": "Meal services, plans, tickets and kitchen counts",
+      "status": "implemented but gated or needs setup",
+      "capability": "Meal plans/selections/pricing, ticket CSV, conference-paid entitlements, café result imports, served-versus-sold reporting and append-only kitchen counts exist.",
+      "boundary": "Meal money closeout is the remaining #212 slice. A sold ticket, café redemption, prepared count and collected money are different facts; protected allergy expansion remains separate.",
+      "evidence": [
+        {
+          "path": "docs/MEALS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md"
+        },
+        {
+          "path": "modules/meals/served-report.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/meals/served-report.ts"
+        },
+        {
+          "path": "modules/meals/kitchen-counts.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/meals/kitchen-counts.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 212,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/212"
+        },
+        {
+          "number": 683,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/683"
+        }
+      ]
+    },
+    {
+      "id": "assets",
+      "group": "current",
+      "feature": "Issued assets and facility controls",
+      "status": "implemented in repository",
+      "capability": "Keys/badges/wristbands/assets can be issued, returned, corrected and reconciled; deposits/charges and facility blocks retain history.",
+      "boundary": "It is an event-issued asset workflow, not an inventory purchasing system or complete camp-store/POS wallet.",
+      "evidence": [
+        {
+          "path": "docs/ISSUED-ASSETS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ISSUED-ASSETS.md"
+        },
+        {
+          "path": "modules/issued-assets/corrections.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/issued-assets/corrections.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 80,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/80"
+        },
+        {
+          "number": 94,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/94"
+        }
+      ]
+    },
+    {
+      "id": "email",
+      "group": "current",
+      "feature": "Event and account communications",
+      "status": "implemented but gated or needs setup",
+      "capability": "Central Email settings, event pause/sender controls, versioned templates, reviewed broadcasts, scheduling, audience selection, attachments/images, delivery attempts/retries, preferences and form-routed notifications exist.",
+      "boundary": "Provider transport/configuration determines real delivery evidence. SES bounce/complaint handling remains open; expanded ready-made announcement sections and the persisted admin feed are not implemented.",
+      "evidence": [
+        {
+          "path": "modules/communications/effective-delivery.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/effective-delivery.ts"
+        },
+        {
+          "path": "docs/FORM-NOTIFICATIONS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/FORM-NOTIFICATIONS.md"
+        },
+        {
+          "path": "modules/communications/scheduled-email-repository.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/scheduled-email-repository.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 77,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/77"
+        },
+        {
+          "number": 836,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/836"
+        },
+        {
+          "number": 837,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/837"
+        },
+        {
+          "number": 845,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/845"
+        },
+        {
+          "number": 863,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/863"
+        },
+        {
+          "number": 1033,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1033"
+        }
+      ]
+    },
+    {
+      "id": "reports-exports",
+      "group": "current",
+      "feature": "Reports, CSVs and registration PDFs",
+      "status": "implemented in repository",
+      "capability": "Operational reports and scoped CSVs support current domains; registration PDFs preserve submission versions and update copies with documented redaction/approved exceptions.",
+      "boundary": "Saved staff views/column profiles are future scope. Export labels must reflect the actual query/selection; PDF-specific allowlists are not a blanket medical redaction guarantee.",
+      "evidence": [
+        {
+          "path": "docs/REGISTRATION-PDF.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/REGISTRATION-PDF.md"
+        },
+        {
+          "path": "modules/registrations/attendee-listing.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/registrations/attendee-listing.ts"
+        },
+        {
+          "path": "docs/reference/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/README.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 75,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/75"
+        },
+        {
+          "number": 181,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/181"
+        },
+        {
+          "number": 182,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/182"
+        },
+        {
+          "number": 1103,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1103"
+        },
+        {
+          "number": 1116,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1116"
+        }
+      ]
+    },
+    {
+      "id": "imports",
+      "group": "current",
+      "feature": "Reviewed imports and sample outputs",
+      "status": "implemented in repository",
+      "capability": "Existing preview/apply/provenance patterns, domain import runbooks, synthetic CSV examples, catalog JSON/CSV and made-up PDF outputs are already in Git.",
+      "boundary": "This pack indexes those assets. It does not rebuild import preparation or authorize real production apply.",
+      "evidence": [
+        {
+          "path": "scripts/imports/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/scripts/imports/README.md"
+        },
+        {
+          "path": "docs/reference/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/README.md"
+        },
+        {
+          "path": "docs/HEALTH-RECORD-IMPORT-RUNBOOK.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HEALTH-RECORD-IMPORT-RUNBOOK.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 76,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/76"
+        },
+        {
+          "number": 172,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/172"
+        },
+        {
+          "number": 173,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/173"
+        },
+        {
+          "number": 174,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/174"
+        },
+        {
+          "number": 175,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/175"
+        }
+      ]
+    },
+    {
+      "id": "protected-health",
+      "group": "current",
+      "feature": "Narrow protected health implementations",
+      "status": "implemented but gated or needs setup",
+      "capability": "Encrypted birth dates and narrow Health Record, registrar entry-only, acknowledgment, administrator break-glass and sealed-copy foundations are present.",
+      "boundary": "ADR 0005 has addendum-specific statuses and production prerequisites. Addendum B is interim accepted; the overall broader policy and Addendum C are separate. No blanket availability/compliance claim.",
+      "evidence": [
+        {
+          "path": "docs/decisions/0005-protected-records-policy.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0005-protected-records-policy.md"
+        },
+        {
+          "path": "modules/health-records/flag.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/health-records/flag.ts"
+        },
+        {
+          "path": "modules/events/health-window.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/events/health-window.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 389,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/389"
+        },
+        {
+          "number": 44,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/44"
+        },
+        {
+          "number": 189,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/189"
+        },
+        {
+          "number": 190,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/190"
+        },
+        {
+          "number": 191,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/191"
+        },
+        {
+          "number": 192,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/192"
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "group": "current",
+      "feature": "Basic event community",
+      "status": "implemented but gated or needs setup",
+      "capability": "An enabled event can offer the existing opt-in community with conduct acceptance, posts/replies, reporting and moderation foundations.",
+      "boundary": "Profiles, directories, groups/media, richer moderation and lifecycle are separate later/policy-bound slices; do not advertise a general social network.",
+      "evidence": [
+        {
+          "path": "docs/ATTENDEE-ACCOUNT-RELEASE.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md"
+        },
+        {
+          "path": "docs/decisions/0004-attendee-community.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0004-attendee-community.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 83,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/83"
+        },
+        {
+          "number": 308,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/308"
+        },
+        {
+          "number": 309,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/309"
+        },
+        {
+          "number": 310,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/310"
+        },
+        {
+          "number": 311,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/311"
+        },
+        {
+          "number": 312,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/312"
+        },
+        {
+          "number": 313,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/313"
+        },
+        {
+          "number": 314,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/314"
+        },
+        {
+          "number": 315,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/315"
+        }
+      ]
+    },
+    {
+      "id": "archive-ops",
+      "group": "current",
+      "feature": "Archive, audit and operating controls",
+      "status": "implemented but gated or needs setup",
+      "capability": "Event archive/unarchive, audit trails, readiness/health surfaces, queued work and backup/restore tooling exist.",
+      "boundary": "Archive hides an event without deleting records and is not the same as full financial closeout. A readiness tick is evidence, not a deployment or enabling action.",
+      "evidence": [
+        {
+          "path": "docs/EVENT-ARCHIVE.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EVENT-ARCHIVE.md"
+        },
+        {
+          "path": "docs/BACKUPS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BACKUPS.md"
+        },
+        {
+          "path": "modules/system-admin/readiness-items.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/system-admin/readiness-items.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 156,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/156"
+        },
+        {
+          "number": 158,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/158"
+        },
+        {
+          "number": 159,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/159"
+        },
+        {
+          "number": 416,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/416"
+        }
+      ]
+    },
+    {
+      "id": "accepted-role-design",
+      "group": "future",
+      "feature": "Distinct role workspace presentation",
+      "status": "accepted design not implemented",
+      "capability": "Accepted direction gives attendee, director, coordinator and administrator one visual language with different navigation, scope and priorities.",
+      "boundary": "The visual prototypes are reference documents; implementation remains in existing child issues. Later page studies do not add extra System menu changes.",
+      "evidence": [
+        {
+          "path": "docs/design/role-workspaces/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md"
+        },
+        {
+          "path": "docs/design/role-workspaces/specs/README.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/specs/README.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 1109,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1109"
+        },
+        {
+          "number": 1111,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1111"
+        },
+        {
+          "number": 1112,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1112"
+        },
+        {
+          "number": 1113,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1113"
+        },
+        {
+          "number": 1073,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1073"
+        },
+        {
+          "number": 1074,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1074"
+        },
+        {
+          "number": 1075,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1075"
+        },
+        {
+          "number": 1076,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1076"
+        },
+        {
+          "number": 1077,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1077"
+        }
+      ]
+    },
+    {
+      "id": "builder-foundations",
+      "group": "future",
+      "feature": "Builder extraction and editable Form templates",
+      "status": "later planned",
+      "capability": "Steps 1/2a/2b cover behavior-preserving extraction, immutable app-editable templates and source/version notices.",
+      "boundary": "The October 20 decision permits foundation work before later visual review; this does not move the #98 queue or codex-ready frontier.",
+      "evidence": [
+        {
+          "path": "modules/forms/seeded-templates.ts",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/seeded-templates.ts"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 1062,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1062"
+        },
+        {
+          "number": 1063,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1063"
+        },
+        {
+          "number": 1064,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1064"
+        },
+        {
+          "number": 1065,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1065"
+        }
+      ]
+    },
+    {
+      "id": "builder-visual-library-logic",
+      "group": "future",
+      "feature": "Inspector, saved questions, phone editor and All/Any",
+      "status": "later planned",
+      "capability": "Proposed next builder steps clarify field/settings ownership, copied saved questions, phone move/edit workflows and combined visibility conditions.",
+      "boundary": "Steps 3–6 retain separate design review. All/Any direction is accepted; that does not approve every proposed visual/library/permission detail.",
+      "evidence": [
+        {
+          "path": "docs/design/public-journeys-and-lists/review.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/review.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 1069,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1069"
+        },
+        {
+          "number": 1070,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1070"
+        },
+        {
+          "number": 1071,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1071"
+        },
+        {
+          "number": 1072,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/1072"
+        }
+      ]
+    },
+    {
+      "id": "presentation-publishing",
+      "group": "future",
+      "feature": "Themes, composed previews and full site builder",
+      "status": "later planned",
+      "capability": "Registration themes/state previews can lead to versioned pages, dynamic modules, branding, publish/rollback and optional domains.",
+      "boundary": "#283/#284 are earlier bounded foundations; #247–#251/#270 own the broader site outcome and publication evidence. Do not wait for all future pages to improve today’s event page.",
+      "evidence": [
+        {
+          "path": "docs/design/public-journeys-and-lists/existing-owner-notes.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/existing-owner-notes.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 283,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/283"
+        },
+        {
+          "number": 284,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/284"
+        },
+        {
+          "number": 448,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/448"
+        },
+        {
+          "number": 84,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/84"
+        },
+        {
+          "number": 247,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/247"
+        },
+        {
+          "number": 248,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/248"
+        },
+        {
+          "number": 249,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/249"
+        },
+        {
+          "number": 250,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/250"
+        },
+        {
+          "number": 251,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/251"
+        },
+        {
+          "number": 270,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/270"
+        }
+      ]
+    },
+    {
+      "id": "saved-views",
+      "group": "future",
+      "feature": "Saved task views and reviewed bulk operations",
+      "status": "later planned",
+      "capability": "Personal/shared views, stable column choices, dashboard drilldowns and a consistent scoped export/action framework extend existing search.",
+      "boundary": "Existing attendee CSV and director saved export formats are delivered and should be reused; a saved view cannot grant field access.",
+      "evidence": [
+        {
+          "path": "docs/design/public-journeys-and-lists/existing-owner-notes.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/existing-owner-notes.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 75,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/75"
+        },
+        {
+          "number": 181,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/181"
+        },
+        {
+          "number": 182,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/182"
+        }
+      ]
+    },
+    {
+      "id": "adventurer-parity",
+      "group": "future",
+      "feature": "Adventurer ministry and voluntary YMMS migration",
+      "status": "later planned",
+      "capability": "The recorded direction is separate clubs per ministry, director-set classes, shared honors/awards catalog and whole-ministry coordinator visibility initially.",
+      "boundary": "This is a later project awaiting materials and survey answers. Migration is voluntary club by club; parent registration/unit scoring/training are independent later needs.",
+      "evidence": [
+        {
+          "path": "docs/NEW-CLUB-APPLICATIONS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/NEW-CLUB-APPLICATIONS.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 840,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/840"
+        },
+        {
+          "number": 841,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/841"
+        },
+        {
+          "number": 842,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/842"
+        },
+        {
+          "number": 843,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/843"
+        },
+        {
+          "number": 485,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/485"
+        },
+        {
+          "number": 494,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/494"
+        },
+        {
+          "number": 493,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/493"
+        },
+        {
+          "number": 492,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/492"
+        }
+      ]
+    },
+    {
+      "id": "finance-expansion",
+      "group": "future",
+      "feature": "Shared ledger, held credits and installment convenience",
+      "status": "later planned",
+      "capability": "Append-only shared charges/allocations, settlement reconciliation, transfers/held credits and optional installment charging extend current financial workflows.",
+      "boundary": "Do not mistake the current meal ledger or immutable invoices for the completed shared financial ledger; recurring processor authorization/terms remain gated.",
+      "evidence": [
+        {
+          "path": "docs/INVOICES.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md"
+        },
+        {
+          "path": "docs/MERCHANDISE-LEDGER-MIGRATION.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MERCHANDISE-LEDGER-MIGRATION.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 74,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/74"
+        },
+        {
+          "number": 117,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/117"
+        },
+        {
+          "number": 118,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/118"
+        },
+        {
+          "number": 119,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/119"
+        },
+        {
+          "number": 120,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/120"
+        },
+        {
+          "number": 121,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/121"
+        },
+        {
+          "number": 122,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/122"
+        },
+        {
+          "number": 123,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/123"
+        },
+        {
+          "number": 92,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/92"
+        },
+        {
+          "number": 229,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/229"
+        },
+        {
+          "number": 230,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/230"
+        },
+        {
+          "number": 231,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/231"
+        },
+        {
+          "number": 232,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/232"
+        },
+        {
+          "number": 268,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/268"
+        }
+      ]
+    },
+    {
+      "id": "merch-store",
+      "group": "future",
+      "feature": "Public merchandise and camp-store account possibilities",
+      "status": "later planned",
+      "capability": "Existing catalog foundations can support future reserved inventory, separately paid merchandise and later store/cashless-account concepts.",
+      "boundary": "Merchandise checkout/fulfillment slices remain held; draft #302 was closed without merging. Camp-store wallets/POS are a separate bigger scope.",
+      "evidence": [
+        {
+          "path": "docs/MERCHANDISE-LEDGER-MIGRATION.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MERCHANDISE-LEDGER-MIGRATION.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 54,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/54"
+        },
+        {
+          "number": 146,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/146"
+        },
+        {
+          "number": 147,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/147"
+        },
+        {
+          "number": 148,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/148"
+        },
+        {
+          "number": 94,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/94"
+        }
+      ]
+    },
+    {
+      "id": "camp-operations",
+      "group": "future",
+      "feature": "Full residential camp capability",
+      "status": "later planned",
+      "capability": "Future camp operations could combine enrollment, cabins/counselors, activity schedules, transport, authorized release, personnel and incident controls.",
+      "boundary": "Today’s lodging/meals/check-in are reusable foundations, not proof of a complete camp product. The separate UltraCamp discovery report identifies contracts and gaps.",
+      "evidence": [
+        {
+          "path": "docs/LODGING.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LODGING.md"
+        },
+        {
+          "path": "docs/MEALS.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md"
+        },
+        {
+          "path": "docs/decisions/0006-minor-release-policy.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0006-minor-release-policy.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 65,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/65"
+        },
+        {
+          "number": 78,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/78"
+        },
+        {
+          "number": 79,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/79"
+        },
+        {
+          "number": 89,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/89"
+        },
+        {
+          "number": 93,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/93"
+        },
+        {
+          "number": 96,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/96"
+        },
+        {
+          "number": 201,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/201"
+        },
+        {
+          "number": 202,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/202"
+        },
+        {
+          "number": 203,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/203"
+        },
+        {
+          "number": 204,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/204"
+        },
+        {
+          "number": 205,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/205"
+        },
+        {
+          "number": 206,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/206"
+        },
+        {
+          "number": 215,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/215"
+        },
+        {
+          "number": 216,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/216"
+        },
+        {
+          "number": 217,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/217"
+        }
+      ]
+    },
+    {
+      "id": "attendee-convenience",
+      "group": "future",
+      "feature": "Returning profiles, wallet passes and native app",
+      "status": "later planned",
+      "capability": "Reviewed reusable facts/prefill, Apple/Google Wallet, a mobile attendee shell, minimized offline support and opt-in push are tracked possibilities.",
+      "boundary": "Current account profile/prefill, web QR and phone-responsive web screens already exist. Native/provider deployment, offline actions and cross-event identity need their own contracts.",
+      "evidence": [
+        {
+          "path": "docs/ATTENDEE-ACCOUNT-RELEASE.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 91,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/91"
+        },
+        {
+          "number": 226,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/226"
+        },
+        {
+          "number": 227,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/227"
+        },
+        {
+          "number": 228,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/228"
+        },
+        {
+          "number": 53,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/53"
+        },
+        {
+          "number": 222,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/222"
+        },
+        {
+          "number": 223,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/223"
+        },
+        {
+          "number": 224,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/224"
+        },
+        {
+          "number": 225,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/225"
+        },
+        {
+          "number": 267,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/267"
+        },
+        {
+          "number": 82,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/82"
+        },
+        {
+          "number": 262,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/262"
+        },
+        {
+          "number": 263,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/263"
+        },
+        {
+          "number": 264,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/264"
+        },
+        {
+          "number": 265,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/265"
+        },
+        {
+          "number": 266,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/266"
+        }
+      ]
+    },
+    {
+      "id": "integration-expansion",
+      "group": "future",
+      "feature": "Partner API, eAdventist and optional UltraCamp",
+      "status": "later planned",
+      "capability": "A scoped first-party/public contract, signed outbound webhooks and reviewed external directory feeds could extend owned data flows.",
+      "boundary": "The eAdventist CSV organization import already exists; it is not an approved live person-membership API. UltraCamp remains optional lowest-priority Phase 5 and requires an allowed data/licensing boundary.",
+      "evidence": [
+        {
+          "path": "docs/EADVENTIST-ORGANIZATIONS-IMPORT.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EADVENTIST-ORGANIZATIONS-IMPORT.md"
+        },
+        {
+          "path": "docs/decisions/0010-external-api-v1-contract.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0010-external-api-v1-contract.md"
+        },
+        {
+          "path": "docs/decisions/0002-unified-operations-platform.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0002-unified-operations-platform.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 103,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/103"
+        },
+        {
+          "number": 124,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/124"
+        },
+        {
+          "number": 237,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/237"
+        },
+        {
+          "number": 238,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/238"
+        },
+        {
+          "number": 239,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/239"
+        },
+        {
+          "number": 240,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/240"
+        },
+        {
+          "number": 241,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/241"
+        },
+        {
+          "number": 269,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/269"
+        },
+        {
+          "number": 69,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/69"
+        },
+        {
+          "number": 242,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/242"
+        },
+        {
+          "number": 243,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/243"
+        },
+        {
+          "number": 244,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/244"
+        },
+        {
+          "number": 245,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/245"
+        },
+        {
+          "number": 246,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/246"
+        },
+        {
+          "number": 71,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/71"
+        }
+      ]
+    },
+    {
+      "id": "future-outcomes-business",
+      "group": "future",
+      "feature": "Outcomes, personnel, incidents and advanced event tools",
+      "status": "later planned",
+      "capability": "Survey/certificate/outcome tools, recruiting/onboarding, restricted incidents, budgets/procurement, presenter portals, networking and hybrid delivery remain long-term domains.",
+      "boundary": "Some have detailed technical slices, others remain planning epics. A roadmap entry is not a committed date, approved policy or current product promise.",
+      "evidence": [
+        {
+          "path": "docs/decisions/0011-personnel-pipeline-policy.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0011-personnel-pipeline-policy.md"
+        },
+        {
+          "path": "docs/decisions/0012-incident-case-management-policy.md",
+          "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0012-incident-case-management-policy.md"
+        }
+      ],
+      "owner_issues": [
+        {
+          "number": 90,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/90"
+        },
+        {
+          "number": 233,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/233"
+        },
+        {
+          "number": 234,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/234"
+        },
+        {
+          "number": 235,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/235"
+        },
+        {
+          "number": 236,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/236"
+        },
+        {
+          "number": 93,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/93"
+        },
+        {
+          "number": 252,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/252"
+        },
+        {
+          "number": 253,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/253"
+        },
+        {
+          "number": 254,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/254"
+        },
+        {
+          "number": 255,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/255"
+        },
+        {
+          "number": 256,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/256"
+        },
+        {
+          "number": 79,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/79"
+        },
+        {
+          "number": 257,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/257"
+        },
+        {
+          "number": 258,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/258"
+        },
+        {
+          "number": 259,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/259"
+        },
+        {
+          "number": 260,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/260"
+        },
+        {
+          "number": 261,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/261"
+        },
+        {
+          "number": 85,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/85"
+        },
+        {
+          "number": 86,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/86"
+        },
+        {
+          "number": 87,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/87"
+        },
+        {
+          "number": 88,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/88"
+        },
+        {
+          "number": 95,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/95"
+        },
+        {
+          "number": 97,
+          "url": "https://github.com/DurantTL/IMSDA-Events/issues/97"
+        }
+      ]
+    }
+  ]
+}

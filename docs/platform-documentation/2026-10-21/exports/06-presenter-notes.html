@@ -1,0 +1,181 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events platform briefing — presenter notes</title><style>
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
+*{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
+.coverline{font-size:9pt;letter-spacing:1.7px;color:#582c83;font-weight:700;border-bottom:4px solid #f0b323;padding-bottom:14px;margin-bottom:18px}
+.baseline{font-size:8.4pt;color:#536b78;background:#f4f7f8;padding:12px 14px;border-left:3px solid #003b5c;margin:0 0 22px}
+h1{font-size:27pt;line-height:1.15;color:#003b5c;letter-spacing:-.5px;margin:0 0 18px}
+h2{font-size:17pt;line-height:1.25;color:#003b5c;margin:24px 0 10px;break-after:avoid}
+h3{font-size:12pt;line-height:1.3;color:#582c83;margin:17px 0 8px;break-after:avoid}
+h4{font-size:10.8pt;break-after:avoid}p,ul,ol{margin:0 0 10px}li{margin:3px 0}li p{margin:0 0 5px}
+a{color:#003b5c;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+strong{font-weight:700}code{font:9pt/1.35 'DejaVu Sans Mono',monospace;overflow-wrap:anywhere;background:#f4f7f8;padding:0 2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f7f8;border:1px solid #dce6ea;font-size:8.8pt}
+blockquote{border-left:3px solid #f0b323;padding:8px 14px;margin:12px 0;background:#fbf8ee}
+table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:8.7pt;line-height:1.4;margin:12px 0 18px}
+th{background:#003b5c;color:white;text-align:left;padding:8px;border:1px solid #003b5c;font-weight:700}
+td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywhere}
+td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
+img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
+hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
+</style></head><body><div class="coverline">IMSDA EVENTS  /  REVIEW &amp; ENABLEMENT PACK</div><h1 id="imsda-events-platform-briefing--presenter-notes">IMSDA Events platform briefing — presenter notes</h1><div class="baseline">Prepared October 21, 2026 · Repository baseline <strong>5e367b7c</strong><br>Current implementation, gated capabilities, accepted design and future plans are distinguished in the text. Repository evidence does not establish the serving production state.</div>
+<h2 id="1-a-clearer-guide-to-imsda-events">1. A clearer guide to IMSDA Events</h2>
+<p>Use this deck with the five companion documents. This is a repository-based briefing, not a statement of deployment or production readiness. The source baseline is main 5e367b7c. Existing rehearsals, decision records and sample imports/outputs are referenced rather than recreated.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300">Source baseline</a></li>
+</ul>
+<h2 id="2-read-every-feature-with-its-status">2. Read every feature with its status</h2>
+<p>These labels prevent a common misunderstanding: a merged change, a design sample and a future issue do not have the same meaning. The documents use the same distinctions. No proposed feature in this deck is a new delivery commitment.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/98">Ordered roadmap</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1109">Design direction</a></li>
+</ul>
+<h2 id="3-a-substantial-event-foundation-already-exists">3. A substantial event foundation already exists</h2>
+<p>These are grouped foundations rather than a promise that every long-term epic is complete. The feature guide gives current limits and source links. The future append-only ledger is distinct from the current payment/refund/adjustment system.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EVENT-FEATURES.md">Feature inventory</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/modules">Source modules</a></li>
+</ul>
+<h2 id="4-one-visual-language-four-different-jobs">4. One visual language. Four different jobs.</h2>
+<p>Do not turn these personas into four options anyone can select. Workspaces follow real grants and authentication. A multi-person registration does not establish permanent household or guardian authority. Current coordinator source selects all active clubs; ministry-scoped access is a later project.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/evidence/role-contract.md">Role contract</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1109">Accepted roles</a></li>
+</ul>
+<h2 id="5-attendee-help-starts-with-the-next-action">5. Attendee help starts with the next action</h2>
+<p>Use the actual event and registration state before suggesting Pay now or Change registration. #1100 is the open lifecycle display defect. Private management links carry access: help users recover access through the intended path rather than forwarding tokens or posting them in support channels.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/61">Private access</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1100">Lifecycle display correction</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1111">Attendee design</a></li>
+</ul>
+<h2 id="6-directors-work-from-club-and-year">6. Directors work from club and year</h2>
+<p>Current director work already exists; #1112 is the accepted shell/roster usability follow-up. A registrar is not a director with a different label, and a reporter does not gain roster access. Do not teach the future Help &amp; learning page as a current destination.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/club-rosters/access.ts">Club capabilities</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1112">Director design</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md">Invoicing</a></li>
+</ul>
+<h2 id="7-coordinators-need-oversight-not-a-director-clone">7. Coordinators need oversight, not a director clone</h2>
+<p>#840/#843 describe the later ministry scope. The accepted future direction is whole-ministry visibility for now, but it is not the current enforced predicate. Current health sheets and the encrypted Pathfinder Health Record are different sources with different guards.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1113">Coordinator design</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/843">Future ministry scope</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0005-protected-records-policy.md">Health policy</a></li>
+</ul>
+<h2 id="8-administrator-training-should-follow-real-work">8. Administrator training should follow real work</h2>
+<p>The left column names existing responsibilities. The right column summarizes accepted design direction in #1073–#1077 and should not be presented as fully shipped. These documents preserve the agreed administrator menu; later page mockup sidebars do not redefine it.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1073">Admin design owner</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1074">Navigation owner</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1075">Dashboard owner</a></li>
+</ul>
+<h2 id="9-form-reuse-has-several-distinct-meanings">9. Form reuse has several distinct meanings</h2>
+<p>The form-builder foundation sequence is #1063, then #1064, then #1065. The latest October 20 decision permits those foundation slices before the separate visual review for steps 3–6. First-publish-only builder testing and draft replacement from a template are delivered. Do not confuse a form configuration copy with copying reservations, people or health records.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1062">Builder epic</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1064">Editable templates</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1065">Template provenance</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1070">Saved questions</a></li>
+</ul>
+<h2 id="10-operations-depend-on-distinct-records-and-states">10. Operations depend on distinct records and states</h2>
+<p>Kitchen scanner import1028 and count entry1029 are delivered;212 now retains money closeout and exceptions. The current Sterling policy keeps registration/login/roster available while gating applicable adult/staff check-in at youth/children events, with an audited override and adult-event clarification.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md">Meals</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/212">Kitchen residual</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/874">Screening rule</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/74">Future ledger</a></li>
+</ul>
+<h2 id="11-accessibility-has-a-useful-existing-foundation">11. Accessibility has a useful existing foundation</h2>
+<p>The review is a source/specification synthesis with clearly identified historical visual references. Read the usability document for concrete findings, related WCAG guidance and verification limits. A successful layout test is useful evidence but not a screen-reader or production usability session.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/RESPONSIVE.md">Responsive conventions</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1114">Current design review</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/917">Open test resilience work</a></li>
+</ul>
+<h2 id="12-fix-confusing-behavior-before-adding-more-surface">12. Fix confusing behavior before adding more surface</h2>
+<p>These are existing open issues, not newly discovered production incidents. The companion review explains reproducible source behavior, user impact and acceptance examples. This slide does not reprioritize the canonical queue.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1114">Review and ownership</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1115">Saved links</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1101">Dirty roster</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1045">Tablet overflow</a></li>
+</ul>
+<h2 id="13-accepted-design-is-a-reference-not-a-shipped-screen">13. Accepted design is a reference, not a shipped screen</h2>
+<p>These two images are synthetic accepted role-workspace mockups from the existing reference pack. They are not production screenshots. Their accepted role separation and the existing navigation owners remain authoritative. No additional administrator menu changes are proposed by this briefing.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">Accepted role gallery</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1112">Director owner</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1073">Admin owner</a></li>
+</ul>
+<h2 id="14-help-should-answer-a-task-in-plain-language">14. Help should answer a task in plain language</h2>
+<p>The help kit is prepared content, not a new Help screen. Draft messages are not sent. Before operational use, check audience, source state, current permission and any event-specific wording. Never place private management links, health details or sensitive records into a general support discussion.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/templates.ts">Current communications templates</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1077">Future Help owner</a></li>
+</ul>
+<h2 id="15-future-possibilities-extend-the-foundation">15. Future possibilities extend the foundation</h2>
+<p>These groups summarize existing issues; they are not a newly ordered roadmap. Each has different maturity and gates. Do not promise dates, automatically enable vendors or treat conference-level approval of one narrow feature as approval of every adjacent parent.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/98">Ordered roadmap</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/844">Comparison index</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/840">Adventurers</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/84">Future site builder</a></li>
+</ul>
+<h2 id="16-a-full-youth-camp-system-needs-more-than-events">16. A full youth-camp system needs more than events</h2>
+<p>Conference Camp Meeting and residential youth/summer camp are different operating models. Existing lodging beds do not by themselves create a counselor/camper supervision model. The separate camp report maps capability, authoritative records and human policy to existing owners. Missing evidence is marked unknown, not asserted absent from UltraCamp.</p>
+<ul>
+<li><a href="04-camp-system-and-ultracamp.pdf">Camp report companion</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LEGACY-EVENT-SYSTEMS.md">Legacy operations</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/71">UltraCamp scope</a></li>
+</ul>
+<h2 id="17-what-we-need-from-ultracamp">17. What we need from UltraCamp</h2>
+<p>This is a draft information request for the owner to use; nothing is sent to UltraCamp. Ask the camp operator and vendor for synthetic/blank examples, not live camper exports. Public documentation gaps do not prove there is no supported interface. All UltraCamp implementation stays Phase 5 under the existing owner decision.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/71">Existing UltraCamp research</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/389">Health discovery index</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/98">Phase order</a></li>
+</ul>
+<h2 id="18-the-code-is-a-modular-monolith">18. The code is a modular monolith</h2>
+<p>The technical report includes a deeper module/data-flow map and code references. Staff User and AttendeeAccount remain linked1:1 with separate authentication boundaries. Current payment/refund/adjustment/invoice records are not the future generalized ledger. Protected domains have narrower guards than ordinary event access.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/AGENTS.md">Automation guide</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/prisma/schema.prisma">Schema</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0001-foundation-architecture.md">Architecture ADR</a></li>
+</ul>
+<h2 id="19-there-is-measured-verification-evidence">19. There is measured verification evidence</h2>
+<p>Exact current main push run 39609956369, job 119260142581, commit 5e367b7c. The skipped backup-script test requires root; the CI runner is nonroot. The full verify job is intentionally skipped on main push; extended database/HTTP evidence is recorded separately for application PR head 9879edba. The app/scripts/workflows are identical between that head and this baseline; the intervening 58 paths are all documentation. These are CI results, not deployment verification.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956369">Current main CI run</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473876">Last application verification</a></li>
+</ul>
+<h2 id="20-know-what-those-checks-do-not-prove">20. Know what those checks do not prove</h2>
+<p>The mobile run is 39520478915; it opened 301 dialogs and checked 1,871 fields plus 56 date fields, with 0 accepted findings and 0 page script errors. Screenshots were disabled, so the report is evidence but not a visual screenshot archive. Badge run 39520473962 is automated evidence, not a real printer test. Existing readiness/rehearsal documents remain the owner of human steps; this deck does not recreate them.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39520478915">Mobile run</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473962">Badge run</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/PRODUCTION-READINESS-REVIEW.md">Readiness evidence</a></li>
+</ul>
+<h2 id="21-build-on-the-materials-already-in-git">21. Build on the materials already in Git</h2>
+<p>This responds to the owner’s correction: the project already has rehearsals, decision records, import preparation and PDF/CSV/JSON outputs. The new feature guide provides an index into them. It does not create another competing decision register, importer or go-live checklist.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs">Existing docs</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/imports">Import references</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/samples/registration-pdf-sample.pdf">Sample registration PDF</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/README.md">Public/list studies</a></li>
+</ul>
+<h2 id="22-use-the-pack-for-explanation-and-review">22. Use the pack for explanation and review</h2>
+<p>The deliverables are documentation. Application code, menus, roles, queues and production switches are unchanged. Future implementation continues from #98 and its existing bounded issues. Use the README to select the right document for the audience.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/844">Backlog review index</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/98">Canonical queue</a></li>
+</ul>
+<h2 id="23-source-notes-and-further-reading">23. Source notes and further reading</h2>
+<p>Primary source baseline <a href="https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300">https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300</a>. The generated documents cite stable source paths and live issue owners. External references are evidence at the dates stated, not a promise about vendor entitlement. This deck uses synthetic accepted design screenshots only, clearly labelled.</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/98">Roadmap</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/844">Review index</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1109">Role design</a></li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/issues/1062">Builder</a></li>
+</ul>
+</body></html>

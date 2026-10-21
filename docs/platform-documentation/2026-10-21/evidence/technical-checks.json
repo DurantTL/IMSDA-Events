@@ -1,0 +1,1935 @@
+{
+  "report_date_utc": "2026-10-21",
+  "repository": "DurantTL/IMSDA-Events",
+  "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "application_baseline_commit": "72a6cb214185cd7b74696f8913535f85330b690f",
+  "reviewed_application_pr_head": "9879edba44f1cfb18af191724a9018fda7ca0b60",
+  "method": "Read-only source/workflow/run/job/log-summary inspection; no application code or tests changed and no new application test run started.",
+  "source_comparison": {
+    "from": "9879edba44f1cfb18af191724a9018fda7ca0b60",
+    "to": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+    "changed_paths": 58,
+    "all_changed_paths_under": "docs/",
+    "non_docs_paths": []
+  },
+  "inventory": {
+    "domain_directories": 70,
+    "vitest_test_files_on_disk": 1015,
+    "committed_sql_migrations": 218,
+    "coverage_measurement": false
+  },
+  "current_main_test_summary": {
+    "files_passed": 1015,
+    "tests_passed": 13504,
+    "tests_skipped": 1,
+    "tests_total": 13505,
+    "duration_seconds": 225.99,
+    "run_id": 39609956369,
+    "job_id": 119260142581,
+    "skip": {
+      "file": "tests/backup-scripts.test.ts",
+      "condition": "test runs only with process.getuid() === 0",
+      "name": "as root, drops to postgres with gosu, and refuses without gosu or su-exec"
+    }
+  },
+  "mobile_summary": {
+    "run_id": 39520478915,
+    "sha": "9879edba44f1cfb18af191724a9018fda7ca0b60",
+    "widths": [
+      360,
+      1024
+    ],
+    "page_width_combinations": 320,
+    "dialogs_opened": 301,
+    "fields_boundary_checked": 1871,
+    "dialog_date_fields": 56,
+    "accepted_findings": 0,
+    "page_script_errors": 0,
+    "screenshots_enabled": false,
+    "check_step_conclusion": "success",
+    "wcag_conformance_certification": false
+  },
+  "runs": [
+    {
+      "id": 39609956369,
+      "name": "CI",
+      "event": "push",
+      "sha": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+      "created_at": "2026-10-21T13:39:54Z",
+      "updated_at": "2026-10-21T13:57:12Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956369",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 119260142581,
+          "name": "main-smoke",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956369/job/119260142581",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check for schema/migration drift",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run lint",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run typecheck",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 119260144523,
+          "name": "verify",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956369/job/119260144523",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": 39609956750,
+      "name": "Docker image",
+      "event": "push",
+      "sha": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+      "created_at": "2026-10-21T13:39:54Z",
+      "updated_at": "2026-10-21T13:54:19Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956750",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 119258998665,
+          "name": "image",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956750/job/119258998665",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Image name",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run docker/setup-buildx-action@v3",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run docker/login-action@v3",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build and push",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build and push backup image",
+              "conclusion": "success"
+            },
+            {
+              "name": "Summary",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Build and push backup image",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Build and push",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run docker/login-action@v3",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run docker/setup-buildx-action@v3",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39522715128,
+      "name": "CI",
+      "event": "push",
+      "sha": "72a6cb214185cd7b74696f8913535f85330b690f",
+      "created_at": "2026-10-21T00:40:17Z",
+      "updated_at": "2026-10-21T00:49:01Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39522715128",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 118970117017,
+          "name": "main-smoke",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39522715128/job/118970117017",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check for schema/migration drift",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run lint",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run typecheck",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 118970118824,
+          "name": "verify",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39522715128/job/118970118824",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": 39605339354,
+      "name": "CI",
+      "event": "pull_request",
+      "sha": "b7b39e955c8844b285708da911aba0c214ca00f5",
+      "created_at": "2026-10-21T13:08:11Z",
+      "updated_at": "2026-10-21T13:19:57Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39605339354",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 119239962705,
+          "name": "verify",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39605339354/job/119239962705",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Decide what this change needs",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check for schema/migration drift",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run lodging:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run form-templates:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run verify",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-capacity",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:group-registration",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:form-revisions",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:staff-act-as",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:single-account-dry-run",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:user-attendee-link",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:staff-attendee-activation",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:unified-sign-in",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-transfers",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:background-check-list",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-supplies",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-imports",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:new-club-application",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:organization-sponsors",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-orders",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:uniform-orders",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:earned-awards",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-entry-void",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-instructors",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-class-emails",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-watch",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-templates",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:seeded-form-templates",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-cloning",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-creation-features",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-content-blocks",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:church-promo-codes",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:church-code-invoices",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-locations",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:operations-search",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging-preferences",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging-assignment",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:issued-assets",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:issued-assets-returns",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:church-sponsor-lodging",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:calendar-bulk",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:calendar-event-links",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:deadline-reminders",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:location-waitlist",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-forms",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:health-records",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:health-snapshots",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:health-import",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-roster-guardians",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-roster-carry-forward",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:billing-responsibility",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:attendance-reconciliation",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:guardian-authority",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:consent-policies",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:acknowledgments",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:invoices",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:scholarship-funds",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:square-hosted-link",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:meals",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:meal-ticket-export",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:meal-submit-contention",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:reservation-deposit",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:cancellation-policy",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:cancellation-requests",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:invoice-delivery",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:ses-delivery",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:announcement-email",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:announcement-attachments",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:announcement-unsubscribe",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-audience-builder",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:scheduled-emails",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:retry-failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:module-requests",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-sites",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:multi-honor-classes",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-class-requirements",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-schedule-board",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-class-waitlist",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-reinstate-seats",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-admin-seat-override",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-deletion",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-archive",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:pbe-registration",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:pbe-advancement",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:general-link-registration",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:staff-invitations",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:check-in-concurrency",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:eadventist-import",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Start the built app",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-capacity",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-access",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-messaging",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-roster",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging-assignment-http",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-instructors-http",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:check-in-multi-device-http",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Show the app log when a suite failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 119239965233,
+          "name": "main-smoke",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39605339354/job/119239965233",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": 39542942380,
+      "name": "CI",
+      "event": "pull_request",
+      "sha": "696743c3b49ed9ff7ca7daf972d3a035b36c54cd",
+      "created_at": "2026-10-21T04:14:29Z",
+      "updated_at": "2026-10-21T04:27:10Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39542942380",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 119034973522,
+          "name": "verify",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39542942380/job/119034973522",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Decide what this change needs",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check for schema/migration drift",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run lodging:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run form-templates:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run verify",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-capacity",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:group-registration",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:form-revisions",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:staff-act-as",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:single-account-dry-run",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:user-attendee-link",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:staff-attendee-activation",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:unified-sign-in",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-transfers",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:background-check-list",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-supplies",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-imports",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:new-club-application",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:organization-sponsors",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-orders",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:uniform-orders",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:earned-awards",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-entry-void",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-instructors",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-class-emails",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-watch",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-templates",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:seeded-form-templates",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-cloning",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-creation-features",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-content-blocks",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:church-promo-codes",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:church-code-invoices",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-locations",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:operations-search",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging-preferences",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging-assignment",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:issued-assets",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:issued-assets-returns",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:church-sponsor-lodging",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:calendar-bulk",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:calendar-event-links",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:deadline-reminders",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:location-waitlist",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-forms",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:health-records",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:health-snapshots",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:health-import",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-roster-guardians",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:club-roster-carry-forward",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:billing-responsibility",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:attendance-reconciliation",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:guardian-authority",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:consent-policies",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:acknowledgments",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:invoices",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:scholarship-funds",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:square-hosted-link",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:meals",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:meal-ticket-export",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:meal-submit-contention",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:reservation-deposit",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:cancellation-policy",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:cancellation-requests",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:invoice-delivery",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:ses-delivery",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:announcement-email",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:announcement-attachments",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:announcement-unsubscribe",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-audience-builder",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:scheduled-emails",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:retry-failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:module-requests",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-sites",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:multi-honor-classes",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-class-requirements",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-schedule-board",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-class-waitlist",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-reinstate-seats",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-admin-seat-override",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-deletion",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:event-archive",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:pbe-registration",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:pbe-advancement",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:general-link-registration",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:staff-invitations",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:check-in-concurrency",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:eadventist-import",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Start the built app",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-capacity",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-access",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-messaging",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:public-roster",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:lodging-assignment-http",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:honor-instructors-http",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run npm run test:check-in-multi-device-http",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Show the app log when a suite failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 119034974618,
+          "name": "main-smoke",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39542942380/job/119034974618",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": 39520473876,
+      "name": "CI",
+      "event": "pull_request",
+      "sha": "9879edba44f1cfb18af191724a9018fda7ca0b60",
+      "created_at": "2026-10-21T00:18:01Z",
+      "updated_at": "2026-10-21T00:38:22Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473876",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 118962817374,
+          "name": "verify",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473876/job/118962817374",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Decide what this change needs",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check for schema/migration drift",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run lodging:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run form-templates:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run verify",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-capacity",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:group-registration",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:form-revisions",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:staff-act-as",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:single-account-dry-run",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:user-attendee-link",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:staff-attendee-activation",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:unified-sign-in",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-transfers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:background-check-list",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-supplies",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-imports",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:new-club-application",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:organization-sponsors",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-orders",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:uniform-orders",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:earned-awards",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-entry-void",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-instructors",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-class-emails",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-watch",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-templates",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:seeded-form-templates",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-cloning",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-creation-features",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-content-blocks",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:church-promo-codes",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:church-code-invoices",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-locations",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:operations-search",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:lodging",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:lodging-preferences",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:lodging-assignment",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:issued-assets",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:issued-assets-returns",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:church-sponsor-lodging",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:calendar-bulk",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:calendar-event-links",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:deadline-reminders",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:location-waitlist",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-forms",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:health-records",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:health-snapshots",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:health-import",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-roster-guardians",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:club-roster-carry-forward",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:billing-responsibility",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:attendance-reconciliation",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:guardian-authority",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:consent-policies",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:acknowledgments",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:invoices",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:scholarship-funds",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:square-hosted-link",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:meals",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:meal-ticket-export",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:meal-submit-contention",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:reservation-deposit",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:cancellation-policy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:cancellation-requests",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:invoice-delivery",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:ses-delivery",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:announcement-email",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:announcement-attachments",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:announcement-unsubscribe",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-audience-builder",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:scheduled-emails",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:retry-failed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:module-requests",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-sites",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:multi-honor-classes",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-class-requirements",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-schedule-board",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-class-waitlist",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-reinstate-seats",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-admin-seat-override",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-deletion",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:event-archive",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:pbe-registration",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:pbe-advancement",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:general-link-registration",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:staff-invitations",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:check-in-concurrency",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:eadventist-import",
+              "conclusion": "success"
+            },
+            {
+              "name": "Start the built app",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:public-capacity",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:public-access",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:public-messaging",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:public-roster",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:lodging-assignment-http",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:honor-instructors-http",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run test:check-in-multi-device-http",
+              "conclusion": "success"
+            },
+            {
+              "name": "Show the app log when a suite failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 118962818810,
+          "name": "main-smoke",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473876/job/118962818810",
+          "conclusion": "skipped",
+          "steps": []
+        }
+      ]
+    },
+    {
+      "id": 39520473962,
+      "name": "Badge print",
+      "event": "pull_request",
+      "sha": "9879edba44f1cfb18af191724a9018fda7ca0b60",
+      "created_at": "2026-10-21T00:18:01Z",
+      "updated_at": "2026-10-21T00:21:58Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473962",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 118962817086,
+          "name": "Badge print (real browser, optional)",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473962/job/118962817086",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run build",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm i --no-save playwright-core@1.56.1 pdfjs-dist@4.10.38",
+              "conclusion": "success"
+            },
+            {
+              "name": "Start the built app",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check name badge printing",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep the printed PDFs",
+              "conclusion": "success"
+            },
+            {
+              "name": "Show the app log when the check failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39520478915,
+      "name": "Mobile layout (label)",
+      "event": "pull_request",
+      "sha": "9879edba44f1cfb18af191724a9018fda7ca0b60",
+      "created_at": "2026-10-21T00:18:03Z",
+      "updated_at": "2026-10-21T00:34:13Z",
+      "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520478915",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 118962832889,
+          "name": "mobile-layout / Mobile layout (real browser, optional)",
+          "url": "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520478915/job/118962832889",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Initialize containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm ci",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:deploy",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run db:seed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run club-forms:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run lodging:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run form-templates:sync",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm run build",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run npm i --no-save playwright-core@1.56.1",
+              "conclusion": "success"
+            },
+            {
+              "name": "Start the built app",
+              "conclusion": "success"
+            },
+            {
+              "name": "Check phone layouts",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep the screenshots and report",
+              "conclusion": "success"
+            },
+            {
+              "name": "Show the app log when the check failed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Stop containers",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "run_id": 39520473962,
+      "name": "badge-print-output",
+      "id": 12309884301,
+      "size_in_bytes": 663405,
+      "expired": false,
+      "created_at": "2026-10-21T00:21:54Z"
+    },
+    {
+      "run_id": 39520478915,
+      "name": "mobile-layout-screenshots",
+      "id": 12312330338,
+      "size_in_bytes": 1303,
+      "expired": false,
+      "created_at": "2026-10-21T00:34:10Z"
+    }
+  ],
+  "historical_reference_checks": [
+    {
+      "reference": "docs/design/public-journeys-and-lists/validation.md",
+      "sha": "72a6cb214185cd7b74696f8913535f85330b690f",
+      "tests_passed": 137,
+      "files": 8,
+      "meaning": "targeted existing contracts; no deployed-browser or end-to-end certification"
+    },
+    {
+      "reference": "docs/design/role-workspaces/README.md",
+      "sha": "696743c3b49ed9ff7ca7daf972d3a035b36c54cd",
+      "screen_width_cases": 16,
+      "role_state_checks": 11,
+      "gallery_widths": 3,
+      "meaning": "static accepted design-reference validation, not production implementation"
+    }
+  ],
+  "unverified_here": [
+    "serving production release/image and enabled switches",
+    "production migration/import apply",
+    "real encryption-key restore evidence and operational backup retention",
+    "real Square settlement and production payment setup",
+    "real email delivery/inbox placement and live SNS configuration",
+    "physical badge/label print and scanner device behavior",
+    "manual screen-reader/keyboard/zoom validation of every workflow",
+    "load/performance targets in a production-equivalent environment",
+    "human policy/activation/medical handling sign-offs"
+  ]
+}

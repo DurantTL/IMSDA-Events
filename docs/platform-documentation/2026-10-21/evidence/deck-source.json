@@ -1,0 +1,3940 @@
+{
+  "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "slides": [
+    {
+      "title": "A clearer guide to\nIMSDA Events",
+      "kicker": "PLATFORM BRIEFING  /  OCTOBER 21, 2026",
+      "cards": null,
+      "columns": null,
+      "summary": "Current features. Practical help. Future possibilities.",
+      "notes": "Use this deck with the five companion documents. This is a repository-based briefing, not a statement of deployment or production readiness. The source baseline is main 5e367b7c. Existing rehearsals, decision records and sample imports/outputs are referenced rather than recreated.",
+      "sources": [
+        [
+          "Source baseline",
+          "https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300"
+        ]
+      ],
+      "layout": "cover"
+    },
+    {
+      "title": "Read every feature with its status",
+      "kicker": "HOW TO USE THIS DECK",
+      "cards": [
+        [
+          "Implemented",
+          "Present in the repository. Confirm configuration and serving release before training on a live event."
+        ],
+        [
+          "Gated or needs setup",
+          "Code exists, but activation, credentials, approved scope or operational evidence is still required."
+        ],
+        [
+          "Accepted design",
+          "The visual direction is accepted. The production interface may still be awaiting implementation."
+        ],
+        [
+          "Later plan",
+          "An issue or proposal describes possible future work. Timing and decisions remain with the roadmap."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "These labels prevent a common misunderstanding: a merged change, a design sample and a future issue do not have the same meaning. The documents use the same distinctions. No proposed feature in this deck is a new delivery commitment.",
+      "sources": [
+        [
+          "Ordered roadmap",
+          "https://github.com/DurantTL/IMSDA-Events/issues/98"
+        ],
+        [
+          "Design direction",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1109"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "A substantial event foundation already exists",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": [
+        [
+          "Registration",
+          "Versioned forms, group/club flows, amendments, waitlists and private management links."
+        ],
+        [
+          "Money",
+          "Payments, refunds, adjustments, church invoices, sponsorship and reconciliation reports."
+        ],
+        [
+          "Event operations",
+          "Lodging, meal tickets, scanner imports, kitchen counts, assets and check-in."
+        ],
+        [
+          "Club ministry",
+          "Annual rosters, forms, Monthly Records, honors, orders and scoped portals."
+        ],
+        [
+          "Communication",
+          "Central Email, templates, announcements, schedules and reviewed audiences."
+        ],
+        [
+          "Public discovery",
+          "Event pages, public calendar, club finder, content and existing public links."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "These are grouped foundations rather than a promise that every long-term epic is complete. The feature guide gives current limits and source links. The future append-only ledger is distinct from the current payment/refund/adjustment system.",
+      "sources": [
+        [
+          "Feature inventory",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EVENT-FEATURES.md"
+        ],
+        [
+          "Source modules",
+          "https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/modules"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "One visual language. Four different jobs.",
+      "kicker": "ROLE BOUNDARIES",
+      "cards": [
+        [
+          "Attendee",
+          "Manage accessible registrations, profile and permitted next actions."
+        ],
+        [
+          "Director",
+          "Work within a selected club and club year, using the capabilities actually granted."
+        ],
+        [
+          "Area Coordinator",
+          "Review available clubs and reports, with narrow existing decision permissions."
+        ],
+        [
+          "System administrator",
+          "Manage the platform and deliberately enter an event for authorized work."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "Do not turn these personas into four options anyone can select. Workspaces follow real grants and authentication. A multi-person registration does not establish permanent household or guardian authority. Current coordinator source selects all active clubs; ministry-scoped access is a later project.",
+      "sources": [
+        [
+          "Role contract",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/evidence/role-contract.md"
+        ],
+        [
+          "Accepted roles",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1109"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Attendee help starts with the next action",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": null,
+      "columns": [
+        [
+          "What people can do",
+          [
+            "Register as a guest or use their account.",
+            "Return through an authorized account or private management link.",
+            "Review registration state, event information and permitted payment or change actions."
+          ]
+        ],
+        [
+          "What help must explain",
+          [
+            "A waitlist request is different from a confirmed place.",
+            "Cancelled registrations remain part of history.",
+            "Payment, registration and check-in states mean different things."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "Use the actual event and registration state before suggesting Pay now or Change registration. #1100 is the open lifecycle display defect. Private management links carry access: help users recover access through the intended path rather than forwarding tokens or posting them in support channels.",
+      "sources": [
+        [
+          "Private access",
+          "https://github.com/DurantTL/IMSDA-Events/issues/61"
+        ],
+        [
+          "Lifecycle display correction",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1100"
+        ],
+        [
+          "Attendee design",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1111"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "Directors work from club and year",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": null,
+      "columns": [
+        [
+          "Daily tasks",
+          [
+            "Maintain the authorized club roster and fix missing details.",
+            "Complete club forms and Monthly Records.",
+            "Choose people for events and manage permitted changes."
+          ]
+        ],
+        [
+          "Keep these distinctions visible",
+          [
+            "Deputy, registrar and reporter have different capabilities.",
+            "Church-billed events belong to the sponsoring church\u2019s invoice flow.",
+            "Birth dates and health information have separate access rules."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "Current director work already exists; #1112 is the accepted shell/roster usability follow-up. A registrar is not a director with a different label, and a reporter does not gain roster access. Do not teach the future Help & learning page as a current destination.",
+      "sources": [
+        [
+          "Club capabilities",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/club-rosters/access.ts"
+        ],
+        [
+          "Director design",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1112"
+        ],
+        [
+          "Invoicing",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "Coordinators need oversight, not a director clone",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": null,
+      "columns": [
+        [
+          "Current oversight",
+          [
+            "Review clubs available to the role.",
+            "Follow Monthly Records, points and event participation.",
+            "Use existing scoped review paths, including the narrow Team approval exception."
+          ]
+        ],
+        [
+          "Avoid misleading training",
+          [
+            "Do not imply an enforced area/ministry filter exists today.",
+            "Club and report views are generally read-only.",
+            "Event health information follows a separate permission and time-window contract."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "#840/#843 describe the later ministry scope. The accepted future direction is whole-ministry visibility for now, but it is not the current enforced predicate. Current health sheets and the encrypted Pathfinder Health Record are different sources with different guards.",
+      "sources": [
+        [
+          "Coordinator design",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1113"
+        ],
+        [
+          "Future ministry scope",
+          "https://github.com/DurantTL/IMSDA-Events/issues/843"
+        ],
+        [
+          "Health policy",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0005-protected-records-policy.md"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "Administrator training should follow real work",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": null,
+      "columns": [
+        [
+          "Existing system responsibilities",
+          [
+            "Event and access administration.",
+            "Central Email and notification settings.",
+            "Calendar, directory, imports and operational readiness evidence."
+          ]
+        ],
+        [
+          "Accepted design improves clarity",
+          [
+            "Explicit System versus Event context.",
+            "Action-first summaries with truthful count meanings.",
+            "Clear settings impact, dirty-edit recovery and task-based help."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "The left column names existing responsibilities. The right column summarizes accepted design direction in #1073\u2013#1077 and should not be presented as fully shipped. These documents preserve the agreed administrator menu; later page mockup sidebars do not redefine it.",
+      "sources": [
+        [
+          "Admin design owner",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1073"
+        ],
+        [
+          "Navigation owner",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1074"
+        ],
+        [
+          "Dashboard owner",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1075"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "Form reuse has several distinct meanings",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": [
+        [
+          "Event template",
+          "A starting configuration for an event; operational module data has its own ownership."
+        ],
+        [
+          "Form template",
+          "A copied form definition. Seeded versions exist; app-editable templates remain planned work."
+        ],
+        [
+          "Published form version",
+          "Each registration stays tied to the version it used. A draft change does not rewrite old answers."
+        ],
+        [
+          "Future saved questions",
+          "A separate copy-on-insert library proposal, with reference and permission details still owned by its issue."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "The form-builder foundation sequence is #1063, then #1064, then #1065. The latest October 20 decision permits those foundation slices before the separate visual review for steps 3\u20136. First-publish-only builder testing and draft replacement from a template are delivered. Do not confuse a form configuration copy with copying reservations, people or health records.",
+      "sources": [
+        [
+          "Builder epic",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1062"
+        ],
+        [
+          "Editable templates",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1064"
+        ],
+        [
+          "Template provenance",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1065"
+        ],
+        [
+          "Saved questions",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1070"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Operations depend on distinct records and states",
+      "kicker": "CURRENT FOUNDATION",
+      "cards": [
+        [
+          "Registration \u2260 payment",
+          "A request, booking state and balance each answer a different question."
+        ],
+        [
+          "Check-in \u2260 screening",
+          "Arrival uses the existing event eligibility and audited override rules."
+        ],
+        [
+          "Meals sold \u2260 meals served",
+          "Scanner records, cancellations and kitchen-entered counts keep their own meaning."
+        ],
+        [
+          "Money report \u2260 future ledger",
+          "Current financial records are the baseline; the general append-only ledger is later work."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "Kitchen scanner import1028 and count entry1029 are delivered;212 now retains money closeout and exceptions. The current Sterling policy keeps registration/login/roster available while gating applicable adult/staff check-in at youth/children events, with an audited override and adult-event clarification.",
+      "sources": [
+        [
+          "Meals",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md"
+        ],
+        [
+          "Kitchen residual",
+          "https://github.com/DurantTL/IMSDA-Events/issues/212"
+        ],
+        [
+          "Screening rule",
+          "https://github.com/DurantTL/IMSDA-Events/issues/874"
+        ],
+        [
+          "Future ledger",
+          "https://github.com/DurantTL/IMSDA-Events/issues/74"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Accessibility has a useful existing foundation",
+      "kicker": "USABILITY & ACCESSIBILITY",
+      "cards": [
+        [
+          "Shared controls",
+          "Reusable labelled actions, dialogs, sortable tables and form validation."
+        ],
+        [
+          "Responsive work",
+          "Existing phone/card layouts and automated page/dialog/field audits."
+        ],
+        [
+          "Recovery patterns",
+          "Current dirty-navigation and error patterns can be applied consistently."
+        ],
+        [
+          "Evidence boundary",
+          "Source checks and automated layout tests do not certify keyboard, screen-reader or WCAG conformance."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "The review is a source/specification synthesis with clearly identified historical visual references. Read the usability document for concrete findings, related WCAG guidance and verification limits. A successful layout test is useful evidence but not a screen-reader or production usability session.",
+      "sources": [
+        [
+          "Responsive conventions",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/RESPONSIVE.md"
+        ],
+        [
+          "Current design review",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1114"
+        ],
+        [
+          "Open test resilience work",
+          "https://github.com/DurantTL/IMSDA-Events/issues/917"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Fix confusing behavior before adding more surface",
+      "kicker": "OPEN USABILITY CORRECTIONS",
+      "cards": [
+        [
+          "Trustworthy links",
+          "Copy saved public URLs, not an unsaved slug. #1115"
+        ],
+        [
+          "Truthful results",
+          "Describe the active sort and disclose the email recipient cap. #1116 / #1103"
+        ],
+        [
+          "Recoverable edits",
+          "Protect unfinished roster, announcement and schedule work. #1101 / #1104"
+        ],
+        [
+          "Complete discovery",
+          "Open the full crowded calendar day and explain finder/map coverage. #1117 / #1118"
+        ],
+        [
+          "Lifecycle meaning",
+          "Align attendee amount-due and upcoming summaries. #1100"
+        ],
+        [
+          "Intermediate widths",
+          "Resolve invitation-table overflow around 861px. #1045"
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "These are existing open issues, not newly discovered production incidents. The companion review explains reproducible source behavior, user impact and acceptance examples. This slide does not reprioritize the canonical queue.",
+      "sources": [
+        [
+          "Review and ownership",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1114"
+        ],
+        [
+          "Saved links",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1115"
+        ],
+        [
+          "Dirty roster",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1101"
+        ],
+        [
+          "Tablet overflow",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1045"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Accepted design is a reference, not a shipped screen",
+      "kicker": "ACCEPTED DESIGN  /  IMPLEMENTATION STILL OPEN",
+      "cards": null,
+      "columns": null,
+      "summary": "",
+      "notes": "These two images are synthetic accepted role-workspace mockups from the existing reference pack. They are not production screenshots. Their accepted role separation and the existing navigation owners remain authoritative. No additional administrator menu changes are proposed by this briefing.",
+      "sources": [
+        [
+          "Accepted role gallery",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md"
+        ],
+        [
+          "Director owner",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1112"
+        ],
+        [
+          "Admin owner",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1073"
+        ]
+      ],
+      "layout": "images",
+      "images": [
+        [
+          "Director club/year workspace",
+          "director-desktop.png"
+        ],
+        [
+          "System administrator workspace",
+          "admin-desktop.png"
+        ]
+      ]
+    },
+    {
+      "title": "Help should answer a task in plain language",
+      "kicker": "PREPARED HELP & COMMUNICATION KIT",
+      "cards": null,
+      "columns": [
+        [
+          "Included in the companion guide",
+          [
+            "Four role-specific quick starts.",
+            "Short FAQs and recovery explanations.",
+            "Support triage and task-oriented help copy."
+          ]
+        ],
+        [
+          "Draft content stays honest",
+          [
+            "Editorial placeholders are not runtime template tokens.",
+            "Messages name the event, current state and permitted next action.",
+            "Future features are announced only after their actual availability is confirmed."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "The help kit is prepared content, not a new Help screen. Draft messages are not sent. Before operational use, check audience, source state, current permission and any event-specific wording. Never place private management links, health details or sensitive records into a general support discussion.",
+      "sources": [
+        [
+          "Current communications templates",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/templates.ts"
+        ],
+        [
+          "Future Help owner",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1077"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "Future possibilities extend the foundation",
+      "kicker": "LATER ROADMAP  /  NO NEW DELIVERY COMMITMENTS",
+      "cards": [
+        [
+          "Authoring & presentation",
+          "Editable form libraries, improved builder, saved views and versioned presentation."
+        ],
+        [
+          "Ministry expansion",
+          "Adventurer classes, awards and voluntary reviewed adoption after supplied materials."
+        ],
+        [
+          "Attendee convenience",
+          "Reviewed returning profiles, wallet passes and native access."
+        ],
+        [
+          "Operational depth",
+          "General sessions, volunteers, transportation, personnel, incidents and minor release."
+        ],
+        [
+          "Publishing & exchange",
+          "Full event sites, scoped APIs/webhooks and approved provider adapters."
+        ],
+        [
+          "Other business models",
+          "Installments, store balances, fundraising and other parent scopes remain separate."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "These groups summarize existing issues; they are not a newly ordered roadmap. Each has different maturity and gates. Do not promise dates, automatically enable vendors or treat conference-level approval of one narrow feature as approval of every adjacent parent.",
+      "sources": [
+        [
+          "Ordered roadmap",
+          "https://github.com/DurantTL/IMSDA-Events/issues/98"
+        ],
+        [
+          "Comparison index",
+          "https://github.com/DurantTL/IMSDA-Events/issues/844"
+        ],
+        [
+          "Adventurers",
+          "https://github.com/DurantTL/IMSDA-Events/issues/840"
+        ],
+        [
+          "Future site builder",
+          "https://github.com/DurantTL/IMSDA-Events/issues/84"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "A full youth-camp system needs more than events",
+      "kicker": "SEPARATE CAMP DISCOVERY",
+      "cards": null,
+      "columns": [
+        [
+          "Reusable IMSDA foundation",
+          [
+            "Registration and financial records.",
+            "Lodging inventory, meals and issued assets.",
+            "Club/guardian declarations, check-in and scoped communication."
+          ]
+        ],
+        [
+          "Camp capabilities to establish",
+          [
+            "Camper/guardian authority and session enrollment depth.",
+            "Counselor supervision, cabins/bunks and daily activities.",
+            "Medication/treatment records, custody release, store allowances and camp outage procedures."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "Conference Camp Meeting and residential youth/summer camp are different operating models. Existing lodging beds do not by themselves create a counselor/camper supervision model. The separate camp report maps capability, authoritative records and human policy to existing owners. Missing evidence is marked unknown, not asserted absent from UltraCamp.",
+      "sources": [
+        [
+          "Camp report companion",
+          "04-camp-system-and-ultracamp.pdf"
+        ],
+        [
+          "Legacy operations",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LEGACY-EVENT-SYSTEMS.md"
+        ],
+        [
+          "UltraCamp scope",
+          "https://github.com/DurantTL/IMSDA-Events/issues/71"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "What we need from UltraCamp",
+      "kicker": "VENDOR DISCOVERY PACKET  /  NOT A LIVE INTEGRATION",
+      "cards": [
+        [
+          "Operational walkthrough",
+          "How the camp actually handles a family, camper, session, cabin, activities and daily exceptions."
+        ],
+        [
+          "Data dictionary",
+          "Stable IDs, relationships, status meanings, history and changed/deleted-record behavior."
+        ],
+        [
+          "Supported access",
+          "Approved API/report/export methods, entitlement, limits and synthetic examples."
+        ],
+        [
+          "Protected boundaries",
+          "Health, medication, insurance, authority and retention capabilities require explicit approval."
+        ],
+        [
+          "Financial evidence",
+          "Balances, transactions, refunds, credits and processor reconciliation; no portable card secrets."
+        ],
+        [
+          "Written operating terms",
+          "Permitted use, vendor approval, ownership, support and an agreed continuity/exit method."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "This is a draft information request for the owner to use; nothing is sent to UltraCamp. Ask the camp operator and vendor for synthetic/blank examples, not live camper exports. Public documentation gaps do not prove there is no supported interface. All UltraCamp implementation stays Phase 5 under the existing owner decision.",
+      "sources": [
+        [
+          "Existing UltraCamp research",
+          "https://github.com/DurantTL/IMSDA-Events/issues/71"
+        ],
+        [
+          "Health discovery index",
+          "https://github.com/DurantTL/IMSDA-Events/issues/389"
+        ],
+        [
+          "Phase order",
+          "https://github.com/DurantTL/IMSDA-Events/issues/98"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "The code is a modular monolith",
+      "kicker": "TECHNICAL HANDOFF",
+      "cards": [
+        [
+          "Pages & route handlers",
+          "Next.js entry points collect input and invoke server-side access and domain services."
+        ],
+        [
+          "Owning domain modules",
+          "Forms, registrations, access, finance, lodging, meals, honors and communication keep their boundaries."
+        ],
+        [
+          "Persistence & work queues",
+          "Prisma/PostgreSQL, immutable versions, audit records, private storage and email outbox."
+        ],
+        [
+          "External adapters",
+          "Payment/email/providers use defined adapters; provider payloads are not the core domain model."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "The technical report includes a deeper module/data-flow map and code references. Staff User and AttendeeAccount remain linked1:1 with separate authentication boundaries. Current payment/refund/adjustment/invoice records are not the future generalized ledger. Protected domains have narrower guards than ordinary event access.",
+      "sources": [
+        [
+          "Automation guide",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/AGENTS.md"
+        ],
+        [
+          "Schema",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/prisma/schema.prisma"
+        ],
+        [
+          "Architecture ADR",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0001-foundation-architecture.md"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "There is measured verification evidence",
+      "kicker": "ACTUAL GITHUB ACTIONS EVIDENCE",
+      "cards": null,
+      "columns": null,
+      "summary": "Current main smoke passed: clean migrations, schema drift, seed, lint, typecheck and Vitest.",
+      "notes": "Exact current main push run 39609956369, job 119260142581, commit 5e367b7c. The skipped backup-script test requires root; the CI runner is nonroot. The full verify job is intentionally skipped on main push; extended database/HTTP evidence is recorded separately for application PR head 9879edba. The app/scripts/workflows are identical between that head and this baseline; the intervening 58 paths are all documentation. These are CI results, not deployment verification.",
+      "sources": [
+        [
+          "Current main CI run",
+          "https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956369"
+        ],
+        [
+          "Last application verification",
+          "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473876"
+        ]
+      ],
+      "layout": "metrics",
+      "metrics": [
+        [
+          "13,504",
+          "tests passed"
+        ],
+        [
+          "1",
+          "test skipped"
+        ],
+        [
+          "1,015",
+          "test files passed"
+        ]
+      ]
+    },
+    {
+      "title": "Know what those checks do not prove",
+      "kicker": "EVIDENCE LIMITS",
+      "cards": null,
+      "columns": [
+        [
+          "Additional recorded checks",
+          [
+            "Last application PR: extended real-DB/HTTP suites passed.",
+            "Mobile audit: 320 page/width combinations at 360 and 1024px passed.",
+            "Optional badge-print checks passed on that application revision."
+          ]
+        ],
+        [
+          "Human & physical evidence",
+          [
+            "Serving release, production configuration and real key restore.",
+            "Screen-reader/keyboard usability and broader device/zoom testing.",
+            "Physical printer/label scans, provider activation and operational sign-off."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "The mobile run is 39520478915; it opened 301 dialogs and checked 1,871 fields plus 56 date fields, with 0 accepted findings and 0 page script errors. Screenshots were disabled, so the report is evidence but not a visual screenshot archive. Badge run 39520473962 is automated evidence, not a real printer test. Existing readiness/rehearsal documents remain the owner of human steps; this deck does not recreate them.",
+      "sources": [
+        [
+          "Mobile run",
+          "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520478915"
+        ],
+        [
+          "Badge run",
+          "https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473962"
+        ],
+        [
+          "Readiness evidence",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/PRODUCTION-READINESS-REVIEW.md"
+        ]
+      ],
+      "layout": "columns"
+    },
+    {
+      "title": "Build on the materials already in Git",
+      "kicker": "EXISTING REFERENCE LIBRARY",
+      "cards": [
+        [
+          "Decisions & policy",
+          "Existing ADRs and the roadmap preserve authority, scope and approval history."
+        ],
+        [
+          "Rehearsal & release",
+          "Readiness reviews, event runbooks and physical print checks already cover operational preparation."
+        ],
+        [
+          "Imports & sample outputs",
+          "Existing JSON/CSV fixtures and sample registration PDFs show supported inputs and outputs."
+        ],
+        [
+          "Design references",
+          "Accepted role layouts and proposed public/list studies are published with clear ownership."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "This responds to the owner\u2019s correction: the project already has rehearsals, decision records, import preparation and PDF/CSV/JSON outputs. The new feature guide provides an index into them. It does not create another competing decision register, importer or go-live checklist.",
+      "sources": [
+        [
+          "Existing docs",
+          "https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs"
+        ],
+        [
+          "Import references",
+          "https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/imports"
+        ],
+        [
+          "Sample registration PDF",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/samples/registration-pdf-sample.pdf"
+        ],
+        [
+          "Public/list studies",
+          "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/README.md"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Use the pack for explanation and review",
+      "kicker": "DOCUMENTATION HANDOFF",
+      "cards": [
+        [
+          "Feature guide",
+          "Explain what is implemented, gated, accepted as design and planned."
+        ],
+        [
+          "Usability review",
+          "Review concrete problems and their existing issue owners."
+        ],
+        [
+          "Help kit",
+          "Adapt role-specific guides and draft messages for the real audience."
+        ],
+        [
+          "Separate camp report",
+          "Prepare an informed camp-operator/UltraCamp discussion."
+        ],
+        [
+          "Technical evidence",
+          "Understand module ownership and the exact checks recorded."
+        ],
+        [
+          "Editable assets",
+          "Use the PowerPoint and Word copies; share the PDF companions."
+        ]
+      ],
+      "columns": null,
+      "summary": "",
+      "notes": "The deliverables are documentation. Application code, menus, roles, queues and production switches are unchanged. Future implementation continues from #98 and its existing bounded issues. Use the README to select the right document for the audience.",
+      "sources": [
+        [
+          "Backlog review index",
+          "https://github.com/DurantTL/IMSDA-Events/issues/844"
+        ],
+        [
+          "Canonical queue",
+          "https://github.com/DurantTL/IMSDA-Events/issues/98"
+        ]
+      ],
+      "layout": "cards"
+    },
+    {
+      "title": "Source notes and further reading",
+      "kicker": "REFERENCE APPENDIX",
+      "cards": null,
+      "columns": [
+        [
+          "Project authority",
+          [
+            "#98\u2014ordered roadmap and current queue.",
+            "#844\u2014comparison/backlog review index.",
+            "#1109 and #1073/#1074\u2014accepted role and admin design.",
+            "#1062\u2014form-builder stages and remaining review."
+          ]
+        ],
+        [
+          "Companion evidence",
+          [
+            "Five source-linked documents explain details and limits.",
+            "Technical-check JSON preserves run IDs and revisions.",
+            "Camp sources distinguish dated research from vendor-confirmed access.",
+            "Speaker notes identify sources and status for each slide."
+          ]
+        ]
+      ],
+      "summary": "",
+      "notes": "Primary source baseline https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300. The generated documents cite stable source paths and live issue owners. External references are evidence at the dates stated, not a promise about vendor entitlement. This deck uses synthetic accepted design screenshots only, clearly labelled.",
+      "sources": [
+        [
+          "Roadmap",
+          "https://github.com/DurantTL/IMSDA-Events/issues/98"
+        ],
+        [
+          "Review index",
+          "https://github.com/DurantTL/IMSDA-Events/issues/844"
+        ],
+        [
+          "Role design",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1109"
+        ],
+        [
+          "Builder",
+          "https://github.com/DurantTL/IMSDA-Events/issues/1062"
+        ]
+      ],
+      "layout": "columns"
+    }
+  ],
+  "text_bounds": [
+    {
+      "slide": 1,
+      "text": "PLATFORM BRIEFING  /  OCTOBER 21, 2026",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 1,
+      "text": "A clearer guide to\nIMSDA Events",
+      "x": 0.8,
+      "y": 1.48,
+      "w": 8.7,
+      "h": 2.5,
+      "font_pt": 43
+    },
+    {
+      "slide": 1,
+      "text": "Current features. Practical help. Future possibilities.",
+      "x": 0.83,
+      "y": 4.25,
+      "w": 8.35,
+      "h": 1.0,
+      "font_pt": 24
+    },
+    {
+      "slide": 1,
+      "text": "Prepared for the IMSDA Events team\nRepository baseline 5e367b7c  \u00b7  Editable briefing",
+      "x": 0.83,
+      "y": 6.22,
+      "w": 8.2,
+      "h": 0.6,
+      "font_pt": 12
+    },
+    {
+      "slide": 1,
+      "text": "CURRENT\n\nHELP\n\nFUTURE",
+      "x": 10.18,
+      "y": 1.7,
+      "w": 2.65,
+      "h": 3.9,
+      "font_pt": 24
+    },
+    {
+      "slide": 2,
+      "text": "HOW TO USE THIS DECK",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 2,
+      "text": "Read every feature with its status",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 2,
+      "text": "Implemented",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 2,
+      "text": "Present in the repository. Confirm configuration and serving release before training on a live event.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 2,
+      "text": "Gated or needs setup",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 2,
+      "text": "Code exists, but activation, credentials, approved scope or operational evidence is still required.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 2,
+      "text": "Accepted design",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 2,
+      "text": "The visual direction is accepted. The production interface may still be awaiting implementation.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 2,
+      "text": "Later plan",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 2,
+      "text": "An issue or proposal describes possible future work. Timing and decisions remain with the roadmap.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 2,
+      "text": "SOURCE  Ordered roadmap  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 2,
+      "text": "02 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 3,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 3,
+      "text": "A substantial event foundation already exists",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 3,
+      "text": "Registration",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 3,
+      "text": "Versioned forms, group/club flows, amendments, waitlists and private management links.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 3,
+      "text": "Money",
+      "x": 4.966666666666667,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 3,
+      "text": "Payments, refunds, adjustments, church invoices, sponsorship and reconciliation reports.",
+      "x": 4.966666666666667,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 3,
+      "text": "Event operations",
+      "x": 8.983333333333333,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 3,
+      "text": "Lodging, meal tickets, scanner imports, kitchen counts, assets and check-in.",
+      "x": 8.983333333333333,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 3,
+      "text": "Club ministry",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 3,
+      "text": "Annual rosters, forms, Monthly Records, honors, orders and scoped portals.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 3,
+      "text": "Communication",
+      "x": 4.966666666666667,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 3,
+      "text": "Central Email, templates, announcements, schedules and reviewed audiences.",
+      "x": 4.966666666666667,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 3,
+      "text": "Public discovery",
+      "x": 8.983333333333333,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 3,
+      "text": "Event pages, public calendar, club finder, content and existing public links.",
+      "x": 8.983333333333333,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 3,
+      "text": "SOURCE  Feature inventory  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 3,
+      "text": "03 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 4,
+      "text": "ROLE BOUNDARIES",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 4,
+      "text": "One visual language. Four different jobs.",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 4,
+      "text": "Attendee",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 4,
+      "text": "Manage accessible registrations, profile and permitted next actions.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 4,
+      "text": "Director",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 4,
+      "text": "Work within a selected club and club year, using the capabilities actually granted.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 4,
+      "text": "Area Coordinator",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 4,
+      "text": "Review available clubs and reports, with narrow existing decision permissions.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 4,
+      "text": "System administrator",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 4,
+      "text": "Manage the platform and deliberately enter an event for authorized work.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 4,
+      "text": "SOURCE  Role contract  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 4,
+      "text": "04 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 5,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 5,
+      "text": "Attendee help starts with the next action",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 5,
+      "text": "What people can do",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 5,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 5,
+      "text": "Register as a guest or use their account.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 5,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 5,
+      "text": "Return through an authorized account or private management link.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 5,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 5,
+      "text": "Review registration state, event information and permitted payment or change actions.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 5,
+      "text": "What help must explain",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 5,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 5,
+      "text": "A waitlist request is different from a confirmed place.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 5,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 5,
+      "text": "Cancelled registrations remain part of history.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 5,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 5,
+      "text": "Payment, registration and check-in states mean different things.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 5,
+      "text": "SOURCE  Private access  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 5,
+      "text": "05 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 6,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 6,
+      "text": "Directors work from club and year",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 6,
+      "text": "Daily tasks",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 6,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 6,
+      "text": "Maintain the authorized club roster and fix missing details.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 6,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 6,
+      "text": "Complete club forms and Monthly Records.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 6,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 6,
+      "text": "Choose people for events and manage permitted changes.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 6,
+      "text": "Keep these distinctions visible",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 6,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 6,
+      "text": "Deputy, registrar and reporter have different capabilities.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 6,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 6,
+      "text": "Church-billed events belong to the sponsoring church\u2019s invoice flow.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 6,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 6,
+      "text": "Birth dates and health information have separate access rules.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 6,
+      "text": "SOURCE  Club capabilities  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 6,
+      "text": "06 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 7,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 7,
+      "text": "Coordinators need oversight, not a director clone",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 7,
+      "text": "Current oversight",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 7,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 7,
+      "text": "Review clubs available to the role.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 7,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 7,
+      "text": "Follow Monthly Records, points and event participation.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 7,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 7,
+      "text": "Use existing scoped review paths, including the narrow Team approval exception.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 7,
+      "text": "Avoid misleading training",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 7,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 7,
+      "text": "Do not imply an enforced area/ministry filter exists today.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 7,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 7,
+      "text": "Club and report views are generally read-only.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 7,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 7,
+      "text": "Event health information follows a separate permission and time-window contract.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 7,
+      "text": "SOURCE  Coordinator design  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 7,
+      "text": "07 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 8,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 8,
+      "text": "Administrator training should follow real work",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 8,
+      "text": "Existing system responsibilities",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 8,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 8,
+      "text": "Event and access administration.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 8,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 8,
+      "text": "Central Email and notification settings.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 8,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 8,
+      "text": "Calendar, directory, imports and operational readiness evidence.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 8,
+      "text": "Accepted design improves clarity",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 8,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 8,
+      "text": "Explicit System versus Event context.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 8,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 8,
+      "text": "Action-first summaries with truthful count meanings.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 8,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 8,
+      "text": "Clear settings impact, dirty-edit recovery and task-based help.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 8,
+      "text": "SOURCE  Admin design owner  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 8,
+      "text": "08 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 9,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 9,
+      "text": "Form reuse has several distinct meanings",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 9,
+      "text": "Event template",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 9,
+      "text": "A starting configuration for an event; operational module data has its own ownership.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 9,
+      "text": "Form template",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 9,
+      "text": "A copied form definition. Seeded versions exist; app-editable templates remain planned work.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 9,
+      "text": "Published form version",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 9,
+      "text": "Each registration stays tied to the version it used. A draft change does not rewrite old answers.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 9,
+      "text": "Future saved questions",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 9,
+      "text": "A separate copy-on-insert library proposal, with reference and permission details still owned by its issue.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 9,
+      "text": "SOURCE  Builder epic  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 9,
+      "text": "09 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 10,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 10,
+      "text": "Operations depend on distinct records and states",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 10,
+      "text": "Registration \u2260 payment",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 10,
+      "text": "A request, booking state and balance each answer a different question.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 10,
+      "text": "Check-in \u2260 screening",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 10,
+      "text": "Arrival uses the existing event eligibility and audited override rules.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 10,
+      "text": "Meals sold \u2260 meals served",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 10,
+      "text": "Scanner records, cancellations and kitchen-entered counts keep their own meaning.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 10,
+      "text": "Money report \u2260 future ledger",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 10,
+      "text": "Current financial records are the baseline; the general append-only ledger is later work.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 10,
+      "text": "SOURCE  Meals  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 10,
+      "text": "10 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 11,
+      "text": "USABILITY & ACCESSIBILITY",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 11,
+      "text": "Accessibility has a useful existing foundation",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 11,
+      "text": "Shared controls",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 11,
+      "text": "Reusable labelled actions, dialogs, sortable tables and form validation.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 11,
+      "text": "Responsive work",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 11,
+      "text": "Existing phone/card layouts and automated page/dialog/field audits.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 11,
+      "text": "Recovery patterns",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 11,
+      "text": "Current dirty-navigation and error patterns can be applied consistently.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 11,
+      "text": "Evidence boundary",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 11,
+      "text": "Source checks and automated layout tests do not certify keyboard, screen-reader or WCAG conformance.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 11,
+      "text": "SOURCE  Responsive conventions  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 11,
+      "text": "11 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 12,
+      "text": "OPEN USABILITY CORRECTIONS",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 12,
+      "text": "Fix confusing behavior before adding more surface",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 12,
+      "text": "Trustworthy links",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 12,
+      "text": "Copy saved public URLs, not an unsaved slug. #1115",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 12,
+      "text": "Truthful results",
+      "x": 4.966666666666667,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 12,
+      "text": "Describe the active sort and disclose the email recipient cap. #1116 / #1103",
+      "x": 4.966666666666667,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 12,
+      "text": "Recoverable edits",
+      "x": 8.983333333333333,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 12,
+      "text": "Protect unfinished roster, announcement and schedule work. #1101 / #1104",
+      "x": 8.983333333333333,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 12,
+      "text": "Complete discovery",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 12,
+      "text": "Open the full crowded calendar day and explain finder/map coverage. #1117 / #1118",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 12,
+      "text": "Lifecycle meaning",
+      "x": 4.966666666666667,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 12,
+      "text": "Align attendee amount-due and upcoming summaries. #1100",
+      "x": 4.966666666666667,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 12,
+      "text": "Intermediate widths",
+      "x": 8.983333333333333,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 12,
+      "text": "Resolve invitation-table overflow around 861px. #1045",
+      "x": 8.983333333333333,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 12,
+      "text": "SOURCE  Review and ownership  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 12,
+      "text": "12 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 13,
+      "text": "ACCEPTED DESIGN  /  IMPLEMENTATION STILL OPEN",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 13,
+      "text": "Accepted design is a reference, not a shipped screen",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 13,
+      "text": "Director club/year workspace",
+      "x": 0.75,
+      "y": 2.07,
+      "w": 5.83,
+      "h": 0.4,
+      "font_pt": 17
+    },
+    {
+      "slide": 13,
+      "text": "System administrator workspace",
+      "x": 6.8,
+      "y": 2.07,
+      "w": 5.83,
+      "h": 0.4,
+      "font_pt": 17
+    },
+    {
+      "slide": 13,
+      "text": "SOURCE  Accepted role gallery  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 13,
+      "text": "13 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 14,
+      "text": "PREPARED HELP & COMMUNICATION KIT",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 14,
+      "text": "Help should answer a task in plain language",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 14,
+      "text": "Included in the companion guide",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 14,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 14,
+      "text": "Four role-specific quick starts.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 14,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 14,
+      "text": "Short FAQs and recovery explanations.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 14,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 14,
+      "text": "Support triage and task-oriented help copy.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 14,
+      "text": "Draft content stays honest",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 14,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 14,
+      "text": "Editorial placeholders are not runtime template tokens.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 14,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 14,
+      "text": "Messages name the event, current state and permitted next action.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 14,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 14,
+      "text": "Future features are announced only after their actual availability is confirmed.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 14,
+      "text": "SOURCE  Current communications templates  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 14,
+      "text": "14 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 15,
+      "text": "LATER ROADMAP  /  NO NEW DELIVERY COMMITMENTS",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 15,
+      "text": "Future possibilities extend the foundation",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 15,
+      "text": "Authoring & presentation",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 15,
+      "text": "Editable form libraries, improved builder, saved views and versioned presentation.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 15,
+      "text": "Ministry expansion",
+      "x": 4.966666666666667,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 15,
+      "text": "Adventurer classes, awards and voluntary reviewed adoption after supplied materials.",
+      "x": 4.966666666666667,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 15,
+      "text": "Attendee convenience",
+      "x": 8.983333333333333,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 15,
+      "text": "Reviewed returning profiles, wallet passes and native access.",
+      "x": 8.983333333333333,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 15,
+      "text": "Operational depth",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 15,
+      "text": "General sessions, volunteers, transportation, personnel, incidents and minor release.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 15,
+      "text": "Publishing & exchange",
+      "x": 4.966666666666667,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 15,
+      "text": "Full event sites, scoped APIs/webhooks and approved provider adapters.",
+      "x": 4.966666666666667,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 15,
+      "text": "Other business models",
+      "x": 8.983333333333333,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 15,
+      "text": "Installments, store balances, fundraising and other parent scopes remain separate.",
+      "x": 8.983333333333333,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 15,
+      "text": "SOURCE  Ordered roadmap  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 15,
+      "text": "15 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 16,
+      "text": "SEPARATE CAMP DISCOVERY",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 16,
+      "text": "A full youth-camp system needs more than events",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 16,
+      "text": "Reusable IMSDA foundation",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 16,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 16,
+      "text": "Registration and financial records.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 16,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 16,
+      "text": "Lodging inventory, meals and issued assets.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 16,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 16,
+      "text": "Club/guardian declarations, check-in and scoped communication.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 16,
+      "text": "Camp capabilities to establish",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 16,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 16,
+      "text": "Camper/guardian authority and session enrollment depth.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 16,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 16,
+      "text": "Counselor supervision, cabins/bunks and daily activities.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 16,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 16,
+      "text": "Medication/treatment records, custody release, store allowances and camp outage procedures.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 16,
+      "text": "SOURCE  Camp report companion  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 16,
+      "text": "16 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 17,
+      "text": "VENDOR DISCOVERY PACKET  /  NOT A LIVE INTEGRATION",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 17,
+      "text": "What we need from UltraCamp",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 17,
+      "text": "Operational walkthrough",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 17,
+      "text": "How the camp actually handles a family, camper, session, cabin, activities and daily exceptions.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 17,
+      "text": "Data dictionary",
+      "x": 4.966666666666667,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 17,
+      "text": "Stable IDs, relationships, status meanings, history and changed/deleted-record behavior.",
+      "x": 4.966666666666667,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 17,
+      "text": "Supported access",
+      "x": 8.983333333333333,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 17,
+      "text": "Approved API/report/export methods, entitlement, limits and synthetic examples.",
+      "x": 8.983333333333333,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 17,
+      "text": "Protected boundaries",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 17,
+      "text": "Health, medication, insurance, authority and retention capabilities require explicit approval.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 17,
+      "text": "Financial evidence",
+      "x": 4.966666666666667,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 17,
+      "text": "Balances, transactions, refunds, credits and processor reconciliation; no portable card secrets.",
+      "x": 4.966666666666667,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 17,
+      "text": "Written operating terms",
+      "x": 8.983333333333333,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 17,
+      "text": "Permitted use, vendor approval, ownership, support and an agreed continuity/exit method.",
+      "x": 8.983333333333333,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 17,
+      "text": "SOURCE  Existing UltraCamp research  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 17,
+      "text": "17 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 18,
+      "text": "TECHNICAL HANDOFF",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 18,
+      "text": "The code is a modular monolith",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 18,
+      "text": "Pages & route handlers",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 18,
+      "text": "Next.js entry points collect input and invoke server-side access and domain services.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 18,
+      "text": "Owning domain modules",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 18,
+      "text": "Forms, registrations, access, finance, lodging, meals, honors and communication keep their boundaries.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 18,
+      "text": "Persistence & work queues",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 18,
+      "text": "Prisma/PostgreSQL, immutable versions, audit records, private storage and email outbox.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 18,
+      "text": "External adapters",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 18,
+      "text": "Payment/email/providers use defined adapters; provider payloads are not the core domain model.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 18,
+      "text": "SOURCE  Automation guide  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 18,
+      "text": "18 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 19,
+      "text": "ACTUAL GITHUB ACTIONS EVIDENCE",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 19,
+      "text": "There is measured verification evidence",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 19,
+      "text": "13,504",
+      "x": 1.0,
+      "y": 2.58,
+      "w": 3.45,
+      "h": 1.0,
+      "font_pt": 48
+    },
+    {
+      "slide": 19,
+      "text": "tests passed",
+      "x": 1.0,
+      "y": 3.7,
+      "w": 3.45,
+      "h": 0.55,
+      "font_pt": 19
+    },
+    {
+      "slide": 19,
+      "text": "1",
+      "x": 5.12,
+      "y": 2.58,
+      "w": 3.45,
+      "h": 1.0,
+      "font_pt": 48
+    },
+    {
+      "slide": 19,
+      "text": "test skipped",
+      "x": 5.12,
+      "y": 3.7,
+      "w": 3.45,
+      "h": 0.55,
+      "font_pt": 19
+    },
+    {
+      "slide": 19,
+      "text": "1,015",
+      "x": 9.24,
+      "y": 2.58,
+      "w": 3.45,
+      "h": 1.0,
+      "font_pt": 48
+    },
+    {
+      "slide": 19,
+      "text": "test files passed",
+      "x": 9.24,
+      "y": 3.7,
+      "w": 3.45,
+      "h": 0.55,
+      "font_pt": 19
+    },
+    {
+      "slide": 19,
+      "text": "Current main smoke passed: clean migrations, schema drift, seed, lint, typecheck and Vitest.",
+      "x": 0.85,
+      "y": 4.98,
+      "w": 11.6,
+      "h": 1.15,
+      "font_pt": 23
+    },
+    {
+      "slide": 19,
+      "text": "SOURCE  Current main CI run  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 19,
+      "text": "19 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 20,
+      "text": "EVIDENCE LIMITS",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 20,
+      "text": "Know what those checks do not prove",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 20,
+      "text": "Additional recorded checks",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 20,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 20,
+      "text": "Last application PR: extended real-DB/HTTP suites passed.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 20,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 20,
+      "text": "Mobile audit: 320 page/width combinations at 360 and 1024px passed.",
+      "x": 1.3199999999999998,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 20,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 20,
+      "text": "Optional badge-print checks passed on that application revision.",
+      "x": 1.3199999999999998,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 20,
+      "text": "Human & physical evidence",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 20,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 20,
+      "text": "Serving release, production configuration and real key restore.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 20,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.25,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 20,
+      "text": "Screen-reader/keyboard usability and broader device/zoom testing.",
+      "x": 7.38,
+      "y": 4.25,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 20,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.33,
+      "w": 0.2,
+      "h": 0.97,
+      "font_pt": 19
+    },
+    {
+      "slide": 20,
+      "text": "Physical printer/label scans, provider activation and operational sign-off.",
+      "x": 7.38,
+      "y": 5.33,
+      "w": 4.95,
+      "h": 0.97,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 20,
+      "text": "SOURCE  Mobile run  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 20,
+      "text": "20 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 21,
+      "text": "EXISTING REFERENCE LIBRARY",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 21,
+      "text": "Build on the materials already in Git",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 21,
+      "text": "Decisions & policy",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 21,
+      "text": "Existing ADRs and the roadmap preserve authority, scope and approval history.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 21,
+      "text": "Rehearsal & release",
+      "x": 6.975,
+      "y": 2.32,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 21,
+      "text": "Readiness reviews, event runbooks and physical print checks already cover operational preparation.",
+      "x": 6.975,
+      "y": 2.92,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 21,
+      "text": "Imports & sample outputs",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 21,
+      "text": "Existing JSON/CSV fixtures and sample registration PDFs show supported inputs and outputs.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 21,
+      "text": "Design references",
+      "x": 6.975,
+      "y": 4.62,
+      "w": 5.404999999999999,
+      "h": 0.53,
+      "font_pt": 21
+    },
+    {
+      "slide": 21,
+      "text": "Accepted role layouts and proposed public/list studies are published with clear ownership.",
+      "x": 6.975,
+      "y": 5.220000000000001,
+      "w": 5.404999999999999,
+      "h": 1.2200000000000002,
+      "font_pt": 19
+    },
+    {
+      "slide": 21,
+      "text": "SOURCE  Existing docs  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 21,
+      "text": "21 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 22,
+      "text": "DOCUMENTATION HANDOFF",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 22,
+      "text": "Use the pack for explanation and review",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 22,
+      "text": "Feature guide",
+      "x": 0.95,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 22,
+      "text": "Explain what is implemented, gated, accepted as design and planned.",
+      "x": 0.95,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 22,
+      "text": "Usability review",
+      "x": 4.966666666666667,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 22,
+      "text": "Review concrete problems and their existing issue owners.",
+      "x": 4.966666666666667,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 22,
+      "text": "Help kit",
+      "x": 8.983333333333333,
+      "y": 2.32,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 22,
+      "text": "Adapt role-specific guides and draft messages for the real audience.",
+      "x": 8.983333333333333,
+      "y": 2.92,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 22,
+      "text": "Separate camp report",
+      "x": 0.95,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 22,
+      "text": "Prepare an informed camp-operator/UltraCamp discussion.",
+      "x": 0.95,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 22,
+      "text": "Technical evidence",
+      "x": 4.966666666666667,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 22,
+      "text": "Understand module ownership and the exact checks recorded.",
+      "x": 4.966666666666667,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 22,
+      "text": "Editable assets",
+      "x": 8.983333333333333,
+      "y": 4.62,
+      "w": 3.396666666666667,
+      "h": 0.53,
+      "font_pt": 19
+    },
+    {
+      "slide": 22,
+      "text": "Use the PowerPoint and Word copies; share the PDF companions.",
+      "x": 8.983333333333333,
+      "y": 5.220000000000001,
+      "w": 3.396666666666667,
+      "h": 1.2200000000000002,
+      "font_pt": 17
+    },
+    {
+      "slide": 22,
+      "text": "SOURCE  Backlog review index  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 22,
+      "text": "22 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    },
+    {
+      "slide": 23,
+      "text": "REFERENCE APPENDIX",
+      "x": 0.88,
+      "y": 0.4,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 11
+    },
+    {
+      "slide": 23,
+      "text": "Source notes and further reading",
+      "x": 0.75,
+      "y": 0.98,
+      "w": 11.85,
+      "h": 1.0,
+      "font_pt": 31
+    },
+    {
+      "slide": 23,
+      "text": "Project authority",
+      "x": 1.0,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "#98\u2014ordered roadmap and current queue.",
+      "x": 1.3199999999999998,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 3.95,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "#844\u2014comparison/backlog review index.",
+      "x": 1.3199999999999998,
+      "y": 3.95,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 4.73,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "#1109 and #1073/#1074\u2014accepted role and admin design.",
+      "x": 1.3199999999999998,
+      "y": 4.73,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 1.0,
+      "y": 5.510000000000001,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "#1062\u2014form-builder stages and remaining review.",
+      "x": 1.3199999999999998,
+      "y": 5.510000000000001,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "Companion evidence",
+      "x": 7.06,
+      "y": 2.38,
+      "w": 5.28,
+      "h": 0.62,
+      "font_pt": 22
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.17,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "Five source-linked documents explain details and limits.",
+      "x": 7.38,
+      "y": 3.17,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 3.95,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "Technical-check JSON preserves run IDs and revisions.",
+      "x": 7.38,
+      "y": 3.95,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 4.73,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "Camp sources distinguish dated research from vendor-confirmed access.",
+      "x": 7.38,
+      "y": 4.73,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "\u2022",
+      "x": 7.06,
+      "y": 5.510000000000001,
+      "w": 0.2,
+      "h": 0.67,
+      "font_pt": 19
+    },
+    {
+      "slide": 23,
+      "text": "Speaker notes identify sources and status for each slide.",
+      "x": 7.38,
+      "y": 5.510000000000001,
+      "w": 4.95,
+      "h": 0.67,
+      "font_pt": 18.3
+    },
+    {
+      "slide": 23,
+      "text": "SOURCE  Roadmap  \u00b7  See speaker notes and companion documents",
+      "x": 0.77,
+      "y": 7.0,
+      "w": 9.9,
+      "h": 0.3,
+      "font_pt": 9.3
+    },
+    {
+      "slide": 23,
+      "text": "23 / 23",
+      "x": 11.45,
+      "y": 7.0,
+      "w": 1.1,
+      "h": 0.3,
+      "font_pt": 10
+    }
+  ]
+}

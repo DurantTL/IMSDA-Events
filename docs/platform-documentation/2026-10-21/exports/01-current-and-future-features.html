@@ -1,0 +1,365 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events: current capabilities and future possibilities</title><style>
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
+*{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
+.coverline{font-size:9pt;letter-spacing:1.7px;color:#582c83;font-weight:700;border-bottom:4px solid #f0b323;padding-bottom:14px;margin-bottom:18px}
+.baseline{font-size:8.4pt;color:#536b78;background:#f4f7f8;padding:12px 14px;border-left:3px solid #003b5c;margin:0 0 22px}
+h1{font-size:27pt;line-height:1.15;color:#003b5c;letter-spacing:-.5px;margin:0 0 18px}
+h2{font-size:17pt;line-height:1.25;color:#003b5c;margin:24px 0 10px;break-after:avoid}
+h3{font-size:12pt;line-height:1.3;color:#582c83;margin:17px 0 8px;break-after:avoid}
+h4{font-size:10.8pt;break-after:avoid}p,ul,ol{margin:0 0 10px}li{margin:3px 0}li p{margin:0 0 5px}
+a{color:#003b5c;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+strong{font-weight:700}code{font:9pt/1.35 'DejaVu Sans Mono',monospace;overflow-wrap:anywhere;background:#f4f7f8;padding:0 2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f7f8;border:1px solid #dce6ea;font-size:8.8pt}
+blockquote{border-left:3px solid #f0b323;padding:8px 14px;margin:12px 0;background:#fbf8ee}
+table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:8.7pt;line-height:1.4;margin:12px 0 18px}
+th{background:#003b5c;color:white;text-align:left;padding:8px;border:1px solid #003b5c;font-weight:700}
+td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywhere}
+td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
+img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
+hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
+</style></head><body><div class="coverline">IMSDA EVENTS  /  REVIEW &amp; ENABLEMENT PACK</div><h1 id="imsda-events-current-capabilities-and-future-possibilities">IMSDA Events: current capabilities and future possibilities</h1><div class="baseline">Prepared October 21, 2026 · Repository baseline <strong>5e367b7c</strong><br>Current implementation, gated capabilities, accepted design and future plans are distinguished in the text. Repository evidence does not establish the serving production state.</div>
+
+<p>IMSDA Events already supports substantial event and club operations. The useful next step is to make those capabilities easier to recognize, learn and operate, while extending the existing modules where the roadmap calls for it. This guide separates what is implemented from accepted presentation work and longer-term possibilities; it does not turn future scope into a product promise.</p>
+<p><strong>Reading the status:</strong> “Implemented” means present in the reviewed repository. “Gated/setup” means code exists but a switch, event setup, provider or human prerequisite still matters. Neither status verifies the serving production release. “Accepted design” means the presentation direction was accepted, not built. “Planned” means tracked scope whose policy, design, timing or dependencies may still be unresolved. The companion <code>feature-matrix.json</code> contains the machine-readable evidence and owner links.</p>
+<h2 id="what-people-can-do-with-the-current-foundations">What people can do with the current foundations</h2>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Role</th>
+<th>Work the system supports</th>
+<th>Scope that training must preserve</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Attendee or registration contact</td>
+<td>Discover events, register eligible people, manage an accessible registration, pay an eligible balance, read published event information and retrieve an owned pass.</td>
+<td>Personal access and registration authority; no staff sidebar. A group booking is not a permanent household or guardian grant.</td>
+</tr>
+<tr class="even">
+<td>Club director/deputy</td>
+<td>Maintain a selected club/year roster, forms and Monthly Records; register selected people for club events; use honors, orders, reports and permitted assignment/invoice views.</td>
+<td>Actual deputy/registrar/reporter grants differ. Church-billed events do not become the director’s personal payment obligation.</td>
+</tr>
+<tr class="odd">
+<td>Area Coordinator</td>
+<td>Review currently available clubs, records and points; follow the existing narrow review links.</td>
+<td>Current club scope is all active clubs in source; ministry scoping is future work. Most club/report views are read-only. Health paths have a separate contract.</td>
+</tr>
+<tr class="even">
+<td>Event staff and system administrators</td>
+<td>Configure permitted events, forms/content, registrations, finance, communications and operations; system administrators manage platform settings and access.</td>
+<td>Real server permissions, System versus Event context and specialized domain guards remain authoritative. Kitchen-only staff have a dedicated narrow entry.</td>
+</tr>
+</tbody>
+</table>
+<p>The accepted four-role examples refine these experiences without making them share the same administrator menu. See the <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">role reference</a> and <a href="https://github.com/DurantTL/IMSDA-Events/issues/1074">navigation ownership in #1074</a>. Later calendar, roster and event-page samples are illustrative page studies, not extra changes to System navigation.</p>
+<h2 id="current-capability-map">Current capability map</h2>
+<p>The table emphasizes what an organizer or trainer can safely describe. Open parent issues can contain delivered children, so “the issue is still open” is not evidence that a whole feature is absent.</p>
+<h3 id="implemented-foundations">Implemented foundations</h3>
+<table><colgroup><col style="width:23%"><col style="width:13%"><col style="width:32%"><col style="width:32%"></colgroup>
+<thead>
+<tr class="header">
+<th>Capability</th>
+<th>Status</th>
+<th>What is supported or proposed</th>
+<th>Important boundary / owner</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/page.tsx">Public front door, calendar and club finder</a></td>
+<td>Implemented</td>
+<td>The homepage connects My account, My club, conference calendar and Find a club; calendar has informational entries, ICS feeds/import, recurrence and links to registration.</td>
+<td>The full searchable/filterable event directory and embeddable calendar remain broader scope. Crowded-day/finder feedback changes are proposed, not shipped. <a href="https://github.com/DurantTL/IMSDA-Events/issues/99">#99</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/106">#106</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/107">#107</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1117">#1117</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/events/public-repository.ts">Event pages, content and links</a></td>
+<td>Implemented</td>
+<td>Event landing pages compose published content, registration choices, resources and lifecycle-aware actions; editors manage assets and sections.</td>
+<td>The proposed composed Public page &amp; links workspace and preview refinements are not the current UI. Saved-link correction remains open. <a href="https://github.com/DurantTL/IMSDA-Events/issues/448">#448</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1115">#1115</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/283">#283</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/284">#284</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/definition.ts">Individual, family, club and group registration</a></td>
+<td>Implemented</td>
+<td>Versioned forms support registration/person scope, repeating attendees, directories, validation, pricing, review, capacity and waitlists; club directors select roster members.</td>
+<td>One multi-person booking does not establish permanent household identity, guardian authority or staff access. <a href="https://github.com/DurantTL/IMSDA-Events/issues/73">#73</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/161">#161</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/162">#162</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/163">#163</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md">Draft/publish form authoring</a></td>
+<td>Implemented</td>
+<td>Save explicit drafts, preview/test, publish versions and replace an unpublished draft from a template; submissions keep their own published version. A test submission is required before the first publication only.</td>
+<td>The three-zone editor, complete phone editor, All/Any groups and saved question library remain future work. <a href="https://github.com/DurantTL/IMSDA-Events/issues/1062">#1062</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1063">#1063</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1069">#1069</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1070">#1070</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/event-templates/domain.ts">Event starters, form starters and annual copy</a></td>
+<td>Implemented</td>
+<td>Data-backed event templates/starters and seeded form templates are applied as copies; annual event cloning can copy selected configuration without operational history.</td>
+<td>Event template administration is currently technical/raw JSON. App-editable Form templates and source-change notices are not yet implemented; saving an event as a template remains separate scope. <a href="https://github.com/DurantTL/IMSDA-Events/issues/137">#137</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/154">#154</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1064">#1064</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1065">#1065</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md">Registration management and attendee accounts</a></td>
+<td>Implemented</td>
+<td>Private management access and verified attendee accounts provide eligible registration details, permitted edits, balances, assignments, published messages and owned QR passes.</td>
+<td>Editing depends on the field and policy. Cancelled/waitlisted account summaries have a focused lifecycle correction open; the accepted new attendee layout is not built. <a href="https://github.com/DurantTL/IMSDA-Events/issues/61">#61</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/109">#109</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1100">#1100</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1111">#1111</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0013-one-account-per-person.md">Linked account and one sign-in foundation</a></td>
+<td>Gated/setup</td>
+<td>User and AttendeeAccount are linked 1:1 behind a sign-in switch; combined entry, hand-link tooling, passkey entry and both-side sign-out foundations exist.</td>
+<td>The two tables/session boundaries remain. The switch defaults off; production enablement/linking and actual serving state are not established by this report. <a href="https://github.com/DurantTL/IMSDA-Events/issues/554">#554</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/108">#108</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/160">#160</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/access/authorization.ts">Staff permissions and workspace context</a></td>
+<td>Implemented</td>
+<td>Server-side event memberships, named permissions, global administration, staff invitations and authorized workspace routing are implemented.</td>
+<td>Only genuine grants/sessions permit entry. Kitchen-only staff do not gain ordinary event/registration access; protected records use narrower domain guards. <a href="https://github.com/DurantTL/IMSDA-Events/issues/108">#108</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/160">#160</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1045">#1045</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EVENT-FEATURES.md">Event feature/settings inventory</a></td>
+<td>Implemented</td>
+<td>Event features shows module and feature state, permitted switches and links to owning settings; event creation can select supported feature configuration.</td>
+<td>A feature row or module switch is not evidence that every capability in that domain is finished. Settings require the current server permission. <a href="https://github.com/DurantTL/IMSDA-Events/issues/1076">#1076</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/CANCELLATION-POLICY.md">Payments, adjustments and cancellation workflows</a></td>
+<td>Gated/setup</td>
+<td>Square integration, manual cash/check/card records, payment attempts, refunds, adjustment history, promo codes, scholarship matching and cancellation requests are present.</td>
+<td>Processor configuration and real-provider rehearsal are operational evidence. Refund execution, real pricing/capacity changes and production activity retain human controls; generalized ledger/credits remain later work. <a href="https://github.com/DurantTL/IMSDA-Events/issues/101">#101</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/102">#102</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/117">#117</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/118">#118</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BILLING-RESPONSIBILITY.md">Church billing and invoices</a></td>
+<td>Implemented</td>
+<td>Responsible organizations, reviewed billable units, immutable drafts/finalization/revisions, invoice PDFs, receivables, payments and statements exist.</td>
+<td>A director who submits a church-billed registration is not the personal debtor. Invoice finalization has its own permission; it is not inherited by every finance role. <a href="https://github.com/DurantTL/IMSDA-Events/issues/194">#194</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/977">#977</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/checkin/README.md">Check-in, passes and badges</a></td>
+<td>Implemented</td>
+<td>Signed attendee passes, scanner/desk check-in, undo, whole-club workflows, printable rosters and Avery badge sheets are implemented.</td>
+<td>A dedicated staff-run event station is still planned. Single-name label printing waits on printer/device decisions; the current station proposal excludes printing. <a href="https://github.com/DurantTL/IMSDA-Events/issues/892">#892</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/894">#894</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0009-sterling-readiness-gate-policy.md">Screening evidence and check-in rules</a></td>
+<td>Gated/setup</td>
+<td>The imported CSV/date list is matched at lookup. Registration/login/roster access stay available; applicable youth/children’s adult/staff check-in follows the delivered gate and audited override.</td>
+<td>Serving-release sign-off, mapping, human import review and fallback evidence remain distinct. Instructor roster access uses the specifically recorded warning behavior. <a href="https://github.com/DurantTL/IMSDA-Events/issues/70">#70</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/113">#113</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/115">#115</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/218">#218</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/club-rosters/access.ts">Club rosters and yearly work</a></td>
+<td>Implemented</td>
+<td>Club grants, encrypted birth dates, roster edits/import/carry-forward, club forms, Monthly Records, points, honors/classes, orders and export formats exist.</td>
+<td>Director/deputy, registrar and reporter capabilities differ. Current new-club applications are Pathfinder-only; future Adventurer parity is a separate project. <a href="https://github.com/DurantTL/IMSDA-Events/issues/41">#41</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/184">#184</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/185">#185</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/840">#840</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/evidence/role-contract.md">Coordinator club oversight</a></td>
+<td>Implemented</td>
+<td>The existing coordinator workspace supports available-club oversight, Monthly Records/points, view-only club data and narrow permitted reviews.</td>
+<td>Current source queries all active clubs. Future ministry-scoped grants are decided in direction but not implemented by the accepted layout; ordinary club/report oversight is read-only. <a href="https://github.com/DurantTL/IMSDA-Events/issues/843">#843</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1113">#1113</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HONORS-INSTRUCTORS.md">Honors Weekend operations</a></td>
+<td>Implemented</td>
+<td>Catalogs, scheduled class offerings, live seats, prerequisites, class waitlists, staff schedule board, instructor rosters, attendance/completion write-back and class-change email options exist.</td>
+<td>Teachers see only assigned roster fields, subject to their second-step and edit window; completion correction/voiding keeps existing authority. <a href="https://github.com/DurantTL/IMSDA-Events/issues/197">#197</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/207">#207</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/208">#208</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/209">#209</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LODGING.md">Lodging inventory, requests and assignments</a></td>
+<td>Gated/setup</td>
+<td>Camp Heritage/Sunnydale templates, event layout snapshots, night availability, holds/rates, requests, assignments, moves and lodging waitlists exist.</td>
+<td>A request is not an assignment. Exact property layout, inventory, prices and event configuration need operational verification. This is not proof of a complete residential youth-camp model. <a href="https://github.com/DurantTL/IMSDA-Events/issues/779">#779</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md">Meal services, plans, tickets and kitchen counts</a></td>
+<td>Gated/setup</td>
+<td>Meal plans/selections/pricing, ticket CSV, conference-paid entitlements, café result imports, served-versus-sold reporting and append-only kitchen counts exist.</td>
+<td>Meal money closeout is the remaining #212 slice. A sold ticket, café redemption, prepared count and collected money are different facts; protected allergy expansion remains separate. <a href="https://github.com/DurantTL/IMSDA-Events/issues/212">#212</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/683">#683</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ISSUED-ASSETS.md">Issued assets and facility controls</a></td>
+<td>Implemented</td>
+<td>Keys/badges/wristbands/assets can be issued, returned, corrected and reconciled; deposits/charges and facility blocks retain history.</td>
+<td>It is an event-issued asset workflow, not an inventory purchasing system or complete camp-store/POS wallet. <a href="https://github.com/DurantTL/IMSDA-Events/issues/80">#80</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/94">#94</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/effective-delivery.ts">Event and account communications</a></td>
+<td>Gated/setup</td>
+<td>Central Email settings, event pause/sender controls, versioned templates, reviewed broadcasts, scheduling, audience selection, attachments/images, delivery attempts/retries, preferences and form-routed notifications exist.</td>
+<td>Provider transport/configuration determines real delivery evidence. SES bounce/complaint handling remains open; expanded ready-made announcement sections and the persisted admin feed are not implemented. <a href="https://github.com/DurantTL/IMSDA-Events/issues/77">#77</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/836">#836</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/837">#837</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/845">#845</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/REGISTRATION-PDF.md">Reports, CSVs and registration PDFs</a></td>
+<td>Implemented</td>
+<td>Operational reports and scoped CSVs support current domains; registration PDFs preserve submission versions and update copies with documented redaction/approved exceptions.</td>
+<td>Saved staff views/column profiles are future scope. Export labels must reflect the actual query/selection; PDF-specific allowlists are not a blanket medical redaction guarantee. <a href="https://github.com/DurantTL/IMSDA-Events/issues/75">#75</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/181">#181</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/182">#182</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1103">#1103</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/scripts/imports/README.md">Reviewed imports and sample outputs</a></td>
+<td>Implemented</td>
+<td>Existing preview/apply/provenance patterns, domain import runbooks, synthetic CSV examples, catalog JSON/CSV and made-up PDF outputs are already in Git.</td>
+<td>This pack indexes those assets. It does not rebuild import preparation or authorize real production apply. <a href="https://github.com/DurantTL/IMSDA-Events/issues/76">#76</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/172">#172</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/173">#173</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/174">#174</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0005-protected-records-policy.md">Narrow protected health implementations</a></td>
+<td>Gated/setup</td>
+<td>Encrypted birth dates and narrow Health Record, registrar entry-only, acknowledgment, administrator break-glass and sealed-copy foundations are present.</td>
+<td>ADR 0005 has addendum-specific statuses and production prerequisites. Addendum B is interim accepted; the overall broader policy and Addendum C are separate. No blanket availability/compliance claim. <a href="https://github.com/DurantTL/IMSDA-Events/issues/389">#389</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/44">#44</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/189">#189</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/190">#190</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md">Basic event community</a></td>
+<td>Gated/setup</td>
+<td>An enabled event can offer the existing opt-in community with conduct acceptance, posts/replies, reporting and moderation foundations.</td>
+<td>Profiles, directories, groups/media, richer moderation and lifecycle are separate later/policy-bound slices; do not advertise a general social network. <a href="https://github.com/DurantTL/IMSDA-Events/issues/83">#83</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/308">#308</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/309">#309</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/310">#310</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EVENT-ARCHIVE.md">Archive, audit and operating controls</a></td>
+<td>Gated/setup</td>
+<td>Event archive/unarchive, audit trails, readiness/health surfaces, queued work and backup/restore tooling exist.</td>
+<td>Archive hides an event without deleting records and is not the same as full financial closeout. A readiness tick is evidence, not a deployment or enabling action. <a href="https://github.com/DurantTL/IMSDA-Events/issues/156">#156</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/158">#158</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/159">#159</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/416">#416</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="accepted-direction-and-future-possibilities">Accepted direction and future possibilities</h3>
+<table><colgroup><col style="width:23%"><col style="width:13%"><col style="width:32%"><col style="width:32%"></colgroup>
+<thead>
+<tr class="header">
+<th>Capability</th>
+<th>Status</th>
+<th>What is supported or proposed</th>
+<th>Important boundary / owner</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">Distinct role workspace presentation</a></td>
+<td>Accepted design</td>
+<td>Accepted direction gives attendee, director, coordinator and administrator one visual language with different navigation, scope and priorities.</td>
+<td>The visual prototypes are reference documents; implementation remains in existing child issues. Later page studies do not add extra System menu changes. <a href="https://github.com/DurantTL/IMSDA-Events/issues/1109">#1109</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1111">#1111</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1112">#1112</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1113">#1113</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/seeded-templates.ts">Builder extraction and editable Form templates</a></td>
+<td>Planned</td>
+<td>Steps 1/2a/2b cover behavior-preserving extraction, immutable app-editable templates and source/version notices.</td>
+<td>The October 20 decision permits foundation work before later visual review; this does not move the #98 queue or codex-ready frontier. <a href="https://github.com/DurantTL/IMSDA-Events/issues/1062">#1062</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1063">#1063</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1064">#1064</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1065">#1065</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/review.md">Inspector, saved questions, phone editor and All/Any</a></td>
+<td>Planned</td>
+<td>Proposed next builder steps clarify field/settings ownership, copied saved questions, phone move/edit workflows and combined visibility conditions.</td>
+<td>Steps 3–6 retain separate design review. All/Any direction is accepted; that does not approve every proposed visual/library/permission detail. <a href="https://github.com/DurantTL/IMSDA-Events/issues/1069">#1069</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1070">#1070</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1071">#1071</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1072">#1072</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/existing-owner-notes.md">Themes, composed previews and full site builder</a></td>
+<td>Planned</td>
+<td>Registration themes/state previews can lead to versioned pages, dynamic modules, branding, publish/rollback and optional domains.</td>
+<td>#283/#284 are earlier bounded foundations; #247–#251/#270 own the broader site outcome and publication evidence. Do not wait for all future pages to improve today’s event page. <a href="https://github.com/DurantTL/IMSDA-Events/issues/283">#283</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/284">#284</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/448">#448</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/84">#84</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/existing-owner-notes.md">Saved task views and reviewed bulk operations</a></td>
+<td>Planned</td>
+<td>Personal/shared views, stable column choices, dashboard drilldowns and a consistent scoped export/action framework extend existing search.</td>
+<td>Existing attendee CSV and director saved export formats are delivered and should be reused; a saved view cannot grant field access. <a href="https://github.com/DurantTL/IMSDA-Events/issues/75">#75</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/181">#181</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/182">#182</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/NEW-CLUB-APPLICATIONS.md">Adventurer ministry and voluntary YMMS migration</a></td>
+<td>Planned</td>
+<td>The recorded direction is separate clubs per ministry, director-set classes, shared honors/awards catalog and whole-ministry coordinator visibility initially.</td>
+<td>This is a later project awaiting materials and survey answers. Migration is voluntary club by club; parent registration/unit scoring/training are independent later needs. <a href="https://github.com/DurantTL/IMSDA-Events/issues/840">#840</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/841">#841</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/842">#842</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/843">#843</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md">Shared ledger, held credits and installment convenience</a></td>
+<td>Planned</td>
+<td>Append-only shared charges/allocations, settlement reconciliation, transfers/held credits and optional installment charging extend current financial workflows.</td>
+<td>Do not mistake the current meal ledger or immutable invoices for the completed shared financial ledger; recurring processor authorization/terms remain gated. <a href="https://github.com/DurantTL/IMSDA-Events/issues/74">#74</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/117">#117</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/118">#118</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/119">#119</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MERCHANDISE-LEDGER-MIGRATION.md">Public merchandise and camp-store account possibilities</a></td>
+<td>Planned</td>
+<td>Existing catalog foundations can support future reserved inventory, separately paid merchandise and later store/cashless-account concepts.</td>
+<td>Merchandise checkout/fulfillment slices remain held; draft #302 was closed without merging. Camp-store wallets/POS are a separate bigger scope. <a href="https://github.com/DurantTL/IMSDA-Events/issues/54">#54</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/146">#146</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/147">#147</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/148">#148</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LODGING.md">Full residential camp capability</a></td>
+<td>Planned</td>
+<td>Future camp operations could combine enrollment, cabins/counselors, activity schedules, transport, authorized release, personnel and incident controls.</td>
+<td>Today’s lodging/meals/check-in are reusable foundations, not proof of a complete camp product. The separate UltraCamp discovery report identifies contracts and gaps. <a href="https://github.com/DurantTL/IMSDA-Events/issues/65">#65</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/78">#78</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/79">#79</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/89">#89</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md">Returning profiles, wallet passes and native app</a></td>
+<td>Planned</td>
+<td>Reviewed reusable facts/prefill, Apple/Google Wallet, a mobile attendee shell, minimized offline support and opt-in push are tracked possibilities.</td>
+<td>Current account profile/prefill, web QR and phone-responsive web screens already exist. Native/provider deployment, offline actions and cross-event identity need their own contracts. <a href="https://github.com/DurantTL/IMSDA-Events/issues/91">#91</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/226">#226</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/227">#227</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/228">#228</a></td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EADVENTIST-ORGANIZATIONS-IMPORT.md">Partner API, eAdventist and optional UltraCamp</a></td>
+<td>Planned</td>
+<td>A scoped first-party/public contract, signed outbound webhooks and reviewed external directory feeds could extend owned data flows.</td>
+<td>The eAdventist CSV organization import already exists; it is not an approved live person-membership API. UltraCamp remains optional lowest-priority Phase 5 and requires an allowed data/licensing boundary. <a href="https://github.com/DurantTL/IMSDA-Events/issues/103">#103</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/124">#124</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/237">#237</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/238">#238</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0011-personnel-pipeline-policy.md">Outcomes, personnel, incidents and advanced event tools</a></td>
+<td>Planned</td>
+<td>Survey/certificate/outcome tools, recruiting/onboarding, restricted incidents, budgets/procurement, presenter portals, networking and hybrid delivery remain long-term domains.</td>
+<td>Some have detailed technical slices, others remain planning epics. A roadmap entry is not a committed date, approved policy or current product promise. <a href="https://github.com/DurantTL/IMSDA-Events/issues/90">#90</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/233">#233</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/234">#234</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/235">#235</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="existing-material-to-use-before-creating-another-document">Existing material to use before creating another document</h2>
+<p>The repository already contains the requested rehearsal, decision and import-preparation foundations. The following is a navigation aid, not a replacement rehearsal plan or a newly declared decision register.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Need</th>
+<th>Existing material</th>
+<th>How to use it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Event operational walkthrough</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md">Staff event workflow</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ATTENDEE-ACCOUNT-RELEASE.md">attendee release acceptance</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/WR26-GO-LIVE-REVIEW.md">WR26 review</a></td>
+<td>Reuse the task structure and recorded checks. The July/September documents contain historical status; reconcile them with source and later issue decisions. Do not rebuild a rehearsal merely because a historical checklist is unchecked.</td>
+</tr>
+<tr class="even">
+<td>Release/readiness evidence</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/PRODUCTION-READINESS-PROGRESS.md">Readiness progress</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/SERVER-SECURITY-CHECKLIST.md">server checklist</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BACKUPS.md">backups</a></td>
+<td>Distinguish code/tooling evidence from the operator’s record of a serving-release rehearsal, migration or key restore. Old aggregate counts/dates are not today’s test results.</td>
+</tr>
+<tr class="odd">
+<td>Decisions and accepted policy</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions">ADR directory</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/98">roadmap #98</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/844">review index #844</a></td>
+<td>Use the exact ADR/addendum status and latest recorded owner decision. A recommendation in an old comment is not an accepted rule.</td>
+</tr>
+<tr class="even">
+<td>Club, calendar, church and health imports</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/CLUB-IMPORT-RUNBOOK.md">Club import runbook</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/CALENDAR-IMPORT.md">calendar import</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/EADVENTIST-ORGANIZATIONS-IMPORT.md">eAdventist CSV</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HEALTH-RECORD-IMPORT-RUNBOOK.md">health import runbook</a></td>
+<td>Keep the domain-specific preview, matching, exception and apply rules. Existing readiness does not authorize a new production import.</td>
+</tr>
+<tr class="odd">
+<td>Upload-ready CSV and JSON</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/README.md">Reference-data index</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/imports/honors.csv">honors CSV</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/imports/club-supply-catalog.csv">club-supply CSV</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/imports/master-award-rules.json">Master Award JSON</a></td>
+<td>Use generated committed import files and their existing stale/parser checks. Regenerate from source through the documented command rather than hand-editing duplicates.</td>
+</tr>
+<tr class="even">
+<td>Synthetic import examples</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/scripts/imports/README.md">CSV contract</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/public/fixtures/wr26-import-template.csv">blank CSV</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/public/fixtures/wr26-import-sample.csv">fictitious CSV</a>, <a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/tests/fixtures/cafe-scanner">café scanner fixtures</a></td>
+<td>Use fabricated examples for learning and review; do not move real attendee or health rows into documents. The old generic import README is a historical entry point, not a universal identity matching rule for every current importer.</td>
+</tr>
+<tr class="odd">
+<td>Example PDF and structured outputs</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/REGISTRATION-PDF.md">Registration PDF guide</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/samples/registration-pdf-sample.pdf">church-billed sample</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/samples/registration-pdf-sample-updated.pdf">self-pay Updated sample</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/tests/fixtures/legacy-form-templates-153.json">seeded form parity JSON</a></td>
+<td>Existing examples already show output structure. The PDF guide defines version, price, redaction and approved exception behavior; do not replace it with a blanket “all sensitive values excluded” statement.</td>
+</tr>
+<tr class="even">
+<td>Design references</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">Accepted role pack</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/README.md">list/public journey review</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/mockups/README.md">interactive studies</a></td>
+<td>Label examples as accepted direction or proposed study as appropriate. They are synthetic, not proof of the current deployed screen.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a-useful-way-to-present-the-future">A useful way to present the future</h2>
+<p>Teach today’s tasks first: find the correct event or club/year, understand the current state, take the permitted action and recover from an error. Present accepted workspace design as an improvement to that same job. Then show future capabilities as modules that extend an existing source of truth rather than a replacement platform.</p>
+<p>For example, a new theme should reuse the registration and event renderers; saved views should reuse authorized query/column definitions; camp cabins should build on lodging while adding the actual camp authority model; and wallet/native access should consume an approved API instead of maintaining another enrollment or balance record. The code report and separate UltraCamp discovery report explain these boundaries in more depth.</p>
+<p><strong>Sequence remains <a href="https://github.com/DurantTL/IMSDA-Events/issues/98">#98</a>.</strong> This guide assigns no new delivery dates, changes no role/menu contract and enables no production feature. Items not evidenced here should be marked unknown, not filled in from a competitor’s product sheet.</p>
+</body></html>
