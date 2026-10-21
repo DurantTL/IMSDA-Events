@@ -7,14 +7,9 @@
     }
   },
   {
-    "file": "07-club-quick-start.pdf",
-    "horizontal": {
-      "width": 1280,
-      "viewport": 1280
-    }
-  },
-  {
     "file": "IMSDA-Events-platform-briefing.pdf",
-    "text_overflows": []
+    "text_overflows": [],
+    "failed_images": [],
+    "screenshot_images": 42
   }
 ]

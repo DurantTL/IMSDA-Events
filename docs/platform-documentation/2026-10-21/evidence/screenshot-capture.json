@@ -1,0 +1,580 @@
+{
+  "source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
+  "captured_on": "2026-10-21",
+  "environment": "Isolated localhost copy of the current application with a dedicated synthetic PostgreSQL database; no production data or services",
+  "fictional_story": {
+    "director": "Jordan Ellis",
+    "club": "Riverton Pathfinders",
+    "coordinator": "Alex Morgan",
+    "member": "Morgan Reed",
+    "other_clubs": [
+      "Cedar Hill Pathfinders",
+      "Lakeview Pathfinders",
+      "Pine Grove Pathfinders"
+    ],
+    "event": "Fall Camporee, November 6\u20138, 2026",
+    "club_year": "2026\u201327"
+  },
+  "interpretation": "Actual app screenshots, not proposed designs or evidence of serving production configuration. Captures preserve before/after local training states. Presentation callouts are editable overlays. Pixel crops enlarge relevant controls; the shared registration-confirmation capture excludes its local check-in QR.",
+  "security": "Only invented records. Passwords and authentication codes are blank or excluded. No real invitations, communications, approvals or registrations were sent.",
+  "screens": {
+    "public-home": {
+      "path": "assets/training/public-home.png",
+      "route": "/",
+      "description": "Public home in the current local application; fictional training records.",
+      "state": "Unsigned visitor",
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "full_page": true,
+      "capture_cleanup": "Development indicator excluded; application content unchanged.",
+      "image_pixels": [
+        2560,
+        1800
+      ],
+      "sha256": "58bc015da2f1cb425ff82b9002b5b4869092236eb666b55e5009b394a54bc5a0"
+    },
+    "public-calendar": {
+      "path": "assets/training/public-calendar.png",
+      "route": "/calendar?view=list",
+      "description": "Public calendar in the current local application; fictional training records.",
+      "state": "Unsigned visitor",
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "full_page": true,
+      "capture_cleanup": "Development indicator excluded; application content unchanged.",
+      "image_pixels": [
+        2560,
+        1800
+      ],
+      "sha256": "3d1911c63cf742e2e7363c4e726ae178f15efda986a74c3ecc01ac3dc9da1dc2"
+    },
+    "sign-in": {
+      "path": "assets/training/sign-in.png",
+      "route": "/account/sign-in",
+      "description": "Account sign-in with Jordan Ellis\u2019s fictional email entered; password blank; no sign-in attempt sent.",
+      "state": "Unsigned visitor",
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "full_page": true,
+      "capture_cleanup": "Development indicator excluded; application content unchanged.",
+      "image_pixels": [
+        2560,
+        1800
+      ],
+      "sha256": "9f13036d9699159707997073cde71987edf924ec02d654ffb463ce0f74278d88"
+    },
+    "invite-card-focus": {
+      "path": "assets/training/invite-card-focus.png",
+      "description": "The current invitation card for Riverton, captured in a600px-wide local browser so its club name and Accept action can be read together. Fictional invitation; not accepted.",
+      "route": "/account",
+      "state": "Fictional invited account before grant acceptance",
+      "viewport_css_px": [
+        600,
+        900
+      ],
+      "device_scale_factor": 2,
+      "element_capture": ".club-invite-card",
+      "image_pixels": [
+        1200,
+        358
+      ],
+      "sha256": "d734274d5053285feba446eaf4f01fe32699ed425ad95d624846a956b6c7d40e"
+    },
+    "roster-edit": {
+      "path": "assets/training/roster-edit.png",
+      "description": "Existing member dialog scrolled to Save and Deactivate actions; current member details are retained.",
+      "route": "/account/clubs/training_club_riverton/roster",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "055b7c4536175d87a2c75f34493097b9315aee5eee750a19054c6990c35804e6",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "roster-add": {
+      "path": "assets/training/roster-add.png",
+      "description": "Filled fictional Morgan Reed fields in the actual Add to roster dialog.",
+      "route": "/account/clubs/training_club_riverton/roster",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "51b9e356cd586aa18889f92668da4cf4a0a7a82fe589532010268e7fd6734143",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "roster-add-save": {
+      "path": "assets/training/roster-add-save.png",
+      "description": "Add to roster dialog scrolled to its final Add to roster action.",
+      "route": "/account/clubs/training_club_riverton/roster",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "6c4a7b4f6c03efbfc3d08989892eb8c6b1c2c32d405894248e4d2cd88f583d53",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "forms": {
+      "path": "assets/training/forms.png",
+      "description": "Available club forms with a saved draft for Morgan Reed and a submitted transportation list.",
+      "route": "/account/clubs/training_club_riverton/forms",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        2998
+      ],
+      "sha256": "a5f679f5a9f2eea52700a1fdc3065f79e84bccdc0e23a27acc5ff007c62f0c0a",
+      "image_pixels": [
+        2560,
+        2998
+      ]
+    },
+    "forms-filled": {
+      "path": "assets/training/forms-filled.png",
+      "description": "Filled forms table distinguishes a Draft/Open permission slip from Submitted/View and print transportation list.",
+      "route": "/account/clubs/training_club_riverton/forms",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        2998
+      ],
+      "sha256": "a5f679f5a9f2eea52700a1fdc3065f79e84bccdc0e23a27acc5ff007c62f0c0a",
+      "image_pixels": [
+        2560,
+        2998
+      ]
+    },
+    "meeting-note": {
+      "path": "assets/training/meeting-note.png",
+      "description": "Fictional October17 meeting note: headcounts, Camping Skills I and a short activity note.",
+      "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "e2884612946ab638d5524875fb24fa48d6e1df9cba8109507a5816f5486e185e",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "report-draft": {
+      "path": "assets/training/report-draft.png",
+      "description": "Saved October draft; actual Save draft and Submit report \u00b7410 points buttons.",
+      "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "c777b4e71ff2c8e35cd6061642bed290affd688641346c4fbf252f1fa12c1b87",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "report-submitted": {
+      "path": "assets/training/report-submitted.png",
+      "description": "Freshly loaded October record after actual submission:410 points,2320yearpoints and2submittedreports.",
+      "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        2990
+      ],
+      "sha256": "6f852e2d0534789b0b12d11069bda306c2886847c9d6b7fbb82a274f97ba71d4",
+      "image_pixels": [
+        2560,
+        2990
+      ]
+    },
+    "event-attendees": {
+      "path": "assets/training/event-attendees.png",
+      "description": "Six fictional club members selected for Fall Camporee; actual Draft saved state.",
+      "route": "/account/clubs/training_club_riverton/events/training_fall_camporee",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        3582
+      ],
+      "sha256": "2bd04b70d54d5682c6c4b2146712acf1ab9c76864c8e3bd3378808058af58bfe",
+      "image_pixels": [
+        2560,
+        3582
+      ]
+    },
+    "event-review": {
+      "path": "assets/training/event-review.png",
+      "description": "Final current-app review for six fictional Fall Camporee attendees, with church invoice facts and Submit registration.",
+      "route": "/account/clubs/training_club_riverton/events/training_fall_camporee",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        7448
+      ],
+      "sha256": "e7e13946907be3e44e08362d4f4e65bb95add0fcfbca3e6ac339d2ddc08c5350",
+      "image_pixels": [
+        2560,
+        7448
+      ]
+    },
+    "event-saved": {
+      "path": "assets/training/event-saved-confirmation.png",
+      "description": "Existing Fall Camporee registration after actual local submission, with six attendees and editing/printing controls. Published crop shows confirmation and billing text; the local check-in QR is excluded.",
+      "route": "/account/clubs/training_club_riverton/events/training_fall_camporee",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        3110
+      ],
+      "sha256": "a60fae578c6986cc5f80fb56796250f114f8707e61bf5623b7ac5709851f2f62",
+      "image_pixels": [
+        2360,
+        370
+      ],
+      "original_capture_sha256": "f5ce6992e8d645660869a889b19f460a26b4b97fe59d9e20c82efccdc49143ff",
+      "published_crop_pixels": [
+        100,
+        1110,
+        2460,
+        1480
+      ]
+    },
+    "roster-edit-top": {
+      "path": "assets/training/roster-edit-top.png",
+      "description": "Morgan Reed\u2019s existing roster record, with current name, type and class visible.",
+      "route": "/account/clubs/training_club_riverton/roster",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "e8f09974872f801b70b1cfa0ce4343c069a78ead80394744a16a51954ff18c1b",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "director-account": {
+      "path": "assets/training/director-account.png",
+      "description": "Director Jordan Ellis\u2019s account entry into the Riverton club workspace.",
+      "route": "/account",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "cbf5b40752eb0666e6fa264494f55f43c34d26c51ffb4397959a657f891f661d",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "director-home": {
+      "path": "assets/training/director-home.png",
+      "description": "Riverton Home before the story:9active people,1report filed, FallCamporee open to register.",
+      "route": "/account/clubs/training_club_riverton",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        2406
+      ],
+      "sha256": "8d380fcf7077ed235b57882a3e7d3d9d08c321563f426b74b53fd5894b2d28a6",
+      "image_pixels": [
+        2560,
+        2406
+      ]
+    },
+    "roster-added": {
+      "path": "assets/training/roster-added.png",
+      "description": "Actual roster after Add to roster saved Morgan Reed:10activepeople.",
+      "route": "/account/clubs/training_club_riverton/roster",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        3678
+      ],
+      "sha256": "520c21f2b2a72cd8d7caa3059b7822ea3d449888f372ee6e8c45a919b4c3e189",
+      "image_pixels": [
+        2560,
+        3678
+      ]
+    },
+    "honors": {
+      "path": "assets/training/honors.png",
+      "description": "Honor records with4completed and4inprogress entries across fictional members.",
+      "route": "/account/clubs/training_club_riverton/honors",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        2616
+      ],
+      "sha256": "0485171177dd1bb8f25b525dc68968cc7cb2f406c459b4b8775f592de2ed825f",
+      "image_pixels": [
+        2560,
+        2616
+      ]
+    },
+    "roster-export": {
+      "path": "assets/training/roster-export.png",
+      "description": "Real roster export Preview:first5of10fictionalrows, before DownloadCSV.",
+      "route": "/account/clubs/training_club_riverton/roster/export",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        2688
+      ],
+      "sha256": "465880b2eca1350f1432b4ee0801b999eb117987525a1c78122c3631f63f6483",
+      "image_pixels": [
+        2560,
+        2688
+      ]
+    },
+    "coordinator-account": {
+      "path": "assets/training/coordinator-account.png",
+      "description": "Alex Morgan\u2019s fictional account overview and Area coordinator entry after the training tasks.",
+      "route": "/account",
+      "state": "Account belongs to the coordinator; Fall Camporee now has one registered club and six people.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "d014472972aa5678f28f9509a86629f6f415af2c40e0d12e98b0c39aac3e0ce1",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        2068
+      ]
+    },
+    "coordinator-all-clubs": {
+      "path": "assets/training/coordinator-all-clubs.png",
+      "description": "All clubs with four fictional club records.",
+      "route": "/account/clubs",
+      "state": "Coordinator All clubs, unfiltered active-club list.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "52126c64f7919b5c60c5bcfdb3f9fb8de026317dc44f54c6a9472c7ac02a1ad4",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "coordinator-club-view": {
+      "path": "assets/training/coordinator-club-view.png",
+      "description": "Riverton Pathfinders opened in the coordinator\u2019s view-only workspace after Jordan\u2019s tasks.",
+      "route": "/account/area/training_club_riverton",
+      "state": "Riverton roster10; September and October submitted410points each; no director editing controls.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "75455cbe251d73a3fec11761b06849788f0399d63f6d5e85b6548ce5b15f3ff0",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        5288
+      ]
+    },
+    "coordinator-overview": {
+      "path": "assets/training/coordinator-overview.png",
+      "description": "2026\u201327 summaries for four fictional clubs after Jordan\u2019s roster/report work.",
+      "route": "/account/area-clubs/overview",
+      "state": "Riverton roster10,2submittedreports,2,320totalpoints; other clubs vary in status and counts.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "d973497012f416e9f0083a72c81a74db588aae51dca6ad679082f74b2ef9f206",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        2574
+      ]
+    },
+    "coordinator-reports": {
+      "path": "assets/training/coordinator-reports.png",
+      "description": "Monthly Records grid after Jordan submits October: Riverton September410 and October410.",
+      "route": "/account/area-clubs/reports",
+      "state": "Post-director-submission state: two Riverton submissions; other fictional clubs show September Draft/Missing/Late and October Due.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "81d0c31cbe1b509440d8cab2087be3cfbe36e9a3483a855112f066636b8c638d",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        1916
+      ]
+    },
+    "coordinator-report-detail": {
+      "path": "assets/training/coordinator-report-detail.png",
+      "description": "Riverton\u2019s submitted September Monthly Record.",
+      "route": "/account/area/training_club_riverton/reports/2026-09",
+      "state": "Coordinator reads a saved report without editing it.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "7f5c3a961e708d0fdb7d30becc7602dd85a5a614046118d20f25280a42eb9f36",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        3958
+      ]
+    },
+    "coordinator-points": {
+      "path": "assets/training/coordinator-points.png",
+      "description": "Points chart and table after both Riverton reports are submitted.",
+      "route": "/account/area-clubs/points",
+      "state": "Riverton820reportpoints +1,500yearlyregistration=2,320; CedarHill1,885;PineGrove1,500;Lakeview0.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "81cfe03b094c9f8d7e51c1eaed714f90c290d8820ce17082f0b5a19e0c611220",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        2388
+      ]
+    },
+    "coordinator-events": {
+      "path": "assets/training/coordinator-events.png",
+      "description": "Fall Camporee club registrations: Registered, Draft, Waitlisted and Cancelled.",
+      "route": "/account/area-clubs/events",
+      "state": "RivertonRegistered6;PineGroveDraft;LakeviewWaitlisted4;CedarHillCancelled3. Eventtotalcountsone registeredclub/sixpeople.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "2cb2e1b410e98190fec7f06973d27bb86113c7f86c2731ceee312ef643362ca1",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "new-clubs": {
+      "path": "assets/training/new-clubs.png",
+      "description": "Harbor Adventurers\u2019 fictional pending application in the coordinator\u2019s view-only New clubs page.",
+      "route": "/account/area-clubs/applications",
+      "state": "One synthetic pending application. Details are visible; no Approve or Decline controls are offered to the coordinator.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "987fb68abdc7ebd6be12163f385610a2cebe1360a90fb5121c46bc44c9906ff2",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        2244
+      ]
+    },
+    "coordinator-reports-draft": {
+      "path": "assets/training/coordinator-reports-draft.png",
+      "description": "Before Jordan finishes October: coordinator grid shows Riverton September410points and OctoberDraft.",
+      "route": "/account/area-clubs/reports",
+      "state": "Pre-director-submission state: Riverton OctoberDraft; SeptemberSubmitted. Other fictional clubs show Draft/Missing/Late.",
+      "http_status": 200,
+      "viewport_css_px": [
+        1280,
+        900
+      ],
+      "device_scale_factor": 2,
+      "sha256": "70938bdb85eade069cc78a907f4c450e4a18c2cb465789619f352156e4e70270",
+      "capture_note": "Actual app pixels, with Next developer-only launcher hidden for presentation; synthetic local data only.",
+      "image_pixels": [
+        2560,
+        1916
+      ]
+    },
+    "two-step": {
+      "path": "assets/training/two-step.png",
+      "description": "Current two-step challenge with an empty authenticator or recovery-code field.",
+      "route": "/account/two-step",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "04c54bee1c2c5b51995803620bc228f32307da8b05337315abd6121709fc328a",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "account-sign-out": {
+      "path": "assets/training/account-sign-out.png",
+      "description": "Account Profile and the actual Sign out control in the portal header.",
+      "route": "/account/profile",
+      "state": "Actual current app; isolated fictional training data; Next developer overlay hidden",
+      "dimensions": [
+        2560,
+        5404
+      ],
+      "sha256": "3bb9202cc92aa58e4dc9c254e7561990edc912a5efc71530af35d8960112240c",
+      "image_pixels": [
+        2560,
+        5404
+      ]
+    },
+    "email-verification": {
+      "path": "assets/training/email-verification.png",
+      "description": "Actual new-account email verification step, six-digit-code field left empty. Development-only code panel excluded.",
+      "route": "/account/sign-up",
+      "state": "Actual app sign-up flow on local development server; no external email provider configured; developer code panel hidden; verification code left blank.",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "ca7043d7c169aafbe7e98ced408245592d56f113e146d6af7ae0cec3aaa92019",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    }
+  }
+}

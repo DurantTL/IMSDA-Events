@@ -1,35 +1,40 @@
-# User-orientation revision — source and content checks
+# Visual user orientation — source and content checks
 
-Prepared October 21, 2026 against `47cd5c00780d0c2dd9e618b56c32e2fbd04b041a`. That main revision merges the preceding documentation pack; its application source is unchanged from the reports' `5e367b7c` baseline.
+Prepared October 21, 2026 against application source `7f77c1dfeadd004deb51f91e2bae1b6c4754638b`. This revision follows the merged practical-orientation documentation. The application source is unchanged; the five reference reports retain their historical `5e367b7c` baseline and original exports.
 
-## What the owner requested
+## Owner's request and revised teaching approach
 
-Replace the general technical/future-feature briefing with a practical explanation of what IMSDA Events does, why it helps, how to sign in and how club directors and Area Coordinators use it. Keep the code/checks, camp discovery and future-feature material in the separate reports.
+The owner asked for fictional data and visual screenshots so the presentation demonstrates what happens rather than repeating feature descriptions. The revised storyboard has **25 slides**: introduction/sign-in (1–7), director story (8–16), coordinator story (17–22), follow-up/help/sign-out (23–25).
 
-## Result
+The scenario uses Riverton Pathfinders, director Jordan Ellis, member Morgan Reed and Area Coordinator Alex Morgan, with three other fictional clubs for comparisons. The working date is October 21, 2026, the club year is 2026–27, and Fall Camporee is November 6–8. September records illustrate overdue status differences; October's director report is within its November 10 deadline. Actual figures and transitions must follow the captured local fixture, not invented totals in slide annotations.
 
-- A 31-slide user orientation with an introduction, first-time and returning sign-in, director tasks, coordinator tasks, practical follow-up, help and sign-out.
-- Spoken notes for every slide, with an optional demonstration and question. Source references are marked as preparation material, not spoken content.
-- A three-page quick-start handout in PDF, Word and Markdown.
-- Numbered task illustrations using actual current labels. No accepted/proposed role mockup is presented as a current application screen, and no new menu is proposed.
+The presentation combines actual local application captures, short captions and editable instructional callouts. Spoken notes retain explanations and exceptions. The companion quick-start remains three pages. Reports 01–05 and their exports remain unchanged; the code/checks, camp discovery and future-feature material stay separate from the user orientation.
 
-## Source review
+## Capture provenance and limits
 
-Separate source investigations verified sign-in/first-use, director work and coordinator work. Their findings are preserved in `orientation-signin.md`, `orientation-director.md` and `orientation-coordinator.md`. Referenced file paths are checked against the pinned source.
+Screens are captured from an isolated local instance of the pinned application using synthetic records. No production session or production database is used. The capture register, `screenshot-capture.json`, records the source revision and each screenshot's page/role/fixture context. This is evidence of repository behavior under the local configuration, not verification of public production switches, availability, enabled templates or current production records.
 
-The final wording preserves these practical details:
+Every visual uses a fictional-data label. Annotations belong to the presentation and do not imply new app controls. Accepted future role designs must not be substituted for current application screenshots. The existing System navigation, role permissions and build order remain unchanged.
 
-- Begin at the website's **Sign in** link; do not teach a fixed staff login route as the universal director/coordinator entry.
-- Existing users reuse their account. New invited directors verify the invited address and **Accept** the club invitation; account creation alone does not attach a club.
-- Email verification and authenticator confirmation are different codes. The current setup key/help and recovery labels are described without promising a QR on every setup screen.
-- Directors use **My club/My clubs**; coordinators use **Clubs overview/Clubs**. Training says to check the year shown, without inventing a universal year selector.
-- Roster membership and event attendance are separate. Draft/save/submit/confirm states and sponsoring-church billing retain their meaning.
-- **Forms** is a director/deputy workflow; registrar/reporter tools remain narrower. **Orders** is a helper/stock workflow, and **Class tracking** is described only for its supported records.
-- Coordinator work is predominantly view-only. **Team approvals** is the specific own-location decision exception; **New clubs** is review-only for coordinators. No area-only filter or automatic reminder button is invented.
-- A name search does not narrow the full-year coordinator CSV. Missing, Draft, Due and submitted report points remain distinct.
+## Source review and teaching safeguards
 
-## Export validation
+The prior source investigations remain in `orientation-signin.md`, `orientation-director.md` and `orientation-coordinator.md`. The screenshot-specific acceptance checklist is `visual-training-qa-plan.md`. Current source confirms these details:
 
-`orientation-checks.json` records the final slide/notes/source/package checks. The HTML deck is checked after font loading, and overflowing text is corrected before final export. PowerPoint shape bounds and Office ZIP integrity are checked. PDFs contain extractable text and tagged structures; the presentation also has bookmarks for its slide titles.
+- Begin at the website's **Sign in** link, not a hard-coded staff route. Reuse an existing account; a new invited director verifies the invited address and **Accepts** the correct club invitation. Account creation alone does not grant club access.
+- The extra confirmation protects club information. Email verification and authenticator confirmation have different purposes. Captures must not contain passwords, usable email codes, MFA setup keys, recovery codes, invitation tokens or private links.
+- Directors use **My club/My clubs**; coordinators use **Clubs overview/Clubs**. Show the current year heading without inventing a universal year dropdown or area filter.
+- Roster membership is separate from event participation. **Add to roster**, saved draft, submitted report and confirmed registration remain distinct results. **Deactivate** is not irreversible **Remove**.
+- Meeting notes do not submit a Monthly Record. A saved report is refreshed explicitly from notes. A September report can be **Missing** after October 10; an existing overdue draft remains **Draft**. An unsubmitted October report on October 21 is **Due** or **Draft**, not overdue Missing.
+- **Forms** is a director/deputy workflow; narrower club roles retain their restrictions. **Orders** is a helper/stock workflow, and **Class tracking** covers its supported records rather than an invented universal curriculum checklist. Sponsoring-church billing remains distinct from a personal payment flow.
+- Coordinator work is predominantly view-only. **Team approvals** is the narrow own-location decision exception; **New clubs** is review-only. There is no general Send reminder action or automatic follow-up message in this training.
+- A coordinator name search does not narrow the full-year CSV or recalculate full-scope rankings. Event totals may remain full-event totals when visible club rows are filtered.
 
-The full deck and handout contact sheets, detailed account-verification and coordinator Monthly Records slides, and a full-size spoken-notes page were inspected for obvious clipping/overlap and readable teaching flow. These are documentation checks, not a live production or assistive-technology audit. No application test run, application change, message send, real report submission or access change is part of this revision.
+## Final export review status
+
+The final presentation has **25 slides, 42 embedded screenshot placements and 34 distinct screen states**. Every slide has spoken notes; every picture has an alternative description. All 47 distinct referenced source files exist at the pinned revision. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
+
+PowerPoint shape bounds and Office package integrity pass. After fonts and images load, the deck has **zero overflowing text boxes and zero failed images**. All eight PDFs open with text and tagged structures; the deck has 25 slide-title bookmarks. Presenter notes are 14 pages; the retained quick-start is three pages. Machine-readable results are in `orientation-checks.json`, `render-checks.json` and `pdf-manifest.json`.
+
+The complete contact sheet and enlarged task/detail slides were visually inspected. An independent review checked fictional-state continuity, source permissions, authentication examples and the before/after report story. Crops were enlarged to show roster saving, returned form states, report submission, event confirmation and the registered headcount. Annotation positions were corrected where they covered a value. The gallery excludes the local check-in QR from the shared confirmation capture; original hash and crop coordinates remain in the capture register.
+
+These documentation checks do not constitute a live production, assistive-technology or physical-printer audit. No application test run, application change, external message, production report submission or access change is part of this revision. All demonstrated saves and submissions affect only the isolated fictional database.
