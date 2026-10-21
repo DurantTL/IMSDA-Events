@@ -112,10 +112,13 @@ async function main() {
   const mail = (email: string) => prisma.messageOutbox.findMany({ where: { eventId, templateKey: "HONOR_WATCH_SUMMARY", recipientEmail: email }, orderBy: { createdAt: "asc" } });
   const allWatchMail = () => prisma.messageOutbox.count({ where: { eventId, templateKey: "HONOR_WATCH_SUMMARY" } });
 
-  const tomorrowKey = centralDateKey(new Date(real.getTime() + DAY));
-  const morning1 = new Date(centralInstant(tomorrowKey, 6).getTime() + 5 * 60 * 1000);
-  const morning2 = new Date(morning1.getTime() + DAY);
-  const morning3 = new Date(morning2.getTime() + DAY);
+  // Each morning is 6:05 AM Central on a Central calendar day, never a fixed 24-hour step: a daylight saving change (1 Nov) moves
+  // the 6:00 AM cutoff by an hour in UTC. Noon Central is far from midnight, so adding whole days to it lands on the right date.
+  const noonToday = centralInstant(centralDateKey(real), 12);
+  const morningOn = (days: number) => new Date(centralInstant(centralDateKey(new Date(noonToday.getTime() + days * DAY)), 6).getTime() + 5 * 60 * 1000);
+  const cutoffOf = (morning: Date) => centralInstant(centralDateKey(morning), 6);
+  const tomorrowKey = centralDateKey(morningOn(1));
+  const [morning1, morning2, morning3, morning4, morning5, morning6, morning7] = [1, 2, 3, 4, 5, 6, 7].map(morningOn) as [Date, Date, Date, Date, Date, Date, Date];
 
   // ---------------------------------------------------------------- setup: validation, audit, and a watch holds no youth data
   const created = new Date(real.getTime() - 60 * 1000);
@@ -199,30 +202,31 @@ async function main() {
   // ---------------------------------------------------------------- a quiet day, then a drop
   await sweep(morning2);
   assert((await allWatchMail()) === 3, "no email when nothing changed");
-  await pick("y1", [], new Date(morning1.getTime() + HOUR)); // leaves the shared class
-  await sendDueClassChangeEmails(morning2);
-  await sweep(morning2);
-  await sweep(morning2);
+  // The leave is made AFTER the quiet day's sweep has moved every summary point to the day-2 cutoff, so the day-3 window owns it.
+  await pick("y1", [], new Date(morning2.getTime() + HOUR)); // leaves the shared class
+  await sendDueClassChangeEmails(morning3);
+  await sweep(morning3);
+  await sweep(morning3);
   const second = await mail(addr.honor[0]!);
   assert(second.length === 2 && second[1]!.bodyTextSnapshot.includes("Left: Kid y1") && !second[1]!.bodyTextSnapshot.includes("Joined:"), "the next summary has only what happened since");
   console.log("ok  a quiet day sends nothing; a drop is reported once, the next morning");
 
   // ---------------------------------------------------------------- retention: a row inside the window survives the prune
-  await pick("y1", [multi], new Date(morning2.getTime() + HOUR));
+  await pick("y1", [multi], new Date(morning3.getTime() + HOUR));
   const old = await prisma.honorClassChange.create({
-    data: { eventId, offeringId: multi, enrollmentId: `${P}_old`, registrationAttendeeId: attendee.y2!, kind: "JOINED", youthName: "Kid old", clubName: null, ageOnEventDate: 10, at: new Date(morning3.getTime() - 9 * DAY), immediateHandledAt: real },
+    data: { eventId, offeringId: multi, enrollmentId: `${P}_old`, registrationAttendeeId: attendee.y2!, kind: "JOINED", youthName: "Kid old", clubName: null, ageOnEventDate: 10, at: new Date(morning4.getTime() - 9 * DAY), immediateHandledAt: real },
     select: { id: true },
   });
-  await sendDueClassChangeEmails(morning3); // prunes rows over eight days old
+  await sendDueClassChangeEmails(morning4); // prunes rows over eight days old
   assert((await prisma.honorClassChange.count({ where: { id: old.id } })) === 0, "the sweep prunes a row older than eight days");
-  assert((await prisma.honorClassChange.count({ where: { eventId, youthName: "Kid y1", at: { gt: new Date(morning2.getTime()) } } })) === 1, "but not one inside the day's window");
-  await sweep(morning3);
+  assert((await prisma.honorClassChange.count({ where: { eventId, youthName: "Kid y1", at: { gt: cutoffOf(morning3) } } })) === 1, "but not one inside the day's window");
+  await sweep(morning4);
   const third = await mail(addr.honor[0]!);
   assert(third.length === 3 && third[2]!.bodyTextSnapshot.includes("Joined: Kid y1") && !third[2]!.bodyTextSnapshot.includes("Kid old"), "the pruned row is gone and the day's row is reported");
   console.log("ok  retention never takes a row inside a day's window");
 
-  // ---------------------------------------------------------------- retargeting restarts a watch; a paused event is suppressed
-  const afterEdit = new Date(morning3.getTime() + 2 * HOUR);
+  // ---------------------------------------------------------------- retargeting keeps the summary point; a paused event is suppressed
+  const afterEdit = new Date(morning4.getTime() + 2 * HOUR);
   await replaceHonorWatches(eventId, adminId, {
     watches: [
       { id: byHonor.id, name: "Second honor of the shared class", recipients: addr.honor, honorIds: [honors[2]], offeringIds: [] },
@@ -231,39 +235,37 @@ async function main() {
   }, afterEdit);
   const edited = await prisma.honorWatch.findMany({ where: { eventId }, orderBy: { position: "asc" } });
   assert(edited.length === 2 && edited[0]!.id === byHonor.id && edited[1]!.name === "Knots class (renamed)" && !edited.some((row) => row.id === byQuiet.id), "the saved list replaces the old one, keeping ids");
-  assert(edited[0]!.summaryAt?.getTime() === centralInstant(centralDateKey(morning3), 6).getTime(), "a watch whose honors did not change keeps its summary point");
-  assert(edited[1]!.summaryAt?.getTime() === afterEdit.getTime(), "a watch whose classes changed starts again from that moment");
+  assert(edited.every((row) => row.summaryAt?.getTime() === cutoffOf(morning4).getTime()), "a save, even one that changes a watch's classes, keeps every summary point, so no change still owed is dropped");
   assert((await getHonorWatchPanel(eventId)).watches.length === 2, "the panel reads them back");
 
-  const morning4 = new Date(morning3.getTime() + DAY);
   await prisma.eventMessageSettings.create({ data: { eventId, senderName: "IMSDA Events", deliveryPaused: true, deliveryPausedAt: new Date() } });
   await prisma.honorClassChange.create({
-    data: { eventId, offeringId: multi, enrollmentId: `${P}_p1`, registrationAttendeeId: attendee.y2!, kind: "JOINED", youthName: "Kid y2", clubName: null, ageOnEventDate: 13, at: new Date(morning3.getTime() + 3 * HOUR) },
+    data: { eventId, offeringId: multi, enrollmentId: `${P}_p1`, registrationAttendeeId: attendee.y2!, kind: "JOINED", youthName: "Kid y2", clubName: null, ageOnEventDate: 13, at: new Date(morning4.getTime() + 3 * HOUR) },
   });
   const before = await allWatchMail();
-  await sweep(morning4);
+  await sweep(morning5);
   const suppressed = await prisma.messageOutbox.findMany({ where: { eventId, templateKey: "HONOR_WATCH_SUMMARY", status: "SUPPRESSED" } });
   assert(suppressed.length === 2 && (await allWatchMail()) === before + 2, "a paused event's summaries are recorded as suppressed, never queued to send");
-  console.log("ok  a retargeted watch starts again from that moment; a paused event's summaries are suppressed");
+  console.log("ok  a retargeting save keeps each summary point; a paused event's summaries are suppressed");
 
   // ---------------------------------------------------------------- a cancelled registration, and a closed roster
   await prisma.eventMessageSettings.deleteMany({ where: { eventId } });
-  await pick("y2", [knots], new Date(morning4.getTime() + HOUR));
-  await cancelRegistration(eventId, regId, adminId, "Synthetic cancellation", new Date(morning4.getTime() + 2 * HOUR));
-  const morning5 = new Date(morning4.getTime() + DAY);
-  await sendDueClassChangeEmails(morning5);
-  await sweep(morning5);
-  assert((await mail(addr.klass[0]!)).length === 1, "a youth who joined the watched class and was cancelled the same day nets out of the class watch");
+  // y2 has been in the Knots class since the start, so cancelling the registration logs its LEAVE; y1 leaves the shared class.
+  await cancelRegistration(eventId, regId, adminId, "Synthetic cancellation", new Date(morning5.getTime() + 2 * HOUR));
+  await sendDueClassChangeEmails(morning6);
+  await sweep(morning6);
+  const classMails = await mail(addr.klass[0]!);
+  assert(classMails.length === 2 && classMails[1]!.bodyTextSnapshot.includes("Left: Kid y2") && !classMails[1]!.bodyTextSnapshot.includes("Joined:"), "the cancellation's leave from the watched class is reported to the class watch");
   const honorMails = await mail(addr.honor[0]!);
-  assert(honorMails.length === 5 && honorMails[4]!.bodyTextSnapshot.includes("Left: Kid y1"), "the cancellation's leave from the shared class is reported to the honor watch");
-  await prisma.event.update({ where: { id: eventId }, data: { endsAt: new Date(morning5.getTime() - 20 * DAY), startsAt: new Date(morning5.getTime() - 22 * DAY) } });
+  assert(honorMails.length === 5 && honorMails[4]!.bodyTextSnapshot.includes("Left: Kid y1"), "and its leave from the shared class to the honor watch");
+  await prisma.event.update({ where: { id: eventId }, data: { endsAt: new Date(morning6.getTime() - 20 * DAY), startsAt: new Date(morning6.getTime() - 22 * DAY) } });
   const sentBefore = await allWatchMail();
   await prisma.honorClassChange.create({
-    data: { eventId, offeringId: knots, enrollmentId: `${P}_p2`, registrationAttendeeId: attendee.y3!, kind: "JOINED", youthName: "Kid y3", clubName: null, ageOnEventDate: 11, at: new Date(morning5.getTime() + HOUR) },
+    data: { eventId, offeringId: knots, enrollmentId: `${P}_p2`, registrationAttendeeId: attendee.y3!, kind: "JOINED", youthName: "Kid y3", clubName: null, ageOnEventDate: 11, at: new Date(morning6.getTime() + HOUR) },
   });
-  await sweep(new Date(morning5.getTime() + DAY));
+  await sweep(morning7);
   assert((await allWatchMail()) === sentBefore, "a closed roster's watches are not read again");
-  console.log("ok  a cancelled registration's picks leave the watched class; a closed roster sends nothing");
+  console.log("ok  a cancelled registration's picks leave the watched classes; a closed roster sends nothing");
 
   await cleanup();
   console.log("honor watch verified");

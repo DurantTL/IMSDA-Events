@@ -111,7 +111,7 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
           return (
             <fieldset className="panel form-stack" key={draft.localKey}>
               <legend>Watch {index + 1}</legend>
-              {draft.warnings.map((warning) => <div className="inline-notice error" key={warning} role="alert">{warning}</div>)}
+              {draft.warnings.map((warning) => <div className="inline-notice" key={warning} role="status">{warning}</div>)}
               <label>
                 <span>Name</span>
                 <input autoComplete="off" maxLength={80} onChange={(event) => update(draft.localKey, { name: event.target.value })} placeholder="Nature honors" value={draft.name} />
@@ -206,7 +206,7 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
             <Save aria-hidden="true" size={14} /> {saving ? "Saving…" : "Save honor watches"}
           </button>
         </div>
-        <p className="field-help">Up to {HONOR_WATCHES_MAX_PER_EVENT} watches per event. Event administrators and system administrators can change them. Changing the honors or classes of a watch starts it again from that moment.</p>
+        <p className="field-help">Up to {HONOR_WATCHES_MAX_PER_EVENT} watches per event. Event administrators and system administrators can change them. A watch you change still gets what happened since its last summary, for what it looks at now.</p>
       </form>
     </section>
   );

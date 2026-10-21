@@ -205,8 +205,10 @@ Staff can have a few addresses told, once a day, when any attendee picks or drop
 
 An event has at most 20 watches. The setup route (`/api/events/<event>/honors/watches`) needs `CONFIGURE_EVENT` on the server,
 refuses a cross-origin save, and validates everything on the server: the honors must be in the catalog, the classes must belong
-to the event, the addresses must be valid. Saving replaces the whole list and keeps the ids of the watches it names. A watch
-whose honors or classes changed starts again from the moment of the save (it does not report what happened before). Each save
+to the event, the addresses must be valid. Saving replaces the whole list and keeps the ids of the watches it names. A save
+never moves a watch's summary point, so changes still owed since its last summary are sent, for whatever the watch looks at after the
+save (a watch given a new honor can therefore report that honor's changes from earlier in the same window). A named watch id must belong
+to the event; a class that was deleted is dropped from the panel (with a notice) so it cannot block saving. Each save
 is audited as `HONOR_WATCHES_CHANGED` with ids and counts only: never an address or a watch name.
 
 A watch holds no youth data: its name, addresses, honor and class ids, and the end of its last summary's window
