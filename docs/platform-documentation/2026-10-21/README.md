@@ -9,7 +9,7 @@ This pack explains the current system, consolidates accessibility/usability find
 - [Getting started PowerPoint — 25 visual slides with spoken presenter notes](exports/IMSDA-Events-platform-briefing.pptx)
 - [Getting started presentation PDF](exports/IMSDA-Events-platform-briefing.pdf)
 - [Presenter notes: PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Markdown](content/06-presenter-notes.md)
-- [Screenshot gallery — 34 fictional training screen states](exports/IMSDA-Events-training-screenshot-gallery.html)
+- [Screenshot gallery — 34 fictional training capture examples](exports/IMSDA-Events-training-screenshot-gallery.html)
 
 - [Quick-start handout — 3 pages](exports/07-club-quick-start.pdf) · [Editable Word](exports/07-club-quick-start.docx) · [Markdown](content/07-club-quick-start.md)
 

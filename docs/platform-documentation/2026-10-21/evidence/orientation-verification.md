@@ -31,7 +31,7 @@ The prior source investigations remain in `orientation-signin.md`, `orientation-
 
 ## Final export review status
 
-The final presentation has **25 slides, 42 embedded screenshot placements and 34 distinct screen states**. Every slide has spoken notes; every picture has an alternative description. All 47 distinct referenced source files exist at the pinned revision. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
+The final presentation has **25 slides, 42 embedded screenshot placements and 34 registered capture examples from 33 unique images**. Every slide has spoken notes; every picture has an alternative description. All 47 distinct referenced source files exist at the pinned revision. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
 
 PowerPoint shape bounds and Office package integrity pass. After fonts and images load, the deck has **zero overflowing text boxes and zero failed images**. All eight PDFs open with text and tagged structures; the deck has 25 slide-title bookmarks. Presenter notes are 14 pages; the retained quick-start is three pages. Machine-readable results are in `orientation-checks.json`, `render-checks.json` and `pdf-manifest.json`.
 

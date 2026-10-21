@@ -14,7 +14,7 @@ The source application revision is `7f77c1dfeadd004deb51f91e2bae1b6c4754638b`. C
 
 ## Final export checks
 
-- **25 slides, 42 embedded screenshot placements, 34 distinct screen states.** All slides contain spoken notes and all pictures have alternative descriptions. Office ZIP integrity and PowerPoint shape bounds pass; screenshots are embedded rather than dependent on a network image URL.
+- **25 slides, 42 embedded screenshot placements, 34 registered capture examples from 33 unique images.** All slides contain spoken notes and all pictures have alternative descriptions. Office ZIP integrity and PowerPoint shape bounds pass; screenshots are embedded rather than dependent on a network image URL.
 - All eight PDFs open and contain extractable text and tagged structures. Notes/document heading outlines remain present; the presentation has 25 slide-title bookmarks. Notes are 14 pages and the retained quick-start is three pages. Tags alone do not certify reading order, PDF/UA or WCAG conformance.
 - All seven Word packages pass ZIP integrity checks. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
 - The final HTML deck has zero overflowing text boxes and zero failed images after fonts/images load. Regenerated presenter notes fit the tested 1280px viewport without horizontal document overflow. All 47 distinct source-file references exist.

@@ -3,7 +3,6 @@
   "slides": 25,
   "speaker_notes": "All 25 slides have Say, with Show/Ask as appropriate",
   "picture_shapes": 42,
-  "unique_screen_states": 34,
   "screenshot_alt_descriptions": true,
   "visuals": "Current local application with fictional training records; annotations are presentation overlays",
   "visible_words_per_slide": [
@@ -87,5 +86,7 @@
       "toc_entries": 122,
       "tagged": true
     }
-  ]
+  ],
+  "registered_screenshot_examples": 34,
+  "unique_capture_images": 33
 }

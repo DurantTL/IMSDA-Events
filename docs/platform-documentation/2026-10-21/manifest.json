@@ -10,8 +10,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 8409,
-      "sha256": "1c75067795e28ea5fae6f07fa4af29d3cb95dfa4194a6d7195aa3a1434b23f88"
+      "bytes": 8412,
+      "sha256": "2f5295fbead01850b4cb5337bb5f1a068fb7990e02e02cefa3b0e3fe647f8969"
     },
     {
       "path": "assets/FONT-LICENSE.txt",
@@ -430,8 +430,8 @@
     },
     {
       "path": "evidence/export-verification.md",
-      "bytes": 3914,
-      "sha256": "68501e463638b6d6eaa751821da4a6f40e87fc89e28c3f8aff943cd877b51daa"
+      "bytes": 3941,
+      "sha256": "7155fd772127610931e32076db23a0e6fc5eebcd115ec4e048c5ccc8c9c6129e"
     },
     {
       "path": "evidence/feature-matrix.json",
@@ -455,13 +455,13 @@
     },
     {
       "path": "evidence/office-pdf-structure-checks.json",
-      "bytes": 1791,
-      "sha256": "649505433a527910a586a723dbeb0ce925bc669158697ba033e82e83cfc5e89d"
+      "bytes": 1832,
+      "sha256": "a62d6871f5961c6f6aefad7537a5af1b421a08eb87af252efac79d859bea484d"
     },
     {
       "path": "evidence/orientation-checks.json",
-      "bytes": 1791,
-      "sha256": "649505433a527910a586a723dbeb0ce925bc669158697ba033e82e83cfc5e89d"
+      "bytes": 1832,
+      "sha256": "a62d6871f5961c6f6aefad7537a5af1b421a08eb87af252efac79d859bea484d"
     },
     {
       "path": "evidence/orientation-coordinator.md",
@@ -480,8 +480,8 @@
     },
     {
       "path": "evidence/orientation-verification.md",
-      "bytes": 6258,
-      "sha256": "cb944ea045202e593fd67d8533cb9dcba02df25977591e70b2d91fbab8244e40"
+      "bytes": 6285,
+      "sha256": "e27c070c51b989fdfebf8b33ccdbe92dfdeeda921da8dba8f38212b1f466571b"
     },
     {
       "path": "evidence/pdf-manifest.json",
