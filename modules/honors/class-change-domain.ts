@@ -28,6 +28,8 @@ export const classSummaryHour = 6;
  * just before the cutoff may commit just after it, so the summary must not look before those writes can have landed.
  */
 export const CLASS_SUMMARY_GRACE_MS = 2 * 60 * 1000;
+/** Change rows older than this are past any daily window and are deleted by the sweep (see `pruneClassChanges`). */
+export const CLASS_CHANGE_RETENTION_DAYS = 8;
 /** A right-away email older than this is not sent: the sweep was off or the staff switch was, and a stale note would mislead. */
 export const IMMEDIATE_STALE_MS = 24 * 60 * 60 * 1000;
 

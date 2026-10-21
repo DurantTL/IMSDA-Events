@@ -194,9 +194,67 @@ Three guards, any one of which is enough:
 
 `npm run test:honor-class-emails` proves this against a real database, including three sweeps at the same moment.
 
+## Honor watches (#1099)
+
+Staff can have a few addresses told, once a day, when any attendee picks or drops a chosen honor. On the honor classes page
+(`/more/honors`), an event administrator (or system administrator) adds **honor watches** under "Honor watches". Each has:
+
+- a name (2 to 80 characters);
+- up to 10 typed addresses (one per line, lower-cased and de-duplicated);
+- one or more **honors** from the catalog, or specific **classes** (at least one of the two).
+
+An event has at most 20 watches. The setup route (`/api/events/<event>/honors/watches`) needs `CONFIGURE_EVENT` on the server,
+refuses a cross-origin save, and validates everything on the server: the honors must be in the catalog, the classes must belong
+to the event, the addresses must be valid. Saving replaces the whole list and keeps the ids of the watches it names. A save
+never moves a watch's summary point, so changes still owed since its last summary are sent, for whatever the watch looks at after the
+save (a watch given a new honor can therefore report that honor's changes from earlier in the same window). A named watch id must belong
+to the event; a class that was deleted is dropped from the panel (with a notice) so it cannot block saving. Each save
+is audited as `HONOR_WATCHES_CHANGED` with ids and counts only: never an address or a watch name.
+
+A watch holds no youth data: its name, addresses, honor and class ids, and the end of its last summary's window
+(`HonorWatch.summaryAt`).
+
+### The daily summary
+
+The code is `modules/honors/watch-emails.ts`, called by the scheduled outbox sweep right after the instructor class emails. It
+reuses the #1098 change log (`HonorClassChange`), the 6:00 AM Central window (plus the two-minute grace) and the same netting.
+From that time each watch of a live event (not archived, and not past the 14-day roster window) emails each address once, listing
+what changed since the watch's last summary for classes that **teach any watched honor** (a class that teaches several honors,
+#812, matches through each of them) or that **are a watched class**:
+
+- the youth's name, club and age on the event date (never a birth date or an answer on a form);
+- the class and its time (the session, or "All sessions");
+- joined or left.
+
+A youth who joined and left (or left and rejoined) the same class in the window is dropped. With nothing left nothing is queued, and
+the watch's summary point still moves. Instructors are unaffected: a class with no instructor can be watched.
+
+The staff switch **Honor watch summaries** (System management, Email, Staff alerts; `HONOR_WATCH_SUMMARIES`, #1016) is read in
+`watch-emails.ts` before any transaction. Off: nothing is queued or stamped; the changes of those days go out in the next summary
+while they are still in the log. Paused event email is respected: the messages are recorded as `SUPPRESSED`, like a waitlist
+offer's. Nothing is sent inside a transaction: delivery runs only after the queueing transaction has committed.
+
+### Why a second sweep cannot send twice
+
+1. The watch's `summaryAt` is moved to the cutoff by one conditional update on the exact value just read (null, or an earlier
+   time), inside the transaction that queues the messages. Of several sweeps at once, only one wins it; the others see zero rows
+   and stop. A rollback leaves both the point and the messages untouched. The watch is read again inside the transaction, so a save
+   made since the sweep listed it is honoured.
+2. Each message carries the key `honor-watch-summary:<watch>:<Central date>:<address>`; the outbox reuses an existing message.
+
+`npm run test:honor-watch` proves this against a real database, including three sweeps at the same moment.
+
+### Retention
+
+The log is pruned after 8 days (see Retention above). The watch's summary point makes that safe: the point moves to the cutoff
+on every day the watch is due, so a window is about one day long and the rows it needs are about a day old, far inside the 8 days.
+A row is only ever pruned after every window that could contain it has been sent. If the sweep or the staff switch is off for more
+than 8 days, the rows of that gap are gone and are not reported (the same limit as the instructor summaries).
+
 ## Audit
 
 Each mark call writes `HONOR_CLASS_MARKS_UPDATED` with the event, class,
 instructor, account, action and counts: ids and counts only, never names.
 Invites, class changes, accepting and removing are audited too.
 An instructor changing their class list email choice is audited as `HONOR_INSTRUCTOR_CLASS_EMAILS_CHANGED` (ids and the old and new choice).
+Saving honor watches is audited as `HONOR_WATCHES_CHANGED` (ids and counts).

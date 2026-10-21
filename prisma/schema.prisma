@@ -653,6 +653,8 @@ enum MessageTemplateKey {
   HONOR_INSTRUCTOR_CLASS_SUMMARY
   /// One youth joined or left an Honors Weekend instructor's class, sent right away when the instructor chose that (#1098). Not an event template.
   HONOR_INSTRUCTOR_CLASS_CHANGE
+  /// The daily summary of youth who joined or left classes an event's honor watch looks at (#1099): one email per watch address, names, clubs and ages only. Not an event template.
+  HONOR_WATCH_SUMMARY
 }
 
 enum MessageTemplateStatus {
@@ -1739,6 +1741,7 @@ model Event {
   clubAssignments                     ClubEventAssignment[]
   honorEnrollments                    HonorEnrollment[]
   honorClassChanges                   HonorClassChange[]
+  honorWatches                        HonorWatch[]
   honorClassWaitlist                  HonorClassWaitlistEntry[]
   memberTransferRegistrationMoves     MemberTransferRegistrationMove[]
   registrationOperations              RegistrationOperation[]
@@ -8703,6 +8706,31 @@ model HonorClassChange {
   @@index([at])
   @@index([immediateHandledAt, at])
   @@index([eventId])
+}
+
+/// A staff "honor watch" (#1099): a few addresses told, once a day, which youth joined or left classes that teach chosen honors
+/// (or chosen classes). It holds no youth data: only the staff's own choices (a name, addresses, honor and class ids) and the
+/// end of the last summary's window. What a summary lists is read from `HonorClassChange`, which retention prunes after 8 days.
+model HonorWatch {
+  id          String    @id @default(cuid())
+  eventId     String
+  position    Int       @default(0)
+  name        String
+  /// Lower-cased typed addresses, at most 10.
+  recipients  String[]
+  /// Catalog honor ids: a class matches when ANY honor it teaches is listed (#812).
+  honorIds    String[]
+  /// Specific class (offering) ids.
+  offeringIds String[]
+  /// The end of the last daily summary's window: changes at or before it are never summarized again. Moved by one conditional
+  /// update (as `HonorInstructor.classChangeSummaryAt` is). Saving the watch never moves it, even when its targets change.
+  summaryAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, position])
 }
 
 /// An instructor's mark on one class enrollment (#833): attended, and

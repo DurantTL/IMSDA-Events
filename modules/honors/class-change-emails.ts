@@ -10,6 +10,7 @@ import { loadEventEmailSettings } from "@/modules/communications/effective-deliv
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
 import {
+  CLASS_CHANGE_RETENTION_DAYS,
   IMMEDIATE_STALE_MS,
   buildClassChangeNotice,
   buildClassChangeSummary,
@@ -45,11 +46,10 @@ import { offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/
 
 const BATCH = 100;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Change rows older than this are past any daily window and are deleted by the sweep. */
-export const CLASS_CHANGE_RETENTION_DAYS = 8;
+export { CLASS_CHANGE_RETENTION_DAYS };
 
 /** An event whose end is before this has a closed roster (the rule that stops the emails): end plus the roster window. */
-function rosterClosedBefore(now: Date) {
+export function rosterClosedBefore(now: Date) {
   return new Date(now.getTime() - INSTRUCTOR_EDIT_GRACE_DAYS * DAY_MS);
 }
 
@@ -87,7 +87,7 @@ function emptyResult(): ClassChangeEmailResult {
 }
 
 /** Event email settings, read once per event and always outside a transaction. */
-function settingsLoader() {
+export function settingsLoader() {
   const cache = new Map<string, Promise<Settings>>();
   return (eventId: string) => {
     let known = cache.get(eventId);
@@ -165,7 +165,7 @@ async function queueInstructorMessage(tx: Db, input: {
   return message.status === "PENDING" ? message.id : null;
 }
 
-async function deliverAfterCommit(messageIds: string[]) {
+export async function deliverAfterCommit(messageIds: string[]) {
   if (messageIds.length === 0) return 0;
   try {
     const delivery = await processQueuedMessageIdsAfterCommit(messageIds);

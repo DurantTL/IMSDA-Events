@@ -181,6 +181,13 @@ jobs:
       - if: steps.scope.outputs.full == 'true'
         run: npm run test:honor-class-emails
 
+      # Real-database check of honor watches (#1099): a watch matches by honor (including the second honor of a class that
+      # teaches two) and by class, a join and a leave net out, nothing is sent on a quiet day, each summary is sent once
+      # however many sweeps run at once, the staff switch and paused events stop or suppress it, retention never takes a row
+      # inside a day's window, and no youth data is stored on a watch or birth date emailed.
+      - if: steps.scope.outputs.full == 'true'
+        run: npm run test:honor-watch
+
       # Real-database check of event templates: apply, revision isolation, save/publish
       # races, parallel same-key applies, key reuse, and sticky archive (#152).
       - if: steps.scope.outputs.full == 'true'

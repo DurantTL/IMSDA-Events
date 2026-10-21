@@ -25,6 +25,7 @@ export const notificationKeys = [
   "CLUB_FORM_SUBMITTED",
   "REGISTRATION_FORM_NOTIFICATIONS",
   "HONOR_INSTRUCTOR_CLASS_EMAILS",
+  "HONOR_WATCH_SUMMARIES",
 ] as const;
 
 export type NotificationKey = (typeof notificationKeys)[number];
@@ -42,6 +43,8 @@ export type NotificationRecipientSource =
   | { kind: "club-form-list" }
   /** A list kept per registration form, in that form's Notifications panel in the registration form builder (#1081). */
   | { kind: "registration-form-list" }
+  /** A list kept per event, on that event's honor classes page (#1099). */
+  | { kind: "honor-watch-list" }
   /** Worked out from people's roles; there is no list to edit. */
   | { kind: "roles" };
 
@@ -221,6 +224,17 @@ export const notificationCatalog: readonly NotificationDefinition[] = [
     sourceNote: "Each instructor chooses daily, right away or off on their own classes page. Turning this off pauses every instructor's emails: changes are kept and go out, summarized, when it is turned back on (a right-away email older than a day is skipped). The log of who joined or left is deleted once an event's roster has closed, and after 8 days at the latest, so changes made while this was off for longer than that are not reported.",
     sentFrom: "modules/honors/class-change-emails.ts",
     switchReadIn: ["modules/honors/class-change-emails.ts"],
+    built: true,
+  },
+  {
+    key: "HONOR_WATCH_SUMMARIES",
+    name: "Honor watch summaries",
+    when: "Once a day (from about 6:00 AM Central), only on a day something changed: which youth joined or left classes that teach the honors, or are the classes, an event administrator chose to watch. The email names the youth, club and age, never a birth date or an answer.",
+    recipients: "The addresses typed into each honor watch on the event's honor classes page.",
+    source: { kind: "honor-watch-list" },
+    sourceNote: "Set on each event's honor classes page, under Honor watches (up to 20 watches, 10 addresses each). Turning this off pauses every watch: nothing is queued, and the changes of those days are reported in the next summary while they are still in the log. The log of who joined or left is deleted after 8 days at the latest, and once an event's roster has closed, so changes made while this was off for longer than that are not reported.",
+    sentFrom: "modules/honors/watch-emails.ts",
+    switchReadIn: ["modules/honors/watch-emails.ts"],
     built: true,
   },
 ];

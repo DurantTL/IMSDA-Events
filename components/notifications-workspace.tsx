@@ -193,6 +193,9 @@ export function NotificationsWorkspace({
                         {definition.source.kind === "registration-form-list" && (
                           <Link className="text-button" href="/registration-builder">Open the registration form builder</Link>
                         )}
+                        {definition.source.kind === "honor-watch-list" && (
+                          <Link className="text-button" href="/more/honors">Open the honor classes page</Link>
+                        )}
                         {definition.source.kind === "event-list" && (
                           <a className="text-button" href="#event-lists">See each event</a>
                         )}
