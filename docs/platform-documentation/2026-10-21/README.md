@@ -1,14 +1,22 @@
 # IMSDA Events — documentation and training pack
 
-Prepared October 21, 2026. Source baseline: [main `5e367b7c`](https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300).
+Prepared October 21, 2026. The reference reports use source baseline: [main `5e367b7c`](https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300).
 
 This pack explains the current system, consolidates accessibility/usability findings, supplies practical help and communication drafts, and separates future possibilities from implemented behavior. Camp-system/UltraCamp discovery and the technical verification report are separate documents so each can be shared with the right audience.
 
-## Start with the presentation
+## Start with the user orientation
 
-- [Editable PowerPoint — 23 slides with speaker notes](exports/IMSDA-Events-platform-briefing.pptx)
-- [Presentation PDF](exports/IMSDA-Events-platform-briefing.pdf)
+- [Getting started PowerPoint — 31 slides with spoken presenter notes](exports/IMSDA-Events-platform-briefing.pptx)
+- [Getting started presentation PDF](exports/IMSDA-Events-platform-briefing.pdf)
 - [Presenter notes: PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Markdown](content/06-presenter-notes.md)
+
+- [Quick-start handout — 3 pages](exports/07-club-quick-start.pdf) · [Editable Word](exports/07-club-quick-start.docx) · [Markdown](content/07-club-quick-start.md)
+
+The presentation explains what IMSDA Events does, why the club and event records work together, how to sign in, and how directors and Area Coordinators use their current tools. Presenter notes provide a spoken explanation, optional demonstration and questions for the group.
+
+**Choose a route:** slides 1–10 introduce the system and sign-in; 11–19 cover club directors; 20–27 cover Area Coordinators; 28–31 cover routines, help and finishing safely. A single-role session can use its section after the common introduction. Training labels and paths were checked against [main `47cd5c00`](https://github.com/DurantTL/IMSDA-Events/commit/47cd5c00780d0c2dd9e618b56c32e2fbd04b041a), whose application source matches the earlier baseline.
+
+The technical evidence, future-feature planning and camp discovery remain in the separate documents below.
 
 ![Presentation overview](previews/deck-overview.png)
 
@@ -26,7 +34,7 @@ This pack explains the current system, consolidates accessibility/usability find
 
 **Implemented** means present in the reviewed repository. **Gated/setup** means code exists with remaining activation/configuration/evidence prerequisites. **Accepted design** means accepted presentation direction awaiting the applicable implementation. **Planned** means future tracked scope with its existing decisions and dependencies. These labels do not establish the serving production state.
 
-The agreed System navigation and distinct attendee, director, coordinator and administrator roles remain authoritative. The presentation's two role-workspace images are synthetic accepted design references, clearly labelled; they are not deployed screenshots. Existing rehearsal plans, decision records and JSON/CSV/PDF examples are indexed in the feature guide rather than duplicated.
+The agreed System navigation and distinct attendee, director, coordinator and administrator roles remain authoritative. The orientation uses numbered teaching illustrations of current task paths and labels. These are presentation aids, not app screenshots or new menu designs. Existing rehearsal plans, decision records and JSON/CSV/PDF examples are indexed in the feature guide rather than duplicated.
 
 UltraCamp's public REST documentation is recorded in the project's prior research; medical/form-readiness API coverage remains unconfirmed. The report explicitly dates that evidence. Fresh vendor verification was unavailable under the execution environment's network policy. All UltraCamp implementation remains Phase 5 under the existing roadmap; the report is discovery material, not a new rollout plan.
 
@@ -41,9 +49,10 @@ The help/message examples are prepared drafts. Square-bracket placeholders are e
 - [Technical check ledger](evidence/technical-checks.json)
 - [Independent content review](evidence/independent-content-qa.md)
 - [Export and visual verification](evidence/export-verification.md)
+- [User-orientation source and content checks](evidence/orientation-verification.md)
 
 The technical report records **13,504 tests passed and one skipped across 1,015 files** in the exact current-main CI run. It distinguishes main smoke from the separately observed extended application, mobile and badge checks, and from human/physical production verification. No new application test run was started for this documentation task.
 
-The presentation contains editable text/shapes and embedded reference images. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. PDFs include text/tag structures and the document PDFs have heading outlines; this is not a PDF/UA or WCAG certification.
+The presentation contains editable text/shapes and numbered task illustrations. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. PDFs include text/tag structures and the document PDFs have heading outlines; this is not a PDF/UA or WCAG certification.
 
 Only documentation and export assets are delivered. Application behavior, menus, permissions, issue labels/states, build order and production switches are unchanged. Follow [#98](https://github.com/DurantTL/IMSDA-Events/issues/98) for implementation order and [#844](https://github.com/DurantTL/IMSDA-Events/issues/844) for the preceding issue review.

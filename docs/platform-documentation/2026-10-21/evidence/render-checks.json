@@ -1,41 +1,13 @@
 [
   {
-    "file": "01-current-and-future-features.pdf",
-    "horizontal": {
-      "width": 1280,
-      "viewport": 1280
-    }
-  },
-  {
-    "file": "02-accessibility-and-usability.pdf",
-    "horizontal": {
-      "width": 1280,
-      "viewport": 1280
-    }
-  },
-  {
-    "file": "03-help-and-communication-kit.pdf",
-    "horizontal": {
-      "width": 1280,
-      "viewport": 1280
-    }
-  },
-  {
-    "file": "04-camp-system-and-ultracamp.pdf",
-    "horizontal": {
-      "width": 1280,
-      "viewport": 1280
-    }
-  },
-  {
-    "file": "05-code-and-verification-evidence.pdf",
-    "horizontal": {
-      "width": 1280,
-      "viewport": 1280
-    }
-  },
-  {
     "file": "06-presenter-notes.pdf",
+    "horizontal": {
+      "width": 1280,
+      "viewport": 1280
+    }
+  },
+  {
+    "file": "07-club-quick-start.pdf",
     "horizontal": {
       "width": 1280,
       "viewport": 1280

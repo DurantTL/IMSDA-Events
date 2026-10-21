@@ -1,4 +1,4 @@
-# Independent content review
+# Independent content review — original reference pack
 
 Reviewed October 21, 2026 against repository baseline `5e367b7c4d1b3c173d37c0415e335be76170b300`.
 
@@ -30,3 +30,8 @@ No further substantive content correction was identified. Export validation shou
 
 
 Final export follow-up by root: the deck spacing and GitHub directory-link refinements were corrected. The relative camp-report link in Markdown presenter notes resolves to `../exports/04-camp-system-and-ultracamp.pdf`; presentation/Office links resolve within their export folder. Render and package checks are recorded separately in `export-verification.md`.
+
+
+## Revised user orientation
+
+The original 23-slide technical/feature briefing was subsequently replaced at the owner’s request by the 31-slide user orientation. This historical review remains evidence for the five unchanged reference reports. Current orientation checks are recorded in `orientation-verification.md`; the original deck-review wording above is not a certification of the new deck.

@@ -1,5 +1,7 @@
 {
   "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "orientation_source_commit": "47cd5c00780d0c2dd9e618b56c32e2fbd04b041a",
+  "presentation": "31-slide practical user orientation",
   "files": [
     {
       "path": ".gitattributes",
@@ -8,8 +10,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 5839,
-      "sha256": "0e7a68d0148f1a07b134176b7b3cd3bb597a128e8c13787553e709c84dd579cc"
+      "bytes": 7025,
+      "sha256": "588bc1892553ed14497ad52be2ab0c4cf288806384c80747061d4d222a910a51"
     },
     {
       "path": "assets/FONT-LICENSE.txt",
@@ -63,18 +65,23 @@
     },
     {
       "path": "content/06-presenter-notes.md",
-      "bytes": 14484,
-      "sha256": "120bb185129142cd873572444f9d219a9da94d7363055db5edee5948fa0269b0"
+      "bytes": 34124,
+      "sha256": "ab40a5df855e2cbd29a54ab47d15d8553d81a2462d92e9962f06f81e9c89ad77"
+    },
+    {
+      "path": "content/07-club-quick-start.md",
+      "bytes": 6859,
+      "sha256": "7e19d18f028c2e0ba4752ab553aad282bf68b9174dbd953e40ba479bbf4d14ed"
     },
     {
       "path": "evidence/deck-source.json",
-      "bytes": 98361,
-      "sha256": "7b60513c16c83a96724688717ea803828f978dc5c1bb69dc869dbdfa459aa068"
+      "bytes": 154475,
+      "sha256": "eceabadba04d1ad4a5478d3d84a9f99a876d362aa1f7a6fef9bd5510ff97f9f2"
     },
     {
       "path": "evidence/export-verification.md",
-      "bytes": 2291,
-      "sha256": "8ad1a48fadca8d7c3dda9066066bac9e0c228551fba8d5cd8ba5b0b62e3dee92"
+      "bytes": 2583,
+      "sha256": "19de814a4a94421cc0c9171d928ec53d400126baeb38586beab7cb1e13a3a215"
     },
     {
       "path": "evidence/feature-matrix.json",
@@ -88,28 +95,53 @@
     },
     {
       "path": "evidence/independent-content-qa.md",
-      "bytes": 4841,
-      "sha256": "2f5b971195ac95708729973918308180a0f87ed4e3ecfb368a3323dd12908afe"
+      "bytes": 5269,
+      "sha256": "9fbe31d68ab34b2fa3002fa15af63ec409455f17d23f6705132c1c23a2490f90"
     },
     {
       "path": "evidence/local-link-checks.json",
       "bytes": 115,
-      "sha256": "de5ef2e30ad6c4878a7a76c0a4da235359aaab4d6a0789b340730229c1c06eda"
+      "sha256": "103efd940f36cb202d30943bface5047c77672b341f0523d478d55297cdb9d13"
     },
     {
       "path": "evidence/office-pdf-structure-checks.json",
-      "bytes": 1699,
-      "sha256": "0df793ab9da07cf686e8f37d87aa245e68bdbd67b49998e97b04db08a5a2833e"
+      "bytes": 1436,
+      "sha256": "25e2820b5eebc5118f520639c76baf5a469621b75aee61836610f4bd55d3c99d"
+    },
+    {
+      "path": "evidence/orientation-checks.json",
+      "bytes": 1436,
+      "sha256": "25e2820b5eebc5118f520639c76baf5a469621b75aee61836610f4bd55d3c99d"
+    },
+    {
+      "path": "evidence/orientation-coordinator.md",
+      "bytes": 14811,
+      "sha256": "61fd0836da68b46d52da155ce6932c97c08ba984e5e3a0de7edb378bc0ef799b"
+    },
+    {
+      "path": "evidence/orientation-director.md",
+      "bytes": 18918,
+      "sha256": "e19b5328d349e38848f3b457e3ef194f9a0939488a0023737d904b969b5a7b69"
+    },
+    {
+      "path": "evidence/orientation-signin.md",
+      "bytes": 13746,
+      "sha256": "805fa15f48a5688f521f8deb35f8f81f7ce1f68c15af79f09cd6996d423408f7"
+    },
+    {
+      "path": "evidence/orientation-verification.md",
+      "bytes": 3614,
+      "sha256": "989ba57fde4306fd15296aa9909c1204f55a049460e56ebad5ff3437289a661a"
     },
     {
       "path": "evidence/pdf-manifest.json",
-      "bytes": 866,
-      "sha256": "6c2c54dbca88a93c4c0c30fc6fcc528de213bd419bf35ccec1a0d18dfd83c9a9"
+      "bytes": 979,
+      "sha256": "c53fae269b58ff2ac6c2f14cf20e268267afa0ab3cc57dad1e797a495bd1b832"
     },
     {
       "path": "evidence/render-checks.json",
-      "bytes": 848,
-      "sha256": "ae40e41dd89e297b7e1ddd609acad10b4d02536ef6a90be363e966aa4c044750"
+      "bytes": 321,
+      "sha256": "f2eb2df000ae63e57209415181a6fab17bc59b9dec457e371f09bdbdb984b7b8"
     },
     {
       "path": "evidence/technical-checks.json",
@@ -213,38 +245,53 @@
     },
     {
       "path": "exports/06-presenter-notes.docx",
-      "bytes": 31447,
-      "sha256": "e8a944511fd4bd68ee94500acd34e7db7d09b7667514ece8c0aacf8d1c22b996"
+      "bytes": 37345,
+      "sha256": "1199c88e76cf11c41cd6747062134b69697af1fa6ca4e5745b59adb59d5691ea"
     },
     {
       "path": "exports/06-presenter-notes.html",
-      "bytes": 19950,
-      "sha256": "6eeabc1947d6908a5ef31b0cafe701c91d81b17096ba94b019331feb4f9c95c3"
+      "bytes": 42872,
+      "sha256": "b4b6b6abb35c833c1cd2c323eb6925885985d5225f9dd94c257335fdadae24c8"
     },
     {
       "path": "exports/06-presenter-notes.pdf",
-      "bytes": 151186,
-      "sha256": "ef243a77a173e31d5867e5c09bcf707cba15fc617c4afe319391ac1c56d044ab"
+      "bytes": 246843,
+      "sha256": "4296665bea0f1747bf86a901b7aa11098b314bc4cc5d0f571e8a8b5c230b7357"
+    },
+    {
+      "path": "exports/07-club-quick-start.docx",
+      "bytes": 27851,
+      "sha256": "af6cbf8d0eb6d12b7216c8ce1d7740aea1b16f59012266055848ef81dba69b78"
+    },
+    {
+      "path": "exports/07-club-quick-start.html",
+      "bytes": 11380,
+      "sha256": "1bc4b33c251ddcac2388ba994510a08d782513e9e7e679bcf5577d5d5167b5b2"
+    },
+    {
+      "path": "exports/07-club-quick-start.pdf",
+      "bytes": 98625,
+      "sha256": "1ee8830e50daddd5b0faaa5ff46c1cff4723c5aedf2f3f447a3d97904e830916"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.html",
-      "bytes": 94493,
-      "sha256": "22041221832bc0da467c1cb6babb9448454192c2cc5391ce6542edcd7c66d385"
+      "bytes": 118600,
+      "sha256": "449028620d77551b54b2d981a4bebb8a094b4fb5c52d8d4f8ba72e062df830b2"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pdf",
-      "bytes": 504633,
-      "sha256": "02d5d7c74949ef7aec056786b6ddd6197081ee41c35f69f20268879f9933db67"
+      "bytes": 359720,
+      "sha256": "daaebd3d32c4caaf57d5c9e245d17c4acec55f6babe232afc09d0803d8721ece"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pptx",
-      "bytes": 410686,
-      "sha256": "f6731c38430708e87777abccec73b26daadcd279fc04da0c978a96b533e14dfd"
+      "bytes": 145337,
+      "sha256": "0aabb676de5cb8721fa7de59742b757c4df98933d40c9a2657fbc465b97a63a7"
     },
     {
       "path": "previews/deck-overview.png",
-      "bytes": 591208,
-      "sha256": "9b94ddaba49f5353af3601126e6646be8f96614cd8212ba99089eea5fe053052"
+      "bytes": 640771,
+      "sha256": "dc8dc434d9510e7ec172aeb6591bfa71bf7f11c7832fcdfa573a990de79e8a5e"
     }
   ]
 }
