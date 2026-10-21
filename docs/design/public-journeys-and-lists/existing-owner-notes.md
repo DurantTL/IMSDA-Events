@@ -103,4 +103,3 @@ Remove is consequential: the current confirmation states that birth date/details
 Verify long/duplicate names; many Honors without rendering a pill wall; missing detail filter/reset and meaningful edit destination; horizontal intermediate widths; phone cards with matching labels; labelled primary/secondary actions; keyboard and 200% zoom. #1101 still independently owns unsaved edit recovery.
 
 Source: [actual columns and row actions](https://github.com/DurantTL/IMSDA-Events/blob/72a6cb214185cd7b74696f8913535f85330b690f/components/club-roster-workspace.tsx#L486), [existing erase confirmation](https://github.com/DurantTL/IMSDA-Events/blob/72a6cb214185cd7b74696f8913535f85330b690f/components/club-roster-workspace.tsx#L373). These column/action refinements are proposed review detail; they do not change the already accepted role separation or #98 ordering.
-
