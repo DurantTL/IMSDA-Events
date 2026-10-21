@@ -8723,7 +8723,7 @@ model HonorWatch {
   /// Specific class (offering) ids.
   offeringIds String[]
   /// The end of the last daily summary's window: changes at or before it are never summarized again. Moved by one conditional
-  /// update (as `HonorInstructor.classChangeSummaryAt` is), and set to "now" when the watch's targets change.
+  /// update (as `HonorInstructor.classChangeSummaryAt` is). Saving the watch never moves it, even when its targets change.
   summaryAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

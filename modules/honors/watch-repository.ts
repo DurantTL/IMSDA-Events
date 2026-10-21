@@ -65,10 +65,15 @@ async function panelFor(eventId: string, rows: Row[]): Promise<HonorWatchPanel> 
     classes,
     watches: rows.map((row) => {
       const warnings: string[] = [];
-      if (row.offeringIds.some((id) => !classIds.has(id))) warnings.push("A class this watch looked at was deleted. It has been taken off the list; save to confirm.");
+      const keptClasses = row.offeringIds.filter((id) => classIds.has(id));
+      if (keptClasses.length < row.offeringIds.length) {
+        warnings.push(keptClasses.length === 0 && row.honorIds.length === 0
+          ? "The classes this watch looked at were deleted, so it watches nothing now. Choose an honor or class, or remove this watch, then save."
+          : "A class this watch looked at was deleted. It has been taken off the list; save to confirm.");
+      }
       if (row.honorIds.some((id) => !knownHonors.has(id))) warnings.push("An honor this watch looked at is no longer in the catalog. Remove it and save.");
       // A deleted class is dropped from what staff see and re-save, so it can never block saving the other watches.
-      return { ...toConfig(row), offeringIds: row.offeringIds.filter((id) => classIds.has(id)), warnings };
+      return { ...toConfig(row), offeringIds: keptClasses, warnings };
     }),
   };
 }
