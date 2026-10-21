@@ -1,0 +1,62 @@
+{
+  "source_commit": "47cd5c00780d0c2dd9e618b56c32e2fbd04b041a",
+  "slides": 31,
+  "speaker_notes": "All 31 slides have Say, with Show/Ask as appropriate",
+  "picture_shapes": 0,
+  "step_illustrations": "Current labels; not product mockups",
+  "source_file_references": 40,
+  "unrelated_reference_files_unchanged": 20,
+  "office_packages_valid": true,
+  "shape_bounds_valid": true,
+  "html_text_overflows": 0,
+  "pdfs": [
+    {
+      "file": "02-accessibility-and-usability.pdf",
+      "pages": 7,
+      "toc_entries": 16,
+      "tagged": true
+    },
+    {
+      "file": "01-current-and-future-features.pdf",
+      "pages": 7,
+      "toc_entries": 7,
+      "tagged": true
+    },
+    {
+      "file": "05-code-and-verification-evidence.pdf",
+      "pages": 8,
+      "toc_entries": 18,
+      "tagged": true
+    },
+    {
+      "file": "03-help-and-communication-kit.pdf",
+      "pages": 9,
+      "toc_entries": 22,
+      "tagged": true
+    },
+    {
+      "file": "IMSDA-Events-platform-briefing.pdf",
+      "pages": 31,
+      "toc_entries": 31,
+      "tagged": true
+    },
+    {
+      "file": "04-camp-system-and-ultracamp.pdf",
+      "pages": 8,
+      "toc_entries": 17,
+      "tagged": true
+    },
+    {
+      "file": "07-club-quick-start.pdf",
+      "pages": 3,
+      "toc_entries": 6,
+      "tagged": true
+    },
+    {
+      "file": "06-presenter-notes.pdf",
+      "pages": 13,
+      "toc_entries": 125,
+      "tagged": true
+    }
+  ]
+}

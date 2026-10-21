@@ -31,14 +31,20 @@
   },
   {
     "file": "06-presenter-notes.pdf",
-    "pages": 6,
-    "bytes": 151186,
-    "text_characters": 10190
+    "pages": 13,
+    "bytes": 246843,
+    "text_characters": 25989
+  },
+  {
+    "file": "07-club-quick-start.pdf",
+    "pages": 3,
+    "bytes": 98625,
+    "text_characters": 6867
   },
   {
     "file": "IMSDA-Events-platform-briefing.pdf",
-    "pages": 23,
-    "bytes": 504633,
-    "text_characters": 12730
+    "pages": 31,
+    "bytes": 359720,
+    "text_characters": 13736
   }
 ]
