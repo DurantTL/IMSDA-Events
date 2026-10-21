@@ -1,6 +1,8 @@
 # Admin usability 2: action-first dashboard and truthful count/readiness meanings
 
-Parent: #1073. Proposed slice 2. Related: delivered #989/#1032/#870, pending #1033, #75/#181, #416/#218/#874.
+Tracking: [#1075](https://github.com/DurantTL/IMSDA-Events/issues/1075). Accepted reference; implementation remains tracked in the issue.
+
+Parent: #1073. Design slice 2. Related: delivered #989/#1032/#870, pending #1033, #75/#181, #416/#218/#874.
 
 ## Accepted design status
 **Visual direction accepted — October 20, 2026.** After reviewing the corrected four-role examples, Caleb said: “those look good actually make the issues and put as much context in them on the github for the design elements and such.” The accepted distinction is a personal attendee portal, a club director portal, a coordinator oversight portal and a full system-admin workbench. This issue records the system-admin part of that direction. The earlier shared staff-style treatment of all roles is superseded by the corrected examples. Production behavior and domain policy remain owned by their existing issues.
@@ -10,7 +12,7 @@ Follow the bounded slices and ordering in #98. Layout acceptance completes the f
 ## Goal
 Give an administrator a short, trustworthy starting point: actions waiting for people, current events, measured system health, and the next relevant help.
 
-## Proposed acceptance criteria
+## Acceptance criteria
 - [ ] Reuse the existing attention model for Waiting on staff, Email problems and measured System health; route actions to the owning event/workflow instead of creating a generic approval endpoint.
 - [ ] Preserve pending feature-request review as its own authorized workflow. A dashboard link never approves a request or changes a module.
 - [ ] Show count units, event/time scope, data freshness and partial/unknown status. Do not display unreadable/unmeasured signals as zero or healthy.

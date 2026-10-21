@@ -4,9 +4,9 @@ Accepted presentation direction, with existing domain ownership preserved. The l
 
 | Workspace / slice | Specification | Tracking |
 |---|---|---|
-| Personal attendee portal | [Attendee](attendee.md) | Child of #109/#99; index #1109 |
-| Club/year director portal | [Director](director.md) | Child of #68; index #1109 |
-| Coordinator oversight | [Coordinator](coordinator.md) | Child of #68; index #1109 |
+| Personal attendee portal | [Attendee](attendee.md) | #1111; parent #109/#99 |
+| Club/year director portal | [Director](director.md) | #1112; parent #68 |
+| Coordinator oversight | [Coordinator](coordinator.md) | #1113; parent #68 |
 | System-admin design index | [Administrator](admin-1073.md) | #1073 |
 | System navigation/search | [Navigation](admin-1074.md) | #1074 |
 | System home/counts/health | [Dashboard](admin-1075.md) | #1075 |

@@ -1,6 +1,8 @@
 # Admin usability 4: task-based Help & learning and future feature organization
 
-Parent: #1073. Proposed slice 4. Related: #108/#160 role workspaces, #98 roadmap, #741 capabilities; distinct from #493 volunteer certification/e-learning and #93/#254 personnel onboarding.
+Tracking: [#1077](https://github.com/DurantTL/IMSDA-Events/issues/1077). Accepted reference; implementation remains tracked in the issue.
+
+Parent: #1073. Design slice 4. Related: #108/#160 role workspaces, #98 roadmap, #741 capabilities; distinct from #493 volunteer certification/e-learning and #93/#254 personnel onboarding.
 
 ## Accepted design status
 **Visual direction accepted — October 20, 2026.** After reviewing the corrected four-role examples, Caleb said: “those look good actually make the issues and put as much context in them on the github for the design elements and such.” The accepted distinction is a personal attendee portal, a club director portal, a coordinator oversight portal and a full system-admin workbench. This issue records the system-admin part of that direction. The earlier shared staff-style treatment of all roles is superseded by the corrected examples. Production behavior and domain policy remain owned by their existing issues.
@@ -10,7 +12,7 @@ Follow the bounded slices and ordering in #98. Layout acceptance completes the f
 ## Goal
 Let a new administrator, event staff member, director or coordinator learn a task without memorizing the menu or asking for broad access.
 
-## Proposed acceptance criteria
+## Acceptance criteria
 - [ ] Provide task-based Help & learning with search, role/context filters, plain-language glossary, and links back to the authorized working page.
 - [ ] Initial guides cover choosing System versus Event scope, creating/copying an event, inviting staff/directors, choosing roles, publishing a form, importing with preview, resolving email problems, and understanding readiness. Link existing runbooks for advanced operations.
 - [ ] Guides state what the reader needs, what they will change, how to verify the outcome, and the next step; screenshots/examples use synthetic data.

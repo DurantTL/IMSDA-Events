@@ -1,10 +1,12 @@
 # Attendee portal: implement the approved personal registration layout and lifecycle-aware next actions
 
+Tracking: [#1111](https://github.com/DurantTL/IMSDA-Events/issues/1111). Accepted reference; implementation remains tracked in the issue.
+
 ## Outcome and ownership
 
 Give an ordinary attendee a clear personal account: their registrations, what each registration means, what they can do next, and where to get help. The user accepted the corrected role-specific examples and requested implementation issues with the design context captured here. The attendee shares IMSDA branding and accessible controls with the other roles; its information hierarchy and navigation are its own.
 
-This is a bounded presentation/interaction child of #109 and #99, tracked in the role-design follow-up #1109. It does not replace #109's broader future family, assignment, pass, message or task work. Keep #1100 as the independent lifecycle-display correction; reuse its result here. Suggested planning labels: `phase-1`, `mobile-check`. Capture the accepted direction without adding another design-approval gate; enter implementation through the normal #98 queue rather than applying `codex-ready` automatically.
+This is a bounded presentation/interaction child of #109 and #99, tracked in the role-design follow-up #1109. It does not replace #109's broader future family, assignment, pass, message or task work. Keep #1100 as the independent lifecycle-display correction; reuse its result here. The visual direction is accepted; enter implementation through the normal #98 queue rather than applying `codex-ready` automatically.
 
 ## Approved visual reference
 

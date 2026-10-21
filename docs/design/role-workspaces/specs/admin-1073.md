@@ -1,5 +1,7 @@
 # Admin workspace usability: scope, daily tasks, settings and learning (design epic)
 
+Tracking: [#1073](https://github.com/DurantTL/IMSDA-Events/issues/1073). Accepted reference; implementation remains tracked in the issue.
+
 Roadmap: #98. Related: #108/#160 gateways, #554 account direction, #1032/#1033 attention, #1043 Email, #75/#181 drilldowns.
 
 ## Problem and outcome
@@ -12,7 +14,7 @@ The grouped system navigation, collapsible staff groups, searchable More launche
 
 Follow the bounded slices and ordering in #98. Layout acceptance completes the former pending-design gate; implementation enters the normal queue and does not become `codex-ready` automatically. Preserve separately owned domain, merge/deploy and operational gates. Cross-role design index: #1109.
 
-## Proposed design principles
+## Design principles
 - System / selected Event / My registrations are explicit work contexts. Keep the current event when leaving and returning to global pages; system pages work with zero events.
 - Daily work and actionable queues come first. Full task directories and technical detail remain reachable with progressive disclosure.
 - Label count scope, time window, units and measured/unknown state. Actionable counts, operational exceptions, review-only lists and unread feed items retain different meanings.

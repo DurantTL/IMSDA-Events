@@ -1,10 +1,12 @@
 # Director portal: implement the approved club/year workspace and task-focused navigation
 
+Tracking: [#1112](https://github.com/DurantTL/IMSDA-Events/issues/1112). Accepted reference; implementation remains tracked in the issue.
+
 ## Outcome and ownership
 
 Give a club director a focused workspace for their own club and working year: continue current work, maintain the roster, open club records and review the club's event registration. The user accepted the corrected director example and requested detailed implementation issues. Share IMSDA branding and accessible controls with other roles while giving directors a club-specific hierarchy and navigation.
 
-Track this bounded design follow-up under #1109 and the club-ministry direction in #68. It builds on the delivered leader portal rather than reopening completed #110: see its [closure and delivered-slice summary](https://github.com/DurantTL/IMSDA-Events/issues/110#issuecomment-5806883322), completed #193, #488, #644 and #918. Cross-link the broader remaining leader work in #194, but do not duplicate it or make this layout wait for all future billing, assignments, reports and messages. Suggested planning labels: `phase-2`, `mobile-check`. The design direction is accepted; schedule implementation through #98 without automatically marking this `codex-ready`.
+Track this bounded design follow-up under #1109 and the club-ministry direction in #68. It builds on the delivered leader portal rather than reopening completed #110: see its [closure and delivered-slice summary](https://github.com/DurantTL/IMSDA-Events/issues/110#issuecomment-5806883322), completed #193, #488, #644 and #918. Cross-link the broader remaining leader work in #194, but do not duplicate it or make this layout wait for all future billing, assignments, reports and messages. The design direction is accepted; schedule implementation through #98 without automatically marking this `codex-ready`.
 
 ## Approved visual reference
 

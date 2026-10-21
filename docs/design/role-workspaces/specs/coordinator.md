@@ -1,5 +1,7 @@
 # Coordinator workspace: role-accurate club oversight and report follow-up
 
+Tracking: [#1113](https://github.com/DurantTL/IMSDA-Events/issues/1113). Accepted reference; implementation remains tracked in the issue.
+
 Parent design review: #1109. Club-system parent: #68. Related: delivered coordinator capability #387, report/query contract #181, later ministry work #840/#843, admin design #1073–#1077.
 
 ## Problem and outcome

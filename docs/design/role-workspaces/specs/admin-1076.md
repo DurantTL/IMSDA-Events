@@ -1,6 +1,8 @@
 # Admin usability 3: settings ownership, change impact and unsaved-edit recovery
 
-Parent: #1073. Proposed slice 3. Related: #1043 central Email, delivered #647 unsaved-navigation guard, #543 profile, #870 readiness, #1064/#1065 form templates.
+Tracking: [#1076](https://github.com/DurantTL/IMSDA-Events/issues/1076). Accepted reference; implementation remains tracked in the issue.
+
+Parent: #1073. Design slice 3. Related: #1043 central Email, delivered #647 unsaved-navigation guard, #543 profile, #870 readiness, #1064/#1065 form templates.
 
 ## Accepted design status
 **Visual direction accepted — October 20, 2026.** After reviewing the corrected four-role examples, Caleb said: “those look good actually make the issues and put as much context in them on the github for the design elements and such.” The accepted distinction is a personal attendee portal, a club director portal, a coordinator oversight portal and a full system-admin workbench. This issue records the system-admin part of that direction. The earlier shared staff-style treatment of all roles is superseded by the corrected examples. Production behavior and domain policy remain owned by their existing issues.
@@ -10,7 +12,7 @@ Follow the bounded slices and ordering in #98. Layout acceptance completes the f
 ## Goal
 Help an administrator understand where a setting is owned, who it affects, when it applies and whether an edit has been saved.
 
-## Proposed acceptance criteria
+## Acceptance criteria
 - [ ] Use distinct Platform settings, Event settings and My profile/security destinations; system scope is independent of the remembered event.
 - [ ] Group settings by recognizable tasks and show contextual help beside the control. Keep provider/technical details under an explicit advanced section.
 - [ ] Show ownership and precedence from the actual source contract: central value, event override, template copy or environment-managed status. Do not invent editable environment credentials or a second source of truth.

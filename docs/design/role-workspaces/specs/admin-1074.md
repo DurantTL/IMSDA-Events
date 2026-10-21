@@ -1,6 +1,8 @@
 # Admin usability 1: scope-aware navigation and destination search
 
-Parent: #1073. Proposed slice 1. Related: #108/#160, #554, delivered #964/#966/#967/#981, #741 module gating.
+Tracking: [#1074](https://github.com/DurantTL/IMSDA-Events/issues/1074). Accepted reference; implementation remains tracked in the issue.
+
+Parent: #1073. Design slice 1. Related: #108/#160, #554, delivered #964/#966/#967/#981, #741 module gating.
 
 ## Accepted design status
 **Visual direction accepted — October 20, 2026.** After reviewing the corrected four-role examples, Caleb said: “those look good actually make the issues and put as much context in them on the github for the design elements and such.” The accepted distinction is a personal attendee portal, a club director portal, a coordinator oversight portal and a full system-admin workbench. This issue records the system-admin part of that direction. The earlier shared staff-style treatment of all roles is superseded by the corrected examples. Production behavior and domain policy remain owned by their existing issues.
@@ -10,7 +12,7 @@ Follow the bounded slices and ordering in #98. Layout acceptance completes the f
 ## Goal
 Make the current scope and the next destination obvious while keeping every authorized existing destination reachable.
 
-## Proposed acceptance criteria
+## Acceptance criteria
 - [ ] Make System / selected Event / My registrations distinct work contexts. A context switch does not grant a role or replace server authorization.
 - [ ] Preserve the selected event when visiting global pages and returning. Explicit event parameters win; stale/unavailable events fail without disclosing existence. System pages remain usable with zero events.
 - [ ] Retain grouped/collapsible navigation, current-page highlighting, icon-only labels/tooltips and mobile directory parity delivered in #964/#966/#967.

@@ -86,6 +86,23 @@ These values are demonstration fixtures, not production requirements. Implementa
 
 </details>
 
+## Implementation tracking
+
+Design index: [#1109](https://github.com/DurantTL/IMSDA-Events/issues/1109). Documentation reference PR: [#1110](https://github.com/DurantTL/IMSDA-Events/pull/1110).
+
+| Implementation owner | Detailed specification |
+|---|---|
+| [#1111 — Attendee portal](https://github.com/DurantTL/IMSDA-Events/issues/1111) | [Personal registrations and next actions](specs/attendee.md) |
+| [#1112 — Director portal](https://github.com/DurantTL/IMSDA-Events/issues/1112) | [Club/year workspace and roster](specs/director.md) |
+| [#1113 — Coordinator workspace](https://github.com/DurantTL/IMSDA-Events/issues/1113) | [Club oversight and report follow-up](specs/coordinator.md) |
+| [#1073 — Admin design index](https://github.com/DurantTL/IMSDA-Events/issues/1073) | [System-admin role distinction](specs/admin-1073.md) |
+| [#1074 — Admin navigation](https://github.com/DurantTL/IMSDA-Events/issues/1074) | [Scope and destination search](specs/admin-1074.md) |
+| [#1075 — Admin dashboard](https://github.com/DurantTL/IMSDA-Events/issues/1075) | [Counts, health and readiness](specs/admin-1075.md) |
+| [#1076 — Admin settings](https://github.com/DurantTL/IMSDA-Events/issues/1076) | [Ownership, change impact and recovery](specs/admin-1076.md) |
+| [#1077 — Role-aware help](https://github.com/DurantTL/IMSDA-Events/issues/1077) | [Learning and future feature homes](specs/admin-1077.md) |
+
+Implementation remains open. The admin issues were expanded in place and their superseded generic layout-review gate removed after acceptance; no new `codex-ready` labels or queue changes were made.
+
 ## Implementation ownership
 
 The attendee presentation is a bounded child of #109/#99. Director/coordinator presentation extends #68 and delivered portal work. Administrator presentation stays in #1073–#1077. #108/#160 own gateways; #554 owns linked account/sign-in direction. #1100/#1101 and other corrective findings retain independent scopes.
