@@ -1,0 +1,178 @@
+{
+  "document": "content/03-help-and-communication-kit.md",
+  "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "prepared_at": "2026-10-21",
+  "scope": "Editorial help and communication artifact only; no app changes, template changes or sends.",
+  "evidence": [
+    {
+      "id": "current_role_boundaries",
+      "path": "docs/design/role-workspaces/evidence/role-contract.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/evidence/role-contract.md",
+      "supports": "Source-grounded separation of attendee, club director, coordinator and system administrator; current and proposed design distinguished."
+    },
+    {
+      "id": "club_role_capabilities",
+      "path": "modules/organizations/director-grants-domain.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/organizations/director-grants-domain.ts",
+      "supports": "Deputy matches director; registrar lacks guardians/team/profile/reports/full DOB; reporter Home/Monthly Records only."
+    },
+    {
+      "id": "club_navigation",
+      "path": "modules/club-rosters/portal-nav.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/club-rosters/portal-nav.ts",
+      "supports": "Current club role-gated destinations, including current coordinator view-only navigation."
+    },
+    {
+      "id": "staff_navigation",
+      "path": "docs/NAVIGATION.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/NAVIGATION.md",
+      "supports": "Existing destination/back-link conventions; preserve agreed menus and explicit context."
+    },
+    {
+      "id": "staff_setup_workflow",
+      "path": "docs/STAFF-EVENT-WORKFLOW.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-EVENT-WORKFLOW.md",
+      "supports": "Existing seven-step setup workflow and first-publish-only form test rule; reused rather than recreated."
+    },
+    {
+      "id": "own_registration_access",
+      "path": "modules/attendee-accounts/registrations-repository.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/attendee-accounts/registrations-repository.ts",
+      "supports": "Verified-email/own-registration access rather than new household or guardian authority."
+    },
+    {
+      "id": "payment_lifecycle",
+      "path": "modules/public-access/domain.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/public-access/domain.ts",
+      "supports": "Actual state/payment meaning used to avoid automatic Pay Now for waitlisted/cancelled records."
+    },
+    {
+      "id": "organization_billing",
+      "path": "docs/BILLING-RESPONSIBILITY.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BILLING-RESPONSIBILITY.md",
+      "supports": "Responsible organization is explicit; director/submitter is not inferred debtor."
+    },
+    {
+      "id": "invoice_separation",
+      "path": "docs/INVOICES.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md",
+      "supports": "Registration confirmation is distinct from approved/finalized invoice delivery and specialized finance permissions."
+    },
+    {
+      "id": "template_keys_and_tokens",
+      "path": "modules/communications/templates.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/templates.ts",
+      "supports": "Confirmed supported message keys/token names, current-state template descriptions and no-payment waitlist/organization-billed semantics."
+    },
+    {
+      "id": "authenticator_help",
+      "path": "app/(public)/account/help/authenticator/page.tsx",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/(public)/account/help/authenticator/page.tsx",
+      "supports": "Existing public authenticator setup help, not a new Help & learning implementation."
+    },
+    {
+      "id": "staff_invitations",
+      "path": "docs/STAFF-INVITATIONS.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-INVITATIONS.md",
+      "supports": "Existing human-preview/send workflow, personal invitation links and office approval separation."
+    },
+    {
+      "id": "registration_pdf",
+      "path": "docs/REGISTRATION-PDF.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/REGISTRATION-PDF.md",
+      "supports": "PDF follows its own version/redaction policy; approved PDF-only sensitive-field exceptions prevent blanket export/privacy claims."
+    },
+    {
+      "id": "existing_samples",
+      "path": "docs/reference/README.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/README.md",
+      "supports": "Reuse current CSV/JSON reference material and sample PDFs rather than recreating import prep."
+    }
+  ],
+  "issue_owners": {
+    "current_account_display_fix": 1100,
+    "roster_dirty_edit_fix": 1101,
+    "accepted_role_layouts": 1109,
+    "future_help_learning": 1077,
+    "saved_public_link_fix": 1115,
+    "current_roadmap": 98,
+    "preparation_index": 844
+  },
+  "message_drafts": [
+    {
+      "id": "A",
+      "type": "editorial",
+      "use": "Personal club invitation/onboarding; no runtime template key asserted."
+    },
+    {
+      "id": "B",
+      "type": "supported-token draft",
+      "contexts": [
+        "REGISTRATION_CONFIRMATION_PAID",
+        "REGISTRATION_CONFIRMATION_UNPAID"
+      ]
+    },
+    {
+      "id": "C",
+      "type": "supported-token draft",
+      "contexts": [
+        "BALANCE_REMINDER"
+      ]
+    },
+    {
+      "id": "D",
+      "type": "supported-token draft",
+      "contexts": [
+        "REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED"
+      ]
+    },
+    {
+      "id": "E",
+      "type": "editorial",
+      "use": "Human-reviewed event information update through existing announcement/custom-message workflow."
+    },
+    {
+      "id": "F",
+      "type": "supported-token draft",
+      "contexts": [
+        "WAITLIST_JOINED"
+      ]
+    },
+    {
+      "id": "G",
+      "type": "supported-token draft",
+      "contexts": [
+        "CANCELLATION_REQUEST_RECEIVED"
+      ]
+    },
+    {
+      "id": "H",
+      "type": "editorial",
+      "use": "Only for feature verified available in serving release."
+    }
+  ],
+  "validation": {
+    "runtime_tokens_used": [
+      "balance_amount",
+      "confirmation_code",
+      "contact_email",
+      "event_dates",
+      "event_location",
+      "event_name",
+      "payment_status_block",
+      "portal_url",
+      "recipient_name"
+    ],
+    "all_runtime_tokens_in_current_allowlist": true,
+    "token_context_preview_still_required": true,
+    "editorial_placeholders_distinguished": true,
+    "actual_messages_sent": false,
+    "new_app_help_pages_created": false,
+    "menus_changed": false
+  },
+  "limitations": [
+    "Source and documentation review, not a production session.",
+    "Role examples/accepted designs do not establish deployed feature availability.",
+    "No blanket statement that all sensitive data is excluded from every PDF/export channel."
+  ]
+}

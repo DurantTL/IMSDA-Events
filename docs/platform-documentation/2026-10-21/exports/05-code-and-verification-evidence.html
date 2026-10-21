@@ -1,0 +1,249 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events: code structure and verification evidence</title><style>
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
+*{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
+.coverline{font-size:9pt;letter-spacing:1.7px;color:#582c83;font-weight:700;border-bottom:4px solid #f0b323;padding-bottom:14px;margin-bottom:18px}
+.baseline{font-size:8.4pt;color:#536b78;background:#f4f7f8;padding:12px 14px;border-left:3px solid #003b5c;margin:0 0 22px}
+h1{font-size:27pt;line-height:1.15;color:#003b5c;letter-spacing:-.5px;margin:0 0 18px}
+h2{font-size:17pt;line-height:1.25;color:#003b5c;margin:24px 0 10px;break-after:avoid}
+h3{font-size:12pt;line-height:1.3;color:#582c83;margin:17px 0 8px;break-after:avoid}
+h4{font-size:10.8pt;break-after:avoid}p,ul,ol{margin:0 0 10px}li{margin:3px 0}li p{margin:0 0 5px}
+a{color:#003b5c;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+strong{font-weight:700}code{font:9pt/1.35 'DejaVu Sans Mono',monospace;overflow-wrap:anywhere;background:#f4f7f8;padding:0 2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f7f8;border:1px solid #dce6ea;font-size:8.8pt}
+blockquote{border-left:3px solid #f0b323;padding:8px 14px;margin:12px 0;background:#fbf8ee}
+table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:8.7pt;line-height:1.4;margin:12px 0 18px}
+th{background:#003b5c;color:white;text-align:left;padding:8px;border:1px solid #003b5c;font-weight:700}
+td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywhere}
+td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
+img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
+hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
+</style></head><body><div class="coverline">IMSDA EVENTS  /  REVIEW &amp; ENABLEMENT PACK</div><h1 id="imsda-events-code-structure-and-verification-evidence">IMSDA Events: code structure and verification evidence</h1><div class="baseline">Prepared October 21, 2026 · Repository baseline <strong>5e367b7c</strong><br>Current implementation, gated capabilities, accepted design and future plans are distinguished in the text. Repository evidence does not establish the serving production state.</div>
+
+<p><strong>Baseline:</strong> repository main at <code>5e367b7c4d1b3c173d37c0415e335be76170b300</code>. The latest application-source merge is <code>72a6cb214185cd7b74696f8913535f85330b690f</code>; subsequent merges added the design reference documents. This report uses read-only source inspection and actual GitHub Actions run/job/log summaries. No application code or tests were changed, and no new application test run was started for this report.</p>
+<h2 id="1-what-the-evidence-establishes">1. What the evidence establishes</h2>
+<p>The current main commit has a successful automated smoke run and successful application/backup-image builds. Its smoke job applied migrations to a clean CI PostgreSQL database, checked schema drift, seeded synthetic data, linted, generated/type-checked routes and ran Vitest. The recorded result is <strong>1,015 test files passed; 13,504 tests passed and one skipped</strong>, from 13,505 tests. The test step completed at 13:57 UTC on October 21.</p>
+<p>The latest application PR also has a successful broader run: its configured real-database and built-application HTTP suites completed, along with successful optional browser badge and mobile checks. A repository comparison found 58 changed paths between that PR head and current main, all under <code>docs/</code>; application, script and workflow source did not change between those two revisions. This makes the earlier application-run evidence relevant while preserving its actual commit identity.</p>
+<p>These are substantial engineering checks. They do not establish which image is currently serving production, which switches are enabled, whether a particular production import was approved, or whether every user journey meets accessibility requirements. “Not verified in this report” does not mean an activity was never performed. Existing rehearsals, decisions and import examples remain the evidence to consult; this report does not create replacement registers or rehearsals.</p>
+<h2 id="2-architecture-and-source-ownership">2. Architecture and source ownership</h2>
+<p>The accepted foundation is a <strong>modular monolith</strong>: one Next.js application and PostgreSQL database, with explicit business domains under <code>modules/</code>. It is not a collection of separately deployed microservices. Pages and route handlers orchestrate requests; domain services and repositories enforce business behavior and persistence. The database schema and committed migrations are part of the application release.</p>
+<p>The checked package manifest uses Next.js 16.3.6, React 19.2.4, TypeScript, Prisma 6.19.3, Zod 4 and Vitest 4. CI selects Node.js 22. These are source-version facts rather than a dependency-vulnerability assessment. There are 70 domain directories, 1,015 Vitest test files and 218 committed SQL migration files at the reviewed commit. File counts describe scale; they are not a code-coverage percentage or a quality score.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Layer</th>
+<th>Main locations</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>User interface and HTTP</td>
+<td><code>app/</code>, <code>components/</code>, <code>proxy.ts</code></td>
+<td>Public/attendee/club/staff/system views, forms, route boundaries, response behavior and request flow.</td>
+</tr>
+<tr class="even">
+<td>Business domains</td>
+<td><code>modules/</code></td>
+<td>Authorization-aware workflows, validation, state transitions, pricing, capacity, assignments and reporting projections.</td>
+</tr>
+<tr class="odd">
+<td>Shared infrastructure</td>
+<td><code>lib/</code></td>
+<td>Prisma access, environment validation, authenticated encryption, logging/redaction and shared validation utilities.</td>
+</tr>
+<tr class="even">
+<td>Persistence and reference data</td>
+<td><code>prisma/schema.prisma</code>, <code>prisma/migrations/</code>, seed/sync scripts</td>
+<td>Relational constraints, release migrations, synthetic local data and versioned template/catalog synchronization.</td>
+</tr>
+<tr class="odd">
+<td>Verification and operations</td>
+<td><code>tests/</code>, <code>scripts/</code>, <code>.github/workflows/</code>, <code>docs/</code></td>
+<td>Unit/route contracts, real-database/HTTP/browser checks, image builds and operator instructions.</td>
+</tr>
+</tbody>
+</table>
+<p>The maintenance rule is to extend the owning module. A calendar page must not acquire its own registration-eligibility rules; a dashboard must not recalculate money differently from finance; an editable template library must not propagate changes directly into published registration versions. Shared visual controls are useful, but four workspaces still have distinct jobs and authority.</p>
+<h3 id="domain-map-for-code-review">Domain map for code review</h3>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Business area</th>
+<th>Primary module families</th>
+<th>Important boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Accounts and access</td>
+<td><code>access</code>, <code>attendee-accounts</code>, <code>account-merge</code>, <code>people</code>, <code>guardian-authority</code></td>
+<td>Person identity, account credentials, sessions, household authority and event/club permissions remain separate concepts.</td>
+</tr>
+<tr class="even">
+<td>Registration and forms</td>
+<td><code>forms</code>, <code>registrations</code>, <code>attendee-types</code>, <code>consent</code>, <code>acknowledgments</code></td>
+<td>A form definition/version, registration party and individual attendee snapshot are different records.</td>
+</tr>
+<tr class="odd">
+<td>Money and billing</td>
+<td><code>payments</code>, <code>promo-codes</code>, <code>scholarship-funds</code>, <code>billing-responsibility</code>, <code>invoices</code>, cancellation modules</td>
+<td>Current money records and immutable invoice versions are the baseline; the general future ledger is not implied by a narrow meal/merchandise ledger.</td>
+</tr>
+<tr class="even">
+<td>Club ministry</td>
+<td><code>organizations</code>, <code>club-rosters</code>, <code>club-forms</code>, <code>club-registrations</code>, <code>club-reports</code>, <code>honors</code>, order/supply modules</td>
+<td>Selected club/year, role differences, capacity, instructor scope and historical completion evidence must agree.</td>
+</tr>
+<tr class="odd">
+<td>Event operations</td>
+<td><code>lodging</code>, <code>meals</code>, <code>issued-assets</code>, <code>program-assignments</code>, <code>checkin</code>, <code>event-locations</code></td>
+<td>Assignments, tickets, attendance, payment and readiness states are related but not interchangeable.</td>
+</tr>
+<tr class="even">
+<td>Communication and discovery</td>
+<td><code>communications</code>, <code>notifications</code>, <code>registration-form-notifications</code>, <code>calendar</code>, <code>events</code></td>
+<td>Outbox delivery, alert preferences, persisted notification history, public visibility and content publication have different ownership.</td>
+</tr>
+<tr class="odd">
+<td>Restricted and operational evidence</td>
+<td><code>health-records</code>, <code>coordinator-health</code>, <code>audit</code>, <code>operations</code>, <code>system-admin</code>, <code>imports</code></td>
+<td>Protected detail, permitted projections, audit trails, manual readiness and measured operational health remain distinct.</td>
+</tr>
+</tbody>
+</table>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0001-foundation-architecture.md">foundation ADR</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/package.json">package manifest</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/prisma/schema.prisma">schema</a>.</p>
+<h2 id="3-the-main-request-and-data-flows">3. The main request and data flows</h2>
+<h3 id="registration-through-operations">Registration through operations</h3>
+<p>A public event/form is resolved through the public projection. The server loads the applicable published form version and validates the submitted registration and per-person answers. Pricing, capacity and assignment decisions must use server-owned state; the browser's displayed total or seat count is not authoritative. A successful transaction preserves the registration's form/version context, attendees, relevant reservations and history. Later edits and lifecycle changes go through the owning service rather than writing status columns directly.</p>
+<p>Messages and downstream work are queued or triggered through existing service boundaries. Staff views then project the registration into financial, class, lodging, meal and check-in contexts. A waitlisted registration is not a confirmed seat; a check-in is not proof of payment; a screening status is not a medical approval. This separation is the practical reason to retain domain ownership when improving the interface.</p>
+<p>The source contains explicit protections against a legacy import silently reactivating a cancelled/waitlisted registration and taking class seats without normal capacity checks. It is a useful example of why an import is a reviewed business operation, not simply a database upload.</p>
+<h3 id="versioned-forms-and-templates">Versioned forms and templates</h3>
+<p><code>RegistrationForm</code>, <code>RegistrationFormVersion</code> and registration snapshots preserve which questions and rules applied. Existing save/publish paths serialize changes and return explicit conflict/busy results. First-publish-only testing is implemented; later form versions do not automatically require another builder test submission. Code tests and CI remain separate obligations.</p>
+<p>Seeded form templates have immutable version records and a synchronized definition store. Forms copy definitions; they do not inherit live changes. The app-editable template library/source tracking in #1064/#1065 remains future work, so current source should not be described as already satisfying that full authoring contract. An ordinary registration form, whole-event template, saved question and fixed-key module bundle are also separate reuse units.</p>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/repository.ts">form repository</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/forms/seeded-templates.ts">seeded-template service</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1062">form-builder owner #1062</a>.</p>
+<h3 id="money-and-organization-billing">Money and organization billing</h3>
+<p>Current finance relies on existing Payment, Refund, RegistrationAdjustment, sponsor/scholarship and invoice records. Church-billed registrations are explicitly excluded from attendee online-balance totals and shown as church amounts; a group contact can be a different debtor from a church. A director submitting a club registration does not thereby owe the invoice personally.</p>
+<p>Square has its own adapter/repository and provider-event handling. A provider acceptance, browser redirect or payment attempt must not be presented as final settlement without the applicable recorded result. Retries and webhook replay require idempotency, while refunds and financial adjustments retain staff authority and audit. The general append-only-ledger transition in #117–#123 is later migration work; domain-specific order/meal ledgers do not prove that every balance reader already uses it.</p>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/registrations/finance-view.ts">finance projection</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/payments/square-repository.ts">Square repository</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/INVOICES.md">invoice runbook</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/74">ledger owner #74</a>.</p>
+<h3 id="communication-and-background-work">Communication and background work</h3>
+<p>The communications boundary uses persisted outbox records, provider events, retry/backoff and scheduled sweeping. The sweep also dispatches due batches that a person has already approved. Operational queue health includes counts and oldest-due age; an application process answering HTTP alone is not enough to declare email healthy.</p>
+<p>The notification catalog/switches, live action counts, and future persisted administrator feed are separate pieces. #1033 still owns feed/read/unread/retention work; central Email settings #1043 are delivered. SES accepting SMTP delivery is not the same as inbox delivery. The SES/SNS bounce/complaint integration in #863 must not be counted as implemented merely because equivalent Resend webhook infrastructure exists.</p>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/communications/outbox-sweep.ts">outbox sweep</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/notifications/catalog.ts">notification catalog</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/863">delivery follow-up #863</a>.</p>
+<h2 id="4-authentication-roles-and-protected-data">4. Authentication, roles and protected data</h2>
+<h3 id="one-sign-in-does-not-mean-one-unrestricted-session">One sign-in does not mean one unrestricted session</h3>
+<p>The accepted account model links <code>User</code> and <code>AttendeeAccount</code> 1:1. It retains their underlying credentials and session boundaries. Unified password sign-in evaluates both credential sides and only staff-grade authentication can issue staff authority. A valid attendee password or attendee email link does not become a staff session because the accounts are linked. Staff passkeys/second factor, staff activation, verified attendee linkage and switch-off fallback have their own existing services.</p>
+<p>The feature is controlled by the persisted unified-sign-in switch, off by default. This report verified code and CI, not its production value. Profile/workspace links show only authorized contexts. The accepted administrator menu and distinct attendee/director/coordinator layouts remain presentation contracts rather than a new permission engine.</p>
+<h3 id="event-and-club-authority">Event and club authority</h3>
+<p><code>requireEventMembership</code>, <code>requirePermission</code> and <code>effectivePermissions</code> are central staff/event checks. Current SYSTEM_ADMIN is permitted into events without an EventMembership and receives the event permission set; a UI redesign must not silently reverse that rule. Specialized domains can impose further guards. Kitchen-only staff deliberately have <code>MANAGE_KITCHEN_COUNTS</code> without general <code>VIEW_EVENT</code> and must not gain registration access through a new dashboard link.</p>
+<p>Club access is separately selected by club/year and actual grant: deputy, registrar and reporter are not equivalent to director. A public management link, multiple people on a registration, common email, Person link or household association must not be treated as blanket guardian/medical authority. Coordinator scope must follow the current owning query; future ministry filtering in #843 is not present merely because its direction was accepted.</p>
+<h3 id="encryption-and-health-scope">Encryption and health scope</h3>
+<p><code>lib/secret-box.ts</code> supplies authenticated AES-256-GCM with fresh nonces and purpose-separated HKDF keys. It supports the protected-key file configuration. This establishes a primitive and actual uses, not proof that every legacy field or export is encrypted. Roster birth dates, the Pathfinder Health Record and the separate coordinator event sheet have different datasets and policy addenda.</p>
+<p>Current health-record paths include a feature gate, role/purpose checks, audit, one-time acknowledgment, registrar creation-only behavior, event access-window checks, sealed snapshots/holds and administrator break-glass enforcement. A system administrator's own applicable grant is required by the Health Record repository before protected decryption; act-as does not bypass that requirement. The separate coordinator sheet reads existing registration/club-form data under its own window and permission contract. The overall ADR and each addendum must be read at their own accepted/interim/proposed status.</p>
+<p>The source does not establish a complete operational key-version/rotation program or prove a real key-backup restore. Existing ADR prerequisites, operator evidence and human decisions remain authoritative. No real protected values were accessed for this report, and this is not a HIPAA or security-conformance certification.</p>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/access/authorization.ts">authorization</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/access/permissions.ts">permission map</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/account-merge/unified-sign-in.ts">unified sign-in</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0013-one-account-per-person.md">ADR 0013</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/lib/secret-box.ts">encryption primitive</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0005-protected-records-policy.md">protected-record ADR/addenda</a>.</p>
+<h2 id="5-imports-migrations-and-operational-release">5. Imports, migrations and operational release</h2>
+<p>Imports already have parsers, reviewed rows, source identifiers/snapshots, proposed actions, conflicts and apply outcomes. Club imports, eAdventist organization imports, WR26 staging/bundles and health imports have different owners and allowlists. An import profile must not confer authority or revive capacity-consuming records by directly replacing their status.</p>
+<p>Existing JSON reference data, CSV fixtures and example PDFs remain useful input/output evidence. Keep using them rather than recreating another set for this documentation pack: <a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/reference/imports">reference imports</a>, <a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/public/fixtures">public CSV fixtures</a>, <a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/samples">registration PDF samples</a>. Synthetic examples demonstrate formats; a production reconciliation remains tied to its reviewed file/version and approval.</p>
+<p>CI deploys the 218 committed migrations into its throwaway database and compares the resulting migration history to the Prisma schema via a shadow database. That is useful evidence against drift on a clean installation. It does not prove the exact state or upgrade path of an existing production database, nor authorize <code>migrate dev</code> against it. Production release/import/backup actions follow the existing operator runbooks.</p>
+<p>Docker image CI publishes application and backup images tagged with the commit SHA. The immutable SHA tag is the release identity to compare with the running service; a successful publish does not show that the server pulled or started it. Runtime credentials, trusted-proxy/rate-limit setup, storage mounts, scheduled workers, email delivery and external provider configuration require their applicable environment evidence.</p>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/imports/repository.ts">import repository</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/DEPLOY-DOCKER.md">deployment guide</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/BACKUPS.md">backups</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/SERVER-SECURITY-CHECKLIST.md">server checklist</a>.</p>
+<h2 id="6-what-runs-automatically-and-when">6. What runs automatically, and when</h2>
+<p>The canonical local command is <code>npm run verify</code>: lint, Next-generated route types/TypeScript, Vitest and production build. Additional scripts exercise real database constraints, concurrency, imports and HTTP paths. They are not all included in that single command.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Check layer</th>
+<th>Current configured trigger/scope</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CI <code>main-smoke</code></td>
+<td>Push to main</td>
+<td>Clean migrations/drift/seed, lint, typecheck and Vitest. No production build or extended domain/HTTP suites in this job.</td>
+</tr>
+<tr class="even">
+<td>CI <code>verify</code></td>
+<td>PR, weekly schedule or manual</td>
+<td>Installs/migrates/drift-checks/seeds/syncs and runs <code>verify</code>. Database/HTTP extensions run for non-visual changes and scheduled/manual runs; visual/docs-only PRs skip those extensions.</td>
+</tr>
+<tr class="odd">
+<td>Mobile layout</td>
+<td>Selected helper/workflow paths or <code>mobile-check</code> label; weekly/manual</td>
+<td>PR quick run is 360/1024 with screenshots disabled. Weekly/manual full run uses 360/390/768/1024 with screenshots. Job is optional: inspect actual check step and report.</td>
+</tr>
+<tr class="even">
+<td>Badge print</td>
+<td>Badge/print dependencies, weekly/manual</td>
+<td>Built-app Chromium/PDF check, optional job. Physical media/printer alignment and scan reliability remain separate.</td>
+</tr>
+<tr class="odd">
+<td>Docker image</td>
+<td>Push main/manual</td>
+<td>Application and backup image build/push. Publication is not deployment or an end-user test.</td>
+</tr>
+</tbody>
+</table>
+<p>The mobile audit checks overflow, table/card behavior, target sizes, dialog/sticky-bar geometry, headings, labels, overlap, some contrast rules and related layout conditions. It is a valuable deterministic screen check, not a full screen-reader, keyboard, cognitive-usability or WCAG assessment. Browser jobs use synthetic local/CI data. Their scripts contain guards that refuse a remote/production target.</p>
+<p>Sources: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/.github/workflows/ci.yml">CI workflow</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/.github/workflows/mobile-layout.yml">mobile workflow</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/RESPONSIVE.md">responsive rules</a>.</p>
+<h2 id="7-observed-verification-ledger">7. Observed verification ledger</h2>
+<p>All times in this section are UTC on October 21, 2026. Run links and detailed step metadata are also recorded in <code>evidence/technical-checks.json</code> supplied with this pack.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Observed evidence</th>
+<th>Actual outcome</th>
+<th>Practical limit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956369">Current main CI, run 39609956369</a>, SHA <code>5e367b7c</code>, created 13:39, completed 13:57</td>
+<td><code>main-smoke</code> successful. Migrations, drift check, seed, lint, typecheck and Vitest steps successful. 13,504 tests passed, one skipped, 1,015 files passed; tests took 225.99 seconds.</td>
+<td><code>verify</code> job skipped on push by design. No new full-domain/HTTP/browser run at this exact merge SHA was observed.</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39609956750">Current main images, run 39609956750</a>, SHA <code>5e367b7c</code>, 13:39–13:54</td>
+<td>Both application and backup-image build/push steps successful.</td>
+<td>Does not establish running deployment, real provider credentials or database upgrade state.</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39522715128">Application-source merge smoke, run 39522715128</a>, SHA <code>72a6cb21</code>, 00:40–00:49</td>
+<td>Main-smoke steps successful.</td>
+<td>Historical merge-run evidence, distinct from current documentation merge.</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473876">Latest application PR full gate, run 39520473876</a>, SHA <code>9879edba</code>, created 00:18</td>
+<td><code>verify</code>, all configured extended real-database checks, built-app startup and seven public/operations HTTP checks successful. Vitest summary: 13,504 passed, one skipped.</td>
+<td>This is the PR head, not current main's commit. A git comparison found application/script/workflow content unchanged through current main; only 58 documentation paths differ.</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39520478915">Application PR mobile, run 39520478915</a>, SHA <code>9879edba</code>, actual check completed 00:34</td>
+<td>Actual “Check phone layouts” step successful: 320 page/width combinations, 301 dialogs, 1,871 boundary-checked form fields and 56 dialog date fields; zero accepted findings and zero page script errors reported.</td>
+<td>Quick widths 360/1024 only; screenshots disabled. The artifact is a small report, despite its <code>mobile-layout-screenshots</code> name. Not an all-width or WCAG certification.</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39520473962">Application PR badge check, run 39520473962</a>, SHA <code>9879edba</code></td>
+<td>Actual “Check name badge printing” step successful; <code>badge-print-output</code> artifact present and unexpired when inspected.</td>
+<td>Automated print rendering, not physical printer/media/device verification.</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39605339354">Design-reference PR 1119 CI</a>, SHA <code>b7b39e95</code>, and <a href="https://github.com/DurantTL/IMSDA-Events/actions/runs/39542942380">PR 1110 CI</a>, SHA <code>696743c3</code></td>
+<td><code>verify</code> including build successful; clean migrations/drift/seed and sync steps successful.</td>
+<td>Scope classification skipped all extended real-database/HTTP suites. Their separate mobile-label runs were skipped, not passed browser audits.</td>
+</tr>
+</tbody>
+</table>
+<p>The one skipped current-main Vitest case is in <code>tests/backup-scripts.test.ts</code>: “as root, drops to postgres with gosu, and refuses without gosu or su-exec.” Its <code>skipIf</code> condition runs it only as root, unlike the normal GitHub-hosted runner user. This is an explicit environment-specific coverage limit, not evidence that every backup scenario ran there. Negative-path tests can also intentionally log redacted errors; the final assertion and step conclusions, rather than the mere presence of an “error” line, determine a test result.</p>
+<h2 id="8-existing-checks-and-evidence-that-should-keep-their-original-scope">8. Existing checks and evidence that should keep their original scope</h2>
+<p>The earlier public-journey review reports 137 passing existing tests in eight files against application source <code>72a6cb21</code>. Its dependency/client setup details are documented. The corrected role-design pack reports 16 static screen/width cases, 11 role/state checks and three gallery widths. These validate the reviewed contracts or reference mockups; they are not fresh claims that proposed layouts are already implemented.</p>
+<p>Older production-readiness documents contain valid historical work, including synthetic backup/restore and deployment-related checks, but they also quote older test/migration counts and dated judgments. Preserve their date/commit rather than carrying their headline “ready” status forward indiscriminately. The user already has rehearsal plans, decision material and import examples; attach the applicable existing evidence to the release being reviewed rather than create another competing checklist.</p>
+<p>The open <a href="https://github.com/DurantTL/IMSDA-Events/issues/917">load-sensitive test issue #917</a> remains relevant. A successful run is evidence of that run, not proof that intermittent cold-import, hashing, PDF or timing-race failures have been eliminated. The issue's repeated-run acceptance should be assessed when that bounded work is performed, without skipping or weakening assertions.</p>
+<p>References: <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/validation.md">public-journey validation</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">role reference validation</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/PRODUCTION-READINESS-PROGRESS.md">readiness progress</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/WR26-GO-LIVE-REVIEW.md">dated WR26 go-live review</a>.</p>
+<h2 id="9-using-this-report-in-a-code-or-release-review">9. Using this report in a code or release review</h2>
+<p>For a future bounded code change, first select the existing owner from <a href="https://github.com/DurantTL/IMSDA-Events/issues/98">roadmap #98</a>, inspect current source and use the issue's residual acceptance contract. Keep the accepted role/menu direction. Review the actual changed domain, authorization entry points, database constraints, retries/concurrency, version/history behavior and public/export projections. Run proportional checks, then verify the required CI steps on the resulting commit rather than assuming a green label means every suite ran.</p>
+<p>For an operational release, pair that code evidence with the existing environment-specific records: serving image/release identity, migration state, reviewed import apply, worker/backup status, real key restore evidence, payment/provider setup, physical print/scan checks and the applicable human sign-offs. This report neither asserts those are absent nor substitutes for them. Production account linking, medical handling, refunds, bulk messages, pricing/capacity changes and deployment remain governed by the repository's existing human-action rules.</p>
+<p>The main documentation improvement is traceability: each claim should name <strong>what was checked, on which source/environment, by which recorded run, with what outcome and what limit</strong>. That makes both current strengths and real remaining work easier to assess without reopening completed work or overpromising future features.</p>
+</body></html>

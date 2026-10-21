@@ -1,0 +1,238 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>IMSDA Events: accessibility and usability review</title><style>
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
+*{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
+.coverline{font-size:9pt;letter-spacing:1.7px;color:#582c83;font-weight:700;border-bottom:4px solid #f0b323;padding-bottom:14px;margin-bottom:18px}
+.baseline{font-size:8.4pt;color:#536b78;background:#f4f7f8;padding:12px 14px;border-left:3px solid #003b5c;margin:0 0 22px}
+h1{font-size:27pt;line-height:1.15;color:#003b5c;letter-spacing:-.5px;margin:0 0 18px}
+h2{font-size:17pt;line-height:1.25;color:#003b5c;margin:24px 0 10px;break-after:avoid}
+h3{font-size:12pt;line-height:1.3;color:#582c83;margin:17px 0 8px;break-after:avoid}
+h4{font-size:10.8pt;break-after:avoid}p,ul,ol{margin:0 0 10px}li{margin:3px 0}li p{margin:0 0 5px}
+a{color:#003b5c;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+strong{font-weight:700}code{font:9pt/1.35 'DejaVu Sans Mono',monospace;overflow-wrap:anywhere;background:#f4f7f8;padding:0 2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f7f8;border:1px solid #dce6ea;font-size:8.8pt}
+blockquote{border-left:3px solid #f0b323;padding:8px 14px;margin:12px 0;background:#fbf8ee}
+table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:8.7pt;line-height:1.4;margin:12px 0 18px}
+th{background:#003b5c;color:white;text-align:left;padding:8px;border:1px solid #003b5c;font-weight:700}
+td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywhere}
+td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
+img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
+hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
+</style></head><body><div class="coverline">IMSDA EVENTS  /  REVIEW &amp; ENABLEMENT PACK</div><h1 id="imsda-events-accessibility-and-usability-review">IMSDA Events: accessibility and usability review</h1><div class="baseline">Prepared October 21, 2026 · Repository baseline <strong>5e367b7c</strong><br>Current implementation, gated capabilities, accepted design and future plans are distinguished in the text. Repository evidence does not establish the serving production state.</div>
+
+<h2 id="assessment-and-evidence">Assessment and evidence</h2>
+<p>IMSDA Events has useful accessibility foundations: shared keyboard-aware dialogs, named actions, sortable table semantics, dirty-navigation handling, status announcements and responsive rules. The largest remaining usability risks are inconsistent recovery and meaning across screens. Someone can lose an unfinished edit, copy an unsaved public address, misunderstand an amount due, or believe a report action includes more records than it does. Fixing those inconsistencies will help experienced operators and new users more than another broad redesign.</p>
+<p>This document consolidates the earlier source and visual reviews into a practical accessibility handoff. It rechecks representative current components, connects findings to existing issues, and identifies the remaining browser and assistive-technology evidence needed. It does not duplicate the project's completed event rehearsals, decision register or import/sample-output work.</p>
+<p><strong>Evidence labels used here:</strong></p>
+<ul>
+<li><strong>Source-confirmed:</strong> behavior is present in the pinned source; the finding does not claim a production-data incident.</li>
+<li><strong>Recorded layout finding:</strong> an existing audit reports the width/overflow behavior; it was not remeasured in a browser for this document.</li>
+<li><strong>Accepted design direction:</strong> reviewed visual direction with implementation still tracked separately.</li>
+<li><strong>Proposal:</strong> a possible presentation improvement with an existing owner; it is not a delivered capability.</li>
+<li><strong>Manual verification outstanding:</strong> behavior such as screen-reader announcement quality, real-device focus and printer output still needs observation in the relevant release.</li>
+</ul>
+<p>No production session, private record, live payment or real message was used. No application code or test was changed. This is not a WCAG conformance statement; the criteria references below identify relevant checks, not certified passes or failures.</p>
+<h2 id="preserve-the-existing-strengths">Preserve the existing strengths</h2>
+<p>The shared <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/use-accessible-dialog.ts">dialog helper</a> moves focus into an open dialog, contains Tab movement, makes the top dialog own Escape, and restores prior focus when the dialog closes. A confirmation over an editor can therefore have a predictable keyboard path. This is a reusable foundation; the remaining work is applying it consistently and making dismissal preserve changes.</p>
+<p>The shared <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/actions-menu.tsx">Actions menu</a> uses a native disclosure, closes on Escape/outside interaction and returns focus to a visible trigger. <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/list-sort.tsx">Sortable headers</a> expose <code>aria-sort</code>, use named buttons, hide decorative arrows from assistive technology and provide a readable order note. Retain those semantics when tables become cards or gain optional columns.</p>
+<p>The current event-settings editor also has valuable recovery behavior: a failed save can open the relevant section and focus the first invalid control; later error clearing does not repeatedly move focus. Saving settings, publishing and unpublishing are distinct actions. The <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/RESPONSIVE.md">responsive guidance</a> and global styles establish type floors, phone target rules and visible focus treatment. These are implementation conventions to preserve, not proof that every rendered state conforms.</p>
+<h2 id="four-workspaces-one-understandable-visual-language">Four workspaces, one understandable visual language</h2>
+<p>The accepted role separation remains authoritative. Later calendar, roster and public-page mockups do not add further System menu changes. Reuse the destination registry and navigation agreed in <a href="https://github.com/DurantTL/IMSDA-Events/issues/1073">#1073</a> and <a href="https://github.com/DurantTL/IMSDA-Events/issues/1074">#1074</a>, with the role contract in <a href="https://github.com/DurantTL/IMSDA-Events/issues/1109">#1109</a>.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Person</th>
+<th>Context the page must communicate</th>
+<th>Usability boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Attendee</td>
+<td>Own registrations, their event/status and permitted next action</td>
+<td>No administrator sidebar or global metrics. Several people on a registration do not establish permanent household or guardian authority.</td>
+</tr>
+<tr class="even">
+<td>Director/deputy</td>
+<td>Selected club and club year; own roster, forms, reports and events</td>
+<td>Registrar and reporter remain narrower roles. A sponsoring-church bill must not look like the attendee's personal Pay now task.</td>
+</tr>
+<tr class="odd">
+<td>Area Coordinator</td>
+<td>Clubs available to the current grant; oversight and permitted review</td>
+<td>Current source selects all active clubs. Planned ministry scope is a separate project. Club views stay read-only, with the specific existing own-location Team approval exception.</td>
+</tr>
+<tr class="even">
+<td>Event staff</td>
+<td>Selected event and only the functions that the actual permission set permits</td>
+<td>A kitchen-only worker must not gain registration/report navigation through a redesigned overview.</td>
+</tr>
+<tr class="odd">
+<td>System administrator</td>
+<td>Explicit System or selected Event context, with a clear return</td>
+<td>Platform access is not a reason to collapse protected-domain guards or combine unrelated financial, screening and arrival statuses.</td>
+</tr>
+</tbody>
+</table>
+<p>The existing <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/README.md">role reference</a> provides accepted examples. Its sample counts are illustrative. A real context switch lists only workspaces the signed-in person can enter; a gallery's persona switcher is review navigation rather than a product requirement.</p>
+<h2 id="findings-that-most-affect-confidence-and-task-completion">Findings that most affect confidence and task completion</h2>
+<p>Priority below describes user impact within this review. It does not reorder <a href="https://github.com/DurantTL/IMSDA-Events/issues/98">#98</a>, remove a gate or add <code>codex-ready</code>.</p>
+<h3 id="1-keep-unfinished-work-through-every-dismissal-path">1. Keep unfinished work through every dismissal path</h3>
+<p><strong>Source-confirmed; high impact. Owners: <a href="https://github.com/DurantTL/IMSDA-Events/issues/1101">#1101</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1104">#1104</a>.</strong> The roster editor's close callback immediately clears the open editor; Close, Cancel, Escape and backdrop do not share a dirty-state review. Announcement and schedule editors have similar gaps beyond the fields already covered by communications dirty tracking.</p>
+<p>Someone fixing a member's contact details or composing arrival instructions can lose that work even though another editor elsewhere preserves it. Reuse the shared dialog and unsaved-navigation patterns: Keep editing or Discard changes, one baseline after successful save, retained values after validation/network failures, and no dismissal while a save is unresolved. A nested confirmation should own Escape and return focus to the editor, not close both layers.</p>
+<p><strong>Observable acceptance:</strong> type a synthetic change; try each close path; choose Keep editing; the exact text remains. A failed save leaves it editable. A successful save or deliberate discard is the only reset. Saving an announcement never publishes, approves or queues email by itself.</p>
+<h3 id="2-show-payable-amounts-and-upcoming-participation-accurately">2. Show payable amounts and upcoming participation accurately</h3>
+<p><strong>Source-confirmed; high impact. Owner: <a href="https://github.com/DurantTL/IMSDA-Events/issues/1100">#1100</a>.</strong> Account summaries use the raw registration balance for non-deferred records, while the public payment view already has lifecycle-aware meaning. The account home chooses its upcoming list by event end date, allowing a cancelled record to compete for “Your next event.”</p>
+<p>A cancelled paid-and-refunded record can appear to owe money through raw arithmetic even though checkout correctly treats it as not payable. Reuse the existing payment/lifecycle projection. Keep original charges, payments and refunds available as history, give a waitlisted request its explicit state, and label the population of any account-wide amount. This is clarity in an existing account, not a new financial policy.</p>
+<p><strong>Observable acceptance:</strong> active, waitlisted, cancelled unpaid, cancelled paid/refunded, past and church-billed examples agree with the existing management/payment view. A cancelled earlier event does not displace the next eligible participation. No historical money is erased to make the display look correct.</p>
+<h3 id="3-public-sharing-must-describe-the-saved-address">3. Public sharing must describe the saved address</h3>
+<p><strong>Source-confirmed; high impact. Owner: <a href="https://github.com/DurantTL/IMSDA-Events/issues/1115">#1115</a>.</strong> The sharing panel and embed builder read the editable draft slug/name even though the component separately maintains successfully saved state. An organizer can therefore copy or open an address that has not been saved, including after a failed save.</p>
+<p>Generate public URLs and embed code from persisted settings. A draft preview must be labelled as a preview and remain distinct from public sharing. Copy event link, Copy form link and Copy embed code are different actions. Announce success/failure and reset copied feedback when its source changes.</p>
+<p><strong>Observable acceptance:</strong> changing the slug without saving does not alter public outputs; a failed save leaves the old address intact; a successful save updates the address. A browser clipboard failure has a usable fallback. No private management token or staff-only preview URL is presented as public sharing.</p>
+<h3 id="4-show-the-true-scope-before-communicating-with-a-report-audience">4. Show the true scope before communicating with a report audience</h3>
+<p><strong>Source-confirmed; high impact. Owner: <a href="https://github.com/DurantTL/IMSDA-Events/issues/1103">#1103</a>.</strong> The report-to-email button deduplicates registration IDs and slices the list to 250 before recipient review. The current action does not explain the omitted remainder.</p>
+<p>Keep the current server limit and reviewed send path, but state matched, selected and omitted counts. Let the person review an explicit bounded set. Distinct registrations sharing an email address may still require registration-specific messages; global address deduplication is not the correction.</p>
+<p><strong>Observable acceptance:</strong> 250 and 251 distinct-registration examples make the difference visible. The recipient review exactly matches the selection, including after refreshing a stale preview. No message is queued just by opening or closing the review.</p>
+<h3 id="5-repair-keyboard-behavior-in-the-merchandise-editors-and-preview-states">5. Repair keyboard behavior in the merchandise editors and preview states</h3>
+<p><strong>Source-confirmed; medium impact. Owner: <a href="https://github.com/DurantTL/IMSDA-Events/issues/1108">#1108</a>.</strong> Product/variant editors have dialog roles and labels but do not apply the shared dialog focus behavior. Audience preview changes update the selected audience before fetching; failed or out-of-order responses can leave old cards under a new audience label.</p>
+<p>Reuse the existing focus/Tab/Escape/return behavior and dirty-edit protection. Tie preview results to the audience actually evaluated, with loading, failed/retry and empty-success states. This corrects editor interaction and preview truthfulness; it does not establish a public authorization failure or implement the held purchase/stock engine.</p>
+<p><strong>Observable acceptance:</strong> a keyboard user can enter, complete and close each editor without losing focus. Rapid audience changes cannot mislabel stale cards, and a failure is not presented as an empty successful result.</p>
+<h2 id="everyday-discoverability-and-responsive-improvements">Everyday discoverability and responsive improvements</h2>
+<table><colgroup><col style="width:44%"><col style="width:16%"><col style="width:40%"></colgroup>
+<thead>
+<tr class="header">
+<th>Finding and evidence class</th>
+<th>Existing owner</th>
+<th>Practical acceptance example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Source-confirmed: the registration result-order note always describes newest submitted first, even when the canonical search uses name or oldest-first order.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/1116">#1116</a></td>
+<td>Name ascending produces a matching readable order note; the query remains authoritative.</td>
+</tr>
+<tr class="even">
+<td>Source-confirmed: an offline arrival row can say Not saved while the same item is saved in the device queue. Nearby operational guidance retains obsolete screening wording.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/1102">#1102</a></td>
+<td>Row, queue and announcements agree on Saved on this device / Queued—not confirmed / Needs review / Confirmed. Only server-confirmed arrivals enter confirmed totals.</td>
+</tr>
+<tr class="odd">
+<td>Source-confirmed: month cells show three items and plain +N more text. The agenda contains the remaining in-month items.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/1117">#1117</a></td>
+<td>View all 5 events for the full date takes the user to all five items while preserving category and month. Phone dots stay noninteractive; the agenda remains the accessible route.</td>
+</tr>
+<tr class="even">
+<td>Source-confirmed: club search supports town, ZIP, club and church, but describes only town/ZIP and lacks explicit result/map coverage feedback.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/1118">#1118</a></td>
+<td>Clear search, N publicly listed clubs found, M on map, no-match recovery and an honest map-unavailable state. Unmapped clubs remain usable in the list.</td>
+</tr>
+<tr class="odd">
+<td>Recorded width finding: invitation tables overflow intermediate tablet containers at 861px without a scroll cue.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/1045">#1045</a></td>
+<td>Either usable cards at the affected width or a visible, keyboard-usable horizontal-scroll wrapper; long names and actions remain reachable.</td>
+</tr>
+<tr class="even">
+<td>Proposal: attendee task columns, roster density and visibly labelled row actions can reduce scanning and memorization. Current named icons already have assistive labels.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/181">#181</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1112">#1112</a></td>
+<td>Resettable stable-ID columns; a readable Edit or named Actions control; phone cards preserve labels and sort controls. No new protected column access.</td>
+</tr>
+<tr class="odd">
+<td>Accepted direction/proposal: task help, System/Event context and settings impact need a consistent presentation across the accepted workspace shells.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/1074">#1074</a>–<a href="https://github.com/DurantTL/IMSDA-Events/issues/1077">#1077</a></td>
+<td>A new helper can name the current scope and change consequence, find the task guide, and return without losing an edit or requesting broader access.</td>
+</tr>
+<tr class="even">
+<td>Proposal: public content, form presentation and sharing need a connected organizer view; the full multi-page site builder remains future work.</td>
+<td><a href="https://github.com/DurantTL/IMSDA-Events/issues/448">#448</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/283">#283</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/284">#284</a></td>
+<td>Distinguish saved public page, draft preview, form URL, embed and private management link. Do not add a new top-level System item from a mockup sidebar.</td>
+</tr>
+</tbody>
+</table>
+<p>The public club projection deliberately omits personal contact details, member records and precise meeting addresses. A friendlier finder must not add those fields casually. Likewise a meal column preset, health status badge or help screenshot must not enlarge health disclosure. Explain what is absent and offer the existing permitted help path.</p>
+<h2 id="accessibility-checks-to-attach-to-the-relevant-existing-work">Accessibility checks to attach to the relevant existing work</h2>
+<p>These checks complement existing rehearsals and automated checks. Attach the result to the actual release and affected issue rather than create another whole-system rehearsal plan.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Concern</th>
+<th>What needs observation</th>
+<th>Relevant WCAG 2.2 guidance</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Keyboard and dialog order</td>
+<td>Start from the trigger; reach every control; Tab stays in the top dialog; Escape affects the top layer; closing returns to a useful visible control.</td>
+<td>2.1.1 Keyboard; 2.1.2 No Keyboard Trap; 2.4.3 Focus Order; 4.1.2 Name, Role, Value</td>
+</tr>
+<tr class="even">
+<td>Focus visibility and sticky UI</td>
+<td>Focus remains visible behind sticky Save bars, menus and the phone keyboard; error focus reveals its control without repeated jumps.</td>
+<td>2.4.7 Focus Visible; 2.4.11 Focus Not Obscured (Minimum)</td>
+</tr>
+<tr class="odd">
+<td>Labels, sorting and status</td>
+<td>Names convey the person/action; <code>aria-sort</code> matches displayed order; asynchronous counts/save/errors are announced without unnecessary focus movement.</td>
+<td>1.3.1 Info and Relationships; 2.4.6 Headings and Labels; 4.1.3 Status Messages</td>
+</tr>
+<tr class="even">
+<td>Errors and consequential changes</td>
+<td>Errors identify the field and correction; entered values survive failure; review makes financial, deletion and recipient consequences explicit.</td>
+<td>3.3.1 Error Identification; 3.3.2 Labels or Instructions; 3.3.3 Error Suggestion; 3.3.4 Error Prevention</td>
+</tr>
+<tr class="odd">
+<td>Reflow and magnification</td>
+<td>At 320 CSS-pixel equivalent width, 200% text zoom and larger browser zoom, ordinary controls and text remain usable. Genuinely two-dimensional tables may scroll within a labelled, discoverable region.</td>
+<td>1.4.4 Resize Text; 1.4.10 Reflow; 1.4.12 Text Spacing</td>
+</tr>
+<tr class="even">
+<td>Touch and pointer</td>
+<td>Dense controls have spacing/size appropriate to the task; a decorative icon's size is separate from its hit target.</td>
+<td>2.5.8 Target Size (Minimum); 2.5.3 Label in Name</td>
+</tr>
+<tr class="odd">
+<td>Color, contrast and motion</td>
+<td>Text, status and focus contrast are measured in actual states; status has words as well as color; reduced-motion preference is respected.</td>
+<td>1.4.1 Use of Color; 1.4.3 Contrast (Minimum); 1.4.11 Non-text Contrast</td>
+</tr>
+<tr class="even">
+<td>Authentication and timing</td>
+<td>Real staff step-up, expired staff sessions, attendee fallback and permitted password-manager/passkey paths have clear recovery without granting access.</td>
+<td>3.3.8 Accessible Authentication (Minimum); applicable 2.2.1 Timing Adjustable exceptions/requirements need review</td>
+</tr>
+</tbody>
+</table>
+<p>The product's 44px phone target convention is stronger than WCAG 2.5.8's basic 24 CSS-pixel minimum/spacing conditions. The 14px staff text convention is a product readability choice, not a WCAG minimum font-size rule. Neither number alone proves conformance. Use real computed contrast and device/browser behavior, including long names, translated text, errors, disabled controls and loading states.</p>
+<p>At minimum, observe representative keyboard use in a desktop browser and screen-reader use in a supported desktop/mobile combination. Record the browser, assistive technology, zoom, release and task. A source audit can find a missing hook; it cannot establish how VoiceOver or NVDA announces a live page.</p>
+<h2 id="help-and-communication-content-that-improves-the-same-tasks">Help and communication content that improves the same tasks</h2>
+<p>Keep inline labels and concise errors beside the action. Task help should explain the workspace, prerequisite, consequence, verification and safe next step. Reading a guide does not grant permission, complete readiness, certify training or send a message. A help drawer needs an accessible title and close action, keyboard return and preservation of the unsaved work behind it.</p>
+<p>Useful wording examples for the existing owners include:</p>
+<ul>
+<li><strong>Saved public sharing:</strong> “These links use your saved event settings. Save address changes before sharing them.”</li>
+<li><strong>Device queue:</strong> “Saved on this device. Check-in is not confirmed until it syncs successfully.”</li>
+<li><strong>Report audience:</strong> “251 registrations matched. This review includes 250; 1 is outside the selection.” Use the final approved bounded-selection behavior rather than silently omit it.</li>
+<li><strong>Church billing:</strong> “Billed to the sponsoring church.” Keep this distinct from a personal balance or a confirmation that the church has paid.</li>
+<li><strong>Finder feedback:</strong> “6 publicly listed clubs found; 4 shown on the map.” Missing coordinates do not remove the other two list results.</li>
+<li><strong>Dirty editor:</strong> “Keep editing” and “Discard changes,” with the affected task named where needed.</li>
+<li><strong>Unavailable action:</strong> explain whether the cause is missing permission, an off/unavailable feature, missing configuration, a closed registration window or a save conflict. Avoid a generic disabled control with no explanation.</li>
+</ul>
+<p>Do not put private registration links, medical values, credentials or production screenshots into general guides/support messages. A support-details action should collect only the approved route/release context and a description. The separate help/content document in this pack provides reusable user-facing copy and ownership detail.</p>
+<h2 id="visual-references-and-what-they-establish">Visual references and what they establish</h2>
+<p>The accepted <a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/screenshots">four-role screenshots</a> establish presentation direction and persona separation. They are synthetic design examples, not screenshots of deployed features. The later <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/mockups/README.md">public-journey gallery</a> is a set of proposals, including the roster phone card inspected for this review.</p>
+<p>That roster phone proposal makes the club/year visible, labels Export roster and Add member, places search/sort/column controls in a single flow, and repeats labels within a person card. It illustrates discoverability, not a claim that search, column persistence or that exact phone shell has shipped. Its ordinary text and target spacing should still be checked in implementation rather than inferred from an image.</p>
+<p>Screenshots under <code>docs/screenshots/issue-645</code> and similar historical folders are useful before/after evidence for those specific changes. Their dates and source releases matter; they should not be used as an unqualified tour of current behavior. New training screenshots should replace proposals only after the relevant implementation is verified, retaining the same role and synthetic-data discipline.</p>
+<h2 id="verification-record-and-handoff">Verification record and handoff</h2>
+<p>For this document, representative current source was read and compared with existing issue bodies, role contracts, visual references and validation records. The roster-phone proposal was visually inspected. No new automated accessibility scan, live-browser keyboard run, screen-reader session, physical print or unit-test execution was performed for this document.</p>
+<p>The earlier <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/public-journeys-and-lists/validation.md">public-journey validation record</a> reports 137 existing tests across eight focused files against unchanged application source. Those tests support existing query/calendar/list/content contracts. They do not establish completion of these fixes, current production deployment or accessibility conformance. The broader technical-checks document in this pack records the CI and code evidence separately.</p>
+<p>Use the existing issue owner for each correction; preserve the accepted menu and role boundaries; choose only the current approved work from #98. For each implemented slice, retain the source change, targeted test result, affected phone/tablet/zoom captures and applicable manual keyboard/assistive-technology observation. Existing detailed specifications are the starting point, so no duplicate broad accessibility or redesign epic is proposed here.</p>
+<h2 id="source-index">Source index</h2>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/tree/5e367b7c4d1b3c173d37c0415e335be76170b300">Current source tree</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/globals.css">global styles</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/RESPONSIVE.md">responsive conventions</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/club-roster-workspace.tsx">Roster editor</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/communications-workspace.tsx">communications editor</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/event-settings-workspace.tsx">event settings/sharing</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/attendee-accounts/registrations-repository.ts">Account projection</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/email-registrations-button.tsx">report email handoff</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/merchandise-admin-workspace.tsx">merchandise editor</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/app/%28public%29/calendar/page.tsx">Calendar page</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/components/public-club-directory.tsx">club finder</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/organizations/public-club-directory.ts">strict public club projection</a>.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/design/role-workspaces/evidence/role-contract.md">Role contract</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1077">accepted help direction</a>, <a href="https://github.com/DurantTL/IMSDA-Events/issues/1114">lists/public-journeys review</a>.</li>
+<li><a href="https://www.w3.org/TR/WCAG22/">WCAG 2.2 Recommendation</a>. Criterion mapping is explanatory; no external conformance assessment is claimed.</li>
+</ul>
+</body></html>

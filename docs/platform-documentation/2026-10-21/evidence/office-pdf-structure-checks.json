@@ -1,0 +1,78 @@
+{
+  "pdfs": [
+    {
+      "file": "02-accessibility-and-usability.pdf",
+      "pages": 7,
+      "toc_entries": 16,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    },
+    {
+      "file": "01-current-and-future-features.pdf",
+      "pages": 7,
+      "toc_entries": 7,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    },
+    {
+      "file": "05-code-and-verification-evidence.pdf",
+      "pages": 8,
+      "toc_entries": 18,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    },
+    {
+      "file": "03-help-and-communication-kit.pdf",
+      "pages": 9,
+      "toc_entries": 22,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    },
+    {
+      "file": "IMSDA-Events-platform-briefing.pdf",
+      "pages": 23,
+      "toc_entries": 0,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    },
+    {
+      "file": "04-camp-system-and-ultracamp.pdf",
+      "pages": 8,
+      "toc_entries": 17,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    },
+    {
+      "file": "06-presenter-notes.pdf",
+      "pages": 6,
+      "toc_entries": 24,
+      "mark_info": [
+        "dict",
+        "<</Type/MarkInfo/Marked true>>"
+      ],
+      "struct_tree": "xref"
+    }
+  ],
+  "office_zip_integrity": "passed",
+  "presentation_slides": 23,
+  "speaker_notes": "all present",
+  "shape_bounds": "within slide"
+}

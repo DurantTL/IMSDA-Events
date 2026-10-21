@@ -1,0 +1,250 @@
+{
+  "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 80,
+      "sha256": "e5c144fced484bdef5b8c2b6ecd3032743a0a90e45873889651def004112da01"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5839,
+      "sha256": "0e7a68d0148f1a07b134176b7b3cd3bb597a128e8c13787553e709c84dd579cc"
+    },
+    {
+      "path": "assets/FONT-LICENSE.txt",
+      "bytes": 5208,
+      "sha256": "075f91382875da1c4b491f1facf2586f55448705133264d98ce15cab6211b125"
+    },
+    {
+      "path": "assets/NotoSans-Bold.ttf",
+      "bytes": 515752,
+      "sha256": "e83493c945848ecd4a9ad0f6d19164541a0d3e23a9c952304a00a46e00272ac5"
+    },
+    {
+      "path": "assets/NotoSans-Regular.ttf",
+      "bytes": 512672,
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d"
+    },
+    {
+      "path": "assets/admin-desktop.png",
+      "bytes": 179264,
+      "sha256": "9cc628673c9658191329dba90618e86d01295f0168465a480fe1f927c64677db"
+    },
+    {
+      "path": "assets/director-desktop.png",
+      "bytes": 131148,
+      "sha256": "5f213379dcf7433ede474a082d4c44297230f0f0f81f87d9c1f31c50e8278e75"
+    },
+    {
+      "path": "content/01-current-and-future-features.md",
+      "bytes": 36952,
+      "sha256": "0457021d1cbc9f66f21b57c07d628b1c105c92addbfa6a7a42e4ee1a447039d9"
+    },
+    {
+      "path": "content/02-accessibility-and-usability.md",
+      "bytes": 25100,
+      "sha256": "f926f5b3a21d42c2606a7583d8e339c7b4b19a01d1b97e612ffd7a5695008008"
+    },
+    {
+      "path": "content/03-help-and-communication-kit.md",
+      "bytes": 25869,
+      "sha256": "9bfb630a1f641d822b65ba2f9a75cb70c0ba9b79971fb54b221d4b8c65328bb1"
+    },
+    {
+      "path": "content/04-camp-system-and-ultracamp.md",
+      "bytes": 26088,
+      "sha256": "a349e4bae9b42baad7fc586406def35e06b3e38e470e65296acbe0efcbb4829c"
+    },
+    {
+      "path": "content/05-code-and-verification-evidence.md",
+      "bytes": 27612,
+      "sha256": "5d50482a37c1f94de19875386986d7ec11e0df01cc332e80b9e57b62897170cc"
+    },
+    {
+      "path": "content/06-presenter-notes.md",
+      "bytes": 14484,
+      "sha256": "120bb185129142cd873572444f9d219a9da94d7363055db5edee5948fa0269b0"
+    },
+    {
+      "path": "evidence/deck-source.json",
+      "bytes": 98361,
+      "sha256": "7b60513c16c83a96724688717ea803828f978dc5c1bb69dc869dbdfa459aa068"
+    },
+    {
+      "path": "evidence/export-verification.md",
+      "bytes": 2291,
+      "sha256": "8ad1a48fadca8d7c3dda9066066bac9e0c228551fba8d5cd8ba5b0b62e3dee92"
+    },
+    {
+      "path": "evidence/feature-matrix.json",
+      "bytes": 68345,
+      "sha256": "64dffdd7c8a92d16dcf766f0fe2c1f10992f4048a2d6ffc1aff75c6ce78549e1"
+    },
+    {
+      "path": "evidence/help-source-map.json",
+      "bytes": 7569,
+      "sha256": "97765d140f7008109a48c669fecd9fb49bf80b2d064590d79486829ad084f2aa"
+    },
+    {
+      "path": "evidence/independent-content-qa.md",
+      "bytes": 4841,
+      "sha256": "2f5b971195ac95708729973918308180a0f87ed4e3ecfb368a3323dd12908afe"
+    },
+    {
+      "path": "evidence/local-link-checks.json",
+      "bytes": 115,
+      "sha256": "de5ef2e30ad6c4878a7a76c0a4da235359aaab4d6a0789b340730229c1c06eda"
+    },
+    {
+      "path": "evidence/office-pdf-structure-checks.json",
+      "bytes": 1699,
+      "sha256": "0df793ab9da07cf686e8f37d87aa245e68bdbd67b49998e97b04db08a5a2833e"
+    },
+    {
+      "path": "evidence/pdf-manifest.json",
+      "bytes": 866,
+      "sha256": "6c2c54dbca88a93c4c0c30fc6fcc528de213bd419bf35ccec1a0d18dfd83c9a9"
+    },
+    {
+      "path": "evidence/render-checks.json",
+      "bytes": 848,
+      "sha256": "ae40e41dd89e297b7e1ddd609acad10b4d02536ef6a90be363e966aa4c044750"
+    },
+    {
+      "path": "evidence/technical-checks.json",
+      "bytes": 60201,
+      "sha256": "f0a2a40b9d2a76af4ecfac43254bbd13d290f4a9f76d90e08bbefa8c0b4df0b7"
+    },
+    {
+      "path": "evidence/ultracamp-sources.json",
+      "bytes": 10995,
+      "sha256": "017895646e58c962ca54b33c9571f90b0a921a8f5ab3c1f84aa70dd3a8afed9b"
+    },
+    {
+      "path": "evidence/ultracamp-vendor-notes.md",
+      "bytes": 7997,
+      "sha256": "47e2be07c1724ff89665abdbd9a33e759591d6ffc98f90834b25ca855b98d562"
+    },
+    {
+      "path": "evidence/ultracamp-vendor-sources.json",
+      "bytes": 6370,
+      "sha256": "e96d70d0d4f14ba4dae9a069bc6564b786cba9ed84acc2d2d407da42e9247be2"
+    },
+    {
+      "path": "evidence/usability-findings.json",
+      "bytes": 17987,
+      "sha256": "8723cc7a4ba009d581ae0580b29ecc2bae675f11c2c2a67bf4c27f6cd5c6ad3e"
+    },
+    {
+      "path": "exports/01-current-and-future-features.docx",
+      "bytes": 40003,
+      "sha256": "761cd14248a1583ae7926335d630b43066b868985c6f2c3ad5a811dd8e44ab82"
+    },
+    {
+      "path": "exports/01-current-and-future-features.html",
+      "bytes": 45072,
+      "sha256": "c064d25df59fa119da89d70a7000aba809186547a1291e8c0c02cd08f4cb55d0"
+    },
+    {
+      "path": "exports/01-current-and-future-features.pdf",
+      "bytes": 306159,
+      "sha256": "a8d53cf71bd4b5d01d62a5c7dab84b4dcee7b4ca9964a7a7f0a5c1943978fdc4"
+    },
+    {
+      "path": "exports/02-accessibility-and-usability.docx",
+      "bytes": 36163,
+      "sha256": "b9d0978298a737cba3d123b470351bdb21414866aefbd87b69f7fca1aface44e"
+    },
+    {
+      "path": "exports/02-accessibility-and-usability.html",
+      "bytes": 31075,
+      "sha256": "56bd45740904fef291e0fcb332197bc6335467c60b739a802c105985a03a62a3"
+    },
+    {
+      "path": "exports/02-accessibility-and-usability.pdf",
+      "bytes": 181566,
+      "sha256": "a50d6f5717432a5aaa59efeb19f8bc69f57aa4b6eb73ae0bd5ade276e28778f3"
+    },
+    {
+      "path": "exports/03-help-and-communication-kit.docx",
+      "bytes": 37048,
+      "sha256": "afc26efb44733d4947df5b7da93eb382217c4808e0a4879a3111d95de6fae80a"
+    },
+    {
+      "path": "exports/03-help-and-communication-kit.html",
+      "bytes": 33772,
+      "sha256": "ba1786755f22c147dbd787e6b1e83f871966f927535b367fc392f4f80a4d705a"
+    },
+    {
+      "path": "exports/03-help-and-communication-kit.pdf",
+      "bytes": 227904,
+      "sha256": "82928950cbe7ed05b40885a1c872eb44c5ff692b52991bd5b4936b19133eeac5"
+    },
+    {
+      "path": "exports/04-camp-system-and-ultracamp.docx",
+      "bytes": 37039,
+      "sha256": "2b756b2e55a1776ecb5117120f5cf37f07616115065d6ea5d234bfd7fb115c33"
+    },
+    {
+      "path": "exports/04-camp-system-and-ultracamp.html",
+      "bytes": 31680,
+      "sha256": "8178f069c1da6088f6dd25a283a96e610383ac8e7b73f271aa28335b681f6bbe"
+    },
+    {
+      "path": "exports/04-camp-system-and-ultracamp.pdf",
+      "bytes": 181685,
+      "sha256": "c30ca256ac2a1b23fa54decd79a0632d4601272cb1e9f4cf6db414c847664d84"
+    },
+    {
+      "path": "exports/05-code-and-verification-evidence.docx",
+      "bytes": 37723,
+      "sha256": "dc5f4375f2da47b5f94fac471d23576b066240af914d2b89d8abc893ff5ba409"
+    },
+    {
+      "path": "exports/05-code-and-verification-evidence.html",
+      "bytes": 34327,
+      "sha256": "2394072f3de5197b03ffba62c2117b9226c3e71fdb9d07882f27add5abc139e0"
+    },
+    {
+      "path": "exports/05-code-and-verification-evidence.pdf",
+      "bytes": 217344,
+      "sha256": "d6d7c3334517f5002a31621d73f26f2a21591c991efbd251c4de7ed968fdc387"
+    },
+    {
+      "path": "exports/06-presenter-notes.docx",
+      "bytes": 31447,
+      "sha256": "e8a944511fd4bd68ee94500acd34e7db7d09b7667514ece8c0aacf8d1c22b996"
+    },
+    {
+      "path": "exports/06-presenter-notes.html",
+      "bytes": 19950,
+      "sha256": "6eeabc1947d6908a5ef31b0cafe701c91d81b17096ba94b019331feb4f9c95c3"
+    },
+    {
+      "path": "exports/06-presenter-notes.pdf",
+      "bytes": 151186,
+      "sha256": "ef243a77a173e31d5867e5c09bcf707cba15fc617c4afe319391ac1c56d044ab"
+    },
+    {
+      "path": "exports/IMSDA-Events-platform-briefing.html",
+      "bytes": 94493,
+      "sha256": "22041221832bc0da467c1cb6babb9448454192c2cc5391ce6542edcd7c66d385"
+    },
+    {
+      "path": "exports/IMSDA-Events-platform-briefing.pdf",
+      "bytes": 504633,
+      "sha256": "02d5d7c74949ef7aec056786b6ddd6197081ee41c35f69f20268879f9933db67"
+    },
+    {
+      "path": "exports/IMSDA-Events-platform-briefing.pptx",
+      "bytes": 410686,
+      "sha256": "f6731c38430708e87777abccec73b26daadcd279fc04da0c978a96b533e14dfd"
+    },
+    {
+      "path": "previews/deck-overview.png",
+      "bytes": 591208,
+      "sha256": "9b94ddaba49f5353af3601126e6646be8f96614cd8212ba99089eea5fe053052"
+    }
+  ]
+}

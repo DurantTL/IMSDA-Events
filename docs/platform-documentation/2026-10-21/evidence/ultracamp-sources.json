@@ -1,0 +1,189 @@
+{
+  "prepared": "2026-10-21",
+  "source_snapshot": "5e367b7c4d1b3c173d37c0415e335be76170b300",
+  "fresh_vendor_verification": false,
+  "verification_limit": "Enforced network allowlist excludes UltraCamp hosts. No bypass attempted. Existing prior official-doc review records and attached research were reconciled.",
+  "primary_project_evidence": "https://github.com/DurantTL/IMSDA-Events/issues/71#issuecomment-5139058493",
+  "phase_decision": "https://github.com/DurantTL/IMSDA-Events/issues/71#issuecomment-5139118475",
+  "terms_verbatim_text_available": false,
+  "sources": [
+    {
+      "title": "Public REST documentation",
+      "url": "https://rest.ultracamp.com/developers/docs/index",
+      "recorded_observation": "Operational account/person/session/reservation/report surface; camp/account keys",
+      "evidence_status": "Prior official-doc review recorded July 30 in #71; not refreshed today",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "API License Terms",
+      "url": "https://ultracampmanagement.com/api-license-terms/",
+      "recorded_observation": "License, permitted-use, confidentiality and availability restrictions reported; last modified Oct 1, 2025 per discovery",
+      "evidence_status": "Prior review summary only; no local full verbatim copy",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Terms of Service",
+      "url": "https://ultracampmanagement.com/terms-of-service2_0_0/",
+      "recorded_observation": "Separate API-license terms and active-contract export language reported",
+      "evidence_status": "Uploaded report/search excerpts; not refreshed",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Health and Medical help",
+      "url": "https://help.ultracamp.com/hc/en-us/sections/7258663404308-Health-and-Medical",
+      "recorded_observation": "Product medical tools exist; not an API guarantee",
+      "evidence_status": "Prior official help review",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Online Form Reports",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7259296035988-Online-Form-Reports",
+      "recorded_observation": "Form reports/export exist; permitted API/form coverage unknown",
+      "evidence_status": "Prior official help review",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Assigning Online Forms",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/50300731674900-Assigning-Online-Forms",
+      "recorded_observation": "Required-form tracking",
+      "evidence_status": "Prior official help review",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Custom Online Forms",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7231482555284-Custom-Online-Forms",
+      "recorded_observation": "Individual/account forms, medical restriction, completion/expiration, third-party route; Classic/New UI distinctions",
+      "evidence_status": "Official documentation reviewed Oct 20; reported update June 18, 2026",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Custom Question Templates",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7232122783124-Custom-Question-Templates",
+      "recorded_observation": "Utilization/change log; linked-template update semantics differ from IMSDA immutable copies",
+      "evidence_status": "Official documentation reviewed Oct 20; reported update June 12, 2026",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Session Roster Report",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7259287896212-Session-Roster-Report",
+      "recorded_observation": "Season/session/location/age/balance/attendance filtering; person/family rows and export",
+      "evidence_status": "Official documentation reviewed Oct 20",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Stored Groups and Exporting",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7259298092436-Storing-Groups-and-Exporting",
+      "recorded_observation": "Excel/CSV/PDF; report warns transient stored groups need explicit permanent save",
+      "evidence_status": "Uploaded report excerpt; confirm retention and full archival coverage",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Account Detail",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7260056170132-Account-Detail-Page",
+      "recorded_observation": "Account/person/reservation/task relationship",
+      "evidence_status": "Official documentation reviewed Oct 20",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Reservation Detail",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7260339252628-Reservation-Detail",
+      "recorded_observation": "Balances/fees/options/booking context",
+      "evidence_status": "Official documentation reviewed Oct 20",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Session Wait List",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7229279130132-Session-Wait-List",
+      "recorded_observation": "Waitlist versus enrolled, held place and timed offer",
+      "evidence_status": "Official documentation reviewed Oct 20",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Activities or Options",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/8911704522644-Should-I-use-Activities-or-Options",
+      "recorded_observation": "Scheduled activity/waitlist versus simpler option selections",
+      "evidence_status": "Official documentation reviewed Oct 20",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Completion Monitoring",
+      "url": "https://help.ultracamp.com/hc/en-us/articles/7259289264788-Completion-Monitoring",
+      "recorded_observation": "Incomplete reservation tracking and reminders",
+      "evidence_status": "Official documentation reviewed Oct 20",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "Privacy/Security Policy",
+      "url": "https://ultracampmanagement.com/privacy-security-policy/",
+      "recorded_observation": "Variety-of-format export reported",
+      "evidence_status": "Uploaded report excerpt; precise medical/export protections unverified",
+      "freshly_verified_2026_10_21": false
+    },
+    {
+      "title": "docs/decisions/0002-unified-operations-platform.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0002-unified-operations-platform.md",
+      "recorded_observation": "Current ownership and optional Phase5 UltraCamp placement; old roadmap conflict already resolved",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "docs/LODGING.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LODGING.md",
+      "recorded_observation": "Existing per-event lodging inventory, cabins/beds, nightly holds, preferences, assignment/moves and waitlist",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "docs/MEALS.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md",
+      "recorded_observation": "Existing meal plans/selections, payer/ledger semantics, tickets and scanner/kitchen foundation",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "docs/ISSUED-ASSETS.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ISSUED-ASSETS.md",
+      "recorded_observation": "Existing issue/return/history/deposit/closeout for keys/wristbands and other assets",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "docs/STAFF-INVITATIONS.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-INVITATIONS.md",
+      "recorded_observation": "Office invitation approval and family registration; not full personnel lifecycle",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "modules/guardian-authority/repository.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/guardian-authority/repository.ts",
+      "recorded_observation": "Narrow event responsible-adult declaration; explicitly not broad health/incident/other-registration authority",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "modules/payments/deposit-domain.ts",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/modules/payments/deposit-domain.ts",
+      "recorded_observation": "Fixed per-registration deposit arithmetic and payment reference",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "docs/decisions/0005-protected-records-policy.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0005-protected-records-policy.md",
+      "recorded_observation": "Addendum-specific protected-health authority, interim acceptance and production prerequisites",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    },
+    {
+      "title": "docs/HEALTH-RECORDS-OPTIONS-REPORT.md",
+      "url": "https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/HEALTH-RECORDS-OPTIONS-REPORT.md",
+      "recorded_observation": "Historical health/insurance/UltraCamp option discovery; later decisions supersede old unanswered status",
+      "evidence_status": "Current repository source read at pinned SHA; no serving-release verification",
+      "reviewed": "2026-10-21"
+    }
+  ],
+  "report": "content/04-camp-system-and-ultracamp.md",
+  "existing_preparation_reused": "Existing decision register, event rehearsal material and synthetic JSON/CSV/PDF examples are referenced; no new generic import or rehearsal pack created.",
+  "source_classification": "Operational vendor coverage is prior official-doc evidence; current source checks establish repository foundations; full-camp parity beyond those foundations remains a scope/discovery question."
+}

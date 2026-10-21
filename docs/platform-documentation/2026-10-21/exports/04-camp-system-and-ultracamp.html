@@ -1,0 +1,287 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>From event management to a full camp system</title><style>
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Regular.ttf')}
+@font-face{font-family:Noto;src:url('../assets/NotoSans-Bold.ttf');font-weight:700}
+*{box-sizing:border-box}body{font:10.2pt/1.48 Noto,Arial,sans-serif;color:#243640;margin:0}
+.coverline{font-size:9pt;letter-spacing:1.7px;color:#582c83;font-weight:700;border-bottom:4px solid #f0b323;padding-bottom:14px;margin-bottom:18px}
+.baseline{font-size:8.4pt;color:#536b78;background:#f4f7f8;padding:12px 14px;border-left:3px solid #003b5c;margin:0 0 22px}
+h1{font-size:27pt;line-height:1.15;color:#003b5c;letter-spacing:-.5px;margin:0 0 18px}
+h2{font-size:17pt;line-height:1.25;color:#003b5c;margin:24px 0 10px;break-after:avoid}
+h3{font-size:12pt;line-height:1.3;color:#582c83;margin:17px 0 8px;break-after:avoid}
+h4{font-size:10.8pt;break-after:avoid}p,ul,ol{margin:0 0 10px}li{margin:3px 0}li p{margin:0 0 5px}
+a{color:#003b5c;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+strong{font-weight:700}code{font:9pt/1.35 'DejaVu Sans Mono',monospace;overflow-wrap:anywhere;background:#f4f7f8;padding:0 2px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f7f8;border:1px solid #dce6ea;font-size:8.8pt}
+blockquote{border-left:3px solid #f0b323;padding:8px 14px;margin:12px 0;background:#fbf8ee}
+table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:8.7pt;line-height:1.4;margin:12px 0 18px}
+th{background:#003b5c;color:white;text-align:left;padding:8px;border:1px solid #003b5c;font-weight:700}
+td{border:1px solid #dce6ea;padding:6.5px;vertical-align:top;overflow-wrap:anywhere}
+td code{font-size:8pt}tr:nth-child(even) td{background:#f4f7f8}thead{display:table-header-group}tr{break-inside:avoid}
+img{max-width:100%;height:auto}figure{margin:14px 0;break-inside:avoid}figcaption{font-size:8pt;color:#536b78}
+hr{border:0;border-top:1px solid #dce6ea;margin:20px 0}#TOC{font-size:9.5pt;margin:0 0 22px}#TOC ul{list-style:none;padding-left:12px}
+</style></head><body><div class="coverline">IMSDA EVENTS  /  REVIEW &amp; ENABLEMENT PACK</div><h1 id="from-event-management-to-a-full-camp-system">From event management to a full camp system</h1><div class="baseline">Prepared October 21, 2026 · Repository baseline <strong>5e367b7c</strong><br>Current implementation, gated capabilities, accepted design and future plans are distinguished in the text. Repository evidence does not establish the serving production state.</div>
+<h2 id="purpose-and-evidence-boundary">Purpose and evidence boundary</h2>
+
+<p>IMSDA Events already has a substantial reusable foundation. A camp system would add the continuous responsibility for an individual child across enrollment, housing, activities, supervision, care, money and release. A conference event with lodging and meal tickets does not establish all of those capabilities.</p>
+<p>The next useful input from UltraCamp is a <strong>written capability, data-access and contract packet tied to the camp's actual workflows</strong>. It should identify what can be exported or exchanged, what remains authoritative in each system and what can be retained after an eventual exit. An API key alone cannot answer those questions.</p>
+<p>Current implementation statements below are based on source and repository documentation, not a live camp or production inspection. Future work is mapped to existing issue owners where possible. UltraCamp facts rely on the dated official-source research recorded in <a href="https://github.com/DurantTL/IMSDA-Events/issues/71#issuecomment-5139058493">#71</a> and the October 20 comparison. The enforced network policy excludes UltraCamp's sites, so their current content, commercial terms and customer-specific entitlements were not freshly verified in this review.</p>
+<h2 id="1-reuse-the-work-already-completed">1. Reuse the work already completed</h2>
+<p>Keep the existing decision register, event rehearsal material and synthetic import/output examples as the starting references. This report does not create another generic rehearsal or rebuild JSON, CSV and PDF import preparation.</p>
+<p>The current foundation includes registration/form versions, party and club registration, private management links, payments and fixed reservation deposits, adjustment/scholarship and church billing workflows, durable email, calendars, check-in, badges, lodging, meal selections/tickets, scanner imports, kitchen counts and issued assets. These are useful components of a camp system. Their specific permissions, historical records and financial meanings should survive any camp expansion.</p>
+<p>Existing references:</p>
+<ul>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LEGACY-EVENT-SYSTEMS.md">Legacy event-system inventory</a> explains Camp Meeting, camporee and retreat requirements. It is not a summer-camp parity specification.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/LODGING.md">Lodging</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/MEALS.md">Meals</a>, <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/ISSUED-ASSETS.md">Issued assets</a> and <a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/STAFF-INVITATIONS.md">Staff invitations</a> document delivered operational behavior.</li>
+<li><a href="https://github.com/DurantTL/IMSDA-Events/blob/5e367b7c4d1b3c173d37c0415e335be76170b300/docs/decisions/0002-unified-operations-platform.md">ADR 0002</a> keeps IMSDA event operations independent of UltraCamp. <a href="https://github.com/DurantTL/IMSDA-Events/issues/98">#98</a> remains the ordered roadmap; all UltraCamp exchange remains optional Phase 5 under <a href="https://github.com/DurantTL/IMSDA-Events/issues/71">#71</a>.</li>
+</ul>
+<h2 id="2-camp-capability-map">2. Camp capability map</h2>
+<p>“Foundation” means useful existing behavior, not full camp parity. “Later scope” identifies an existing backlog direction; it does not promise completion or a release date. A camp-specific requirement is not classified as absent merely because its exact name was not found in a search.</p>
+<table><colgroup><col style="width:20%"><col style="width:24%"><col style="width:36%"><col style="width:20%"></colgroup>
+<thead>
+<tr class="header">
+<th>Camp operation</th>
+<th>Current IMSDA foundation</th>
+<th>What a full camp scope must establish</th>
+<th>Existing owner/reference</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Family, camper and responsible adult</td>
+<td>People/household structures, attendee accounts, party registration and narrow declared guardian evidence</td>
+<td>Verified authority, separate parents/households, who may see/change which camper, disputed or revoked access and multiple-session history</td>
+<td>#40, #43, #91; <code>modules/guardian-authority</code></td>
+</tr>
+<tr class="even">
+<td>Enrollment and sessions</td>
+<td>Event/form versions, capacity, waitlist and registration lifecycle</td>
+<td>Camp season/session structure, age/grade cutoff, eligibility, transfers, repeat weeks, offers, cancellation and concurrent seats</td>
+<td>#100, #207–#209; current registration services</td>
+</tr>
+<tr class="odd">
+<td>Forms and consent</td>
+<td>Published policy/form versions and acknowledgment evidence</td>
+<td>Camp-specific required forms, responsible signer, re-consent, expiration and completion/readiness across sessions</td>
+<td>#43, #130/#132; #71 only for approved external readiness</td>
+</tr>
+<tr class="even">
+<td>Cabins and beds</td>
+<td>Camp Heritage/Sunnydale lodging templates, rooms/cabins/beds, nightly availability, holds, assignments, moves and waitlist</td>
+<td>Whether assignment is to cabin, individual bed/bunk or cohort; counselor association, age/gender/sibling and separation rules, occupancy by session and turnover</td>
+<td><code>modules/lodging</code>; #89 grouping</td>
+</tr>
+<tr class="odd">
+<td>Counselor supervision</td>
+<td>Event staff permissions, club roles and staff invitation/approval</td>
+<td>Which staff are responsible for each cabin/group and time period, coverage/ratios, handoff and substitute authority</td>
+<td>#65/#201–#203; #93/#252–#256</td>
+</tr>
+<tr class="even">
+<td>Activities and attendance</td>
+<td>Delivered Honors scheduling, seats, waitlists, instructor rosters and attendance/completion</td>
+<td>General camp activity periods, prerequisites, skill levels, daily/weekly picks, change windows and camper whereabouts; reuse Honors only where its domain fits</td>
+<td>#100/#207–#209; #89</td>
+</tr>
+<tr class="odd">
+<td>Check-in and movement</td>
+<td>Event check-in, passes, club check-in and issued-item history</td>
+<td>Arrival versus attendance versus custody; offsite trips, late arrival, temporary departure, overnight whereabouts and final release</td>
+<td>#78, #79, #96</td>
+</tr>
+<tr class="even">
+<td>Registration finance</td>
+<td>Square payments, partial balance, fixed registration deposit, adjustments, scholarships and church invoices</td>
+<td>Camp charges, sibling/sponsor rules, session transfers and refunds, scheduled collection, processor/account ownership and treasury reconciliation</td>
+<td>#74, #92/#229–#232, #101/#120</td>
+</tr>
+<tr class="odd">
+<td>Camp store and allowance</td>
+<td>Merchandise catalog foundation; issued badge/wristband identifiers</td>
+<td>Guardian-funded balances, spending limits, POS, returns, tax treatment, unspent funds and cash/card reconciliation</td>
+<td>#94; #54/#146–#148 is a separate merchandise purchase scope</td>
+</tr>
+<tr class="even">
+<td>Food operations</td>
+<td>Meal plans/selections/ledger, tickets, scanner results and append-only kitchen counts</td>
+<td>Individual camp entitlement versus registration quantities, supervision of special meals and approved dietary disclosure; money closeout remains #212</td>
+<td><code>modules/meals</code>; #81/#192/#212</td>
+</tr>
+<tr class="odd">
+<td>Health history and care readiness</td>
+<td>Narrow encrypted Health Record, permissions, acknowledgment, event windows, sealed copies and break-glass foundations</td>
+<td>Camp nurse scope, current authorization/consent, care-plan review, approved emergency availability and clear external/local source ownership</td>
+<td>#389/#44/#189–#192; ADR 0005 by addendum</td>
+</tr>
+<tr class="even">
+<td>Medication administration and treatment</td>
+<td>Health-information storage is a foundation, not an evidenced complete care-log workflow</td>
+<td>Intake reconciliation, orders/instructions, dose/time/route, due/PRN administration, refusal/missed/error, inventory/disposal, corrections, clinical review and restricted signatures</td>
+<td>Camp-specific scope must be defined with qualified operations under #44/#79; not a generic form/notes feature</td>
+</tr>
+<tr class="odd">
+<td>Pickup and custody</td>
+<td>Narrow declaration of a responsible adult</td>
+<td>Approved pickup people, identity verification, restrictions, expiring/revoked authority, duplicate-safe release, overrides and transport handoff</td>
+<td>#96/#215–#217; policy gate remains</td>
+</tr>
+<tr class="even">
+<td>Transportation</td>
+<td>Registration/group identity and event context</td>
+<td>Routes/legs, vehicles, driver/vehicle readiness, manifests, departure/arrival and controlled rider substitutions</td>
+<td>#78/#204–#206</td>
+</tr>
+<tr class="odd">
+<td>Staff lifecycle</td>
+<td>Event access, screening-date evidence and office invitations</td>
+<td>Recruiting, references, offers, onboarding/training, qualification expiry, supervisors, offboarding and personnel-record boundaries</td>
+<td>#93/#252–#256; #70; #65</td>
+</tr>
+<tr class="even">
+<td>Incident and emergency operations</td>
+<td>Event references and limited operational records</td>
+<td>Dedicated cases, missing-person response, restricted timelines, escalation, reunification, evidence, retention and after-action review</td>
+<td>#79/#257–#261; decisions remain with that policy owner</td>
+</tr>
+<tr class="odd">
+<td>Parent communication</td>
+<td>Transactional/segmented email, attachments, announcements and private account/management routes</td>
+<td>Which authorized adult receives which update, communication preference, emergencies versus announcements, support and delivery evidence</td>
+<td>#77/#178/#179; do not infer authority from shared email</td>
+</tr>
+<tr class="even">
+<td>Outage and records continuity</td>
+<td>Printable/exportable operations, existing backup/security runbooks and some duplicate-safe offline-entry paths</td>
+<td>Each critical camp task's permitted degraded behavior, current restricted reference copy, reconciliation and secure disposal; no blanket offline promise</td>
+<td>Existing runbooks; #264 is later native offline scope</td>
+</tr>
+</tbody>
+</table>
+<p>Two distinctions matter immediately. A bunk recorded in facility inventory does not establish camper-to-bunk assignment or counselor supervision. A dietary/medication answer or a Health Record does not establish a medication administration record. Those require explicit operational scope and evidence before anyone markets the platform as a complete camp system.</p>
+<p>The narrow guardian repository states that a declaration gives no access to health, incident or other registration data. Preserve that boundary; a camper's name on a family registration must not silently grant every adult authority over the child.</p>
+<h2 id="3-what-to-obtain-from-camp-leadership-first">3. What to obtain from camp leadership first</h2>
+<p>Ask the camp director/registrar, nurse or designated health lead, treasurer, staffing lead and the authorized UltraCamp administrator for a demonstration using synthetic participants. This is an extension of existing discovery, not a replacement decision register.</p>
+<p>Capture the camp's real session types, ages, household arrangements, resident/day-camp differences, cabins and activity periods. Identify which tasks are performed daily, who is permitted to perform them and which exact UltraCamp screens/reports are relied upon. Record seasonal peaks, concurrent arrival stations and poor-connectivity locations as measured inputs rather than guesses.</p>
+<p>For each critical task, collect the approved expected outcome and the existing sample output: a session roster, cabin/counselor roster, arrival/release list, activity list, financial statement or restricted care record. Keep sensitive workflows in restricted review; put only metadata and synthetic examples in the project. The question is whether IMSDA can produce the right operational result with the right authority, not whether it resembles UltraCamp's screen.</p>
+<p>Identify the intended boundary: does camp registration remain in UltraCamp, move to IMSDA, or differ by program? Does the camp want only consolidated references/readiness, an archive when exiting, or a future operational replacement? That choice determines which of the following vendor requests are necessary. The current roadmap does not already select a new summer-camp replacement project.</p>
+<h2 id="4-what-we-need-from-ultracamp">4. What we need from UltraCamp</h2>
+<h3 id="a-access-and-permitted-use">A. Access and permitted use</h3>
+<p>Request the current API documentation/version, API License Terms, applicable customer agreement, enabled camp/account scopes and an entitlement/fee statement. The existing discovery identifies a real public REST documentation site and camp/account-level keys. Do not repeat the older uploaded report's conclusion that no public API exists.</p>
+<p>The July discovery reports a limited/revocable interoperability/internal-use license and restrictions concerning replication/replacement or competing services using the API. The full current terms were not retrieved for this report. These are reported constraints requiring written confirmation, not a verbatim quotation or a legal conclusion. Ask the vendor and conference contract owner to address the exact intended overlap or exit use, lawful export/retention, permitted writes and post-termination access before approving a connector.</p>
+<h3 id="b-a-capability-by-domain-answer">B. A capability-by-domain answer</h3>
+<p>The public REST review recorded accounts/people, sessions/seasons/locations, carts/reservations, session-option rosters, waitlists, cancellations and operational/financial reports. It did not clearly establish health, medication, treatment-log, form-answer or form-completion endpoints. UltraCamp's product/help documentation describes medical and required-form features; availability in a user interface is not proof of API access.</p>
+<p>Obtain a table from UltraCamp naming the supported method for every requested domain: API endpoint, webhook, scheduled report, secure export, supported deep link, or unavailable. Ask for exact fields, read/write permissions and customer-plan restrictions. Specifically ask whether form required/started/complete/out-of-date/review state can be returned <strong>without answers</strong>, and whether restricted medical-form readiness has a separate entitlement. An unknown response stays “unsupported/unconfirmed” in IMSDA; it must not be guessed from a successful reservation or a missing report row.</p>
+<h3 id="c-stable-identity-history-and-change-semantics">C. Stable identity, history and change semantics</h3>
+<p>Request camp/account/person/session/reservation/form/transaction IDs and their relationships. Learn what happens when accounts or people merge, a child moves household, a session transfer replaces a reservation, a cancellation is reversed or a source row is deleted. Ask for creation/modification timestamps, time zones, tombstones and a supported incremental-change cursor or report cutoff.</p>
+<p>Names, shared family email, phone and birth date are matching evidence, not a universal synchronization key. Use stable external references plus reviewed ambiguous matches. A source merge must not silently merge IMSDA people or transfer guardian authority.</p>
+<h3 id="d-reliable-exchange-and-operational-support">D. Reliable exchange and operational support</h3>
+<p>Request a sandbox/test camp, least-privilege credentials, rotation/revocation procedure, published limits, pagination, 429/retry guidance, timeout/maintenance behavior and a support escalation contact. Confirm write idempotency and whether a lost response can be reconciled safely before retrying. Ask which fields are eventually consistent and what “export as of” means.</p>
+<p>For reports/archives, confirm maximum rows, attachment inclusion, readable relationships, permanent-save behavior, complete audit/history export and the time available before contract termination. Existing research says stored report groups may be temporary without an explicit permanent save; verify the current behavior rather than treating a downloaded CSV or stored group as a full archive.</p>
+<h3 id="e-finance-and-protected-records">E. Finance and protected records</h3>
+<p>Ask who is merchant of record, which processor owns payment tokens, which balances/fees/refunds/credits can be exported, and whether transaction references survive a transfer or cancellation. Do not assume saved card credentials are portable or copy card details. Avoid a second payment ledger for one obligation; source ownership and reconciliation belong to existing finance policy. Current fees/processor restrictions need a written quote, not reuse of an older research price.</p>
+<p>Health history, medication administration, treatment, insurance, attachments and incident evidence need separate field/role/retention answers. Prefer approved source references/readiness or restricted deep links where sufficient. Existing #71 does not authorize bulk copying these into ordinary IMSDA forms, emails, rosters or archives. Any separately approved protected archive needs its own encrypted manifest, retention/hold handling, access audit and tested restoration.</p>
+<h2 id="5-data-contract-checklist-for-existing-examples">5. Data-contract checklist for existing examples</h2>
+<p>Use the JSON/CSV/PDF examples already prepared. Add a contract addendum only where the following metadata is missing; do not generate another generic import format or request real camper exports for prompts.</p>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Contract section</th>
+<th>Fields/behavior to confirm</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Envelope</td>
+<td>Source product/version, camp, schema/export version, generated-at and as-of time, time zone, filters, complete/partial flag, row/attachment totals</td>
+<td>A partial report must not be interpreted as deletion or zero attendance</td>
+</tr>
+<tr class="even">
+<td>Identity</td>
+<td>Stable account/person/session/reservation IDs, source merge/replacement aliases and relationship references</td>
+<td>Prevent duplicates and preserve original history</td>
+</tr>
+<tr class="odd">
+<td>Lifecycle</td>
+<td>Status vocabulary, effective time, cancellation/transfer reference, deletion/tombstone and last-modified/cursor</td>
+<td>Preserve transitions instead of overwriting the latest row</td>
+</tr>
+<tr class="even">
+<td>Money</td>
+<td>Currency/minor-unit amounts, charge/payment/refund/credit IDs, processor reference and allocation relationships</td>
+<td>Reconcile value without creating or losing money</td>
+</tr>
+<tr class="odd">
+<td>Readiness</td>
+<td>Exact form/version/person/session, required/completion/review/expiry meaning, source time and supported unknown/error state</td>
+<td>Missing/stale/unconfirmed is not “cleared”</td>
+</tr>
+<tr class="even">
+<td>Restricted files</td>
+<td>Opaque reference, classification, permitted recipient, checksum, MIME/size, version and retention/hold metadata</td>
+<td>Make any approved archive verifiable without broad searchability</td>
+</tr>
+<tr class="odd">
+<td>Reconciliation</td>
+<td>NEW/UPDATE/NEEDS CHECK/SKIP/error meaning, source digest, reviewed preview, counts, retry identity and partial-failure result</td>
+<td>A repeat apply or changed source file must not double-create</td>
+</tr>
+<tr class="even">
+<td>Audit/ownership</td>
+<td>Data owner, allowed direction, operator/purpose, approval evidence, source IDs and execution result</td>
+<td>An imported fact does not automatically become editable authority</td>
+</tr>
+</tbody>
+</table>
+<p>Request synthetic edge cases, not only one successful row: duplicate names, shared email, multiple guardians, separate households, repeated camp weeks, account merge, session transfer, cancellation after payment, split sponsorship, refunded deposit, changed health-form version, revoked authority, an attachment version and an unavailable/stale feed.</p>
+<h2 id="6-three-operating-models-to-compare-later">6. Three operating models to compare later</h2>
+<table><colgroup><col style="width:23%"><col style="width:36%"><col style="width:41%"></colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Appropriate outcome</th>
+<th>Main dependency</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Retain UltraCamp for camp; IMSDA runs its current event/club scope</td>
+<td>Fewest new camp responsibilities. Link or exchange only a separately approved minimum set if it materially reduces work</td>
+<td>Document clear boundaries; avoid duplicate entry/contradictory balances</td>
+</tr>
+<tr class="even">
+<td>Controlled coexistence with a narrow Phase 5 adapter</td>
+<td>Approved operational references/readiness reduce manual reconciliation while each system has named authoritative domains</td>
+<td>Written permission, supported data contract, stable matching, staleness and outage behavior</td>
+</tr>
+<tr class="odd">
+<td>Independently build a full camp capability and exit UltraCamp</td>
+<td>IMSDA eventually owns the selected camp workflows and approved historical record access</td>
+<td>Camp-specific scope, operational/clinical/policy sign-off, parity evidence, support capacity and permitted export/exit plan</td>
+</tr>
+</tbody>
+</table>
+<p>An exit archive alone may be the right scope when there is no continuing integration need. Rebuilding every historical UltraCamp screen or implementing two-way synchronization by default is not necessary to preserve records. Conversely, replacing registration does not prove that medication, supervision, pickup and staff workflows are ready to leave UltraCamp.</p>
+<p>This report recommends obtaining evidence for those models before choosing one. It does not select a model, create a new queue, promote #71 or undo existing ADR 0002 ownership.</p>
+<h2 id="7-scope-and-evidence-needed-before-claiming-full-camp-coverage">7. Scope and evidence needed before claiming full camp coverage</h2>
+<p>Use the existing issue and decision owners. Sessions/activity assignments map to #100/#207–#209; grouping to #89; staffing to #65/#93; transport to #78; release to #96; incidents to #79; cashless store to #94; protected care boundaries to #44. Medication administration/treatment and counselor supervision need camp-specific scope rather than assumptions that those parents already supply complete operational requirements.</p>
+<p>A future camp readiness statement should name the exact program and feature version, approved roles, source ownership and supporting evidence. It should distinguish repository implementation, tested behavior, authorized configuration, serving-release verification and trained operational use. A passing registration test cannot certify a nurse workflow or custody release.</p>
+<p>Extend the existing rehearsals only for genuinely new camp workflows: simultaneous arrival, camper movement between weeks, caregiver change, medication correction, unauthorized pickup, missed transport and connectivity loss. Record which critical task has a safe operational fallback and how its later reconciliation prevents duplicate actions. These are additions to existing evidence, not a new generic rehearsal plan.</p>
+<h2 id="8-vendor-meeting-agenda-and-prepared-request">8. Vendor meeting agenda and prepared request</h2>
+<p>Suggested 45-minute agenda: 5 minutes to confirm the selected use case and account entitlement; 10 for supported resources/identifiers; 10 for forms/health-readiness versus protected details; 10 for historical/financial exports and exit rights; 5 for reliability, sandbox and support; 5 to assign written follow-up owners and dates. The camp director/operations lead and authorized UltraCamp administrator should bring a synthetic walkthrough. Involve the conference contract owner and health lead for their respective questions.</p>
+<h3 id="draft-request--prepared-for-the-authorized-administrator-not-sent">Draft request — prepared for the authorized administrator; not sent</h3>
+<p><strong>Subject:</strong> UltraCamp capability and data-access confirmation for IMSDA camp planning</p>
+<p>Hello [ULTRACAMP CONTACT],</p>
+<p>We are documenting how [CAMP/CONFERENCE] uses UltraCamp and whether a future, limited exchange or eventual export to our independently managed IMSDA platform is appropriate. We are requesting documentation and written clarification; we are not asking to enable production writes or send participant/medical data at this stage.</p>
+<p>Please provide the current API documentation/version, API License Terms, applicable access fees, supported account/camp scopes, sandbox availability and credential/rotation process. Please confirm whether our described use—[RETAIN WITH REFERENCES / LIMITED COEXISTENCE / HISTORICAL EXPORT FOR EXIT]—is permitted, including use of exported records after the contract ends.</p>
+<p>For accounts/people, sessions/reservations, options/activities/lodging, waitlists/transfers/cancellations, financial transactions, online-form readiness, restricted medical workflows, attachments and audit history, please identify the supported API, report/export, feed or secure-link method. We especially need to know whether required/started/complete/out-of-date/review states can be supplied without form answers, and whether that covers medically restricted forms.</p>
+<p>Please include stable identifiers and merge/transfer/delete semantics; pagination/change tracking; limits, retries and write-idempotency guidance; export completeness/relationships/attachment manifests; termination export and retention/deletion provisions; and support/outage escalation. Synthetic schemas and examples are sufficient. Please do not send actual camper, health, payment credential or personnel data in response to this request.</p>
+<p>We will review the proposed field scope and ownership with our camp, finance, health and contract leads before any production connection. Thank you, [AUTHORIZED ADMINISTRATOR].</p>
+<h2 id="9-source-and-confidence-notes">9. Source and confidence notes</h2>
+<ul>
+<li><strong>Current source, high confidence for repository behavior:</strong> main SHA above; <code>modules/lodging</code>, <code>meals</code>, <code>issued-assets</code>, <code>guardian-authority</code>, <code>payments/deposit-domain.ts</code>, <code>health-records</code>, <code>coordinator-health</code>, and the linked operational documents. Deployment, enabled health flags and real camp operation were not inspected.</li>
+<li><strong>Current project direction:</strong> <a href="https://github.com/DurantTL/IMSDA-Events/issues/71#issuecomment-5139118475">#71 owner decision</a>, #98 and current ADR 0002. The old roadmap/ADR conflict was already reconciled; it is not a newly open decision.</li>
+<li><strong>Dated official-source findings:</strong> <a href="https://rest.ultracamp.com/developers/docs/index">public REST documentation</a>, <a href="https://ultracampmanagement.com/api-license-terms/">API License Terms</a>, <a href="https://help.ultracamp.com/hc/en-us/sections/7258663404308-Health-and-Medical">Health and Medical</a>, <a href="https://help.ultracamp.com/hc/en-us/articles/7259296035988-Online-Form-Reports">Online Form Reports</a>, <a href="https://help.ultracamp.com/hc/en-us/articles/7259287896212-Session-Roster-Report">Session Roster</a>, <a href="https://help.ultracamp.com/hc/en-us/articles/7260056170132-Account-Detail-Page">Account Detail</a>, <a href="https://help.ultracamp.com/hc/en-us/articles/8911704522644-Should-I-use-Activities-or-Options">Activities or Options</a>, and <a href="https://help.ultracamp.com/hc/en-us/articles/7259298092436-Storing-Groups-and-Exporting">Stored Groups/Exporting</a>. These links were reconciled from prior research, not re-fetched here.</li>
+<li><strong>Superseded research statement:</strong> the uploaded integration report's unsuccessful search for public API documentation does not override the specific REST documentation identified in #71. Negative search results do not establish product or API absence.</li>
+<li><strong>Still unverified:</strong> the camp's actual contracted entitlements, current API fields/limits, medical-readiness source, attachment/history coverage, post-termination rights, current pricing, supported authentication details and permitted replacement/coexistence use. Obtain written answers; no fee, compliance certification or vendor permission is asserted by this report.</li>
+</ul>
+<p>The accompanying <code>evidence/ultracamp-sources.json</code> records the references, evidence dates and limitations so future updates can replace unknowns with verified answers without reopening decisions already made.</p>
+</body></html>
