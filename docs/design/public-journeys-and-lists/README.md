@@ -9,6 +9,10 @@ Tracking index: [#1114](https://github.com/DurantTL/IMSDA-Events/issues/1114). R
 
 The review covers registration cards, attendee-list and club-roster columns, icon/action language, public calendar, Find a club, event-page customization, public links and embeds. It distinguishes current strengths, source-confirmed inconsistencies, proposed presentation changes and future feature ownership. It is source/test/issue evidence; no production session or production data was used.
 
+## Interactive design mockups
+
+[Six proposed desktop/phone screen designs](mockups/README.md) translate this report into visible examples. Includes a seven-page PDF, 19 screenshots and a downloadable offline interactive kit. New visual studies remain proposals; implementation issues stay open.
+
 ## Focused new follow-ups
 
 | Issue | Reference specification |
