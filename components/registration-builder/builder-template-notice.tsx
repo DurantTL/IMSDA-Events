@@ -9,10 +9,10 @@ export function BuilderTemplateNotice() {
   const notice = selectedForm?.templateNotice;
   if (!selectedForm || !notice) return null;
   return (
-    <section className="panel" role="status" data-testid="template-changed-notice" aria-labelledby="template-changed-title">
+    <section className="panel" data-testid="template-changed-notice" aria-labelledby="template-changed-title">
       <p className="eyebrow">Template changed</p>
       <h3 id="template-changed-title">The {notice.templateName} template has changed since this form was made</h3>
-      <p className="field-help">
+      <p className="field-help" role="status">
         This form was made from version {notice.appliedVersion}; the template is now at version {notice.latestVersion}. Nothing on this form has changed, and nothing will change unless you choose to update the draft.
       </p>
       <div className="builder-actions">

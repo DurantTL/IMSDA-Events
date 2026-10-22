@@ -93,7 +93,7 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
 
   // The shared model, with Save pointed at the template instead of an event's form.
   const model: BuilderModel = {
-    eventId: "", eventSlug: "", eventName: "", eventAudience: undefined, eventBillingMode: undefined, templates: [], canEditNotifications: false, canSaveAsTemplate: false,
+    eventId: "", eventSlug: "", eventName: "", eventAudience: undefined, eventBillingMode: undefined, canEditNotifications: false, canSaveAsTemplate: false,
     ...state, ...derived, ...edits, ...removal, ...actions, saveDraft: saveTemplate,
   };
   const owned = definition ? moduleOwnedFields(definition) : [];

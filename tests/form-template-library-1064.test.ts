@@ -88,7 +88,7 @@ function fakeDatabase() {
         const row = key ? versions.find((entry) => entry.templateId === key.templateId && entry.version === key.version) : versions.find((entry) => entry.id === where.id);
         return row ? copy(row) : null;
       }),
-      findMany: vi.fn(async ({ where }: Row = {}) => versions.filter((entry) => (!where?.source || entry.source === where.source) && (!where?.templateId?.in || where.templateId.in.includes(entry.templateId))).sort((a, b) => b.version - a.version).map(copy)),
+      findMany: vi.fn(async ({ where }: Row = {}) => versions.filter((entry) => (!where?.source || entry.source === where.source) && (!where?.templateId?.in || where.templateId.in.includes(entry.templateId)) && (!where?.OR || where.OR.some((pair: Row) => pair.templateId === entry.templateId && pair.version === entry.version))).sort((a, b) => b.version - a.version).map(copy)),
     },
     registrationFormVersion: {
       findFirst: vi.fn(async ({ where }: Row) => {
@@ -561,6 +561,24 @@ describe("saving a form as a template (#1065)", () => {
     expect(db.formVersions[0]!.definition.sections[0].fields.at(-1).acknowledgment.source).toBe("POLICY_VERSION");
   });
 
+  it("removes meal ticket prices (price, late price and the \"each\" label suffix) so one event's prices never reach another", async () => {
+    const camp = structuredClone(getFormTemplate("camp_meeting_export")!.definition);
+    const meal = camp.sections.flatMap((section) => section.fields).find((field) => field.key === "breakfast_adult_qty")!;
+    meal.priceCents = 700;
+    meal.latePricing = { startsOn: "2028-01-01", label: "Late price", priceCents: 900 };
+    meal.label = "Adult breakfasts — $7 each";
+    storeFormVersion(camp);
+    const result = await saveFormAsTemplate({ mode: "NEW", ...reference, name: "Meals", description: "", audience: "Any event" }, "admin-1");
+    const savedDefinition = db.templates.find((row) => row.key === result.key)!.definition;
+    const saved = savedDefinition.sections.flatMap((section: Row) => section.fields).find((field: Row) => field.key === "breakfast_adult_qty");
+    expect(saved.priceCents).toBeUndefined();
+    expect(saved.latePricing).toBeUndefined();
+    expect(saved.label).toBe("Adult breakfasts");
+    expect(JSON.stringify(savedDefinition)).toContain("lunch_adult_qty");
+    // The stored form version is read, never changed.
+    expect(db.formVersions[0]!.definition.sections.flatMap((section: Row) => section.fields).find((field: Row) => field.key === "breakfast_adult_qty").priceCents).toBe(700);
+  });
+
   it("re-runs the policy-version rule on a copy, so a source that carries one is refused and nothing is written", async () => {
     await syncSeededFormTemplates(db.prisma as never);
     const row = db.templates.find((entry) => entry.key === "simple_rsvp")!;
@@ -607,6 +625,15 @@ describe("template version ids and the used-by count filter (#1065)", () => {
     expect(second!.versionId).toBe(db.versions.find((row) => row.version === 2)!.id);
     const all = await loadAllFormTemplates(db.tx as never);
     expect(all.find((template) => template.key === "simple_rsvp")!.versionId).toBe(second!.versionId);
+  });
+
+  it("reads every template's version id in one query for the picker", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    db.tx.seededFormTemplateVersion.findUnique.mockClear();
+    db.tx.seededFormTemplateVersion.findMany.mockClear();
+    await loadAllFormTemplates(db.tx as never);
+    expect(db.tx.seededFormTemplateVersion.findMany).toHaveBeenCalledTimes(1);
+    expect(db.tx.seededFormTemplateVersion.findUnique).not.toHaveBeenCalled();
   });
 
   it("counts only the opened template's forms when opening one template, and every template for the list", async () => {

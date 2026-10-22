@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
 import { assertNoReservedChoiceValues, registrationFormDefinitionSchema, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
+import { stripMealPricesFromDefinition } from "@/modules/meals/domain";
 import {
   assertTemplateHasNoPolicyVersions,
   codeFormTemplate,
@@ -289,7 +290,7 @@ export type SaveFormAsTemplateResult = {
  * A system administrator turns a registration form into a template (#1065): a new APP template at version 1, or the next
  * version of an existing one, through the same advisory lock, versioning and audit path as every other template write. It
  * snapshots the one persisted form version named (never unsaved editor content), reading it inside the template lock, and
- * copies configuration only: no answers, registrations, test submissions, people or messages. Policy-version
+ * copies configuration only: no answers, registrations, test submissions, people or messages, and no meal ticket prices (the event's meal plan sets those). Policy-version
  * acknowledgments are an event's, so each becomes typed placeholder wording and is reported. The form is not changed.
  */
 export async function saveFormAsTemplate(input: SaveFormAsTemplateInput, actorUserId: string): Promise<SaveFormAsTemplateResult> {
@@ -302,7 +303,7 @@ export async function saveFormAsTemplate(input: SaveFormAsTemplateInput, actorUs
       if (!version) throw new FormTemplateError("FORM_NOT_FOUND", "That registration form version was not found.");
       const parsed = registrationFormDefinitionSchema.safeParse(version.definition);
       if (!parsed.success) throw new FormTemplateError("INVALID_TEMPLATE", "That form version's stored definition cannot be read, so it cannot be saved as a template.");
-      const { definition: portable, replacedLabels } = replacePolicyVersionAcknowledgments(parsed.data);
+      const { definition: portable, replacedLabels } = replacePolicyVersionAcknowledgments(stripMealPricesFromDefinition(parsed.data));
       const definition = prepareTemplateDefinition(portable);
       const origin: FormOrigin = { eventId: input.eventId, formId: input.formId, formVersionId: version.id };
       if (input.mode === "NEW") {

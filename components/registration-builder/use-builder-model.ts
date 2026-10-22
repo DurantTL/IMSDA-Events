@@ -11,13 +11,13 @@ import { useBuilderState } from "./use-builder-state";
 // builds it once and shares it through BuilderContext, so each zone of the
 // editor can be moved or wrapped without threading props.
 export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: ReturnType<typeof useConfirm>["confirm"]) {
-  const { eventId, eventSlug, eventName, eventAudience, eventBillingMode, templates, canEditNotifications = false, canSaveAsTemplate = false } = props;
+  const { eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications = false, canSaveAsTemplate = false } = props;
   const state = useBuilderState(props);
   const derived = useBuilderDerived(eventId, state);
   const edits = useBuilderEdits(state, derived);
   const removal = useBuilderRemoval(state, edits);
   const actions = useBuilderActions(props, state, derived, askConfirm);
-  return { eventId, eventSlug, eventName, eventAudience, eventBillingMode, templates, canEditNotifications, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions };
+  return { eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions };
 }
 
 export type BuilderModel = ReturnType<typeof useBuilderModel>;

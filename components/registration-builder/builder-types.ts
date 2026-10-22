@@ -39,6 +39,8 @@ export type TemplateView = {
   /** The template's latest version number, and the immutable id of that version (null when it is not stored yet). */
   version?: number | null;
   versionId?: string | null;
+  /** How many of its acknowledgments still carry the placeholder wording (a template saved from a form). */
+  placeholderAcknowledgments?: number;
 };
 /** The "template changed" notice (#1065): the form's source template has a newer, undismissed version. */
 export type TemplateNoticeView = { templateKey: string; templateName: string; appliedVersion: number; latestVersion: number; latestVersionId: string };

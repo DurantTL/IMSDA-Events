@@ -9,8 +9,10 @@ import type { PublicRegistrationStepId } from "@/modules/forms/public-registrati
 import { duplicatePublicFormGroups } from "@/modules/forms/duplicate-public-forms";
 import { type PreviewValue, type DragState, moduleCategories, type PreviewAttendee, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
 
-export function useBuilderState({ initialForms, focusTarget = null }: Pick<BuilderWorkspaceProps, "initialForms"> & Partial<Pick<BuilderWorkspaceProps, "focusTarget">>) {
+export function useBuilderState({ initialForms, templates: initialTemplates = [], focusTarget = null }: Pick<BuilderWorkspaceProps, "initialForms"> & Partial<Pick<BuilderWorkspaceProps, "focusTarget" | "templates">>) {
   const [forms, setForms] = useState(initialForms);
+  // The picker's templates; refreshed after a save as template so a second save names the current version (#1065).
+  const [templates, setTemplates] = useState(initialTemplates);
   // A setup warning (#617) links here with the form and field to fix: open that form.
   const focusedForm = focusTarget ? initialForms.find((form) => form.id === focusTarget.formId) : undefined;
   const [selectedFormId, setSelectedFormId] = useState(focusedForm?.id ?? initialForms[0]?.id ?? "");
@@ -85,7 +87,7 @@ export function useBuilderState({ initialForms, focusTarget = null }: Pick<Build
     setModuleQuery("");
     setModuleCategory("All");
   }
-  return { showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
+  return { templates, setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
 }
 
 export type BuilderState = ReturnType<typeof useBuilderState>;

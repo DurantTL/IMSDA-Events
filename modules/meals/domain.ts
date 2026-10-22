@@ -366,6 +366,26 @@ export function applyMealPricesToDefinition<F extends FormFieldLike, D extends F
   } as D;
 }
 
+/**
+ * The form with every bound ticket field's price removed: no price, no late price, and no "— $7 each" label suffix. Used when a
+ * form becomes a template (#1065), so one event's meal prices never travel into another event; the plan sets them again on creation.
+ */
+export function stripMealPricesFromDefinition<F extends FormFieldLike, D extends FormDefinitionLike<F>>(definition: D): D {
+  return {
+    ...definition,
+    sections: definition.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        if (!(field.type === "NUMBER" && field.scope === "REGISTRATION" && mealTicketBinding(field.key))) return field;
+        const rest: typeof field = { ...field, label: field.label.replace(LABEL_PRICE, "") };
+        delete rest.priceCents;
+        delete rest.latePricing;
+        return rest;
+      }),
+    })),
+  } as D;
+}
+
 /** Fields whose price differs from the plan's: the draft was saved before the plan's price changed. */
 export function mealPriceDrift<F extends FormFieldLike>(definition: FormDefinitionLike<F>, prices: ReadonlyMap<string, number>) {
   return mealTicketFields(definition).filter((field) => {

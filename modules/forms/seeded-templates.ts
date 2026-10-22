@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
-import { registrationFormDefinitionSchema, type FormTemplate } from "@/modules/forms/definition";
+import { registrationFormDefinitionSchema, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { codeFormTemplate, codeFormTemplates, formTemplateSignature, type CodeFormTemplate, type FormTemplateSource } from "@/modules/forms/form-template-library-domain";
 
@@ -104,9 +104,14 @@ export type LoadedFormTemplate = FormTemplate & {
   versionId: string | null;
 };
 
-async function storedVersionId(client: Client, row: { id: string; version: number }) {
-  const version = await client.seededFormTemplateVersion.findUnique({ where: { templateId_version: { templateId: row.id, version: row.version } }, select: { id: true } });
-  return version?.id ?? null;
+/** The immutable version id of each stored row's latest version, in one read however many rows there are. Keyed by row id. */
+async function storedVersionIds(client: Client, rows: ReadonlyArray<{ id: string; version: number }>) {
+  if (rows.length === 0) return new Map<string, string>();
+  const versions = await client.seededFormTemplateVersion.findMany({
+    where: { OR: rows.map((row) => ({ templateId: row.id, version: row.version })) },
+    select: { id: true, templateId: true, version: true },
+  });
+  return new Map(versions.map((version) => [version.templateId, version.id]));
 }
 
 /**
@@ -130,7 +135,7 @@ export async function loadFormTemplate(client: Client, key: string): Promise<Loa
     logWarn(`Form template row failed validation; ${fromCode ? "using the code's copy" : "it is not available"}`, { templateKey: key, storedVersion: row.version });
     return fromCode;
   }
-  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource, versionId: await storedVersionId(client, row) };
+  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource, versionId: (await storedVersionIds(client, [row])).get(row.id) ?? null };
 }
 
 /**
@@ -140,20 +145,34 @@ export async function loadFormTemplate(client: Client, key: string): Promise<Loa
  * validates is left out, with a log line naming its key.
  */
 export async function loadAllFormTemplates(client: Client): Promise<LoadedFormTemplate[]> {
-  const codeKeys = codeFormTemplates().map((template) => template.key);
-  const [code, appRows] = await Promise.all([
-    Promise.all(codeKeys.map((key) => loadFormTemplate(client, key))),
-    client.seededFormTemplate.findMany({ where: { key: { notIn: codeKeys } }, orderBy: [{ name: "asc" }, { key: "asc" }] }),
-  ]);
-  const app = (await Promise.all(appRows.map(async (row): Promise<LoadedFormTemplate[]> => {
+  const code = codeFormTemplates();
+  const codeKeys = new Set(code.map((template) => template.key));
+  // Two reads in all: every stored row, then every row's latest version id.
+  const rows = await client.seededFormTemplate.findMany({ orderBy: [{ name: "asc" }, { key: "asc" }] });
+  const versionIds = await storedVersionIds(client, rows);
+  const loadedRow = (row: (typeof rows)[number], definition: RegistrationFormDefinition): LoadedFormTemplate => ({
+    key: row.key, name: row.name, description: row.description, audience: row.audience, definition, version: row.version, source: row.latestSource, versionId: versionIds.get(row.id) ?? null,
+  });
+  const fromCode = code.flatMap((template): LoadedFormTemplate[] => {
+    const row = rows.find((entry) => entry.key === template.key);
+    const copy: LoadedFormTemplate = { key: template.key, name: template.name, description: template.description, audience: template.audience, definition: template.definition, version: template.version, source: "CODE", versionId: null };
+    if (!row) return [copy];
+    const definition = registrationFormDefinitionSchema.safeParse(row.definition);
+    if (!definition.success) {
+      logWarn("Form template row failed validation; using the code's copy", { templateKey: row.key, storedVersion: row.version });
+      return [copy];
+    }
+    return [loadedRow(row, definition.data)];
+  });
+  const app = rows.filter((row) => !codeKeys.has(row.key)).flatMap((row): LoadedFormTemplate[] => {
     const definition = registrationFormDefinitionSchema.safeParse(row.definition);
     if (!definition.success) {
       logWarn("Form template row failed validation; it is left out of the picker", { templateKey: row.key, storedVersion: row.version });
       return [];
     }
-    return [{ key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource, versionId: await storedVersionId(client, row) }];
-  }))).flat();
-  return [...code.filter((template): template is LoadedFormTemplate => template !== null), ...app];
+    return [loadedRow(row, definition.data)];
+  });
+  return [...fromCode, ...app];
 }
 
 /**

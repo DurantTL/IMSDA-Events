@@ -72,6 +72,17 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     finally { setBusy(null); }
   }
 
+  // Reloads the template list and each form's notice from the server, leaving the editor's draft and unsaved edits alone.
+  async function refreshTemplates() {
+    try {
+      const response = await fetch(`/api/events/${eventId}/forms`);
+      if (!response.ok) return;
+      const result = await response.json() as { forms: FormView[]; templates: BuilderWorkspaceProps["templates"] };
+      state.setTemplates(result.templates);
+      setForms((current) => current.map((form) => ({ ...form, templateNotice: result.forms.find((fresh) => fresh.id === form.id)?.templateNotice ?? null })));
+    } catch { /* the lists stay as they were; a stale version is refused by the server */ }
+  }
+
   async function saveDraft() {
     if (!selectedForm || !selectedVersion || !definition) return;
     setBusy("save"); setError(""); setNotice("");
@@ -199,5 +210,5 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     const nextDefinition = structuredClone(version.definition);
     setSelectedVersionId(version.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
   }
-  return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion };
+  return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion };
 }

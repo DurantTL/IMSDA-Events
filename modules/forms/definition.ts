@@ -97,6 +97,15 @@ export const ACKNOWLEDGMENT_TEXT_MAX = 4000;
  * of the acknowledgment kind. The reference is by version id, never "latest": the form version that carries it is
  * immutable once published and a policy version is never edited, so what a person saw can always be reproduced.
  */
+export const ACKNOWLEDGMENT_PLACEHOLDER_TEXT = "Replace this with the statement people acknowledge.";
+
+/** Labels of acknowledgment fields whose wording is still the placeholder (#1065): such a form version must not be published. */
+export function placeholderAcknowledgmentLabels(definition: { sections: Array<{ fields: Array<{ label: string; type: string; acknowledgment?: { source: string; text?: string } | undefined }> }> }) {
+  return definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.type === "ACKNOWLEDGMENT" && field.acknowledgment?.source === "TEXT" && field.acknowledgment.text?.trim() === ACKNOWLEDGMENT_PLACEHOLDER_TEXT)
+    .map((field) => field.label);
+}
+
 export const acknowledgmentConfigSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("TEXT"), text: z.string().trim().min(5, "Enter the acknowledgment wording.").max(ACKNOWLEDGMENT_TEXT_MAX) }),
   z.object({ source: z.literal("POLICY_VERSION"), policyVersionId: z.string().trim().min(1).max(100) }),

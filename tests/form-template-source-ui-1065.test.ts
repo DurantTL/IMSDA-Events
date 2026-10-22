@@ -38,6 +38,13 @@ describe("the template changed notice", () => {
     expect(markup).toMatch(/data-testid="template-changed-notice"[\s\S]*Update draft from a template/);
   });
 
+  it("puts the status on the text only, not around the action buttons", () => {
+    const markup = render({ templateNotice: notice });
+    const section = markup.match(/<section[^>]*data-testid="template-changed-notice"[^>]*>/)![0];
+    expect(section).not.toContain("role=");
+    expect(markup).toMatch(/<p class="field-help" role="status">This form was made/);
+  });
+
   it("shows nothing for a form with no source or a null notice", () => {
     expect(render()).not.toContain("template-changed-notice");
     expect(render({ templateNotice: null })).not.toContain("template-changed-notice");

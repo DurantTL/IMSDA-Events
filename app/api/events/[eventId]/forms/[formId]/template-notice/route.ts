@@ -10,6 +10,7 @@ import { withRequestContext } from "@/lib/request-context";
 const dismissSchema = z.object({ templateVersionId: z.string().trim().min(1).max(100) }).strict();
 
 function apiError(error: unknown) {
+  if (error instanceof SyntaxError) return Response.json({ error: "INVALID_JSON_BODY", message: "The request body must be valid JSON." }, { status: 400 });
   if (error instanceof z.ZodError) return Response.json({ error: "INVALID_FORM", message: error.issues[0]?.message }, { status: 400 });
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status });
   if (error instanceof FormOperationError) return Response.json({ error: error.code, message: error.message }, { status: error.code.endsWith("NOT_FOUND") ? 404 : 409 });

@@ -54,7 +54,8 @@ function assert(condition: unknown, message: string): asserts condition {
 
 /** Removes every template row. A form's source column points at a template version (#1065), so those are cleared first. */
 async function resetTemplateTables() {
-  await prisma.registrationForm.updateMany({ data: { sourceTemplateVersionId: null, dismissedTemplateVersionId: null } });
+  // Raw SQL, so the forms' @updatedAt is not bumped: the snapshots below compare every form whole.
+  await prisma.$executeRaw`UPDATE "RegistrationForm" SET "sourceTemplateVersionId" = NULL, "dismissedTemplateVersionId" = NULL WHERE "sourceTemplateVersionId" IS NOT NULL OR "dismissedTemplateVersionId" IS NOT NULL`;
   await prisma.seededFormTemplateVersion.deleteMany();
   await prisma.seededFormTemplate.deleteMany();
 }

@@ -8,7 +8,7 @@ import { useBuilder } from "./builder-context";
 type Saved = { key: string; version: number; created: boolean; replacedAcknowledgments: string[] };
 
 export function BuilderSaveTemplatePanel() {
-  const { eventId, selectedForm, selectedVersion, definition, dirty, busy, showSaveTemplate, setShowSaveTemplate, templates, canSaveAsTemplate } = useBuilder();
+  const { eventId, selectedForm, selectedVersion, definition, dirty, busy, showSaveTemplate, setShowSaveTemplate, templates, canSaveAsTemplate, refreshTemplates } = useBuilder();
   const [mode, setMode] = useState<"NEW" | "NEW_VERSION">("NEW");
   const [name, setName] = useState("");
   const [audience, setAudience] = useState("Any event");
@@ -35,6 +35,7 @@ export function BuilderSaveTemplatePanel() {
       const result = await response.json().catch(() => ({})) as Partial<Saved> & { message?: string };
       if (!response.ok || !result.key) throw new Error(result.message ?? "The template could not be saved.");
       setSaved(result as Saved);
+      await refreshTemplates();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The template could not be saved.");
     } finally {

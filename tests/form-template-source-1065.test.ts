@@ -60,7 +60,10 @@ function txFor(options: { templateRow?: unknown; versionRow?: unknown; existingF
     $queryRaw: vi.fn().mockResolvedValue([]),
     eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
     seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(templateRow) },
-    seededFormTemplateVersion: { findUnique: vi.fn().mockResolvedValue(versionRow) },
+    seededFormTemplateVersion: {
+      findUnique: vi.fn().mockResolvedValue(versionRow),
+      findMany: vi.fn().mockResolvedValue(versionRow ? [{ ...(versionRow as object), templateId: "tpl-1", version: 3 }] : []),
+    },
     registrationForm: {
       findUnique: vi.fn().mockResolvedValue(null),
       findFirst: vi.fn().mockResolvedValue(options.existingForm ?? formRow()),
@@ -112,6 +115,13 @@ describe("recording the source on New from template and Update draft from a temp
     expect(tx.auditLog.create.mock.calls[0]![0].data.metadata).toMatchObject({ templateVersionId: "tpl-version-3" });
   });
 
+  it("clears the form's source instead of leaving a stale one when the code's copy (no stored version) is applied", async () => {
+    const tx = txFor({ templateRow: null });
+    mocks.getPrisma.mockReturnValue(prismaFor(tx));
+    await replaceRegistrationFormDraftFromTemplate("event-1", "form-1", "user-1", template.key);
+    expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { status: "PUBLISHED", sourceTemplateVersionId: null, dismissedTemplateVersionId: null } });
+  });
+
   it("applies nothing and records nothing when the template moved on after it was chosen, never substituting the newer definition", async () => {
     const tx = txFor();
     mocks.getPrisma.mockReturnValue(prismaFor(tx));
@@ -153,6 +163,7 @@ describe("the \"template changed\" notice", () => {
   function listWith(forms: unknown[], sources: unknown[] = [source]) {
     const prisma = prismaFor(txFor(), {
       registrationForm: { findMany: vi.fn().mockResolvedValue(forms), findFirst: vi.fn().mockResolvedValue(forms[0]) },
+      seededFormTemplate: { findMany: vi.fn().mockResolvedValue([{ id: "tpl-1", definition: sources.length > 0 ? (sources[0] as { template: { definition: unknown } }).template.definition : null }]) },
       seededFormTemplateVersion: { findMany: vi.fn().mockResolvedValueOnce(sources).mockResolvedValueOnce([{ id: "tpl-version-3", templateId: "tpl-1" }]) },
     });
     mocks.getPrisma.mockReturnValue(prisma);
@@ -195,6 +206,17 @@ describe("the \"template changed\" notice", () => {
     expect((await listRegistrationForms("event-1"))[0]!.templateNotice).toBeNull();
   });
 
+  it("reads and parses template definitions only for templates that are newer, once each", async () => {
+    const prisma = listWith([formRow({ sourceTemplateVersionId: "tpl-version-1" }), formRow({ id: "form-2", sourceTemplateVersionId: "tpl-version-1" })]);
+    await listRegistrationForms("event-1");
+    const templateReads = (prisma as unknown as { seededFormTemplate: { findMany: ReturnType<typeof vi.fn> } }).seededFormTemplate.findMany;
+    expect(templateReads).toHaveBeenCalledTimes(1);
+    expect(templateReads.mock.calls[0]![0].where).toEqual({ id: { in: ["tpl-1"] } });
+    const current = listWith([formRow({ sourceTemplateVersionId: "tpl-version-3" })], [{ ...source, id: "tpl-version-3", version: 3 }]);
+    await listRegistrationForms("event-1");
+    expect((current as unknown as { seededFormTemplate: { findMany: ReturnType<typeof vi.fn> } }).seededFormTemplate.findMany).not.toHaveBeenCalled();
+  });
+
   it("is included when one form is read", async () => {
     listWith([formRow({ sourceTemplateVersionId: "tpl-version-1" })]);
     expect((await getRegistrationForm("event-1", "form-1"))!.templateNotice).toMatchObject({ latestVersionId: "tpl-version-3" });
@@ -215,7 +237,12 @@ describe("dismissing the notice for one version", () => {
   it("records only the dismissed version, never touching the form's source, and audits ids", async () => {
     const tx = dismissTx({ templateId: "tpl-1", version: 1 }, { templateId: "tpl-1", version: 3 });
     await dismissTemplateNotice("event-1", "form-1", "user-1", "tpl-version-3");
-    expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { dismissedTemplateVersionId: "tpl-version-3" } });
+    // Raw, so the form's updatedAt (which orders the forms list) is untouched, and only the dismissal column is written.
+    expect(tx.registrationForm.update).not.toHaveBeenCalled();
+    const [strings, ...values] = tx.$executeRaw.mock.calls.at(-1) as unknown as [string[], ...unknown[]];
+    expect(strings.join("?")).toContain('SET "dismissedTemplateVersionId" =');
+    expect(strings.join("?")).not.toContain("sourceTemplateVersionId");
+    expect(values).toEqual(["tpl-version-3", "form-1"]);
     expect(tx.registrationFormVersion.create).not.toHaveBeenCalled();
     expect(tx.registrationFormVersion.update).not.toHaveBeenCalled();
     expect(tx.auditLog.create.mock.calls[0]![0].data).toMatchObject({ action: "REGISTRATION_FORM_TEMPLATE_NOTICE_DISMISSED", eventId: "event-1", actorUserId: "user-1", entityId: "form-1" });
@@ -288,6 +315,13 @@ describe("who can do what", () => {
     expect((await FROM_FORM(post({ ...saveBody, mode: "NEW_VERSION", templateKey: "simple_rsvp", expectedVersion: 1, name: undefined, description: undefined, audience: undefined }))).status).toBe(409);
     mocks.saveFormAsTemplate.mockRejectedValueOnce(new FormTemplateError("FORM_NOT_FOUND", "missing"));
     expect((await FROM_FORM(post(saveBody))).status).toBe(404);
+  });
+
+  it("answers malformed JSON on the dismiss route with 400, not 500", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-1", globalRole: "SYSTEM_ADMIN" } });
+    const request = new Request("https://events.imsda.test/api", { method: "POST", headers: { "content-type": "application/json" }, body: "{not json" });
+    const response = await DISMISS(request, { params: Promise.resolve({ eventId: "event-1", formId: "form-1" }) });
+    expect(response.status).toBe(400);
   });
 
   it("lets staff with MANAGE_FORMS dismiss the notice, and nobody without it, with the cross-origin guard first", async () => {

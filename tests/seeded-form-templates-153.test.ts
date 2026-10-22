@@ -73,7 +73,7 @@ describe("seeded form templates (#153)", () => {
 
     const revised = structuredClone(bundled.definition);
     revised.title = "Synthetic revised title";
-    const stored = { seededFormTemplate: { findUnique: vi.fn().mockResolvedValue({ id: "template-1", key: bundled.key, version: bundled.version + 1, name: bundled.name, description: "", audience: bundled.audience, definition: revised }) }, seededFormTemplateVersion: { findUnique: vi.fn().mockResolvedValue({ id: "template-version-9" }) } };
+    const stored = { seededFormTemplate: { findUnique: vi.fn().mockResolvedValue({ id: "template-1", key: bundled.key, version: bundled.version + 1, name: bundled.name, description: "", audience: bundled.audience, definition: revised }) }, seededFormTemplateVersion: { findMany: vi.fn().mockResolvedValue([{ id: "template-version-9", templateId: "template-1", version: bundled.version + 1 }]) } };
     const fromRow = await loadSeededFormTemplate(stored as never, bundled.key);
     expect(fromRow).toMatchObject({ version: bundled.version + 1, versionId: "template-version-9" });
     expect(fromRow!.definition.title).toBe("Synthetic revised title");

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
-import { formTemplates, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { ACKNOWLEDGMENT_PLACEHOLDER_TEXT, formTemplates, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
 
 /**
  * The form template library (#1064): the pure parts. A form template is one
@@ -98,7 +98,7 @@ export type FormTemplateLibraryEntry = {
 export type FormTemplateVersionEntry = { version: number; source: FormTemplateSource; createdAt: string; createdBy: string | null };
 
 /** The wording a policy-version acknowledgment becomes in a template: a visible prompt for staff to replace, never a silent blank. */
-export const templateAcknowledgmentPlaceholder = "Replace this with the statement people acknowledge.";
+export const templateAcknowledgmentPlaceholder = ACKNOWLEDGMENT_PLACEHOLDER_TEXT;
 
 function policyVersionAcknowledgmentLabels(definition: RegistrationFormDefinition) {
   return definition.sections.flatMap((section) => section.fields)

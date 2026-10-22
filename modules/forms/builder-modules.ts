@@ -1,4 +1,4 @@
-import { DIRECTORY_NOT_LISTED_VALUE, localCalendarDate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { ACKNOWLEDGMENT_PLACEHOLDER_TEXT, DIRECTORY_NOT_LISTED_VALUE, localCalendarDate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { fullNameKeys, splitNameKeyPairs } from "@/modules/forms/public-domain";
 import { shirtSizeOptions } from "@/modules/merchandise/legacy-shirt-size-compat";
 
@@ -600,7 +600,7 @@ export const builderFieldModules: BuilderModuleDefinition[] = [
     category: "Common",
     name: "Recorded acknowledgment",
     description: "Records the exact wording or policy version acknowledged",
-    fields: [{ key: "acknowledgment_record", label: "Acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION", required: true, options: [], acknowledgment: { source: "TEXT", text: "Replace this with the statement people acknowledge." } }],
+    fields: [{ key: "acknowledgment_record", label: "Acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION", required: true, options: [], acknowledgment: { source: "TEXT", text: ACKNOWLEDGMENT_PLACEHOLDER_TEXT } }],
   },
   {
     key: "scheduled_fee",

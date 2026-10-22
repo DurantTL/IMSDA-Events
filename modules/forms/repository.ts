@@ -6,6 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
 import {
   assertNoReservedChoiceValues,
+  placeholderAcknowledgmentLabels,
   registrationFormDefinitionSchema,
   summarizeChoiceUsage,
   type RegistrationFormDefinition,
@@ -78,7 +79,7 @@ async function assertAcknowledgmentPolicies(eventId: string, definition: Registr
 
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED" | "ACKNOWLEDGMENT_PLACEHOLDER",
     message: string,
   ) {
     super(message);
@@ -166,9 +167,15 @@ async function loadTemplateNotices(forms: ReadonlyArray<{ id: string; sourceTemp
   const prisma = getPrisma();
   const sources = await prisma.seededFormTemplateVersion.findMany({
     where: { id: { in: sourceIds } },
-    select: { id: true, version: true, template: { select: { id: true, key: true, name: true, version: true, definition: true } } },
+    select: { id: true, version: true, template: { select: { id: true, key: true, name: true, version: true } } },
   });
-  const newer = sources.filter((source) => source.template.version > source.version && registrationFormDefinitionSchema.safeParse(source.template.definition).success);
+  const changed = sources.filter((source) => source.template.version > source.version);
+  if (changed.length === 0) return notices;
+  // Definitions are read and parsed only for templates that are newer, once each.
+  const changedTemplateIds = [...new Set(changed.map((source) => source.template.id))];
+  const stored = await prisma.seededFormTemplate.findMany({ where: { id: { in: changedTemplateIds } }, select: { id: true, definition: true } });
+  const readable = new Set(stored.filter((row) => registrationFormDefinitionSchema.safeParse(row.definition).success).map((row) => row.id));
+  const newer = changed.filter((source) => readable.has(source.template.id));
   if (newer.length === 0) return notices;
   const templates = [...new Map(newer.map((source) => [source.template.id, source.template])).values()];
   const latest = await prisma.seededFormTemplateVersion.findMany({
@@ -265,7 +272,7 @@ export async function getRegistrationForm(eventId: string, formId: string) {
 export async function listFormTemplates() {
   const resolved = await loadAllFormTemplates(getPrisma());
   return resolved.map(({ key, name, description, audience, definition, version, versionId }) => ({
-    key, name, description, audience, version: version ?? null, versionId, collectsPayment: Boolean(definition.payment?.enabled), sectionCount: definition.sections.length,
+    key, name, description, audience, version: version ?? null, versionId, placeholderAcknowledgments: placeholderAcknowledgmentLabels(definition).length, collectsPayment: Boolean(definition.payment?.enabled), sectionCount: definition.sections.length,
     fieldCount: definition.sections.reduce((count, section) => count + section.fields.length, 0),
   }));
 }
@@ -404,7 +411,8 @@ export async function replaceRegistrationFormDraftFromTemplate(eventId: string, 
       // replacement leaves the earlier source untouched. A dismissal named an older "newer" version, so it is cleared too.
       await tx.registrationForm.update({ where: { id: formId }, data: {
         status: hasLiveVersion ? RegistrationFormStatus.PUBLISHED : RegistrationFormStatus.DRAFT,
-        ...(template.versionId ? { sourceTemplateVersionId: template.versionId, dismissedTemplateVersionId: null } : {}),
+        // With no stored version to point at (the code's copy was applied) the old source would be wrong, so it is cleared.
+        sourceTemplateVersionId: template.versionId, dismissedTemplateVersionId: null,
       } });
       await tx.auditLog.create({ data: {
         eventId, actorUserId, action: "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE", entityType: "RegistrationForm", entityId: formId,
@@ -437,7 +445,8 @@ export async function dismissTemplateNotice(eventId: string, formId: string, act
     if (!source || !target || target.templateId !== source.templateId || target.version <= source.version) {
       throw new FormOperationError("TEMPLATE_CHANGED", "There is no newer version of this form's template to dismiss. Reload the page.");
     }
-    await tx.registrationForm.update({ where: { id: formId }, data: { dismissedTemplateVersionId: templateVersionId } });
+    // Raw, so the form's updatedAt (which orders the forms list) is not bumped by a dismissal.
+    await tx.$executeRaw`UPDATE "RegistrationForm" SET "dismissedTemplateVersionId" = ${templateVersionId} WHERE "id" = ${formId}`;
     await tx.auditLog.create({ data: {
       eventId, actorUserId, action: "REGISTRATION_FORM_TEMPLATE_NOTICE_DISMISSED", entityType: "RegistrationForm", entityId: formId,
       correlationId: randomUUID(), summary: `Dismissed the "template changed" notice on ${form.name} for one template version.`,
@@ -591,6 +600,9 @@ export async function publishRegistrationForm(eventId: string, formId: string, a
     const questionOrder = clubQuestionOrderProblem(definition);
     if (questionOrder) throw new FormOperationError("CLUB_QUESTION_ORDER", questionOrder);
     await assertAcknowledgmentPolicies(eventId, definition);
+    // A form saved as a template carries placeholder wording to reword (#1065); it must not go live as the real statement.
+    const placeholders = placeholderAcknowledgmentLabels(definition);
+    if (placeholders.length > 0) throw new FormOperationError("ACKNOWLEDGMENT_PLACEHOLDER", `Write the acknowledgment statement for: ${placeholders.join(", ")}.`);
     // A test is required only before a form's first publish (#564, #1061).
     // The first publish proves the form can be filled in and priced. Once a
     // version has been published or archived, later drafts are mostly wording
