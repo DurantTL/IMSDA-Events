@@ -575,6 +575,126 @@
         2560,
         1800
       ]
+    },
+    "club-class-tracking": {
+      "path": "assets/training/club-class-tracking.png",
+      "description": "Morgan Reed\u2019s Friend completion is recorded. The filtered member table shows the completion date and Class history.",
+      "route": "/account/clubs/training_club_riverton/class-tracking",
+      "state": "Actual current app; isolated fictional training data; developer overlay hidden; no source changes",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "9a0a84afff7b475af45928d668fb6963b77d86a184384ee51e5b3e30c06a5d03",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "club-orders-list": {
+      "path": "assets/training/club-orders-list.png",
+      "description": "Actual Orders helper row: Pathfinder Scarf quantity 4 minus available stock 2 gives 2 to order. Save and Remove edit this helper list.",
+      "route": "/account/clubs/training_club_riverton/orders",
+      "state": "Actual app; isolated fictional training data; captured real panel or viewport; developer overlay hidden",
+      "dimensions": [
+        2224,
+        176
+      ],
+      "sha256": "dea786db46d48292cb61e050058a845803d28ae895501da98bb735895f8c5bf3",
+      "image_pixels": [
+        2224,
+        176
+      ]
+    },
+    "club-year-end": {
+      "path": "assets/training/club-year-end.png",
+      "description": "Year-End draft review shows membership 9, staff 1 and total membership 10, with calculated totals and roster sources.",
+      "route": "/account/clubs/training_club_riverton/reports/year-end/2026-27",
+      "state": "Actual app; isolated fictional training data; captured real panel or viewport; developer overlay hidden",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "e45aa4907416688b954e9ef27e2e733c79230d898894c3b90c2789ca4704ad09",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "club-class-suggestions": {
+      "path": "assets/training/club-class-suggestions.png",
+      "description": "Morgan Reed\u2019s four suggested Friend insignia items require a separate Add to order list confirmation.",
+      "route": "/account/clubs/training_club_riverton/class-tracking",
+      "state": "Actual current app; isolated fictional training data; developer overlay hidden; no source changes",
+      "dimensions": [
+        2264,
+        698
+      ],
+      "sha256": "95a3df45fab66195bd1886f5103ee093bf3d11c0de90106c066298e08947a334",
+      "image_pixels": [
+        2264,
+        698
+      ]
+    },
+    "club-orders-handout": {
+      "path": "assets/training/club-orders-handout.png",
+      "description": "Drew Patel\u2019s Good Conduct Bar is ready from stock. The selected row enables the actual Mark handed out action.",
+      "route": "/account/clubs/training_club_riverton/orders",
+      "state": "Actual current app; isolated fictional training data; developer overlay hidden; no source changes",
+      "dimensions": [
+        2272,
+        892
+      ],
+      "sha256": "5572cead2a39a2257a3a2cc0ba5c13d0b9aa71bc4faaf22f3784ecfc6ac0478d",
+      "image_pixels": [
+        2272,
+        892
+      ]
+    },
+    "club-orders-stock-after": {
+      "path": "assets/training/club-orders-stock-after.png",
+      "description": "After the actual handout, Good Conduct Bar stock is 2. Drew\u2019s need is no longer in Ready to hand out.",
+      "route": "/account/clubs/training_club_riverton/orders",
+      "state": "Actual current app; isolated fictional training data; developer overlay hidden; no source changes",
+      "dimensions": [
+        2272,
+        1196
+      ],
+      "sha256": "9867972f326c5f278abbb00e2e6d00644e41ad66086ec963dcfe620a2628211b",
+      "image_pixels": [
+        2272,
+        1196
+      ]
+    },
+    "club-year-end-save": {
+      "path": "assets/training/club-year-end-save.png",
+      "description": "Lower Year-End sections distinguish prefilled class and honor counts from manual entries, with Save draft and Submit report.",
+      "route": "/account/clubs/training_club_riverton/reports/year-end/2026-27",
+      "state": "Actual current app; isolated fictional training data; developer overlay hidden; no source changes",
+      "dimensions": [
+        2560,
+        1800
+      ],
+      "sha256": "2cef7a485d04f6dd5b2175d90446152d5d3d3ac863a85a0caa329b7370c085b5",
+      "image_pixels": [
+        2560,
+        1800
+      ]
+    },
+    "club-year-end-header": {
+      "path": "assets/training/club-year-end-header.png",
+      "description": "Actual Year-End Report header: Pathfinder year 2026\u201327, May 1\u2013April 30, due April 1, 2027, and Draft state.",
+      "route": "/account/clubs/training_club_riverton/reports/year-end/2026-27",
+      "state": "Actual app; isolated fictional training data; captured real panel or viewport; developer overlay hidden",
+      "dimensions": [
+        2360,
+        326
+      ],
+      "sha256": "c70adf36f6ea6eeb56f06135c00682dde9e52bc607eb592afb00b067ee73e9c1",
+      "image_pixels": [
+        2360,
+        326
+      ]
     }
   }
 }

@@ -1,5 +1,7 @@
 # Closing feature slides: source and status audit
 
+**Historical review of the prior 31-slide deck.** The latest 33-slide revision shows the three club tools with current screenshots and replaces the planned form-builder pitch with a meeting workflow. See `meeting-form-builder-review.md`, `more-club-tools-independent-qa.md` and `deck-source.json` for the current section and slide numbers.
+
 Reviewed for the October 21, 2026 presentation revision. The current application evidence is the same source baseline used for the screenshot deck, `7f77c1dfeadd004deb51f91e2bae1b6c4754638b`. The feature report and matrix retain their original `5e367b7c` historical baseline. Current GitHub issue bodies and labels were checked again for the closing section; an open parent issue is not proof that every child capability is missing.
 
 ## Recommended ending

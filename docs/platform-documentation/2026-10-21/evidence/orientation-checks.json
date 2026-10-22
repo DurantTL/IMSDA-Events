@@ -1,12 +1,12 @@
 {
   "source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
-  "slides": 31,
-  "speaker_notes": "All 31 slides have Say, with Show/Ask as appropriate",
-  "picture_shapes": 42,
-  "registered_screenshot_examples": 34,
-  "unique_capture_images": 33,
+  "slides": 33,
+  "speaker_notes": "All 33 slides have Say, with Show/Ask as appropriate",
+  "picture_shapes": 52,
+  "registered_screenshot_examples": 42,
+  "unique_capture_images": 41,
   "screenshot_alt_descriptions": true,
-  "visuals": "Current local application with fictional training records, plus six explicitly labelled capability and future-outlook diagrams",
+  "visuals": "Current fictional-data app screenshots including class tracking, supplies and year-end reporting; stable meeting-day form workflow; labelled capability/future diagrams",
   "visible_words_per_slide": [
     41,
     58,
@@ -32,15 +32,17 @@
     49,
     61,
     46,
-    64,
+    61,
+    67,
+    69,
     97,
     111,
-    116,
+    103,
     80,
     108,
     56
   ],
-  "source_file_references": 70,
+  "source_file_references": 79,
   "unrelated_reference_files_unchanged": 20,
   "office_packages_valid": true,
   "shape_bounds_valid": true,
@@ -72,8 +74,8 @@
     },
     {
       "file": "IMSDA-Events-platform-briefing.pdf",
-      "pages": 31,
-      "toc_entries": 31,
+      "pages": 33,
+      "toc_entries": 33,
       "tagged": true
     },
     {
@@ -90,40 +92,50 @@
     },
     {
       "file": "06-presenter-notes.pdf",
-      "pages": 19,
-      "toc_entries": 158,
+      "pages": 21,
+      "toc_entries": 173,
       "tagged": true
     }
   ],
-  "outlook_review_commit": "2cac4150c2b237b02190495d931e6bffb2189184",
+  "outlook_review_commit": "6667bc02c95b62fcce03c035b02c62823c9eb4f1",
   "outlook_slides": [
     {
       "slide": 25,
-      "title": "More club tools are already here",
+      "title": "Record completed classes and earned items",
       "status": "current"
     },
     {
       "slide": 26,
-      "title": "Event teams have tools before, during and after",
+      "title": "Use Orders for supplies and hand-outs",
       "status": "current"
     },
     {
       "slide": 27,
+      "title": "Review the Year-End Report",
+      "status": "current"
+    },
+    {
+      "slide": 28,
+      "title": "Event teams have tools before, during and after",
+      "status": "current"
+    },
+    {
+      "slide": 29,
       "title": "Planned: make the next task easier to find",
       "status": "planned"
     },
     {
-      "slide": 28,
-      "title": "Planned: make forms easier to build and maintain",
-      "status": "planned"
+      "slide": 30,
+      "title": "Build and check an event form",
+      "status": "current"
     },
     {
-      "slide": 29,
+      "slide": 31,
       "title": "A full camp workflow could build on this foundation",
       "status": "possible"
     },
     {
-      "slide": 30,
+      "slide": 32,
       "title": "Longer-term possibilities to develop",
       "status": "possible"
     }

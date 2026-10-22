@@ -1,0 +1,45 @@
+{
+  "source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
+  "captured_on": "2026-10-22",
+  "app_source_changed": false,
+  "synthetic_only": true,
+  "core_story": {
+    "active_roster": 10,
+    "monthly_reports": [
+      {
+        "reportMonth": "2026-09",
+        "status": "SUBMITTED",
+        "totalPoints": 410
+      },
+      {
+        "reportMonth": "2026-10",
+        "status": "SUBMITTED",
+        "totalPoints": 410
+      }
+    ],
+    "event_status": "SUBMITTED",
+    "event_attendees": 6
+  },
+  "new_examples": {
+    "class_completions": 2,
+    "good_conduct_stock_before": 3,
+    "good_conduct_stock_after": 2,
+    "good_conduct_need_after": "AWARDED",
+    "handout_http_status": 200,
+    "year_end_save_draft_http_status": 200,
+    "year_end_status": "DRAFT",
+    "year_end_totals": {
+      "membership": 9,
+      "staff": 1,
+      "totalMembership": 10,
+      "tlts": 0,
+      "youthBaptisms": 1,
+      "invested": 2
+    }
+  },
+  "checks": {
+    "core_story_preserved": true,
+    "handout_decrements_stock": true,
+    "year_end_remains_draft": true
+  }
+}
