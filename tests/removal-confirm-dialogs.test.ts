@@ -72,12 +72,14 @@ describe("high-consequence actions use the shared ConfirmDialog, not window.conf
  */
 describe("removal review dialogs say what's removed and what's kept (#471)", () => {
   it("registration builder shows the real submitted-answer count before removing a field or section", () => {
-    const code = source("components/registration-builder-workspace.tsx");
+    const code = source("components/registration-builder/builder-dialogs.tsx");
+    const removal = source("components/registration-builder/use-builder-removal.ts");
     expect(code).toContain("<ConfirmDialog");
     expect(code).toContain("removalAnswerNote(");
-    expect(code).toContain("/field-answer-counts");
+    expect(removal).toContain("/field-answer-counts");
     // A failed lookup is worded neutrally, never as "no answers".
     expect(code).not.toContain("No attendee has submitted an answer");
+    expect(removal).not.toContain("No attendee has submitted an answer");
     expect(source("modules/forms/field-answer-counts.ts")).toContain("stay on those registrations");
   });
 

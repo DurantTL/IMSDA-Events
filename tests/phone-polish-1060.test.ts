@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -19,11 +19,15 @@ function textControls(source: string, firstLine = 1) {
 }
 
 describe("form builders do not invite AutoFill (#1060)", () => {
-  const registration = read("components/registration-builder-workspace.tsx");
-  // The preview above the editor (before the form-title input) is not a builder field.
-  const editorStart = registration.slice(0, registration.indexOf("value={definition.title}")).split("\n").length;
+  // The builder is split across components/registration-builder/. The live preview's
+  // inputs (builder-preview.tsx) imitate the public form and are not builder fields.
+  const registration = readdirSync(path.join(process.cwd(), "components/registration-builder"))
+    .filter((file) => file.endsWith(".tsx") && file !== "builder-preview.tsx")
+    .sort()
+    .map((file) => read(`components/registration-builder/${file}`))
+    .join("\n");
   const sets = [
-    ["registration builder", textControls(registration, editorStart - 1)],
+    ["registration builder", textControls(registration)],
     ["club form builder", textControls(read("components/club-form-builder.tsx"))],
   ] as const;
 

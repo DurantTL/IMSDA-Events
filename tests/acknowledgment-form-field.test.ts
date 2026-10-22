@@ -223,7 +223,9 @@ describe("the builder module and settings", () => {
 
 describe("the screens (#150)", () => {
   const publicForm = readFileSync("components/public-registration-form.tsx", "utf8");
-  const builder = readFileSync("components/registration-builder-workspace.tsx", "utf8");
+  const builderDerived = readFileSync("components/registration-builder/use-builder-derived.ts", "utf8");
+  const builderFieldSettings = readFileSync("components/registration-builder/builder-field-settings.tsx", "utf8");
+  const builderTypes = readFileSync("components/registration-builder/builder-types.ts", "utf8");
   const settings = readFileSync("components/acknowledgment-field-settings.tsx", "utf8");
   const styles = readFileSync("app/globals.css", "utf8");
 
@@ -260,13 +262,13 @@ describe("the screens (#150)", () => {
     expect(settings).toContain("/api/events/${eventId}/consent-policy-versions");
     expect(settings).not.toContain("/consent-policies");
     expect(settings).toContain('version.kind === "ACKNOWLEDGMENT"');
-    expect(builder).toContain("useAcknowledgmentPolicyVersions");
-    expect(builder).toContain("AcknowledgmentFieldSettings");
+    expect(builderDerived).toContain("useAcknowledgmentPolicyVersions");
+    expect(builderFieldSettings).toContain("AcknowledgmentFieldSettings");
   });
 
   it("labels the old checkbox as a checkbox so the two are never confused", () => {
-    expect(builder).toContain('CHECKBOX: "Checkbox"');
-    expect(builder).toContain('ACKNOWLEDGMENT: "Recorded acknowledgment"');
+    expect(builderTypes).toContain('CHECKBOX: "Checkbox"');
+    expect(builderTypes).toContain('ACKNOWLEDGMENT: "Recorded acknowledgment"');
   });
 
   it("makes the wording region and the tick a comfortable touch target and keeps it inside the viewport", () => {

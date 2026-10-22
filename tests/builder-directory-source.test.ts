@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 // Field settings only render once a field is expanded (client state), so this
 // checks the builder source: a directory-sourced field shows a note instead of
 // the hand-typed choices, per-choice descriptions, and per-choice prices.
-const builder = readFileSync(path.join(process.cwd(), "components/registration-builder-workspace.tsx"), "utf8");
+const builder = readFileSync(path.join(process.cwd(), "components/registration-builder/builder-choice-settings.tsx"), "utf8");
 
 describe("builder directory-sourced fields (#482)", () => {
   it("replaces the choices and description editors with a note for a directory-sourced field", () => {

@@ -124,10 +124,13 @@ describe("Fee warning names and links to the field (#617)", () => {
   });
 
   it("the builder labels the amount input as the registration fee and can be focused by id", () => {
-    const source = readFileSync("components/registration-builder-workspace.tsx", "utf8");
-    expect(source).toContain(REGISTRATION_FEE_INPUT_LABEL);
-    expect(source).toContain("id={`registration-fee-${field.id}`}");
-    expect(source).toContain('document.getElementById(`registration-fee-${focusedFieldId}`)');
+    const settings = readFileSync("components/registration-builder/builder-field-settings.tsx", "utf8");
+    const advanced = readFileSync("components/registration-builder/builder-field-advanced.tsx", "utf8");
+    const state = readFileSync("components/registration-builder/use-builder-state.ts", "utf8");
+    expect(settings).toContain(REGISTRATION_FEE_INPUT_LABEL);
+    expect(settings).toContain("id={`registration-fee-${field.id}`}");
+    expect(advanced).toContain("id={`registration-fee-${field.id}`}");
+    expect(state).toContain('document.getElementById(`registration-fee-${focusedFieldId}`)');
     expect(readFileSync("app/(workspace)/registration-builder/page.tsx", "utf8")).toContain("focusTarget");
   });
 });

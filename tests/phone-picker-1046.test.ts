@@ -123,6 +123,6 @@ describe("full-screen phone picker (#1046)", () => {
   it("covers every phone-facing caller", () => {
     expect(read("components/public-registration-form.tsx")).toMatch(/sheet=\{!embedded\}\s+label=\{field\.label\}/);
     expect(read("components/attendee-registration-answers-form.tsx")).toMatch(/<SearchableSelect[\s\S]*?\bsheet\b[\s\S]*?label=\{field\.label\}/);
-    expect(read("components/registration-builder-workspace.tsx")).toContain("<SearchableSelect id={inputId} sheet label={field.label}");
+    expect(read("components/registration-builder/builder-preview.tsx")).toContain("<SearchableSelect id={inputId} sheet label={field.label}");
   });
 });
