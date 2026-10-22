@@ -38,7 +38,14 @@ import {
   eventTimeZones,
   type EventSettingsInput,
 } from "@/modules/events/schemas";
-import { buildRegistrationEmbedCode } from "@/modules/forms/embed";
+import {
+  SAVED_SHARE_ADDRESS_NOTE,
+  copySavedEmbedCode,
+  embedPath,
+  isCopiedFor,
+  publicEventPath,
+  shareAddressDiffers,
+} from "@/modules/events/share-links";
 import { setEventSettingsDirty } from "@/components/event-settings-dirty";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
@@ -175,7 +182,7 @@ export function EventSettingsWorkspace({
   const [saveMessage, setSaveMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [copiedFormSlug, setCopiedFormSlug] = useState("");
+  const [copied, setCopied] = useState<{ eventSlug: string; formSlug: string } | null>(null);
   // Which blocks are open (#743). Only the first is open on load; closing a
   // block hides it (a native <details>) and never unmounts its fields, so typed
   // values and validation survive.
@@ -316,6 +323,8 @@ export function EventSettingsWorkspace({
       const nextDraft = draftFromEvent(result.event);
       setDraft(nextDraft);
       setSavedDraft(nextDraft);
+      // A save can change the name in copied embed code, so earlier "Copied" no longer describes the clipboard (#1115).
+      setCopied(null);
       setPublishedFormCount(result.event.publishedFormCount);
       setPublished(result.event.isPublished);
       setLoadedDates({ startsOn: result.event.startsOn, endsOn: result.event.endsOn });
@@ -486,18 +495,19 @@ export function EventSettingsWorkspace({
   }
 
   async function copyEmbedCode(formSlug: string) {
-    const code = buildRegistrationEmbedCode({
+    // Copied code identifies the last saved event, never unsaved edits.
+    const result = await copySavedEmbedCode({
       origin: window.location.origin,
-      eventSlug: draft.slug,
+      saved: savedDraft,
       formSlug,
-      eventName: draft.name,
+      writeText: (text) => navigator.clipboard.writeText(text),
     });
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopiedFormSlug(formSlug);
+    if (result.ok) {
+      setCopied(result.copied);
       setNotice("Auto-sizing embed code copied. Paste the full block into the website’s Custom HTML area.");
       setError("");
-    } catch {
+    } else {
+      setCopied(null);
       setError("The embed code could not be copied. Open the embedded form and copy its address instead.");
     }
   }
@@ -1084,25 +1094,28 @@ export function EventSettingsWorkspace({
                   <p>Link to the event page from IMSDA.org, or embed a specific form in a Custom HTML block.</p>
                   <a
                     className="secondary-button full-button"
-                    href={`/events/${encodeURIComponent(draft.slug)}`}
+                    href={publicEventPath(savedDraft)}
                     target="_blank"
                     rel="noreferrer"
                   >
                     <ExternalLink size={15} aria-hidden="true" /> Open public event page
                   </a>
+                  {shareAddressDiffers(draft, savedDraft) && (
+                    <p className="event-share-saved-note" role="status">{SAVED_SHARE_ADDRESS_NOTE}</p>
+                  )}
                   <div className="event-share-form-list">
                     {initialEvent.publishedForms.map((form) => (
                       <article key={form.id}>
-                        <span><strong>{form.name}</strong><small>/embed/{draft.slug}/{form.slug}</small></span>
+                        <span><strong>{form.name}</strong><small>{embedPath(savedDraft, form.slug)}</small></span>
                         <button
                           className="secondary-button"
                           type="button"
                           onClick={() => copyEmbedCode(form.slug)}
                         >
-                          {copiedFormSlug === form.slug
+                          {isCopiedFor(copied, savedDraft, form.slug)
                             ? <CheckCircle2 size={15} aria-hidden="true" />
                             : <Copy size={15} aria-hidden="true" />}
-                          {copiedFormSlug === form.slug ? "Copied" : "Copy embed code"}
+                          {isCopiedFor(copied, savedDraft, form.slug) ? "Copied" : "Copy embed code"}
                         </button>
                       </article>
                     ))}
