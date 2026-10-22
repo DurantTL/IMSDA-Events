@@ -27,10 +27,12 @@ npm run club-forms:sync
 echo "[entrypoint] Syncing lodging property templates (npm run lodging:sync)..."
 npm run lodging:sync
 
-# Bring the seeded form templates (#153: Women's Retreat, Camp Meeting, Spring
-# Camporee) to this release's version. It only adds or updates the template
-# rows; no event, registration form or published form version is touched.
-echo "[entrypoint] Syncing seeded form templates (npm run form-templates:sync)..."
+# Bring the form templates (#153, #1064) to this release's version: every
+# template in code, the seeded Women's Retreat, Camp Meeting and Spring Camporee
+# and the rest. It only adds or updates the template rows, never one a system
+# administrator edited in the app; no event, registration form or published form
+# version is touched.
+echo "[entrypoint] Syncing form templates (npm run form-templates:sync)..."
 npm run form-templates:sync
 
 if [ "${RUN_DB_SEED}" = "true" ]; then

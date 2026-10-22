@@ -33,7 +33,7 @@ export default async function AdminFormTemplatesPage() {
           <table role="table" className="report-table table-cards">
             <caption className="sr-only">Form templates</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Template</th><th role="columnheader" scope="col">For</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col">Used by</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
+              <tr role="row"><th role="columnheader" scope="col">Template</th><th role="columnheader" scope="col">For</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col">Forms created from it</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
             </thead>
             <tbody role="rowgroup">
               {templates.map((template) => (
@@ -46,7 +46,7 @@ export default async function AdminFormTemplatesPage() {
                     {template.updatedBy && <small className="quiet-copy"> · by {template.updatedBy}</small>}
                     {template.unreadable && <small className="club-report-problem"> · The stored definition cannot be read. {template.appCreated ? "Event staff cannot pick it." : "Event staff get the code's copy until you save it."}</small>}
                   </td>
-                  <td {...cardCell("Used by")}>{template.usedByForms} {template.usedByForms === 1 ? "form" : "forms"}</td>
+                  <td {...cardCell("Forms created from it")}>{template.usedByForms}</td>
                   <td {...cardCell(null)}>
                     {!(template.unreadable && template.appCreated) && <Link className="secondary-button" href={`/admin/form-templates/${encodeURIComponent(template.key)}`}>Edit</Link>}
                   </td>

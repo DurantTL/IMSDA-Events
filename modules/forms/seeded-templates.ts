@@ -88,7 +88,7 @@ export async function syncSeededFormTemplates(
       if (stored) result.updated.push({ key: seed.key, from: stored.version, to: version });
       else result.created.push({ key: seed.key, version });
     }
-  });
+  }, { timeout: 30_000 });
   return result;
 }
 

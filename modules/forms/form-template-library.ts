@@ -59,14 +59,20 @@ async function authorNames(userIds: readonly string[]) {
   return new Map(users.map((user) => [user.id, user.displayName]));
 }
 
-/** How many forms were created from, or had their draft replaced from, a template. Counts distinct forms, read from the audit trail. */
-async function usedByFormCount(key: string) {
-  const rows = await getPrisma().auditLog.findMany({
-    where: { action: { in: usageActions }, entityType: "RegistrationForm", metadata: { path: ["templateKey"], equals: key } },
-    select: { entityId: true },
-    distinct: ["entityId"],
-  });
-  return rows.length;
+/**
+ * How many forms still in the app were created from, or had their draft replaced from, each template: one grouped
+ * read of the audit trail, joined to RegistrationForm so a deleted form is not counted. Keyed by template key.
+ */
+async function usedByFormCounts() {
+  const rows = await getPrisma().$queryRaw<Array<{ key: string; count: number }>>`
+    SELECT a."metadata"->>'templateKey' AS "key", COUNT(DISTINCT a."entityId")::int AS "count"
+    FROM "AuditLog" a
+    JOIN "RegistrationForm" f ON f."id" = a."entityId"
+    WHERE a."entityType" = 'RegistrationForm'
+      AND a."action" IN (${Prisma.join(usageActions)})
+      AND a."metadata"->>'templateKey' IS NOT NULL
+    GROUP BY 1`;
+  return new Map(rows.map((row) => [row.key, Number(row.count)]));
 }
 
 /** Every template: the code's, in the picker's order, then the ones created in the app. Unreadable stored definitions are listed and flagged, never hidden. */
@@ -82,18 +88,18 @@ export async function listFormTemplateLibrary(): Promise<FormTemplateLibraryEntr
     select: { templateId: true, version: true, createdByUserId: true, createdAt: true },
   });
   const names = await authorNames(latestAppVersions.flatMap((version) => (version.createdByUserId ? [version.createdByUserId] : [])));
-  const counts = await Promise.all(keys.map((key) => usedByFormCount(key)));
-  return keys.map((key, index): FormTemplateLibraryEntry => {
+  const counts = await usedByFormCounts();
+  return keys.map((key): FormTemplateLibraryEntry => {
     const row = rowByKey.get(key);
     const fromCode = code.find((template) => template.key === key);
     if (!row) {
       // Not synced yet: the code's copy is what the app uses.
-      return { key, name: fromCode!.name, audience: fromCode!.audience, version: fromCode!.version ?? 1, source: "CODE", usedByForms: counts[index]!, unreadable: false, appCreated: false, updatedAt: null, updatedBy: null };
+      return { key, name: fromCode!.name, audience: fromCode!.audience, version: fromCode!.version ?? 1, source: "CODE", usedByForms: (counts.get(key) ?? 0), unreadable: false, appCreated: false, updatedAt: null, updatedBy: null };
     }
     const readable = registrationFormDefinitionSchema.safeParse(row.definition).success;
     const latestApp = row.latestSource === "APP" ? latestAppVersions.find((version) => version.templateId === row.id && version.version === row.version) : undefined;
     return {
-      key, name: row.name, audience: row.audience, version: readable ? row.version : null, source: row.latestSource, usedByForms: counts[index]!,
+      key, name: row.name, audience: row.audience, version: readable ? row.version : null, source: row.latestSource, usedByForms: (counts.get(key) ?? 0),
       unreadable: !readable, appCreated: !fromCode, updatedAt: row.updatedAt.toISOString(),
       updatedBy: latestApp?.createdByUserId ? names.get(latestApp.createdByUserId) ?? null : null,
     };
@@ -123,7 +129,7 @@ export async function getFormTemplateForEditor(key: string): Promise<FormTemplat
   const code = codeFormTemplate(key);
   const row = await prisma.seededFormTemplate.findUnique({ where: { key }, include: { versions: { orderBy: { version: "desc" }, select: { version: true, source: true, createdAt: true, createdByUserId: true } } } });
   if (!row && !code) return null;
-  const usedByForms = await usedByFormCount(key);
+  const usedByForms = (await usedByFormCounts()).get(key) ?? 0;
   if (!row) {
     return {
       key, name: code!.name, description: code!.description, audience: code!.audience, version: code!.version ?? 1, source: "CODE", appCreated: false,
@@ -156,6 +162,11 @@ export async function saveFormTemplateVersion(key: string, input: SaveFormTempla
   const parsed = registrationFormDefinitionSchema.safeParse(input.definition);
   if (!parsed.success) throw new FormTemplateError("INVALID_TEMPLATE", parsed.error.issues[0]?.message ?? "The form definition is not valid.");
   const definition = withExplicitSensitiveFlags(parsed.data);
+  // A template belongs to no event, and a policy version is per event, so a template carries typed wording only.
+  const policyField = definition.sections.flatMap((section) => section.fields).find((field) => field.type === "ACKNOWLEDGMENT" && field.acknowledgment?.source === "POLICY_VERSION");
+  if (policyField) {
+    throw new FormTemplateError("INVALID_TEMPLATE", `${policyField.label}: a form template cannot point an acknowledgment at a published policy version, because policy versions belong to one event. Type the wording here; staff can choose a policy version on the event's own form.`);
+  }
   try {
     assertNoReservedChoiceValues(definition);
   } catch (error) {

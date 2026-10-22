@@ -1313,10 +1313,12 @@ code's version; run it once after `db:seed`, and again after pulling a change to
 `modules/club-forms/definitions.ts`. Until it has run, the Club forms admin page
 shows "Needs sync" and no form can be turned on.
 
-`form-templates:sync` brings the seeded form templates (Women's Retreat, Camp
-Meeting, Spring Camporee) to the versions in `prisma/seed-data/form-templates/`
-(#153). The container entrypoint runs it after the migrations. It is safe to run
-any number of times, writes a template only when it is missing or its seed
-version is higher, and never changes an existing event, registration form or
-published form version. Until it has run the app builds new forms from the
-bundled copy of the same seeds.
+`form-templates:sync` stores every form template the code defines (#153, #1064):
+the seeded Women's Retreat, Camp Meeting and Spring Camporee (versions in
+`prisma/seed-data/form-templates/`) and the rest of `formTemplates`, which are
+versioned by content. The container entrypoint runs it after the migrations. It
+is safe to run any number of times, writes a template only when it is missing or
+the code's version is newer, never changes a template whose latest version a
+system administrator saved in the app, and never changes an existing event,
+registration form or published form version. Until it has run the app builds new
+forms from the code's copy of the same templates.

@@ -14,6 +14,7 @@ const statusByCode: Record<FormTemplateError["code"], number> = {
   INVALID_TEMPLATE: 400,
 };
 
+export const formTemplateDeniedMessage = "System administrator access is required to manage form templates.";
 export const formTemplateNoStore = { "Cache-Control": "private, no-store, max-age=0" };
 
 /**

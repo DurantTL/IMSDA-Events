@@ -103,7 +103,7 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
       <div className="builder-status-row">
         <span className={`status-chip ${source === "APP" ? "gold" : "purple"}`}>Version {version}</span>
         <span>{sourceLabel(source)}</span>
-        <span>Used by {props.usedByForms} {props.usedByForms === 1 ? "form" : "forms"}</span>
+        <span>{props.usedByForms} {props.usedByForms === 1 ? "form" : "forms"} created from it</span>
         {dirty && <span role="status">Unsaved changes</span>}
       </div>
       <div className="builder-title-row">

@@ -86,6 +86,7 @@ describe("form template routes", () => {
       mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
       const response = await route.call();
       expect(response.status).toBe(403);
+      expect((await response.json()).message).toContain("form templates");
       expect(route.service()).not.toHaveBeenCalled();
     });
 

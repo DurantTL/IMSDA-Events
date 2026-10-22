@@ -32,6 +32,7 @@ function fakeDatabase() {
   const templates: Row[] = [];
   const versions: Row[] = [];
   const audits: Row[] = [];
+  const existingForms = new Set<string>(["form-1", "form-2", "form-3"]);
   const users: Row[] = [{ id: "admin-1", displayName: "Synthetic Admin" }];
   let sequence = 0;
   const duplicate = () => new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "test" });
@@ -82,11 +83,17 @@ function fakeDatabase() {
     },
     auditLog: {
       create: vi.fn(async ({ data }: Row) => { audits.push(copy(data)); return data; }),
-      findMany: vi.fn(async ({ where }: Row) => {
-        const matching = audits.filter((entry) => where.action.in.includes(entry.action) && entry.entityType === where.entityType && entry.metadata?.[where.metadata.path[0]] === where.metadata.equals);
-        return [...new Map(matching.map((entry) => [entry.entityId, { entityId: entry.entityId }])).values()];
-      }),
     },
+    // The grouped "forms created from it" read: audit rows joined to forms that still exist, counted by distinct form.
+    $queryRaw: vi.fn(async () => {
+      const counts = new Map<string, Set<string>>();
+      for (const entry of audits) {
+        if (entry.entityType !== "RegistrationForm" || !existingForms.has(entry.entityId) || !entry.metadata?.templateKey) continue;
+        if (!["REGISTRATION_FORM_CREATED", "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE"].includes(entry.action)) continue;
+        counts.set(entry.metadata.templateKey, (counts.get(entry.metadata.templateKey) ?? new Set()).add(entry.entityId));
+      }
+      return [...counts].map(([key, forms]) => ({ key, count: forms.size }));
+    }),
     user: { findMany: vi.fn(async ({ where }: Row) => users.filter((user) => where.id.in.includes(user.id)).map(copy)) },
   };
   let queue: Promise<unknown> = Promise.resolve();
@@ -98,7 +105,7 @@ function fakeDatabase() {
       return run;
     }),
   };
-  return { prisma, tx, templates, versions, audits };
+  return { prisma, tx, templates, versions, audits, existingForms };
 }
 
 function titled(definition: RegistrationFormDefinition, title: string): RegistrationFormDefinition {
@@ -293,6 +300,18 @@ describe("saving a template version in the app (#1064)", () => {
     expect(db.audits).toHaveLength(0);
   });
 
+  it("refuses an acknowledgment that points at a policy version, because a template belongs to no event, and writes nothing", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    const definition = structuredClone(rsvp().definition);
+    definition.sections[0]!.fields.push({ id: "field_ack", key: "ack", label: "I agree", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION", required: true, options: [], acknowledgment: { source: "POLICY_VERSION", policyVersionId: "synthetic-version" } });
+    const before = JSON.stringify([db.templates, db.versions]);
+    await expect(save("simple_rsvp", definition, 1)).rejects.toMatchObject({ code: "INVALID_TEMPLATE", message: expect.stringContaining("policy version") });
+    expect(JSON.stringify([db.templates, db.versions])).toBe(before);
+    // Typed wording is fine.
+    definition.sections[0]!.fields.at(-1)!.acknowledgment = { source: "TEXT", text: "I agree to the synthetic terms." };
+    await expect(save("simple_rsvp", definition, 1)).resolves.toMatchObject({ version: 2 });
+  });
+
   it("answers not found for a key that is neither a code template nor stored", async () => {
     await expect(save("no_such_template", rsvp().definition, 1)).rejects.toMatchObject({ code: "TEMPLATE_NOT_FOUND" });
     expect(db.templates).toHaveLength(0);
@@ -317,23 +336,24 @@ describe("copying a template (#1064)", () => {
     const before = structuredClone(db.templates.filter((row) => row.key === "simple_rsvp"));
     const versionsBefore = db.versions.length;
     const created = await copyFormTemplate({ sourceKey: "simple_rsvp", name: "Spring Sign-Up!" }, "admin-1");
-    expect(created).toEqual({ key: "spring_sign_up", version: 1 });
-    const row = db.templates.find((entry) => entry.key === "spring_sign_up")!;
+    expect(created).toEqual({ key: "app_spring_sign_up", version: 1 });
+    const row = db.templates.find((entry) => entry.key === "app_spring_sign_up")!;
     expect(row).toMatchObject({ version: 1, latestSource: "APP", name: "Spring Sign-Up!" });
     expect(row.definition.title).toBe("Synthetic edited RSVP");
     expect(db.versions.length).toBe(versionsBefore + 1);
     expect(db.versions.find((entry) => entry.templateId === row.id)).toMatchObject({ source: "APP", createdByUserId: "admin-1", version: 1 });
     expect(db.templates.filter((entry) => entry.key === "simple_rsvp")).toEqual(before);
-    expect(db.audits.at(-1)).toMatchObject({ action: "FORM_TEMPLATE_CREATED", metadata: { templateKey: "spring_sign_up", copiedFromKey: "simple_rsvp", versionNumber: 1 } });
+    expect(db.audits.at(-1)).toMatchObject({ action: "FORM_TEMPLATE_CREATED", metadata: { templateKey: "app_spring_sign_up", copiedFromKey: "simple_rsvp", versionNumber: 1 } });
   });
 
   it("never reuses a key the code or another template already has", async () => {
     await syncSeededFormTemplates(db.prisma as never);
     const first = await copyFormTemplate({ sourceKey: "simple_rsvp", name: "Simple RSVP" }, "admin-1");
     const second = await copyFormTemplate({ sourceKey: "simple_rsvp", name: "Simple RSVP" }, "admin-1");
-    expect(first.key).toBe("simple_rsvp_2");
-    expect(second.key).toBe("simple_rsvp_3");
-    expect(newFormTemplateKey("***", new Set())).toBe("form_template");
+    expect(first.key).toBe("app_simple_rsvp");
+    expect(second.key).toBe("app_simple_rsvp_2");
+    expect(newFormTemplateKey("***", new Set())).toBe("app_form_template");
+    expect(newFormTemplateKey("x".repeat(200), new Set()).length).toBeLessThanOrEqual(60);
   });
 
   it("copies a code template that was never synced, and refuses an unknown source", async () => {
@@ -399,6 +419,8 @@ describe("the library and the editor view (#1064)", () => {
       { action: "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE", entityType: "RegistrationForm", entityId: "form-1", metadata: { templateKey: "simple_rsvp" } },
       { action: "REGISTRATION_FORM_CREATED", entityType: "RegistrationForm", entityId: "form-2", metadata: { templateKey: "simple_rsvp" } },
       { action: "REGISTRATION_FORM_CREATED", entityType: "RegistrationForm", entityId: "form-3", metadata: { templateKey: created.key } },
+      // A form that no longer exists is not counted.
+      { action: "REGISTRATION_FORM_CREATED", entityType: "RegistrationForm", entityId: "form-deleted", metadata: { templateKey: "simple_rsvp" } },
     );
     const library = await listFormTemplateLibrary();
     expect(library.map((entry) => entry.key)).toEqual([...codeFormTemplates().map((template) => template.key), created.key]);

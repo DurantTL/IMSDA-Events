@@ -55,9 +55,10 @@ export const formTemplateKeyMaxLength = 60;
 
 /** A stable key for a template an administrator creates in the app: lowercase letters, digits and underscores, never one the code or another template already uses. */
 export function newFormTemplateKey(name: string, taken: ReadonlySet<string>) {
-  const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, formTemplateKeyMaxLength - 5) || "form_template";
-  let key = base;
-  for (let suffix = 2; taken.has(key); suffix += 1) key = `${base}_${suffix}`;
+  const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, formTemplateKeyMaxLength - 9) || "form_template";
+  // The app_ prefix keeps an app-created key from ever colliding with, or shadowing, a template key the code adds later.
+  let key = `app_${base}`;
+  for (let suffix = 2; taken.has(key); suffix += 1) key = `app_${base}_${suffix}`;
   return key;
 }
 

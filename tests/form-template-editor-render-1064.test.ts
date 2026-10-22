@@ -34,7 +34,7 @@ describe("the form template editor", () => {
   it("shows the version chip, where the version came from, and how many forms use the template", () => {
     expect(markup).toContain("Version 4");
     expect(markup).toContain("Edited in the app");
-    expect(markup).toContain("Used by 3 forms");
+    expect(markup).toContain("3 forms created from it");
     expect(markup).toContain("code updates no longer apply");
   });
 
