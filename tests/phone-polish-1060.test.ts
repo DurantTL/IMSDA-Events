@@ -25,6 +25,7 @@ describe("form builders do not invite AutoFill (#1060)", () => {
     .filter((file) => file.endsWith(".tsx") && file !== "builder-preview.tsx")
     .sort()
     .map((file) => read(`components/registration-builder/${file}`))
+    .concat(read("components/registration-builder-workspace.tsx"))
     .join("\n");
   const sets = [
     ["registration builder", textControls(registration)],

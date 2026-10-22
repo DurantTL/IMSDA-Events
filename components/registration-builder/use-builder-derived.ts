@@ -1,7 +1,6 @@
 // Values computed from the builder state: the preview plan, pricing, and
 // what the current version allows (edit, test, publish).
 import { useMemo } from "react";
-import {  } from "lucide-react";
 import { useAcknowledgmentPolicyVersions } from "@/components/acknowledgment-field-settings";
 import { calculateFormTotal, calculateRosterTotal, getAttendeeRosterConfig, isChoiceFieldType, isFieldVisible } from "@/modules/forms/definition";
 import { builderFieldModules } from "@/modules/forms/builder-modules";

@@ -2,7 +2,6 @@
 // from a template, save, test, publish, withdraw, slug sync, and switching form
 // or version. The save order and the messages are unchanged from the original
 // single-file builder.
-import {  } from "lucide-react";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
