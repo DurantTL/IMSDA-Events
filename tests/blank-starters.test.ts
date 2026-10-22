@@ -87,7 +87,7 @@ describe("blank form templates (#592)", () => {
   it("chooses the blank form by event audience and leads the picker with it", async () => {
     expect(blankFormTemplateKey("CLUB")).toBe(BLANK_CLUB_FORM_KEY);
     expect(blankFormTemplateKey("GENERAL")).toBe(BLANK_FORM_KEY);
-    dependencies.getPrisma.mockReturnValue({ seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null) } });
+    dependencies.getPrisma.mockReturnValue({ seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) } });
     const templates = await listFormTemplates();
     const general = templatesForPicker(templates, "GENERAL");
     const club = templatesForPicker(templates, "CLUB");
@@ -147,6 +147,7 @@ describe("applying the blank starters through the create-from-template flow (#59
       eventAttendeeType: { createMany: vi.fn() },
       eventAttendeeClassification: { createMany: vi.fn() },
       eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
+      seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null) },
       registrationForm: { findUnique: vi.fn().mockResolvedValue(null), create: registrationFormCreate },
       eventMessageTemplate: { create: vi.fn() },
       eventTemplateApplication: { create: vi.fn().mockResolvedValue({ id: "application-1" }) },

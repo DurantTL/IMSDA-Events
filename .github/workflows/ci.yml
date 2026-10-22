@@ -86,7 +86,7 @@ jobs:
       - run: npm run db:seed
       # The lodging property templates are code data synced after migrations (#198).
       - run: npm run lodging:sync
-      # The seeded form templates (Women's Retreat, Camp Meeting, Spring Camporee) are seed-file data synced after migrations (#153).
+      # The form templates (the seeded Women's Retreat, Camp Meeting and Spring Camporee, and the rest of the code's templates) are synced after migrations; a template edited in the app is never overwritten (#153, #1064).
       - run: npm run form-templates:sync
       - run: npm run verify
       # Real-database check that Honors Weekend class seats hold under concurrent saves (#359).
@@ -193,7 +193,7 @@ jobs:
       - if: steps.scope.outputs.full == 'true'
         run: npm run test:event-templates
 
-      # Real-database check that the seeded form templates sync and re-sync without changing any existing event, form or published form version, and that a newer template version reaches only forms created after it (#153).
+      # Real-database check that the form templates sync and re-sync without changing any existing event, form or published form version, that a newer template version reaches only forms created after it (#153), and that sync never overwrites a template edited in the app and concurrent saves lose no version (#1064).
       - if: steps.scope.outputs.full == 'true'
         run: npm run test:seeded-form-templates
 

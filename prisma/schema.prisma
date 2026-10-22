@@ -9612,16 +9612,25 @@ model EventMealLedgerEntry {
 model SeededFormTemplate {
   id          String   @id @default(cuid())
   key         String   @unique
-  /// Bumped in the seed file when the definition changes; sync applies only a higher version.
+  /// The latest version number. Code sync bumps it from the seed file's version while `latestSource` is CODE; each app save adds one (#1064).
   version     Int
   name        String
   description String   @default("")
   audience    String
   definition  Json
+  /// Where the latest version came from (#1064). `form-templates:sync` updates a template only while this is CODE;
+  /// once a system administrator saves it in the app it is APP and sync never changes it again.
+  latestSource FormTemplateSource @default(CODE)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   versions SeededFormTemplateVersion[]
+}
+
+/// Where a form template version came from (#1064): the code (`form-templates:sync`) or a system administrator's save in the app.
+enum FormTemplateSource {
+  CODE
+  APP
 }
 
 /// A frozen copy of one version of a seeded form template (#153), added by
@@ -9635,6 +9644,10 @@ model SeededFormTemplateVersion {
   description String   @default("")
   audience    String
   definition  Json
+  /// Whether sync (CODE) or a system administrator (APP) wrote this version (#1064).
+  source      FormTemplateSource @default(CODE)
+  /// The system administrator who saved an APP version; null for CODE versions. A plain id, like ClubFormTemplateVersion's.
+  createdByUserId String?
   createdAt   DateTime @default(now())
 
   template SeededFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)

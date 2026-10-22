@@ -34,6 +34,8 @@ export function useBuilderRemoval(state: BuilderState, edits: BuilderEdits) {
     removalAnswerRequestId.current = requestId;
     setRemovalAnswerCounts(null);
     if (!selectedForm) { setRemovalAnswerCountsLoading(false); return; }
+    // A form template (#1064) belongs to no event, so it holds no submitted answers.
+    if (!selectedForm.eventId) { setRemovalAnswerCounts(Object.fromEntries(fieldKeys.map((key) => [key, 0]))); setRemovalAnswerCountsLoading(false); return; }
     setRemovalAnswerCountsLoading(true);
     let merged: Record<string, number> | null = {};
     try {

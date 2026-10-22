@@ -25,7 +25,7 @@ const idle: PolicyVersionsState = { status: "idle", versions: [] };
  * The published policy versions a form builder may point an acknowledgment at (#150), from the slim read under
  * MANAGE_FORMS. Fetched once, and only once something on the form needs it. Published versions only, never a draft.
  */
-export function useAcknowledgmentPolicyVersions(eventId: string, needed: boolean): PolicyVersionsState {
+export function useAcknowledgmentPolicyVersions(eventId: string | null, needed: boolean): PolicyVersionsState {
   const [state, setState] = useState<PolicyVersionsState>(idle);
   const started = useRef(false);
   const mounted = useRef(true);
@@ -34,7 +34,7 @@ export function useAcknowledgmentPolicyVersions(eventId: string, needed: boolean
     return () => { mounted.current = false; };
   }, []);
   useEffect(() => {
-    if (!needed || started.current) return;
+    if (!needed || !eventId || started.current) return;
     started.current = true;
     setState({ status: "loading", versions: [] });
     fetch(`/api/events/${eventId}/consent-policy-versions`)
