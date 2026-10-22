@@ -2285,7 +2285,10 @@ body:has(.auth-page) { padding-bottom: 0; }
 .version-history small { margin-top: 2px; font-size: max(var(--type-floor, 0px), 0.54rem); }
 .builder-canvas { display: grid; min-width: 0; gap: 12px; }
 .builder-editor-head { display: grid; gap: 12px; border-top: 4px solid var(--imsda-navy); }
+/* The form template editor (#1064) groups its name, audience and description fields in one row. */
+.builder-title-row { display: grid; gap: 12px; align-items: end; }
 .builder-editor-head > label,
+.builder-title-row > label,
 .confirmation-editor label { display: grid; gap: 5px; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 0.64rem); font-weight: 700; }
 .builder-editor-head input,
 .builder-editor-head textarea,
