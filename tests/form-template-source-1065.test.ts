@@ -25,9 +25,10 @@ vi.mock("@/modules/forms/form-template-library", () => ({ saveFormAsTemplate: mo
 
 import { POST as FROM_FORM } from "@/app/api/admin/form-templates/from-form/route";
 import { POST as DISMISS } from "@/app/api/events/[eventId]/forms/[formId]/template-notice/route";
+import { POST as PUBLISH } from "@/app/api/events/[eventId]/forms/[formId]/publish/route";
 import { POST as CREATE } from "@/app/api/events/[eventId]/forms/route";
 import { POST as DRAFT_FROM_TEMPLATE } from "@/app/api/events/[eventId]/forms/[formId]/draft-from-template/route";
-import { formTemplates, registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import { formTemplates, getFormTemplate, registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { FormTemplateError } from "@/modules/forms/form-template-library-domain";
 import { createRegistrationForm, dismissTemplateNotice, listRegistrationForms, replaceRegistrationFormDraftFromTemplate, getRegistrationForm } from "@/modules/forms/repository";
 
@@ -113,6 +114,21 @@ describe("recording the source on New from template and Update draft from a temp
     expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { status: "PUBLISHED", sourceTemplateVersionId: "tpl-version-3", dismissedTemplateVersionId: null } });
     expect(tx.registrationFormVersion.create).toHaveBeenCalledTimes(1);
     expect(tx.auditLog.create.mock.calls[0]![0].data.metadata).toMatchObject({ templateVersionId: "tpl-version-3" });
+  });
+
+  it("creates a form from a template that kept meal prices as defaults with the target event's meal plan price", async () => {
+    const camp = structuredClone(getFormTemplate("camp_meeting_export")!.definition);
+    const meal = camp.sections.flatMap((section) => section.fields).find((field) => field.key === "breakfast_adult_qty")!;
+    meal.priceCents = 700;
+    meal.label = "Adult breakfasts — $7 each";
+    const tx = txFor({ templateRow: { ...storedTemplate, definition: camp } });
+    tx.eventMealPlan.findFirst.mockResolvedValue({ prices: [{ mealType: "BREAKFAST", ageGroup: "ADULT", amountCents: 850 }] });
+    mocks.getPrisma.mockReturnValue(prismaFor(tx));
+    await createRegistrationForm("event-1", "user-1", template.key);
+    const stored = tx.registrationForm.create.mock.calls[0]![0].data.versions.create.definition;
+    const field = stored.sections.flatMap((section: { fields: Array<Record<string, unknown>> }) => section.fields).find((entry: Record<string, unknown>) => entry.key === "breakfast_adult_qty");
+    expect(field.priceCents).toBe(850);
+    expect(field.label).toContain("$8.50 each");
   });
 
   it("clears the form's source instead of leaving a stale one when the code's copy (no stored version) is applied", async () => {
@@ -242,7 +258,8 @@ describe("dismissing the notice for one version", () => {
     const [strings, ...values] = tx.$executeRaw.mock.calls.at(-1) as unknown as [string[], ...unknown[]];
     expect(strings.join("?")).toContain('SET "dismissedTemplateVersionId" =');
     expect(strings.join("?")).not.toContain("sourceTemplateVersionId");
-    expect(values).toEqual(["tpl-version-3", "form-1"]);
+    expect(strings.join("?")).toContain('"eventId" =');
+    expect(values).toEqual(["tpl-version-3", "form-1", "event-1"]);
     expect(tx.registrationFormVersion.create).not.toHaveBeenCalled();
     expect(tx.registrationFormVersion.update).not.toHaveBeenCalled();
     expect(tx.auditLog.create.mock.calls[0]![0].data).toMatchObject({ action: "REGISTRATION_FORM_TEMPLATE_NOTICE_DISMISSED", eventId: "event-1", actorUserId: "user-1", entityId: "form-1" });
@@ -315,6 +332,22 @@ describe("who can do what", () => {
     expect((await FROM_FORM(post({ ...saveBody, mode: "NEW_VERSION", templateKey: "simple_rsvp", expectedVersion: 1, name: undefined, description: undefined, audience: undefined }))).status).toBe(409);
     mocks.saveFormAsTemplate.mockRejectedValueOnce(new FormTemplateError("FORM_NOT_FOUND", "missing"));
     expect((await FROM_FORM(post(saveBody))).status).toBe(404);
+  });
+
+  it("answers the publish route with 409 and the field labels while an acknowledgment still has the placeholder wording", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-1", globalRole: "SYSTEM_ADMIN" } });
+    const placeholder = structuredClone(definition);
+    placeholder.sections[0]!.fields.push({
+      id: "field_placeholder_ack", key: "placeholder_ack", label: "Synthetic acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION",
+      required: true, options: [], acknowledgment: { source: "TEXT", text: "Replace this with the statement people acknowledge." },
+    });
+    const tx = txFor({ existingForm: formRow({}, [version({ status: "DRAFT", definition: placeholder })]) });
+    mocks.getPrisma.mockReturnValue(prismaFor(tx));
+    const response = await PUBLISH(new Request("https://events.imsda.test/api", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), { params: Promise.resolve({ eventId: "event-1", formId: "form-1" }) });
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe("ACKNOWLEDGMENT_PLACEHOLDER");
+    expect(body.message).toBe("Write the acknowledgment statement for: Synthetic acknowledgment.");
   });
 
   it("answers malformed JSON on the dismiss route with 400, not 500", async () => {

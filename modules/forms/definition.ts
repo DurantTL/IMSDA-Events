@@ -92,11 +92,6 @@ export function getAvailabilityMode(field: Pick<RegistrationFormField, "type" | 
 /** The longest acknowledgment statement a form can carry as plain text (#150); longer wording belongs in a policy version. */
 export const ACKNOWLEDGMENT_TEXT_MAX = 4000;
 
-/**
- * What an ACKNOWLEDGMENT field records (#150): the exact text shown, or a reference to a published #129 policy version
- * of the acknowledgment kind. The reference is by version id, never "latest": the form version that carries it is
- * immutable once published and a policy version is never edited, so what a person saw can always be reproduced.
- */
 export const ACKNOWLEDGMENT_PLACEHOLDER_TEXT = "Replace this with the statement people acknowledge.";
 
 /** Labels of acknowledgment fields whose wording is still the placeholder (#1065): such a form version must not be published. */
@@ -106,6 +101,11 @@ export function placeholderAcknowledgmentLabels(definition: { sections: Array<{ 
     .map((field) => field.label);
 }
 
+/**
+ * What an ACKNOWLEDGMENT field records (#150): the exact text shown, or a reference to a published #129 policy version
+ * of the acknowledgment kind. The reference is by version id, never "latest": the form version that carries it is
+ * immutable once published and a policy version is never edited, so what a person saw can always be reproduced.
+ */
 export const acknowledgmentConfigSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("TEXT"), text: z.string().trim().min(5, "Enter the acknowledgment wording.").max(ACKNOWLEDGMENT_TEXT_MAX) }),
   z.object({ source: z.literal("POLICY_VERSION"), policyVersionId: z.string().trim().min(1).max(100) }),

@@ -158,7 +158,8 @@ export type TemplateNotice = {
 /**
  * One notice per form that has a source, or none: a form with no source (every form made before #1065, or from the code's
  * copy of a template not stored yet) stays silent, and so does one whose newest template definition cannot be read,
- * because it could not be applied. Two grouped reads however many forms there are.
+ * because it could not be applied. Up to three grouped reads (sources, then the newer templates' definitions, then their latest
+ * version ids) however many forms there are.
  */
 async function loadTemplateNotices(forms: ReadonlyArray<{ id: string; sourceTemplateVersionId: string | null; dismissedTemplateVersionId: string | null }>) {
   const notices = new Map<string, TemplateNotice>();
@@ -446,7 +447,7 @@ export async function dismissTemplateNotice(eventId: string, formId: string, act
       throw new FormOperationError("TEMPLATE_CHANGED", "There is no newer version of this form's template to dismiss. Reload the page.");
     }
     // Raw, so the form's updatedAt (which orders the forms list) is not bumped by a dismissal.
-    await tx.$executeRaw`UPDATE "RegistrationForm" SET "dismissedTemplateVersionId" = ${templateVersionId} WHERE "id" = ${formId}`;
+    await tx.$executeRaw`UPDATE "RegistrationForm" SET "dismissedTemplateVersionId" = ${templateVersionId} WHERE "id" = ${formId} AND "eventId" = ${eventId}`;
     await tx.auditLog.create({ data: {
       eventId, actorUserId, action: "REGISTRATION_FORM_TEMPLATE_NOTICE_DISMISSED", entityType: "RegistrationForm", entityId: formId,
       correlationId: randomUUID(), summary: `Dismissed the "template changed" notice on ${form.name} for one template version.`,

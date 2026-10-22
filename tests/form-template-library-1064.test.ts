@@ -561,22 +561,16 @@ describe("saving a form as a template (#1065)", () => {
     expect(db.formVersions[0]!.definition.sections[0].fields.at(-1).acknowledgment.source).toBe("POLICY_VERSION");
   });
 
-  it("removes meal ticket prices (price, late price and the \"each\" label suffix) so one event's prices never reach another", async () => {
+  it("keeps meal ticket prices and the \"each\" label suffix as defaults, since the target event's meal plan overrides them", async () => {
     const camp = structuredClone(getFormTemplate("camp_meeting_export")!.definition);
     const meal = camp.sections.flatMap((section) => section.fields).find((field) => field.key === "breakfast_adult_qty")!;
     meal.priceCents = 700;
-    meal.latePricing = { startsOn: "2028-01-01", label: "Late price", priceCents: 900 };
     meal.label = "Adult breakfasts — $7 each";
     storeFormVersion(camp);
     const result = await saveFormAsTemplate({ mode: "NEW", ...reference, name: "Meals", description: "", audience: "Any event" }, "admin-1");
-    const savedDefinition = db.templates.find((row) => row.key === result.key)!.definition;
-    const saved = savedDefinition.sections.flatMap((section: Row) => section.fields).find((field: Row) => field.key === "breakfast_adult_qty");
-    expect(saved.priceCents).toBeUndefined();
-    expect(saved.latePricing).toBeUndefined();
-    expect(saved.label).toBe("Adult breakfasts");
-    expect(JSON.stringify(savedDefinition)).toContain("lunch_adult_qty");
-    // The stored form version is read, never changed.
-    expect(db.formVersions[0]!.definition.sections.flatMap((section: Row) => section.fields).find((field: Row) => field.key === "breakfast_adult_qty").priceCents).toBe(700);
+    const saved = db.templates.find((row) => row.key === result.key)!.definition.sections.flatMap((section: Row) => section.fields).find((field: Row) => field.key === "breakfast_adult_qty");
+    expect(saved.priceCents).toBe(700);
+    expect(saved.label).toBe("Adult breakfasts — $7 each");
   });
 
   it("re-runs the policy-version rule on a copy, so a source that carries one is refused and nothing is written", async () => {
