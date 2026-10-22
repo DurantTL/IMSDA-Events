@@ -10,7 +10,7 @@ export function publicEventPath(saved: Pick<ShareFields, "slug">) {
 }
 
 export function embedPath(saved: Pick<ShareFields, "slug">, formSlug: string) {
-  return `/embed/${saved.slug}/${formSlug}`;
+  return `/embed/${encodeURIComponent(saved.slug)}/${encodeURIComponent(formSlug)}`;
 }
 
 export function shareAddressDiffers(draft: Pick<ShareFields, "slug">, saved: Pick<ShareFields, "slug">) {

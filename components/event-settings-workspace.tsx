@@ -323,6 +323,8 @@ export function EventSettingsWorkspace({
       const nextDraft = draftFromEvent(result.event);
       setDraft(nextDraft);
       setSavedDraft(nextDraft);
+      // A save can change the name in copied embed code, so earlier "Copied" no longer describes the clipboard (#1115).
+      setCopied(null);
       setPublishedFormCount(result.event.publishedFormCount);
       setPublished(result.event.isPublished);
       setLoadedDates({ startsOn: result.event.startsOn, endsOn: result.event.endsOn });
