@@ -187,20 +187,32 @@ export function ClubRosterWorkspace({
     if (!dialogOpen || !form || !baselineRef.current) return;
     baselineRef.current = { ...baselineRef.current, contacts: rosterFormSnapshot(formEntries(form), "contacts") };
   }, [guardianRev, dialogOpen]);
+  const editorIsDirty = useCallback(() => {
+    const form = formRef.current;
+    return Boolean(form) && rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form!)));
+  }, []);
   /** Close, Cancel, Escape and the backdrop all come here: clean closes at once, dirty asks, saving waits. */
   const requestClose = useCallback(async () => {
-    const form = formRef.current;
-    const dirty = Boolean(form) && rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form!)));
-    const decision = rosterCloseDecision({ saving: savingRef.current, reviewing: reviewingRef.current, dirty });
+    const decision = rosterCloseDecision({ saving: savingRef.current, reviewing: reviewingRef.current, dirty: editorIsDirty() });
     if (decision === "ignore") return;
     if (decision === "confirm") {
+      const form = formRef.current;
+      const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       reviewingRef.current = true;
       const discard = await askConfirm({ ...rosterDiscardPrompt });
       reviewingRef.current = false;
-      if (!discard || savingRef.current) return;
+      if (!discard || savingRef.current) {
+        // Keep editing: put focus back inside the editor, on the field it was on, else the dialog itself.
+        window.requestAnimationFrame(() => {
+          const dialog = form?.closest<HTMLElement>("[role='dialog']") ?? null;
+          if (previous && dialog?.contains(previous) && previous.isConnected) previous.focus();
+          else dialog?.focus();
+        });
+        return;
+      }
     }
     closeDialog();
-  }, [askConfirm, closeDialog]);
+  }, [askConfirm, closeDialog, editorIsDirty]);
   const dialogRef = useAccessibleDialog<HTMLElement>(dialogOpen, requestClose);
   const closeHonors = useCallback(() => setHonorsFor(null), []);
 
@@ -393,9 +405,16 @@ export function ClubRosterWorkspace({
   async function confirmSetStatus(member: RosterMemberRecord) {
     const next = member.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     const verb = next === "INACTIVE" ? "Deactivate" : "Reactivate";
+    // The status change closes the editor, so unsaved edits typed here would be lost: say so (#1101).
+    const hasUnsavedEdits = editorIsDirty();
     const confirmed = await askConfirm({
       title: `${verb} ${member.firstName} ${member.lastName}`,
-      body: <p>{next === "INACTIVE" ? "They stay on file but are left out of new registrations until reactivated." : "They are available for registrations again."}</p>,
+      body: (
+        <>
+          <p>{next === "INACTIVE" ? "They stay on file but are left out of new registrations until reactivated." : "They are available for registrations again."}</p>
+          {hasUnsavedEdits && <p><strong>You have unsaved changes. Save them first, or they will be discarded.</strong></p>}
+        </>
+      ),
       confirmLabel: `${verb} ${member.firstName} ${member.lastName}`,
       destructive: next === "INACTIVE",
     });

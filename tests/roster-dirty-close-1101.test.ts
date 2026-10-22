@@ -57,11 +57,28 @@ describe("roster editor dirty tracking (#1101)", () => {
 
   it("routes Close, Cancel, Escape and the backdrop through requestClose; save success closes directly", () => {
     const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
-    expect(source).toContain("useAccessibleDialog<HTMLElement>(dialogOpen, requestClose)");
-    expect(source).toContain("if (event.target === event.currentTarget) void requestClose();");
+    expect(source).toMatch(/useAccessibleDialog<HTMLElement>\(dialogOpen,\s*requestClose\)/);
+    expect(source).toMatch(/event\.target === event\.currentTarget\)\s*void requestClose\(\)/);
     expect(source.match(/onClick=\{\(\) => void requestClose\(\)\}/g)).toHaveLength(2);
     expect(source).not.toMatch(/onClick=\{closeDialog\}/);
-    // A failed save returns null and never resets the form; only a successful result closes.
-    expect(source).toContain("if (result) {\n      setBirthDates(null);\n      formElement.reset();\n      closeDialog();");
+    // Only a successful save result closes the dialog and resets the form.
+    expect(source).toMatch(/if \(result\) \{\s*setBirthDates\(null\);\s*formElement\.reset\(\);\s*closeDialog\(\);/);
+  });
+
+  it("Deactivate/Reactivate warns when there are unsaved edits", () => {
+    const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
+    const start = source.indexOf("async function confirmSetStatus");
+    const body = source.slice(start, source.indexOf("async function remove", start));
+    expect(body).toMatch(/editorIsDirty\(\)/);
+    expect(body).toContain("You have unsaved changes. Save them first, or they will be discarded.");
+  });
+
+  it("Keep editing returns focus inside the editor", () => {
+    const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
+    const start = source.indexOf("const requestClose");
+    const body = source.slice(start, source.indexOf("useAccessibleDialog<HTMLElement>", start));
+    expect(body).toMatch(/document\.activeElement/);
+    expect(body).toMatch(/previous\.focus\(\)/);
+    expect(body).toMatch(/dialog\?\.focus\(\)/);
   });
 });
