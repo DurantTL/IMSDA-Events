@@ -12,6 +12,7 @@ const statusByCode: Record<FormTemplateError["code"], number> = {
   VERSION_CONFLICT: 409,
   TEMPLATE_BUSY: 503,
   INVALID_TEMPLATE: 400,
+  FORM_NOT_FOUND: 404,
 };
 
 export const formTemplateDeniedMessage = "System administrator access is required to manage form templates.";

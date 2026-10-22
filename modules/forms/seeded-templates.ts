@@ -3,7 +3,7 @@ import "server-only";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
-import { registrationFormDefinitionSchema, type FormTemplate } from "@/modules/forms/definition";
+import { registrationFormDefinitionSchema, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { codeFormTemplate, codeFormTemplates, formTemplateSignature, type CodeFormTemplate, type FormTemplateSource } from "@/modules/forms/form-template-library-domain";
 
@@ -93,7 +93,26 @@ export async function syncSeededFormTemplates(
 }
 
 /** A form template as the app should use it: its definition and, when it comes from a stored row or a seed file, the version. */
-export type LoadedFormTemplate = FormTemplate & { version: number | undefined; source: FormTemplateSource };
+export type LoadedFormTemplate = FormTemplate & {
+  version: number | undefined;
+  source: FormTemplateSource;
+  /**
+   * The immutable `SeededFormTemplateVersion` id of the definition loaded (#1065); with the version row's template it is the
+   * template-and-version pair a form records as its source. Null for the code's copy of a template that is not stored yet
+   * (or whose stored row cannot be read): there is no stored version to point at, so nothing is recorded.
+   */
+  versionId: string | null;
+};
+
+/** The immutable version id of each stored row's latest version, in one read however many rows there are. Keyed by row id. */
+async function storedVersionIds(client: Client, rows: ReadonlyArray<{ id: string; version: number }>) {
+  if (rows.length === 0) return new Map<string, string>();
+  const versions = await client.seededFormTemplateVersion.findMany({
+    where: { OR: rows.map((row) => ({ templateId: row.id, version: row.version })) },
+    select: { id: true, templateId: true, version: true },
+  });
+  return new Map(versions.map((version) => [version.templateId, version.id]));
+}
 
 /**
  * Any form template for a key, as the app should create new forms from it: the
@@ -107,7 +126,7 @@ export type LoadedFormTemplate = FormTemplate & { version: number | undefined; s
 export async function loadFormTemplate(client: Client, key: string): Promise<LoadedFormTemplate | null> {
   const code = codeFormTemplate(key);
   const fromCode: LoadedFormTemplate | null = code
-    ? { key: code.key, name: code.name, description: code.description, audience: code.audience, definition: code.definition, version: code.version, source: "CODE" }
+    ? { key: code.key, name: code.name, description: code.description, audience: code.audience, definition: code.definition, version: code.version, source: "CODE", versionId: null }
     : null;
   const row = await client.seededFormTemplate.findUnique({ where: { key } });
   if (!row) return fromCode;
@@ -116,7 +135,7 @@ export async function loadFormTemplate(client: Client, key: string): Promise<Loa
     logWarn(`Form template row failed validation; ${fromCode ? "using the code's copy" : "it is not available"}`, { templateKey: key, storedVersion: row.version });
     return fromCode;
   }
-  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource };
+  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource, versionId: (await storedVersionIds(client, [row])).get(row.id) ?? null };
 }
 
 /**
@@ -126,20 +145,34 @@ export async function loadFormTemplate(client: Client, key: string): Promise<Loa
  * validates is left out, with a log line naming its key.
  */
 export async function loadAllFormTemplates(client: Client): Promise<LoadedFormTemplate[]> {
-  const codeKeys = codeFormTemplates().map((template) => template.key);
-  const [code, appRows] = await Promise.all([
-    Promise.all(codeKeys.map((key) => loadFormTemplate(client, key))),
-    client.seededFormTemplate.findMany({ where: { key: { notIn: codeKeys } }, orderBy: [{ name: "asc" }, { key: "asc" }] }),
-  ]);
-  const app = appRows.flatMap((row): LoadedFormTemplate[] => {
+  const code = codeFormTemplates();
+  const codeKeys = new Set(code.map((template) => template.key));
+  // Two reads in all: every stored row, then every row's latest version id.
+  const rows = await client.seededFormTemplate.findMany({ orderBy: [{ name: "asc" }, { key: "asc" }] });
+  const versionIds = await storedVersionIds(client, rows);
+  const loadedRow = (row: (typeof rows)[number], definition: RegistrationFormDefinition): LoadedFormTemplate => ({
+    key: row.key, name: row.name, description: row.description, audience: row.audience, definition, version: row.version, source: row.latestSource, versionId: versionIds.get(row.id) ?? null,
+  });
+  const fromCode = code.flatMap((template): LoadedFormTemplate[] => {
+    const row = rows.find((entry) => entry.key === template.key);
+    const copy: LoadedFormTemplate = { key: template.key, name: template.name, description: template.description, audience: template.audience, definition: template.definition, version: template.version, source: "CODE", versionId: null };
+    if (!row) return [copy];
+    const definition = registrationFormDefinitionSchema.safeParse(row.definition);
+    if (!definition.success) {
+      logWarn("Form template row failed validation; using the code's copy", { templateKey: row.key, storedVersion: row.version });
+      return [copy];
+    }
+    return [loadedRow(row, definition.data)];
+  });
+  const app = rows.filter((row) => !codeKeys.has(row.key)).flatMap((row): LoadedFormTemplate[] => {
     const definition = registrationFormDefinitionSchema.safeParse(row.definition);
     if (!definition.success) {
       logWarn("Form template row failed validation; it is left out of the picker", { templateKey: row.key, storedVersion: row.version });
       return [];
     }
-    return [{ key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource }];
+    return [loadedRow(row, definition.data)];
   });
-  return [...code.filter((template): template is LoadedFormTemplate => template !== null), ...app];
+  return [...fromCode, ...app];
 }
 
 /**

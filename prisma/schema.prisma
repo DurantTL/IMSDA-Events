@@ -4266,11 +4266,19 @@ model RegistrationForm {
   name            String
   slug            String
   status          RegistrationFormStatus @default(DRAFT)
+  /// The immutable template version this form was created from or its draft was last replaced from (#1065); null for
+  /// forms with no known source. The version row names its template, so this one id is the template-and-version pair.
+  sourceTemplateVersionId String?
+  /// The newer template version whose "template changed" notice staff dismissed for this form (#1065). Dismissing never
+  /// touches `sourceTemplateVersionId`; a later template version differs from it, so it notifies again.
+  dismissedTemplateVersionId String?
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
   event                 Event                             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   createdBy             User                              @relation("RegistrationFormCreatedBy", fields: [createdByUserId], references: [id])
+  sourceTemplateVersion    SeededFormTemplateVersion? @relation("RegistrationFormSourceTemplateVersion", fields: [sourceTemplateVersionId], references: [id], onDelete: Restrict)
+  dismissedTemplateVersion SeededFormTemplateVersion? @relation("RegistrationFormDismissedTemplateVersion", fields: [dismissedTemplateVersionId], references: [id], onDelete: Restrict)
   versions              RegistrationFormVersion[]
   capacityReservations  RegistrationCapacityReservation[]
   programAssignmentRuns ProgramAssignmentRun[]
@@ -9651,6 +9659,8 @@ model SeededFormTemplateVersion {
   createdAt   DateTime @default(now())
 
   template SeededFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  formsCreatedFrom  RegistrationForm[] @relation("RegistrationFormSourceTemplateVersion")
+  formsDismissed    RegistrationForm[] @relation("RegistrationFormDismissedTemplateVersion")
 
   @@unique([templateId, version])
 }

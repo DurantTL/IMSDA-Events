@@ -11,7 +11,7 @@ vi.mock("@/modules/attendee-types/repository", () => ({
   listActiveAttendeeTypes: dependencies.listActiveAttendeeTypes,
 }));
 
-import { formTemplates, getFormTemplate } from "@/modules/forms/definition";
+import { ACKNOWLEDGMENT_PLACEHOLDER_TEXT, formTemplates, getFormTemplate } from "@/modules/forms/definition";
 import {
   FormOperationError,
   publishRegistrationForm,
@@ -107,6 +107,28 @@ describe("registration form publish gate", () => {
     dependencies.getPrisma.mockReturnValue(prismaFor(current));
     await publishRegistrationForm("event-1", "form-1", "user-1");
     expect(current.registrationFormVersion.updateMany).toHaveBeenCalled();
+  });
+
+  it("refuses to publish while an acknowledgment still has the placeholder wording, naming the field, and allows it once reworded (#1065)", async () => {
+    const withAcknowledgment = (text: string) => {
+      const next = structuredClone(definition);
+      next.sections[0]!.fields.push({
+        id: "field_placeholder_ack", key: "placeholder_ack", label: "Synthetic acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION",
+        required: true, options: [], acknowledgment: { source: "TEXT", text },
+      });
+      return next;
+    };
+    const placeholder = transactionClient(1, 0);
+    placeholder.registrationForm.findFirst.mockResolvedValue({ id: "form-1", eventId: "event-1", name: "Form", versions: [version({ definition: withAcknowledgment(ACKNOWLEDGMENT_PLACEHOLDER_TEXT) })] });
+    dependencies.getPrisma.mockReturnValue(prismaFor(placeholder));
+    await expect(publishRegistrationForm("event-1", "form-1", "user-1")).rejects.toMatchObject({ code: "ACKNOWLEDGMENT_PLACEHOLDER", message: "Write the acknowledgment statement for: Synthetic acknowledgment." });
+    expect(placeholder.registrationFormVersion.updateMany).not.toHaveBeenCalled();
+
+    const reworded = transactionClient(0, 1);
+    reworded.registrationForm.findFirst.mockResolvedValue({ id: "form-1", eventId: "event-1", name: "Form", versions: [version({ definition: withAcknowledgment("I have read and agree to the synthetic rules.") })] });
+    dependencies.getPrisma.mockReturnValue(prismaFor(reworded));
+    await publishRegistrationForm("event-1", "form-1", "user-1");
+    expect(reworded.registrationFormVersion.updateMany).toHaveBeenCalled();
   });
 
   it("requires a valid test submission for a form's first published version", async () => {

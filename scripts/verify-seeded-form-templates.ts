@@ -12,9 +12,15 @@
  * snapshot must be byte-identical. Also proves that the synced rows equal the
  * bundled seeds, that a new form is created from the newest synced version
  * (and records it), and that an older form keeps its own definition.
+ * Also proves (#1065) that a form records the immutable template version it was
+ * created from or last updated from, that the "template changed" notice appears
+ * only for a newer, undismissed version and changes nothing by itself, that
+ * dismissing is scoped to one version, that a stale pinned version is refused,
+ * and that saving a form as a template copies stored configuration only.
  * Uses fictitious users and data it creates and removes itself.
  *
- * Destructive: it deletes every row in both seeded template tables. It refuses
+ * Destructive: it deletes every row in both seeded template tables (after clearing the
+ * template source columns of every registration form, which would otherwise block it). It refuses
  * to run unless NODE_ENV is not production and DATABASE_URL points at this
  * machine (a local database or the CI service container), using the same
  * guard as prisma/seed.ts.
@@ -23,10 +29,10 @@
  */
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
-import { createRegistrationForm, createRegistrationFormFromTemplateInTransaction, listFormTemplates } from "../modules/forms/repository";
+import { createRegistrationForm, createRegistrationFormFromTemplateInTransaction, dismissTemplateNotice, getRegistrationForm, listFormTemplates, replaceRegistrationFormDraftFromTemplate } from "../modules/forms/repository";
 import { getFormTemplate } from "../modules/forms/definition";
-import { copyFormTemplate, listFormTemplateLibrary, saveFormTemplateVersion } from "../modules/forms/form-template-library";
-import { codeFormTemplates, type CodeFormTemplate } from "../modules/forms/form-template-library-domain";
+import { copyFormTemplate, listFormTemplateLibrary, saveFormAsTemplate, saveFormTemplateVersion } from "../modules/forms/form-template-library";
+import { codeFormTemplates, templateAcknowledgmentPlaceholder, type CodeFormTemplate } from "../modules/forms/form-template-library-domain";
 import { canonicalJson } from "../modules/event-clones/domain";
 import { bundledSeededFormTemplates, type SeededFormTemplateSeed } from "../modules/forms/seeded-template-data";
 import { syncSeededFormTemplates } from "../modules/forms/seeded-templates";
@@ -46,6 +52,14 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`FAILED: ${message}`);
 }
 
+/** Removes every template row. A form's source column points at a template version (#1065), so those are cleared first. */
+async function resetTemplateTables() {
+  // Raw SQL, so the forms' @updatedAt is not bumped: the snapshots below compare every form whole.
+  await prisma.$executeRaw`UPDATE "RegistrationForm" SET "sourceTemplateVersionId" = NULL, "dismissedTemplateVersionId" = NULL WHERE "sourceTemplateVersionId" IS NOT NULL OR "dismissedTemplateVersionId" IS NOT NULL`;
+  await prisma.seededFormTemplateVersion.deleteMany();
+  await prisma.seededFormTemplate.deleteMany();
+}
+
 async function cleanup() {
   await prisma.auditLog.deleteMany({ where: { actorUserId: adminId } });
   await prisma.event.deleteMany({ where: { slug: { startsWith: `${P}-` } } });
@@ -56,7 +70,8 @@ async function cleanup() {
 async function snapshot() {
   const tables = {
     events: await prisma.event.findMany({ orderBy: { id: "asc" } }),
-    forms: await prisma.registrationForm.findMany({ orderBy: { id: "asc" } }),
+    // The two template source columns (#1065) are provenance, not content; the template reset in this script clears them.
+    forms: await prisma.registrationForm.findMany({ omit: { sourceTemplateVersionId: true, dismissedTemplateVersionId: true }, orderBy: { id: "asc" } }),
     versions: await prisma.registrationFormVersion.findMany({ orderBy: { id: "asc" } }),
     eventTemplates: await prisma.eventTemplate.findMany({ orderBy: { id: "asc" } }),
     eventTemplateVersions: await prisma.eventTemplateVersion.findMany({ orderBy: { id: "asc" } }),
@@ -87,8 +102,7 @@ async function run() {
   const event = await prisma.event.create({ data: { name: "Seedfm Existing 2026", slug: `${P}-existing-2026`, startsAt: new Date("2026-05-05T12:00:00Z"), endsAt: new Date("2026-05-07T12:00:00Z"), timezone: "America/Chicago" } });
 
   // Start from a database that has never run the sync: no seeded rows (a deploy before form-templates:sync).
-  await prisma.seededFormTemplateVersion.deleteMany();
-  await prisma.seededFormTemplate.deleteMany();
+  await resetTemplateTables();
 
   // Existing history, created from the bundled seeds before any sync; one form is published.
   const before = await createForms(event.id);
@@ -140,8 +154,7 @@ async function run() {
   assert(JSON.stringify(await prisma.seededFormTemplate.findMany({ orderBy: { key: "asc" } })) === stamps, "a rerun does not even touch the seeded rows");
   assert(await prisma.seededFormTemplateVersion.count() === total, "a rerun adds no version row");
   await unchanged("after reruns");
-  await prisma.seededFormTemplateVersion.deleteMany();
-  await prisma.seededFormTemplate.deleteMany();
+  await resetTemplateTables();
   const parallelFirst = await Promise.all([syncSeededFormTemplates(prisma), syncSeededFormTemplates(prisma)]);
   assert(parallelFirst.flatMap((result) => result.created).length === total && await prisma.seededFormTemplate.count() === total && await prisma.seededFormTemplateVersion.count() === total,
     "two syncs racing on an empty table create each template exactly once");
@@ -172,6 +185,8 @@ async function run() {
   assert((freshVersion.definition as { title?: string }).title === "Seedfm revised retreat registration", "a form created after the bump starts from version 2");
   const freshAudit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: fresh.id, action: "REGISTRATION_FORM_CREATED" } });
   assert((freshAudit.metadata as { templateVersion?: number }).templateVersion === 2, "its creation audit records template version 2");
+  const freshSource = await prisma.registrationForm.findUniqueOrThrow({ where: { id: fresh.id }, select: { sourceTemplateVersionId: true } });
+  assert(freshSource.sourceTemplateVersionId === wr.versions[1]!.id, "a form created from version 2 records version 2's immutable id as its source");
   console.log("ok  a newer seeded version reaches only forms created after it; earlier forms and the published version keep their definition");
 
   // 5. Code at an older version never rolls the data back.
@@ -268,9 +283,92 @@ async function run() {
   assert((copyAudit.metadata as { templateKey?: string; templateVersion?: number }).templateKey === copied.key && (copyAudit.metadata as { templateVersion?: number }).templateVersion === 1, "its creation audit records the app template key and version");
   const library = await listFormTemplateLibrary();
   assert(library.find((entry) => entry.key === "simple_rsvp")!.usedByForms >= 1 && library.find((entry) => entry.key === copied.key)!.usedByForms === 1, "the library counts the forms made from each template");
-  const saveAudit = await prisma.auditLog.findFirstOrThrow({ where: { action: "FORM_TEMPLATE_VERSION_SAVED", actorUserId: adminId } });
+  const saveAudit = await prisma.auditLog.findFirstOrThrow({ where: { action: "FORM_TEMPLATE_VERSION_SAVED", actorUserId: adminId }, orderBy: { createdAt: "asc" } });
   assert(saveAudit.eventId === null && Object.keys(saveAudit.metadata as object).sort().join() === "previousVersionNumber,productionWrite,source,templateKey,versionId,versionNumber", "the save audit entry carries ids and the template key only");
   console.log("ok  new forms use the latest version, an app-created template is discoverable and usable, and copying changes no existing form");
+
+  // 10. Source tracking, the "template changed" notice and saving a form as a template (#1065).
+  const rsvpVersions = async () => (await rsvpRow()).versions;
+  const sourceOf = async (formId: string) => (await prisma.registrationForm.findUniqueOrThrow({ where: { id: formId }, select: { sourceTemplateVersionId: true, dismissedTemplateVersionId: true } }));
+  const noticeOf = async (formId: string) => (await getRegistrationForm(event.id, formId))!.templateNotice;
+  // The form made in step 9 was created from the template's latest version (3): its source is that immutable version row, and it is current.
+  const v3 = (await rsvpVersions()).find((row) => row.version === 3)!;
+  assert((await sourceOf(freshForm.id)).sourceTemplateVersionId === v3.id, "a form created from an app-edited template records that version's immutable id");
+  assert((await sourceOf(fromCopy.id)).sourceTemplateVersionId === (await prisma.seededFormTemplateVersion.findFirstOrThrow({ where: { template: { key: copied.key }, version: 1 } })).id, "a form created from an app-created template records its version 1");
+  assert(await noticeOf(freshForm.id) === null, "no notice while the form's template is at the version the form was made from");
+  // A form made before source tracking has no source, and stays silent even though its template has moved on.
+  assert((await sourceOf(before.womens_retreat_export!)).sourceTemplateVersionId === null && await noticeOf(before.womens_retreat_export!) === null, "a form with no recorded source shows no notice");
+
+  // The form's stored version becomes template version 4 (a system administrator saves it as a new version).
+  const freshVersion3 = await prisma.registrationFormVersion.findFirstOrThrow({ where: { formId: freshForm.id } });
+  const asVersion = await saveFormAsTemplate({ mode: "NEW_VERSION", eventId: event.id, formId: freshForm.id, versionId: freshVersion3.id, templateKey: "simple_rsvp", expectedVersion: 3 }, adminId);
+  assert(asVersion.version === 4 && asVersion.created === false, "saving a form as a new version of a template makes version 4");
+  const v4 = (await rsvpVersions()).find((row) => row.version === 4)!;
+  assert(v4.source === "APP" && v4.createdByUserId === adminId && (v4.definition as { title?: string }).title === (freshVersion3.definition as { title?: string }).title, "version 4 is an APP version made from the stored form version, saved by the administrator");
+  const fromFormAudit = await prisma.auditLog.findFirstOrThrow({ where: { action: "FORM_TEMPLATE_VERSION_SAVED", entityId: v4.templateId, eventId: event.id } });
+  assert((fromFormAudit.metadata as { sourceFormId?: string }).sourceFormId === freshForm.id, "the audit entry names the source form by id");
+  // The notice now appears, and reading it changed nothing.
+  const formBefore = JSON.stringify(await prisma.registrationForm.findUniqueOrThrow({ where: { id: freshForm.id } }));
+  const versionsBefore = JSON.stringify(await prisma.registrationFormVersion.findMany({ where: { formId: freshForm.id }, orderBy: { versionNumber: "asc" } }));
+  const notice4 = await noticeOf(freshForm.id);
+  assert(notice4 !== null && notice4.appliedVersion === 3 && notice4.latestVersion === 4 && notice4.latestVersionId === v4.id && notice4.templateKey === "simple_rsvp", "the form now shows a notice naming the template and both versions");
+  assert(formBefore === JSON.stringify(await prisma.registrationForm.findUniqueOrThrow({ where: { id: freshForm.id } })) && versionsBefore === JSON.stringify(await prisma.registrationFormVersion.findMany({ where: { formId: freshForm.id }, orderBy: { versionNumber: "asc" } })), "showing the notice changes neither the form nor its versions");
+
+  // Dismissing is scoped to version 4, never touches the source, and a later version notifies again.
+  await dismissTemplateNotice(event.id, freshForm.id, adminId, v4.id);
+  const dismissed = await sourceOf(freshForm.id);
+  assert(dismissed.sourceTemplateVersionId === v3.id && dismissed.dismissedTemplateVersionId === v4.id && await noticeOf(freshForm.id) === null, "dismissing hides the notice for version 4 and keeps the applied source");
+  let refusedDismiss = false;
+  try { await dismissTemplateNotice(event.id, freshForm.id, adminId, v3.id); } catch (error) { refusedDismiss = (error as { code?: string }).code === "TEMPLATE_CHANGED"; }
+  assert(refusedDismiss && (await sourceOf(freshForm.id)).dismissedTemplateVersionId === v4.id, "a version that is not newer than the source cannot be dismissed");
+  await save("simple_rsvp", { ...rsvpDefinition, title: "Seedfm version five" }, 4);
+  const v5 = (await rsvpVersions()).find((row) => row.version === 5)!;
+  const notice5 = await noticeOf(freshForm.id);
+  assert(notice5 !== null && notice5.latestVersion === 5 && notice5.latestVersionId === v5.id, "a later template version brings the notice back after a dismissal");
+
+  // A stale pinned version is refused with a recoverable conflict and changes nothing; the confirmed latest is applied and recorded.
+  const draftsBefore = await prisma.registrationFormVersion.count({ where: { formId: freshForm.id } });
+  let stale: string | undefined;
+  try { await replaceRegistrationFormDraftFromTemplate(event.id, freshForm.id, adminId, "simple_rsvp", v4.id); } catch (error) { stale = (error as { code?: string }).code; }
+  assert(stale === "TEMPLATE_CHANGED", "applying a version that is no longer the latest is refused as TEMPLATE_CHANGED");
+  assert(await prisma.registrationFormVersion.count({ where: { formId: freshForm.id } }) === draftsBefore && (await sourceOf(freshForm.id)).sourceTemplateVersionId === v3.id, "the refused application changed neither the form's versions nor its source");
+  await replaceRegistrationFormDraftFromTemplate(event.id, freshForm.id, adminId, "simple_rsvp", v5.id);
+  const applied = await sourceOf(freshForm.id);
+  assert(applied.sourceTemplateVersionId === v5.id && applied.dismissedTemplateVersionId === null && await noticeOf(freshForm.id) === null, "applying the pinned latest records it as the source, clears the old dismissal and ends the notice");
+  const appliedDraft = await prisma.registrationFormVersion.findFirstOrThrow({ where: { formId: freshForm.id }, orderBy: { versionNumber: "desc" } });
+  assert((appliedDraft.definition as { title?: string }).title === "Seedfm version five", "the draft now holds the pinned template version");
+  const appliedAudit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: freshForm.id, action: "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE" }, orderBy: { createdAt: "desc" } });
+  assert((appliedAudit.metadata as { templateVersionId?: string }).templateVersionId === v5.id, "its audit entry records the template version id");
+
+  // Saving a form as a template copies stored configuration only, and changes no existing form or form version.
+  Object.assign(baseline, await snapshot());
+  const policyForm = await createRegistrationForm(event.id, adminId, "simple_rsvp");
+  const policyBase = await prisma.registrationFormVersion.findFirstOrThrow({ where: { formId: policyForm.id } });
+  const withPolicy = structuredClone(policyBase.definition) as { sections: Array<{ fields: unknown[] }> };
+  withPolicy.sections[0]!.fields.push({
+    id: "field_seedfm_policy", key: "seedfm_policy", label: "Seedfm policy acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION",
+    required: true, options: [], acknowledgment: { source: "POLICY_VERSION", policyVersionId: "seedfm-synthetic-policy-version" },
+  });
+  await prisma.registrationFormVersion.update({ where: { id: policyBase.id }, data: { definition: withPolicy as never } });
+  Object.assign(baseline, await snapshot());
+  const policyTemplate = await saveFormAsTemplate({ mode: "NEW", eventId: event.id, formId: policyForm.id, versionId: policyBase.id, name: "Seedfm From Form", description: "Seedfm", audience: "Any event" }, adminId);
+  assert(policyTemplate.created && policyTemplate.version === 1 && policyTemplate.replacedAcknowledgments.join() === "Seedfm policy acknowledgment", "saving a form as a new template reports the policy acknowledgment it replaced");
+  const policyRow = await prisma.seededFormTemplate.findUniqueOrThrow({ where: { key: policyTemplate.key } });
+  const savedFields = (policyRow.definition as unknown as { sections: Array<{ fields: Array<{ id: string; acknowledgment?: { source: string; text?: string } }> }> }).sections.flatMap((section) => section.fields);
+  const savedAck = savedFields.find((field) => field.id === "field_seedfm_policy")!;
+  assert(policyRow.latestSource === "APP" && savedAck.acknowledgment?.source === "TEXT" && savedAck.acknowledgment.text === templateAcknowledgmentPlaceholder, "the template carries typed placeholder wording, as an APP template");
+  assert(!JSON.stringify(policyRow.definition).includes("seedfm-synthetic-policy-version"), "no policy version id reaches the template");
+  assert(JSON.stringify((await prisma.registrationFormVersion.findUniqueOrThrow({ where: { id: policyBase.id } })).definition).includes("seedfm-synthetic-policy-version"), "the stored form version still points at its policy version");
+  await unchanged("after saving forms as templates");
+  // Two saves of the same template version, one from a form and one from the editor, cannot both win.
+  const racingFromForm = await Promise.allSettled([
+    saveFormAsTemplate({ mode: "NEW_VERSION", eventId: event.id, formId: freshForm.id, versionId: appliedDraft.id, templateKey: "simple_rsvp", expectedVersion: 5 }, adminId),
+    save("simple_rsvp", { ...rsvpDefinition, title: "Seedfm race C" }, 5),
+  ]);
+  assert(racingFromForm.filter((result) => result.status === "fulfilled").length === 1, "exactly one of a save-from-form and an editor save from the same version succeeds");
+  assert((racingFromForm.find((result) => result.status === "rejected") as PromiseRejectedResult).reason?.code === "VERSION_CONFLICT", "the other is refused as a version conflict");
+  assert((await rsvpVersions()).map((row) => row.version).join() === "1,2,3,4,5,6", "no template version was lost or duplicated");
+  console.log("ok  forms record the immutable template version they came from; the notice appears only for a newer undismissed version and changes nothing; a stale pin is refused; saving a form as a template copies stored configuration only");
 }
 
 async function main() {
@@ -280,8 +378,7 @@ async function main() {
   } finally {
     await cleanup();
     // Leave the table in sync with this code, as a deploy would.
-    await prisma.seededFormTemplateVersion.deleteMany();
-    await prisma.seededFormTemplate.deleteMany();
+    await resetTemplateTables();
     await syncSeededFormTemplates(prisma);
   }
 }

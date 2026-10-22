@@ -30,10 +30,10 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     if (message) setNotice(message);
   }
 
-  async function createFromTemplate(templateKey: string) {
+  async function createFromTemplate(templateKey: string, templateVersionId?: string | null) {
     setBusy("create"); setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/forms`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateKey }) });
+      const response = await fetch(`/api/events/${eventId}/forms`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateKey, ...(templateVersionId ? { templateVersionId } : {}) }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Unable to create this form.");
       syncForm(result.form, "Draft created from the selected template.");
@@ -47,13 +47,40 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     if (!selectedForm || !draftTemplateTarget) return;
     setBusy("draft-template"); setDraftTemplateError(""); setError(""); setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/draft-from-template`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateKey: draftTemplateTarget.key }) });
+      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/draft-from-template`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateKey: draftTemplateTarget.key, ...(draftTemplateTarget.versionId ? { templateVersionId: draftTemplateTarget.versionId } : {}) }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? "Unable to update the draft from this template.");
       syncForm(result.form, `The draft now matches the ${draftTemplateTarget.name} template. The published form is unchanged until you publish this draft. A test is optional.`);
       setDraftTemplateTarget(null); setShowDraftTemplates(false);
     } catch (caught) { setDraftTemplateError(caught instanceof Error ? caught.message : "Unable to update the draft from this template."); }
     finally { setBusy(null); }
+  }
+
+  // Hides the "template changed" notice for the one newer version it advertised. The form, its draft and its source are untouched.
+  async function dismissTemplateNotice() {
+    const advertised = selectedForm?.templateNotice;
+    if (!selectedForm || !advertised) return;
+    setBusy("dismiss-notice"); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}/template-notice`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateVersionId: advertised.latestVersionId }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Unable to dismiss this notice.");
+      // Only the notice changes: the editor's draft, unsaved edits and selected version stay as they are.
+      setForms((current) => current.map((form) => (form.id === selectedForm.id ? { ...form, templateNotice: result.form.templateNotice ?? null } : form)));
+      setNotice("Notice dismissed for this template version. It will appear again if the template changes again.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to dismiss this notice."); }
+    finally { setBusy(null); }
+  }
+
+  // Reloads the template list and each form's notice from the server, leaving the editor's draft and unsaved edits alone.
+  async function refreshTemplates() {
+    try {
+      const response = await fetch(`/api/events/${eventId}/forms`);
+      if (!response.ok) return;
+      const result = await response.json() as { forms: FormView[]; templates: BuilderWorkspaceProps["templates"] };
+      state.setTemplates(result.templates);
+      setForms((current) => current.map((form) => ({ ...form, templateNotice: result.forms.find((fresh) => fresh.id === form.id)?.templateNotice ?? null })));
+    } catch { /* the lists stay as they were; a stale version is refused by the server */ }
   }
 
   async function saveDraft() {
@@ -183,5 +210,5 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     const nextDefinition = structuredClone(version.definition);
     setSelectedVersionId(version.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
   }
-  return { createFromTemplate, updateDraftFromTemplate, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion };
+  return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion };
 }

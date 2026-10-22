@@ -31,7 +31,7 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
     const { eventId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_FORMS", findActiveMembership);
     const input = createFormSchema.parse(await request.json());
-    return Response.json({ form: await createRegistrationForm(eventId, access.user.id, input.templateKey) }, { status: 201 });
+    return Response.json({ form: await createRegistrationForm(eventId, access.user.id, input.templateKey, input.templateVersionId) }, { status: 201 });
   } catch (error) { return apiError(error); }
 }
 

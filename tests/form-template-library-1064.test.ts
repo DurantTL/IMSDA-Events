@@ -13,9 +13,11 @@ import {
   FormTemplateError,
   formTemplateSignature,
   newFormTemplateKey,
+  saveFormAsTemplateSchema,
+  templateAcknowledgmentPlaceholder,
   type CodeFormTemplate,
 } from "@/modules/forms/form-template-library-domain";
-import { copyFormTemplate, getFormTemplateForEditor, listFormTemplateLibrary, saveFormTemplateVersion } from "@/modules/forms/form-template-library";
+import { copyFormTemplate, getFormTemplateForEditor, listFormTemplateLibrary, saveFormAsTemplate, saveFormTemplateVersion } from "@/modules/forms/form-template-library";
 import { loadAllFormTemplates, loadFormTemplate, loadSeededFormTemplate, syncSeededFormTemplates } from "@/modules/forms/seeded-templates";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 
@@ -34,6 +36,8 @@ function fakeDatabase() {
   const audits: Row[] = [];
   const existingForms = new Set<string>(["form-1", "form-2", "form-3"]);
   const users: Row[] = [{ id: "admin-1", displayName: "Synthetic Admin" }];
+  // Stored registration form versions a form can be saved as a template from (#1065).
+  const formVersions: Row[] = [];
   let sequence = 0;
   const duplicate = () => new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "test" });
   const copy = <T,>(value: T): T => structuredClone(value);
@@ -79,7 +83,18 @@ function fakeDatabase() {
         versions.push(row);
         return copy(row);
       }),
-      findMany: vi.fn(async ({ where }: Row = {}) => versions.filter((entry) => (!where?.source || entry.source === where.source) && (!where?.templateId?.in || where.templateId.in.includes(entry.templateId))).sort((a, b) => b.version - a.version).map(copy)),
+      findUnique: vi.fn(async ({ where }: Row) => {
+        const key = where.templateId_version;
+        const row = key ? versions.find((entry) => entry.templateId === key.templateId && entry.version === key.version) : versions.find((entry) => entry.id === where.id);
+        return row ? copy(row) : null;
+      }),
+      findMany: vi.fn(async ({ where }: Row = {}) => versions.filter((entry) => (!where?.source || entry.source === where.source) && (!where?.templateId?.in || where.templateId.in.includes(entry.templateId)) && (!where?.OR || where.OR.some((pair: Row) => pair.templateId === entry.templateId && pair.version === entry.version))).sort((a, b) => b.version - a.version).map(copy)),
+    },
+    registrationFormVersion: {
+      findFirst: vi.fn(async ({ where }: Row) => {
+        const row = formVersions.find((entry) => entry.id === where.id && entry.formId === where.formId && entry.eventId === where.form.eventId);
+        return row ? copy(row) : null;
+      }),
     },
     auditLog: {
       create: vi.fn(async ({ data }: Row) => { audits.push(copy(data)); return data; }),
@@ -105,7 +120,7 @@ function fakeDatabase() {
       return run;
     }),
   };
-  return { prisma, tx, templates, versions, audits, existingForms };
+  return { prisma, tx, templates, versions, audits, existingForms, formVersions };
 }
 
 function titled(definition: RegistrationFormDefinition, title: string): RegistrationFormDefinition {
@@ -467,5 +482,163 @@ describe("the library and the editor view (#1064)", () => {
     const b = { name: "A", description: "", audience: "x", definition: { c: [1, { y: 2, z: 1 }], b: 1 } };
     expect(formTemplateSignature(a)).toBe(formTemplateSignature(b));
     expect(formTemplateSignature({ ...b, name: "B" })).not.toBe(formTemplateSignature(a));
+  });
+});
+
+/** A policy-version acknowledgment, which belongs to one event's published policy version. */
+function withPolicyAcknowledgment(definition: RegistrationFormDefinition): RegistrationFormDefinition {
+  const next = structuredClone(definition);
+  next.sections[0]!.fields.push({
+    id: "field_policy_ack", key: "policy_ack", label: "Synthetic policy acknowledgment", helpText: "", type: "ACKNOWLEDGMENT", scope: "REGISTRATION",
+    required: true, options: [], acknowledgment: { source: "POLICY_VERSION", policyVersionId: "synthetic-policy-version-1" },
+  });
+  return next;
+}
+
+describe("saving a form as a template (#1065)", () => {
+  const reference = { eventId: "event-1", formId: "form-1", versionId: "form-version-1" };
+  const storeFormVersion = (definition: unknown, overrides: Row = {}) => db.formVersions.push({ id: "form-version-1", formId: "form-1", eventId: "event-1", definition, ...overrides });
+
+  it("creates a new APP template at version 1 from the stored version, through the same audit path, and changes nothing else", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    storeFormVersion(titled(rsvp().definition, "Synthetic event form"));
+    const templatesBefore = structuredClone(db.templates);
+    const result = await saveFormAsTemplate({ mode: "NEW", ...reference, name: "From A Form", description: "Synthetic description", audience: "Any event" }, "admin-1");
+    expect(result).toMatchObject({ key: "app_from_a_form", version: 1, created: true, replacedAcknowledgments: [] });
+    const row = db.templates.find((entry) => entry.key === result.key)!;
+    expect(row).toMatchObject({ version: 1, latestSource: "APP", name: "From A Form", audience: "Any event" });
+    expect(row.definition.title).toBe("Synthetic event form");
+    expect(db.versions.find((entry) => entry.templateId === row.id)).toMatchObject({ source: "APP", createdByUserId: "admin-1", version: 1 });
+    expect(db.templates.filter((entry) => entry.key !== result.key)).toEqual(templatesBefore);
+    expect(db.audits.at(-1)).toMatchObject({
+      action: "FORM_TEMPLATE_CREATED", actorUserId: "admin-1", eventId: "event-1",
+      metadata: { templateKey: result.key, sourceFormId: "form-1", sourceFormVersionId: "form-version-1", versionNumber: 1, source: "APP" },
+    });
+    expect(JSON.stringify(db.audits.at(-1)!.metadata)).not.toContain("sections");
+  });
+
+  it("adds the next version of an existing template, keeping the template's own name, and refuses a stale version without writing", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    storeFormVersion(titled(rsvp().definition, "Synthetic event form"));
+    const saved = await saveFormAsTemplate({ mode: "NEW_VERSION", ...reference, templateKey: "simple_rsvp", expectedVersion: 1 }, "admin-1");
+    expect(saved).toMatchObject({ key: "simple_rsvp", version: 2, created: false });
+    expect(db.templates.find((row) => row.key === "simple_rsvp")).toMatchObject({ version: 2, latestSource: "APP", name: rsvp().name });
+    expect(db.versions.filter((row) => row.version === 1 && row.source === "CODE").length).toBeGreaterThan(0);
+    expect(db.audits.at(-1)).toMatchObject({ action: "FORM_TEMPLATE_VERSION_SAVED", metadata: { templateKey: "simple_rsvp", versionNumber: 2, previousVersionNumber: 1, sourceFormId: "form-1" } });
+
+    const versionsBefore = db.versions.length;
+    await expect(saveFormAsTemplate({ mode: "NEW_VERSION", ...reference, templateKey: "simple_rsvp", expectedVersion: 1 }, "admin-1")).rejects.toMatchObject({ code: "VERSION_CONFLICT" });
+    expect(db.versions.length).toBe(versionsBefore);
+  });
+
+  it("lets only one of two concurrent saves of the same template version win", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    storeFormVersion(titled(rsvp().definition, "Synthetic event form"));
+    const outcomes = await Promise.allSettled([
+      saveFormAsTemplate({ mode: "NEW_VERSION", ...reference, templateKey: "simple_rsvp", expectedVersion: 1 }, "admin-1"),
+      save("simple_rsvp", titled(rsvp().definition, "Synthetic editor save"), 1),
+    ]);
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.find((outcome) => outcome.status === "rejected")).toMatchObject({ reason: { code: "VERSION_CONFLICT" } });
+    expect(db.templates.find((row) => row.key === "simple_rsvp")!.version).toBe(2);
+  });
+
+  it("saves an unsynced code template's first app version on top of its code version", async () => {
+    storeFormVersion(titled(rsvp().definition, "Synthetic event form"));
+    await saveFormAsTemplate({ mode: "NEW_VERSION", ...reference, templateKey: "simple_rsvp", expectedVersion: 1 }, "admin-1");
+    expect(db.versions.map((row) => [row.version, row.source]).sort()).toEqual([[1, "CODE"], [2, "APP"]]);
+  });
+
+  it("replaces an event's policy-version acknowledgments with typed placeholder wording, reports them, and leaves the stored form alone", async () => {
+    const stored = withPolicyAcknowledgment(rsvp().definition);
+    storeFormVersion(stored);
+    const result = await saveFormAsTemplate({ mode: "NEW", ...reference, name: "With Policy", description: "", audience: "Any event" }, "admin-1");
+    expect(result.replacedAcknowledgments).toEqual(["Synthetic policy acknowledgment"]);
+    const field = db.templates.find((row) => row.key === result.key)!.definition.sections[0].fields.find((entry: Row) => entry.id === "field_policy_ack");
+    expect(field.acknowledgment).toEqual({ source: "TEXT", text: templateAcknowledgmentPlaceholder });
+    expect(JSON.stringify(db.templates)).not.toContain("synthetic-policy-version-1");
+    // The stored form version is read, never written.
+    expect(db.formVersions[0]!.definition.sections[0].fields.at(-1).acknowledgment.source).toBe("POLICY_VERSION");
+  });
+
+  it("keeps meal ticket prices and the \"each\" label suffix as defaults, since the target event's meal plan overrides them", async () => {
+    const camp = structuredClone(getFormTemplate("camp_meeting_export")!.definition);
+    const meal = camp.sections.flatMap((section) => section.fields).find((field) => field.key === "breakfast_adult_qty")!;
+    meal.priceCents = 700;
+    meal.label = "Adult breakfasts — $7 each";
+    storeFormVersion(camp);
+    const result = await saveFormAsTemplate({ mode: "NEW", ...reference, name: "Meals", description: "", audience: "Any event" }, "admin-1");
+    const saved = db.templates.find((row) => row.key === result.key)!.definition.sections.flatMap((section: Row) => section.fields).find((field: Row) => field.key === "breakfast_adult_qty");
+    expect(saved.priceCents).toBe(700);
+    expect(saved.label).toBe("Adult breakfasts — $7 each");
+  });
+
+  it("re-runs the policy-version rule on a copy, so a source that carries one is refused and nothing is written", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    const row = db.templates.find((entry) => entry.key === "simple_rsvp")!;
+    row.definition = withPolicyAcknowledgment(rsvp().definition);
+    const templatesBefore = db.templates.length;
+    await expect(copyFormTemplate({ sourceKey: "simple_rsvp", name: "Should Not Exist" }, "admin-1")).rejects.toMatchObject({ code: "INVALID_TEMPLATE" });
+    expect(db.templates.length).toBe(templatesBefore);
+    expect(db.audits.some((entry) => entry.action === "FORM_TEMPLATE_CREATED")).toBe(false);
+  });
+
+  it("answers not found for a form, version or event that does not match, and for an unreadable stored definition", async () => {
+    storeFormVersion(titled(rsvp().definition, "Synthetic event form"));
+    const attempt = (overrides: Row) => saveFormAsTemplate({ mode: "NEW", ...reference, ...overrides, name: "Nope", description: "", audience: "Any event" } as never, "admin-1");
+    await expect(attempt({ eventId: "event-2" })).rejects.toMatchObject({ code: "FORM_NOT_FOUND" });
+    await expect(attempt({ formId: "form-2" })).rejects.toMatchObject({ code: "FORM_NOT_FOUND" });
+    await expect(attempt({ versionId: "missing" })).rejects.toMatchObject({ code: "FORM_NOT_FOUND" });
+    db.formVersions[0]!.definition = { sections: "synthetic-secret-marker" };
+    await expect(attempt({})).rejects.toMatchObject({ code: "INVALID_TEMPLATE" });
+    expect(db.templates).toHaveLength(0);
+    expect(db.audits).toHaveLength(0);
+  });
+
+  it("answers not found for an unknown template when saving a new version", async () => {
+    storeFormVersion(titled(rsvp().definition, "Synthetic event form"));
+    await expect(saveFormAsTemplate({ mode: "NEW_VERSION", ...reference, templateKey: "no_such_template", expectedVersion: 1 }, "admin-1")).rejects.toMatchObject({ code: "TEMPLATE_NOT_FOUND" });
+  });
+
+  it("validates the request: a definition in the body, or a missing mode, is not accepted", () => {
+    expect(saveFormAsTemplateSchema.safeParse({ mode: "NEW", ...reference, name: "A", audience: "B", definition: {} }).success).toBe(false);
+    expect(saveFormAsTemplateSchema.safeParse({ ...reference, name: "A", audience: "B" }).success).toBe(false);
+    expect(saveFormAsTemplateSchema.safeParse({ mode: "NEW_VERSION", ...reference, templateKey: "simple_rsvp", expectedVersion: 1 }).success).toBe(true);
+  });
+});
+
+describe("template version ids and the used-by count filter (#1065)", () => {
+  it("loads the immutable version id of the version it loaded, and null when nothing is stored", async () => {
+    expect((await loadFormTemplate(db.tx as never, "simple_rsvp"))!.versionId).toBeNull();
+    await syncSeededFormTemplates(db.prisma as never);
+    const first = await loadFormTemplate(db.tx as never, "simple_rsvp");
+    expect(first!.versionId).toBe(db.versions.find((row) => row.version === 1 && row.templateId === db.templates.find((entry) => entry.key === "simple_rsvp")!.id)!.id);
+    await save("simple_rsvp", titled(rsvp().definition, "Synthetic edit"), 1);
+    const second = await loadFormTemplate(db.tx as never, "simple_rsvp");
+    expect(second!.versionId).not.toBe(first!.versionId);
+    expect(second!.versionId).toBe(db.versions.find((row) => row.version === 2)!.id);
+    const all = await loadAllFormTemplates(db.tx as never);
+    expect(all.find((template) => template.key === "simple_rsvp")!.versionId).toBe(second!.versionId);
+  });
+
+  it("reads every template's version id in one query for the picker", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    db.tx.seededFormTemplateVersion.findUnique.mockClear();
+    db.tx.seededFormTemplateVersion.findMany.mockClear();
+    await loadAllFormTemplates(db.tx as never);
+    expect(db.tx.seededFormTemplateVersion.findMany).toHaveBeenCalledTimes(1);
+    expect(db.tx.seededFormTemplateVersion.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("counts only the opened template's forms when opening one template, and every template for the list", async () => {
+    await syncSeededFormTemplates(db.prisma as never);
+    db.prisma.$queryRaw.mockClear();
+    await getFormTemplateForEditor("simple_rsvp");
+    const [, ...values] = db.prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(values).toContain("simple_rsvp");
+    db.prisma.$queryRaw.mockClear();
+    await listFormTemplateLibrary();
+    const [, ...listValues] = db.prisma.$queryRaw.mock.calls[0] as unknown[];
+    expect(listValues.filter((value) => value === null).length).toBe(2);
   });
 });

@@ -92,6 +92,15 @@ export function getAvailabilityMode(field: Pick<RegistrationFormField, "type" | 
 /** The longest acknowledgment statement a form can carry as plain text (#150); longer wording belongs in a policy version. */
 export const ACKNOWLEDGMENT_TEXT_MAX = 4000;
 
+export const ACKNOWLEDGMENT_PLACEHOLDER_TEXT = "Replace this with the statement people acknowledge.";
+
+/** Labels of acknowledgment fields whose wording is still the placeholder (#1065): such a form version must not be published. */
+export function placeholderAcknowledgmentLabels(definition: { sections: Array<{ fields: Array<{ label: string; type: string; acknowledgment?: { source: string; text?: string } | undefined }> }> }) {
+  return definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.type === "ACKNOWLEDGMENT" && field.acknowledgment?.source === "TEXT" && field.acknowledgment.text?.trim() === ACKNOWLEDGMENT_PLACEHOLDER_TEXT)
+    .map((field) => field.label);
+}
+
 /**
  * What an ACKNOWLEDGMENT field records (#150): the exact text shown, or a reference to a published #129 policy version
  * of the acknowledgment kind. The reference is by version id, never "latest": the form version that carries it is
@@ -1920,7 +1929,11 @@ export function validateTestResponses(
   return { isValid: issues.length === 0, issues };
 }
 
-export const createFormSchema = z.object({ templateKey: z.string().trim().min(1).max(80) });
+export const createFormSchema = z.object({
+  templateKey: z.string().trim().min(1).max(80),
+  /** The immutable template version staff chose (#1065); the request is refused when the template has moved on. Omitted by older callers. */
+  templateVersionId: z.string().trim().min(1).max(100).optional(),
+});
 export const updateFormSlugSchema = z.object({
   slug: z.string()
     .trim()

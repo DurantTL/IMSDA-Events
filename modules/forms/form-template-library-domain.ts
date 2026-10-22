@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
-import { formTemplates, type FormTemplate } from "@/modules/forms/definition";
+import { ACKNOWLEDGMENT_PLACEHOLDER_TEXT, formTemplates, type FormTemplate, type RegistrationFormDefinition } from "@/modules/forms/definition";
 
 /**
  * The form template library (#1064): the pure parts. A form template is one
@@ -15,7 +15,7 @@ export type FormTemplateSource = "CODE" | "APP";
 
 export class FormTemplateError extends Error {
   constructor(
-    public readonly code: "TEMPLATE_NOT_FOUND" | "TEMPLATE_UNREADABLE" | "VERSION_CONFLICT" | "TEMPLATE_BUSY" | "INVALID_TEMPLATE",
+    public readonly code: "TEMPLATE_NOT_FOUND" | "TEMPLATE_UNREADABLE" | "VERSION_CONFLICT" | "TEMPLATE_BUSY" | "INVALID_TEMPLATE" | "FORM_NOT_FOUND",
     message: string,
   ) {
     super(message);
@@ -96,3 +96,66 @@ export type FormTemplateLibraryEntry = {
 };
 
 export type FormTemplateVersionEntry = { version: number; source: FormTemplateSource; createdAt: string; createdBy: string | null };
+
+/** The wording a policy-version acknowledgment becomes in a template: a visible prompt for staff to replace, never a silent blank. */
+export const templateAcknowledgmentPlaceholder = ACKNOWLEDGMENT_PLACEHOLDER_TEXT;
+
+function policyVersionAcknowledgmentLabels(definition: RegistrationFormDefinition) {
+  return definition.sections.flatMap((section) => section.fields)
+    .filter((field) => field.type === "ACKNOWLEDGMENT" && field.acknowledgment?.source === "POLICY_VERSION")
+    .map((field) => field.label);
+}
+
+/**
+ * A form template belongs to no event, and a policy version belongs to one event, so a template carries typed wording only
+ * (#1064). Every path that writes a template runs this: a save, a copy, and a save from a form.
+ */
+export function assertTemplateHasNoPolicyVersions(definition: RegistrationFormDefinition) {
+  const [label] = policyVersionAcknowledgmentLabels(definition);
+  if (label !== undefined) {
+    throw new FormTemplateError("INVALID_TEMPLATE", `${label}: a form template cannot point an acknowledgment at a published policy version, because policy versions belong to one event. Type the wording here; staff can choose a policy version on the event's own form.`);
+  }
+}
+
+/**
+ * Saving an event's form as a template (#1065): each acknowledgment pointing at that event's published policy version becomes
+ * a typed-wording acknowledgment with a placeholder, and its label is returned so the administrator is told which to reword.
+ * The form itself is never changed; this works on a copy.
+ */
+export function replacePolicyVersionAcknowledgments(definition: RegistrationFormDefinition): { definition: RegistrationFormDefinition; replacedLabels: string[] } {
+  const replacedLabels = policyVersionAcknowledgmentLabels(definition);
+  if (replacedLabels.length === 0) return { definition, replacedLabels };
+  const next = structuredClone(definition);
+  for (const field of next.sections.flatMap((section) => section.fields)) {
+    if (field.type === "ACKNOWLEDGMENT" && field.acknowledgment?.source === "POLICY_VERSION") {
+      field.acknowledgment = { source: "TEXT", text: templateAcknowledgmentPlaceholder };
+    }
+  }
+  return { definition: next, replacedLabels };
+}
+
+const formReference = {
+  eventId: z.string().trim().min(1).max(100),
+  formId: z.string().trim().min(1).max(100),
+  /** The persisted form version to snapshot. Unsaved editor content is never sent: only what is stored is saved. */
+  versionId: z.string().trim().min(1).max(100),
+};
+
+/** A system administrator turns a saved registration form version into a new template, or into the next version of an existing one (#1065). */
+export const saveFormAsTemplateSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("NEW"),
+    ...formReference,
+    name: z.string().trim().min(1, "Enter a template name.").max(120),
+    description: z.string().trim().max(500).default(""),
+    audience: z.string().trim().min(1, "Enter who the template is for.").max(80),
+  }).strict(),
+  z.object({
+    mode: z.literal("NEW_VERSION"),
+    ...formReference,
+    templateKey: z.string().trim().min(1).max(80),
+    /** The template version the administrator saw; the save is refused when the template has moved on. */
+    expectedVersion: z.number().int().min(1),
+  }).strict(),
+]);
+export type SaveFormAsTemplateInput = z.infer<typeof saveFormAsTemplateSchema>;

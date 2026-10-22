@@ -73,7 +73,7 @@ describe("updating a form's draft from a template (#1056)", () => {
     expect(tx.registrationFormVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.formTestSubmission.deleteMany).not.toHaveBeenCalled();
     // The form stays PUBLISHED, and its name and slug are untouched.
-    expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { status: "PUBLISHED" } });
+    expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { status: "PUBLISHED", sourceTemplateVersionId: null, dismissedTemplateVersionId: null } });
     expect(result.versions.find((item) => item.versionNumber === 1)?.status).toBe("PUBLISHED");
     expect(result.activeVersion.versionNumber).toBe(2);
   });
@@ -107,7 +107,7 @@ describe("updating a form's draft from a template (#1056)", () => {
     const tx = txFor([version({ status: "ARCHIVED" })]);
     dependencies.getPrisma.mockReturnValue(prismaFor(tx, []));
     await replaceRegistrationFormDraftFromTemplate("event-1", "form-1", "user-1", template.key);
-    expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { status: "DRAFT" } });
+    expect(tx.registrationForm.update).toHaveBeenCalledWith({ where: { id: "form-1" }, data: { status: "DRAFT", sourceTemplateVersionId: null, dismissedTemplateVersionId: null } });
   });
 
   it("refuses an unknown template and writes nothing", async () => {
