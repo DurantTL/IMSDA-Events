@@ -2,7 +2,7 @@
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Award, Eye, Pencil, Plus, Power, Save, Trash2, UsersRound, X } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
@@ -14,6 +14,7 @@ import { validateRosterForm, rosterFormFieldOrder, type RosterFormErrors, type R
 import { ClubMemberHonorsDialog } from "@/components/club-member-honors-dialog";
 import { RosterCsvImport } from "@/components/roster-csv-import";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { formEntries, rosterCloseDecision, rosterDialogIsDirty, rosterDiscardPrompt, rosterFormSnapshot, rosterFormSnapshots, type RosterFormSnapshot } from "@/components/roster-dialog-dirty";
 import { complianceFilterLabels, complianceFilterState, type ComplianceFilterValue } from "@/modules/background-checks/display";
 import {
   clubClassLevelLabels,
@@ -167,7 +168,40 @@ export function ClubRosterWorkspace({
     setDialogOpen(false);
     setEditing(null);
   }, []);
-  const dialogRef = useAccessibleDialog<HTMLElement>(dialogOpen, closeDialog);
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const formRef = useRef<HTMLFormElement>(null);
+  const baselineRef = useRef<RosterFormSnapshot | null>(null);
+  const savingRef = useRef(false);
+  const reviewingRef = useRef(false);
+  useEffect(() => {
+    savingRef.current = saving;
+  }, [saving]);
+  // Once the loaded values are in the DOM, that is the baseline (#1101).
+  useEffect(() => {
+    const form = formRef.current;
+    baselineRef.current = dialogOpen && form ? rosterFormSnapshots(formEntries(form)) : null;
+  }, [dialogOpen, editing?.id]);
+  // A refreshed contact list replaces only the contact fields, so only that half is re-baselined.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!dialogOpen || !form || !baselineRef.current) return;
+    baselineRef.current = { ...baselineRef.current, contacts: rosterFormSnapshot(formEntries(form), "contacts") };
+  }, [guardianRev, dialogOpen]);
+  /** Close, Cancel, Escape and the backdrop all come here: clean closes at once, dirty asks, saving waits. */
+  const requestClose = useCallback(async () => {
+    const form = formRef.current;
+    const dirty = Boolean(form) && rosterDialogIsDirty(baselineRef.current, rosterFormSnapshots(formEntries(form!)));
+    const decision = rosterCloseDecision({ saving: savingRef.current, reviewing: reviewingRef.current, dirty });
+    if (decision === "ignore") return;
+    if (decision === "confirm") {
+      reviewingRef.current = true;
+      const discard = await askConfirm({ ...rosterDiscardPrompt });
+      reviewingRef.current = false;
+      if (!discard || savingRef.current) return;
+    }
+    closeDialog();
+  }, [askConfirm, closeDialog]);
+  const dialogRef = useAccessibleDialog<HTMLElement>(dialogOpen, requestClose);
   const closeHonors = useCallback(() => setHonorsFor(null), []);
 
   /** Add and edit happen in a pop-up (#383), so the list never scrolls away. */
@@ -387,7 +421,6 @@ export function ClubRosterWorkspace({
     if (result?.birthDates) setBirthDates(result.birthDates);
   }
 
-  const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <div className="club-roster-stack">
       {confirmDialog}
@@ -635,9 +668,10 @@ export function ClubRosterWorkspace({
       </section>
 
       {dialogOpen && (
-        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) closeDialog(); }} role="presentation">
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) void requestClose(); }} role="presentation">
       <section aria-labelledby="roster-dialog-title" aria-modal="true" className="modal-card roster-dialog" ref={dialogRef} role="dialog" tabIndex={-1}>
       <form
+        ref={formRef}
         className="form-stack"
         key={editing?.id ?? "new"}
         noValidate
@@ -653,7 +687,7 @@ export function ClubRosterWorkspace({
             <p className="public-registration-eyebrow">{editing ? "Edit" : "Add someone"}</p>
             <h2 id="roster-dialog-title" translate={editing ? "no" : undefined}>{editing ? `${editing.firstName} ${editing.lastName}` : "Add to the roster"}</h2>
           </div>
-          <button aria-label="Close" className="icon-button modal-close-button" onClick={closeDialog} type="button">
+          <button aria-label="Close" className="icon-button modal-close-button" onClick={() => void requestClose()} type="button">
             <X aria-hidden="true" size={18} />
           </button>
         </div>
@@ -741,7 +775,7 @@ export function ClubRosterWorkspace({
               <Power aria-hidden="true" size={14} /> {editing.status === "ACTIVE" ? "Deactivate" : "Reactivate"}
             </button>
           )}
-          <button className="secondary-button" disabled={saving} onClick={closeDialog} type="button">Cancel</button>
+          <button className="secondary-button" disabled={saving} onClick={() => void requestClose()} type="button">Cancel</button>
           <SubmitButton className="primary-button" icon={editing ? <Save aria-hidden="true" size={16} /> : <Plus aria-hidden="true" size={16} />} label={editing ? (contactsOnlyDialog ? "Save contacts" : "Save") : "Add to roster"} submitting={saving} submittingLabel={editing ? "Saving…" : "Adding…"} />
         </div>
       </form>
