@@ -68,7 +68,7 @@ describe("row and card actions (#981 batch 3)", () => {
   });
 
   it("registration builder field rows keep one actions menu with Copy, Move up, Move down and Remove", () => {
-    const source = read("components/registration-builder-workspace.tsx");
+    const source = read("components/registration-builder/builder-field-row.tsx");
     const row = source.slice(source.indexOf('className="field-actions-menu"'), source.indexOf("</ActionsMenu></div>}"));
     for (const label of ["Copy", "Move up", "Move down", "Remove"]) expect(row).toContain(label);
     // Up and Down stay real buttons with their own names, so they work from the keyboard.
@@ -205,7 +205,7 @@ describe("review fixes (#981 batch 3)", () => {
     expect(read("components/organization-directory-workspace.tsx")).toContain("ariaLabel={`More actions for ${organization.name}`}");
     expect(read("components/calendar-admin-workspace.tsx")).toContain("ariaLabel={`More actions for ${entry.title}`}");
     expect(read("components/communications-workspace.tsx")).toContain("ariaLabel={`More actions for ${announcement.title}`}");
-    expect(read("components/registration-builder-workspace.tsx")).toContain("ariaLabel={`Actions for ${field.label}`}");
+    expect(read("components/registration-builder/builder-field-row.tsx")).toContain("ariaLabel={`Actions for ${field.label}`}");
   });
 
   it("labels the check-in manual field for what it does, and dims an inactive card without dimming its menu", () => {

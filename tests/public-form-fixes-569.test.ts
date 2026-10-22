@@ -57,7 +57,7 @@ describe("FB-5 numeric min/max (#569)", () => {
     expect(numberFieldBounds(field)).toEqual({ minimumAge: 2, maximumAge: 100000 });
   });
   it("builder exposes minimum and maximum inputs", () => {
-    const src = readFileSync("components/registration-builder-workspace.tsx", "utf8");
+    const src = readFileSync("components/registration-builder/builder-field-advanced.tsx", "utf8");
     expect(src).toContain("Minimum value for");
     expect(src).toContain("Maximum value for");
   });

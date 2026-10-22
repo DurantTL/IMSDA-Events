@@ -211,7 +211,7 @@ describe("field flags: sensitive answers in other staff views", () => {
 });
 
 describe("field flags: the form builder", () => {
-  const builder = readFileSync(path.join(process.cwd(), "components/registration-builder-workspace.tsx"), "utf8");
+  const builder = readFileSync(path.join(process.cwd(), "components/registration-builder/builder-field-settings.tsx"), "utf8");
 
   it("has two labelled checkboxes with help text, started from the resolved defaults", () => {
     expect(builder).toContain("Show as a filter</label>");
@@ -363,10 +363,11 @@ describe("field flags: the builder writes explicit defaults", () => {
   });
 
   it("hides Show as a filter for the payment-method field and explains linked sensitive fields", () => {
-    const builder = readFileSync(path.join(process.cwd(), "components/registration-builder-workspace.tsx"), "utf8");
+    const builder = readFileSync(path.join(process.cwd(), "components/registration-builder/builder-field-settings.tsx"), "utf8");
+    const actions = readFileSync(path.join(process.cwd(), "components/registration-builder/use-builder-actions.tsx"), "utf8");
     expect(builder).toContain("field.key !== paymentKey");
     expect(builder).toContain("Treated as sensitive because it is shown by, or controls, a sensitive question.");
-    expect(builder).toContain("withExplicitSensitiveFlags(definition)");
+    expect(actions).toContain("withExplicitSensitiveFlags(definition)");
   });
 });
 
