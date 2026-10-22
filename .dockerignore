@@ -7,3 +7,9 @@ node_modules
 npm-debug.log*
 .DS_Store
 coverage
+
+# Documentation-only images, PDFs, slides and prototypes (#1109, #1114, the
+# training pack). Nothing in the app or its seed reads them; docs/reference stays.
+docs/design
+docs/platform-documentation
+docs/screenshots
