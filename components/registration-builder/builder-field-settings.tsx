@@ -13,7 +13,7 @@ import { BuilderFieldAdvanced } from "./builder-field-advanced";
 import { useLoadedBuilder } from "./builder-context";
 
 export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex }: { section: RegistrationFormDefinition["sections"][number]; field: RegistrationFormField; sectionIndex: number; fieldIndex: number }) {
-  const { definition, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, allFields, policyVersions, canEdit, updateField } = useLoadedBuilder();
+  const { definition, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, allFields, policyVersions, canEdit, updateField, eventId } = useLoadedBuilder();
   return (
     <div className="field-editor-body">
               <div className="field-settings field-basic-settings">
@@ -74,7 +74,7 @@ export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex 
                 return <div className="field-full inline-notice choice-type-hint" data-testid={`choice-type-hint-${field.key}`}><span>{hint.message}</span><button className="text-button" type="button" onClick={() => updateField(sectionIndex, fieldIndex, { type: hint.suggestedType, ...creditPatchForKindChange(field, { type: hint.suggestedType }) })}>{hint.actionLabel}</button><button className="text-button" type="button" aria-label={`Dismiss the choice control suggestion for ${field.label}`} onClick={() => setDismissedChoiceHintIds((current) => new Set(current).add(field.id))}>Keep {fieldTypeLabels[field.type].toLowerCase()}</button></div>;
               })()}
       {isChoiceFieldType(field.type) && <BuilderChoiceSettings field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
-              {field.type === "ACKNOWLEDGMENT" && <AcknowledgmentFieldSettings field={field} canEdit={canEdit} policyVersions={policyVersions} onChange={(acknowledgment) => updateField(sectionIndex, fieldIndex, { acknowledgment })} />}
+              {field.type === "ACKNOWLEDGMENT" && <AcknowledgmentFieldSettings field={field} canEdit={canEdit} policyVersions={policyVersions} allowPolicyVersion={Boolean(eventId)} onChange={(acknowledgment) => updateField(sectionIndex, fieldIndex, { acknowledgment })} />}
               {field.type === "CALCULATED" && !hasCredit(field) && <div className="field-settings field-registration-fee"><label className="field-full">Registration fee (standard price)<span className="money-input"><b>$</b><input id={`registration-fee-${field.id}`} aria-label={`Price for ${field.label}`} disabled={!canEdit} type="number" min={0} max={100000} step="0.01" placeholder="0.00" value={field.priceCents === undefined ? "" : field.priceCents / 100} onChange={(event) => updateField(sectionIndex, fieldIndex, { priceCents: event.target.value === "" ? undefined : Math.round(Number(event.target.value) * 100), latePricing: event.target.value === "" ? undefined : field.latePricing })} /></span></label></div>}
       <BuilderFieldAdvanced field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />
     </div>

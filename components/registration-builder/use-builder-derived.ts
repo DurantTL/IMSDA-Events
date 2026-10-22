@@ -8,7 +8,8 @@ import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registrati
 import { slugMatchesTitle } from "@/modules/forms/slug";
 import type { BuilderState } from "./use-builder-state";
 
-export function useBuilderDerived(eventId: string, state: BuilderState) {
+// `eventId` is null where the builder edits a form template (#1064), which belongs to no event and so has no policy versions to load.
+export function useBuilderDerived(eventId: string | null, state: BuilderState) {
   const { selectedForm, selectedVersion, definition, responses, previewAttendees, dirty, moduleQuery, moduleCategory, pricingPreviewDate, previewStepId } = state;
   const totalFields = useMemo(() => definition?.sections.reduce((count, section) => count + section.fields.length, 0) ?? 0, [definition]);
   const allFields = useMemo(() => definition?.sections.flatMap((section) => section.fields) ?? [], [definition]);

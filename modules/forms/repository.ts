@@ -5,8 +5,6 @@ import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
 import {
-  formTemplates,
-  getFormTemplate,
   assertNoReservedChoiceValues,
   registrationFormDefinitionSchema,
   summarizeChoiceUsage,
@@ -14,7 +12,7 @@ import {
 } from "@/modules/forms/definition";
 import { clubQuestionOrderProblem } from "@/modules/club-registrations/domain";
 import { preparePublicRegistration } from "@/modules/forms/public-domain";
-import { loadSeededFormTemplate } from "@/modules/forms/seeded-templates";
+import { loadAllFormTemplates, loadFormTemplate } from "@/modules/forms/seeded-templates";
 import { loadTicketPrices } from "@/modules/meals/config-repository";
 import { applyMealPricesToDefinition, mealPriceDrift } from "@/modules/meals/domain";
 import { slugCandidate, slugify, slugMatchesTitle } from "@/modules/forms/slug";
@@ -211,10 +209,13 @@ export async function getRegistrationForm(eventId: string, formId: string) {
   return form ? serializeForm(form, attendeeTypes, directory) : null;
 }
 
-/** The picker's list. Seeded templates (#153) show their synced row, so a newer seeded version is what staff see. */
+/**
+ * The picker's list (#153, #1064): the code's templates (each as its stored row, so a newer or
+ * app-edited version is what staff see) followed by the templates system administrators created
+ * in the app. Event staff read this; only system administrators change the templates.
+ */
 export async function listFormTemplates() {
-  const client = getPrisma();
-  const resolved = await Promise.all(formTemplates.map(async (template) => await loadSeededFormTemplate(client, template.key) ?? template));
+  const resolved = await loadAllFormTemplates(getPrisma());
   return resolved.map(({ key, name, description, audience, definition }) => ({
     key, name, description, audience, collectsPayment: Boolean(definition.payment?.enabled), sectionCount: definition.sections.length,
     fieldCount: definition.sections.reduce((count, section) => count + section.fields.length, 0),
@@ -222,7 +223,7 @@ export async function listFormTemplates() {
 }
 
 /**
- * Creates one draft registration form from a code-defined form template
+ * Creates one draft registration form from a stored form template
  * inside the caller's transaction. Shared by `createRegistrationForm` and by
  * applying an event template (#152); the storing itself is
  * `createRegistrationFormFromDefinitionInTransaction`.
@@ -233,15 +234,14 @@ export async function createRegistrationFormFromTemplateInTransaction(
   actorUserId: string,
   templateKey: string,
 ) {
-  // A seeded template (#153) is read from its synced row; the definition is copied into the new
-  // form's own version, so nothing created here is linked to the template afterwards.
-  const seeded = await loadSeededFormTemplate(tx, templateKey);
-  const template = seeded ?? getFormTemplate(templateKey);
+  // A template is read from its stored row (#153, #1064), at its latest version; the definition is copied into the
+  // new form's own version, so nothing created here is linked to the template afterwards.
+  const template = await loadFormTemplate(tx, templateKey);
   if (!template) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
   return createRegistrationFormFromDefinitionInTransaction(tx, eventId, actorUserId, {
     definition: template.definition,
     summary: (formName) => `Created ${formName} from the ${template.name} template.`,
-    metadata: seeded ? { templateKey, templateVersion: seeded.version } : { templateKey },
+    metadata: template.version !== undefined ? { templateKey, templateVersion: template.version } : { templateKey },
   });
 }
 
@@ -294,7 +294,6 @@ export async function createRegistrationFormFromDefinitionInTransaction(
 }
 
 export async function createRegistrationForm(eventId: string, actorUserId: string, templateKey: string) {
-  if (!getFormTemplate(templateKey)) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
   const created = await getPrisma().$transaction((tx) => createRegistrationFormFromTemplateInTransaction(tx, eventId, actorUserId, templateKey));
   return (await getRegistrationForm(eventId, created.id))!;
 }
@@ -311,8 +310,7 @@ export async function createRegistrationForm(eventId: string, actorUserId: strin
 export async function replaceRegistrationFormDraftFromTemplate(eventId: string, formId: string, actorUserId: string, templateKey: string) {
   try {
     await formWriteTransaction(async (tx) => {
-      const seeded = await loadSeededFormTemplate(tx, templateKey);
-      const template = seeded ?? getFormTemplate(templateKey);
+      const template = await loadFormTemplate(tx, templateKey);
       if (!template) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
       const definition = registrationFormDefinitionSchema.parse(structuredClone(template.definition));
       assertNoReservedChoiceValues(definition);
@@ -341,7 +339,7 @@ export async function replaceRegistrationFormDraftFromTemplate(eventId: string, 
       await tx.auditLog.create({ data: {
         eventId, actorUserId, action: "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE", entityType: "RegistrationForm", entityId: formId,
         correlationId: randomUUID(), summary: `Replaced the draft of ${form.name} with the ${template.name} template.`,
-        metadata: { templateKey, ...(seeded ? { templateVersion: seeded.version } : {}), versionId, versionNumber, replacedExistingDraft: Boolean(draft), invalidatedTestCount, productionWrite: false },
+        metadata: { templateKey, ...(template.version !== undefined ? { templateVersion: template.version } : {}), versionId, versionNumber, replacedExistingDraft: Boolean(draft), invalidatedTestCount, productionWrite: false },
       } });
     }, formId, eventId);
   } catch (error) {

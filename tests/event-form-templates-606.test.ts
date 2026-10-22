@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 
 /** A database with no synced seeded form template rows: the list falls back to the bundled seeds (#153). */
-const noSeededRows = { seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null) } };
+const noSeededRows = { seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) } };
 
 import { applyEventTemplate } from "@/modules/event-templates/repository";
 import { parseEventTemplatePayload, templateBillingMode, validateEventTemplatePayloadReferences } from "@/modules/event-templates/domain";
@@ -449,6 +449,7 @@ describe("the #606 starters", () => {
       eventAttendeeClassification: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventLocation: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
       eventMealPlan: { findFirst: vi.fn().mockResolvedValue(null) },
+      seededFormTemplate: { findUnique: vi.fn().mockResolvedValue(null) },
       registrationForm: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "form-1", name: starter.name }) },
       eventMessageTemplate: { create: vi.fn().mockResolvedValue({}) },
       eventTemplateApplication: { create: vi.fn().mockResolvedValue({ id: "application-1" }) },

@@ -6,11 +6,13 @@ import {
 } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 
-export async function requireSystemAdministrator() {
+export async function requireSystemAdministrator(
+  deniedMessage = "System administrator access is required to manage clubs and churches.",
+) {
   const user = requireAuthenticatedUser(await getCurrentSession());
   if (user.globalRole !== "SYSTEM_ADMIN") {
     throw new AccessDeniedError(
-      "System administrator access is required to manage clubs and churches.",
+      deniedMessage,
       403,
       "PERMISSION_DENIED",
     );

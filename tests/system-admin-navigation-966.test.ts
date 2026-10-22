@@ -56,7 +56,7 @@ beforeEach(() => {
 
 describe("system navigation groups", () => {
   it("lists the groups in order, with only Catalogs and settings collapsed by default", () => {
-    expect(systemNavGroups.map((group) => group.label)).toEqual(["Events", "Clubs", "People", "Catalogs and settings"]);
+    expect(systemNavGroups.map((group) => group.label)).toEqual(["Events", "Clubs", "People", "Forms", "Catalogs and settings"]);
     expect(systemNavGroups.filter((group) => group.collapsedByDefault).map((group) => group.label)).toEqual(["Catalogs and settings"]);
   });
 
@@ -105,7 +105,7 @@ describe("system navigation groups", () => {
 describe("sidebar on /admin pages", () => {
   it("shows the system groups to a system admin, collapsible, with Catalogs and settings closed", () => {
     const nav = sidebarOf(render(admin));
-    for (const label of ["Events", "Clubs", "People", "Catalogs and settings"]) expect(nav).toContain(`<span>${label}</span>`);
+    for (const label of ["Events", "Clubs", "People", "Forms", "Catalogs and settings"]) expect(nav).toContain(`<span>${label}</span>`);
     expect(nav).toContain('href="/admin/clubs/reports?event=evt_one"');
     expect(nav).toContain('href="/event-setup/copy?event=evt_one"');
     expect(nav).toMatch(/id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-system-catalogs-toggle"/);
