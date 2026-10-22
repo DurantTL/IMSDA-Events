@@ -1920,7 +1920,11 @@ export function validateTestResponses(
   return { isValid: issues.length === 0, issues };
 }
 
-export const createFormSchema = z.object({ templateKey: z.string().trim().min(1).max(80) });
+export const createFormSchema = z.object({
+  templateKey: z.string().trim().min(1).max(80),
+  /** The immutable template version staff chose (#1065); the request is refused when the template has moved on. Omitted by older callers. */
+  templateVersionId: z.string().trim().min(1).max(100).optional(),
+});
 export const updateFormSlugSchema = z.object({
   slug: z.string()
     .trim()

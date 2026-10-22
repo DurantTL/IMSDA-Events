@@ -93,7 +93,21 @@ export async function syncSeededFormTemplates(
 }
 
 /** A form template as the app should use it: its definition and, when it comes from a stored row or a seed file, the version. */
-export type LoadedFormTemplate = FormTemplate & { version: number | undefined; source: FormTemplateSource };
+export type LoadedFormTemplate = FormTemplate & {
+  version: number | undefined;
+  source: FormTemplateSource;
+  /**
+   * The immutable `SeededFormTemplateVersion` id of the definition loaded (#1065); with the version row's template it is the
+   * template-and-version pair a form records as its source. Null for the code's copy of a template that is not stored yet
+   * (or whose stored row cannot be read): there is no stored version to point at, so nothing is recorded.
+   */
+  versionId: string | null;
+};
+
+async function storedVersionId(client: Client, row: { id: string; version: number }) {
+  const version = await client.seededFormTemplateVersion.findUnique({ where: { templateId_version: { templateId: row.id, version: row.version } }, select: { id: true } });
+  return version?.id ?? null;
+}
 
 /**
  * Any form template for a key, as the app should create new forms from it: the
@@ -107,7 +121,7 @@ export type LoadedFormTemplate = FormTemplate & { version: number | undefined; s
 export async function loadFormTemplate(client: Client, key: string): Promise<LoadedFormTemplate | null> {
   const code = codeFormTemplate(key);
   const fromCode: LoadedFormTemplate | null = code
-    ? { key: code.key, name: code.name, description: code.description, audience: code.audience, definition: code.definition, version: code.version, source: "CODE" }
+    ? { key: code.key, name: code.name, description: code.description, audience: code.audience, definition: code.definition, version: code.version, source: "CODE", versionId: null }
     : null;
   const row = await client.seededFormTemplate.findUnique({ where: { key } });
   if (!row) return fromCode;
@@ -116,7 +130,7 @@ export async function loadFormTemplate(client: Client, key: string): Promise<Loa
     logWarn(`Form template row failed validation; ${fromCode ? "using the code's copy" : "it is not available"}`, { templateKey: key, storedVersion: row.version });
     return fromCode;
   }
-  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource };
+  return { key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource, versionId: await storedVersionId(client, row) };
 }
 
 /**
@@ -131,14 +145,14 @@ export async function loadAllFormTemplates(client: Client): Promise<LoadedFormTe
     Promise.all(codeKeys.map((key) => loadFormTemplate(client, key))),
     client.seededFormTemplate.findMany({ where: { key: { notIn: codeKeys } }, orderBy: [{ name: "asc" }, { key: "asc" }] }),
   ]);
-  const app = appRows.flatMap((row): LoadedFormTemplate[] => {
+  const app = (await Promise.all(appRows.map(async (row): Promise<LoadedFormTemplate[]> => {
     const definition = registrationFormDefinitionSchema.safeParse(row.definition);
     if (!definition.success) {
       logWarn("Form template row failed validation; it is left out of the picker", { templateKey: row.key, storedVersion: row.version });
       return [];
     }
-    return [{ key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource }];
-  });
+    return [{ key: row.key, name: row.name, description: row.description, audience: row.audience, definition: definition.data, version: row.version, source: row.latestSource, versionId: await storedVersionId(client, row) }];
+  }))).flat();
   return [...code.filter((template): template is LoadedFormTemplate => template !== null), ...app];
 }
 

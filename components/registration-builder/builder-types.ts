@@ -29,10 +29,19 @@ export type FormView = {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+  /** Present only when the form has a known source template that has since changed. Forms with no source never have one. */
+  templateNotice?: TemplateNoticeView | null;
   activeVersion: FormVersionView;
   versions: FormVersionView[];
 };
-export type TemplateView = { key: string; name: string; description: string; audience: string; collectsPayment?: boolean; sectionCount: number; fieldCount: number };
+export type TemplateView = {
+  key: string; name: string; description: string; audience: string; collectsPayment?: boolean; sectionCount: number; fieldCount: number;
+  /** The template's latest version number, and the immutable id of that version (null when it is not stored yet). */
+  version?: number | null;
+  versionId?: string | null;
+};
+/** The "template changed" notice (#1065): the form's source template has a newer, undismissed version. */
+export type TemplateNoticeView = { templateKey: string; templateName: string; appliedVersion: number; latestVersion: number; latestVersionId: string };
 export type DragState =
   | { kind: "section"; sectionIndex: number }
   | { kind: "field"; sectionIndex: number; fieldIndex: number }
@@ -120,5 +129,7 @@ export type BuilderWorkspaceProps = {
   templates: TemplateView[];
   focusTarget?: { formId: string; fieldId: string } | null;
   canEditNotifications?: boolean;
+  /** System administrators only (#1065); the server checks it again on every save. */
+  canSaveAsTemplate?: boolean;
 };
 

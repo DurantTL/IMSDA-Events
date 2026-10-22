@@ -78,7 +78,7 @@ async function assertAcknowledgmentPolicies(eventId: string, definition: Registr
 
 export class FormOperationError extends Error {
   constructor(
-    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE",
+    public readonly code: "FORM_NOT_FOUND" | "TEMPLATE_NOT_FOUND" | "EDIT_CONFLICT" | "NO_DRAFT" | "TEST_REQUIRED" | "VERSION_NOT_FOUND" | "NOT_PUBLISHED" | "FORM_BUSY" | "SLUG_LOCKED" | "FORM_SLUG_TAKEN" | "MEAL_PRICE_DRIFT" | "CLUB_QUESTION_ORDER" | "ACKNOWLEDGMENT_POLICY_UNAVAILABLE" | "TEMPLATE_CHANGED",
     message: string,
   ) {
     super(message);
@@ -140,7 +140,53 @@ function usageResponseSetsFromJson(value: Prisma.JsonValue): Array<Record<string
   return [record];
 }
 
-function serializeForm(form: FormWithVersions, attendeeTypes: AttendeeTypeOption[] = [], directory: OrganizationDirectory = emptyDirectory) {
+/**
+ * The "template changed" notice (#1065): the form's source template has a newer version than the one the form was made
+ * from or last updated from, and staff have not dismissed that version. It only informs; nothing changes a form by itself.
+ */
+export type TemplateNotice = {
+  templateKey: string;
+  templateName: string;
+  /** The template version the form was made from or last updated from. */
+  appliedVersion: number;
+  latestVersion: number;
+  /** The immutable id of the newer version: what "Update draft from a template" pins and "Dismiss for this version" names. */
+  latestVersionId: string;
+};
+
+/**
+ * One notice per form that has a source, or none: a form with no source (every form made before #1065, or from the code's
+ * copy of a template not stored yet) stays silent, and so does one whose newest template definition cannot be read,
+ * because it could not be applied. Two grouped reads however many forms there are.
+ */
+async function loadTemplateNotices(forms: ReadonlyArray<{ id: string; sourceTemplateVersionId: string | null; dismissedTemplateVersionId: string | null }>) {
+  const notices = new Map<string, TemplateNotice>();
+  const sourceIds = [...new Set(forms.flatMap((form) => (form.sourceTemplateVersionId ? [form.sourceTemplateVersionId] : [])))];
+  if (sourceIds.length === 0) return notices;
+  const prisma = getPrisma();
+  const sources = await prisma.seededFormTemplateVersion.findMany({
+    where: { id: { in: sourceIds } },
+    select: { id: true, version: true, template: { select: { id: true, key: true, name: true, version: true, definition: true } } },
+  });
+  const newer = sources.filter((source) => source.template.version > source.version && registrationFormDefinitionSchema.safeParse(source.template.definition).success);
+  if (newer.length === 0) return notices;
+  const templates = [...new Map(newer.map((source) => [source.template.id, source.template])).values()];
+  const latest = await prisma.seededFormTemplateVersion.findMany({
+    where: { OR: templates.map((template) => ({ templateId: template.id, version: template.version })) },
+    select: { id: true, templateId: true },
+  });
+  const latestByTemplate = new Map(latest.map((version) => [version.templateId, version.id]));
+  const sourceById = new Map(newer.map((source) => [source.id, source]));
+  for (const form of forms) {
+    const source = form.sourceTemplateVersionId ? sourceById.get(form.sourceTemplateVersionId) : undefined;
+    const latestVersionId = source ? latestByTemplate.get(source.template.id) : undefined;
+    if (!source || !latestVersionId || form.dismissedTemplateVersionId === latestVersionId) continue;
+    notices.set(form.id, { templateKey: source.template.key, templateName: source.template.name, appliedVersion: source.version, latestVersion: source.template.version, latestVersionId });
+  }
+  return notices;
+}
+
+function serializeForm(form: FormWithVersions, attendeeTypes: AttendeeTypeOption[] = [], directory: OrganizationDirectory = emptyDirectory, templateNotice: TemplateNotice | null = null) {
   const versions = form.versions.map((version) => {
     let definition = withAttendeeTypeOptions(definitionFromJson(version.definition), attendeeTypes);
     if (hasDirectoryOptionSource(definition)) definition = withDirectoryOptions(definition, directory);
@@ -179,6 +225,7 @@ function serializeForm(form: FormWithVersions, attendeeTypes: AttendeeTypeOption
     createdAt: form.createdAt.toISOString(),
     updatedAt: form.updatedAt.toISOString(),
     createdBy: form.createdBy.displayName,
+    templateNotice,
     activeVersion,
     versions,
   };
@@ -199,14 +246,15 @@ export async function listRegistrationForms(eventId: string) {
     getPrisma().registrationForm.findMany({ where: { eventId }, orderBy: { updatedAt: "desc" }, include: formInclude }),
     listActiveAttendeeTypes(eventId),
   ]);
-  const directory = await formsDirectory(forms);
-  return forms.map((form) => serializeForm(form, attendeeTypes, directory));
+  const [directory, notices] = await Promise.all([formsDirectory(forms), loadTemplateNotices(forms)]);
+  return forms.map((form) => serializeForm(form, attendeeTypes, directory, notices.get(form.id) ?? null));
 }
 
 export async function getRegistrationForm(eventId: string, formId: string) {
   const [form, attendeeTypes] = await Promise.all([loadForm(eventId, formId), listActiveAttendeeTypes(eventId)]);
   const directory = form ? await formsDirectory([form]) : emptyDirectory;
-  return form ? serializeForm(form, attendeeTypes, directory) : null;
+  const notice = form ? (await loadTemplateNotices([form])).get(form.id) ?? null : null;
+  return form ? serializeForm(form, attendeeTypes, directory, notice) : null;
 }
 
 /**
@@ -216,10 +264,20 @@ export async function getRegistrationForm(eventId: string, formId: string) {
  */
 export async function listFormTemplates() {
   const resolved = await loadAllFormTemplates(getPrisma());
-  return resolved.map(({ key, name, description, audience, definition }) => ({
-    key, name, description, audience, collectsPayment: Boolean(definition.payment?.enabled), sectionCount: definition.sections.length,
+  return resolved.map(({ key, name, description, audience, definition, version, versionId }) => ({
+    key, name, description, audience, version: version ?? null, versionId, collectsPayment: Boolean(definition.payment?.enabled), sectionCount: definition.sections.length,
     fieldCount: definition.sections.reduce((count, section) => count + section.fields.length, 0),
   }));
+}
+
+/**
+ * The template version staff confirmed is the one applied (#1065): when the template has moved on since the picker or the
+ * notice was loaded, nothing is applied and the caller gets a recoverable conflict, never a silently newer definition.
+ */
+function assertTemplateVersionStillChosen(template: { name: string; versionId: string | null }, expectedVersionId: string | undefined) {
+  if (expectedVersionId !== undefined && template.versionId !== expectedVersionId) {
+    throw new FormOperationError("TEMPLATE_CHANGED", `The ${template.name} template changed while you were choosing it. Reload the page to see the newer version, then choose it again.`);
+  }
 }
 
 /**
@@ -233,15 +291,18 @@ export async function createRegistrationFormFromTemplateInTransaction(
   eventId: string,
   actorUserId: string,
   templateKey: string,
+  expectedVersionId?: string,
 ) {
   // A template is read from its stored row (#153, #1064), at its latest version; the definition is copied into the
   // new form's own version, so nothing created here is linked to the template afterwards.
   const template = await loadFormTemplate(tx, templateKey);
   if (!template) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
+  assertTemplateVersionStillChosen(template, expectedVersionId);
   return createRegistrationFormFromDefinitionInTransaction(tx, eventId, actorUserId, {
     definition: template.definition,
+    sourceTemplateVersionId: template.versionId,
     summary: (formName) => `Created ${formName} from the ${template.name} template.`,
-    metadata: template.version !== undefined ? { templateKey, templateVersion: template.version } : { templateKey },
+    metadata: { templateKey, ...(template.version !== undefined ? { templateVersion: template.version } : {}), ...(template.versionId ? { templateVersionId: template.versionId } : {}) },
   });
 }
 
@@ -263,6 +324,8 @@ export async function createRegistrationFormFromDefinitionInTransaction(
   source: {
     definition: unknown;
     preferredSlug?: string;
+    /** The immutable template version this definition is a copy of (#1065); omitted for any other source. */
+    sourceTemplateVersionId?: string | null;
     summary: (formName: string) => string;
     metadata: Record<string, Prisma.InputJsonValue>;
   },
@@ -283,6 +346,7 @@ export async function createRegistrationFormFromDefinitionInTransaction(
       createdByUserId: actorUserId,
       name: definition.title,
       slug,
+      ...(source.sourceTemplateVersionId ? { sourceTemplateVersionId: source.sourceTemplateVersionId } : {}),
       versions: { create: { createdByUserId: actorUserId, versionNumber: 1, definition: storedDefinition as Prisma.InputJsonValue } },
     },
   });
@@ -293,8 +357,8 @@ export async function createRegistrationFormFromDefinitionInTransaction(
   return form;
 }
 
-export async function createRegistrationForm(eventId: string, actorUserId: string, templateKey: string) {
-  const created = await getPrisma().$transaction((tx) => createRegistrationFormFromTemplateInTransaction(tx, eventId, actorUserId, templateKey));
+export async function createRegistrationForm(eventId: string, actorUserId: string, templateKey: string, expectedVersionId?: string) {
+  const created = await getPrisma().$transaction((tx) => createRegistrationFormFromTemplateInTransaction(tx, eventId, actorUserId, templateKey, expectedVersionId));
   return (await getRegistrationForm(eventId, created.id))!;
 }
 
@@ -307,11 +371,12 @@ export async function createRegistrationForm(eventId: string, actorUserId: strin
  * (#564) so a concurrent save or publish serializes with it. The form's name and slug are left alone (publish syncs the name).
  * The audit entry carries ids and the template key only.
  */
-export async function replaceRegistrationFormDraftFromTemplate(eventId: string, formId: string, actorUserId: string, templateKey: string) {
+export async function replaceRegistrationFormDraftFromTemplate(eventId: string, formId: string, actorUserId: string, templateKey: string, expectedVersionId?: string) {
   try {
     await formWriteTransaction(async (tx) => {
       const template = await loadFormTemplate(tx, templateKey);
       if (!template) throw new FormOperationError("TEMPLATE_NOT_FOUND", "That form template is not available.");
+      assertTemplateVersionStillChosen(template, expectedVersionId);
       const definition = registrationFormDefinitionSchema.parse(structuredClone(template.definition));
       assertNoReservedChoiceValues(definition);
       const storedDefinition = stripDirectoryOptions(stripAttendeeTypeOptions(applyMealPricesToDefinition(definition, await loadTicketPrices(tx, eventId))));
@@ -335,11 +400,16 @@ export async function replaceRegistrationFormDraftFromTemplate(eventId: string, 
       }
       // A live version keeps the form PUBLISHED (#564); only a form with none falls back to DRAFT.
       const hasLiveVersion = form.versions.some((version) => version.status === RegistrationFormStatus.PUBLISHED);
-      await tx.registrationForm.update({ where: { id: formId }, data: { status: hasLiveVersion ? RegistrationFormStatus.PUBLISHED : RegistrationFormStatus.DRAFT } });
+      // The applied template version is recorded only here, in the same transaction as the draft it describes (#1065): a failed
+      // replacement leaves the earlier source untouched. A dismissal named an older "newer" version, so it is cleared too.
+      await tx.registrationForm.update({ where: { id: formId }, data: {
+        status: hasLiveVersion ? RegistrationFormStatus.PUBLISHED : RegistrationFormStatus.DRAFT,
+        ...(template.versionId ? { sourceTemplateVersionId: template.versionId, dismissedTemplateVersionId: null } : {}),
+      } });
       await tx.auditLog.create({ data: {
         eventId, actorUserId, action: "REGISTRATION_FORM_DRAFT_FROM_TEMPLATE", entityType: "RegistrationForm", entityId: formId,
         correlationId: randomUUID(), summary: `Replaced the draft of ${form.name} with the ${template.name} template.`,
-        metadata: { templateKey, ...(template.version !== undefined ? { templateVersion: template.version } : {}), versionId, versionNumber, replacedExistingDraft: Boolean(draft), invalidatedTestCount, productionWrite: false },
+        metadata: { templateKey, ...(template.version !== undefined ? { templateVersion: template.version } : {}), ...(template.versionId ? { templateVersionId: template.versionId } : {}), versionId, versionNumber, replacedExistingDraft: Boolean(draft), invalidatedTestCount, productionWrite: false },
       } });
     }, formId, eventId);
   } catch (error) {
@@ -348,6 +418,32 @@ export async function replaceRegistrationFormDraftFromTemplate(eventId: string, 
     }
     throw error;
   }
+  return (await getRegistrationForm(eventId, formId))!;
+}
+
+/**
+ * Dismisses the "template changed" notice for one newer template version on one form (#1065). Only the advertised version
+ * is recorded, so a later template version notifies again, and the form's source (what it was made from) is never touched.
+ * Runs under the form-row lock like every other form write. The audit entry carries ids and the template key only.
+ */
+export async function dismissTemplateNotice(eventId: string, formId: string, actorUserId: string, templateVersionId: string) {
+  await formWriteTransaction(async (tx) => {
+    const form = await tx.registrationForm.findFirst({ where: { id: formId, eventId }, select: { id: true, name: true, sourceTemplateVersionId: true } });
+    if (!form) throw new FormOperationError("FORM_NOT_FOUND", "That registration form was not found.");
+    const source = form.sourceTemplateVersionId
+      ? await tx.seededFormTemplateVersion.findUnique({ where: { id: form.sourceTemplateVersionId }, select: { templateId: true, version: true, template: { select: { key: true } } } })
+      : null;
+    const target = await tx.seededFormTemplateVersion.findUnique({ where: { id: templateVersionId }, select: { templateId: true, version: true } });
+    if (!source || !target || target.templateId !== source.templateId || target.version <= source.version) {
+      throw new FormOperationError("TEMPLATE_CHANGED", "There is no newer version of this form's template to dismiss. Reload the page.");
+    }
+    await tx.registrationForm.update({ where: { id: formId }, data: { dismissedTemplateVersionId: templateVersionId } });
+    await tx.auditLog.create({ data: {
+      eventId, actorUserId, action: "REGISTRATION_FORM_TEMPLATE_NOTICE_DISMISSED", entityType: "RegistrationForm", entityId: formId,
+      correlationId: randomUUID(), summary: `Dismissed the "template changed" notice on ${form.name} for one template version.`,
+      metadata: { templateKey: source.template.key, templateVersionId, templateVersion: target.version, sourceTemplateVersionId: form.sourceTemplateVersionId, productionWrite: false },
+    } });
+  }, formId, eventId);
   return (await getRegistrationForm(eventId, formId))!;
 }
 

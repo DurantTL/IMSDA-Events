@@ -24,7 +24,7 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
     const { eventId, formId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_FORMS", findActiveMembership);
     const input = createFormSchema.parse(await request.json());
-    return Response.json({ form: await replaceRegistrationFormDraftFromTemplate(eventId, formId, access.user.id, input.templateKey) });
+    return Response.json({ form: await replaceRegistrationFormDraftFromTemplate(eventId, formId, access.user.id, input.templateKey, input.templateVersionId) });
   } catch (error) { return apiError(error); }
 }
 

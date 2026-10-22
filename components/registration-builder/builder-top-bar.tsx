@@ -1,14 +1,14 @@
 // Top bar zone: the page actions (preview, templates) and the form header with
 // the version chip, Save draft, Publish version and the form title.
 import { staffPageTitles } from "@/components/staff-navigation";
-import { AlertTriangle, CopyPlus, Eye, ExternalLink, FileClock, Layers3, Save, Send, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BookmarkPlus, CopyPlus, Eye, ExternalLink, FileClock, Layers3, Save, Send, ShieldCheck } from "lucide-react";
 import { statusLabel } from "./builder-types";
 import { useLoadedBuilder, useBuilder } from "./builder-context";
 
 export function BuilderPageIntro() {
-  const { selectedForm, definition, busy, setShowTemplates, showDraftTemplates, setShowDraftTemplates, showPreview, eventName } = useBuilder();
+  const { selectedForm, definition, busy, setShowTemplates, showDraftTemplates, setShowDraftTemplates, showPreview, eventName, canSaveAsTemplate, showSaveTemplate, setShowSaveTemplate } = useBuilder();
   return (
-    <div className="page-intro"><div><p className="eyebrow">Public registration setup</p><h2 className="duplicate-page-title">{staffPageTitles.registrationForm}</h2><p>Create, arrange, preview, test, and publish versioned registration forms for {eventName} without code.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview &amp; test</button>}<button className="secondary-button" type="button" onClick={() => setShowTemplates((value) => !value)}><CopyPlus size={16} /> New from template</button>{selectedForm && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setShowDraftTemplates((value) => !value)} aria-expanded={showDraftTemplates}><Layers3 size={16} /> Update draft from a template</button>}</div></div>
+    <div className="page-intro"><div><p className="eyebrow">Public registration setup</p><h2 className="duplicate-page-title">{staffPageTitles.registrationForm}</h2><p>Create, arrange, preview, test, and publish versioned registration forms for {eventName} without code.</p></div><div className="intro-actions"><span className="count-badge"><ShieldCheck size={16} /> Safe draft editing</span>{definition && <button className="secondary-button" type="button" onClick={showPreview}><Eye size={16} /> Preview &amp; test</button>}<button className="secondary-button" type="button" onClick={() => setShowTemplates((value) => !value)}><CopyPlus size={16} /> New from template</button>{selectedForm && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setShowDraftTemplates((value) => !value)} aria-expanded={showDraftTemplates}><Layers3 size={16} /> Update draft from a template</button>}{canSaveAsTemplate && selectedForm && <button className="secondary-button" type="button" disabled={busy !== null} onClick={() => setShowSaveTemplate((value) => !value)} aria-expanded={showSaveTemplate}><BookmarkPlus size={16} /> Save as template</button>}</div></div>
   );
 }
 

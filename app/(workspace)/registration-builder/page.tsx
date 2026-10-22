@@ -11,12 +11,12 @@ export const metadata: Metadata = { title: staffPageTitles.registrationForm };
 
 export default async function RegistrationBuilderPage({ searchParams }: { searchParams: Promise<{ event?: string; form?: string; field?: string }> }) {
   const { event: requested, form: focusForm, field: focusField } = await searchParams;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FORMS")) {
     return <AccessRestricted title="Registration form access is restricted" detail="Event administrators and registration managers can create, test, and publish event forms." />;
   }
   return <>
     <BuilderPhoneNotice eventId={event.id} />
-    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} /></div>
+    <div className="builder-phone-hidden"><BuilderDeviceHint /><RegistrationBuilderWorkspace key={event.id} eventId={event.id} eventSlug={event.slug} eventName={event.name} eventAudience={event.audience} eventBillingMode={event.billingMode} initialForms={await listRegistrationForms(event.id)} templates={await listFormTemplates()} focusTarget={focusForm && focusField ? { formId: focusForm, fieldId: focusField } : null} canEditNotifications={permissions.includes("CONFIGURE_EVENT")} canSaveAsTemplate={user.globalRole === "SYSTEM_ADMIN"} /></div>
   </>;
 }
