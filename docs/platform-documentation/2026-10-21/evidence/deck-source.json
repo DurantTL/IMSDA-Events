@@ -1,6 +1,6 @@
 {
   "source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
-  "outlook_review_commit": "2cac4150c2b237b02190495d931e6bffb2189184",
+  "outlook_review_commit": "6667bc02c95b62fcce03c035b02c62823c9eb4f1",
   "slides": [
     {
       "title": "Follow a club through a real task",
@@ -1305,50 +1305,314 @@
       "objective": "Describe a useful support request and distinguish access assignment from password failure."
     },
     {
-      "title": "More club tools are already here",
-      "kicker": "OTHER CURRENT CAPABILITIES",
-      "layout": "capability_map",
+      "title": "Record completed classes and earned items",
+      "kicker": "MORE CLUB TOOLS \u00b7 CLASS TRACKING",
+      "layout": "compare",
       "status": "current",
-      "tiles": [
+      "section": "club_tools",
+      "role": "director",
+      "screens": [
         {
-          "title": "Class records",
-          "body": "Record earned insignia, patches and supported awards.",
-          "status": "Current",
-          "icon": "badge"
+          "key": "club-class-tracking",
+          "label": "Morgan \u00b7 recorded Friend completion",
+          "crop": [
+            920,
+            1450,
+            1880,
+            1690
+          ],
+          "box": [
+            0.65,
+            3.7,
+            5.91,
+            1.6
+          ]
         },
         {
-          "title": "Orders and supplies",
-          "body": "Orders tracks supplies, stock and hand-outs.",
-          "status": "Current",
-          "icon": "box"
-        },
-        {
-          "title": "Year-end reports",
-          "body": "Review the year's saved work before submitting.",
-          "status": "Current",
-          "icon": "report"
+          "key": "club-class-suggestions",
+          "label": "Insignia \u00b7 a separate order-list choice",
+          "crop": [
+            0,
+            138,
+            1100,
+            698
+          ]
         }
       ],
-      "takeaway": "The same club records support achievements, supplies and year-end reporting.",
-      "say": "The walkthrough showed the tasks people often need first. There are other current club tools to use through the year. Class tracking records supported earned items, including class insignia and event patches; it is not a universal checklist for every curriculum requirement. Orders helps the club organize needed supplies, stock and hand-outs rather than taking an online payment. Year-end reports bring together the year's recorded work for review. Jordan should still check the club, year and actual saved information before making a change or submitting a report. The tools shown depend on the person's club role.",
-      "show": "Use this capability map to explain the purpose of Class tracking, Orders and the year-end report. These are infographic labels, not new app controls. Refer back to the current club navigation if someone wants to practice.",
-      "ask": "Which of these tools would help your club avoid maintaining a second list?",
+      "insets": [
+        {
+          "key": "club-class-tracking",
+          "label": "Actual selected member: Reed, Morgan",
+          "crop": [
+            160,
+            1580,
+            650,
+            1680
+          ],
+          "box": [
+            1.3,
+            2.55,
+            4.4,
+            0.9
+          ]
+        }
+      ],
+      "callouts": [
+        {
+          "screen": 0,
+          "n": 1,
+          "label": "Read the saved completion"
+        },
+        {
+          "screen": 1,
+          "n": 2,
+          "label": "Choose the items you actually need"
+        }
+      ],
+      "takeaway": "Completing a class suggests insignia. Add to order list is a separate choice.",
+      "say": "Class tracking keeps completed classes and supported earned items with the member. In our fictional example, Morgan is in Companion and has a recorded Friend completion. The saved history prevents recording the same completion again. That completion suggests the corresponding insignia, but it does not order anything by itself. Jordan reviews the suggested items and chooses Add to order list only for items actually needed. Other supported records include event patches, Good Conduct, TLT items and Master Award progress. This is not a checklist for every curriculum requirement. Directors and deputies record these items; narrower roles retain their own access.",
+      "show": "Open Class tracking. Read Morgan\u2019s saved Friend completion and Class history, then inspect the separate Suggested insignia panel and Add to order list action. Explain that marking a class completed and adding its items to the order helper are separate steps. Do not repeat a completion that is already recorded.",
+      "ask": "Does a completed class automatically place an order or change stock?",
       "refs": [
-        "modules/club-rosters/portal-nav.ts",
+        "components/club-earned-awards-workspace.tsx",
+        "modules/earned-awards/order-source.ts",
         "modules/earned-awards/domain.ts",
+        "modules/club-rosters/portal-nav.ts"
+      ],
+      "issue_refs": [
+        532,
+        184,
+        185
+      ]
+    },
+    {
+      "title": "Use Orders for supplies and hand-outs",
+      "kicker": "MORE CLUB TOOLS \u00b7 ORDERS",
+      "layout": "placed",
+      "status": "current",
+      "section": "club_tools",
+      "role": "director",
+      "screens": [
+        {
+          "key": "club-orders-list",
+          "label": "Helper list \u00b7 4 scarves needed \u2212 2 available = 2 to order",
+          "label_box": [
+            0.65,
+            1.76,
+            12,
+            0.38
+          ],
+          "box": [
+            0.65,
+            2.24,
+            12,
+            0.95
+          ]
+        },
+        {
+          "key": "club-orders-handout",
+          "label": "Hand out \u00b7 Drew\u2019s Good Conduct Bar",
+          "label_box": [
+            0.65,
+            3.58,
+            5.9,
+            0.38
+          ],
+          "crop": [
+            0,
+            560,
+            900,
+            892
+          ],
+          "box": [
+            0.65,
+            4.12,
+            5.9,
+            2.05
+          ]
+        },
+        {
+          "key": "club-orders-stock-after",
+          "label": "Saved result \u00b7 Good Conduct stock: 3 \u2192 2",
+          "label_box": [
+            6.77,
+            3.58,
+            5.9,
+            0.38
+          ],
+          "crop": [
+            0,
+            620,
+            2272,
+            750
+          ],
+          "box": [
+            6.77,
+            4.4,
+            5.9,
+            0.7
+          ]
+        }
+      ],
+      "insets": [
+        {
+          "key": "club-orders-stock-after",
+          "label": "Actual stock count after handout: 2",
+          "crop": [
+            1900,
+            636,
+            2090,
+            735
+          ],
+          "box": [
+            8.4,
+            5.25,
+            1.8,
+            0.9
+          ]
+        }
+      ],
+      "callouts": [
+        {
+          "screen": 0,
+          "n": 1,
+          "label": "Check the list and export when needed"
+        },
+        {
+          "screen": 1,
+          "n": 2,
+          "label": "Record stock and actual hand-outs"
+        }
+      ],
+      "takeaway": "Orders is a supply helper. A list, stock receipt and hand-out are different records.",
+      "say": "The scarf row shows four needed, two available and two to order. Drew\u2019s Good Conduct Bar is selected for an actual hand-out; the saved result leaves two on hand, down from three. The app subtracts that handed-out item automatically, so do not subtract it a second time. Orders helps Jordan turn recorded needs into a practical supply list. The fictional list includes scarves and earned items. Stock is what the club already has, and a hand-out records items actually given to a member. Those are different steps, so an item on the helper list is not proof it was purchased or handed out. Use the available CSV, printable list or pick list for the real task. This is not an online checkout and does not create a personal payment for the director. Directors and deputies manage the supported records; a registrar\u2019s view remains narrower.",
+      "show": "Open Orders. Read the fictional scarf and earned-item needs, then compare the stock quantity and hand-out controls. Point to available exports/pick-list actions. Use only the synthetic training records if demonstrating a stock or hand-out action.",
+      "ask": "If a scarf appears on the helper list, does that mean the member has received it?",
+      "refs": [
+        "app/(public)/account/(portal)/clubs/[organizationId]/orders/page.tsx",
         "modules/club-orders/domain.ts",
         "modules/club-supplies/domain.ts",
-        "modules/club-reports/year-end-repository.ts"
+        "modules/club-orders/repository.ts"
       ],
       "issue_refs": [
         41,
         184,
         185
+      ]
+    },
+    {
+      "title": "Review the Year-End Report",
+      "kicker": "MORE CLUB TOOLS \u00b7 YEAR-END REPORT",
+      "layout": "placed",
+      "status": "current",
+      "section": "club_tools",
+      "role": "director",
+      "screens": [
+        {
+          "key": "club-year-end-header",
+          "label": "2026\u201327 \u00b7 May\u2013April \u00b7 Due April 1, 2027 \u00b7 Draft",
+          "label_box": [
+            0.65,
+            1.72,
+            12,
+            0.3
+          ],
+          "label_size": 13,
+          "box": [
+            0.65,
+            2.05,
+            12,
+            1.05
+          ]
+        },
+        {
+          "key": "club-year-end",
+          "label": "Review \u00b7 9 members + 1 staff = 10 total",
+          "label_box": [
+            0.65,
+            3.35,
+            8.6,
+            0.4
+          ],
+          "crop": [
+            100,
+            150,
+            2460,
+            1180
+          ],
+          "box": [
+            0.65,
+            3.9,
+            8.5,
+            2.35
+          ]
+        },
+        {
+          "key": "club-year-end-save",
+          "label": "Keep unfinished work",
+          "label_box": [
+            9.45,
+            3.35,
+            3.2,
+            0.4
+          ],
+          "crop": [
+            100,
+            1610,
+            345,
+            1705
+          ],
+          "box": [
+            9.45,
+            4.05,
+            3.2,
+            1.0
+          ]
+        }
       ],
-      "role": "all",
-      "screens": [],
-      "callouts": [],
-      "objective": "Recognize the capability and its actual current/planned/exploratory status."
+      "placed_captions": [
+        {
+          "box": [
+            9.45,
+            5.3,
+            3.2,
+            0.9
+          ],
+          "text": "Review prefilled sources and manual figures before submitting.",
+          "size": 17
+        }
+      ],
+      "callouts": [
+        {
+          "screen": 0,
+          "n": 1,
+          "label": "Check the report year and due date"
+        },
+        {
+          "screen": 0,
+          "n": 2,
+          "label": "Review the prefilled figures"
+        },
+        {
+          "screen": 0,
+          "n": 3,
+          "label": "Save unfinished work as a draft"
+        }
+      ],
+      "takeaway": "Review the saved records and any manual figures. Save draft does not submit the report.",
+      "say": "The Year-End Report uses saved club information to help prepare the yearly record. Check the report year and due date first. Review the prefilled figures and their source, then enter or correct the information the form requires. A prefilled number still needs review; it is not a guarantee the underlying record is complete. Our October training example is a draft for 2026\u201327, due April first, 2027. We are showing preparation, not telling clubs to submit an incomplete year early. Save draft keeps work in progress. The club\u2019s director, deputy or reporter submits the report when it is complete; a submitted report is locked until the office reopens it.",
+      "show": "From Monthly Records, open the appropriate Year-End Report. Read the year/span, due date, Draft state and source labels on prefilled counts. Point to Save draft. There is no separate Preview button on this form; the displayed report is the review surface. Keep the synthetic example as a draft.",
+      "ask": "What should you check before trusting a prefilled number? Has Save draft filed the report?",
+      "refs": [
+        "components/club-year-end-report-form.tsx",
+        "modules/club-reports/year-end-domain.ts",
+        "modules/club-reports/year-end-repository.ts",
+        "app/(public)/account/(portal)/clubs/[organizationId]/reports/year-end/[year]/page.tsx"
+      ],
+      "issue_refs": [
+        41,
+        185
+      ]
     },
     {
       "title": "Event teams have tools before, during and after",
@@ -1483,61 +1747,59 @@
       "objective": "Recognize the capability and its actual current/planned/exploratory status."
     },
     {
-      "title": "Planned: make forms easier to build and maintain",
-      "kicker": "FORM-BUILDER ROADMAP \u00b7 LATER VISUAL STEPS STILL NEED REVIEW",
+      "title": "Build and check an event form",
+      "kicker": "MEETING WORKFLOW \u00b7 AUTHORIZED EVENT STAFF",
       "layout": "feature_tracks",
-      "status": "planned",
+      "status": "current",
       "tiles": [
         {
-          "title": "Reusable form starters",
-          "body": "Maintain form templates in the app and use copies for new work.",
-          "status": "Planned foundation",
+          "title": "Choose a starter",
+          "body": "Make an independent copy; update an existing draft deliberately.",
+          "status": "Independent form copy",
           "icon": "copy"
         },
         {
-          "title": "Source-change notices",
-          "body": "Know when a copied starter has changed without silently replacing an existing form.",
-          "status": "Planned foundation",
-          "icon": "notice"
-        },
-        {
-          "title": "Clearer editing",
-          "body": "Keep the question list, selected question and its settings easier to understand.",
-          "status": "Design review ahead",
+          "title": "Edit and save the draft",
+          "body": "Check question scope and required answers, then save.",
+          "status": "Draft is not public",
           "icon": "form"
         },
         {
-          "title": "Questions, rules and phone tools",
-          "body": "Reuse questions, combine visibility conditions and improve editing on a phone.",
-          "status": "Design review ahead",
-          "icon": "phone"
+          "title": "Preview and test",
+          "body": "Try the attendee flow; first publication requires a valid test.",
+          "status": "First-publish test",
+          "icon": "preview"
+        },
+        {
+          "title": "Publish the version",
+          "body": "Confirm the version, then check the public form and event.",
+          "status": "Check event publication too",
+          "icon": "page"
         }
       ],
-      "takeaway": "Drafts and publishing already exist. Planned tools make forms easier to build and maintain.",
-      "say": "Forms already have explicit drafts, preview and test tools, and published versions that keep older submissions tied to their original form version. The roadmap aims to make creating and maintaining those forms easier. Its ordered foundation work includes preparing the builder, app-editable form starters, and notices about changes to their source. Later visual work covers a clearer editing workspace, reusable questions, phone editing and combined visibility rules. Those later steps still require their own design review. A changed starter should not silently rewrite a form someone is already using. This is the planned direction, with no release date announced here.",
-      "show": "Begin with the takeaway so listeners know which controls already exist. Then follow the planned foundations and the later reviewed tools. Keep engineering extraction and build-queue details in preparation references rather than the spoken explanation.",
-      "ask": "Would a clearer editor, reusable starter or reusable question save you the most work?",
+      "takeaway": "Choose a starter, save the draft, check the attendee experience, then publish.",
+      "say": "Start with the correct event and registration form. A starter gives you an independent copy; replacing an existing draft is a deliberate action. Check whether a question is asked once for the booking or for every attendee, and which answers are required. Save the draft, then preview and test with fictional people. A valid test is required before the first publication; later versions do not acquire another mandatory first-publication test. Review and publish the saved version, and check that the event is published too. Existing registrations keep the version they submitted. We will use the editor available for this meeting; the job is to build, check and publish the right form.",
+      "show": "In the meeting-day editor, demonstrate New from template or Update draft from a template, question scope and Required, Save draft, Preview & test, Run test submission, Publish version and the Publish form confirmation. Check Open public form. Trainer preparation: the owner expects the redesign before the meeting. Refresh actual builder screenshots and exact labels against that approved release; this workflow diagram does not claim the unfinished inspector, shared-template library, saved-question library or complete phone editor is already delivered. If it has not landed, demonstrate the actual available editor. Use a synthetic event; do not change a live public form for training.",
+      "ask": "If you save a draft, have you changed the form visitors are using? What else must be published?",
       "refs": [
-        "docs/STAFF-EVENT-WORKFLOW.md",
+        "app/(workspace)/registration-builder/page.tsx",
+        "components/registration-builder-workspace.tsx",
         "modules/forms/repository.ts",
         "modules/forms/seeded-templates.ts",
-        "docs/design/public-journeys-and-lists/review.md"
+        "docs/STAFF-EVENT-WORKFLOW.md"
       ],
       "issue_refs": [
-        98,
         1062,
-        1063,
-        1064,
-        1065,
-        1069,
-        1070,
-        1071,
-        1072
+        1056,
+        1057,
+        1061,
+        1066
       ],
       "role": "all",
       "screens": [],
       "callouts": [],
-      "objective": "Recognize the capability and its actual current/planned/exploratory status."
+      "objective": "Recognize the capability and its actual current/planned/exploratory status.",
+      "section": "meeting_form"
     },
     {
       "title": "A full camp workflow could build on this foundation",
@@ -1833,7 +2095,7 @@
     },
     {
       "slide": 2,
-      "text": "02 / 31",
+      "text": "02 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -1914,7 +2176,7 @@
     },
     {
       "slide": 3,
-      "text": "03 / 31",
+      "text": "03 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2040,7 +2302,7 @@
     },
     {
       "slide": 4,
-      "text": "04 / 31",
+      "text": "04 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2139,7 +2401,7 @@
     },
     {
       "slide": 5,
-      "text": "05 / 31",
+      "text": "05 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2238,7 +2500,7 @@
     },
     {
       "slide": 6,
-      "text": "06 / 31",
+      "text": "06 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2319,7 +2581,7 @@
     },
     {
       "slide": 7,
-      "text": "07 / 31",
+      "text": "07 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2445,7 +2707,7 @@
     },
     {
       "slide": 8,
-      "text": "08 / 31",
+      "text": "08 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2553,7 +2815,7 @@
     },
     {
       "slide": 9,
-      "text": "09 / 31",
+      "text": "09 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2652,7 +2914,7 @@
     },
     {
       "slide": 10,
-      "text": "10 / 31",
+      "text": "10 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2751,7 +3013,7 @@
     },
     {
       "slide": 11,
-      "text": "11 / 31",
+      "text": "11 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2877,7 +3139,7 @@
     },
     {
       "slide": 12,
-      "text": "12 / 31",
+      "text": "12 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -2985,7 +3247,7 @@
     },
     {
       "slide": 13,
-      "text": "13 / 31",
+      "text": "13 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3102,7 +3364,7 @@
     },
     {
       "slide": 14,
-      "text": "14 / 31",
+      "text": "14 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3183,7 +3445,7 @@
     },
     {
       "slide": 15,
-      "text": "15 / 31",
+      "text": "15 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3264,7 +3526,7 @@
     },
     {
       "slide": 16,
-      "text": "16 / 31",
+      "text": "16 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3345,7 +3607,7 @@
     },
     {
       "slide": 17,
-      "text": "17 / 31",
+      "text": "17 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3444,7 +3706,7 @@
     },
     {
       "slide": 18,
-      "text": "18 / 31",
+      "text": "18 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3516,7 +3778,7 @@
     },
     {
       "slide": 19,
-      "text": "19 / 31",
+      "text": "19 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3615,7 +3877,7 @@
     },
     {
       "slide": 20,
-      "text": "20 / 31",
+      "text": "20 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3741,7 +4003,7 @@
     },
     {
       "slide": 21,
-      "text": "21 / 31",
+      "text": "21 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3822,7 +4084,7 @@
     },
     {
       "slide": 22,
-      "text": "22 / 31",
+      "text": "22 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -3921,7 +4183,7 @@
     },
     {
       "slide": 23,
-      "text": "23 / 31",
+      "text": "23 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -4002,7 +4264,7 @@
     },
     {
       "slide": 24,
-      "text": "24 / 31",
+      "text": "24 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -4011,7 +4273,7 @@
     },
     {
       "slide": 25,
-      "text": "OTHER CURRENT CAPABILITIES",
+      "text": "MORE CLUB TOOLS \u00b7 CLASS TRACKING",
       "x": 0.83,
       "y": 0.29,
       "w": 11.8,
@@ -4020,7 +4282,7 @@
     },
     {
       "slide": 25,
-      "text": "More club tools are already here",
+      "text": "Record completed classes and earned items",
       "x": 0.65,
       "y": 0.83,
       "w": 12.05,
@@ -4029,88 +4291,43 @@
     },
     {
       "slide": 25,
-      "text": "Class records",
-      "x": 0.89,
-      "y": 3.42,
-      "w": 3.34,
-      "h": 0.86,
-      "font_pt": 21
-    },
-    {
-      "slide": 25,
-      "text": "Record earned insignia, patches and supported awards.",
-      "x": 0.89,
-      "y": 4.49,
-      "w": 3.34,
-      "h": 1.02,
-      "font_pt": 18
-    },
-    {
-      "slide": 25,
-      "text": "CURRENT",
-      "x": 0.89,
-      "y": 5.58,
-      "w": 3.34,
+      "text": "Morgan \u00b7 recorded Friend completion",
+      "x": 0.65,
+      "y": 1.76,
+      "w": 5.8,
       "h": 0.38,
-      "font_pt": 10.3
+      "font_pt": 15
     },
     {
       "slide": 25,
-      "text": "Orders and supplies",
-      "x": 4.98,
-      "y": 3.42,
-      "w": 3.34,
-      "h": 0.86,
-      "font_pt": 21
+      "text": "1  Read the saved completion",
+      "x": 0.65,
+      "y": 5.88,
+      "w": 5.88,
+      "h": 0.59,
+      "font_pt": 12.8
     },
     {
       "slide": 25,
-      "text": "Orders tracks supplies, stock and hand-outs.",
-      "x": 4.98,
-      "y": 4.49,
-      "w": 3.34,
-      "h": 1.02,
-      "font_pt": 18
-    },
-    {
-      "slide": 25,
-      "text": "CURRENT",
-      "x": 4.98,
-      "y": 5.58,
-      "w": 3.34,
+      "text": "Insignia \u00b7 a separate order-list choice",
+      "x": 6.7700000000000005,
+      "y": 1.76,
+      "w": 5.8,
       "h": 0.38,
-      "font_pt": 10.3
+      "font_pt": 15
     },
     {
       "slide": 25,
-      "text": "Year-end reports",
-      "x": 9.07,
-      "y": 3.42,
-      "w": 3.34,
-      "h": 0.86,
-      "font_pt": 21
+      "text": "2  Choose the items you actually need",
+      "x": 6.7700000000000005,
+      "y": 5.88,
+      "w": 5.88,
+      "h": 0.59,
+      "font_pt": 12.8
     },
     {
       "slide": 25,
-      "text": "Review the year's saved work before submitting.",
-      "x": 9.07,
-      "y": 4.49,
-      "w": 3.34,
-      "h": 1.02,
-      "font_pt": 18
-    },
-    {
-      "slide": 25,
-      "text": "CURRENT",
-      "x": 9.07,
-      "y": 5.58,
-      "w": 3.34,
-      "h": 0.38,
-      "font_pt": 10.3
-    },
-    {
-      "slide": 25,
-      "text": "The same club records support achievements, supplies and year-end reporting.",
+      "text": "Completing a class suggests insignia. Add to order list is a separate choice.",
       "x": 0.82,
       "y": 6.645,
       "w": 11.66,
@@ -4119,879 +4336,6 @@
     },
     {
       "slide": 25,
-      "text": "Current capabilities in reviewed source \u00b7 Event setup and assigned access vary",
-      "x": 0.67,
-      "y": 7.18,
-      "w": 10.8,
-      "h": 0.23,
-      "font_pt": 8.6
-    },
-    {
-      "slide": 25,
-      "text": "25 / 31",
-      "x": 11.68,
-      "y": 7.16,
-      "w": 1.0,
-      "h": 0.27,
-      "font_pt": 9.5
-    },
-    {
-      "slide": 26,
-      "text": "CURRENT EVENT OPERATIONS \u00b7 SETUP AND PERMISSIONS APPLY",
-      "x": 0.83,
-      "y": 0.29,
-      "w": 11.8,
-      "h": 0.35,
-      "font_pt": 10.5
-    },
-    {
-      "slide": 26,
-      "text": "Event teams have tools before, during and after",
-      "x": 0.65,
-      "y": 0.83,
-      "w": 12.05,
-      "h": 0.83,
-      "font_pt": 29
-    },
-    {
-      "slide": 26,
-      "text": "Publish",
-      "x": 1.6099999999999999,
-      "y": 2.21,
-      "w": 2.7,
-      "h": 0.61,
-      "font_pt": 18
-    },
-    {
-      "slide": 26,
-      "text": "Prepare event pages and versioned forms.",
-      "x": 0.8400000000000001,
-      "y": 2.98,
-      "w": 3.46,
-      "h": 0.66,
-      "font_pt": 14.2
-    },
-    {
-      "slide": 26,
-      "text": "CURRENT",
-      "x": 0.8400000000000001,
-      "y": 3.71,
-      "w": 3.46,
-      "h": 0.25,
-      "font_pt": 8.7
-    },
-    {
-      "slide": 26,
-      "text": "Register",
-      "x": 5.69,
-      "y": 2.21,
-      "w": 2.7,
-      "h": 0.61,
-      "font_pt": 18
-    },
-    {
-      "slide": 26,
-      "text": "Manage bookings, capacity and waitlists.",
-      "x": 4.920000000000001,
-      "y": 2.98,
-      "w": 3.46,
-      "h": 0.66,
-      "font_pt": 14.2
-    },
-    {
-      "slide": 26,
-      "text": "CURRENT",
-      "x": 4.920000000000001,
-      "y": 3.71,
-      "w": 3.46,
-      "h": 0.25,
-      "font_pt": 8.7
-    },
-    {
-      "slide": 26,
-      "text": "Communicate",
-      "x": 9.77,
-      "y": 2.21,
-      "w": 2.7,
-      "h": 0.61,
-      "font_pt": 18
-    },
-    {
-      "slide": 26,
-      "text": "Send reviewed messages through configured email.",
-      "x": 9.0,
-      "y": 2.98,
-      "w": 3.46,
-      "h": 0.66,
-      "font_pt": 14.2
-    },
-    {
-      "slide": 26,
-      "text": "SETUP REQUIRED",
-      "x": 9.0,
-      "y": 3.71,
-      "w": 3.46,
-      "h": 0.25,
-      "font_pt": 8.7
-    },
-    {
-      "slide": 26,
-      "text": "Welcome people",
-      "x": 1.6099999999999999,
-      "y": 4.42,
-      "w": 2.7,
-      "h": 0.61,
-      "font_pt": 18
-    },
-    {
-      "slide": 26,
-      "text": "Use check-in, passes, rosters and badge sheets.",
-      "x": 0.8400000000000001,
-      "y": 5.1899999999999995,
-      "w": 3.46,
-      "h": 0.66,
-      "font_pt": 14.2
-    },
-    {
-      "slide": 26,
-      "text": "CURRENT",
-      "x": 0.8400000000000001,
-      "y": 5.92,
-      "w": 3.46,
-      "h": 0.25,
-      "font_pt": 8.7
-    },
-    {
-      "slide": 26,
-      "text": "Reconcile",
-      "x": 5.69,
-      "y": 4.42,
-      "w": 2.7,
-      "h": 0.61,
-      "font_pt": 18
-    },
-    {
-      "slide": 26,
-      "text": "Review invoices, payments, reports and exports.",
-      "x": 4.920000000000001,
-      "y": 5.1899999999999995,
-      "w": 3.46,
-      "h": 0.66,
-      "font_pt": 14.2
-    },
-    {
-      "slide": 26,
-      "text": "SETUP APPLIES",
-      "x": 4.920000000000001,
-      "y": 5.92,
-      "w": 3.46,
-      "h": 0.25,
-      "font_pt": 8.7
-    },
-    {
-      "slide": 26,
-      "text": "Host",
-      "x": 9.77,
-      "y": 4.42,
-      "w": 2.7,
-      "h": 0.61,
-      "font_pt": 18
-    },
-    {
-      "slide": 26,
-      "text": "Configure lodging, meals and kitchen counts.",
-      "x": 9.0,
-      "y": 5.1899999999999995,
-      "w": 3.46,
-      "h": 0.66,
-      "font_pt": 14.2
-    },
-    {
-      "slide": 26,
-      "text": "EVENT SETUP",
-      "x": 9.0,
-      "y": 5.92,
-      "w": 3.46,
-      "h": 0.25,
-      "font_pt": 8.7
-    },
-    {
-      "slide": 26,
-      "text": "Event staff use assigned permissions; available options depend on the event and its setup.",
-      "x": 0.82,
-      "y": 6.645,
-      "w": 11.66,
-      "h": 0.34,
-      "font_pt": 15
-    },
-    {
-      "slide": 26,
-      "text": "Current capabilities in reviewed source \u00b7 Event setup and assigned access vary",
-      "x": 0.67,
-      "y": 7.18,
-      "w": 10.8,
-      "h": 0.23,
-      "font_pt": 8.6
-    },
-    {
-      "slide": 26,
-      "text": "26 / 31",
-      "x": 11.68,
-      "y": 7.16,
-      "w": 1.0,
-      "h": 0.27,
-      "font_pt": 9.5
-    },
-    {
-      "slide": 27,
-      "text": "ACCEPTED DIRECTION AND PLANNED IMPROVEMENTS",
-      "x": 0.83,
-      "y": 0.29,
-      "w": 11.8,
-      "h": 0.35,
-      "font_pt": 10.5
-    },
-    {
-      "slide": 27,
-      "text": "Planned: make the next task easier to find",
-      "x": 0.65,
-      "y": 0.83,
-      "w": 12.05,
-      "h": 0.83,
-      "font_pt": 29
-    },
-    {
-      "slide": 27,
-      "text": "Workspaces for each role",
-      "x": 1.6099999999999999,
-      "y": 2.21,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 27,
-      "text": "Keep each role's priorities and access clear.",
-      "x": 0.8400000000000001,
-      "y": 2.98,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 27,
-      "text": "DESIGN DIRECTION ACCEPTED",
-      "x": 0.8400000000000001,
-      "y": 3.71,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 27,
-      "text": "Clearer lists",
-      "x": 7.73,
-      "y": 2.21,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 27,
-      "text": "Improve columns, icons and saved views so people can return to useful work.",
-      "x": 6.960000000000001,
-      "y": 2.98,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 27,
-      "text": "PLANNED",
-      "x": 6.960000000000001,
-      "y": 3.71,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 27,
-      "text": "Public pages and links",
-      "x": 1.6099999999999999,
-      "y": 4.42,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 27,
-      "text": "Help people find the right date, club, event page and registration link.",
-      "x": 0.8400000000000001,
-      "y": 5.1899999999999995,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 27,
-      "text": "PROPOSED REFINEMENTS",
-      "x": 0.8400000000000001,
-      "y": 5.92,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 27,
-      "text": "Alerts and money closeout",
-      "x": 7.73,
-      "y": 4.42,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 27,
-      "text": "Administrator alerts and kitchen money closeout support staff following through on event work.",
-      "x": 6.960000000000001,
-      "y": 5.1899999999999995,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 27,
-      "text": "IN THE ORDERED ROADMAP",
-      "x": 6.960000000000001,
-      "y": 5.92,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 27,
-      "text": "The aim is easier learning while each role keeps its own responsibilities and access.",
-      "x": 0.82,
-      "y": 6.645,
-      "w": 11.66,
-      "h": 0.34,
-      "font_pt": 15
-    },
-    {
-      "slide": 27,
-      "text": "Planned work / accepted design direction \u00b7 Delivery dates are not set",
-      "x": 0.67,
-      "y": 7.18,
-      "w": 10.8,
-      "h": 0.23,
-      "font_pt": 8.6
-    },
-    {
-      "slide": 27,
-      "text": "27 / 31",
-      "x": 11.68,
-      "y": 7.16,
-      "w": 1.0,
-      "h": 0.27,
-      "font_pt": 9.5
-    },
-    {
-      "slide": 28,
-      "text": "FORM-BUILDER ROADMAP \u00b7 LATER VISUAL STEPS STILL NEED REVIEW",
-      "x": 0.83,
-      "y": 0.29,
-      "w": 11.8,
-      "h": 0.35,
-      "font_pt": 10.5
-    },
-    {
-      "slide": 28,
-      "text": "Planned: make forms easier to build and maintain",
-      "x": 0.65,
-      "y": 0.83,
-      "w": 12.05,
-      "h": 0.83,
-      "font_pt": 29
-    },
-    {
-      "slide": 28,
-      "text": "Reusable form starters",
-      "x": 1.6099999999999999,
-      "y": 2.21,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 28,
-      "text": "Maintain form templates in the app and use copies for new work.",
-      "x": 0.8400000000000001,
-      "y": 2.98,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 28,
-      "text": "PLANNED FOUNDATION",
-      "x": 0.8400000000000001,
-      "y": 3.71,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 28,
-      "text": "Source-change notices",
-      "x": 7.73,
-      "y": 2.21,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 28,
-      "text": "Know when a copied starter has changed without silently replacing an existing form.",
-      "x": 6.960000000000001,
-      "y": 2.98,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 28,
-      "text": "PLANNED FOUNDATION",
-      "x": 6.960000000000001,
-      "y": 3.71,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 28,
-      "text": "Clearer editing",
-      "x": 1.6099999999999999,
-      "y": 4.42,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 28,
-      "text": "Keep the question list, selected question and its settings easier to understand.",
-      "x": 0.8400000000000001,
-      "y": 5.1899999999999995,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 28,
-      "text": "DESIGN REVIEW AHEAD",
-      "x": 0.8400000000000001,
-      "y": 5.92,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 28,
-      "text": "Questions, rules and phone tools",
-      "x": 7.73,
-      "y": 4.42,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 28,
-      "text": "Reuse questions, combine visibility conditions and improve editing on a phone.",
-      "x": 6.960000000000001,
-      "y": 5.1899999999999995,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 28,
-      "text": "DESIGN REVIEW AHEAD",
-      "x": 6.960000000000001,
-      "y": 5.92,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 28,
-      "text": "Drafts and publishing already exist. Planned tools make forms easier to build and maintain.",
-      "x": 0.82,
-      "y": 6.645,
-      "w": 11.66,
-      "h": 0.34,
-      "font_pt": 15
-    },
-    {
-      "slide": 28,
-      "text": "Planned work / accepted design direction \u00b7 Delivery dates are not set",
-      "x": 0.67,
-      "y": 7.18,
-      "w": 10.8,
-      "h": 0.23,
-      "font_pt": 8.6
-    },
-    {
-      "slide": 28,
-      "text": "28 / 31",
-      "x": 11.68,
-      "y": 7.16,
-      "w": 1.0,
-      "h": 0.27,
-      "font_pt": 9.5
-    },
-    {
-      "slide": 29,
-      "text": "FUTURE CAMP POSSIBILITY \u00b7 DISCOVERY AND POLICY WORK REMAIN",
-      "x": 0.83,
-      "y": 0.29,
-      "w": 11.8,
-      "h": 0.35,
-      "font_pt": 10.5
-    },
-    {
-      "slide": 29,
-      "text": "A full camp workflow could build on this foundation",
-      "x": 0.65,
-      "y": 0.83,
-      "w": 12.05,
-      "h": 0.83,
-      "font_pt": 29
-    },
-    {
-      "slide": 29,
-      "text": "Existing foundations",
-      "x": 0.89,
-      "y": 3.42,
-      "w": 3.34,
-      "h": 0.86,
-      "font_pt": 21
-    },
-    {
-      "slide": 29,
-      "text": "Build on registration, lodging, meals and check-in.",
-      "x": 0.89,
-      "y": 4.49,
-      "w": 3.34,
-      "h": 1.02,
-      "font_pt": 18
-    },
-    {
-      "slide": 29,
-      "text": "CURRENT FOUNDATION",
-      "x": 0.89,
-      "y": 5.58,
-      "w": 3.34,
-      "h": 0.38,
-      "font_pt": 10.3
-    },
-    {
-      "slide": 29,
-      "text": "Camp responsibilities to define",
-      "x": 4.98,
-      "y": 3.42,
-      "w": 3.34,
-      "h": 0.86,
-      "font_pt": 21
-    },
-    {
-      "slide": 29,
-      "text": "Define cabin groups, counselor care and safe pickup.",
-      "x": 4.98,
-      "y": 4.49,
-      "w": 3.34,
-      "h": 1.02,
-      "font_pt": 18
-    },
-    {
-      "slide": 29,
-      "text": "FUTURE SCOPE",
-      "x": 4.98,
-      "y": 5.58,
-      "w": 3.34,
-      "h": 0.38,
-      "font_pt": 10.3
-    },
-    {
-      "slide": 29,
-      "text": "Optional vendor connection",
-      "x": 9.07,
-      "y": 3.42,
-      "w": 3.34,
-      "h": 0.86,
-      "font_pt": 21
-    },
-    {
-      "slide": 29,
-      "text": "Explore UltraCamp data, APIs and licensing.",
-      "x": 9.07,
-      "y": 4.49,
-      "w": 3.34,
-      "h": 1.02,
-      "font_pt": 18
-    },
-    {
-      "slide": 29,
-      "text": "EXPLORATION",
-      "x": 9.07,
-      "y": 5.58,
-      "w": 3.34,
-      "h": 0.38,
-      "font_pt": 10.3
-    },
-    {
-      "slide": 29,
-      "text": "A camp system adds care, supervision and release responsibilities beyond a lodging reservation.",
-      "x": 0.82,
-      "y": 6.645,
-      "w": 11.66,
-      "h": 0.34,
-      "font_pt": 15
-    },
-    {
-      "slide": 29,
-      "text": "Future possibility / discovery \u00b7 Scope and timing require further decisions",
-      "x": 0.67,
-      "y": 7.18,
-      "w": 10.8,
-      "h": 0.23,
-      "font_pt": 8.6
-    },
-    {
-      "slide": 29,
-      "text": "29 / 31",
-      "x": 11.68,
-      "y": 7.16,
-      "w": 1.0,
-      "h": 0.27,
-      "font_pt": 9.5
-    },
-    {
-      "slide": 30,
-      "text": "LATER ROADMAP \u00b7 DECISIONS AND DEPENDENCIES APPLY",
-      "x": 0.83,
-      "y": 0.29,
-      "w": 11.8,
-      "h": 0.35,
-      "font_pt": 10.5
-    },
-    {
-      "slide": 30,
-      "text": "Longer-term possibilities to develop",
-      "x": 0.65,
-      "y": 0.83,
-      "w": 12.05,
-      "h": 0.83,
-      "font_pt": 29
-    },
-    {
-      "slide": 30,
-      "text": "Adventurer ministry",
-      "x": 1.6099999999999999,
-      "y": 2.21,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 30,
-      "text": "Extend ministry-specific records and coordinator scope after program decisions and materials.",
-      "x": 0.8400000000000001,
-      "y": 2.98,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 30,
-      "text": "DECISIONS OPEN",
-      "x": 0.8400000000000001,
-      "y": 3.71,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 30,
-      "text": "Wallet passes and mobile access",
-      "x": 7.73,
-      "y": 2.21,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 30,
-      "text": "Make event information easier to keep; current web passes already work on a phone.",
-      "x": 6.960000000000001,
-      "y": 2.98,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 30,
-      "text": "PLANNED EXTENSION",
-      "x": 6.960000000000001,
-      "y": 3.71,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 30,
-      "text": "Merchandise and fundraising",
-      "x": 1.6099999999999999,
-      "y": 4.42,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 30,
-      "text": "Separate checkout is held; fundraising needs its own scope.",
-      "x": 0.8400000000000001,
-      "y": 5.1899999999999995,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 30,
-      "text": "CHECKOUT ON HOLD",
-      "x": 0.8400000000000001,
-      "y": 5.92,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 30,
-      "text": "Feedback and certificates",
-      "x": 7.73,
-      "y": 4.42,
-      "w": 4.74,
-      "h": 0.61,
-      "font_pt": 20
-    },
-    {
-      "slide": 30,
-      "text": "Extend event follow-up with feedback and useful records of participation or completion.",
-      "x": 6.960000000000001,
-      "y": 5.1899999999999995,
-      "w": 5.5,
-      "h": 0.66,
-      "font_pt": 16.8
-    },
-    {
-      "slide": 30,
-      "text": "LATER ROADMAP",
-      "x": 6.960000000000001,
-      "y": 5.92,
-      "w": 5.5,
-      "h": 0.25,
-      "font_pt": 9.2
-    },
-    {
-      "slide": 30,
-      "text": "Future scope follows the existing roadmap, decisions and event needs; no delivery dates are set.",
-      "x": 0.82,
-      "y": 6.645,
-      "w": 11.66,
-      "h": 0.34,
-      "font_pt": 15
-    },
-    {
-      "slide": 30,
-      "text": "Future possibility / discovery \u00b7 Scope and timing require further decisions",
-      "x": 0.67,
-      "y": 7.18,
-      "w": 10.8,
-      "h": 0.23,
-      "font_pt": 8.6
-    },
-    {
-      "slide": 30,
-      "text": "30 / 31",
-      "x": 11.68,
-      "y": 7.16,
-      "w": 1.0,
-      "h": 0.27,
-      "font_pt": 9.5
-    },
-    {
-      "slide": 31,
-      "text": "READY TO USE IT",
-      "x": 0.83,
-      "y": 0.29,
-      "w": 11.8,
-      "h": 0.35,
-      "font_pt": 10.5
-    },
-    {
-      "slide": 31,
-      "text": "Check the result. Sign out. Return to the same place.",
-      "x": 0.65,
-      "y": 0.83,
-      "w": 12.05,
-      "h": 0.83,
-      "font_pt": 29
-    },
-    {
-      "slide": 31,
-      "text": "Finish safely",
-      "x": 8.55,
-      "y": 1.94,
-      "w": 3.95,
-      "h": 0.64,
-      "font_pt": 24
-    },
-    {
-      "slide": 31,
-      "text": "Use Sign out before leaving a shared device.",
-      "x": 8.55,
-      "y": 5.27,
-      "w": 4.1,
-      "h": 0.83,
-      "font_pt": 20
-    },
-    {
-      "slide": 31,
-      "text": "1",
-      "x": 0.37300000000000005,
-      "y": 4.0802808988764045,
-      "w": 0.2,
-      "h": 0.25,
-      "font_pt": 11
-    },
-    {
-      "slide": 31,
-      "text": "2",
-      "x": 9.110000000000001,
-      "y": 3.7031034482758622,
-      "w": 0.2,
-      "h": 0.25,
-      "font_pt": 11
-    },
-    {
-      "slide": 31,
-      "text": "Try one task for your role. Check its saved state, then Sign out\u2014especially on a shared device.",
-      "x": 0.82,
-      "y": 6.645,
-      "w": 11.66,
-      "h": 0.34,
-      "font_pt": 15
-    },
-    {
-      "slide": 31,
       "text": "events.imsda.org  \u00b7  Actual local app screens  \u00b7  Fictional training records",
       "x": 0.67,
       "y": 7.18,
@@ -5000,8 +4344,1034 @@
       "font_pt": 8.6
     },
     {
+      "slide": 25,
+      "text": "25 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 26,
+      "text": "MORE CLUB TOOLS \u00b7 ORDERS",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 26,
+      "text": "Use Orders for supplies and hand-outs",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 26,
+      "text": "Helper list \u00b7 4 scarves needed \u2212 2 available = 2 to order",
+      "x": 0.65,
+      "y": 1.76,
+      "w": 12,
+      "h": 0.38,
+      "font_pt": 15
+    },
+    {
+      "slide": 26,
+      "text": "Hand out \u00b7 Drew\u2019s Good Conduct Bar",
+      "x": 0.65,
+      "y": 3.58,
+      "w": 5.9,
+      "h": 0.38,
+      "font_pt": 15
+    },
+    {
+      "slide": 26,
+      "text": "Saved result \u00b7 Good Conduct stock: 3 \u2192 2",
+      "x": 6.77,
+      "y": 3.58,
+      "w": 5.9,
+      "h": 0.38,
+      "font_pt": 15
+    },
+    {
+      "slide": 26,
+      "text": "Orders is a supply helper. A list, stock receipt and hand-out are different records.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 26,
+      "text": "events.imsda.org  \u00b7  Actual local app screens  \u00b7  Fictional training records",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 26,
+      "text": "26 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 27,
+      "text": "MORE CLUB TOOLS \u00b7 YEAR-END REPORT",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 27,
+      "text": "Review the Year-End Report",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 27,
+      "text": "2026\u201327 \u00b7 May\u2013April \u00b7 Due April 1, 2027 \u00b7 Draft",
+      "x": 0.65,
+      "y": 1.72,
+      "w": 12,
+      "h": 0.3,
+      "font_pt": 13
+    },
+    {
+      "slide": 27,
+      "text": "Review \u00b7 9 members + 1 staff = 10 total",
+      "x": 0.65,
+      "y": 3.35,
+      "w": 8.6,
+      "h": 0.4,
+      "font_pt": 15
+    },
+    {
+      "slide": 27,
+      "text": "Keep unfinished work",
+      "x": 9.45,
+      "y": 3.35,
+      "w": 3.2,
+      "h": 0.4,
+      "font_pt": 15
+    },
+    {
+      "slide": 27,
+      "text": "Review prefilled sources and manual figures before submitting.",
+      "x": 9.45,
+      "y": 5.3,
+      "w": 3.2,
+      "h": 0.9,
+      "font_pt": 17
+    },
+    {
+      "slide": 27,
+      "text": "Review the saved records and any manual figures. Save draft does not submit the report.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 27,
+      "text": "events.imsda.org  \u00b7  Actual local app screens  \u00b7  Fictional training records",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 27,
+      "text": "27 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 28,
+      "text": "CURRENT EVENT OPERATIONS \u00b7 SETUP AND PERMISSIONS APPLY",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 28,
+      "text": "Event teams have tools before, during and after",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 28,
+      "text": "Publish",
+      "x": 1.6099999999999999,
+      "y": 2.21,
+      "w": 2.7,
+      "h": 0.61,
+      "font_pt": 18
+    },
+    {
+      "slide": 28,
+      "text": "Prepare event pages and versioned forms.",
+      "x": 0.8400000000000001,
+      "y": 2.98,
+      "w": 3.46,
+      "h": 0.66,
+      "font_pt": 14.2
+    },
+    {
+      "slide": 28,
+      "text": "CURRENT",
+      "x": 0.8400000000000001,
+      "y": 3.71,
+      "w": 3.46,
+      "h": 0.25,
+      "font_pt": 8.7
+    },
+    {
+      "slide": 28,
+      "text": "Register",
+      "x": 5.69,
+      "y": 2.21,
+      "w": 2.7,
+      "h": 0.61,
+      "font_pt": 18
+    },
+    {
+      "slide": 28,
+      "text": "Manage bookings, capacity and waitlists.",
+      "x": 4.920000000000001,
+      "y": 2.98,
+      "w": 3.46,
+      "h": 0.66,
+      "font_pt": 14.2
+    },
+    {
+      "slide": 28,
+      "text": "CURRENT",
+      "x": 4.920000000000001,
+      "y": 3.71,
+      "w": 3.46,
+      "h": 0.25,
+      "font_pt": 8.7
+    },
+    {
+      "slide": 28,
+      "text": "Communicate",
+      "x": 9.77,
+      "y": 2.21,
+      "w": 2.7,
+      "h": 0.61,
+      "font_pt": 18
+    },
+    {
+      "slide": 28,
+      "text": "Send reviewed messages through configured email.",
+      "x": 9.0,
+      "y": 2.98,
+      "w": 3.46,
+      "h": 0.66,
+      "font_pt": 14.2
+    },
+    {
+      "slide": 28,
+      "text": "SETUP REQUIRED",
+      "x": 9.0,
+      "y": 3.71,
+      "w": 3.46,
+      "h": 0.25,
+      "font_pt": 8.7
+    },
+    {
+      "slide": 28,
+      "text": "Welcome people",
+      "x": 1.6099999999999999,
+      "y": 4.42,
+      "w": 2.7,
+      "h": 0.61,
+      "font_pt": 18
+    },
+    {
+      "slide": 28,
+      "text": "Use check-in, passes, rosters and badge sheets.",
+      "x": 0.8400000000000001,
+      "y": 5.1899999999999995,
+      "w": 3.46,
+      "h": 0.66,
+      "font_pt": 14.2
+    },
+    {
+      "slide": 28,
+      "text": "CURRENT",
+      "x": 0.8400000000000001,
+      "y": 5.92,
+      "w": 3.46,
+      "h": 0.25,
+      "font_pt": 8.7
+    },
+    {
+      "slide": 28,
+      "text": "Reconcile",
+      "x": 5.69,
+      "y": 4.42,
+      "w": 2.7,
+      "h": 0.61,
+      "font_pt": 18
+    },
+    {
+      "slide": 28,
+      "text": "Review invoices, payments, reports and exports.",
+      "x": 4.920000000000001,
+      "y": 5.1899999999999995,
+      "w": 3.46,
+      "h": 0.66,
+      "font_pt": 14.2
+    },
+    {
+      "slide": 28,
+      "text": "SETUP APPLIES",
+      "x": 4.920000000000001,
+      "y": 5.92,
+      "w": 3.46,
+      "h": 0.25,
+      "font_pt": 8.7
+    },
+    {
+      "slide": 28,
+      "text": "Host",
+      "x": 9.77,
+      "y": 4.42,
+      "w": 2.7,
+      "h": 0.61,
+      "font_pt": 18
+    },
+    {
+      "slide": 28,
+      "text": "Configure lodging, meals and kitchen counts.",
+      "x": 9.0,
+      "y": 5.1899999999999995,
+      "w": 3.46,
+      "h": 0.66,
+      "font_pt": 14.2
+    },
+    {
+      "slide": 28,
+      "text": "EVENT SETUP",
+      "x": 9.0,
+      "y": 5.92,
+      "w": 3.46,
+      "h": 0.25,
+      "font_pt": 8.7
+    },
+    {
+      "slide": 28,
+      "text": "Event staff use assigned permissions; available options depend on the event and its setup.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 28,
+      "text": "Current capabilities in reviewed source \u00b7 Event setup and assigned access vary",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 28,
+      "text": "28 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 29,
+      "text": "ACCEPTED DIRECTION AND PLANNED IMPROVEMENTS",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 29,
+      "text": "Planned: make the next task easier to find",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 29,
+      "text": "Workspaces for each role",
+      "x": 1.6099999999999999,
+      "y": 2.21,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 29,
+      "text": "Keep each role's priorities and access clear.",
+      "x": 0.8400000000000001,
+      "y": 2.98,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 29,
+      "text": "DESIGN DIRECTION ACCEPTED",
+      "x": 0.8400000000000001,
+      "y": 3.71,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 29,
+      "text": "Clearer lists",
+      "x": 7.73,
+      "y": 2.21,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 29,
+      "text": "Improve columns, icons and saved views so people can return to useful work.",
+      "x": 6.960000000000001,
+      "y": 2.98,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 29,
+      "text": "PLANNED",
+      "x": 6.960000000000001,
+      "y": 3.71,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 29,
+      "text": "Public pages and links",
+      "x": 1.6099999999999999,
+      "y": 4.42,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 29,
+      "text": "Help people find the right date, club, event page and registration link.",
+      "x": 0.8400000000000001,
+      "y": 5.1899999999999995,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 29,
+      "text": "PROPOSED REFINEMENTS",
+      "x": 0.8400000000000001,
+      "y": 5.92,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 29,
+      "text": "Alerts and money closeout",
+      "x": 7.73,
+      "y": 4.42,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 29,
+      "text": "Administrator alerts and kitchen money closeout support staff following through on event work.",
+      "x": 6.960000000000001,
+      "y": 5.1899999999999995,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 29,
+      "text": "IN THE ORDERED ROADMAP",
+      "x": 6.960000000000001,
+      "y": 5.92,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 29,
+      "text": "The aim is easier learning while each role keeps its own responsibilities and access.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 29,
+      "text": "Planned work / accepted design direction \u00b7 Delivery dates are not set",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 29,
+      "text": "29 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 30,
+      "text": "MEETING WORKFLOW \u00b7 AUTHORIZED EVENT STAFF",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 30,
+      "text": "Build and check an event form",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 30,
+      "text": "Choose a starter",
+      "x": 1.6099999999999999,
+      "y": 2.21,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 30,
+      "text": "Make an independent copy; update an existing draft deliberately.",
+      "x": 0.8400000000000001,
+      "y": 2.98,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 30,
+      "text": "INDEPENDENT FORM COPY",
+      "x": 0.8400000000000001,
+      "y": 3.71,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 30,
+      "text": "Edit and save the draft",
+      "x": 7.73,
+      "y": 2.21,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 30,
+      "text": "Check question scope and required answers, then save.",
+      "x": 6.960000000000001,
+      "y": 2.98,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 30,
+      "text": "DRAFT IS NOT PUBLIC",
+      "x": 6.960000000000001,
+      "y": 3.71,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 30,
+      "text": "Preview and test",
+      "x": 1.6099999999999999,
+      "y": 4.42,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 30,
+      "text": "Try the attendee flow; first publication requires a valid test.",
+      "x": 0.8400000000000001,
+      "y": 5.1899999999999995,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 30,
+      "text": "FIRST-PUBLISH TEST",
+      "x": 0.8400000000000001,
+      "y": 5.92,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 30,
+      "text": "Publish the version",
+      "x": 7.73,
+      "y": 4.42,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 30,
+      "text": "Confirm the version, then check the public form and event.",
+      "x": 6.960000000000001,
+      "y": 5.1899999999999995,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 30,
+      "text": "CHECK EVENT PUBLICATION TOO",
+      "x": 6.960000000000001,
+      "y": 5.92,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 30,
+      "text": "Choose a starter, save the draft, check the attendee experience, then publish.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 30,
+      "text": "Current capabilities in reviewed source \u00b7 Event setup and assigned access vary",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 30,
+      "text": "30 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
       "slide": 31,
-      "text": "31 / 31",
+      "text": "FUTURE CAMP POSSIBILITY \u00b7 DISCOVERY AND POLICY WORK REMAIN",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 31,
+      "text": "A full camp workflow could build on this foundation",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 31,
+      "text": "Existing foundations",
+      "x": 0.89,
+      "y": 3.42,
+      "w": 3.34,
+      "h": 0.86,
+      "font_pt": 21
+    },
+    {
+      "slide": 31,
+      "text": "Build on registration, lodging, meals and check-in.",
+      "x": 0.89,
+      "y": 4.49,
+      "w": 3.34,
+      "h": 1.02,
+      "font_pt": 18
+    },
+    {
+      "slide": 31,
+      "text": "CURRENT FOUNDATION",
+      "x": 0.89,
+      "y": 5.58,
+      "w": 3.34,
+      "h": 0.38,
+      "font_pt": 10.3
+    },
+    {
+      "slide": 31,
+      "text": "Camp responsibilities to define",
+      "x": 4.98,
+      "y": 3.42,
+      "w": 3.34,
+      "h": 0.86,
+      "font_pt": 21
+    },
+    {
+      "slide": 31,
+      "text": "Define cabin groups, counselor care and safe pickup.",
+      "x": 4.98,
+      "y": 4.49,
+      "w": 3.34,
+      "h": 1.02,
+      "font_pt": 18
+    },
+    {
+      "slide": 31,
+      "text": "FUTURE SCOPE",
+      "x": 4.98,
+      "y": 5.58,
+      "w": 3.34,
+      "h": 0.38,
+      "font_pt": 10.3
+    },
+    {
+      "slide": 31,
+      "text": "Optional vendor connection",
+      "x": 9.07,
+      "y": 3.42,
+      "w": 3.34,
+      "h": 0.86,
+      "font_pt": 21
+    },
+    {
+      "slide": 31,
+      "text": "Explore UltraCamp data, APIs and licensing.",
+      "x": 9.07,
+      "y": 4.49,
+      "w": 3.34,
+      "h": 1.02,
+      "font_pt": 18
+    },
+    {
+      "slide": 31,
+      "text": "EXPLORATION",
+      "x": 9.07,
+      "y": 5.58,
+      "w": 3.34,
+      "h": 0.38,
+      "font_pt": 10.3
+    },
+    {
+      "slide": 31,
+      "text": "A camp system adds care, supervision and release responsibilities beyond a lodging reservation.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 31,
+      "text": "Future possibility / discovery \u00b7 Scope and timing require further decisions",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 31,
+      "text": "31 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 32,
+      "text": "LATER ROADMAP \u00b7 DECISIONS AND DEPENDENCIES APPLY",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 32,
+      "text": "Longer-term possibilities to develop",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 32,
+      "text": "Adventurer ministry",
+      "x": 1.6099999999999999,
+      "y": 2.21,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 32,
+      "text": "Extend ministry-specific records and coordinator scope after program decisions and materials.",
+      "x": 0.8400000000000001,
+      "y": 2.98,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 32,
+      "text": "DECISIONS OPEN",
+      "x": 0.8400000000000001,
+      "y": 3.71,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 32,
+      "text": "Wallet passes and mobile access",
+      "x": 7.73,
+      "y": 2.21,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 32,
+      "text": "Make event information easier to keep; current web passes already work on a phone.",
+      "x": 6.960000000000001,
+      "y": 2.98,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 32,
+      "text": "PLANNED EXTENSION",
+      "x": 6.960000000000001,
+      "y": 3.71,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 32,
+      "text": "Merchandise and fundraising",
+      "x": 1.6099999999999999,
+      "y": 4.42,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 32,
+      "text": "Separate checkout is held; fundraising needs its own scope.",
+      "x": 0.8400000000000001,
+      "y": 5.1899999999999995,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 32,
+      "text": "CHECKOUT ON HOLD",
+      "x": 0.8400000000000001,
+      "y": 5.92,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 32,
+      "text": "Feedback and certificates",
+      "x": 7.73,
+      "y": 4.42,
+      "w": 4.74,
+      "h": 0.61,
+      "font_pt": 20
+    },
+    {
+      "slide": 32,
+      "text": "Extend event follow-up with feedback and useful records of participation or completion.",
+      "x": 6.960000000000001,
+      "y": 5.1899999999999995,
+      "w": 5.5,
+      "h": 0.66,
+      "font_pt": 16.8
+    },
+    {
+      "slide": 32,
+      "text": "LATER ROADMAP",
+      "x": 6.960000000000001,
+      "y": 5.92,
+      "w": 5.5,
+      "h": 0.25,
+      "font_pt": 9.2
+    },
+    {
+      "slide": 32,
+      "text": "Future scope follows the existing roadmap, decisions and event needs; no delivery dates are set.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 32,
+      "text": "Future possibility / discovery \u00b7 Scope and timing require further decisions",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 32,
+      "text": "32 / 33",
+      "x": 11.68,
+      "y": 7.16,
+      "w": 1.0,
+      "h": 0.27,
+      "font_pt": 9.5
+    },
+    {
+      "slide": 33,
+      "text": "READY TO USE IT",
+      "x": 0.83,
+      "y": 0.29,
+      "w": 11.8,
+      "h": 0.35,
+      "font_pt": 10.5
+    },
+    {
+      "slide": 33,
+      "text": "Check the result. Sign out. Return to the same place.",
+      "x": 0.65,
+      "y": 0.83,
+      "w": 12.05,
+      "h": 0.83,
+      "font_pt": 29
+    },
+    {
+      "slide": 33,
+      "text": "Finish safely",
+      "x": 8.55,
+      "y": 1.94,
+      "w": 3.95,
+      "h": 0.64,
+      "font_pt": 24
+    },
+    {
+      "slide": 33,
+      "text": "Use Sign out before leaving a shared device.",
+      "x": 8.55,
+      "y": 5.27,
+      "w": 4.1,
+      "h": 0.83,
+      "font_pt": 20
+    },
+    {
+      "slide": 33,
+      "text": "1",
+      "x": 0.37300000000000005,
+      "y": 4.0802808988764045,
+      "w": 0.2,
+      "h": 0.25,
+      "font_pt": 11
+    },
+    {
+      "slide": 33,
+      "text": "2",
+      "x": 9.110000000000001,
+      "y": 3.7031034482758622,
+      "w": 0.2,
+      "h": 0.25,
+      "font_pt": 11
+    },
+    {
+      "slide": 33,
+      "text": "Try one task for your role. Check its saved state, then Sign out\u2014especially on a shared device.",
+      "x": 0.82,
+      "y": 6.645,
+      "w": 11.66,
+      "h": 0.34,
+      "font_pt": 15
+    },
+    {
+      "slide": 33,
+      "text": "events.imsda.org  \u00b7  Actual local app screens  \u00b7  Fictional training records",
+      "x": 0.67,
+      "y": 7.18,
+      "w": 10.8,
+      "h": 0.23,
+      "font_pt": 8.6
+    },
+    {
+      "slide": 33,
+      "text": "33 / 33",
       "x": 11.68,
       "y": 7.16,
       "w": 1.0,
@@ -5686,7 +6056,167 @@
       ]
     },
     {
-      "slide": 31,
+      "slide": 25,
+      "key": "club-class-tracking",
+      "path": "assets/training/details/club-class-tracking-83b90e14.png",
+      "crop": [
+        920,
+        1450,
+        1880,
+        1690
+      ],
+      "display_inches": [
+        0.65,
+        3.7612500000000004,
+        5.91,
+        1.4775
+      ]
+    },
+    {
+      "slide": 25,
+      "key": "club-class-suggestions",
+      "path": "assets/training/details/club-class-suggestions-588a0a0d.png",
+      "crop": [
+        0,
+        138,
+        1100,
+        698
+      ],
+      "display_inches": [
+        6.7700000000000005,
+        2.4606363636363637,
+        5.91,
+        3.0087272727272727
+      ]
+    },
+    {
+      "slide": 25,
+      "key": "club-class-tracking",
+      "path": "assets/training/details/club-class-tracking-4e6c7542.png",
+      "crop": [
+        160,
+        1580,
+        650,
+        1680
+      ],
+      "display_inches": [
+        1.3,
+        2.5510204081632653,
+        4.4,
+        0.8979591836734694
+      ]
+    },
+    {
+      "slide": 26,
+      "key": "club-orders-list",
+      "path": "assets/training/club-orders-list.png",
+      "crop": null,
+      "display_inches": [
+        0.65,
+        2.240179856115108,
+        12.0,
+        0.9496402877697843
+      ]
+    },
+    {
+      "slide": 26,
+      "key": "club-orders-handout",
+      "path": "assets/training/details/club-orders-handout-7cf14ce1.png",
+      "crop": [
+        0,
+        560,
+        900,
+        892
+      ],
+      "display_inches": [
+        0.8213855421686752,
+        4.12,
+        5.55722891566265,
+        2.05
+      ]
+    },
+    {
+      "slide": 26,
+      "key": "club-orders-stock-after",
+      "path": "assets/training/details/club-orders-stock-after-80481007.png",
+      "crop": [
+        0,
+        620,
+        2272,
+        750
+      ],
+      "display_inches": [
+        6.77,
+        4.581205985915493,
+        5.9,
+        0.33758802816901406
+      ]
+    },
+    {
+      "slide": 26,
+      "key": "club-orders-stock-after",
+      "path": "assets/training/details/club-orders-stock-after-71920933.png",
+      "crop": [
+        1900,
+        636,
+        2090,
+        735
+      ],
+      "display_inches": [
+        8.436363636363637,
+        5.25,
+        1.7272727272727273,
+        0.8999999999999999
+      ]
+    },
+    {
+      "slide": 27,
+      "key": "club-year-end-header",
+      "path": "assets/training/club-year-end-header.png",
+      "crop": null,
+      "display_inches": [
+        2.8493865030674845,
+        2.05,
+        7.601226993865031,
+        1.05
+      ]
+    },
+    {
+      "slide": 27,
+      "key": "club-year-end",
+      "path": "assets/training/details/club-year-end-2d333d68.png",
+      "crop": [
+        100,
+        150,
+        2460,
+        1180
+      ],
+      "display_inches": [
+        2.2077669902912618,
+        3.9,
+        5.384466019417476,
+        2.35
+      ]
+    },
+    {
+      "slide": 27,
+      "key": "club-year-end-save",
+      "path": "assets/training/details/club-year-end-save-532716b1.png",
+      "crop": [
+        100,
+        1610,
+        345,
+        1705
+      ],
+      "display_inches": [
+        9.760526315789473,
+        4.05,
+        2.5789473684210527,
+        1.0
+      ]
+    },
+    {
+      "slide": 33,
       "key": "event-saved",
       "path": "assets/training/details/event-saved-75a76ff4.png",
       "crop": [
@@ -5703,7 +6233,7 @@
       ]
     },
     {
-      "slide": 31,
+      "slide": 33,
       "key": "account-sign-out",
       "path": "assets/training/details/account-sign-out-ad36035a.png",
       "crop": [

@@ -1,5 +1,7 @@
 # Independent review: additional capabilities and future outlook
 
+**Historical review of the prior 31-slide deck.** The latest 33-slide revision shows the three club tools with current screenshots and replaces the planned form-builder pitch with a meeting workflow. See `meeting-form-builder-review.md`, `more-club-tools-independent-qa.md` and `deck-source.json` for the current section and slide numbers.
+
 Reviewed for the October 21, 2026 training revision. Scope: the six new slides 25–30, their spoken notes, source references and status labels. The existing task walkthrough and its fictional-data captures retain their separate review record.
 
 ## Material inspected

@@ -6,20 +6,24 @@ This pack explains the current system, consolidates accessibility/usability find
 
 ## Start with the user orientation
 
-- [Getting started PowerPoint — 31 slides with screenshots, feature outlook and spoken notes](exports/IMSDA-Events-platform-briefing.pptx)
+- [Getting started PowerPoint — 33 slides with screenshots, practical tools and spoken notes](exports/IMSDA-Events-platform-briefing.pptx)
 - [Getting started presentation PDF](exports/IMSDA-Events-platform-briefing.pdf)
 - [Presenter notes: PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Markdown](content/06-presenter-notes.md)
-- [Screenshot gallery — 34 fictional training capture examples](exports/IMSDA-Events-training-screenshot-gallery.html)
+- [Screenshot gallery — 42 fictional training capture examples](exports/IMSDA-Events-training-screenshot-gallery.html)
 
 - [Quick-start handout — 3 pages](exports/07-club-quick-start.pdf) · [Editable Word](exports/07-club-quick-start.docx) · [Markdown](content/07-club-quick-start.md)
 
-The presentation follows a fictional club through the current application: director Jordan Ellis adds Morgan Reed to Riverton Pathfinders, records an October meeting and registers people for Fall Camporee. Area Coordinator Alex Morgan then reviews club progress, report statuses and event participation. Screenshots use fictional records in an isolated local application; short annotations show where to act and how to recognize a saved result. Presenter notes carry the fuller explanation, optional demonstration and questions.
+The presentation follows a fictional club through the current application: director Jordan Ellis adds Morgan Reed to Riverton Pathfinders, records an October meeting and registers people for Fall Camporee. Area Coordinator Alex Morgan then reviews club progress, report statuses and event participation. The additional club tools are shown directly: Morgan's completed class and insignia suggestions, an Orders helper row and Drew's actual hand-out/stock change, and a Year-End Report saved as a draft. Screenshots use fictional records in an isolated local application; short annotations show where to act and how to recognize a saved result. Presenter notes carry the fuller explanation, optional demonstration and questions.
 
-**Choose a route:** slides 1–7 introduce the system and sign-in; 8–16 follow the director; 17–22 follow the Area Coordinator; 23–24 cover follow-up and help; 25–30 add other current tools, planned improvements and future possibilities; 31 finishes safely. A single-role session can use its section after the common introduction. Screenshots and current labels use [source `7f77c1df`](https://github.com/DurantTL/IMSDA-Events/commit/7f77c1dfeadd004deb51f91e2bae1b6c4754638b), whose application source matches the earlier baseline. The capture/source register is [screenshot-capture.json](evidence/screenshot-capture.json).
+**Choose a route:** slides 1–7 introduce the system and sign-in; 8–16 follow the director; 17–22 follow the Area Coordinator; 23–24 cover follow-up and help; 25–27 demonstrate Class tracking, Orders and the Year-End Report; 28–32 cover current event operations, planned workspaces, the meeting form-building workflow and future possibilities; 33 finishes safely. A single-role session can use its section after the common introduction. The capture/source register is [screenshot-capture.json](evidence/screenshot-capture.json): 42 registered examples from 41 unique capture images.
+
+**Source distinction:** actual app captures remain pinned to [source `7f77c1df`](https://github.com/DurantTL/IMSDA-Events/commit/7f77c1dfeadd004deb51f91e2bae1b6c4754638b), whose application source matches the original report baseline. The latest meeting workflow and feature-status review uses [main `6667bc02`](https://github.com/DurantTL/IMSDA-Events/commit/6667bc02c95b62fcce03c035b02c62823c9eb4f1) and the recorded owner-issue status. These source checks do not verify the serving production release.
 
 **Training scenario:** October 21, 2026, club year 2026–27. September records illustrate overdue status differences; October's record is still within its submission period. Fall Camporee takes place November 6–8. Names, clubs, contacts, figures and event records are fictional. These local captures verify repository behavior, not the configuration or data currently serving on the public production site.
 
-The six optional closing slides cover other current club/event tools, planned workspace and form-builder work, and longer-term possibilities such as camp operations, Adventurer support, wallet passes, merchandise, fundraising and feedback. Current, planned and possible are labelled separately; no delivery dates are promised. For a task-only orientation, use slides 1–24 and 31. Detailed technical evidence, future-feature planning and camp discovery remain in the separate reports below.
+The closing material now includes three actual club-tool demonstrations and five capability/workflow diagrams. The old “Planned: make forms easier” pitch has been replaced by **Build and check an event form**: choose an independent starter, edit and save a draft, preview/test, then publish the form version and check event publication. The owner expects editor changes before the meeting; trainer preparation requires refreshing its screenshots and labels against the approved meeting release. No meeting date has been supplied, and this document does not claim an open redesign has already shipped. The meeting workflow uses actions that already exist rather than advertising the editor as a distant-future feature.
+
+Current tools, planned workspace improvements and longer-term camp, Adventurer, wallet, merchandise, fundraising and feedback possibilities retain separate status labels. For a task-only orientation, use slides 1–27 and 33; event staff can also use the form-building sequence on slide 30. Detailed technical evidence, future-feature planning and camp discovery remain in the separate reports below.
 
 ![Current capabilities and future outlook](previews/feature-outlook.png)
 
@@ -58,12 +62,16 @@ The help/message examples are prepared drafts. Square-bracket placeholders are e
 - [Screenshot capture/source register](evidence/screenshot-capture.json)
 - [Visual-training review checklist](evidence/visual-training-qa-plan.md)
 - [Closing feature source/status audit](evidence/closing-feature-audit.md)
-- [Closing slide independent review](evidence/outlook-independent-qa.md)
-- [Independent visual-training review](evidence/visual-training-independent-qa.md)
+- [Earlier closing-slide independent review](evidence/outlook-independent-qa.md)
+- [Earlier screenshot-walkthrough review](evidence/visual-training-independent-qa.md)
+- [More club tools and meeting-workflow independent review](evidence/more-club-tools-independent-qa.md)
+- [Additional club-tool capture notes](evidence/more-club-tools-capture-notes.md)
+- [Local club-tool action checks](evidence/more-club-tools-checks.json)
+- [Meeting form-builder source and refresh review](evidence/meeting-form-builder-review.md)
 - [Fictional dataset and before/after story](evidence/synthetic-training-dataset.md)
 
 The technical report records **13,504 tests passed and one skipped across 1,015 files** in the exact current-main CI run. It distinguishes main smoke from the separately observed extended application, mobile and badge checks, and from human/physical production verification. No new application test run was started for this documentation task.
 
-The PowerPoint contains embedded screenshot images with editable titles, captions and callout shapes. Its six closing capability diagrams also use editable text and vector shapes, with status-aware captions that distinguish them from current app screenshots. Screenshots are raster captures rather than editable application components. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. Export-check results are recorded separately in the evidence files; PDF tags alone do not establish PDF/UA or WCAG conformance.
+The PowerPoint contains embedded screenshot images with editable titles, captions and callout shapes. Its five capability/workflow diagrams use editable text and vector shapes, with status-aware captions that distinguish them from current app screenshots. Screenshots are raster captures rather than editable application components. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. Export-check results are recorded separately in the evidence files; PDF tags alone do not establish PDF/UA or WCAG conformance. Earlier independent reviews retain their dated scope; the latest club-tool and meeting-workflow review records the added material.
 
 Only documentation and export assets are delivered. Application behavior, menus, permissions, issue labels/states, build order and production switches are unchanged. Follow [#98](https://github.com/DurantTL/IMSDA-Events/issues/98) for implementation order and [#844](https://github.com/DurantTL/IMSDA-Events/issues/844) for the preceding issue review.

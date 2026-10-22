@@ -1,8 +1,8 @@
 {
   "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
   "orientation_source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
-  "outlook_review_commit": "2cac4150c2b237b02190495d931e6bffb2189184",
-  "presentation": "31-slide user orientation with fictional screenshots and a labelled feature outlook",
+  "outlook_review_commit": "6667bc02c95b62fcce03c035b02c62823c9eb4f1",
+  "presentation": "33-slide user orientation with fictional screenshots and a labelled feature outlook",
   "files": [
     {
       "path": ".gitattributes",
@@ -11,8 +11,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9273,
-      "sha256": "c271d6d8ad7eaa0d065c128cb71c2844340e78133f33a41c8ebb3b38c9e159ea"
+      "bytes": 11061,
+      "sha256": "d753d08a9fc32a6dd156b6e5af8274fe131d534d49cea49b8fa2f04d4a923a4d"
     },
     {
       "path": "assets/FONT-LICENSE.txt",
@@ -43,6 +43,46 @@
       "path": "assets/training/account-sign-out.png",
       "bytes": 971599,
       "sha256": "3bb9202cc92aa58e4dc9c254e7561990edc912a5efc71530af35d8960112240c"
+    },
+    {
+      "path": "assets/training/club-class-suggestions.png",
+      "bytes": 64971,
+      "sha256": "95a3df45fab66195bd1886f5103ee093bf3d11c0de90106c066298e08947a334"
+    },
+    {
+      "path": "assets/training/club-class-tracking.png",
+      "bytes": 678209,
+      "sha256": "9a0a84afff7b475af45928d668fb6963b77d86a184384ee51e5b3e30c06a5d03"
+    },
+    {
+      "path": "assets/training/club-orders-handout.png",
+      "bytes": 60174,
+      "sha256": "5572cead2a39a2257a3a2cc0ba5c13d0b9aa71bc4faaf22f3784ecfc6ac0478d"
+    },
+    {
+      "path": "assets/training/club-orders-list.png",
+      "bytes": 28272,
+      "sha256": "dea786db46d48292cb61e050058a845803d28ae895501da98bb735895f8c5bf3"
+    },
+    {
+      "path": "assets/training/club-orders-stock-after.png",
+      "bytes": 127690,
+      "sha256": "9867972f326c5f278abbb00e2e6d00644e41ad66086ec963dcfe620a2628211b"
+    },
+    {
+      "path": "assets/training/club-year-end-header.png",
+      "bytes": 43008,
+      "sha256": "c70adf36f6ea6eeb56f06135c00682dde9e52bc607eb592afb00b067ee73e9c1"
+    },
+    {
+      "path": "assets/training/club-year-end-save.png",
+      "bytes": 174609,
+      "sha256": "2cef7a485d04f6dd5b2175d90446152d5d3d3ac863a85a0caa329b7370c085b5"
+    },
+    {
+      "path": "assets/training/club-year-end.png",
+      "bytes": 167675,
+      "sha256": "e45aa4907416688b954e9ef27e2e733c79230d898894c3b90c2789ca4704ad09"
     },
     {
       "path": "assets/training/coordinator-account.png",
@@ -93,6 +133,46 @@
       "path": "assets/training/details/account-sign-out-ad36035a.png",
       "bytes": 3385,
       "sha256": "bcd7bcea5fa9eb5fa974fbfe5f2439961dee2cc6264d1fe941d98aa11e76e199"
+    },
+    {
+      "path": "assets/training/details/club-class-suggestions-588a0a0d.png",
+      "bytes": 37350,
+      "sha256": "34d46c05ac41c0d2b7d2ff183c77ae5c28e02b26b349ab5d8a023349d4fb4bd3"
+    },
+    {
+      "path": "assets/training/details/club-class-tracking-4e6c7542.png",
+      "bytes": 4764,
+      "sha256": "e326f6ed04944659c8369277dafe618c5a6a4245fd93be93ba167cb9802e9109"
+    },
+    {
+      "path": "assets/training/details/club-class-tracking-83b90e14.png",
+      "bytes": 14682,
+      "sha256": "1daca9bc722157cceae171413684b91f225dc336cbd800cc6866f045659931e8"
+    },
+    {
+      "path": "assets/training/details/club-orders-handout-7cf14ce1.png",
+      "bytes": 20416,
+      "sha256": "1959df535193ba034a5d93fa6611cf7a0d75177732021bbc70ad7de26dc4f0aa"
+    },
+    {
+      "path": "assets/training/details/club-orders-stock-after-71920933.png",
+      "bytes": 2105,
+      "sha256": "39902a8e9412b7c75152c9a73d9aba034ae96bc2873fcd1b937300bb3fe81aa0"
+    },
+    {
+      "path": "assets/training/details/club-orders-stock-after-80481007.png",
+      "bytes": 16503,
+      "sha256": "ed8012909e44c79bfe8578ddf541139279c186986d7b72bd06b57baa65cb1d6b"
+    },
+    {
+      "path": "assets/training/details/club-year-end-2d333d68.png",
+      "bytes": 75517,
+      "sha256": "241521a3995d372905f9d742437e9feb1b5929d69dfb0117be13dc8ac6b5a367"
+    },
+    {
+      "path": "assets/training/details/club-year-end-save-532716b1.png",
+      "bytes": 5418,
+      "sha256": "c1560d3b912b19cff98e94311f90b217e89644187a0d1277be5ad9ceb281764c"
     },
     {
       "path": "assets/training/details/coordinator-account-ce11f08f.png",
@@ -416,8 +496,8 @@
     },
     {
       "path": "content/06-presenter-notes.md",
-      "bytes": 56724,
-      "sha256": "66331b22de184227a6a194b05d4cae69fc96c1df14325dbc9a8e35a292504429"
+      "bytes": 63542,
+      "sha256": "3c0c2a5d50c7fde76ceed66f2bbcd3263eaefd6aad51392c8eae0ab6d4923c68"
     },
     {
       "path": "content/07-club-quick-start.md",
@@ -426,18 +506,18 @@
     },
     {
       "path": "evidence/closing-feature-audit.md",
-      "bytes": 8963,
-      "sha256": "072bf810e76a30d895629c05faf0b85655c3f8656d6d1f8c7a83f0bcc561c593"
+      "bytes": 9304,
+      "sha256": "76c454f4e9a2886a053d93b937c8a14f7c64f4f27fb702bca9121b173c23bdc6"
     },
     {
       "path": "evidence/deck-source.json",
-      "bytes": 149304,
-      "sha256": "81bb4ab9d45f27b6ec44d8d507ef03fac9c8616ae05997099a996ec50e40dd8c"
+      "bytes": 163283,
+      "sha256": "ab4a17a3c393f06eccdfce95144ebd8c0fbba8e7dc1f032ee20f49d4def384b4"
     },
     {
       "path": "evidence/export-verification.md",
-      "bytes": 4517,
-      "sha256": "7a59cd17b0a2421012fd438731859b16a06bd5c6472f58d520c1120b5d1ea10a"
+      "bytes": 5015,
+      "sha256": "d542b2045d43d3722b26583080ecf2a6e33122e452328c5233d45e32e952c96c"
     },
     {
       "path": "evidence/feature-matrix.json",
@@ -457,17 +537,37 @@
     {
       "path": "evidence/local-link-checks.json",
       "bytes": 115,
-      "sha256": "c88fbacbe7558ee5c76e6846c76a3a45a31e180b11aeffeb2acdfffb8de90b4a"
+      "sha256": "c6191a7371285a8462baef8e585b5a9d61abf321c17f515f529171beddd249b6"
+    },
+    {
+      "path": "evidence/meeting-form-builder-review.md",
+      "bytes": 10138,
+      "sha256": "2762a762c2de6232d4ad045b1767b38151e6fa18801450ab45a8677c9b42870f"
+    },
+    {
+      "path": "evidence/more-club-tools-capture-notes.md",
+      "bytes": 4692,
+      "sha256": "7e528d3d3a91a917fed0e5436d30e5f750bf318ecc93703056ffa12f1af92b0f"
+    },
+    {
+      "path": "evidence/more-club-tools-checks.json",
+      "bytes": 1072,
+      "sha256": "7aceb6c6ec9cd5e7e4e1b1b6a8e479b093cbd7810051ada87303ffc0e848022d"
+    },
+    {
+      "path": "evidence/more-club-tools-independent-qa.md",
+      "bytes": 7527,
+      "sha256": "a0ccdea28a2ff6f26af1cf0e13e3a59516ace1465fc3bbba4de9eb4b5a89b5b6"
     },
     {
       "path": "evidence/office-pdf-structure-checks.json",
-      "bytes": 2730,
-      "sha256": "c376831ed01a3951bd427af9b412bf89c3ba09d20973d2efda5515e2f7369c7e"
+      "bytes": 2994,
+      "sha256": "75de7be49a78b5dd60f11a958f83989fff9941416135e45547579ce62891a0ea"
     },
     {
       "path": "evidence/orientation-checks.json",
-      "bytes": 2730,
-      "sha256": "c376831ed01a3951bd427af9b412bf89c3ba09d20973d2efda5515e2f7369c7e"
+      "bytes": 2994,
+      "sha256": "75de7be49a78b5dd60f11a958f83989fff9941416135e45547579ce62891a0ea"
     },
     {
       "path": "evidence/orientation-coordinator.md",
@@ -486,33 +586,33 @@
     },
     {
       "path": "evidence/orientation-verification.md",
-      "bytes": 7314,
-      "sha256": "ff48253637460b01038189f4a848ab9327f571b5889d9d452f729c4b128c86fb"
+      "bytes": 8263,
+      "sha256": "9efcc229d98b40ff96b69ca6ea6a511ff8a6a7ce89ad70be6bcd51d497a0352c"
     },
     {
       "path": "evidence/outlook-independent-qa.md",
-      "bytes": 5582,
-      "sha256": "223de5527dd22c0da102f9b177fe0d09b5b1322488317e798b6f1ed8e4e73034"
+      "bytes": 5923,
+      "sha256": "9d929de7e9cdfc3aa1a78d69734cfdc438722d3b91e1840e5bf0cc79cc7ef346"
     },
     {
       "path": "evidence/pdf-manifest.json",
       "bytes": 980,
-      "sha256": "5ea4a21bbdc983aadbd5394a650d8eab46edb520d2066e86dea9d5de6b8f1111"
+      "sha256": "159711c2848c781a853f80429fee67e299f4ba53fa09e5e52e1deb9a11d063b8"
     },
     {
       "path": "evidence/render-checks.json",
       "bytes": 257,
-      "sha256": "085cd88ee94a876bcceb3e9255f39c37f6ef9dfb2c7b9c58db268a7f693371ee"
+      "sha256": "b29c0d451d1b534c2cedc02a26f899c0f89973f00730a1e85c4511f6eadc3867"
     },
     {
       "path": "evidence/screenshot-capture.json",
-      "bytes": 22703,
-      "sha256": "938c51dfc6c8b024a4caf75d488e0238bd5bb051e30a0fb80125b5267e77bce4"
+      "bytes": 27702,
+      "sha256": "7210ced11efe30373582c46df4a06d205d1531e1ffdb2c428705d72595428f6b"
     },
     {
       "path": "evidence/synthetic-training-dataset.md",
-      "bytes": 5044,
-      "sha256": "5d6cc95609d6f7eb43c2f36aad24e2940d19a0c322de27af45012ea93c5c8b7f"
+      "bytes": 8831,
+      "sha256": "c5dd621802942b142d12c5ef09200f2d04997252a2cc812b4adb3f19f8f28242"
     },
     {
       "path": "evidence/technical-checks.json",
@@ -626,18 +726,18 @@
     },
     {
       "path": "exports/06-presenter-notes.docx",
-      "bytes": 46449,
-      "sha256": "882ed6bbcac124cb1953e22524665d8d40f98b288c21b0c4f56b77f5a4eac9db"
+      "bytes": 49045,
+      "sha256": "bd14f3170cba57545928596b356e4fa46b2a8ef974ea17292d2c004cd2e45c8a"
     },
     {
       "path": "exports/06-presenter-notes.html",
-      "bytes": 68789,
-      "sha256": "d91ab347b7ba5730aa357141f4bbc520ec3f5b1b51fb6625760cb0b1e207b5ce"
+      "bytes": 76417,
+      "sha256": "d17cf0e43de601ddf462f45aeff952f7ec12b9cb1117c2251acf05253ae1bf1a"
     },
     {
       "path": "exports/06-presenter-notes.pdf",
-      "bytes": 416806,
-      "sha256": "8c782778c14f28c10d268eedcaaedb7029d007aca52acad2a7f0a209a2afd293"
+      "bytes": 455760,
+      "sha256": "bb3cfb2d29b4cae9d04a7dd2fc1476f5a1577ed19db518b31e0bb7e58da925fe"
     },
     {
       "path": "exports/07-club-quick-start.docx",
@@ -656,33 +756,33 @@
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.html",
-      "bytes": 142432,
-      "sha256": "84bb866d374aee4859f5425f20230b69c1d43d492010b7565c35a14f48ad69c5"
+      "bytes": 147821,
+      "sha256": "80978f7ac45164c721ccff0c0f24d5d57ddbe2cc25a566740399112bd2b26c3f"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pdf",
-      "bytes": 4866564,
-      "sha256": "9acbe381f10e997afbe67fe470103afb7d98a93d277704c6f391b86fb35f4eeb"
+      "bytes": 5093607,
+      "sha256": "12cf487431bac055eb7886d376d8a334f3094adc3e2a1b660bfdc33bad99d77f"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pptx",
-      "bytes": 5842998,
-      "sha256": "fcd228660465f54ed541e0f4df6a94e536e17cdfa90d74f130acc90e08f20b76"
+      "bytes": 6080835,
+      "sha256": "7da4a1f0a0c803f3812b0bc812745c4fce2a0bd25bcb8ba697c108561dffd045"
     },
     {
       "path": "exports/IMSDA-Events-training-screenshot-gallery.html",
-      "bytes": 15422,
-      "sha256": "48561af5119684a0b317f4afca625d8c3c41d1bd978e9335d4c5e51e17266b59"
+      "bytes": 19436,
+      "sha256": "26b626c4f25802a6e6349688f2e68bbfe4aeea2826fabb4e354e4fb272880973"
     },
     {
       "path": "previews/deck-overview.png",
-      "bytes": 644531,
-      "sha256": "342b05e2fc7c24ff755e6c51365f4c9a65110519580d1e24f0a5aad5fc702deb"
+      "bytes": 672905,
+      "sha256": "9f58aff26af33a4b4494e793a93ac924a9e20947cf6285674914d3f2e2864479"
     },
     {
       "path": "previews/feature-outlook.png",
-      "bytes": 437575,
-      "sha256": "2e7bbce92dcc58b9ee51893847a96c8b2de57ec625f958396132598a7fbf397b"
+      "bytes": 365351,
+      "sha256": "70fabdeef079385f7816ba74b60113cb11ac04bf4c6182b16c64cb9527e05151"
     }
   ]
 }

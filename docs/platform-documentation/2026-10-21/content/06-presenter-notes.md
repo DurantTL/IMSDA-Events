@@ -2,7 +2,9 @@
 
 A visual orientation for club directors and Area Coordinators. The presentation follows fictional Riverton Pathfinders through ordinary tasks, then changes to a coordinator's view of the same records. These are screenshots of an isolated local copy of the current app, populated only with invented training records. They show implemented behavior at the source version recorded below; production configuration may affect which tools appear.
 
-**Optional closing section:** slides 25–30 show other current tools, planned design/form-builder work and longer-term possibilities. These are capability illustrations, not application screenshots. Each slide labels its status; they do not promise a delivery date. Slide 31 finishes the session. For a task-only orientation, use slides 1–24 and 31.
+**More tools and meeting section:** slides 25–27 demonstrate Class tracking, Orders and the Year-End Report with fictional-data screenshots. Slides 28–32 cover event-team capabilities, planned workspace improvements, a practical form-building meeting walkthrough and longer-term possibilities. Capability diagrams label their status; they are not future app screenshots. Slide 33 finishes the session. A shorter orientation can use slides 1–24 and 33.
+
+**Form-builder meeting preparation:** the owner expects the editor changes before the meeting. The form slide teaches the stable build/save/preview/test/publish workflow rather than advertising those changes as a distant-future feature. Refresh editor screenshots and exact button labels against the approved meeting-day release. This pack does not claim the reviewed open redesign scope has already shipped.
 
 **How to present:** show the screenshot, point to the numbered controls or visible result, then use the Say paragraph in your own words. Keep the detailed steps in these notes instead of reading long lists on screen. Pause for the question or a short practice task. For a single-role group, use the shared opening and its role section.
 
@@ -479,36 +481,107 @@ If sign-in works but the club or Clubs section is missing, first check the signe
 - [app/(public)/account/help/authenticator/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/help/authenticator/page.tsx)
 - [app/(public)/account/(portal)/layout.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/layout.tsx)
 
-## 25. More club tools are already here
+## 25. Record completed classes and earned items
 
 ### Say
 
-The walkthrough showed the tasks people often need first. There are other current club tools to use through the year. Class tracking records supported earned items, including class insignia and event patches; it is not a universal checklist for every curriculum requirement. Orders helps the club organize needed supplies, stock and hand-outs rather than taking an online payment. Year-end reports bring together the year's recorded work for review. Jordan should still check the club, year and actual saved information before making a change or submitting a report. The tools shown depend on the person's club role.
+Class tracking keeps completed classes and supported earned items with the member. In our fictional example, Morgan is in Companion and has a recorded Friend completion. The saved history prevents recording the same completion again. That completion suggests the corresponding insignia, but it does not order anything by itself. Jordan reviews the suggested items and chooses Add to order list only for items actually needed. Other supported records include event patches, Good Conduct, TLT items and Master Award progress. This is not a checklist for every curriculum requirement. Directors and deputies record these items; narrower roles retain their own access.
 
 ### Point to or demonstrate
 
-Use this capability map to explain the purpose of Class tracking, Orders and the year-end report. These are infographic labels, not new app controls. Refer back to the current club navigation if someone wants to practice.
+Open Class tracking. Read Morgan’s saved Friend completion and Class history, then inspect the separate Suggested insignia panel and Add to order list action. Explain that marking a class completed and adding its items to the order helper are separate steps. Do not repeat a completion that is already recorded.
 
 ### Ask the group
 
-Which of these tools would help your club avoid maintaining a second list?
+Does a completed class automatically place an order or change stock?
 
 ### Capability status
 
-CURRENT. The same club records support achievements, supplies and year-end reporting.
+CURRENT. Completing a class suggests insignia. Add to order list is a separate choice.
+
+### Visual example
+
+- Morgan · recorded Friend completion: Morgan Reed’s Friend completion is recorded. The filtered member table shows the completion date and Class history.
+- Insignia · a separate order-list choice: Morgan Reed’s four suggested Friend insignia items require a separate Add to order list confirmation.
 
 ### Preparation references — not spoken
 
-- [modules/club-rosters/portal-nav.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-rosters/portal-nav.ts)
-- [modules/earned-awards/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/earned-awards/domain.ts)
-- [modules/club-orders/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-orders/domain.ts)
-- [modules/club-supplies/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-supplies/domain.ts)
-- [modules/club-reports/year-end-repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-reports/year-end-repository.ts)
+- [components/club-earned-awards-workspace.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-earned-awards-workspace.tsx)
+- [modules/earned-awards/order-source.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/earned-awards/order-source.ts)
+- [modules/earned-awards/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/earned-awards/domain.ts)
+- [modules/club-rosters/portal-nav.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-rosters/portal-nav.ts)
+- [Roadmap / issue #532](https://github.com/DurantTL/IMSDA-Events/issues/532)
+- [Roadmap / issue #184](https://github.com/DurantTL/IMSDA-Events/issues/184)
+- [Roadmap / issue #185](https://github.com/DurantTL/IMSDA-Events/issues/185)
+
+## 26. Use Orders for supplies and hand-outs
+
+### Say
+
+The scarf row shows four needed, two available and two to order. Drew’s Good Conduct Bar is selected for an actual hand-out; the saved result leaves two on hand, down from three. The app subtracts that handed-out item automatically, so do not subtract it a second time. Orders helps Jordan turn recorded needs into a practical supply list. The fictional list includes scarves and earned items. Stock is what the club already has, and a hand-out records items actually given to a member. Those are different steps, so an item on the helper list is not proof it was purchased or handed out. Use the available CSV, printable list or pick list for the real task. This is not an online checkout and does not create a personal payment for the director. Directors and deputies manage the supported records; a registrar’s view remains narrower.
+
+### Point to or demonstrate
+
+Open Orders. Read the fictional scarf and earned-item needs, then compare the stock quantity and hand-out controls. Point to available exports/pick-list actions. Use only the synthetic training records if demonstrating a stock or hand-out action.
+
+### Ask the group
+
+If a scarf appears on the helper list, does that mean the member has received it?
+
+### Capability status
+
+CURRENT. Orders is a supply helper. A list, stock receipt and hand-out are different records.
+
+### Visual example
+
+- Helper list · 4 scarves needed − 2 available = 2 to order: Actual Orders helper row: Pathfinder Scarf quantity 4 minus available stock 2 gives 2 to order. Save and Remove edit this helper list.
+- Hand out · Drew’s Good Conduct Bar: Drew Patel’s Good Conduct Bar is ready from stock. The selected row enables the actual Mark handed out action.
+- Saved result · Good Conduct stock: 3 → 2: After the actual handout, Good Conduct Bar stock is 2. Drew’s need is no longer in Ready to hand out.
+
+### Preparation references — not spoken
+
+- [app/(public)/account/(portal)/clubs/[organizationId]/orders/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/orders/page.tsx)
+- [modules/club-orders/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-orders/domain.ts)
+- [modules/club-supplies/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-supplies/domain.ts)
+- [modules/club-orders/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-orders/repository.ts)
 - [Roadmap / issue #41](https://github.com/DurantTL/IMSDA-Events/issues/41)
 - [Roadmap / issue #184](https://github.com/DurantTL/IMSDA-Events/issues/184)
 - [Roadmap / issue #185](https://github.com/DurantTL/IMSDA-Events/issues/185)
 
-## 26. Event teams have tools before, during and after
+## 27. Review the Year-End Report
+
+### Say
+
+The Year-End Report uses saved club information to help prepare the yearly record. Check the report year and due date first. Review the prefilled figures and their source, then enter or correct the information the form requires. A prefilled number still needs review; it is not a guarantee the underlying record is complete. Our October training example is a draft for 2026–27, due April first, 2027. We are showing preparation, not telling clubs to submit an incomplete year early. Save draft keeps work in progress. The club’s director, deputy or reporter submits the report when it is complete; a submitted report is locked until the office reopens it.
+
+### Point to or demonstrate
+
+From Monthly Records, open the appropriate Year-End Report. Read the year/span, due date, Draft state and source labels on prefilled counts. Point to Save draft. There is no separate Preview button on this form; the displayed report is the review surface. Keep the synthetic example as a draft.
+
+### Ask the group
+
+What should you check before trusting a prefilled number? Has Save draft filed the report?
+
+### Capability status
+
+CURRENT. Review the saved records and any manual figures. Save draft does not submit the report.
+
+### Visual example
+
+- 2026–27 · May–April · Due April 1, 2027 · Draft: Actual Year-End Report header: Pathfinder year 2026–27, May 1–April 30, due April 1, 2027, and Draft state.
+- Review · 9 members + 1 staff = 10 total: Year-End draft review shows membership 9, staff 1 and total membership 10, with calculated totals and roster sources.
+- Keep unfinished work: Lower Year-End sections distinguish prefilled class and honor counts from manual entries, with Save draft and Submit report.
+
+### Preparation references — not spoken
+
+- [components/club-year-end-report-form.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/components/club-year-end-report-form.tsx)
+- [modules/club-reports/year-end-domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-reports/year-end-domain.ts)
+- [modules/club-reports/year-end-repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/modules/club-reports/year-end-repository.ts)
+- [app/(public)/account/(portal)/clubs/[organizationId]/reports/year-end/[year]/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/reports/year-end/%5Byear%5D/page.tsx)
+- [Roadmap / issue #41](https://github.com/DurantTL/IMSDA-Events/issues/41)
+- [Roadmap / issue #185](https://github.com/DurantTL/IMSDA-Events/issues/185)
+
+## 28. Event teams have tools before, during and after
 
 ### Say
 
@@ -528,14 +601,14 @@ CURRENT. Event staff use assigned permissions; available options depend on the e
 
 ### Preparation references — not spoken
 
-- [docs/STAFF-EVENT-WORKFLOW.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/STAFF-EVENT-WORKFLOW.md)
-- [docs/EVENT-FEATURES.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/EVENT-FEATURES.md)
-- [modules/forms/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/forms/repository.ts)
-- [modules/checkin/README.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/checkin/README.md)
-- [modules/communications/effective-delivery.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/communications/effective-delivery.ts)
-- [docs/BILLING-RESPONSIBILITY.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/BILLING-RESPONSIBILITY.md)
-- [docs/LODGING.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/LODGING.md)
-- [docs/MEALS.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/MEALS.md)
+- [docs/STAFF-EVENT-WORKFLOW.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/STAFF-EVENT-WORKFLOW.md)
+- [docs/EVENT-FEATURES.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/EVENT-FEATURES.md)
+- [modules/forms/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/modules/forms/repository.ts)
+- [modules/checkin/README.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/modules/checkin/README.md)
+- [modules/communications/effective-delivery.ts](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/modules/communications/effective-delivery.ts)
+- [docs/BILLING-RESPONSIBILITY.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/BILLING-RESPONSIBILITY.md)
+- [docs/LODGING.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/LODGING.md)
+- [docs/MEALS.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/MEALS.md)
 - [Roadmap / issue #73](https://github.com/DurantTL/IMSDA-Events/issues/73)
 - [Roadmap / issue #75](https://github.com/DurantTL/IMSDA-Events/issues/75)
 - [Roadmap / issue #77](https://github.com/DurantTL/IMSDA-Events/issues/77)
@@ -544,7 +617,7 @@ CURRENT. Event staff use assigned permissions; available options depend on the e
 - [Roadmap / issue #212](https://github.com/DurantTL/IMSDA-Events/issues/212)
 - [Roadmap / issue #779](https://github.com/DurantTL/IMSDA-Events/issues/779)
 
-## 27. Planned: make the next task easier to find
+## 29. Planned: make the next task easier to find
 
 ### Say
 
@@ -564,10 +637,10 @@ PLANNED. The aim is easier learning while each role keeps its own responsibiliti
 
 ### Preparation references — not spoken
 
-- [docs/design/role-workspaces/README.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/role-workspaces/README.md)
-- [docs/design/role-workspaces/evidence/role-contract.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/role-workspaces/evidence/role-contract.md)
-- [docs/design/public-journeys-and-lists/review.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/public-journeys-and-lists/review.md)
-- [docs/design/public-journeys-and-lists/existing-owner-notes.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/public-journeys-and-lists/existing-owner-notes.md)
+- [docs/design/role-workspaces/README.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/design/role-workspaces/README.md)
+- [docs/design/role-workspaces/evidence/role-contract.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/design/role-workspaces/evidence/role-contract.md)
+- [docs/design/public-journeys-and-lists/review.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/design/public-journeys-and-lists/review.md)
+- [docs/design/public-journeys-and-lists/existing-owner-notes.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/design/public-journeys-and-lists/existing-owner-notes.md)
 - [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
 - [Roadmap / issue #1109](https://github.com/DurantTL/IMSDA-Events/issues/1109)
 - [Roadmap / issue #1111](https://github.com/DurantTL/IMSDA-Events/issues/1111)
@@ -582,41 +655,38 @@ PLANNED. The aim is easier learning while each role keeps its own responsibiliti
 - [Roadmap / issue #1033](https://github.com/DurantTL/IMSDA-Events/issues/1033)
 - [Roadmap / issue #212](https://github.com/DurantTL/IMSDA-Events/issues/212)
 
-## 28. Planned: make forms easier to build and maintain
+## 30. Build and check an event form
 
 ### Say
 
-Forms already have explicit drafts, preview and test tools, and published versions that keep older submissions tied to their original form version. The roadmap aims to make creating and maintaining those forms easier. Its ordered foundation work includes preparing the builder, app-editable form starters, and notices about changes to their source. Later visual work covers a clearer editing workspace, reusable questions, phone editing and combined visibility rules. Those later steps still require their own design review. A changed starter should not silently rewrite a form someone is already using. This is the planned direction, with no release date announced here.
+Start with the correct event and registration form. A starter gives you an independent copy; replacing an existing draft is a deliberate action. Check whether a question is asked once for the booking or for every attendee, and which answers are required. Save the draft, then preview and test with fictional people. A valid test is required before the first publication; later versions do not acquire another mandatory first-publication test. Review and publish the saved version, and check that the event is published too. Existing registrations keep the version they submitted. We will use the editor available for this meeting; the job is to build, check and publish the right form.
 
 ### Point to or demonstrate
 
-Begin with the takeaway so listeners know which controls already exist. Then follow the planned foundations and the later reviewed tools. Keep engineering extraction and build-queue details in preparation references rather than the spoken explanation.
+In the meeting-day editor, demonstrate New from template or Update draft from a template, question scope and Required, Save draft, Preview & test, Run test submission, Publish version and the Publish form confirmation. Check Open public form. Trainer preparation: the owner expects the redesign before the meeting. Refresh actual builder screenshots and exact labels against that approved release; this workflow diagram does not claim the unfinished inspector, shared-template library, saved-question library or complete phone editor is already delivered. If it has not landed, demonstrate the actual available editor. Use a synthetic event; do not change a live public form for training.
 
 ### Ask the group
 
-Would a clearer editor, reusable starter or reusable question save you the most work?
+If you save a draft, have you changed the form visitors are using? What else must be published?
 
 ### Capability status
 
-PLANNED. Drafts and publishing already exist. Planned tools make forms easier to build and maintain.
+CURRENT. Choose a starter, save the draft, check the attendee experience, then publish.
 
 ### Preparation references — not spoken
 
-- [docs/STAFF-EVENT-WORKFLOW.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/STAFF-EVENT-WORKFLOW.md)
-- [modules/forms/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/forms/repository.ts)
-- [modules/forms/seeded-templates.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/forms/seeded-templates.ts)
-- [docs/design/public-journeys-and-lists/review.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/public-journeys-and-lists/review.md)
-- [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
+- [app/(workspace)/registration-builder/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/app/%28workspace%29/registration-builder/page.tsx)
+- [components/registration-builder-workspace.tsx](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/components/registration-builder-workspace.tsx)
+- [modules/forms/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/modules/forms/repository.ts)
+- [modules/forms/seeded-templates.ts](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/modules/forms/seeded-templates.ts)
+- [docs/STAFF-EVENT-WORKFLOW.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/STAFF-EVENT-WORKFLOW.md)
 - [Roadmap / issue #1062](https://github.com/DurantTL/IMSDA-Events/issues/1062)
-- [Roadmap / issue #1063](https://github.com/DurantTL/IMSDA-Events/issues/1063)
-- [Roadmap / issue #1064](https://github.com/DurantTL/IMSDA-Events/issues/1064)
-- [Roadmap / issue #1065](https://github.com/DurantTL/IMSDA-Events/issues/1065)
-- [Roadmap / issue #1069](https://github.com/DurantTL/IMSDA-Events/issues/1069)
-- [Roadmap / issue #1070](https://github.com/DurantTL/IMSDA-Events/issues/1070)
-- [Roadmap / issue #1071](https://github.com/DurantTL/IMSDA-Events/issues/1071)
-- [Roadmap / issue #1072](https://github.com/DurantTL/IMSDA-Events/issues/1072)
+- [Roadmap / issue #1056](https://github.com/DurantTL/IMSDA-Events/issues/1056)
+- [Roadmap / issue #1057](https://github.com/DurantTL/IMSDA-Events/issues/1057)
+- [Roadmap / issue #1061](https://github.com/DurantTL/IMSDA-Events/issues/1061)
+- [Roadmap / issue #1066](https://github.com/DurantTL/IMSDA-Events/issues/1066)
 
-## 29. A full camp workflow could build on this foundation
+## 31. A full camp workflow could build on this foundation
 
 ### Say
 
@@ -636,11 +706,11 @@ POSSIBLE. A camp system adds care, supervision and release responsibilities beyo
 
 ### Preparation references — not spoken
 
-- [docs/LODGING.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/LODGING.md)
-- [docs/MEALS.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/MEALS.md)
-- [docs/decisions/0005-protected-records-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/decisions/0005-protected-records-policy.md)
-- [docs/decisions/0011-personnel-pipeline-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/decisions/0011-personnel-pipeline-policy.md)
-- [docs/platform-documentation/2026-10-21/content/04-camp-system-and-ultracamp.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/platform-documentation/2026-10-21/content/04-camp-system-and-ultracamp.md)
+- [docs/LODGING.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/LODGING.md)
+- [docs/MEALS.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/MEALS.md)
+- [docs/decisions/0005-protected-records-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/decisions/0005-protected-records-policy.md)
+- [docs/decisions/0011-personnel-pipeline-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/decisions/0011-personnel-pipeline-policy.md)
+- [docs/platform-documentation/2026-10-21/content/04-camp-system-and-ultracamp.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/platform-documentation/2026-10-21/content/04-camp-system-and-ultracamp.md)
 - [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
 - [Roadmap / issue #65](https://github.com/DurantTL/IMSDA-Events/issues/65)
 - [Roadmap / issue #71](https://github.com/DurantTL/IMSDA-Events/issues/71)
@@ -650,7 +720,7 @@ POSSIBLE. A camp system adds care, supervision and release responsibilities beyo
 - [Roadmap / issue #237](https://github.com/DurantTL/IMSDA-Events/issues/237)
 - [Roadmap / issue #238](https://github.com/DurantTL/IMSDA-Events/issues/238)
 
-## 30. Longer-term possibilities to develop
+## 32. Longer-term possibilities to develop
 
 ### Say
 
@@ -670,10 +740,10 @@ POSSIBLE. Future scope follows the existing roadmap, decisions and event needs; 
 
 ### Preparation references — not spoken
 
-- [docs/NEW-CLUB-APPLICATIONS.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/NEW-CLUB-APPLICATIONS.md)
-- [docs/ATTENDEE-ACCOUNT-RELEASE.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/ATTENDEE-ACCOUNT-RELEASE.md)
-- [docs/MERCHANDISE-LEDGER-MIGRATION.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/MERCHANDISE-LEDGER-MIGRATION.md)
-- [docs/decisions/0011-personnel-pipeline-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/decisions/0011-personnel-pipeline-policy.md)
+- [docs/NEW-CLUB-APPLICATIONS.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/NEW-CLUB-APPLICATIONS.md)
+- [docs/ATTENDEE-ACCOUNT-RELEASE.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/ATTENDEE-ACCOUNT-RELEASE.md)
+- [docs/MERCHANDISE-LEDGER-MIGRATION.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/MERCHANDISE-LEDGER-MIGRATION.md)
+- [docs/decisions/0011-personnel-pipeline-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/6667bc02c95b62fcce03c035b02c62823c9eb4f1/docs/decisions/0011-personnel-pipeline-policy.md)
 - [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
 - [Roadmap / issue #840](https://github.com/DurantTL/IMSDA-Events/issues/840)
 - [Roadmap / issue #841](https://github.com/DurantTL/IMSDA-Events/issues/841)
@@ -694,7 +764,7 @@ POSSIBLE. Future scope follows the existing roadmap, decisions and event needs; 
 - [Roadmap / issue #235](https://github.com/DurantTL/IMSDA-Events/issues/235)
 - [Roadmap / issue #95](https://github.com/DurantTL/IMSDA-Events/issues/95)
 
-## 31. Check the result. Sign out. Return to the same place.
+## 33. Check the result. Sign out. Return to the same place.
 
 ### Say
 
