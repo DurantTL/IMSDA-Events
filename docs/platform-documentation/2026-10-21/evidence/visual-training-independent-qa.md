@@ -2,6 +2,8 @@
 
 Reviewed October 21, 2026. This review covers the first and replacement renders of the 25-slide visual orientation and its spoken notes. It records observed findings separately from the final export checks. It is not a production or assistive-technology audit.
 
+**Scope of this record:** this is the retained review of the earlier 25-slide screenshot walkthrough. The six later capability/outlook slides have their own review in `outlook-independent-qa.md`; the current deck totals 31 slides.
+
 ## Material inspected
 
 - `exports/IMSDA-Events-platform-briefing.pdf`: all 25 slides through the contact sheet; slides 2, 9, 11, 14, 19, 21, 22 and 23 rendered individually at 1.5× for closer inspection.
@@ -41,7 +43,7 @@ These are presentation crop/layout findings, not requests for application behavi
 
 Re-inspected slides **2, 9, 11, 13, 14, 15, 21, 23 and 25** individually after replacement rendering. Slide 2 now enlarges Morgan's roster row and selected event row. Slide 9 includes the real Add to roster button. Slide 11 shows both an available form and the Draft/Open versus Submitted/View and print controls. Slides 13 and 23 make the submission result readable; slide 15 shows the actual Submit registration action and Registered result; slide 25 shows the actual Sign out control. Slide 21 now includes all four fictional clubs, including Riverton's registered row. These changes resolve the four original crop findings.
 
-The final machine-readable checks report **25 slides, 42 embedded picture shapes, 34 unique captured states, no HTML text overflow, no failed image loads, valid Office packages and shape bounds**, with 25 presentation PDF bookmarks and the three-page quick-start retained. These results were read from `orientation-checks.json` and `render-checks.json`; the independent visual pass complements them rather than rerunning the renderer.
+The final machine-readable checks report **25 slides, 42 embedded picture shapes, 34 registered capture examples from 33 unique images, no HTML text overflow, no failed image loads, valid Office packages and shape bounds**, with 25 presentation PDF bookmarks and the three-page quick-start retained. These results were read from `orientation-checks.json` and `render-checks.json`; the independent visual pass complements them rather than rerunning the renderer.
 
 The final slide 21 was inspected again after its gold 1/2/3 markers moved outside the left edge of the relevant rows. Riverton's Registered/six-person count, Pine Grove's Draft state and Lakeview's Waitlisted/four-person count are now unobscured and agree with the captions. The final capture register was rehashed after changing the shared event confirmation crop to `event-saved-confirmation.png`: all **34** file hashes match. The original local event check-in QR is excluded from that shared confirmation image; the source hash and pixel crop coordinates are retained in the register.
 

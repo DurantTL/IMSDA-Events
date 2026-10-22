@@ -2,6 +2,8 @@
 
 A visual orientation for club directors and Area Coordinators. The presentation follows fictional Riverton Pathfinders through ordinary tasks, then changes to a coordinator's view of the same records. These are screenshots of an isolated local copy of the current app, populated only with invented training records. They show implemented behavior at the source version recorded below; production configuration may affect which tools appear.
 
+**Optional closing section:** slides 25–30 show other current tools, planned design/form-builder work and longer-term possibilities. These are capability illustrations, not application screenshots. Each slide labels its status; they do not promise a delivery date. Slide 31 finishes the session. For a task-only orientation, use slides 1–24 and 31.
+
 **How to present:** show the screenshot, point to the numbered controls or visible result, then use the Say paragraph in your own words. Keep the detailed steps in these notes instead of reading long lists on screen. Pause for the question or a short practice task. For a single-role group, use the shared opening and its role section.
 
 **Our fictional story:** Jordan Ellis directs Riverton Pathfinders. Morgan Reed is a fictional roster member. Alex Morgan is an Area Coordinator reviewing several fictional clubs. The program year is 2026–27. September records illustrate past submissions and unfinished work; October illustrates the director's current task. All names, contacts, counts and event registrations are examples, not real ministry records.
@@ -477,7 +479,222 @@ If sign-in works but the club or Clubs section is missing, first check the signe
 - [app/(public)/account/help/authenticator/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/help/authenticator/page.tsx)
 - [app/(public)/account/(portal)/layout.tsx](https://github.com/DurantTL/IMSDA-Events/blob/7f77c1dfeadd004deb51f91e2bae1b6c4754638b/app/%28public%29/account/%28portal%29/layout.tsx)
 
-## 25. Check the result. Sign out. Return to the same place.
+## 25. More club tools are already here
+
+### Say
+
+The walkthrough showed the tasks people often need first. There are other current club tools to use through the year. Class tracking records supported earned items, including class insignia and event patches; it is not a universal checklist for every curriculum requirement. Orders helps the club organize needed supplies, stock and hand-outs rather than taking an online payment. Year-end reports bring together the year's recorded work for review. Jordan should still check the club, year and actual saved information before making a change or submitting a report. The tools shown depend on the person's club role.
+
+### Point to or demonstrate
+
+Use this capability map to explain the purpose of Class tracking, Orders and the year-end report. These are infographic labels, not new app controls. Refer back to the current club navigation if someone wants to practice.
+
+### Ask the group
+
+Which of these tools would help your club avoid maintaining a second list?
+
+### Capability status
+
+CURRENT. The same club records support achievements, supplies and year-end reporting.
+
+### Preparation references — not spoken
+
+- [modules/club-rosters/portal-nav.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-rosters/portal-nav.ts)
+- [modules/earned-awards/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/earned-awards/domain.ts)
+- [modules/club-orders/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-orders/domain.ts)
+- [modules/club-supplies/domain.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-supplies/domain.ts)
+- [modules/club-reports/year-end-repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/club-reports/year-end-repository.ts)
+- [Roadmap / issue #41](https://github.com/DurantTL/IMSDA-Events/issues/41)
+- [Roadmap / issue #184](https://github.com/DurantTL/IMSDA-Events/issues/184)
+- [Roadmap / issue #185](https://github.com/DurantTL/IMSDA-Events/issues/185)
+
+## 26. Event teams have tools before, during and after
+
+### Say
+
+IMSDA Events also supports the people running an event. Beforehand, authorized staff prepare its public information, publish a versioned form and manage registrations, capacity and waitlists. They can review event communications through the configured email service. On arrival, staff have pass, check-in, roster and badge tools. Financial staff have their permitted invoice, payment and reporting workflows. Lodging and meal tools can be used when the event's inventory, plans and settings are prepared. These capabilities belong to the appropriate event and staff permissions. A director or Area Coordinator assignment does not by itself provide the event team's administrative tools.
+
+### Point to or demonstrate
+
+Follow the map from preparation to arrival to follow-up. Explain that configured provider delivery, lodging inventory, meal setup and payment setup are separate from the existence of the tools. This overview is not a live production readiness claim.
+
+### Ask the group
+
+Which team owns each step at your next event?
+
+### Capability status
+
+CURRENT. Event staff use assigned permissions; available options depend on the event and its setup.
+
+### Preparation references — not spoken
+
+- [docs/STAFF-EVENT-WORKFLOW.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/STAFF-EVENT-WORKFLOW.md)
+- [docs/EVENT-FEATURES.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/EVENT-FEATURES.md)
+- [modules/forms/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/forms/repository.ts)
+- [modules/checkin/README.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/checkin/README.md)
+- [modules/communications/effective-delivery.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/communications/effective-delivery.ts)
+- [docs/BILLING-RESPONSIBILITY.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/BILLING-RESPONSIBILITY.md)
+- [docs/LODGING.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/LODGING.md)
+- [docs/MEALS.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/MEALS.md)
+- [Roadmap / issue #73](https://github.com/DurantTL/IMSDA-Events/issues/73)
+- [Roadmap / issue #75](https://github.com/DurantTL/IMSDA-Events/issues/75)
+- [Roadmap / issue #77](https://github.com/DurantTL/IMSDA-Events/issues/77)
+- [Roadmap / issue #194](https://github.com/DurantTL/IMSDA-Events/issues/194)
+- [Roadmap / issue #197](https://github.com/DurantTL/IMSDA-Events/issues/197)
+- [Roadmap / issue #212](https://github.com/DurantTL/IMSDA-Events/issues/212)
+- [Roadmap / issue #779](https://github.com/DurantTL/IMSDA-Events/issues/779)
+
+## 27. Planned: make the next task easier to find
+
+### Say
+
+One improvement is how people recognize the work already available. The accepted role-workspace direction gives the different roles a consistent visual language while keeping their own navigation, priorities and access. Other tracked work includes clearer list columns and icons, saved task views, public-page and link previews, calendar and club-finder refinements, and guidance near the task. These are improvements to the same jobs we practiced. The accepted layout direction is a reference for implementation, not a released interface. The public-page studies have their own review status. This overview does not add another administrator menu change or give broader permissions to a role. Two operational examples in the ordered roadmap are the administrator alert feed with read and unread states, and kitchen money closeout. Those belong to their respective staff responsibilities; they are not new coordinator or attendee permissions.
+
+### Point to or demonstrate
+
+Read the status attached to each track. Explain the difference between accepted design direction and proposed or planned work. No future app screen is pictured on this slide.
+
+### Ask the group
+
+Where do people most often hesitate or ask where to go next?
+
+### Capability status
+
+PLANNED. The aim is easier learning while each role keeps its own responsibilities and access.
+
+### Preparation references — not spoken
+
+- [docs/design/role-workspaces/README.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/role-workspaces/README.md)
+- [docs/design/role-workspaces/evidence/role-contract.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/role-workspaces/evidence/role-contract.md)
+- [docs/design/public-journeys-and-lists/review.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/public-journeys-and-lists/review.md)
+- [docs/design/public-journeys-and-lists/existing-owner-notes.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/public-journeys-and-lists/existing-owner-notes.md)
+- [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
+- [Roadmap / issue #1109](https://github.com/DurantTL/IMSDA-Events/issues/1109)
+- [Roadmap / issue #1111](https://github.com/DurantTL/IMSDA-Events/issues/1111)
+- [Roadmap / issue #1112](https://github.com/DurantTL/IMSDA-Events/issues/1112)
+- [Roadmap / issue #1113](https://github.com/DurantTL/IMSDA-Events/issues/1113)
+- [Roadmap / issue #1074](https://github.com/DurantTL/IMSDA-Events/issues/1074)
+- [Roadmap / issue #1077](https://github.com/DurantTL/IMSDA-Events/issues/1077)
+- [Roadmap / issue #1103](https://github.com/DurantTL/IMSDA-Events/issues/1103)
+- [Roadmap / issue #1115](https://github.com/DurantTL/IMSDA-Events/issues/1115)
+- [Roadmap / issue #1117](https://github.com/DurantTL/IMSDA-Events/issues/1117)
+- [Roadmap / issue #1118](https://github.com/DurantTL/IMSDA-Events/issues/1118)
+- [Roadmap / issue #1033](https://github.com/DurantTL/IMSDA-Events/issues/1033)
+- [Roadmap / issue #212](https://github.com/DurantTL/IMSDA-Events/issues/212)
+
+## 28. Planned: make forms easier to build and maintain
+
+### Say
+
+Forms already have explicit drafts, preview and test tools, and published versions that keep older submissions tied to their original form version. The roadmap aims to make creating and maintaining those forms easier. Its ordered foundation work includes preparing the builder, app-editable form starters, and notices about changes to their source. Later visual work covers a clearer editing workspace, reusable questions, phone editing and combined visibility rules. Those later steps still require their own design review. A changed starter should not silently rewrite a form someone is already using. This is the planned direction, with no release date announced here.
+
+### Point to or demonstrate
+
+Begin with the takeaway so listeners know which controls already exist. Then follow the planned foundations and the later reviewed tools. Keep engineering extraction and build-queue details in preparation references rather than the spoken explanation.
+
+### Ask the group
+
+Would a clearer editor, reusable starter or reusable question save you the most work?
+
+### Capability status
+
+PLANNED. Drafts and publishing already exist. Planned tools make forms easier to build and maintain.
+
+### Preparation references — not spoken
+
+- [docs/STAFF-EVENT-WORKFLOW.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/STAFF-EVENT-WORKFLOW.md)
+- [modules/forms/repository.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/forms/repository.ts)
+- [modules/forms/seeded-templates.ts](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/modules/forms/seeded-templates.ts)
+- [docs/design/public-journeys-and-lists/review.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/design/public-journeys-and-lists/review.md)
+- [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
+- [Roadmap / issue #1062](https://github.com/DurantTL/IMSDA-Events/issues/1062)
+- [Roadmap / issue #1063](https://github.com/DurantTL/IMSDA-Events/issues/1063)
+- [Roadmap / issue #1064](https://github.com/DurantTL/IMSDA-Events/issues/1064)
+- [Roadmap / issue #1065](https://github.com/DurantTL/IMSDA-Events/issues/1065)
+- [Roadmap / issue #1069](https://github.com/DurantTL/IMSDA-Events/issues/1069)
+- [Roadmap / issue #1070](https://github.com/DurantTL/IMSDA-Events/issues/1070)
+- [Roadmap / issue #1071](https://github.com/DurantTL/IMSDA-Events/issues/1071)
+- [Roadmap / issue #1072](https://github.com/DurantTL/IMSDA-Events/issues/1072)
+
+## 29. A full camp workflow could build on this foundation
+
+### Say
+
+A residential camp needs more than a registration and a bed assignment. The current lodging, meal, registration and check-in foundations could support future work. Camp operations would also need clear cabin and counselor responsibility, activity scheduling, guardian consent, appropriate care access, transport and authorized pickup. Those roles and policies must be designed deliberately. UltraCamp is a separate, optional discovery path in the later roadmap. Its allowed data, licensing and API coverage need confirmation, especially for protected forms and care information. We have a separate camp discovery document so this possibility can be assessed without claiming that a complete camp system or automatic synchronization is already available.
+
+### Point to or demonstrate
+
+Follow the diagram from existing foundations through camp responsibility gaps to the optional vendor boundary. Describe this as a capability discussion, not an announced replacement or integration plan.
+
+### Ask the group
+
+Which camp responsibility is hardest to manage reliably today?
+
+### Capability status
+
+POSSIBLE. A camp system adds care, supervision and release responsibilities beyond a lodging reservation.
+
+### Preparation references — not spoken
+
+- [docs/LODGING.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/LODGING.md)
+- [docs/MEALS.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/MEALS.md)
+- [docs/decisions/0005-protected-records-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/decisions/0005-protected-records-policy.md)
+- [docs/decisions/0011-personnel-pipeline-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/decisions/0011-personnel-pipeline-policy.md)
+- [docs/platform-documentation/2026-10-21/content/04-camp-system-and-ultracamp.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/platform-documentation/2026-10-21/content/04-camp-system-and-ultracamp.md)
+- [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
+- [Roadmap / issue #65](https://github.com/DurantTL/IMSDA-Events/issues/65)
+- [Roadmap / issue #71](https://github.com/DurantTL/IMSDA-Events/issues/71)
+- [Roadmap / issue #78](https://github.com/DurantTL/IMSDA-Events/issues/78)
+- [Roadmap / issue #79](https://github.com/DurantTL/IMSDA-Events/issues/79)
+- [Roadmap / issue #89](https://github.com/DurantTL/IMSDA-Events/issues/89)
+- [Roadmap / issue #237](https://github.com/DurantTL/IMSDA-Events/issues/237)
+- [Roadmap / issue #238](https://github.com/DurantTL/IMSDA-Events/issues/238)
+
+## 30. Longer-term possibilities to develop
+
+### Say
+
+There are further possibilities beyond the changes to everyday screens. Adventurer ministry has its own program, materials and scope decisions. Wallet passes could build on the web passes that already exist; a native mobile experience would also need its own provider, privacy and offline rules. Merchandise checkout remains on hold, and a camp-store account would be a larger project than today's Orders helper. Surveys, certificates and recorded outcomes could improve follow-up after an event. These items have different levels of detail and different dependencies. They are possibilities on the longer roadmap, not an announcement that everything is approved, scheduled or available now. Donations, fundraising and designated funds are another later track, separate from current church invoicing and the Orders helper.
+
+### Point to or demonstrate
+
+Point to the different status labels. Ask for useful examples of need rather than presenting a delivery schedule. The canonical roadmap remains the source of implementation order.
+
+### Ask the group
+
+Which future outcome would solve a concrete problem for your club or event team?
+
+### Capability status
+
+POSSIBLE. Future scope follows the existing roadmap, decisions and event needs; no delivery dates are set.
+
+### Preparation references — not spoken
+
+- [docs/NEW-CLUB-APPLICATIONS.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/NEW-CLUB-APPLICATIONS.md)
+- [docs/ATTENDEE-ACCOUNT-RELEASE.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/ATTENDEE-ACCOUNT-RELEASE.md)
+- [docs/MERCHANDISE-LEDGER-MIGRATION.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/MERCHANDISE-LEDGER-MIGRATION.md)
+- [docs/decisions/0011-personnel-pipeline-policy.md](https://github.com/DurantTL/IMSDA-Events/blob/2cac4150c2b237b02190495d931e6bffb2189184/docs/decisions/0011-personnel-pipeline-policy.md)
+- [Roadmap / issue #98](https://github.com/DurantTL/IMSDA-Events/issues/98)
+- [Roadmap / issue #840](https://github.com/DurantTL/IMSDA-Events/issues/840)
+- [Roadmap / issue #841](https://github.com/DurantTL/IMSDA-Events/issues/841)
+- [Roadmap / issue #842](https://github.com/DurantTL/IMSDA-Events/issues/842)
+- [Roadmap / issue #843](https://github.com/DurantTL/IMSDA-Events/issues/843)
+- [Roadmap / issue #53](https://github.com/DurantTL/IMSDA-Events/issues/53)
+- [Roadmap / issue #91](https://github.com/DurantTL/IMSDA-Events/issues/91)
+- [Roadmap / issue #226](https://github.com/DurantTL/IMSDA-Events/issues/226)
+- [Roadmap / issue #227](https://github.com/DurantTL/IMSDA-Events/issues/227)
+- [Roadmap / issue #228](https://github.com/DurantTL/IMSDA-Events/issues/228)
+- [Roadmap / issue #54](https://github.com/DurantTL/IMSDA-Events/issues/54)
+- [Roadmap / issue #146](https://github.com/DurantTL/IMSDA-Events/issues/146)
+- [Roadmap / issue #147](https://github.com/DurantTL/IMSDA-Events/issues/147)
+- [Roadmap / issue #148](https://github.com/DurantTL/IMSDA-Events/issues/148)
+- [Roadmap / issue #90](https://github.com/DurantTL/IMSDA-Events/issues/90)
+- [Roadmap / issue #233](https://github.com/DurantTL/IMSDA-Events/issues/233)
+- [Roadmap / issue #234](https://github.com/DurantTL/IMSDA-Events/issues/234)
+- [Roadmap / issue #235](https://github.com/DurantTL/IMSDA-Events/issues/235)
+- [Roadmap / issue #95](https://github.com/DurantTL/IMSDA-Events/issues/95)
+
+## 31. Check the result. Sign out. Return to the same place.
 
 ### Say
 

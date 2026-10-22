@@ -4,7 +4,7 @@ Prepared October 21, 2026 against application source `7f77c1dfeadd004deb51f91e2b
 
 ## Owner's request and revised teaching approach
 
-The owner asked for fictional data and visual screenshots so the presentation demonstrates what happens rather than repeating feature descriptions. The revised storyboard has **25 slides**: introduction/sign-in (1–7), director story (8–16), coordinator story (17–22), follow-up/help/sign-out (23–25).
+The owner asked for fictional data and visual screenshots so the presentation demonstrates what happens rather than repeating feature descriptions. The revised storyboard has **31 slides**: introduction/sign-in (1–7), director story (8–16), coordinator story (17–22), follow-up/help (23–24), optional current capabilities and future outlook (25–30), and sign-out (31).
 
 The scenario uses Riverton Pathfinders, director Jordan Ellis, member Morgan Reed and Area Coordinator Alex Morgan, with three other fictional clubs for comparisons. The working date is October 21, 2026, the club year is 2026–27, and Fall Camporee is November 6–8. September records illustrate overdue status differences; October's director report is within its November 10 deadline. Actual figures and transitions must follow the captured local fixture, not invented totals in slide annotations.
 
@@ -29,11 +29,17 @@ The prior source investigations remain in `orientation-signin.md`, `orientation-
 - Coordinator work is predominantly view-only. **Team approvals** is the narrow own-location decision exception; **New clubs** is review-only. There is no general Send reminder action or automatic follow-up message in this training.
 - A coordinator name search does not narrow the full-year CSV or recalculate full-scope rankings. Event totals may remain full-event totals when visible club rows are filtered.
 
+## Added feature outlook
+
+The latest request adds six closing slides so the audience sees more of the current system and its future direction. Two slides cover implemented club/event tools with setup and role boundaries. Two cover planned workspace, public-journey and form-builder improvements; administrator alerts and kitchen closeout are also named as ordered roadmap work. Two cover possible camp workflows and later Adventurer, wallet, merchandise, fundraising and feedback/certificate scope. Each has a status label and matching footer; none uses an unreleased app mockup or promises a delivery date. The original screenshot walkthrough is retained.
+
+The outlook was checked against main `2cac4150c2b237b02190495d931e6bffb2189184` and fresh owner-issue/roadmap status. `closing-feature-audit.md` records boundaries and `outlook-independent-qa.md` records the final visual/content review. The screenshot source remains pinned separately to `7f77c1df`.
+
 ## Final export review status
 
-The final presentation has **25 slides, 42 embedded screenshot placements and 34 registered capture examples from 33 unique images**. Every slide has spoken notes; every picture has an alternative description. All 47 distinct referenced source files exist at the pinned revision. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
+The final presentation has **31 slides, 42 embedded screenshot placements and 34 registered capture examples from 33 unique images**. Every slide has spoken notes; every picture has an alternative description. All 70 distinct referenced source files exist at the pinned revision. The five reference reports' 20 Markdown/Word/HTML/PDF files are byte-identical to the merged versions.
 
-PowerPoint shape bounds and Office package integrity pass. After fonts and images load, the deck has **zero overflowing text boxes and zero failed images**. All eight PDFs open with text and tagged structures; the deck has 25 slide-title bookmarks. Presenter notes are 14 pages; the retained quick-start is three pages. Machine-readable results are in `orientation-checks.json`, `render-checks.json` and `pdf-manifest.json`.
+PowerPoint shape bounds and Office package integrity pass. After fonts and images load, the deck has **zero overflowing text boxes and zero failed images**. All eight PDFs open with text and tagged structures; the deck has 31 slide-title bookmarks. Presenter notes are 19 pages; the retained quick-start is three pages. Machine-readable results are in `orientation-checks.json`, `render-checks.json` and `pdf-manifest.json`.
 
 The complete contact sheet and enlarged task/detail slides were visually inspected. An independent review checked fictional-state continuity, source permissions, authentication examples and the before/after report story. Crops were enlarged to show roster saving, returned form states, report submission, event confirmation and the registered headcount. Annotation positions were corrected where they covered a value. The gallery excludes the local check-in QR from the shared confirmation capture; original hash and crop coordinates remain in the capture register.
 

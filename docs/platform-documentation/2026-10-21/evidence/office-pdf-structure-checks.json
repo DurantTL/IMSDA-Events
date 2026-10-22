@@ -1,10 +1,12 @@
 {
   "source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
-  "slides": 25,
-  "speaker_notes": "All 25 slides have Say, with Show/Ask as appropriate",
+  "slides": 31,
+  "speaker_notes": "All 31 slides have Say, with Show/Ask as appropriate",
   "picture_shapes": 42,
+  "registered_screenshot_examples": 34,
+  "unique_capture_images": 33,
   "screenshot_alt_descriptions": true,
-  "visuals": "Current local application with fictional training records; annotations are presentation overlays",
+  "visuals": "Current local application with fictional training records, plus six explicitly labelled capability and future-outlook diagrams",
   "visible_words_per_slide": [
     41,
     58,
@@ -30,9 +32,15 @@
     49,
     61,
     46,
+    64,
+    97,
+    111,
+    116,
+    80,
+    108,
     56
   ],
-  "source_file_references": 47,
+  "source_file_references": 70,
   "unrelated_reference_files_unchanged": 20,
   "office_packages_valid": true,
   "shape_bounds_valid": true,
@@ -64,8 +72,8 @@
     },
     {
       "file": "IMSDA-Events-platform-briefing.pdf",
-      "pages": 25,
-      "toc_entries": 25,
+      "pages": 31,
+      "toc_entries": 31,
       "tagged": true
     },
     {
@@ -82,11 +90,42 @@
     },
     {
       "file": "06-presenter-notes.pdf",
-      "pages": 14,
-      "toc_entries": 122,
+      "pages": 19,
+      "toc_entries": 158,
       "tagged": true
     }
   ],
-  "registered_screenshot_examples": 34,
-  "unique_capture_images": 33
+  "outlook_review_commit": "2cac4150c2b237b02190495d931e6bffb2189184",
+  "outlook_slides": [
+    {
+      "slide": 25,
+      "title": "More club tools are already here",
+      "status": "current"
+    },
+    {
+      "slide": 26,
+      "title": "Event teams have tools before, during and after",
+      "status": "current"
+    },
+    {
+      "slide": 27,
+      "title": "Planned: make the next task easier to find",
+      "status": "planned"
+    },
+    {
+      "slide": 28,
+      "title": "Planned: make forms easier to build and maintain",
+      "status": "planned"
+    },
+    {
+      "slide": 29,
+      "title": "A full camp workflow could build on this foundation",
+      "status": "possible"
+    },
+    {
+      "slide": 30,
+      "title": "Longer-term possibilities to develop",
+      "status": "possible"
+    }
+  ]
 }

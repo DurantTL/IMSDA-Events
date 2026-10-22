@@ -1,7 +1,8 @@
 {
   "source_commit": "5e367b7c4d1b3c173d37c0415e335be76170b300",
   "orientation_source_commit": "7f77c1dfeadd004deb51f91e2bae1b6c4754638b",
-  "presentation": "25-slide visual user orientation with fictional training records",
+  "outlook_review_commit": "2cac4150c2b237b02190495d931e6bffb2189184",
+  "presentation": "31-slide user orientation with fictional screenshots and a labelled feature outlook",
   "files": [
     {
       "path": ".gitattributes",
@@ -10,8 +11,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 8412,
-      "sha256": "2f5295fbead01850b4cb5337bb5f1a068fb7990e02e02cefa3b0e3fe647f8969"
+      "bytes": 9273,
+      "sha256": "c271d6d8ad7eaa0d065c128cb71c2844340e78133f33a41c8ebb3b38c9e159ea"
     },
     {
       "path": "assets/FONT-LICENSE.txt",
@@ -415,8 +416,8 @@
     },
     {
       "path": "content/06-presenter-notes.md",
-      "bytes": 38981,
-      "sha256": "882a12b72e41bf3756ee3788c2b00b7569255586e55efcf449db4507a43bb5a7"
+      "bytes": 56724,
+      "sha256": "66331b22de184227a6a194b05d4cae69fc96c1df14325dbc9a8e35a292504429"
     },
     {
       "path": "content/07-club-quick-start.md",
@@ -424,14 +425,19 @@
       "sha256": "7e19d18f028c2e0ba4752ab553aad282bf68b9174dbd953e40ba479bbf4d14ed"
     },
     {
+      "path": "evidence/closing-feature-audit.md",
+      "bytes": 8963,
+      "sha256": "072bf810e76a30d895629c05faf0b85655c3f8656d6d1f8c7a83f0bcc561c593"
+    },
+    {
       "path": "evidence/deck-source.json",
-      "bytes": 113511,
-      "sha256": "9bcc58e46644544252f18e7f0e2c2cdeafc07ed2a7d96ef8eb4422b25b0c0a81"
+      "bytes": 149304,
+      "sha256": "81bb4ab9d45f27b6ec44d8d507ef03fac9c8616ae05997099a996ec50e40dd8c"
     },
     {
       "path": "evidence/export-verification.md",
-      "bytes": 3941,
-      "sha256": "7155fd772127610931e32076db23a0e6fc5eebcd115ec4e048c5ccc8c9c6129e"
+      "bytes": 4517,
+      "sha256": "7a59cd17b0a2421012fd438731859b16a06bd5c6472f58d520c1120b5d1ea10a"
     },
     {
       "path": "evidence/feature-matrix.json",
@@ -451,17 +457,17 @@
     {
       "path": "evidence/local-link-checks.json",
       "bytes": 115,
-      "sha256": "2be5b51847741412fa3f8858f8bfcc7898627acf83abb8c848629d3a6ec0f958"
+      "sha256": "c88fbacbe7558ee5c76e6846c76a3a45a31e180b11aeffeb2acdfffb8de90b4a"
     },
     {
       "path": "evidence/office-pdf-structure-checks.json",
-      "bytes": 1832,
-      "sha256": "a62d6871f5961c6f6aefad7537a5af1b421a08eb87af252efac79d859bea484d"
+      "bytes": 2730,
+      "sha256": "c376831ed01a3951bd427af9b412bf89c3ba09d20973d2efda5515e2f7369c7e"
     },
     {
       "path": "evidence/orientation-checks.json",
-      "bytes": 1832,
-      "sha256": "a62d6871f5961c6f6aefad7537a5af1b421a08eb87af252efac79d859bea484d"
+      "bytes": 2730,
+      "sha256": "c376831ed01a3951bd427af9b412bf89c3ba09d20973d2efda5515e2f7369c7e"
     },
     {
       "path": "evidence/orientation-coordinator.md",
@@ -480,13 +486,18 @@
     },
     {
       "path": "evidence/orientation-verification.md",
-      "bytes": 6285,
-      "sha256": "e27c070c51b989fdfebf8b33ccdbe92dfdeeda921da8dba8f38212b1f466571b"
+      "bytes": 7314,
+      "sha256": "ff48253637460b01038189f4a848ab9327f571b5889d9d452f729c4b128c86fb"
+    },
+    {
+      "path": "evidence/outlook-independent-qa.md",
+      "bytes": 5582,
+      "sha256": "223de5527dd22c0da102f9b177fe0d09b5b1322488317e798b6f1ed8e4e73034"
     },
     {
       "path": "evidence/pdf-manifest.json",
-      "bytes": 979,
-      "sha256": "225b1428883be1cfbc4d3102677e342d126b86566d9852775377e67ae76e89b9"
+      "bytes": 980,
+      "sha256": "5ea4a21bbdc983aadbd5394a650d8eab46edb520d2066e86dea9d5de6b8f1111"
     },
     {
       "path": "evidence/render-checks.json",
@@ -530,8 +541,8 @@
     },
     {
       "path": "evidence/visual-training-independent-qa.md",
-      "bytes": 7544,
-      "sha256": "7fc82d12d85862ff7e976e80aff63a877fba848550d746b8d863477aaebf019f"
+      "bytes": 7803,
+      "sha256": "5dd02c7e13e206a6f72871b7d824425d8e2e479fd2f162ef025310b5495a84da"
     },
     {
       "path": "evidence/visual-training-qa-plan.md",
@@ -615,18 +626,18 @@
     },
     {
       "path": "exports/06-presenter-notes.docx",
-      "bytes": 39201,
-      "sha256": "bd9fbc3850ac68ce60f573ae5394b3639cb5576f4f5afdb7e7ac62b798694063"
+      "bytes": 46449,
+      "sha256": "882ed6bbcac124cb1953e22524665d8d40f98b288c21b0c4f56b77f5a4eac9db"
     },
     {
       "path": "exports/06-presenter-notes.html",
-      "bytes": 47966,
-      "sha256": "467d9ad36fe27fbce15eadd79550573f41e15f391fd48fb011ba051e10762ef2"
+      "bytes": 68789,
+      "sha256": "d91ab347b7ba5730aa357141f4bbc520ec3f5b1b51fb6625760cb0b1e207b5ce"
     },
     {
       "path": "exports/06-presenter-notes.pdf",
-      "bytes": 278088,
-      "sha256": "8b9a5e78ebc0c721b681bac109015a8208d43e81ea325e305b483b0aa609843f"
+      "bytes": 416806,
+      "sha256": "8c782778c14f28c10d268eedcaaedb7029d007aca52acad2a7f0a209a2afd293"
     },
     {
       "path": "exports/07-club-quick-start.docx",
@@ -645,18 +656,18 @@
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.html",
-      "bytes": 92266,
-      "sha256": "286d9502edd3e23217e97e63cb00ad06767d72d19bd91136984728da6272ba80"
+      "bytes": 142432,
+      "sha256": "84bb866d374aee4859f5425f20230b69c1d43d492010b7565c35a14f48ad69c5"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pdf",
-      "bytes": 4774377,
-      "sha256": "d29c6de0cf49de7553e29e7a84b8fb6b97b57115fc970bfec50e4f747ff952df"
+      "bytes": 4866564,
+      "sha256": "9acbe381f10e997afbe67fe470103afb7d98a93d277704c6f391b86fb35f4eeb"
     },
     {
       "path": "exports/IMSDA-Events-platform-briefing.pptx",
-      "bytes": 5813735,
-      "sha256": "40f3e07d26eb500e9cfe5111ae6cf1757d4b6973b2c40e323e8cd0fe146896a5"
+      "bytes": 5842998,
+      "sha256": "fcd228660465f54ed541e0f4df6a94e536e17cdfa90d74f130acc90e08f20b76"
     },
     {
       "path": "exports/IMSDA-Events-training-screenshot-gallery.html",
@@ -665,8 +676,13 @@
     },
     {
       "path": "previews/deck-overview.png",
-      "bytes": 492991,
-      "sha256": "b878af8ecb5ca87972314ef9dec0890fd44abdbd3edaf881f359e8e776d6f60d"
+      "bytes": 644531,
+      "sha256": "342b05e2fc7c24ff755e6c51365f4c9a65110519580d1e24f0a5aad5fc702deb"
+    },
+    {
+      "path": "previews/feature-outlook.png",
+      "bytes": 437575,
+      "sha256": "2e7bbce92dcc58b9ee51893847a96c8b2de57ec625f958396132598a7fbf397b"
     }
   ]
 }

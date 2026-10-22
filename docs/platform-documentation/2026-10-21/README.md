@@ -6,7 +6,7 @@ This pack explains the current system, consolidates accessibility/usability find
 
 ## Start with the user orientation
 
-- [Getting started PowerPoint — 25 visual slides with spoken presenter notes](exports/IMSDA-Events-platform-briefing.pptx)
+- [Getting started PowerPoint — 31 slides with screenshots, feature outlook and spoken notes](exports/IMSDA-Events-platform-briefing.pptx)
 - [Getting started presentation PDF](exports/IMSDA-Events-platform-briefing.pdf)
 - [Presenter notes: PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Markdown](content/06-presenter-notes.md)
 - [Screenshot gallery — 34 fictional training capture examples](exports/IMSDA-Events-training-screenshot-gallery.html)
@@ -15,11 +15,13 @@ This pack explains the current system, consolidates accessibility/usability find
 
 The presentation follows a fictional club through the current application: director Jordan Ellis adds Morgan Reed to Riverton Pathfinders, records an October meeting and registers people for Fall Camporee. Area Coordinator Alex Morgan then reviews club progress, report statuses and event participation. Screenshots use fictional records in an isolated local application; short annotations show where to act and how to recognize a saved result. Presenter notes carry the fuller explanation, optional demonstration and questions.
 
-**Choose a route:** slides 1–7 introduce the system and sign-in; 8–16 follow the director; 17–22 follow the Area Coordinator; 23–25 cover specific follow-up, help and sign-out. A single-role session can use its section after the common introduction. Screenshots and current labels use [source `7f77c1df`](https://github.com/DurantTL/IMSDA-Events/commit/7f77c1dfeadd004deb51f91e2bae1b6c4754638b), whose application source matches the earlier baseline. The capture/source register is [screenshot-capture.json](evidence/screenshot-capture.json).
+**Choose a route:** slides 1–7 introduce the system and sign-in; 8–16 follow the director; 17–22 follow the Area Coordinator; 23–24 cover follow-up and help; 25–30 add other current tools, planned improvements and future possibilities; 31 finishes safely. A single-role session can use its section after the common introduction. Screenshots and current labels use [source `7f77c1df`](https://github.com/DurantTL/IMSDA-Events/commit/7f77c1dfeadd004deb51f91e2bae1b6c4754638b), whose application source matches the earlier baseline. The capture/source register is [screenshot-capture.json](evidence/screenshot-capture.json).
 
 **Training scenario:** October 21, 2026, club year 2026–27. September records illustrate overdue status differences; October's record is still within its submission period. Fall Camporee takes place November 6–8. Names, clubs, contacts, figures and event records are fictional. These local captures verify repository behavior, not the configuration or data currently serving on the public production site.
 
-The technical evidence, future-feature planning and camp discovery remain in the separate documents below.
+The six optional closing slides cover other current club/event tools, planned workspace and form-builder work, and longer-term possibilities such as camp operations, Adventurer support, wallet passes, merchandise, fundraising and feedback. Current, planned and possible are labelled separately; no delivery dates are promised. For a task-only orientation, use slides 1–24 and 31. Detailed technical evidence, future-feature planning and camp discovery remain in the separate reports below.
+
+![Current capabilities and future outlook](previews/feature-outlook.png)
 
 ![Presentation overview](previews/deck-overview.png)
 
@@ -55,11 +57,13 @@ The help/message examples are prepared drafts. Square-bracket placeholders are e
 - [User-orientation source and content checks](evidence/orientation-verification.md)
 - [Screenshot capture/source register](evidence/screenshot-capture.json)
 - [Visual-training review checklist](evidence/visual-training-qa-plan.md)
+- [Closing feature source/status audit](evidence/closing-feature-audit.md)
+- [Closing slide independent review](evidence/outlook-independent-qa.md)
 - [Independent visual-training review](evidence/visual-training-independent-qa.md)
 - [Fictional dataset and before/after story](evidence/synthetic-training-dataset.md)
 
 The technical report records **13,504 tests passed and one skipped across 1,015 files** in the exact current-main CI run. It distinguishes main smoke from the separately observed extended application, mobile and badge checks, and from human/physical production verification. No new application test run was started for this documentation task.
 
-The PowerPoint contains embedded screenshot images with editable titles, captions and callout shapes. Screenshots are raster captures rather than editable application components. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. Export-check results are recorded separately in the evidence files; PDF tags alone do not establish PDF/UA or WCAG conformance.
+The PowerPoint contains embedded screenshot images with editable titles, captions and callout shapes. Its six closing capability diagrams also use editable text and vector shapes, with status-aware captions that distinguish them from current app screenshots. Screenshots are raster captures rather than editable application components. Noto Sans is used in the exports; font files and their license are included under `assets/` for consistent offline HTML viewing. Export-check results are recorded separately in the evidence files; PDF tags alone do not establish PDF/UA or WCAG conformance.
 
 Only documentation and export assets are delivered. Application behavior, menus, permissions, issue labels/states, build order and production switches are unchanged. Follow [#98](https://github.com/DurantTL/IMSDA-Events/issues/98) for implementation order and [#844](https://github.com/DurantTL/IMSDA-Events/issues/844) for the preceding issue review.
