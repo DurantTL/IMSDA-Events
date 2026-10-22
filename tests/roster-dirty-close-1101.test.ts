@@ -68,7 +68,10 @@ describe("roster editor dirty tracking (#1101)", () => {
   it("Deactivate/Reactivate warns when there are unsaved edits", () => {
     const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
     const start = source.indexOf("async function confirmSetStatus");
-    const body = source.slice(start, source.indexOf("async function remove", start));
+    const end = source.indexOf("async function remove", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const body = source.slice(start, end);
     expect(body).toMatch(/editorIsDirty\(\)/);
     expect(body).toContain("You have unsaved changes. Save them first, or they will be discarded.");
   });
@@ -76,7 +79,10 @@ describe("roster editor dirty tracking (#1101)", () => {
   it("Keep editing returns focus inside the editor", () => {
     const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
     const start = source.indexOf("const requestClose");
-    const body = source.slice(start, source.indexOf("useAccessibleDialog<HTMLElement>", start));
+    const end = source.indexOf("useAccessibleDialog<HTMLElement>", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const body = source.slice(start, end);
     expect(body).toMatch(/document\.activeElement/);
     expect(body).toMatch(/previous\.focus\(\)/);
     expect(body).toMatch(/dialog\?\.focus\(\)/);
