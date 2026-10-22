@@ -34,7 +34,7 @@ import {
  * is staff-scoped and enforces its own access. The callers draw these groups
  * only for a system administrator. Nothing here grants access.
  */
-export type SystemNavGroupKey = "system-events" | "system-clubs" | "system-people" | "system-catalogs";
+export type SystemNavGroupKey = "system-events" | "system-clubs" | "system-people" | "system-forms" | "system-catalogs";
 
 export type SystemNavItem = {
   href: string;
@@ -89,14 +89,21 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     ],
   },
   {
+    key: "system-forms",
+    label: "Forms",
+    collapsedByDefault: false,
+    items: [
+      { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
+      { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
+    ],
+  },
+  {
     key: "system-catalogs",
     label: "Catalogs and settings",
     collapsedByDefault: true,
     items: [
       { href: "/admin/honors", label: "Honor catalog", description: "The honors clubs can earn.", icon: Award },
       { href: "/admin/club-supplies", label: "Club supply catalog", description: "Supplies clubs can order.", icon: Package },
-      { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
-      { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
       { href: "/admin/master-award-rules", label: "Master Award rules", description: "What it takes to earn a Master Award.", icon: Trophy },
       { href: "/admin/calendar", label: "Public calendar", description: "The calendar visitors see.", icon: CalendarDays },
       { href: "/admin/organizations/background-checks", label: "Sterling Volunteers", description: "Sterling Volunteers screening status for clubs.", icon: ShieldCheck },
