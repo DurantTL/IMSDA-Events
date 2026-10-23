@@ -8509,8 +8509,9 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .calendar-chip.calendar-kind-entry { background: var(--imsda-purple); }
   .calendar-chip a, .calendar-chip span { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; font-size: 0; }
   .calendar-more { display: none; }
-  /* #1117: the day number is the phone's visible, labelled way to the full dated agenda; the dots stay decorative. */
-  .calendar-day-link { width: 100%; min-height: 44px; border-radius: 10px; }
+  /* #1117: the day number is the phone's visible, labelled way to the full dated agenda; the dots stay decorative.
+     It spans the cell's padding too, so a 360px-wide month still gives each day a 44px-wide target. */
+  .calendar-day-link { width: calc(100% + 8px); min-height: 44px; margin-inline: -4px; border-radius: 10px; }
   .calendar-day-actions .secondary-button, .calendar-day-actions .text-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
   .calendar-agenda-item { grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 12px; }
   .calendar-agenda-action { grid-column: 1 / -1; justify-content: center; min-height: 44px; }
