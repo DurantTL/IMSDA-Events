@@ -36,7 +36,7 @@ export function positionStatus(sections: Sections, fieldId: string): string {
 
 const name = (field: RegistrationFormField) => `"${field.label || "Untitled question"}"`;
 
-type Inversion = { id: string; dependent: RegistrationFormField; controller: RegistrationFormField };
+type Inversion = { id: string; kind: "conditional" | "optionalWhen"; dependent: RegistrationFormField; controller: RegistrationFormField };
 
 /**
  * Every question that sits ahead of a question its rule depends on. A show-when rule (`conditional`) always counts; an
@@ -46,7 +46,7 @@ function inversions(sections: Sections): Inversion[] {
   const order: Array<{ field: RegistrationFormField; sectionIndex: number }> = sections.flatMap((section, sectionIndex) => section.fields.map((field) => ({ field, sectionIndex })));
   const found: Inversion[] = [];
   order.forEach(({ field, sectionIndex }, position) => {
-    const rules = [{ kind: "conditional", key: field.conditional?.fieldKey }, { kind: "optionalWhen", key: field.optionalWhen?.fieldKey }];
+    const rules = [{ kind: "conditional" as const, key: field.conditional?.fieldKey }, { kind: "optionalWhen" as const, key: field.optionalWhen?.fieldKey }];
     for (const rule of rules) {
       if (!rule.key) continue;
       const controllerAt = order.findIndex((entry) => entry.field.key === rule.key);
@@ -56,7 +56,7 @@ function inversions(sections: Sections): Inversion[] {
         // Same step: order changes nothing. A mutual pair (each makes the other optional) cannot be ordered at all.
         if (controller.sectionIndex === sectionIndex || controller.field.optionalWhen?.fieldKey === field.key) continue;
       }
-      found.push({ id: `${field.id}|${rule.kind}|${rule.key}`, dependent: field, controller: order[controllerAt]!.field });
+      found.push({ id: `${field.id}|${rule.kind}|${rule.key}`, kind: rule.kind, dependent: field, controller: order[controllerAt]!.field });
     }
   });
   return found;
@@ -72,9 +72,10 @@ export function newOrderInversion(before: Sections, after: Sections, movedFieldI
   const known = new Set(inversions(before).map((entry) => entry.id));
   const created = inversions(after).find((entry) => !known.has(entry.id));
   if (!created) return null;
-  const { dependent, controller } = created;
-  if (movedFieldId === controller.id) return `${name(dependent)} is shown only when ${name(controller)} is answered, so ${name(controller)} has to stay before it. Move ${name(controller)} somewhere above ${name(dependent)} instead.`;
-  if (movedFieldId === dependent.id) return `${name(dependent)} is shown only when ${name(controller)} is answered, so it has to stay after that question. Move it somewhere below ${name(controller)} instead.`;
+  const { kind, dependent, controller } = created;
+  const rule = kind === "conditional" ? `is shown only when ${name(controller)} is answered` : `becomes optional depending on ${name(controller)}`;
+  if (movedFieldId === controller.id) return `${name(dependent)} ${rule}, so ${name(controller)} has to stay before it. Move ${name(controller)} somewhere above ${name(dependent)} instead.`;
+  if (movedFieldId === dependent.id) return `${name(dependent)} ${rule}, so it has to stay after that question. Move it somewhere below ${name(controller)} instead.`;
   return `${name(dependent)} depends on ${name(controller)}, so that question has to stay before it. Keep the steps in an order where it does.`;
 }
 

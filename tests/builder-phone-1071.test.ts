@@ -75,7 +75,10 @@ describe("Move up and Move down (#1071)", () => {
   it("also guard an optional-when rule, but only across steps", () => {
     const list = sections();
     list[1]!.fields[0] = field("shirt", "Shirt size", { optionalWhen: { fieldKey: "club_name", operator: "NOT_EMPTY", value: "" } });
-    expect(planMoveToStep(list, "club_name", 2).kind).toBe("refused");
+    const refused = planMoveToStep(list, "club_name", 2);
+    expect(refused.kind).toBe("refused");
+    // The message names the optional-when rule, not a show-when rule.
+    expect(refused.kind === "refused" && refused.message).toMatch(/becomes optional depending on/);
     expect(planMoveToStep(list, "shirt", 0).kind).toBe("moved");
     // Inside one step the order changes nothing, so it is free.
     const same = sections();
