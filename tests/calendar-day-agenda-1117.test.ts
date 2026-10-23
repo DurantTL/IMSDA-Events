@@ -93,5 +93,7 @@ describe("calendar page wiring (#1117)", () => {
     expect(chip).toContain('"aria-hidden": true');
     expect(chip).toContain("tabIndex: -1");
     expect(css).toMatch(/\.calendar-day-link \{ width: 100%; min-height: 44px;/);
+    // At 360px a day cell is about 47px wide with 4px padding; the phone link spans the padding to reach 44px.
+    expect(css).toContain(".calendar-day-link { width: calc(100% + 8px); min-height: 44px; margin-inline: -4px;");
   });
 });
