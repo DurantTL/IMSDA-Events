@@ -62,7 +62,7 @@ describe("system navigation groups", () => {
 
   it("lists All forms first in Forms, ahead of the existing entries, with no duplicate destinations (#1151)", () => {
     const forms = systemNavGroups.find((group) => group.key === "system-forms")!;
-    expect(forms.items.map((item) => item.label)).toEqual(["All forms", "Club forms", "Form templates", "Information forms"]);
+    expect(forms.items.map((item) => item.label)).toEqual(["All forms", "Club forms", "Form templates", "Question library", "Information forms"]);
     const hrefs = systemNavGroups.flatMap((group) => group.items.map((item) => item.href));
     expect(hrefs.filter((href) => href === "/admin/forms")).toHaveLength(1);
   });

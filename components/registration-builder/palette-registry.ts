@@ -29,6 +29,8 @@ export type PaletteInsertContext = {
 export type PaletteInsert = {
   fields: RegistrationFormField[];
   module?: BuilderModuleDefinition;
+  /** Saved questions (#1070): inserted fields that need the person's attention (a reference that could not be carried over), by field id. */
+  repairs?: Array<{ fieldId: string; message: string }>;
 };
 
 export type PaletteEntry = {
@@ -78,7 +80,7 @@ export const defaultPaletteGroups: readonly PaletteGroup[] = [
   { id: PALETTE_GROUP_IDS.money, label: "Money" },
   { id: PALETTE_GROUP_IDS.agreements, label: "Agreements" },
   { id: PALETTE_GROUP_IDS.modules, label: "Modules" },
-  { id: PALETTE_GROUP_IDS.saved, label: "Saved questions", emptyHint: "Questions you save to the library will appear here." },
+  { id: PALETTE_GROUP_IDS.saved, label: "Question library", emptyHint: "Questions saved to the library appear here. Use Save to library in a question's actions menu. Adding one puts an independent copy on this form." },
 ];
 
 export type PaletteRegistry = {

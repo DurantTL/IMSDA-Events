@@ -111,3 +111,25 @@ The layout is remembered per browser in `localStorage` (key
 `imsda.registrationBuilder.editorLayout.v1`). Every storage read and write is in
 a try/catch, so with storage unavailable the layout still works for the page
 visit and is simply not remembered.
+
+## Question library (#1070)
+
+Saved questions live in the `QuestionLibraryItem` table (`modules/question-library/`), not in source. The builder loads
+them for the event being built (`GET /api/question-library?eventId=`) and layers them over the shared registry
+(`library-registry.ts`), so each one is a palette entry in the `saved` group ("Question library"). The shared registry is
+never written to.
+
+- **Who:** anyone who can build forms (system administrators, event staff with `MANAGE_FORMS` on that event) saves with
+  "Save to library" in a question's actions menu and adds from the palette. Only system administrators rename, edit or
+  delete (System, Forms, Question library). Every route checks this on the server.
+- **Copies:** adding makes an independent copy (`instantiateLibraryFragment`): fresh id, a key free on the form that is
+  never one a module reads by name, and conditions between copied questions follow the new keys. A condition that points
+  outside the saved item is removed and the copy is marked "Needs repair" in the builder; it is never pointed at another
+  question that happens to share the key. Library edits and deletes never reach inserted questions or published versions.
+- **Configuration only:** a fragment is validated with the form definition's field schema. Module-owned and canonical keys
+  (promo code, roster bundle, age fields, meal tickets, attendee type) cannot be saved; an acknowledgment that points at an
+  event's policy version is saved as placeholder wording; health-type questions are always saved as sensitive, and a
+  question wired to a sensitive question is saved as sensitive and not a filter.
+- **Information forms:** library entries pass through the same refusal check as every other entry, so only items an
+  information form accepts are offered there.
+- **Audit:** `QUESTION_LIBRARY_ITEM_CREATED`, `_EDITED` and `_DELETED` carry ids and counts only. Delete archives the row.

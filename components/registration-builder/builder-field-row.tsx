@@ -1,7 +1,7 @@
 // Canvas zone, one field: its summary row, drag handle and actions menu. The
 // field's settings open beneath it.
 import { ActionsMenu } from "@/components/actions-menu";
-import { ArrowDown, ArrowUp, ChevronRight, Copy, GripVertical, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, BookmarkPlus, ChevronRight, Copy, GripVertical, Trash2 } from "lucide-react";
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import { fieldTypeLabels } from "./builder-types";
 import { BuilderFieldSettings } from "./builder-field-settings";
@@ -9,7 +9,8 @@ import { useLoadedBuilder } from "./builder-context";
 import { InformationFieldIssues } from "./builder-information-issues";
 
 export function BuilderFieldRow({ section, field, sectionIndex, fieldIndex }: { section: RegistrationFormDefinition["sections"][number]; field: RegistrationFormField; sectionIndex: number; fieldIndex: number }) {
-  const { dragging, setDragging, expandedFieldId, setExpandedFieldId, canEdit, moveField, dropField, duplicateField, openRemoveField, information } = useLoadedBuilder();
+  const { dragging, setDragging, expandedFieldId, setExpandedFieldId, canEdit, moveField, dropField, duplicateField, openRemoveField, information, setLibraryTarget, libraryRepairs, setLibraryRepairs } = useLoadedBuilder();
+  const repair = libraryRepairs[field.id];
   return (
     <article
             className={dragging?.kind === "field" && dragging.sectionIndex === sectionIndex && dragging.fieldIndex === fieldIndex ? "builder-field-card dragging" : "builder-field-card"}
@@ -23,11 +24,18 @@ export function BuilderFieldRow({ section, field, sectionIndex, fieldIndex }: { 
               <button className="field-module-summary" type="button" aria-expanded={expandedFieldId === field.id} aria-label={`${expandedFieldId === field.id ? "Close settings for" : "Edit"} ${field.label}`} onClick={() => setExpandedFieldId((current) => current === field.id ? null : field.id)}><span className="field-type-mark">{fieldTypeLabels[field.type].slice(0, 1)}</span><span><strong>{field.label}</strong><small>{fieldTypeLabels[field.type]}{information ? "" : ` · ${field.scope === "ATTENDEE" ? "Each attendee" : "Registration"}`}{field.required ? " · Required" : ""}</small></span><ChevronRight className={expandedFieldId === field.id ? "expanded" : ""} size={16} /></button>
               {canEdit && <div className="field-actions-menu"><ActionsMenu label="Actions" ariaLabel={`Actions for ${field.label}`}>
                 <li><button type="button" aria-label={`Duplicate ${field.label}`} onClick={() => duplicateField(sectionIndex, fieldIndex)}><Copy size={14} aria-hidden="true" /> Copy</button></li>
+                <li><button type="button" aria-label={`Save ${field.label} to library`} onClick={() => setLibraryTarget({ fieldId: field.id })}><BookmarkPlus size={14} aria-hidden="true" /> Save to library</button></li>
                 <li><button type="button" aria-label={`Move ${field.label} up`} disabled={fieldIndex === 0} onClick={() => moveField(sectionIndex, fieldIndex, -1)}><ArrowUp size={14} aria-hidden="true" /> Move up</button></li>
                 <li><button type="button" aria-label={`Move ${field.label} down`} disabled={fieldIndex === section.fields.length - 1} onClick={() => moveField(sectionIndex, fieldIndex, 1)}><ArrowDown size={14} aria-hidden="true" /> Move down</button></li>
                 <li className="actions-menu-divider"><button className="actions-menu-danger" type="button" aria-label={`Remove ${field.label}`} onClick={() => openRemoveField(sectionIndex, fieldIndex)}><Trash2 size={14} aria-hidden="true" /> Remove</button></li>
               </ActionsMenu></div>}
             </div>
+      {repair && (
+        <div className="inline-notice library-repair-notice" role="alert" data-library-repair={field.id}>
+          <strong>Needs repair.</strong> {repair}
+          <button className="secondary-button" type="button" onClick={() => setLibraryRepairs((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== field.id)))}>Mark as repaired</button>
+        </div>
+      )}
       <InformationFieldIssues fieldId={field.id} />
       {expandedFieldId === field.id && <BuilderFieldSettings section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
     </article>

@@ -104,6 +104,10 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
       : "__review",
   );
   const previewRef = useRef<HTMLElement>(null);
+  // The question library (#1070): the question being saved, how often the saved list has changed, and the inserted questions that need repair (by field id).
+  const [libraryTarget, setLibraryTarget] = useState<{ fieldId: string } | null>(null);
+  const [libraryRefresh, setLibraryRefresh] = useState(0);
+  const [libraryRepairs, setLibraryRepairs] = useState<Readonly<Record<string, string>>>({});
   useUnsavedChangesGuard(
     dirty,
     "This registration form has unsaved changes. Leave and discard the draft edits?",
@@ -114,7 +118,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setModuleQuery("");
     setModuleCategory("All");
   }
-  return { information, informationIssues, setInformationIssues, history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary };
+  return { information, informationIssues, setInformationIssues, history, setHistory, setFocusRequest, autoKeyFieldIds, setAutoKeyFieldIds, templates,setTemplates, showSaveTemplate, setShowSaveTemplate, forms, setForms, selectedFormId, setSelectedFormId, selectedForm, duplicatePublishedGroups, selectedVersionId, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, busy, setBusy, notice, setNotice, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, error, setError, testIssues, setTestIssues, showTemplates, setShowTemplates, confirmingPublish, setConfirmingPublish, confirmingUnpublish, setConfirmingUnpublish, showDraftTemplates, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, dragging, setDragging, expandedFieldId, setExpandedFieldId, openModuleSection, setOpenModuleSection, moduleQuery, setModuleQuery, moduleCategory, setModuleCategory, pricingPreviewDate, setPricingPreviewDate, previewStepId, setPreviewStepId, previewRef, closeModuleLibrary, libraryTarget, setLibraryTarget, libraryRefresh, setLibraryRefresh, libraryRepairs, setLibraryRepairs };
 }
 
 export type BuilderState = ReturnType<typeof useBuilderState>;

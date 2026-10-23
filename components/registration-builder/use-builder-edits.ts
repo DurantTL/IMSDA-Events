@@ -12,7 +12,7 @@ import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
 
 export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
-  const { history, setHistory, expandedFieldId, setAutoKeyFieldIds, definition, setDefinition, setPreviewAttendees, setDirty, setNotice, setError, setTestIssues, dragging, setDragging, setExpandedFieldId, previewRef, closeModuleLibrary } = state;
+  const { history, setHistory, expandedFieldId, setAutoKeyFieldIds, definition, setDefinition, setPreviewAttendees, setDirty, setNotice, setError, setTestIssues, dragging, setDragging, setExpandedFieldId, previewRef, closeModuleLibrary, setLibraryRepairs } = state;
   const { totalFields, allFields } = derived;
   function replaceDefinition(next: RegistrationFormDefinition) {
     const pruned = pruneRequireAtLeastOne(next);
@@ -207,6 +207,10 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     else if (plan.kind === "inserted") {
       replaceDefinition({ ...definition, sections: plan.sections });
       setExpandedFieldId(plan.selectedFieldId);
+      if (plan.repairs.length > 0) {
+        setLibraryRepairs((current) => ({ ...current, ...Object.fromEntries(plan.repairs.map((repair) => [repair.fieldId, repair.message])) }));
+        setNotice(`${plan.repairs.length === 1 ? "1 question needs" : `${plan.repairs.length} questions need`} repair: a condition could not be carried over from the library. It is marked on the question.`);
+      }
     }
   }
 

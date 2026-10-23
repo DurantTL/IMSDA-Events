@@ -24,6 +24,7 @@ import {
   KeyRound,
   ListChecks,
   Bell,
+  BookmarkPlus,
 } from "lucide-react";
 
 /**
@@ -98,6 +99,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/forms", label: "All forms", description: "Every club, general and event form in one list.", icon: ListChecks },
       { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
       { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
+      { href: "/admin/question-library", label: "Question library", description: "Saved questions anyone building a form can add.", icon: BookmarkPlus },
       { href: "/admin/information-forms", label: "Information forms", description: "Surveys and interest forms that belong to no event.", icon: ClipboardPen },
     ],
   },
@@ -198,6 +200,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/forms(\/|$)/, "All forms"],
   [/^\/admin\/form-templates\/[^/]+(\/|$)/, "Form template"],
   [/^\/admin\/form-templates(\/|$)/, "Form templates"],
+  [/^\/admin\/question-library(\/|$)/, "Question library"],
   [/^\/admin\/information-forms\/[^/]+\/responses(\/|$)/, "Form responses"],
   [/^\/admin\/information-forms\/[^/]+(\/|$)/, "Information form"],
   [/^\/admin\/information-forms(\/|$)/, "Information forms"],
