@@ -182,6 +182,7 @@ function fakeDatabase() {
         return {};
       }),
     },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { create: vi.fn(async ({ data }: any) => { outbox.push(data); return { id: `msg-${outbox.length}` }; }) },
   };
   const prisma = { ...tx, $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };

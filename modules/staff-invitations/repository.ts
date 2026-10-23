@@ -3,6 +3,7 @@ import "server-only";
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { createHash, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
@@ -870,6 +871,15 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
         })),
       ],
     });
+    // The feed item (#1033) beside the office digest, in the same transaction: one per event per digest window.
+    if (staff.length > 0) {
+      await recordAlertFeedItem(tx, {
+        notificationKey: "STAFF_INVITATION_APPROVAL_DIGEST",
+        occurrenceKey: `staff-invitation-digest:${event.id}:${window}`,
+        summary: `${waitingCount} staff ${waitingCount === 1 ? "registration is" : "registrations are"} waiting for approval.`,
+        href: `/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`,
+      });
+    }
     return { confirmationCode, eventName: event.name };
   });
   await deliverAfterCommit(notices);

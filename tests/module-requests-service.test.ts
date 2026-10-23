@@ -94,6 +94,7 @@ function fakeDatabase(options: { products?: boolean } = {}) {
         return { ...row, event: { name: events.get(row.eventId)!.name }, requestedBy: row.requestedByUserId ? users.get(row.requestedByUserId) ?? null : null };
       }),
     },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { create: vi.fn(async ({ data }: any) => { outbox.push(data); return { id: `msg-${outbox.length}` }; }) },
     merchandiseProduct: options.products
       ? { groupBy: vi.fn(async () => [{ eventId: "event-general" }]) }

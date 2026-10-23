@@ -37,6 +37,7 @@ const client = {
   $executeRaw: mocks.executeRaw,
   clubFormLink: { updateMany: mocks.linkUpdateMany, findUnique: mocks.linkFindUnique },
   clubFormSubmission: { create: mocks.submissionCreate },
+  adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
   messageOutbox: { create: mocks.outboxCreate, findMany: mocks.outboxFindMany },
   organization: { findUnique: mocks.organizationFindUnique, findMany: vi.fn(async () => []) },
   clubRosterMember: { findFirst: mocks.rosterFindFirst },

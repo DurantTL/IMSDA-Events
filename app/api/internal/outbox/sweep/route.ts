@@ -7,6 +7,7 @@ import { refreshDueCalendarFeeds } from "@/modules/calendar/feeds";
 import { reconcileDeadlineReminders } from "@/modules/calendar/deadline-reminders";
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 import { pruneExpiredCommunityContent } from "@/modules/community/repository";
+import { pruneAlertFeed } from "@/modules/notifications/feed";
 import { sweepClassWaitlists } from "@/modules/honors/waitlist-repository";
 import { sendDueClassChangeEmails } from "@/modules/honors/class-change-emails";
 import { sendDueHonorWatchSummaries } from "@/modules/honors/watch-emails";
@@ -50,6 +51,12 @@ async function postHandler(request: Request) {
     });
     const communityRetention = await pruneExpiredCommunityContent().catch((error) => {
       logError("Community retention sweep failed after a successful outbox sweep", error);
+      return null;
+    });
+    // The administrator alert feed (#1033): items past 90 days are deleted (reads already hide them), with their read receipts.
+    // Emails and audit rows are untouched. Its failure must not make a successful sweep look failed.
+    const alertFeedRetention = await pruneAlertFeed().catch((error) => {
+      logError("The alert feed retention sweep failed after a successful outbox sweep", error);
       return null;
     });
     // The daily location waitlist digest to Area Coordinators and event staff
@@ -127,6 +134,7 @@ async function postHandler(request: Request) {
         cleared: alerts.cleared,
       },
       communityRetention,
+      alertFeedRetention,
       calendarFeeds,
       deadlineReminders,
       hostedLinks,

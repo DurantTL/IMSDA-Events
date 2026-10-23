@@ -52,6 +52,7 @@ function submitFixture(paused: boolean) {
     eventMessageTemplate: { findMany: vi.fn().mockResolvedValue([]) },
     event: { findUnique: vi.fn().mockResolvedValue({ supportContact: "office@example.test", paymentInstructionVersions: [] }) },
     registrationAttendee: { findMany: vi.fn().mockResolvedValue([{ id: "attendee-1" }]) },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { create, findMany: vi.fn().mockResolvedValue([]) },
     messageOutboxFile: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn().mockResolvedValue({ count: 0 }) },
     messageTemplateVersionFile: { findMany: vi.fn().mockResolvedValue([]) },
@@ -100,6 +101,7 @@ function transitionFixture(paused: boolean) {
     ...baseTx(paused),
     eventMessageTemplate: { findUnique: vi.fn().mockResolvedValue(null) },
     registration: { findFirst: vi.fn().mockResolvedValue(registrationRow()) },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { upsert },
   };
   return { tx, upsert };

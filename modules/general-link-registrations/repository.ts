@@ -3,6 +3,7 @@ import "server-only";
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -904,6 +905,16 @@ async function createPending(input: {
             })),
           ],
         });
+        // The feed item (#1033) beside the staff digest, in the same transaction: one per event per digest window, the
+        // same grain as the digest email. Counts and a link only.
+        if (staff.length > 0) {
+          await recordAlertFeedItem(tx, {
+            notificationKey: "GROUP_REGISTRATION_APPROVAL_DIGEST",
+            occurrenceKey: `general-link-digest:${input.event.id}:${window}`,
+            summary: `${waitingCount} ${waitingCount === 1 ? "team is" : "teams are"} waiting for approval.`,
+            href: `/people/pending-teams?event=${encodeURIComponent(input.event.id)}`,
+          });
+        }
         return { row: created, created: true };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: locationTransactionTimeoutMs });
       if (row.created) await sendAfterCommit(noticeIds);

@@ -105,6 +105,7 @@ function world() {
     honorEnrollment: {
       groupBy: vi.fn(async ({ where }: { where: { offeringId: { in: string[] } } }) => where.offeringId.in.map((offeringId) => ({ offeringId, _count: { _all: enrolled.get(offeringId) ?? 0 } }))),
     },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: {
       upsert: vi.fn(async ({ where, create }: { where: { idempotencyKey: string }; create: Row }) => {
         const existing = outbox.get(where.idempotencyKey);

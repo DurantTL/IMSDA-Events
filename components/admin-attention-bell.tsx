@@ -9,8 +9,10 @@ import {
   isSafeAttentionHref,
   type AttentionSummary,
 } from "@/modules/system-admin/attention-model";
+import type { AlertFeed } from "@/modules/notifications/feed-model";
 
 export const ATTENTION_ENDPOINT = "/api/admin/attention";
+export const ALERT_FEED_ENDPOINT = "/api/admin/alert-feed";
 const DIRECTORY_REVIEW_EVENT_LIMIT_LABEL = 10;
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -29,15 +31,21 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 export function AdminAttentionBell({
   defaultOpen = false,
   initial = null,
+  initialFeed = null,
 }: {
   /** Render the panel already open (used by render tests). */
   defaultOpen?: boolean;
   /** A summary to show before any read (used by render tests). */
   initial?: AttentionSummary | null;
+  /** The alert feed to show before any read (used by render tests). */
+  initialFeed?: AlertFeed | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [summary, setSummary] = useState<AttentionSummary | null>(initial);
   const [state, setState] = useState<LoadState>(initial ? "ready" : "idle");
+  const [feed, setFeed] = useState<AlertFeed | null>(initialFeed);
+  const [feedFailed, setFeedFailed] = useState(false);
+  const [feedBusy, setFeedBusy] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -58,11 +66,48 @@ export function AdminAttentionBell({
     }
   }, []);
 
+  /** The alert feed (#1033) is read beside the counts; its failure never hides them, nor theirs the feed. */
+  const loadFeed = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch(ALERT_FEED_ENDPOINT, { cache: "no-store", credentials: "same-origin", signal });
+      if (!response.ok) throw new Error("alert feed request failed");
+      const body = (await response.json()) as { feed?: AlertFeed };
+      if (!body.feed || typeof body.feed.unreadCount !== "number" || !Array.isArray(body.feed.items)) throw new Error("unexpected response");
+      setFeed(body.feed);
+      setFeedFailed(false);
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") return;
+      setFeedFailed(true);
+    }
+  }, []);
+
+  /** Marks one item, or everything up to the newest item shown, read. The server answers with the new feed. */
+  const changeFeed = useCallback(async (body: { action: "read"; id: string } | { action: "read-all"; cutoff?: string }) => {
+    setFeedBusy(true);
+    try {
+      const response = await fetch(ALERT_FEED_ENDPOINT, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error("alert feed update failed");
+      const parsed = (await response.json()) as { feed?: AlertFeed };
+      if (parsed.feed) setFeed(parsed.feed);
+      setFeedFailed(false);
+    } catch {
+      setFeedFailed(true);
+    } finally {
+      setFeedBusy(false);
+    }
+  }, []);
+
   // The first read waits until the browser is idle, so the badge never competes with the page itself.
   useEffect(() => {
     if (initial) return;
     const controller = new AbortController();
-    const start = () => { void load(controller.signal); };
+    const start = () => { void load(controller.signal); void loadFeed(controller.signal); };
     const idle = (window as unknown as { requestIdleCallback?: (callback: () => void) => number; cancelIdleCallback?: (id: number) => void });
     const handle = idle.requestIdleCallback ? idle.requestIdleCallback(start) : window.setTimeout(start, 300);
     return () => {
@@ -70,7 +115,7 @@ export function AdminAttentionBell({
       if (idle.requestIdleCallback) idle.cancelIdleCallback?.(handle);
       else window.clearTimeout(handle);
     };
-  }, [initial, load]);
+  }, [initial, load, loadFeed]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,10 +143,13 @@ export function AdminAttentionBell({
   function toggle() {
     const next = !open;
     setOpen(next);
-    if (next && !initial) void load();
+    if (next && !initial) { void load(); void loadFeed(); }
   }
 
-  const total = summary?.total ?? null;
+  // Unread alerts plus the live counts. Some records can appear in both, so this is a badge, not a count of unique records;
+  // the panel keeps the two lists apart.
+  const total = summary === null && feed === null ? null : (summary?.total ?? 0) + (feed?.unreadCount ?? 0);
+  const unreadItems = feed?.items.filter((item) => !item.read) ?? [];
 
   return (
     <div
@@ -151,6 +199,57 @@ export function AdminAttentionBell({
               </ul>
             </section>
           ))}
+          <section aria-label="Recent alerts" className="attention-group alert-feed">
+            <div className="alert-feed-head">
+              <h3>Recent alerts{feed && feed.unreadCount > 0 ? `, ${feed.unreadCount} unread` : ""}</h3>
+              {unreadItems.length > 0 && (
+                <button
+                  className="alert-feed-action"
+                  disabled={feedBusy}
+                  onClick={() => { void changeFeed({ action: "read-all", cutoff: feed?.items[0]?.occurredAt }); }}
+                  type="button"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+            {feedFailed && <p className="attention-note" role="status">Alerts could not be loaded. The rest of the page is unaffected.</p>}
+            {feed && feed.items.length === 0 && !feedFailed && <p role="status">No alerts in the last 90 days.</p>}
+            {feed && feed.items.length > 0 && (
+              <ul>
+                {feed.items.map((item) => (
+                  <li className="alert-feed-item" data-read={item.read ? "true" : "false"} key={item.id}>
+                    {item.href && isSafeAttentionHref(item.href)
+                      ? (
+                        <Link
+                          className="attention-item"
+                          href={item.href}
+                          onClick={() => { if (!item.read) void changeFeed({ action: "read", id: item.id }); setOpen(false); }}
+                        >
+                          <span><strong className="alert-feed-name">{item.alertName}</strong>{item.read ? "" : <span className="alert-feed-unread"> (unread)</span>}<br />{item.summary}</span>
+                        </Link>
+                      )
+                      : (
+                        <span className="attention-item">
+                          <span><strong className="alert-feed-name">{item.alertName}</strong>{item.read ? "" : <span className="alert-feed-unread"> (unread)</span>}<br />{item.summary}</span>
+                        </span>
+                      )}
+                    {!item.read && (
+                      <button
+                        aria-label={`Mark read: ${item.alertName}`}
+                        className="alert-feed-action"
+                        disabled={feedBusy}
+                        onClick={() => { void changeFeed({ action: "read", id: item.id }); }}
+                        type="button"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           {summary?.partial && <p className="attention-note">Some checks could not be read, so this list may be incomplete.</p>}
           {summary?.truncated && <p className="attention-note">Only the {DIRECTORY_REVIEW_EVENT_LIMIT_LABEL} most recent events were checked for directory review.</p>}
         </div>

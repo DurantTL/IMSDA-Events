@@ -61,6 +61,7 @@ function fixture(options: {
     eventLocation: { findMany: vi.fn().mockResolvedValue(options.locations ?? [{ id: "loc-a", coordinator: coordinator() }]) },
     eventMembership: { findMany: vi.fn().mockResolvedValue(options.memberships ?? [admin("user-1", "staff.admin@example.test", "Sam Admin")]) },
     event: { findMany: vi.fn().mockResolvedValue([{ id: "event-1", name: "Honors Weekend 2027" }]) },
+    adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: {
       findUnique: vi.fn(async ({ where }: { where: { idempotencyKey: string } }) => (options.existingKeys?.includes(where.idempotencyKey) ? { id: "existing" } : null)),
       create: vi.fn(async (args: { data: Record<string, unknown> }) => { created.push(args); return { id: `message-${created.length}` }; }),
@@ -121,6 +122,12 @@ describe("the daily location waitlist digest", () => {
     expect(String(coordinatorMail.bodyTextSnapshot)).toContain("Joined the waitlist: River City Pathfinders (12 people, place #1 in line)");
     expect(byEmail.get("staff.admin@example.test")).toMatchObject({ accountUserId: "user-1", accountAttendeeId: null });
     expect(tx.locationWaitlistChange.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["change-1"] }, digestedAt: null }, data: { digestedAt: MORNING } });
+    // One feed item (#1033) for the day's digest, in the same transaction however many recipients, with no names in it.
+    expect(tx.adminAlertFeedItem.createMany).toHaveBeenCalledTimes(1);
+    const feed = (tx.adminAlertFeedItem.createMany.mock.calls[0] as unknown as [{ data: Array<{ notificationKey: string; occurrenceKey: string; summary: string }> }])[0].data[0]!;
+    expect(feed).toMatchObject({ notificationKey: "LOCATION_WAITLIST_DIGEST", occurrenceKey: "location-waitlist-digest:2026-10-06" });
+    expect(feed.summary).not.toContain("River City");
+    expect(feed.summary).not.toContain("Pat");
   });
 
   it("gives a revoked coordinator nothing, and an expired one nothing", async () => {

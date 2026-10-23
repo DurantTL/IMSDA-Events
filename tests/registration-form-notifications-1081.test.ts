@@ -226,6 +226,7 @@ describe("queued held inside the submission's transaction (#1081)", () => {
     const created: Array<Record<string, unknown>> = [];
     const tx = {
       registrationFormNotification: { findMany: vi.fn().mockResolvedValue(rows) },
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: {
         findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -339,6 +340,7 @@ describe("the PDFs are made after the commit and a failure never fails the regis
           return { id: `attachment-${attachments.length}` };
         }),
       },
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: outbox,
       registrationNotificationDelivery: deliveries,
       registrationPdfDocument: { findFirst: mocks.latestDocument },
@@ -412,6 +414,7 @@ describe("re-send on a later change (#1081)", () => {
     const created: Array<Record<string, unknown>> = [];
     const deliveries = { upsert: vi.fn().mockResolvedValue({}) };
     const tx = {
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: {
         findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -433,6 +436,7 @@ describe("re-send on a later change (#1081)", () => {
         }),
       },
       messageAttachment: { create: vi.fn(async () => ({ id: "attachment-1" })) },
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: { findMany: vi.fn().mockResolvedValue([]) },
       organization: organizationLookup(),
       registrationNotificationDelivery: deliveries,
@@ -566,6 +570,7 @@ describe("review fixes (#1081)", () => {
     const created: Array<Record<string, unknown>> = [];
     const deliveries = { upsert: vi.fn().mockResolvedValue({}) };
     const tx = {
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: {
         findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -578,6 +583,7 @@ describe("review fixes (#1081)", () => {
       registrationFormNotification: { findMany: vi.fn().mockResolvedValue(rows) },
       registration: { findFirst: vi.fn().mockResolvedValue({ status: "CONFIRMED", locationId: null, submittedAt: new Date("2027-02-01T00:00:00Z"), location: null, publicFormSubmission: { formVersion: { formId: "form-1" } } }) },
       messageAttachment: { create: vi.fn(async () => ({ id: "stored-attachment" })) },
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: { findMany: vi.fn().mockResolvedValue(Array.from({ length: existingKeys }, (_, index) => ({ id: `old-${index}` }))) },
       registrationNotificationDelivery: deliveries,
       registrationPdfDocument: { findFirst: mocks.latestDocument },
@@ -599,6 +605,7 @@ describe("review fixes (#1081)", () => {
     ];
     const tx = {
       registrationFormNotification: { findMany: vi.fn().mockResolvedValue(rows) },
+      adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
       messageOutbox: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: `m-${String(data.recipientEmail)}`, status: "PENDING" })) },
     };
     const submitted = await queueFormNotificationsForSubmission(tx as never, {

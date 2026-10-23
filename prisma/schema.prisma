@@ -819,6 +819,7 @@ model User {
   createdPaymentInstructionVersions EventPaymentInstructionVersion[] @relation("PaymentInstructionVersionApprovedBy")
   platformSettingsUpdates   PlatformSettings[]        @relation("PlatformSettingsUpdatedBy")
   notificationSettingUpdates NotificationSetting[]    @relation("NotificationSettingUpdatedBy")
+  adminAlertFeedReceipts     AdminAlertFeedReceipt[]
   uploadedEventAssets       EventAsset[]              @relation("EventAssetUploadedBy")
   uploadedMessageFiles      MessageFile[]             @relation("MessageFileUploadedBy")
   appliedProgramAssignments ProgramAssignmentRun[]    @relation("ProgramAssignmentAppliedBy")
@@ -1567,6 +1568,38 @@ model NotificationSetting {
   updatedAt       DateTime @updatedAt
 
   updatedBy User? @relation("NotificationSettingUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+}
+
+/// One alert occurrence in the system administrator feed (#1033). Written in the same transaction as the alert's
+/// outbox email, never carries answers, medical or payment details, and is dropped from the feed after 90 days.
+model AdminAlertFeedItem {
+  id              String   @id @default(cuid())
+  /// A `notificationKeys` value from the #1016 catalog.
+  notificationKey String
+  /// One value per alert occurrence (retries and extra recipients share it), so a rewrite is a no-op.
+  occurrenceKey   String   @unique
+  /// A short neutral label, never free text from a person.
+  summary         String
+  /// An internal same-site path, or null when there is nothing to open.
+  href            String?
+  occurredAt      DateTime @default(now())
+
+  receipts AdminAlertFeedReceipt[]
+
+  @@index([occurredAt])
+}
+
+/// One administrator has read one feed item. A missing row means unread.
+model AdminAlertFeedReceipt {
+  itemId String
+  userId String
+  readAt DateTime @default(now())
+
+  item AdminAlertFeedItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, userId])
+  @@index([userId])
 }
 
 model Event {

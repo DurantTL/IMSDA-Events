@@ -7,6 +7,7 @@ import { escapeMarkdown, plainTextFromEscapedMarkdown, renderEmailBodyHtml } fro
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { registrationPdfHoldUntil } from "@/modules/registration-pdf/hold";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import {
   CLUB_CONDITION_KEY,
@@ -138,6 +139,18 @@ export async function queueNotificationMessages(tx: Prisma.TransactionClient, in
     });
     messageIds.push(message.id);
     if (message.status === "PENDING") pendingMessageIds.push(message.id);
+  }
+  // The feed item (#1033) beside the emails, in the same transaction: one per notification, registration and change,
+  // however many addresses it goes to. Not for a paused event (nothing can leave). No names, no answers.
+  if (created > 0 && !suppressed) {
+    await recordAlertFeedItem(tx, {
+      notificationKey: "REGISTRATION_FORM_NOTIFICATIONS",
+      occurrenceKey: `registration-form-notification:${input.notification.id}:${input.registrationId}:${input.keyScope}`,
+      summary: input.keyScope === "initial"
+        ? "A registration form notification was sent for a new registration."
+        : "A registration form notification was sent for a changed registration.",
+      href: `/people?event=${encodeURIComponent(input.eventId)}`,
+    });
   }
   return { messageIds, pendingMessageIds, suppressed, created };
 }

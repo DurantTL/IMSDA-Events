@@ -9,6 +9,7 @@ import {
 } from "@/modules/communications/effective-delivery";
 import { withPlainLeadNote } from "@/modules/communications/email-html";
 import { MessagingError } from "@/modules/communications/messaging-error";
+import { recordAlertFeedItem } from "@/modules/notifications/feed";
 
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -3705,6 +3706,16 @@ export async function enqueuePublicRegistrationMessages(
     messageIds.push(message.id);
     if (recipient.kind === "REGISTRANT") registrantMessageIds.push(message.id);
     if (!suppressed) pendingMessageIds.push(message.id);
+    // The feed item (#1033) beside the staff copy, in the same transaction: one per registration however many addresses
+    // the staff list holds. Not when the copy is suppressed (nothing can leave). A link only: no name, answer or amount.
+    if (recipient.kind === "INTERNAL" && !suppressed) {
+      await recordAlertFeedItem(tx, {
+        notificationKey: "NEW_REGISTRATION_STAFF_COPY",
+        occurrenceKey: `new-registration:${input.registration.id}`,
+        summary: "A new public registration was submitted.",
+        href: `/people?event=${encodeURIComponent(input.event.id)}`,
+      });
+    }
   }
   await linkQueuedMessageFiles(tx, { eventId: input.event.id, messageIds });
   return {
