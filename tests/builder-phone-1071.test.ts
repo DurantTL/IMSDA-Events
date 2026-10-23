@@ -230,7 +230,8 @@ describe("the phone builder wiring (#1071)", () => {
     expect(shell).toContain("{!phone && <BuilderSaveDraftButton");
     expect(shell).toContain('"fb-btn outline" : "fb-btn primary"');
     expect(shell).toContain('<BuilderPublishButton className="fb-btn primary" />');
-    expect(css).toMatch(/\.fb-phone-bar \{ position: sticky; bottom: calc\(var\(--fb-keyboard-inset, 0px\) \+ 8px\)/);
+    expect(css).toContain('.fb-phone-bar[data-engaged], .fb-phone-bar[data-keyboard="open"] { position: sticky; }');
+    expect(css).toMatch(/\.fb-phone-bar \{ position: static; bottom: calc\(var\(--fb-keyboard-inset, 0px\) \+ 8px\)/);
     expect(css).toContain("body:has(.mobile-nav) .fb-phone-bar { bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 8px); }");
   });
 

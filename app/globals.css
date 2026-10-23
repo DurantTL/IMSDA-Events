@@ -12781,7 +12781,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .fb-shell[data-inspector="open"] .fb-inspector-actions .fb-tool { flex: 1 1 calc(50% - 6px); min-height: 48px; }
   .fb-shell[data-inspector="open"] .fb-palette-grip { display: none; }
   /* Save draft and Preview stay on screen: above the phone tab bar and the safe area, and above the keyboard when it is open. */
-  .fb-phone-bar { position: sticky; bottom: calc(var(--fb-keyboard-inset, 0px) + 8px); z-index: 30; display: grid; gap: 8px; margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: 0 -6px 18px rgba(18, 38, 63, 0.12); padding: 10px; }
+  .fb-phone-bar { position: static; bottom: calc(var(--fb-keyboard-inset, 0px) + 8px); z-index: 30; display: grid; gap: 8px; margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: 0 -6px 18px rgba(18, 38, 63, 0.12); padding: 10px; }
+  .fb-phone-bar[data-engaged], .fb-phone-bar[data-keyboard="open"] { position: sticky; }
   body:has(.mobile-nav) .fb-phone-bar { bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 8px); }
   body:has(.mobile-nav) .fb-phone-bar[data-keyboard="open"] { bottom: calc(var(--fb-keyboard-inset, 0px) + 8px); }
   .fb-phone-bar-notices { display: grid; gap: 6px; max-height: 30dvh; overflow: auto; }
@@ -12791,6 +12792,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .fb-phone-bar-actions .fb-btn { flex: 1 1 0; min-height: 48px; }
   html:has(.fb-phone-bar) { scroll-padding-bottom: calc(var(--fb-phone-bar-height, 120px) + 24px); }
   .fb-phone-bar[data-keyboard="open"] .fb-phone-bar-notices { max-height: 4.5rem; overflow: auto; }
+  .fb-shell .preview-step-progress button { min-height: var(--touch-target, 44px); }
   .fb-phone-step .section-actions button { min-height: 48px; min-width: 48px; }
   .fb-phone-step .section-actions .drag-handle { display: none; }
   /* Until the page knows it is on a phone (the first paint), mask the desktop canvas and top-bar buttons so they do not flash. */

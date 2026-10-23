@@ -465,8 +465,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
         {layout.sidebarVisible
           ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} asideRef={asideRef} modal={sheetActive} inspector={{ title: tab === "form-settings" ? "Form settings" : tab === "questions" ? "Add a question" : selection ? selection.field.label || "Untitled question" : "Question settings", onBack: closeInspector, onDone: closeInspector, doneLabel: tab === "questions" ? "Close" : "Done", hideBack: tab === "questions", note: tab === "questions" ? undefined : "Done keeps your changes in this draft. They are saved with Save draft.", notices: phone && inspectorOpen ? phoneNotices : undefined }} />
           : <div className="fb-rail"><button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{sidebarSide === "left" ? <PanelLeft size={15} aria-hidden="true" /> : <PanelRight size={15} aria-hidden="true" />} Show sidebar</button><button className="fb-btn" type="button" onClick={() => addToStep(targetIndex)}><Plus size={15} aria-hidden="true" /> Add question</button></div>}
-      </div>
-      {/* Phone width (#1071): Save draft and Preview stay at the bottom, above the keyboard and the safe area. Save is the one filled button unless Publish is showing (it is in the top bar). */}
+        {/* Phone width (#1071): Save draft and Preview stay at the bottom, above the keyboard and the safe area. Inside the body so it only sticks while the builder is on screen, never over the page above it. Save is the one filled button unless Publish is showing (it is in the top bar). */}
       {phone && (
         <div className="fb-phone-bar" ref={phoneBarRef} role="group" aria-label="Draft actions">
           {!inspectorOpen && <div className="fb-phone-bar-notices">{phoneNotices}</div>}
@@ -476,6 +475,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           </div>
         </div>
       )}
+      </div>
       {phone && moveFieldId && <PhoneMoveSheet fieldId={moveFieldId} onClose={() => setMoveFieldId(null)} onMoved={setPhoneStepId} />}
     </div>
   );
