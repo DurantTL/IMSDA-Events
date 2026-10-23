@@ -37,7 +37,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
     setSeenDirty(dirty);
     if (!dirty) setAutoKeyFieldIds(new Set());
   }
-  const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | "draft-template" | "dismiss-notice" | "save-template" | null>(null);
+  const [busy, setBusy] = useState<"create" | "save" | "test" | "publish" | "unpublish" | "slug" | "draft-template" | "dismiss-notice" | "save-template" | "restore" | null>(null);
   const [notice, setNotice] = useState("");
   // Fields the builder just turned into a choice field that defaulted to radio cards (FB-9).
   const [autoRadioFieldIds, setAutoRadioFieldIds] = useState<ReadonlySet<string>>(() => new Set());

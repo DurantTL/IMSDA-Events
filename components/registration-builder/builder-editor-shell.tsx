@@ -281,8 +281,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
       label: "History",
       panel: (
         <div className="fb-history">
-          <p className="fb-hint">Every saved version of this form, read-only. Choose one to view it. Restoring an old version comes later.</p>
-          <BuilderVersionHistory />
+          <p className="fb-hint">Every saved version of this form. Choose one to view it read-only. Restore as draft copies an older version into the draft; the live version stays live until you publish.</p>
+          <BuilderVersionHistory detailed />
         </div>
       ),
     },

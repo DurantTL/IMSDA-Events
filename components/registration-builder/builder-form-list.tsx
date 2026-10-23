@@ -1,14 +1,31 @@
 // Event forms and version history: the form switcher beside the editor.
-import { ChevronRight, FileClock } from "lucide-react";
+import { ChevronRight, FileClock, RotateCcw } from "lucide-react";
+import { canRestoreVersion, versionStateLabel, versionWhoWhen } from "./version-history";
 import { statusLabel } from "./builder-types";
 import { useBuilder } from "./builder-context";
 
-// The read-only list of a form's versions. The editor shell's History tab (#1132) shows the same list;
-// restoring a version is #1069.
-export function BuilderVersionHistory() {
-  const { selectedForm, selectedVersion, chooseVersion } = useBuilder();
+// A form's versions. The editor shell's History tab (#1132, #1140) shows who and when for each and offers Restore as
+// draft; the form switcher's list stays the compact read-only one.
+export function BuilderVersionHistory({ detailed = false }: { detailed?: boolean }) {
+  const { selectedForm, selectedVersion, chooseVersion, restoreVersion, busy } = useBuilder();
   if (!selectedForm) return null;
-  return <div className="version-history"><p className="eyebrow">Version history</p>{selectedForm.versions.map((version) => <button aria-pressed={version.id === selectedVersion?.id} className={version.id === selectedVersion?.id ? "selected" : ""} type="button" key={version.id} onClick={() => chooseVersion(version)}><FileClock size={15} /><span><strong>Version {version.versionNumber}</strong><small>{statusLabel(version.status)} · {version.testSubmissionCount} tests</small></span></button>)}</div>;
+  const versions = selectedForm.versions;
+  if (!detailed) {
+    return <div className="version-history"><p className="eyebrow">Version history</p>{versions.map((version) => <button aria-pressed={version.id === selectedVersion?.id} className={version.id === selectedVersion?.id ? "selected" : ""} type="button" key={version.id} onClick={() => chooseVersion(version)}><FileClock size={15} /><span><strong>Version {version.versionNumber}</strong><small>{statusLabel(version.status)} · {version.testSubmissionCount} tests</small></span></button>)}</div>;
+  }
+  return (
+    <div className="version-history version-history-detailed"><p className="eyebrow">Version history</p>
+      <ul className="version-history-list">{versions.map((version) => (
+        <li className="version-history-row" key={version.id}>
+          <button aria-pressed={version.id === selectedVersion?.id} className={version.id === selectedVersion?.id ? "selected" : ""} type="button" onClick={() => chooseVersion(version)}>
+            <FileClock size={15} />
+            <span><strong>Version {version.versionNumber} · {versionStateLabel(version, versions)}</strong><small>{versionWhoWhen(version)}</small><small>{version.testSubmissionCount} tests</small></span>
+          </button>
+          {canRestoreVersion(version) && <button className="version-restore" type="button" disabled={busy !== null} onClick={() => restoreVersion(version)}><RotateCcw size={14} /> Restore version {version.versionNumber} as draft</button>}
+        </li>
+      ))}</ul>
+    </div>
+  );
 }
 
 export function BuilderFormList() {

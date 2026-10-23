@@ -7,6 +7,7 @@ import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
 import { runPublishFlow } from "./publish-flow";
+import { canRestoreVersion, restoreConfirmation, restoreNotice, restoreSaveTarget } from "./version-history";
 import type { useConfirm } from "@/components/use-confirm";
 import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
@@ -219,5 +220,34 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     const nextDefinition = structuredClone(version.definition);
     setSelectedVersionId(version.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
   }
-  return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion };
+
+  // Restore as draft (#1140): the old version's definition goes through the same draft save as an edit, so validation,
+  // price sync, policy checks, MANAGE_FORMS and the expectedUpdatedAt stale-save rule are the server's, unchanged.
+  async function restoreVersion(version: FormVersionView) {
+    if (!selectedForm || !canRestoreVersion(version)) return;
+    const { draft, expectedUpdatedAt } = restoreSaveTarget(selectedForm.versions);
+    if (!expectedUpdatedAt) return;
+    const confirmation = restoreConfirmation({ versionNumber: version.versionNumber, draftVersionNumber: draft?.versionNumber ?? null, unsavedEdits: dirty });
+    if (confirmation && !(await askConfirm({
+      title: confirmation.title,
+      body: <>{confirmation.lines.map((line) => <p key={line}>{line}</p>)}</>,
+      confirmLabel: confirmation.confirmLabel,
+      cancelLabel: "Keep as it is",
+      destructive: true,
+    }))) return;
+    setBusy("restore"); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/events/${eventId}/forms/${selectedForm.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ definition: withExplicitSensitiveFlags(version.definition), expectedUpdatedAt }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message ?? "Unable to restore this version.");
+      syncForm(result.form, restoreNotice(version.versionNumber));
+      // Focus follows the draft's chip once the new draft has rendered.
+      setTimeout(() => document.getElementById("fb-version-chip-draft")?.focus(), 0);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to restore this version."); }
+    finally { setBusy(null); }
+  }
+  return { createFromTemplate, updateDraftFromTemplate, dismissTemplateNotice, refreshTemplates, saveDraft, runTest, beginPublish, keepSlug, updateSlug, publish, unpublish, chooseForm, chooseVersion, restoreVersion };
 }

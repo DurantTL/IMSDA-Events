@@ -58,7 +58,7 @@ export function BuilderVersionChips() {
     <span className="fb-version-chips" role="group" aria-label="Version state">
       {chips.map((chip) => chip.kind === "unsaved"
         ? <span className="unsaved-dot fb-version-chip" key={chip.kind}>{chip.text}</span>
-        : <span className={`status-chip fb-version-chip ${versionChipTone[chip.kind]}`} key={chip.kind}>{chip.text}</span>)}
+        : <span className={`status-chip fb-version-chip ${versionChipTone[chip.kind]}`} key={chip.kind} id={chip.kind === "draft" ? "fb-version-chip-draft" : undefined} tabIndex={chip.kind === "draft" ? -1 : undefined}>{chip.text}</span>)}
     </span>
   );
 }
