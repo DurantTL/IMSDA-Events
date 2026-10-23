@@ -12,7 +12,7 @@ import { TemplateCleanupChecklistPanel } from "@/components/template-cleanup-che
 import { PUBLIC_DRAFT_STAFF_HELP } from "@/modules/forms/public-draft";
 import { statusLabel } from "./builder-types";
 import { useLoadedBuilder } from "./builder-context";
-import { BuilderActionHints, BuilderHistoricalGate, BuilderPublicLink, BuilderPublishButton, BuilderSaveDraftButton } from "./builder-top-bar";
+import { showsPublishButton, BuilderActionHints, BuilderHistoricalGate, BuilderPublicLink, BuilderPublishButton, BuilderSaveDraftButton } from "./builder-top-bar";
 import { BuilderNotices } from "./builder-notices";
 import { BuilderTemplateNotice } from "./builder-template-notice";
 import { BuilderRosterSettings, BuilderConfirmationEditor } from "./builder-form-settings";
@@ -79,7 +79,7 @@ function dialogIsOpen() {
  */
 export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
-    eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, canEditNotifications,
+    eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications,
     expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
   const layoutControls = useEditorLayout();
@@ -267,7 +267,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
         <span className={`status-chip fb-version-chip ${status === "PUBLISHED" ? "green" : status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(status)} · version {selectedVersion.versionNumber}</span>
         {dirty && <span className="unsaved-dot">Unsaved changes</span>}
         <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview &amp; test</button>
-        <BuilderSaveDraftButton className="fb-btn outline" />
+        {/* Publish is the main button; with no Publish (a clean live or withdrawn version) Save is (#1137). */}
+        <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />
         <BuilderPublishButton className="fb-btn primary" />
         <button
           ref={menuButtonRef}

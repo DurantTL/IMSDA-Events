@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { publishBlockedReasonFor } from "@/components/registration-builder/use-builder-derived";
+import { showsPublishButton } from "@/components/registration-builder/builder-top-bar";
 import { runPublishFlow } from "@/components/registration-builder/publish-flow";
 import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 
@@ -57,12 +58,19 @@ describe("one-click publish (#1137)", () => {
     expect(result).toMatchObject({ ok: false, stage: "publish", message: "Publish refused.", savedForm: form(2) });
   });
 
+  it("shows Publish for a draft, and for a dirty live version only", () => {
+    expect(showsPublishButton({ status: "DRAFT", canEdit: true, editsCreateDraft: false, dirty: false })).toBe(true);
+    expect(showsPublishButton({ status: "PUBLISHED", canEdit: true, editsCreateDraft: true, dirty: true })).toBe(true);
+    expect(showsPublishButton({ status: "PUBLISHED", canEdit: true, editsCreateDraft: true, dirty: false })).toBe(false);
+    expect(showsPublishButton({ status: "SUPERSEDED", canEdit: false, editsCreateDraft: true, dirty: true })).toBe(false);
+  });
+
   it("wires the shell, button, hint and dialog to the new rules", () => {
     const shell = read("components/registration-builder/builder-editor-shell.tsx");
     expect(shell).toContain('<BuilderPublishButton className="fb-btn primary" />');
-    expect(shell).toContain('<BuilderSaveDraftButton className="fb-btn outline" />');
+    expect(shell).toContain('"fb-btn outline" : "fb-btn primary"');
     const bar = read("components/registration-builder/builder-top-bar.tsx");
-    expect(bar).toContain("Publish changes");
+    expect(bar).toContain("dirty && hasEverPublished ? \"Publish changes\"");
     expect(bar).toContain("canEdit && editsCreateDraft && dirty");
     expect(bar).toContain('dirty && !hasEverPublished && <p className="builder-gate">');
     expect(read("components/registration-builder/builder-dialogs.tsx")).toContain("Your unsaved changes will be saved");

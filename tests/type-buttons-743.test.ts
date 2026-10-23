@@ -499,7 +499,7 @@ describe("one filled primary per screen (#743)", () => {
     expect(markup.slice(zone)).toContain("Withdraw from public page");
     expect(markup.slice(zone)).toContain(`Withdraw ${definition.title}`);
     expect(markup.slice(0, zone)).not.toContain("Withdraw from public page");
-    // A clean live version has no Publish button (#1137), so nothing is filled.
-    expect(filledPrimaries(markup)).toHaveLength(0);
+    // A clean live version has no Publish button (#1137), so Save is the filled one.
+    expect(filledPrimaries(markup)).toHaveLength(1);
   });
 });

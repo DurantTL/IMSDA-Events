@@ -2,6 +2,7 @@
 // from a template, save, test, publish, withdraw, slug sync, and switching form
 // or version. The save order and the messages are unchanged from the original
 // single-file builder.
+import { useRef } from "react";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
@@ -164,8 +165,12 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     finally { setBusy(null); }
   }
 
+  const publishingRef = useRef(false);
+
   async function publish() {
     if (!selectedForm || !selectedVersion || !definition) return;
+    if (publishingRef.current) return;
+    publishingRef.current = true;
     const saveFirst = dirty;
     setBusy("publish"); setError(""); setNotice(""); setConfirmingPublish(false);
     try {
@@ -176,7 +181,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
         if (result.savedForm) syncForm(result.savedForm);
         setError(result.savedForm ? `Your changes are saved as a draft but not published. ${result.message}` : result.message);
       }
-    } finally { setBusy(null); }
+    } finally { publishingRef.current = false; setBusy(null); }
   }
 
   async function unpublish() {

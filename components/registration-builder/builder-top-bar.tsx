@@ -29,10 +29,14 @@ export function BuilderPublicLink({ className = "secondary-button" }: { classNam
  * (#1137): Publish then saves the edits, which creates the new draft, and
  * publishes it. Historical versions never show it.
  */
+export function showsPublishButton({ status, canEdit, editsCreateDraft, dirty }: { status: string; canEdit: boolean; editsCreateDraft: boolean; dirty: boolean }) {
+  return status === "DRAFT" || (canEdit && editsCreateDraft && dirty);
+}
+
 export function BuilderPublishButton({ className = "primary-button" }: { className?: string }) {
-  const { selectedVersion, busy, dirty, editsCreateDraft, canEdit, publishBlockedReason, beginPublish } = useLoadedBuilder();
-  if (selectedVersion.status !== "DRAFT" && !(canEdit && editsCreateDraft && dirty)) return null;
-  return <button className={className} type="button" disabled={Boolean(publishBlockedReason) || busy !== null} aria-describedby="builder-action-hints" title={publishBlockedReason || undefined} onClick={beginPublish}><Send size={15} /> {busy === "publish" ? "Publishing…" : dirty ? "Publish changes" : "Publish version"}</button>;
+  const { selectedVersion, busy, dirty, editsCreateDraft, canEdit, hasEverPublished, publishBlockedReason, beginPublish } = useLoadedBuilder();
+  if (!showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty })) return null;
+  return <button className={className} type="button" disabled={Boolean(publishBlockedReason) || busy !== null} aria-describedby="builder-action-hints" title={publishBlockedReason || undefined} onClick={beginPublish}><Send size={15} /> {busy === "publish" ? "Publishing…" : dirty && hasEverPublished ? "Publish changes" : "Publish version"}</button>;
 }
 
 /** Why Save or Publish is unavailable, and what a live version means for edits. Both layouts point `aria-describedby` at it. */
