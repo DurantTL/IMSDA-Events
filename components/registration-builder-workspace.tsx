@@ -26,6 +26,7 @@ import { BuilderTemplateNotice } from "@/components/registration-builder/builder
 import { BuilderFormList } from "@/components/registration-builder/builder-form-list";
 import { BuilderRosterSettings, BuilderConfirmationEditor } from "@/components/registration-builder/builder-form-settings";
 import { BuilderPaymentSettings } from "@/components/registration-builder/builder-payment-settings";
+import { BuilderInformationSettings } from "@/components/registration-builder/builder-information-settings";
 import { BuilderSectionCard } from "@/components/registration-builder/builder-section-card";
 import { BuilderPreview } from "@/components/registration-builder/builder-preview";
 import { BuilderDialogs } from "@/components/registration-builder/builder-dialogs";
@@ -38,7 +39,7 @@ import { useEditorShellViewport } from "@/components/registration-builder/use-ed
 export function RegistrationBuilderWorkspace(props: BuilderWorkspaceProps) {
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const model = useBuilderModel(props, askConfirm);
-  const { forms, selectedForm, selectedVersion, definition, showTemplates, setShowTemplates, canEdit, addSection, eventId, canEditNotifications } = model;
+  const { forms, selectedForm, selectedVersion, definition, showTemplates, setShowTemplates, canEdit, addSection, eventId, canEditNotifications, information } = model;
   const shellViewport = useEditorShellViewport();
   const formOpen = Boolean(selectedForm && selectedVersion && definition);
   const showShell = shellViewport && formOpen && props.layout !== "classic";
@@ -53,15 +54,16 @@ export function RegistrationBuilderWorkspace(props: BuilderWorkspaceProps) {
       {selectedForm && selectedVersion && definition && <>
         <div className="builder-canvas"><BuilderEditorHead />
         <BuilderTemplateNotice />
-        {canEdit && <TemplateCleanupChecklistPanel key={selectedForm.id} formId={selectedForm.id} definition={definition} />}
-        <BuilderRosterSettings />
-        <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>
+        {canEdit && !information && <TemplateCleanupChecklistPanel key={selectedForm.id} formId={selectedForm.id} definition={definition} />}
+        {!information && <BuilderRosterSettings />}
+        {!information && <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>}
         {definition.sections.map((section, sectionIndex) => <BuilderSectionCard key={section.id} section={section} sectionIndex={sectionIndex} />)}
         {canEdit && <button className="add-section-button" type="button" onClick={addSection}><Plus size={17} /> Add another section</button>}
-        <BuilderPaymentSettings />
-        {canEditNotifications && selectedForm && <RegistrationFormNotificationsPanel key={selectedForm.id} eventId={eventId} formId={selectedForm.id} />}
+        {!information && <BuilderPaymentSettings />}
+        {information && <BuilderInformationSettings />}
+        {canEditNotifications && !information && selectedForm && <RegistrationFormNotificationsPanel key={selectedForm.id} eventId={eventId} formId={selectedForm.id} />}
         <BuilderConfirmationEditor />
-        <BuilderWithdrawZone />
+        {!information && <BuilderWithdrawZone />}
         </div>
         <BuilderPreview />
       </>}

@@ -200,6 +200,9 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/lodging", "prefix", staffPageTitles.lodging],
   ["/more/issued-assets", "prefix", staffPageTitles.issuedAssets],
   ["/communications/scheduled", "prefix", staffPageTitles.scheduledEmails],
+  // An event's information forms (#1149) sit in the event workspace but are not a nav item: the registration builder and More reach them.
+  ["/information-forms/responses", "prefix", "Information form responses"],
+  ["/information-forms", "prefix", "Information forms"],
   ["/more/program-assignments/", "under", staffPageTitles.assignmentRoster],
   ["/more/program-assignments", "exact", staffPageTitles.programAssignments],
 ];

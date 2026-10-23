@@ -43,6 +43,12 @@ export type PaletteEntry = {
   /** Extra words the search matches, e.g. "e-mail", "phone number". */
   keywords: readonly string[];
   add: (context: PaletteInsertContext) => PaletteInsert;
+  /**
+   * Whether the entry may be used in an information form (#1149). Leave it out and the entry is tried against the
+   * information-form refusal check (information-palette.ts), so a new module is allowed or hidden by what it adds, not
+   * by a list. Set it only to override that.
+   */
+  informationForm?: boolean;
 };
 
 export type PaletteGroup = {
@@ -264,12 +270,12 @@ function directoryEntry(spec: typeof directorySpecs[number]): PaletteEntry {
 const moneyFieldEntries: PaletteEntry[] = [
   {
     id: "money:priced-checkbox", label: "Paid add-on", description: "A checkbox that adds a price when ticked", group: PALETTE_GROUP_IDS.money, icon: DollarSign,
-    keywords: ["price", "fee", "extra", "optional", "charge"],
+    keywords: ["price", "fee", "extra", "optional", "charge"], informationForm: false,
     add: (context) => ({ fields: [baseField(context, "Paid add-on", "CHECKBOX", { placeholder: "Yes, add this" })] }),
   },
   {
     id: "money:priced-quantity", label: "Priced quantity", description: "A number multiplied by a price", group: PALETTE_GROUP_IDS.money, icon: Tag,
-    keywords: ["price per item", "tickets", "quantity", "count", "cost"],
+    keywords: ["price per item", "tickets", "quantity", "count", "cost"], informationForm: false,
     add: (context) => ({ fields: [baseField(context, "Quantity", "NUMBER")] }),
   },
 ];

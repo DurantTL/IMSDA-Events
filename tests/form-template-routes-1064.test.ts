@@ -180,7 +180,7 @@ describe("form template pages", () => {
     expect(hrefs).toContain("/admin/form-templates");
     const forms = systemNavGroups.find((group) => group.key === "system-forms")!;
     expect(forms.label).toBe("Forms");
-    expect(forms.items.map((item) => item.href)).toEqual(["/admin/club-forms", "/admin/form-templates"]);
+    expect(forms.items.map((item) => item.href)).toEqual(["/admin/club-forms", "/admin/form-templates", "/admin/information-forms"]);
     expect(systemNavGroups.map((group) => group.key).slice(-2)).toEqual(["system-forms", "system-catalogs"]);
   });
 });

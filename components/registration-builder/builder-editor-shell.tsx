@@ -4,7 +4,7 @@
 // resized. It is a layout over the existing builder model (BuilderContext):
 // every edit and action it triggers is one the builder already had.
 // Phones keep the older layout (see registration-builder-workspace.tsx).
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import { ChevronLeft, Eye, EllipsisVertical, PanelLeft, PanelRight, Plus } from "lucide-react";
 import { RegistrationFormNotificationsPanel } from "@/components/registration-form-notifications-panel";
@@ -30,8 +30,10 @@ import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSideba
 import { canRedo, canUndo } from "./edit-history";
 import { focusTargetAction, isSearchShortcut, undoRedoShortcut } from "./shell-keys";
 import { useEditorLayout, useHydrated } from "./use-editor-layout";
-import type { PaletteEntry, PaletteRegistry } from "./palette-registry";
-
+import { paletteRegistry, type PaletteEntry, type PaletteRegistry } from "./palette-registry";
+import { filterPaletteRegistry } from "./information-palette";
+import { informationListHref, informationResponsesHref } from "./information-mode";
+import { BuilderInformationSettings } from "./builder-information-settings";
 type FocusRequest =
   | { kind: "label" }
   | { kind: "search" }
@@ -91,9 +93,12 @@ function dialogIsOpen() {
  */
 export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
-    eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications,
+    eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications: canEditRegistrationNotifications, information,
     busy, history, undoEdit, redoEdit, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
+  // Information mode (#1149): no registration notifications, and the palette lists only what the information-form check allows.
+  const canEditNotifications = canEditRegistrationNotifications && !information;
+  const paletteSource = useMemo(() => information ? filterPaletteRegistry(registry ?? paletteRegistry) : registry, [information, registry]);
   const layoutControls = useEditorLayout();
   const hydrated = useHydrated();
   const { layout, showSidebar } = layoutControls;
@@ -271,7 +276,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
       label: "Questions",
       panel: (
         <BuilderPalette
-          registry={registry}
+          registry={paletteSource}
+          searchPlaceholder={information ? "Name, email, choice, date…" : undefined}
           steps={definition.sections.map((section) => ({ id: section.id, title: section.title }))}
           targetIndex={targetIndex}
           onTargetChange={(index) => setTargetSectionId(definition.sections[index]?.id ?? null)}
@@ -288,13 +294,22 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
       label: "Form settings",
       // The form-wide controls, reused as they are (#1139): who the form registers, payment, the confirmation message and Withdraw.
       panel: (
-        <div className="fb-form-settings" id="builder-settings" role="group" aria-label="Settings and payment">
-          <div className="fb-public-link"><BuilderPublicLink /></div>
-          <BuilderRosterSettings />
-          <BuilderPaymentSettings />
-          <BuilderConfirmationEditor />
-          <BuilderWithdrawZone />
-        </div>
+        information
+          ? (
+            <div className="fb-form-settings" id="builder-settings" role="group" aria-label="Form settings">
+              <BuilderInformationSettings />
+              <BuilderConfirmationEditor />
+            </div>
+          )
+          : (
+            <div className="fb-form-settings" id="builder-settings" role="group" aria-label="Settings and payment">
+              <div className="fb-public-link"><BuilderPublicLink /></div>
+              <BuilderRosterSettings />
+              <BuilderPaymentSettings />
+              <BuilderConfirmationEditor />
+              <BuilderWithdrawZone />
+            </div>
+          )
       ),
     },
     {
@@ -314,18 +329,20 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   return (
     <div className="fb-shell" data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} data-inspector={inspectorOpen ? "open" : "closed"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
       <header className="fb-topbar" ref={topbarRef}>
-        <Link className="fb-icon-button" href={`/event-setup?event=${encodeURIComponent(eventId)}`} aria-label="Back to event setup"><ChevronLeft size={18} aria-hidden="true" /></Link>
+        <Link className="fb-icon-button" href={information ? informationListHref(information) : `/event-setup?event=${encodeURIComponent(eventId)}`} aria-label={information ? "Back to information forms" : "Back to event setup"}><ChevronLeft size={18} aria-hidden="true" /></Link>
         {forms.length > 1
           ? <label className="fb-form-switch"><span className="sr-only">Form</span><select value={selectedFormId} onChange={(event) => { const form = forms.find((candidate) => candidate.id === event.target.value); if (form) void chooseForm(form); }}>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
           : <span className="fb-form-name">{selectedForm.name}</span>}
         <nav className="fb-nav" aria-label="Form sections">
           <a href="#builder-editor" aria-current={activeSection === "editor" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
-          <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>
+          {information && <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Form settings</a>}
+          {!information && <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>}
+          {information && <Link href={informationResponsesHref(information, selectedForm.id)}>Responses</Link>}
           {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
         </nav>
         <BuilderVersionChips />
         <BuilderUndoRedo />
-        <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview &amp; test</button>
+        <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> {information ? "Preview" : "Preview & test"}</button>
         {/* Publish is the main button; with no Publish (a clean live or withdrawn version) Save is (#1137). */}
         <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />
         <BuilderPublishButton className="fb-btn primary" />
@@ -361,9 +378,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           <BuilderActionHints />
           <BuilderHistoricalGate />
           <BuilderTemplateNotice />
-          {canEdit && <TemplateCleanupChecklistPanel key={selectedForm.id} formId={selectedForm.id} definition={definition} />}
-          <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>
-          <BuilderCanvas
+          {canEdit && !information && <TemplateCleanupChecklistPanel key={selectedForm.id} formId={selectedForm.id} definition={definition} />}
+          {!information && <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>}          <BuilderCanvas
             paletteDrag={paletteDrag}
             onSelect={selectField}
             onAction={onToolbarAction}

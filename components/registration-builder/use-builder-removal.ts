@@ -34,6 +34,8 @@ export function useBuilderRemoval(state: BuilderState, edits: BuilderEdits) {
     removalAnswerRequestId.current = requestId;
     setRemovalAnswerCounts(null);
     if (!selectedForm) { setRemovalAnswerCountsLoading(false); return; }
+    // An information form's answers are counted by its own responses page, not by the registration lookup: leave the counts unknown, which the dialog words neutrally (#1149).
+    if (state.information) { setRemovalAnswerCountsLoading(false); return; }
     // A form template (#1064) belongs to no event, so it holds no submitted answers.
     if (!selectedForm.eventId) { setRemovalAnswerCounts(Object.fromEntries(fieldKeys.map((key) => [key, 0]))); setRemovalAnswerCountsLoading(false); return; }
     setRemovalAnswerCountsLoading(true);

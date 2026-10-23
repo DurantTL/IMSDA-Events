@@ -10,6 +10,7 @@ import { isPublicReviewSection } from "@/modules/forms/public-registration-steps
 import { fieldTypeLabels, money } from "./builder-types";
 import { deriveFieldChips } from "./field-chips";
 import { BuilderSectionHead } from "./builder-section-card";
+import { InformationFieldIssues, InformationFormIssues, InformationSectionIssues } from "./builder-information-issues";
 import { useLoadedBuilder } from "./builder-context";
 import { buildCanvasRows } from "./canvas-rows";
 import type { PaletteEntry } from "./palette-registry";
@@ -106,7 +107,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
   onAddToStep: (sectionIndex: number) => void;
   onDropPalette: (sectionIndex: number, index: number) => void;
 }) {
-  const { definition, expandedFieldId, canEdit, dragging, dropField, dropSection } = useLoadedBuilder();
+  const { definition, expandedFieldId, canEdit, dragging, dropField, dropSection, information } = useLoadedBuilder();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const review = isPublicReviewSection(definition, section);
@@ -140,6 +141,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
         </button>
       </div>
       {settingsOpen && <div className="fb-step-settings builder-section" id={`fb-step-settings-${section.id}`}><BuilderSectionHead section={section} sectionIndex={sectionIndex} /></div>}
+      <InformationSectionIssues sectionId={section.id} />
       {section.description && <p className="fb-step-description">{section.description}</p>}
       <div className="fb-rows">
         {rows.map((row) => (
@@ -148,7 +150,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
             <div className="fb-row-cells">
               {row.cells.map(({ field, fieldIndex }) => {
                 const selected = expandedFieldId === field.id;
-                const chips = deriveFieldChips(field, section.title);
+                const chips = deriveFieldChips(field, section.title, { information: Boolean(information) });
                 return (
                   <div
                     className={`fb-cell${selected ? " selected" : ""}${dropIndex === fieldIndex && dragActive ? " drop-before" : ""}${dragging?.kind === "field" && dragging.sectionIndex === sectionIndex && dragging.fieldIndex === fieldIndex ? " dragging" : ""}`}
@@ -164,7 +166,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
                       className="fb-field"
                       data-field-id={field.id}
                       aria-current={selected ? "true" : undefined}
-                      aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}, ${chips.map((chip) => chip.label).join(", ")}. ${selected ? "Selected." : "Select to edit."}`}
+                      aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}, ${chips.map((chip) => chip.label).join(", ")}.${selected ? "Selected." : "Select to edit."}`}
                       onClick={() => onSelect(field.id, sectionIndex)}
                     >
                       <span className="fb-q-label" aria-hidden="true">{field.label}{field.required && <span className="fb-required"> *</span>}</span>
@@ -173,6 +175,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
                       {/* Text chips, never colour alone; plain spans inside the button, so they add no tab stops. They are in the button's name above. */}
                       <span className="fb-chips" aria-hidden="true">{chips.map((chip) => <span className={`fb-q-chip fb-q-chip-${chip.kind}`} key={chip.kind}>{chip.label}</span>)}</span>
                     </button>
+                    <InformationFieldIssues fieldId={field.id} />
                     {canEdit && selected && <FieldToolbar section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} onAction={onAction} />}
                   </div>
                 );
@@ -208,6 +211,7 @@ export function BuilderCanvas({ paletteDrag, onSelect, onAction, onAddToStep, on
         <input id="fb-form-title" className="fb-title-input" autoComplete="off" name="builder-rb-field-1" disabled={!canEdit} value={definition.title} maxLength={120} onChange={(event) => replaceDefinition({ ...definition, title: event.target.value })} />
         <label className="fb-field-label" htmlFor="fb-form-description">Description</label>
         <textarea id="fb-form-description" autoComplete="off" name="builder-rb-note-2" disabled={!canEdit} value={definition.description} maxLength={500} rows={2} onChange={(event) => replaceDefinition({ ...definition, description: event.target.value })} />
+        <InformationFormIssues />
       </div>
       {definition.sections.map((section, sectionIndex) => (
         <CanvasStep key={section.id} section={section} sectionIndex={sectionIndex} paletteDrag={paletteDrag} onSelect={onSelect} onAction={onAction} onAddToStep={onAddToStep} onDropPalette={onDropPalette} />

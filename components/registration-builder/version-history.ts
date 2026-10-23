@@ -23,8 +23,9 @@ export function formatVersionDate(iso: string) {
 
 /** Published versions say when they went live; others say when they were last saved. `createdBy` is whoever last saved it. */
 export function versionWhoWhen(version: VersionLike) {
-  if (version.publishedAt) return `Published ${formatVersionDate(version.publishedAt)}, last saved by ${version.createdBy}`;
-  return `Saved ${formatVersionDate(version.updatedAt)} by ${version.createdBy}`;
+  // An information form's versions carry no name (#1149), so the "by" is left out rather than shown empty.
+  if (version.publishedAt) return `Published ${formatVersionDate(version.publishedAt)}${version.createdBy ? `, last saved by ${version.createdBy}` : ""}`;
+  return `Saved ${formatVersionDate(version.updatedAt)}${version.createdBy ? ` by ${version.createdBy}` : ""}`;
 }
 
 /** Only a version that is not the draft can be copied into the draft. */

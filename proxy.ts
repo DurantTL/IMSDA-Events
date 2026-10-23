@@ -27,6 +27,7 @@ export const config = {
     "/community/:path*",
     "/finance/:path*",
     "/imports/:path*",
+    "/information-forms/:path*",
     "/more/:path*",
     "/overview/:path*",
     "/profile/:path*",

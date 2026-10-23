@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Church,
   ClipboardList,
+  ClipboardPen,
   CloudCog,
   Copy,
   FileStack,
@@ -95,6 +96,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     items: [
       { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
       { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
+      { href: "/admin/information-forms", label: "Information forms", description: "Surveys and interest forms that belong to no event.", icon: ClipboardPen },
     ],
   },
   {
@@ -193,6 +195,9 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/clubs\/transfers(\/|$)/, "Club member transfers"],
   [/^\/admin\/form-templates\/[^/]+(\/|$)/, "Form template"],
   [/^\/admin\/form-templates(\/|$)/, "Form templates"],
+  [/^\/admin\/information-forms\/[^/]+\/responses(\/|$)/, "Information form responses"],
+  [/^\/admin\/information-forms\/[^/]+(\/|$)/, "Information form"],
+  [/^\/admin\/information-forms(\/|$)/, "Information forms"],
   [/^\/admin\/club-forms\/[^/]+(\/|$)/, "Club form builder"],
   [/^\/admin\/club-forms(\/|$)/, "Club forms"],
   [/^\/admin\/club-supplies(\/|$)/, "Club supply catalog"],

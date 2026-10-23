@@ -4,6 +4,7 @@
 import type { AddressValue } from "@/modules/forms/address";
 import { getAttendeeRosterConfig, type ChoiceUsage, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registration-steps";
+import type { InformationBuilderConfig, InformationFormExtras } from "./information-mode";
 
 export type PreviewValue = string | boolean | string[] | AddressValue;
 export type TestSubmissionView = { id: string; isValid: boolean; submittedBy: string; createdAt: string; validation: Record<string, unknown>; responses: Record<string, unknown> };
@@ -33,6 +34,8 @@ export type FormView = {
   templateNotice?: TemplateNoticeView | null;
   activeVersion: FormVersionView;
   versions: FormVersionView[];
+  /** Information mode only (#1149): who may fill the form, when it opens and closes, and whether it is open. */
+  information?: InformationFormExtras;
 };
 export type TemplateView = {
   key: string; name: string; description: string; audience: string; collectsPayment?: boolean; sectionCount: number; fieldCount: number;
@@ -69,9 +72,10 @@ export const fieldTypeLabels: Record<RegistrationFormField["type"], string> = {
 export const choicePresets = [
   { name: "Yes / No", options: ["No", "Yes"] },
   { name: "Adult / Teen", options: ["Adult", "Teen"] },
-  { name: "Meal preference", options: ["Regular", "Vegetarian", "Vegan", "Gluten-free"] },
-  { name: "Payment method", options: ["Pay Later", "Pay Now"] },
-];
+  // `informationForm: false` keeps a preset out of information forms (#1149): dietary and payment choices are not asked there.
+  { name: "Meal preference", options: ["Regular", "Vegetarian", "Vegan", "Gluten-free"], informationForm: false },
+  { name: "Payment method", options: ["Pay Later", "Pay Now"], informationForm: false },
+] as ReadonlyArray<{ name: string; options: string[]; informationForm?: boolean }>;
 
 export const moduleCategories = ["All", "Common", "People", "Housing", "Group event"] as const;
 
@@ -137,5 +141,7 @@ export type BuilderWorkspaceProps = {
   canSaveAsTemplate?: boolean;
   /** For tests: the phone-width layout is otherwise picked by viewport, which a server render cannot vary. `classic` always uses the phone-width layout (form list, section cards, preview column); `auto` (the default) uses the editor shell (#1132) from 768px. */
   layout?: "auto" | "classic";
+  /** Information mode (#1149): the builder opens an information form instead of an event's registration form. Payment, roster, meals, attendee-type and pricing parts are left out, and every request goes to the information-forms API. */
+  information?: InformationBuilderConfig;
 };
 

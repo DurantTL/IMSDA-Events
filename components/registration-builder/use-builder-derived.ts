@@ -81,12 +81,15 @@ export function useBuilderDerived(eventId: string | null, state: BuilderState) {
   // changed in place. Only superseded historical versions are read-only.
   const canEdit = Boolean(selectedVersion && !isHistorical);
   const editsCreateDraft = Boolean(selectedVersion && selectedVersion.status !== "DRAFT");
-  const hasValidTest = Boolean(selectedVersion?.testSubmissions.some((submission) => submission.isValid));
+  // An information form has no test submission to run (#1149): there is no registration, total or payment to check.
+  const informationMode = Boolean(state.information);
+  const hasValidTest = informationMode || Boolean(selectedVersion?.testSubmissions.some((submission) => submission.isValid));
   // A valid test submission is required only before a form's first publish
   // (#564, #1061). After that a test is optional; the server enforces the same.
   const hasEverPublished = Boolean(selectedForm?.versions.some((version) => version.publishedAt));
-  const testRequired = !hasEverPublished;
-  const publishBlockedReason = publishBlockedReasonFor({ dirty, hasEverPublished, hasValidTest });
+  const testRequired = !informationMode && !hasEverPublished;
+  // Publish is one click for an information form: it saves the unsaved edits first, whether or not it was published before.
+  const publishBlockedReason = informationMode ? "" : publishBlockedReasonFor({ dirty, hasEverPublished, hasValidTest });
   // A form copied from a template can keep the template's web address after
   // its title changes. Before a form's first publish only, offer to sync the
   // slug to the current title — after that, shared links depend on the slug
@@ -94,7 +97,7 @@ export function useBuilderDerived(eventId: string | null, state: BuilderState) {
   // A `title-N` slug that creation added counts as matching. The server
   // makes the final call and picks a free address to offer.
   const slugMayNeedSync = Boolean(
-    selectedForm && definition && !hasEverPublished && definition.title.trim() && !slugMatchesTitle(selectedForm.slug, definition.title),
+    !informationMode && selectedForm && definition && !hasEverPublished && definition.title.trim() && !slugMatchesTitle(selectedForm.slug, definition.title),
   );
   return { totalFields, allFields, policyVersions, visibleFieldModules, attendeeFields, hasAttendeeNameFields, roster, calculation, previewSteps, previewStepIndex, previewStep, paymentMethodFields, scheduledPriceFields, publishedVersion, isHistorical, canEdit, editsCreateDraft, hasValidTest, hasEverPublished, testRequired, publishBlockedReason, slugMayNeedSync };
 }

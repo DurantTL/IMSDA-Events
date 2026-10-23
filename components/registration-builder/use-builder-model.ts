@@ -13,7 +13,8 @@ import { useBuilderState } from "./use-builder-state";
 export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: ReturnType<typeof useConfirm>["confirm"]) {
   const { eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications = false, canSaveAsTemplate = false, mealPlanPrices = {} } = props;
   const state = useBuilderState(props);
-  const derived = useBuilderDerived(eventId, state);
+  // An information form has no event policies to point an acknowledgment at (#1149).
+  const derived = useBuilderDerived(props.information ? null : eventId, state);
   const edits = useBuilderEdits(state, derived);
   const removal = useBuilderRemoval(state, edits);
   const actions = useBuilderActions(props, state, derived, askConfirm);
