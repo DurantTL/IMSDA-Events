@@ -34,14 +34,19 @@ const defaultZoom = 6;
  * rendered by React beside the map rather than through Leaflet's
  * innerHTML-based attribution control.
  */
+export type PublicClubMapStatus = "loading" | "ready" | "tiles-failed" | "unavailable";
+
 export function PublicClubMap({
   clubs,
   selectedId,
   onSelect,
+  onStatus,
 }: {
   clubs: PublicClubListing[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Reports whether the map library and its tiles loaded, so the page can say so honestly. */
+  onStatus?: (status: PublicClubMapStatus) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const leafletRef = useRef<Leaflet | null>(null);
@@ -51,11 +56,14 @@ export function PublicClubMap({
   const fittedRef = useRef<string | null>(null);
   const onSelectRef = useRef(onSelect);
   const selectedIdRef = useRef(selectedId);
+  const onStatusRef = useRef(onStatus);
+  const lastBoundsRef = useRef<[number, number][] | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
-  }, [onSelect]);
+    onStatusRef.current = onStatus;
+  }, [onSelect, onStatus]);
 
   const groups = useMemo(() => groupClubsByLocation(clubs), [clubs]);
 
@@ -63,6 +71,7 @@ export function PublicClubMap({
   useEffect(() => {
     let cancelled = false;
     const pins = pinsRef.current;
+    let observer: ResizeObserver | null = null;
 
     void import("leaflet").then((leafletModule) => {
       if (cancelled || !containerRef.current || mapRef.current) return;
@@ -72,14 +81,37 @@ export function PublicClubMap({
         scrollWheelZoom: false,
         attributionControl: false,
       }).setView(defaultCenter, defaultZoom);
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+      const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+      // Tile trouble is reported, never fatal: the pins and the list still work.
+      tiles.on("tileerror", () => onStatusRef.current?.("tiles-failed"));
+      tiles.on("tileload", () => onStatusRef.current?.("ready"));
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
+      // On phones the map is hidden while the list shows; when it comes back
+      // Leaflet must re-measure itself and refit the pins.
+      if (typeof ResizeObserver !== "undefined") {
+        let lastWidth = containerRef.current.clientWidth;
+        observer = new ResizeObserver(() => {
+          const width = containerRef.current?.clientWidth ?? 0;
+          if (width > 0 && lastWidth === 0 && mapRef.current) {
+            mapRef.current.invalidateSize();
+            if (lastBoundsRef.current) {
+              mapRef.current.fitBounds(lastBoundsRef.current, { padding: [32, 32], maxZoom: 11 });
+            }
+          }
+          lastWidth = width;
+        });
+        observer.observe(containerRef.current);
+      }
       setReady(true);
+      onStatusRef.current?.("ready");
+    }).catch(() => {
+      if (!cancelled) onStatusRef.current?.("unavailable");
     });
 
     return () => {
       cancelled = true;
+      observer?.disconnect();
       pins.clear();
       mapRef.current?.remove();
       mapRef.current = null;
@@ -143,10 +175,9 @@ export function PublicClubMap({
     const fitKey = groups.map((group) => group.key).join("|");
     if (fitKey !== fittedRef.current && groups.length > 0) {
       fittedRef.current = fitKey;
-      map.fitBounds(
-        groups.map((group) => [group.latitude, group.longitude] as [number, number]),
-        { padding: [32, 32], maxZoom: 11 },
-      );
+      const bounds = groups.map((group) => [group.latitude, group.longitude] as [number, number]);
+      lastBoundsRef.current = bounds;
+      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 11 });
     }
 
     applySelection(pins, selectedIdRef.current);
