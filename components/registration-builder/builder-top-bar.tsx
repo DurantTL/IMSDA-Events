@@ -1,5 +1,6 @@
 // Top bar zone: the page actions (preview, templates) and the form header with
 // the version chip, Save draft, Publish version and the form title.
+import { useEffect, useRef } from "react";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { AlertTriangle, BookmarkPlus, CopyPlus, Eye, ExternalLink, FileClock, Layers3, Redo2, Save, Send, ShieldCheck, Undo2 } from "lucide-react";
 import { canRedo, canUndo } from "./edit-history";
@@ -25,10 +26,25 @@ export function BuilderSaveDraftButton({ className = "secondary-button" }: { cla
 export function BuilderUndoRedo() {
   const { history, canEdit, busy, undoEdit, redoEdit } = useLoadedBuilder();
   const idle = canEdit && busy === null;
+  const undoDisabled = !idle || !canUndo(history);
+  const redoDisabled = !idle || !canRedo(history);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  const redoRef = useRef<HTMLButtonElement>(null);
+  // A button that was just pressed and is now disabled would drop focus to the page; move it to the other one, or the editor.
+  const pressed = useRef<"undo" | "redo" | null>(null);
+  useEffect(() => {
+    const was = pressed.current;
+    if (!was) return;
+    pressed.current = null;
+    const own = was === "undo" ? undoRef.current : redoRef.current;
+    if (!own?.disabled) return;
+    const other = was === "undo" ? redoRef.current : undoRef.current;
+    (other && !other.disabled ? other : document.getElementById("builder-editor"))?.focus();
+  }, [history]);
   return (
     <span className="fb-undo-redo" role="group" aria-label="Undo and redo">
-      <button className="fb-btn outline" type="button" disabled={!idle || !canUndo(history)} onClick={undoEdit}><Undo2 size={15} aria-hidden="true" /> Undo</button>
-      <button className="fb-btn outline" type="button" disabled={!idle || !canRedo(history)} onClick={redoEdit}><Redo2 size={15} aria-hidden="true" /> Redo</button>
+      <button ref={undoRef} className="fb-btn outline" type="button" disabled={undoDisabled} aria-keyshortcuts="Control+Z Meta+Z" onClick={() => { pressed.current = "undo"; undoEdit(); }}><Undo2 size={15} aria-hidden="true" /> Undo</button>
+      <button ref={redoRef} className="fb-btn outline" type="button" disabled={redoDisabled} aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" onClick={() => { pressed.current = "redo"; redoEdit(); }}><Redo2 size={15} aria-hidden="true" /> Redo</button>
     </span>
   );
 }

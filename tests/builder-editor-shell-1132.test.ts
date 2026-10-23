@@ -678,7 +678,7 @@ describe("the edits behind the palette, run for real (#1132)", () => {
     const allFields = definition.sections.flatMap((section) => section.fields);
     const edits = buildEdits({
       definition, setDefinition: (next: RegistrationFormDefinition) => { calls.definition = next; }, setPreviewAttendees: () => { calls.previewAttendees += 1; },
-      history: { past: [], future: [], lastKey: null, lastAt: 0 }, setHistory: () => {}, setDirty: () => { calls.dirty = true; }, setNotice: () => {}, setError: (message: string) => { calls.error = message; }, setTestIssues: () => {},
+      history: { past: [], future: [], lastKey: null, lastAt: 0, baseline: null }, setHistory: () => {}, setDirty: () => { calls.dirty = true; }, setNotice: () => {}, setError: (message: string) => { calls.error = message; }, setTestIssues: () => {},
       dragging: null, setDragging: () => {}, setExpandedFieldId: (id: string | null) => { calls.expanded = id; }, previewRef: { current: null }, closeModuleLibrary: () => {},
     } as never, { totalFields: allFields.length, allFields } as never);
     return { edits, calls };

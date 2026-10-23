@@ -28,7 +28,7 @@ export function useBuilderState({ initialForms, templates: initialTemplates = []
   const selectedVersion = selectedForm?.versions.find((version) => version.id === selectedVersionId) ?? selectedForm?.activeVersion ?? null;
   const [definition, setDefinition] = useState<RegistrationFormDefinition | null>(selectedVersion?.definition ?? null);
   // Undo and redo steps for the unsaved draft (#1134); cleared whenever the draft is replaced wholesale.
-  const [history, setHistory] = useState<EditHistory<RegistrationFormDefinition>>(() => emptyHistory());
+  const [history, setHistory] = useState<EditHistory<RegistrationFormDefinition>>(() => emptyHistory(selectedVersion?.definition ?? null));
   const [responses, setResponses] = useState<Record<string, PreviewValue>>({});
   const [previewAttendees, setPreviewAttendees] = useState<PreviewAttendee[]>(() => blankPreviewAttendees(selectedVersion?.definition ?? null));
   const [dirty, setDirty] = useState(false);

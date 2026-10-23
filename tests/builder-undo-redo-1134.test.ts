@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  COALESCE_MS, HISTORY_LIMIT, canRedo, canUndo, clearHistory, emptyHistory, recordEdit, redo, singleValueEditKey, undo,
+  COALESCE_MS, HISTORY_LIMIT, canRedo, canUndo, clearHistory, emptyHistory, isAtBaseline, recordEdit, redo, singleValueEditKey, undo,
 } from "@/components/registration-builder/edit-history";
 import { undoRedoShortcut, type UndoKeyEvent } from "@/components/registration-builder/shell-keys";
 
 const keys = (overrides: Partial<UndoKeyEvent>): UndoKeyEvent => ({
-  key: "z", shiftKey: false, metaKey: false, ctrlKey: true, altKey: false, defaultPrevented: false, fromTypingTarget: false, dialogOpen: false, ...overrides,
+  key: "z", shiftKey: false, metaKey: false, ctrlKey: true, altKey: false, defaultPrevented: false, fromTypingTarget: false, dialogOpen: false, inEditorScope: true, ...overrides,
 });
 
 describe("edit history (#1134)", () => {
@@ -84,11 +84,37 @@ describe("single value edit key (#1134)", () => {
     expect(singleValueEditKey(draft, typed)).toBe("$.sections[0].fields[0].label");
     expect(singleValueEditKey(draft, { ...draft, title: "Camp 2" })).toBe("$.title");
   });
+  it("treats a label and its following key as one value, but not other pairs", () => {
+    const typed = { ...draft, sections: [{ id: "s1", fields: [{ id: "f1", label: "Names", key: "names", required: true }] }] };
+    const before = { ...draft, sections: [{ id: "s1", fields: [{ id: "f1", label: "Name", key: "name", required: true }] }] };
+    expect(singleValueEditKey(before, typed)).toBe("$.sections[0].fields[0].label");
+    const otherPair = { ...draft, sections: [{ id: "s1", fields: [{ id: "f1", label: "Names", key: "name", required: true, help: "x" }] }] };
+    expect(singleValueEditKey(before, otherPair)).toBeNull();
+    const twoFields = { ...draft, sections: [{ id: "s1", fields: [{ id: "f1", label: "Names", key: "name", required: true }, { id: "f2", label: "B", key: "b" }] }] };
+    expect(singleValueEditKey({ ...before, sections: [{ id: "s1", fields: [before.sections[0]!.fields[0]!, { id: "f2", label: "A", key: "b" }] }] }, twoFields)).toBeNull();
+  });
   it("is null for structural, boolean or multi-value changes", () => {
     expect(singleValueEditKey(draft, { ...draft, sections: [] })).toBeNull();
     expect(singleValueEditKey(draft, { ...draft, sections: [{ id: "s1", fields: [{ id: "f1", label: "Name", required: false }] }] })).toBeNull();
     expect(singleValueEditKey(draft, { ...draft, title: "X", sections: [{ id: "s2", fields: draft.sections[0]!.fields }] })).toBeNull();
     expect(singleValueEditKey(draft, draft)).toBeNull();
+  });
+});
+
+describe("clean baseline (#1134)", () => {
+  const saved = { title: "Saved" };
+  it("knows the saved definition by reference, through edits, undo and redo", () => {
+    let history = emptyHistory<{ title: string }>(saved);
+    const edited = { title: "Edited" };
+    history = recordEdit(history, saved, "$.title", 0);
+    const back = undo(history, edited)!;
+    expect(isAtBaseline(back.history, back.value)).toBe(true);
+    const forward = redo(back.history, back.value)!;
+    expect(isAtBaseline(forward.history, edited)).toBe(false);
+    expect(isAtBaseline(clearHistory({ title: "Saved" }), { title: "Saved" })).toBe(false);
+  });
+  it("never claims clean without a baseline", () => {
+    expect(isAtBaseline(emptyHistory<{ title: string }>(), saved)).toBe(false);
   });
 });
 
@@ -105,6 +131,7 @@ describe("undo and redo shortcuts (#1134)", () => {
     expect(undoRedoShortcut(keys({ dialogOpen: true }))).toBeNull();
     expect(undoRedoShortcut(keys({ defaultPrevented: true }))).toBeNull();
     expect(undoRedoShortcut(keys({ altKey: true }))).toBeNull();
+    expect(undoRedoShortcut(keys({ inEditorScope: false }))).toBeNull();
     expect(undoRedoShortcut(keys({ key: "x" }))).toBeNull();
   });
 });

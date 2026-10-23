@@ -22,14 +22,18 @@ export function focusTargetAction(state: { handled: boolean; hydrated: boolean; 
   return state.sidebarVisible ? "focus" : "reveal";
 }
 
-export type UndoKeyEvent = SlashKeyEvent & { shiftKey: boolean };
+export type UndoKeyEvent = SlashKeyEvent & {
+  shiftKey: boolean;
+  /** Focus is in the editor or canvas, or on nothing; not in another panel such as Notifications. */
+  inEditorScope: boolean;
+};
 
 /**
  * Ctrl or Cmd+Z undoes, Shift+Ctrl or Cmd+Z and Ctrl+Y redo (#1134). Never while typing (the field has its own undo),
  * after another handler took the key, or under a dialog.
  */
 export function undoRedoShortcut(event: UndoKeyEvent): "undo" | "redo" | null {
-  if (event.defaultPrevented || event.fromTypingTarget || event.dialogOpen || event.altKey) return null;
+  if (event.defaultPrevented || event.fromTypingTarget || event.dialogOpen || event.altKey || !event.inEditorScope) return null;
   if (!event.metaKey && !event.ctrlKey) return null;
   const key = event.key.toLowerCase();
   if (key === "z") return event.shiftKey ? "redo" : "undo";

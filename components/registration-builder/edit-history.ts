@@ -11,11 +11,16 @@ export type EditHistory<T> = {
   /** What the latest recorded edit changed, for coalescing; null when it must not merge with the next. */
   lastKey: string | null;
   lastAt: number;
+  /** The draft as last saved or loaded (by reference); null when unknown. A draft that is this object is clean. */
+  baseline: T | null;
 };
 
-export function emptyHistory<T>(): EditHistory<T> {
-  return { past: [], future: [], lastKey: null, lastAt: 0 };
+export function emptyHistory<T>(baseline: T | null = null): EditHistory<T> {
+  return { past: [], future: [], lastKey: null, lastAt: 0, baseline };
 }
+
+/** True when `value` is the saved or loaded draft itself, so undoing back to it may show the draft as clean. */
+export const isAtBaseline = <T>(history: EditHistory<T>, value: T) => history.baseline !== null && history.baseline === value;
 
 export const canUndo = (history: EditHistory<unknown>) => history.past.length > 0;
 export const canRedo = (history: EditHistory<unknown>) => history.future.length > 0;
@@ -29,34 +34,35 @@ export function recordEdit<T>(history: EditHistory<T>, before: T, key: string | 
     return { ...history, future: [], lastAt: now };
   }
   const past = [...history.past, before];
-  return { past: past.length > limit ? past.slice(past.length - limit) : past, future: [], lastKey: key, lastAt: now };
+  return { past: past.length > limit ? past.slice(past.length - limit) : past, future: [], lastKey: key, lastAt: now, baseline: history.baseline };
 }
 
 export function undo<T>(history: EditHistory<T>, current: T): { history: EditHistory<T>; value: T } | null {
   const value = history.past[history.past.length - 1];
   if (history.past.length === 0 || value === undefined) return null;
-  return { value, history: { past: history.past.slice(0, -1), future: [current, ...history.future], lastKey: null, lastAt: 0 } };
+  return { value, history: { past: history.past.slice(0, -1), future: [current, ...history.future], lastKey: null, lastAt: 0, baseline: history.baseline } };
 }
 
 export function redo<T>(history: EditHistory<T>, current: T): { history: EditHistory<T>; value: T } | null {
   const value = history.future[0];
   if (history.future.length === 0 || value === undefined) return null;
-  return { value, history: { past: [...history.past, current], future: history.future.slice(1), lastKey: null, lastAt: 0 } };
+  return { value, history: { past: [...history.past, current], future: history.future.slice(1), lastKey: null, lastAt: 0, baseline: history.baseline } };
 }
 
-export function clearHistory<T>(): EditHistory<T> {
-  return emptyHistory<T>();
+export function clearHistory<T>(baseline: T | null = null): EditHistory<T> {
+  return emptyHistory<T>(baseline);
 }
 
 /**
  * The path of the one text or number value that differs between two drafts, or null when the edit changed anything else
- * (a structural change, several values, nothing). Typing in one box yields the same path each keystroke.
+ * (a structural change, several values, nothing). Typing in one box yields the same path each keystroke. A question's
+ * label and the key that follows it change together as it is typed, so that pair counts as one value, the label.
  */
 export function singleValueEditKey(before: unknown, after: unknown): string | null {
   const found: string[] = [];
   const isScalar = (value: unknown) => typeof value === "string" || typeof value === "number";
   function walk(a: unknown, b: unknown, path: string): boolean {
-    if (found.length > 1) return false;
+    if (found.length > 2) return false;
     if (a === b) return true;
     if (isScalar(a) && isScalar(b) && typeof a === typeof b) { found.push(path); return true; }
     if (Array.isArray(a) && Array.isArray(b)) {
@@ -73,5 +79,15 @@ export function singleValueEditKey(before: unknown, after: unknown): string | nu
     }
     return false;
   }
-  return walk(before, after, "$") && found.length === 1 ? found[0]! : null;
+  if (!walk(before, after, "$")) return null;
+  if (found.length === 1) return found[0]!;
+  if (found.length === 2) {
+    const [first, second] = found as [string, string];
+    const split = (path: string) => [path.slice(0, path.lastIndexOf(".")), path.slice(path.lastIndexOf(".") + 1)] as const;
+    const [firstParent, firstName] = split(first);
+    const [secondParent, secondName] = split(second);
+    const pair = new Set([firstName, secondName]);
+    if (firstParent === secondParent && pair.size === 2 && pair.has("label") && pair.has("key")) return `${firstParent}.label`;
+  }
+  return null;
 }

@@ -27,6 +27,7 @@ import { tabAfterSelectionChange, type SidebarTab } from "./sidebar-tabs";
 import { locateField } from "./canvas-rows";
 import { inspectorAfterClose, inspectorAfterSelection } from "./phone-inspector";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
+import { canRedo, canUndo } from "./edit-history";
 import { focusTargetAction, isSearchShortcut, undoRedoShortcut } from "./shell-keys";
 import { useEditorLayout, useHydrated } from "./use-editor-layout";
 import type { PaletteEntry, PaletteRegistry } from "./palette-registry";
@@ -73,6 +74,13 @@ function useMeasuredSize(ref: RefObject<HTMLElement | null>) {
   return size;
 }
 
+/** Undo and redo act from the editor and canvas, the top bar and the sidebar, or with nothing focused; not in Notifications. */
+function inUndoScope(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return true;
+  if (target === document.body) return true;
+  return target.closest(".fb-shell") !== null && target.closest("#builder-notifications") === null;
+}
+
 function dialogIsOpen() {
   return document.querySelector('dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"]') !== null;
 }
@@ -84,7 +92,7 @@ function dialogIsOpen() {
 export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
     eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications,
-    busy, undoEdit, redoEdit, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
+    busy, history, undoEdit, redoEdit, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
   const layoutControls = useEditorLayout();
   const hydrated = useHydrated();
@@ -192,14 +200,15 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   // Ctrl or Cmd+Z, Shift+Ctrl or Cmd+Z and Ctrl+Y (#1134), outside text fields (which keep the browser's own undo) and dialogs.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      const action = undoRedoShortcut({ key: event.key, shiftKey: event.shiftKey, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, defaultPrevented: event.defaultPrevented, fromTypingTarget: isTypingTarget(event.target), dialogOpen: dialogIsOpen() });
-      if (!action) return;
+      const action = undoRedoShortcut({ key: event.key, shiftKey: event.shiftKey, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, defaultPrevented: event.defaultPrevented, fromTypingTarget: isTypingTarget(event.target), dialogOpen: dialogIsOpen(), inEditorScope: inUndoScope(event.target) });
+      // Only a shortcut that runs is taken from the browser.
+      if (!action || !canEdit || busy !== null || !(action === "undo" ? canUndo(history) : canRedo(history))) return;
       event.preventDefault();
-      if (canEdit && busy === null) (action === "undo" ? undoEdit : redoEdit)();
+      (action === "undo" ? undoEdit : redoEdit)();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [canEdit, busy, undoEdit, redoEdit]);
+  }, [canEdit, busy, history, undoEdit, redoEdit]);
 
   function selectField(fieldId: string, sectionIndex: number) {
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);

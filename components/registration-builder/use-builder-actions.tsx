@@ -22,7 +22,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     setSelectedVersionId(form.activeVersion.id);
     const nextDefinition = structuredClone(form.activeVersion.definition);
     setDefinition(nextDefinition);
-    setHistory(clearHistory());
+    setHistory(clearHistory(nextDefinition));
     setDirty(false);
     if (!preserveTestResponses) {
       setResponses({});
@@ -208,7 +208,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       destructive: true,
     }))) return;
     const nextDefinition = structuredClone(form.activeVersion.definition);
-    setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setHistory(clearHistory()); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
+    setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setHistory(clearHistory(nextDefinition)); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
   }
 
   async function chooseVersion(version: FormVersionView) {
@@ -220,7 +220,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       destructive: true,
     }))) return;
     const nextDefinition = structuredClone(version.definition);
-    setSelectedVersionId(version.id); setDefinition(nextDefinition); setHistory(clearHistory()); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
+    setSelectedVersionId(version.id); setDefinition(nextDefinition); setHistory(clearHistory(nextDefinition)); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
   }
 
   // Restore as draft (#1140): the old version's definition goes through the same draft save as an edit, so validation,
