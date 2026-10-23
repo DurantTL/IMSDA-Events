@@ -161,6 +161,12 @@ export function parseDateParam(value: string | undefined, today: string): string
   return monthKey(month) === value.slice(0, 7) ? value : undefined;
 }
 
+/** The month shown and the selected date: a valid date (month view only) wins over the month param and decides the month. */
+export function resolveMonthAndDate(view: "month" | "list", monthParam: string | undefined, dateParam: string | undefined, today: string) {
+  const selectedDate = view === "month" ? parseDateParam(dateParam, today) : undefined;
+  return { selectedDate, month: parseMonthParam(selectedDate ? selectedDate.slice(0, 7) : monthParam, today) };
+}
+
 /** "April 24, 2027". */
 export function formatLongDate(date: string) {
   return formatDateRange(date, date);

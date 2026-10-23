@@ -5,6 +5,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { AgendaItem } from "@/components/calendar-agenda-item";
+import { CalendarDayLink } from "@/components/calendar-day-link";
 import { CalendarDayFocus } from "@/components/calendar-day-focus";
 import { CalendarMonthChip } from "@/components/calendar-month-chip";
 import {
@@ -20,7 +21,7 @@ import {
   monthKey,
   monthLabel,
   parseMonthParam,
-  parseDateParam,
+  resolveMonthAndDate,
   formatLongDate,
   calendarCountLabel,
   sortCalendarItems,
@@ -71,8 +72,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const today = conferenceToday();
   // A selected date (month view only) opens that date's complete agenda and decides the month shown, so an adjacent-month
   // date from the grid lands on its own month instead of a list that excludes it.
-  const selectedDate = view === "month" ? parseDateParam(params.date, today) : undefined;
-  const month = parseMonthParam(selectedDate ? selectedDate.slice(0, 7) : params.month, today);
+  const { selectedDate, month } = resolveMonthAndDate(view, params.month, params.date, today);
 
   const grid = monthGrid(month);
   const from = view === "month" ? grid[0][0] : today;
@@ -170,9 +170,9 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                   key={date}
                 >
                   {dayItems.length > 0 ? (
-                    <Link aria-current={date === selectedDate ? "date" : undefined} aria-label={`${dayLabel}. View all`} className="calendar-day-number calendar-day-link" href={dayHref}>
+                    <CalendarDayLink aria-current={date === selectedDate ? "true" : date === today ? "date" : undefined} aria-label={`${dayLabel}. View all`} className="calendar-day-number calendar-day-link" href={dayHref}>
                       {Number(date.slice(8))}
-                    </Link>
+                    </CalendarDayLink>
                   ) : (
                     <span className="calendar-day-number">{Number(date.slice(8))}</span>
                   )}
@@ -191,9 +191,9 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
                       ))}
                       {dayItems.length > 3 && (
                         <li className="calendar-more">
-                          <Link className="calendar-more-link" href={dayHref}>
+                          <CalendarDayLink className="calendar-more-link" href={dayHref}>
                             View all {dayItems.length}<span className="sr-only"> events for {formatLongDate(date)}</span>
-                          </Link>
+                          </CalendarDayLink>
                         </li>
                       )}
                     </ul>
@@ -206,9 +206,9 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
 
         {view === "month" && selectedDate && (
           <section aria-labelledby="calendar-day-heading" className="calendar-day-detail" id="calendar-day-detail">
-            <CalendarDayFocus key={`${selectedDate}|${category ?? ""}`} />
+            <CalendarDayFocus key={selectedDate} />
             <h2 id="calendar-day-heading" tabIndex={-1}>Events on {formatLongDate(selectedDate)}</h2>
-            <p className="calendar-day-count" role="status">
+            <p className="calendar-day-count">
               {selectedItems.length === 0
                 ? `No events on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`
                 : `${calendarCountLabel(selectedItems.length)} on ${formatLongDate(selectedDate)}${category ? ` in ${category}` : ""}.`}
