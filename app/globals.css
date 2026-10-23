@@ -11483,11 +11483,13 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   .staff-invite-table td { overflow-wrap: anywhere; }
   .staff-invite-table td:empty { display: none; }
 }
-/* Tablet widths (#1045): when the box around the table is narrower than 760px (about 861px beside the sidebar) the same cards show,
-   so the table is never wider than its box. The box decides (container query on the `.card-box` wrapper), not the viewport. Phones keep the rules above. */
+/* Tablet widths (#1045): when the box around the table is narrower than 760px (up to about 1100px wide beside the sidebar, as #997)
+   the same cards show, so the table is never wider than its box. The box decides (container query on the `.card-box` wrapper), not the
+   viewport. Phones keep the rules above. The tables (600px and 677px) fit any wider box, so the wrapper never needs to clip. */
+.report-table-wrap.card-box:has(> .staff-invite-table) { overflow: visible; }
 @media screen and (min-width: 641px) {
   @container (max-width: 760px) {
-    .report-table-wrap.card-box:has(> .staff-invite-table) { overflow: visible; }
+    .staff-invite-select { min-width: 44px; min-height: 44px; }
     .staff-invite-table, .staff-invite-table tbody, .staff-invite-table tr, .staff-invite-table td { display: block; width: 100%; box-sizing: border-box; }
     .staff-invite-table { min-width: 0; }
     .staff-invite-table thead { display: none; }
