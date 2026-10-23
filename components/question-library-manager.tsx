@@ -36,10 +36,12 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
     }
   }
 
-  if (items.length === 0) return <p className="quiet-copy">Nothing is saved yet. In the form builder, open a question&apos;s actions menu and choose Save to library.</p>;
+  const heading = <h2 ref={headingRef} tabIndex={-1}>Saved questions</h2>;
+  // The heading stays in the empty state so focus has somewhere to land after the last item is deleted.
+  if (items.length === 0) return <div className="form-stack">{heading}<p className="quiet-copy">Nothing is saved yet. In the form builder, open a question&apos;s actions menu and choose Save to library.</p></div>;
   return (
     <div className="form-stack">
-      <h2 ref={headingRef} tabIndex={-1}>Saved questions</h2>
+      {heading}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <ul className="question-library-list">
         {items.map((item) => (

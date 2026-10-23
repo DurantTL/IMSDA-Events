@@ -85,7 +85,7 @@ export function prepareLibraryFragment(raw: unknown): { fragment: QuestionLibrar
     if (isHealthTypeField(next)) next.sensitive = true;
     return next;
   });
-  // Restrictions never loosen: a sensitive question is never a filter, and a question wired (in either direction) to a
+  // Restrictions never loosen: a sensitive question is never a filter, and a question that depends on a
   // sensitive question in this item is stored sensitive and not a filter. The form's own check decides, so there is no second rule.
   const restricted = fields.map((candidate) => {
     const offer = resolveFieldOffer(candidate, { allFields: fields, sectionTitleOf: () => "", paymentMethodFieldKey: null });
