@@ -753,12 +753,12 @@ const SORT_DESCRIPTION: Record<SearchSortKey, { label: string; kind: SortKind }>
   submitted: { label: "submitted date", kind: "date" },
   created: { label: "created date", kind: "date" },
   code: { label: "confirmation code", kind: "text" },
-  name: { label: "name", kind: "text" },
+  name: { label: "last name", kind: "text" },
   total: { label: "total", kind: "number" },
 };
 
 /**
- * The sentence for the order a search actually ran in ("Sorted by name, A to Z."),
+ * The sentence for the order a search actually ran in ("Sorted by last name, A to Z."),
  * from the resolved query the service ordered by, never from raw URL text. A
  * search that did not run (`ok` false: an invalid or unavailable sort among the
  * issues) has no order to describe, so this returns null rather than name a

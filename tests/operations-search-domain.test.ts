@@ -173,8 +173,8 @@ describe("what a viewer may search", () => {
       return describeSearchOrder({ ok: resolved.ok && parsed.issues.length === 0, query: parsed.query });
     };
     expect(order("q=smith")).toBe("Sorted by submitted date, newest first.");
-    expect(order("sort=name")).toBe("Sorted by name, A to Z.");
-    expect(order("sort=name.desc")).toBe("Sorted by name, Z to A.");
+    expect(order("sort=name")).toBe("Sorted by last name, A to Z.");
+    expect(order("sort=name.desc")).toBe("Sorted by last name, Z to A.");
     expect(order("sort=submitted.asc")).toBe("Sorted by submitted date, oldest first.");
     expect(order("sort=total")).toBe("Sorted by total, highest first.");
     expect(order("sort=total.asc")).toBe("Sorted by total, lowest first.");
@@ -184,6 +184,8 @@ describe("what a viewer may search", () => {
     expect(order("sort=name", viewer("VIEW_EVENT", "MANAGE_FINANCE"))).toBeNull();
     expect(order("sort=total", viewer("VIEW_EVENT", "VIEW_SENSITIVE_DATA"))).toBeNull();
     expect(order("sort=password")).toBeNull();
+    // A rejected service result names no field, whatever its query says.
+    expect(describeSearchOrder({ ok: false, query: { sort: "name", direction: "asc" } })).toBeNull();
   });
 
   it("needs the identity domain to sort by name and the payment domain to sort by total", () => {
