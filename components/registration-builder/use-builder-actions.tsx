@@ -6,6 +6,7 @@ import { useRef } from "react";
 import { withExplicitSensitiveFlags } from "@/modules/forms/field-flags";
 import { recordTemplateCleanupCreated } from "@/components/template-cleanup-checklist";
 import { type FormVersionView, type FormView, blankPreviewAttendees, firstPreviewStepId, type BuilderWorkspaceProps } from "./builder-types";
+import { clearHistory } from "./edit-history";
 import { runPublishFlow } from "./publish-flow";
 import { canRestoreVersion, restoreConfirmation, restoreNotice, restoreSaveTarget } from "./version-history";
 import type { useConfirm } from "@/components/use-confirm";
@@ -13,7 +14,7 @@ import type { BuilderState } from "./use-builder-state";
 import type { BuilderDerived } from "./use-builder-derived";
 
 export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceProps, "eventId" | "eventSlug">, state: BuilderState, derived: BuilderDerived, askConfirm: ReturnType<typeof useConfirm>["confirm"]) {
-  const { setForms, setSelectedFormId, selectedForm, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, setBusy, setFocusRequest, setNotice, setError, setTestIssues, setShowTemplates, setConfirmingPublish, setConfirmingUnpublish, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, setDraftTemplateError, slugPrompt, setSlugPrompt, setSlugError, setExpandedFieldId, setPreviewStepId, closeModuleLibrary } = state;
+  const { setHistory, setForms, setSelectedFormId, selectedForm, setSelectedVersionId, selectedVersion, definition, setDefinition, responses, setResponses, previewAttendees, setPreviewAttendees, dirty, setDirty, setBusy, setFocusRequest, setNotice, setError, setTestIssues, setShowTemplates, setConfirmingPublish, setConfirmingUnpublish, setShowDraftTemplates, draftTemplateTarget, setDraftTemplateTarget, setDraftTemplateError, slugPrompt, setSlugPrompt, setSlugError, setExpandedFieldId, setPreviewStepId, closeModuleLibrary } = state;
   const { roster, previewSteps, editsCreateDraft, slugMayNeedSync } = derived;
   function syncForm(form: FormView, message?: string, preserveTestResponses = false) {
     setForms((current) => [form, ...current.filter((item) => item.id !== form.id)]);
@@ -21,6 +22,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
     setSelectedVersionId(form.activeVersion.id);
     const nextDefinition = structuredClone(form.activeVersion.definition);
     setDefinition(nextDefinition);
+    setHistory(clearHistory());
     setDirty(false);
     if (!preserveTestResponses) {
       setResponses({});
@@ -206,7 +208,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       destructive: true,
     }))) return;
     const nextDefinition = structuredClone(form.activeVersion.definition);
-    setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
+    setSelectedFormId(form.id); setSelectedVersionId(form.activeVersion.id); setDefinition(nextDefinition); setHistory(clearHistory()); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setTestIssues([]); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError("");
   }
 
   async function chooseVersion(version: FormVersionView) {
@@ -218,7 +220,7 @@ export function useBuilderActions({ eventId, eventSlug }: Pick<BuilderWorkspaceP
       destructive: true,
     }))) return;
     const nextDefinition = structuredClone(version.definition);
-    setSelectedVersionId(version.id); setDefinition(nextDefinition); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
+    setSelectedVersionId(version.id); setDefinition(nextDefinition); setHistory(clearHistory()); setDirty(false); setResponses({}); setPreviewAttendees(blankPreviewAttendees(nextDefinition)); setPreviewStepId(firstPreviewStepId(nextDefinition)); setExpandedFieldId(null); closeModuleLibrary(); setNotice(""); setError(""); setTestIssues([]);
   }
 
   // Restore as draft (#1140): the old version's definition goes through the same draft save as an edit, so validation,

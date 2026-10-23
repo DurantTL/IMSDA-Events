@@ -1,7 +1,8 @@
 // Top bar zone: the page actions (preview, templates) and the form header with
 // the version chip, Save draft, Publish version and the form title.
 import { staffPageTitles } from "@/components/staff-navigation";
-import { AlertTriangle, BookmarkPlus, CopyPlus, Eye, ExternalLink, FileClock, Layers3, Save, Send, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BookmarkPlus, CopyPlus, Eye, ExternalLink, FileClock, Layers3, Redo2, Save, Send, ShieldCheck, Undo2 } from "lucide-react";
+import { canRedo, canUndo } from "./edit-history";
 import { statusLabel } from "./builder-types";
 import { useLoadedBuilder, useBuilder } from "./builder-context";
 import { versionStateChips, type VersionChipKind } from "./version-state";
@@ -18,6 +19,18 @@ export function BuilderPageIntro() {
 export function BuilderSaveDraftButton({ className = "secondary-button" }: { className?: string }) {
   const { dirty, busy, canEdit, editsCreateDraft, saveDraft } = useLoadedBuilder();
   return <button className={className} type="button" disabled={!canEdit || (!dirty && !editsCreateDraft) || busy !== null} aria-describedby="builder-action-hints" onClick={saveDraft}><Save size={15} /> {busy === "save" ? "Saving…" : editsCreateDraft ? (dirty ? "Save as new draft" : "Create new version") : "Save draft"}</button>;
+}
+
+/** Undo and Redo for the unsaved draft (#1134). Outline buttons, so Publish or Save stays the one filled button. */
+export function BuilderUndoRedo() {
+  const { history, canEdit, busy, undoEdit, redoEdit } = useLoadedBuilder();
+  const idle = canEdit && busy === null;
+  return (
+    <span className="fb-undo-redo" role="group" aria-label="Undo and redo">
+      <button className="fb-btn outline" type="button" disabled={!idle || !canUndo(history)} onClick={undoEdit}><Undo2 size={15} aria-hidden="true" /> Undo</button>
+      <button className="fb-btn outline" type="button" disabled={!idle || !canRedo(history)} onClick={redoEdit}><Redo2 size={15} aria-hidden="true" /> Redo</button>
+    </span>
+  );
 }
 
 export function BuilderPublicLink({ className = "secondary-button" }: { className?: string }) {

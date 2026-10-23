@@ -11,7 +11,7 @@ import { RegistrationFormNotificationsPanel } from "@/components/registration-fo
 import { TemplateCleanupChecklistPanel } from "@/components/template-cleanup-checklist-panel";
 import { PUBLIC_DRAFT_STAFF_HELP } from "@/modules/forms/public-draft";
 import { useLoadedBuilder } from "./builder-context";
-import { showsPublishButton, BuilderActionHints, BuilderHistoricalGate, BuilderPublicLink, BuilderPublishButton, BuilderSaveDraftButton, BuilderVersionChips } from "./builder-top-bar";
+import { showsPublishButton, BuilderActionHints, BuilderHistoricalGate, BuilderPublicLink, BuilderPublishButton, BuilderSaveDraftButton, BuilderUndoRedo, BuilderVersionChips } from "./builder-top-bar";
 import { BuilderNotices } from "./builder-notices";
 import { BuilderTemplateNotice } from "./builder-template-notice";
 import { BuilderRosterSettings, BuilderConfirmationEditor } from "./builder-form-settings";
@@ -27,7 +27,7 @@ import { tabAfterSelectionChange, type SidebarTab } from "./sidebar-tabs";
 import { locateField } from "./canvas-rows";
 import { inspectorAfterClose, inspectorAfterSelection } from "./phone-inspector";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
-import { focusTargetAction, isSearchShortcut } from "./shell-keys";
+import { focusTargetAction, isSearchShortcut, undoRedoShortcut } from "./shell-keys";
 import { useEditorLayout, useHydrated } from "./use-editor-layout";
 import type { PaletteEntry, PaletteRegistry } from "./palette-registry";
 
@@ -84,7 +84,7 @@ function dialogIsOpen() {
 export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
     eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications,
-    expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
+    busy, undoEdit, redoEdit, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
   const layoutControls = useEditorLayout();
   const hydrated = useHydrated();
@@ -188,6 +188,18 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [showSidebar, request]);
+
+  // Ctrl or Cmd+Z, Shift+Ctrl or Cmd+Z and Ctrl+Y (#1134), outside text fields (which keep the browser's own undo) and dialogs.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const action = undoRedoShortcut({ key: event.key, shiftKey: event.shiftKey, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, defaultPrevented: event.defaultPrevented, fromTypingTarget: isTypingTarget(event.target), dialogOpen: dialogIsOpen() });
+      if (!action) return;
+      event.preventDefault();
+      if (canEdit && busy === null) (action === "undo" ? undoEdit : redoEdit)();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [canEdit, busy, undoEdit, redoEdit]);
 
   function selectField(fieldId: string, sectionIndex: number) {
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);
@@ -303,6 +315,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
         </nav>
         <BuilderVersionChips />
+        <BuilderUndoRedo />
         <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview &amp; test</button>
         {/* Publish is the main button; with no Publish (a clean live or withdrawn version) Save is (#1137). */}
         <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />
