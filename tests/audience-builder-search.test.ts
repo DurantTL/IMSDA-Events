@@ -55,6 +55,7 @@ function prismaFixture(options: { bounced?: Array<{ email: string; status: strin
     registrationBillingResponsibility: { findFirst: vi.fn().mockResolvedValue(null) },
     registration: { findMany: registrationFindMany },
     registrationAttendee: { findMany: vi.fn().mockResolvedValue([]) },
+    emailAddressSuppression: { findMany: vi.fn().mockResolvedValue([]) },
   };
   mocks.getPrisma.mockReturnValue(prisma);
   return { prisma, registrationFindMany, queryRaw };

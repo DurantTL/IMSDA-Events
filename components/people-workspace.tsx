@@ -7,6 +7,7 @@ import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
+import { suppressionExplanation, suppressionLabel } from "@/modules/communications/suppression-labels";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { closeRegistrationUrlAction, followRegistrationParam, withoutRegistrationParam, type ParamOpened } from "@/lib/registration-param";
@@ -264,6 +265,7 @@ export function PeopleWorkspace({
   initialRegistrationId,
   backgroundFlaggedAttendeeIds = [],
   announcementOptOuts = {},
+  emailSuppressions = { registrations: {}, attendees: {} },
   responsibleAdults = {},
   locationId = null,
   matchingPersonFilter = false,
@@ -286,6 +288,8 @@ export function PeopleWorkspace({
   backgroundFlaggedAttendeeIds?: string[];
   /** Registrations whose contact address opted out of announcements (#838), by registration id. */
   announcementOptOuts?: Record<string, "EVENT" | "ALL">;
+  /** Who is not being sent to after a hard bounce or a spam complaint (#863), by registration contact and by attendee. */
+  emailSuppressions?: { registrations: Record<string, "BOUNCE" | "COMPLAINT">; attendees: Record<string, "BOUNCE" | "COMPLAINT"> };
   /** Minors by attendee id with who is responsible for them (#131): a name, "None of us", or not recorded. */
   responsibleAdults?: Record<string, { adultName: string | null; noneOfUs: boolean; ageUnknown: boolean }>;
   /** The location filter (#413) the CSV export follows; null exports every location. */
@@ -826,6 +830,11 @@ export function PeopleWorkspace({
             <span className="record-copy"><strong>{registration.accountHolder.firstName} {registration.accountHolder.lastName}</strong><small>{registration.confirmationCode} · {registration.attendeeCount} {registration.attendeeCount === 1 ? "person" : "people"}{registration.location ? ` · ${registration.location.name}` : ""}</small><small>{registration.attendeeCount > 1 ? registration.attendees.slice(0, 2).map((attendee) => `${attendee.firstName} ${attendee.lastName}`).join(", ") + (registration.attendeeCount > 2 ? ` +${registration.attendeeCount - 2} more` : "") : registration.accountHolder.email || "No email on file"}</small><small className="record-date">{submittedDateTime(registration.submittedAt, eventTimezone)}</small></span>
             <span className="record-badges">
               {registration.attendees.some((attendee) => backgroundFlaggedAttendeeIds.includes(attendee.id)) && <BackgroundCheckBadge />}
+              {emailSuppressions.registrations[registration.id] && (
+                <span className="status-chip coral" title={suppressionExplanation(emailSuppressions.registrations[registration.id]!)}>
+                  {suppressionLabel(emailSuppressions.registrations[registration.id]!)}
+                </span>
+              )}
               {announcementOptOuts[registration.id] && (
                 <span className="status-chip gold" title={announcementOptOuts[registration.id] === "ALL" ? "Opted out of all IMSDA Events announcements. Confirmations, receipts and reminders still go." : "Opted out of this event's announcements. Confirmations, receipts and reminders still go."}>
                   Announcements off
@@ -984,7 +993,7 @@ export function PeopleWorkspace({
                 ) : (
                   <>
                 <div className="detail-grid"><span><small>Confirmation</small><strong>{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong>{waitingForApproval(selected) ? "waiting for office approval" : selected.status.toLowerCase()}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong>{money(selected.totalAmountCents)}</strong></span><span><small>Balance</small><strong>{money(selected.balanceCents)}</strong></span></div>
-                <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}</div>
+                <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMSDA Events announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>
                   {selectedPricing && <details open>
@@ -1042,6 +1051,7 @@ export function PeopleWorkspace({
                                     </form>
                                   : <>
                                       {attendee.email || <span className="quiet-copy">Not provided</span>}
+                                      {emailSuppressions.attendees[attendee.id] && <span className="status-chip gold" data-email-suppressed="attendee" title={suppressionExplanation(emailSuppressions.attendees[attendee.id]!)}>{suppressionLabel(emailSuppressions.attendees[attendee.id]!)}</span>}
                                       {canEdit && <button className="text-button" type="button" onClick={() => { setError(""); setEditingAttendeeEmailId(attendee.id); }}><PencilLine aria-hidden="true" size={14} /> Edit</button>}
                                     </>}
                               </dd>

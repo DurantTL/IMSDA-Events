@@ -35,6 +35,18 @@ export const effectiveDeliveryDouble = {
     const mode = (row?.deliveryMode as string | undefined) ?? "LOCAL_CAPTURE";
     return { mode, reason: mode === "EXTERNAL_EMAIL" ? "ON" : "NOT_CONFIGURED", paused: false };
   },
+  /**
+   * The per-recipient suppression decision (#863). The delivery worker now REQUIRES the suppression table, so a fake
+   * Prisma either supplies `emailAddressSuppression` (and is asked, like the real module does) or this double treats the
+   * address as deliverable. The real decision and its fail-closed behavior are tested in
+   * `tests/email-suppression-delivery-863.test.ts` against the real module.
+   */
+  checkRecipientDeliverable: async (client: { emailAddressSuppression?: { findFirst?: (args: unknown) => Promise<{ reason: string; suppressedAt: Date } | null> } }, email: string) => {
+    const hit = await client.emailAddressSuppression?.findFirst?.({ where: { normalizedEmail: email.trim().toLowerCase(), reenabledAt: null } });
+    return hit
+      ? { deliverable: false as const, reason: "ADDRESS_SUPPRESSED" as const, suppression: hit, note: "Not sent: the address is suppressed." }
+      : { deliverable: true as const };
+  },
   isEmailEnvironmentConfigured: () => true,
   loadCentralSender: async () => ({ name: "IMSDA Events", email: null, replyTo: null }),
   isPlatformEmailConfigured: () => true,

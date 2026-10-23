@@ -25,6 +25,7 @@ import {
 } from "@/modules/registrations/choice-answer-filter";
 import { ChoiceAnswerFilter, type ChoiceFilterView } from "@/components/choice-answer-filter";
 import { listEventAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
+import { listEventSuppressionMarks } from "@/modules/communications/email-suppression";
 import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/repository";
 import { getResponsibleAdultsByAttendee } from "@/modules/guardian-authority/repository";
 import { countPendingTeams } from "@/modules/general-link-registrations/repository";
@@ -59,11 +60,11 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   const offPageRegistrationId = searchResult && registration && !searchResult.registrationIds.includes(registration) ? [registration] : [];
   // Teams from the general registration link that wait for a club (#931): said at the top, for someone who can resolve them.
   const pendingTeamCount = permissions.includes("MANAGE_REGISTRATION") ? await countPendingTeams(event.id) : 0;
-  const [loaded, flagged, responsibleByAttendee, optOutRows] = await Promise.all([
+  const [loaded, flagged, responsibleByAttendee, optOutRows, suppressionMarks] = await Promise.all([
     searchResult
       ? ([...searchResult.registrationIds, ...offPageRegistrationId].length > 0 ? listRegistrations(event.id, { registrationIds: [...searchResult.registrationIds, ...offPageRegistrationId] }) : Promise.resolve([]))
       : listRegistrations(event.id, { locationId }),
-    backgroundFlaggedAttendeeIds(event.id), getResponsibleAdultsByAttendee(event.id), listEventAnnouncementOptOuts(event.id),
+    backgroundFlaggedAttendeeIds(event.id), getResponsibleAdultsByAttendee(event.id), listEventAnnouncementOptOuts(event.id), listEventSuppressionMarks(event.id),
   ]);
   // The service's canonical order, not the loader's.
   const allRegistrations = searchResult
@@ -110,6 +111,6 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
     />
     <LocationFilter basePath="/people" locations={locations} params={searchResult ? searchParamsForLinks : { event: event.id, filter, [CHOICE_FILTER_QUESTION_PARAM]: choice?.question.id, [CHOICE_FILTER_VALUE_PARAM]: choice?.value ?? undefined }} selectedId={locationId} />
     <ChoiceAnswerFilter eventId={event.id} view={choiceView} carry={{ filter, location: locationId ?? undefined }} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canExport={permissions.includes("VIEW_REPORTS") && permissions.includes("VIEW_SENSITIVE_DATA")} />
-    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} pendingTeamCount={pendingTeamCount} />
+    <PeopleWorkspace key={`${event.id}:${choice?.question.id ?? ""}:${choice?.value ?? ""}:${searchResult?.queryString ?? ""}`} eventId={event.id} eventSlug={event.slug} eventTimezone={event.timezone} waitlistEnabled={event.waitlistEnabled} initialRegistrations={registrations} canEdit={permissions.includes("MANAGE_REGISTRATION")} canEmail={permissions.includes("MANAGE_COMMUNICATIONS")} canImport={permissions.includes("MANAGE_IMPORTS")} initialFilter={filter} initialRegistrationId={registration} backgroundFlaggedAttendeeIds={[...flagged]} announcementOptOuts={announcementOptOuts} emailSuppressions={suppressionMarks} responsibleAdults={responsibleAdults} matchingPersonFilter={Boolean(choice?.value)} locationId={locationId} pageScoped={Boolean(searchResult)} openOnlyRegistration={openOnlyRegistration} pendingTeamCount={pendingTeamCount} />
   </>;
 }

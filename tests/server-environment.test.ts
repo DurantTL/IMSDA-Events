@@ -99,6 +99,28 @@ describe("server environment contract", () => {
     expect(issuesFor({ ...ses, SES_REGION: "us-east-2.evil.example" }).some((issue) => issue.startsWith("SES_REGION:"))).toBe(true);
   });
 
+  it("accepts the SES notification topic only with the account that owns it (#863)", () => {
+    const ses = {
+      ...productionEnv,
+      RESEND_API_KEY: undefined,
+      EMAIL_PROVIDER: "ses",
+      SES_REGION: "us-east-2",
+      SES_SMTP_USERNAME: "synthetic-user",
+      SES_SMTP_PASSWORD: "synthetic-password",
+    };
+    const topic = "arn:aws:sns:us-east-2:123456789012:synthetic-ses-events";
+    expect(validateServerEnv({ ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "123456789012" }).ok).toBe(true);
+    // Both blank is fine: the endpoint simply answers 503 and processes nothing.
+    expect(validateServerEnv(ses).ok).toBe(true);
+    expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: topic }).some((issue) => issue.startsWith("SES_AWS_ACCOUNT_ID:"))).toBe(true);
+    expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "999999999999" }).some((issue) => issue.startsWith("SES_AWS_ACCOUNT_ID:"))).toBe(true);
+    expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: "https://evil.example.test/topic", SES_AWS_ACCOUNT_ID: "123456789012" }).some((issue) => issue.startsWith("SES_SNS_TOPIC_ARN:"))).toBe(true);
+    expect(issuesFor({ ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "12345" }).some((issue) => issue.startsWith("SES_AWS_ACCOUNT_ID:"))).toBe(true);
+    const both = { ...ses, SES_SNS_TOPIC_ARN: topic, SES_AWS_ACCOUNT_ID: "123456789012" };
+    for (const value of [undefined, "", "1", "2"]) expect(validateServerEnv({ ...both, SES_SNS_SIGNATURE_VERSION: value }).ok, String(value)).toBe(true);
+    expect(issuesFor({ ...both, SES_SNS_SIGNATURE_VERSION: "3" }).some((issue) => issue.startsWith("SES_SNS_SIGNATURE_VERSION:"))).toBe(true);
+  });
+
   it("requires somewhere to send account email from in production", () => {
     // An invited colleague who never receives a link cannot obtain a credential
     // at all, and no operator action substitutes for it at scale. So this is a

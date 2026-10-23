@@ -1,8 +1,9 @@
 import "server-only";
 
-import type { EventMessageSettings, Prisma } from "@prisma/client";
+import type { EmailSuppressionReason, EventMessageSettings, Prisma, PrismaClient } from "@prisma/client";
 import type { getPrisma } from "@/lib/prisma";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { suppressionLabel, suppressionSkipNote } from "@/modules/communications/suppression-labels";
 
 /**
  * Whether email for an event really leaves the building, and from where (#1043). This is the one place that decides it.
@@ -17,6 +18,11 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
  *     sender is set. The mode stays `EXTERNAL_EMAIL` so every path queues them, and delivery refuses with
  *     EXTERNAL_EMAIL_NOT_CONFIGURED until then;
  *   - otherwise real email (`ON`).
+ *
+ * Suppressed addresses (#863): a hard bounce or a spam complaint reported by SES stops ALL email to that address,
+ * confirmations and receipts included, until a system administrator re-enables it. That is a per-recipient decision, so it
+ * is made here too (`checkRecipientDeliverable`), and the one delivery worker every send path ends in asks it right before
+ * the provider call. Soft bounces are recorded and never suppress.
  *
  * The From address is always the platform's central sender. An event overrides only its display name and reply-to.
  *
@@ -163,4 +169,58 @@ export function pauseFields(paused: boolean, actorUserId: string, now: Date) {
   return paused
     ? { deliveryPaused: true, deliveryPausedAt: now, deliveryPausedByUserId: actorUserId }
     : { deliveryPaused: false, deliveryPausedAt: null, deliveryPausedByUserId: null };
+}
+
+
+// --- Suppressed addresses (#863) ----------------------------------------------------------------------------------
+
+export type AddressSuppression = { reason: EmailSuppressionReason; suppressedAt: Date };
+
+type SuppressionClient = Pick<PrismaClient, "emailAddressSuppression"> | Pick<Prisma.TransactionClient, "emailAddressSuppression">;
+
+/** Addresses are compared trimmed and lower-cased, on both sides, everywhere suppression looks at one. */
+export function normalizeSuppressionEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export { suppressionLabel, suppressionSkipNote };
+
+/** The active suppression of one address, or null. Active means not re-enabled. */
+export async function findActiveAddressSuppression(client: SuppressionClient, email: string): Promise<AddressSuppression | null> {
+  const normalized = normalizeSuppressionEmail(email);
+  if (!normalized) return null;
+  const row = await client.emailAddressSuppression.findFirst({
+    where: { normalizedEmail: normalized, reenabledAt: null },
+    select: { reason: true, suppressedAt: true },
+  });
+  return row ?? null;
+}
+
+/** The active suppressions among many addresses, keyed by normalized address. */
+export async function findActiveAddressSuppressions(client: SuppressionClient, emails: readonly string[]): Promise<Map<string, AddressSuppression>> {
+  const normalized = [...new Set(emails.map(normalizeSuppressionEmail).filter(Boolean))];
+  const found = new Map<string, AddressSuppression>();
+  for (let offset = 0; offset < normalized.length; offset += 500) {
+    const rows = await client.emailAddressSuppression.findMany({
+      where: { normalizedEmail: { in: normalized.slice(offset, offset + 500) }, reenabledAt: null },
+      select: { normalizedEmail: true, reason: true, suppressedAt: true },
+    });
+    for (const row of rows) found.set(row.normalizedEmail, { reason: row.reason, suppressedAt: row.suppressedAt });
+  }
+  return found;
+}
+
+export type RecipientDelivery =
+  | { deliverable: true }
+  | { deliverable: false; reason: "ADDRESS_SUPPRESSED"; suppression: AddressSuppression; note: string };
+
+/** Pure decision: an active suppression of the recipient's address means nothing is sent to it, whatever the event says. */
+export function resolveRecipientDelivery(suppression: AddressSuppression | null): RecipientDelivery {
+  if (!suppression) return { deliverable: true };
+  return { deliverable: false, reason: "ADDRESS_SUPPRESSED", suppression, note: suppressionSkipNote(suppression.reason) };
+}
+
+/** Whether email may go to this address now. The lookup can throw; callers fail closed (retry later, never send). */
+export async function checkRecipientDeliverable(client: SuppressionClient, email: string): Promise<RecipientDelivery> {
+  return resolveRecipientDelivery(await findActiveAddressSuppression(client, email));
 }

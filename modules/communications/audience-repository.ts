@@ -137,8 +137,8 @@ async function loadSuppressions(
     // The interactive transaction's own limit is above the statement timeout, so the database cancels first.
     const latest = await client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(SUPPRESSION_TIMEOUT_MS)}, true)`;
-      return tx.$queryRaw<Array<{ email: string; status: string }>>`
-        SELECT DISTINCT ON (lower("recipientEmail")) lower("recipientEmail") AS email, "providerDeliveryStatus"::text AS status
+      return tx.$queryRaw<Array<{ email: string; status: string; at: Date }>>`
+        SELECT DISTINCT ON (lower("recipientEmail")) lower("recipientEmail") AS email, "providerDeliveryStatus"::text AS status, "providerStatusAt" AS at
         FROM "MessageOutbox"
         WHERE lower("recipientEmail") IN (${Prisma.join(chunk)})
           AND "providerDeliveryStatus" IS NOT NULL AND "providerStatusAt" IS NOT NULL
@@ -149,9 +149,23 @@ async function loadSuppressions(
       }
       throw error;
     });
+    // An address a system administrator re-enabled (#863) is no longer held back by a bounce or complaint that was
+    // recorded before the re-enable; a later one is (the suppression row is switched back on then).
+    const explicit = await client.emailAddressSuppression.findMany({
+      where: { normalizedEmail: { in: chunk } },
+      select: { normalizedEmail: true, reason: true, reenabledAt: true },
+    });
+    const reenabledAt = new Map(explicit.filter((row) => row.reenabledAt).map((row) => [row.normalizedEmail, row.reenabledAt as Date]));
     for (const row of latest) {
+      const reenabled = reenabledAt.get(row.email);
+      if (reenabled && row.at && row.at <= reenabled) continue;
       if (row.status === "BOUNCED") suppressions.set(row.email, "PROVIDER_BOUNCED");
       else if (row.status === "COMPLAINED") suppressions.set(row.email, "PROVIDER_COMPLAINED");
+    }
+    // The address's own suppression (a hard bounce or complaint reported for any message, matched or not).
+    for (const row of explicit) {
+      if (row.reenabledAt) continue;
+      suppressions.set(row.normalizedEmail, row.reason === "COMPLAINT" ? "PROVIDER_COMPLAINED" : "PROVIDER_BOUNCED");
     }
     // Only an announcement can be opted out of (#838).
     if (query.messageKind === "ANNOUNCEMENT") {

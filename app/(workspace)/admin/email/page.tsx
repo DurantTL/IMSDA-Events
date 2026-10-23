@@ -15,6 +15,7 @@ import { listEventStaffListSummaries } from "@/modules/notifications/event-lists
 import { listNotificationSwitches } from "@/modules/notifications/settings";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { buildEmailHealth } from "@/modules/system-admin/email-health";
+import { listActiveSuppressions } from "@/modules/communications/email-suppression";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 
 export const metadata: Metadata = { title: "Email" };
@@ -28,12 +29,13 @@ export default async function EmailPage() {
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
 
-  const [switches, settings, eventLists, emailEvents, attention] = await Promise.all([
+  const [switches, settings, eventLists, emailEvents, attention, suppressions] = await Promise.all([
     listNotificationSwitches(),
     getPlatformSettings(),
     listEventStaffListSummaries(),
     listEventEmailStates(),
     getAdminAttentionSummary(),
+    listActiveSuppressions(),
   ]);
   const availability = getEmailAvailability();
   const health = buildEmailHealth(attention, {
@@ -41,7 +43,7 @@ export default async function EmailPage() {
     webhookConfigured: availability.webhookConfigured,
     accountEmailConfigured: isAccountEmailConfigured(),
     centralSenderSet: Boolean(settings.defaultSenderEmail),
-  });
+  }, suppressions);
 
   return (
     <section className="page-stack notifications-page">

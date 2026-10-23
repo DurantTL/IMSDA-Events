@@ -74,6 +74,12 @@ export const serverEnvSchema = z
     SES_SMTP_PORT: z.string().trim().regex(/^\d{1,5}$/, "must be a port number").optional(),
     SES_CONFIGURATION_SET: optionalTrimmed,
     SES_MAX_SEND_RATE: z.string().trim().regex(/^\d+(\.\d+)?$/, "must be a number of messages per second").optional(),
+    // Bounce, complaint and delivery reports from SES through SNS (#863). Both are required for the endpoint to accept
+    // anything: the one SNS topic it trusts, and the AWS account that owns it and sends the mail.
+    SES_SNS_TOPIC_ARN: z.string().trim().regex(/^arn:aws:sns:[a-z]{2}(?:-[a-z]+)+-\d{1,2}:\d{12}:[A-Za-z0-9_-]{1,256}$/, "must be an SNS topic ARN such as arn:aws:sns:us-east-2:123456789012:imsda-ses-events").optional(),
+    // "2" refuses SNS SignatureVersion 1 (SHA1). Blank accepts both; set the topic's SignatureVersion to 2 first.
+    SES_SNS_SIGNATURE_VERSION: z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? undefined : value), z.enum(["1", "2"]).optional()),
+    SES_AWS_ACCOUNT_ID: z.string().trim().regex(/^\d{12}$/, "must be a 12-digit AWS account id").optional(),
 
     // Sender identity for account email. Event messages take theirs from
     // EventMessageSettings; activation and password reset belong to no event.
@@ -234,6 +240,14 @@ export const serverEnvSchema = z
         message: "is required in production so account recovery email can be delivered",
       });
     }
+    if (value.SES_SNS_TOPIC_ARN) {
+      // The topic must belong to the account named beside it, so a typo in one cannot quietly trust another account's topic.
+      if (!value.SES_AWS_ACCOUNT_ID) {
+        context.addIssue({ code: "custom", path: ["SES_AWS_ACCOUNT_ID"], message: "is required when SES_SNS_TOPIC_ARN is set" });
+      } else if (value.SES_SNS_TOPIC_ARN.split(":")[4] !== value.SES_AWS_ACCOUNT_ID) {
+        context.addIssue({ code: "custom", path: ["SES_AWS_ACCOUNT_ID"], message: "must be the account id inside SES_SNS_TOPIC_ARN" });
+      }
+    }
     if (value.EMAIL_PROVIDER === "ses") {
       for (const key of ["SES_REGION", "SES_SMTP_USERNAME", "SES_SMTP_PASSWORD"] as const) {
         if (isProduction && !value[key]) {
@@ -365,6 +379,9 @@ export const SERVER_ENV_KEYS = [
     "SES_SMTP_PORT",
     "SES_CONFIGURATION_SET",
     "SES_MAX_SEND_RATE",
+    "SES_SNS_TOPIC_ARN",
+    "SES_AWS_ACCOUNT_ID",
+    "SES_SNS_SIGNATURE_VERSION",
     "ACCOUNT_EMAIL_SENDER_NAME",
     "ACCOUNT_EMAIL_SENDER_ADDRESS",
     "ACCOUNT_EMAIL_REPLY_TO",
