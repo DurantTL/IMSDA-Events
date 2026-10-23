@@ -374,6 +374,25 @@ describe("verified attendee registration views", () => {
     expect(registration?.totalCents).toBe(10000);
   });
 
+  it("keeps payment history on a cancelled registration, paid and not refunded (#1100)", async () => {
+    directRegistrationFixture("CANCELLED", [{ amount: { toString: () => "100" }, refunds: [] }]);
+    const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+    expect(registration).toMatchObject({ balanceCents: 0, grossPaidCents: 10000, refundedCents: 0 });
+  });
+
+  it("keeps payment history on a cancelled registration with a partial refund (#1100)", async () => {
+    directRegistrationFixture("CANCELLED", [{ amount: { toString: () => "100" }, refunds: [{ amount: { toString: () => "30" } }] }]);
+    const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+    expect(registration).toMatchObject({ balanceCents: 0, paidCents: 7000, grossPaidCents: 10000, refundedCents: 3000 });
+  });
+
+  it("shows a confirmed registration paid in full as not payable (#1100)", async () => {
+    directRegistrationFixture("CONFIRMED", [{ amount: { toString: () => "100" }, refunds: [] }]);
+    const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");
+    expect(registration).toMatchObject({ balanceCents: 0, grossPaidCents: 10000 });
+    expect(registration?.payment).toMatchObject({ state: "PAID", paymentEligible: false });
+  });
+
   it("still shows a submitted direct registration's balance as payable (#1100)", async () => {
     directRegistrationFixture("SUBMITTED", [{ amount: { toString: () => "40" }, refunds: [] }]);
     const [registration] = await listRegistrationsForVerifiedEmail("holder@example.test");

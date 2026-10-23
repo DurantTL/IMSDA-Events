@@ -31,3 +31,27 @@ export function accountAmountDue<T extends Lifecycle>(registrations: T[]) {
     scope: payable.length === 1 ? `for ${payable[0]!.event.name}` : `across ${payable.length} registrations`,
   };
 }
+
+const moneyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const formatMoney = (cents: number) => moneyFormatter.format(cents / 100);
+
+/**
+ * The text of the Balance cell for a directly billed registration (#1100):
+ * the lifecycle-aware main line, plus the payment history when money was paid
+ * on a registration that is not payable (cancelled or waitlisted).
+ */
+export function directBalanceCell(registration: Pick<AttendeeRegistrationSummary, "balanceCents" | "totalCents" | "grossPaidCents" | "refundedCents" | "payment">) {
+  const total = registration.totalCents ?? 0;
+  const { payment } = registration;
+  const main = payment.paymentEligible && registration.balanceCents > 0
+    ? `${formatMoney(registration.balanceCents)} due of ${formatMoney(total)}`
+    : payment.state === "PAID"
+      ? `Paid in full \u00b7 ${formatMoney(total)}`
+      : payment.label;
+  const gross = registration.grossPaidCents ?? 0;
+  const refunded = registration.refundedCents ?? 0;
+  const history = payment.state === "NOT_DUE" && gross > 0
+    ? `${formatMoney(gross)} paid${refunded > 0 ? ` \u00b7 ${formatMoney(refunded)} refunded` : ""}`
+    : null;
+  return { main, history };
+}

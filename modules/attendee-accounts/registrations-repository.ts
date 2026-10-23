@@ -306,6 +306,9 @@ export type AttendeeRegistrationSummary = {
   /** Null on a church-billed event (#621): registrants never see a total, amount paid or balance there. */
   totalCents: number | null;
   paidCents: number | null;
+  /** Money collected and refunded, before netting: the payment history kept visible on cancelled and waitlisted records (#1100). */
+  grossPaidCents: number | null;
+  refundedCents: number | null;
   /** The amount payable now (#1100): always 0 while waitlisted, cancelled or draft, and on a church-billed event. */
   balanceCents: number;
   /** The raw lifecycle status, for choosing what to feature; the display wording is in `status`. */
@@ -554,6 +557,8 @@ export async function listRegistrationsForVerifiedEmail(
       },
       totalCents: isDeferredOrganizationBilling ? null : totalCents,
       paidCents: isDeferredOrganizationBilling ? null : paymentSummary.paidCents,
+      grossPaidCents: isDeferredOrganizationBilling ? null : paymentSummary.paidCents + paymentSummary.refundedCents,
+      refundedCents: isDeferredOrganizationBilling ? null : paymentSummary.refundedCents,
       balanceCents,
       lifecycle: registration.status,
       payment: {
