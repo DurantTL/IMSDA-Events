@@ -7,7 +7,7 @@ import type { RegistrationFormDefinition } from "@/modules/forms/definition";
 import type { useConfirm } from "@/components/use-confirm";
 import { restoreConfirmation, restoreNotice, restoreSaveTarget, canRestoreVersion } from "./version-history";
 import {
-  informationFormToView, informationIssuesFromResponse, noInformationIssues, runInformationPublishFlow, saveInformationDraftRequest,
+  informationFormToView, informationIssuesFromResponse, mergeSettingsForm, noInformationIssues, runInformationPublishFlow, saveInformationDraftRequest,
   saveInformationSettingsRequest, setInformationStatusRequest, type InformationFillAccess,
 } from "./information-mode";
 import type { FormVersionView, FormView } from "./builder-types";
@@ -25,8 +25,11 @@ export function useInformationActions(
   const publishingRef = useRef(false);
 
   function refused(message: string, body: unknown, sent: RegistrationFormDefinition) {
-    setError(message);
-    setInformationIssues(informationIssuesFromResponse(body, sent));
+    const issues = informationIssuesFromResponse(body, sent);
+    const places = issues.form.length + Object.keys(issues.sections).length + Object.keys(issues.fields).length;
+    // One summary goes to the existing error live region; the details sit beside each section or question without announcing again.
+    setError(places > 1 ? `${message} ${places} places need changes; each is marked on the form.` : message);
+    setInformationIssues(issues);
   }
 
   async function saveDraft() {
@@ -90,7 +93,7 @@ export function useInformationActions(
 
   /** Replaces the form's own record without touching the editor's draft, unsaved edits or history. */
   function applySettingsForm(view: FormView) {
-    setForms((current) => current.map((form) => (form.id === view.id ? view : form)));
+    setForms((current) => current.map((form) => (form.id === view.id ? mergeSettingsForm(form, view) : form)));
   }
 
   async function saveSettings(settings: { fillAccess?: InformationFillAccess; opensAt?: string | null; closesAt?: string | null }) {

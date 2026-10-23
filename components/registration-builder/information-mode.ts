@@ -146,6 +146,14 @@ export function informationFormToView(form: InformationFormApi): FormView {
   };
 }
 
+/**
+ * After a settings or status change: take only the form-level fields. The versions (and so the draft's updatedAt, the
+ * stale-save token) stay as the editor has them, so a settings save never makes the next draft save look stale.
+ */
+export function mergeSettingsForm(current: FormView, fresh: FormView): FormView {
+  return { ...current, name: fresh.name, status: fresh.status, updatedAt: fresh.updatedAt, information: fresh.information };
+}
+
 // ---------------------------------------------------------------------------
 // Open and close times, edited in the browser's own time zone.
 
@@ -293,8 +301,9 @@ export function saveInformationDraftRequest(config: InformationBuilderConfig, fo
   return call(fetchImpl, informationFormApiPath(config, formId), "PATCH", { definition, expectedUpdatedAt });
 }
 
-export function publishInformationDraftRequest(config: InformationBuilderConfig, formId: string, fetchImpl: typeof fetch = fetch) {
-  return call(fetchImpl, informationFormApiPath(config, formId, "/publish"), "POST");
+export function publishInformationDraftRequest(config: InformationBuilderConfig, formId: string, expectedUpdatedAt: string, fetchImpl: typeof fetch = fetch) {
+  // The server refuses the publish when the draft changed since the editor last saw it.
+  return call(fetchImpl, informationFormApiPath(config, formId, "/publish"), "POST", { expectedUpdatedAt });
 }
 
 export function saveInformationSettingsRequest(config: InformationBuilderConfig, formId: string, settings: { fillAccess?: InformationFillAccess; opensAt?: string | null; closesAt?: string | null }, fetchImpl: typeof fetch = fetch) {
@@ -325,7 +334,7 @@ export async function runInformationPublishFlow({ config, formId, saveFirst, def
     if (!saved.ok) return { ok: false, stage: "save", message: saved.message, body: saved.body };
     savedForm = informationFormToView(saved.value);
   }
-  const published = await publishInformationDraftRequest(config, formId, fetchImpl);
+  const published = await publishInformationDraftRequest(config, formId, savedForm ? savedForm.activeVersion.updatedAt : expectedUpdatedAt, fetchImpl);
   if (!published.ok) return { ok: false, stage: "publish", message: published.message, body: published.body, savedForm };
   return { ok: true, form: informationFormToView(published.value) };
 }

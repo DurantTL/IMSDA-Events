@@ -9,6 +9,8 @@ const repositoryMocks = vi.hoisted(() => ({
 vi.mock("@/modules/rate-limit/repository", () => repositoryMocks);
 
 import {
+  checkInformationFormClientRateLimit,
+  checkInformationFormRateLimit,
   checkLoginAccountRateLimit,
   checkPublicManageRateLimit,
   checkRegistrationCodeAccessRateLimit,
@@ -159,5 +161,18 @@ describe("check-in desk limiter sizes (#825)", () => {
     ]) {
       expect(readFileSync(file, "utf8"), file).not.toMatch(/rate-limit/);
     }
+  });
+});
+
+describe("information form budgets (#1150)", () => {
+  it("charges the client and the form, passing only digests", async () => {
+    const request = new Request("https://events.imsda.test/forms/camp-survey", { headers: { "x-forwarded-for": "192.0.2.90" } });
+    await checkInformationFormRateLimit(request, "general:camp-survey", "submit");
+    const rules = repositoryMocks.enforceRateLimitRules.mock.calls[0]![0] as Array<{ policy: string; limit: number; subjectHash: string }>;
+    expect(rules.map((rule) => rule.policy)).toEqual(["information-form.submit.client-form"]);
+    await checkInformationFormClientRateLimit(request, "read");
+    expect((repositoryMocks.enforceRateLimitRules.mock.calls[1]![0] as Array<{ policy: string }>).map((rule) => rule.policy)).toEqual(["information-form.read.client"]);
+    expect(JSON.stringify(rules)).not.toContain("camp-survey");
+    expect(JSON.stringify(rules)).not.toContain("192.0.2.90");
   });
 });

@@ -195,7 +195,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/clubs\/transfers(\/|$)/, "Club member transfers"],
   [/^\/admin\/form-templates\/[^/]+(\/|$)/, "Form template"],
   [/^\/admin\/form-templates(\/|$)/, "Form templates"],
-  [/^\/admin\/information-forms\/[^/]+\/responses(\/|$)/, "Information form responses"],
+  [/^\/admin\/information-forms\/[^/]+\/responses(\/|$)/, "Form responses"],
   [/^\/admin\/information-forms\/[^/]+(\/|$)/, "Information form"],
   [/^\/admin\/information-forms(\/|$)/, "Information forms"],
   [/^\/admin\/club-forms\/[^/]+(\/|$)/, "Club form builder"],

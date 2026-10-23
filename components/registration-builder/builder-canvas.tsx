@@ -166,7 +166,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
                       className="fb-field"
                       data-field-id={field.id}
                       aria-current={selected ? "true" : undefined}
-                      aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}, ${chips.map((chip) => chip.label).join(", ")}.${selected ? "Selected." : "Select to edit."}`}
+                      aria-label={`${field.label || "Untitled question"}, ${fieldTypeLabels[field.type]}${chips.length > 0 ? `, ${chips.map((chip) => chip.label).join(", ")}` : ""}. ${selected ? "Selected." : "Select to edit."}`}
                       onClick={() => onSelect(field.id, sectionIndex)}
                     >
                       <span className="fb-q-label" aria-hidden="true">{field.label}{field.required && <span className="fb-required"> *</span>}</span>

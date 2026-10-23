@@ -1,6 +1,8 @@
 import "server-only";
 
-import { listFormTemplates } from "@/modules/forms/repository";
+import { getPrisma } from "@/lib/prisma";
+import { loadAllFormTemplates } from "@/modules/forms/seeded-templates";
+import { informationFormDefinitionIssues } from "@/modules/information-forms/definition";
 import { informationTemplates } from "@/modules/forms/information-audience";
 import type { InformationFormTarget } from "@/modules/information-forms/domain";
 import { InformationFormError } from "@/modules/information-forms/errors";
@@ -11,13 +13,15 @@ import type { InformationFormListItem, InformationFormTemplateChoice } from "@/c
 
 /** What the list page shows for a scope. The caller has already checked who may see it. */
 export async function loadInformationFormsHome(target: InformationFormTarget): Promise<{ forms: InformationFormListItem[]; templates: InformationFormTemplateChoice[] }> {
-  const [forms, templates] = await Promise.all([listInformationForms(target), listFormTemplates()]);
+  const [forms, loaded] = await Promise.all([listInformationForms(target), loadAllFormTemplates(getPrisma())]);
+  // Only templates the server would accept for an information form: the same refusal check, so a choice never fails on create.
+  const templates = informationTemplates(loaded).filter((template) => informationFormDefinitionIssues(template.definition).length === 0);
   return {
     forms: forms.map((form) => ({
       id: form.id, name: form.name, slug: form.slug, status: form.status, fillAccess: form.fillAccess, responseCount: form.responseCount,
       published: form.versions.some((version) => version.status === "PUBLISHED"), updatedAt: form.updatedAt.toISOString(),
     })),
-    templates: informationTemplates(templates).map((template) => ({ key: template.key, name: template.name, description: template.description })),
+    templates: templates.map((template) => ({ key: template.key, name: template.name, description: template.description })),
   };
 }
 

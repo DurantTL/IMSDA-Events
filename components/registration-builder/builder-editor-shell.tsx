@@ -379,7 +379,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           <BuilderHistoricalGate />
           <BuilderTemplateNotice />
           {canEdit && !information && <TemplateCleanupChecklistPanel key={selectedForm.id} formId={selectedForm.id} definition={definition} />}
-          {!information && <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>}          <BuilderCanvas
+          {!information && <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>}
+          <BuilderCanvas
             paletteDrag={paletteDrag}
             onSelect={selectField}
             onAction={onToolbarAction}

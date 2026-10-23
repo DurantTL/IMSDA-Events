@@ -3,7 +3,7 @@ import { createDefaultPaletteRegistry } from "@/components/registration-builder/
 import { filterPaletteRegistry, informationEntryAllowed } from "@/components/registration-builder/information-palette";
 import {
   eventInformationConfig, generalInformationConfig, informationApiBase, informationFieldTypeAllowed, informationFormToView, informationIssuesFromResponse,
-  informationPublicPath, informationResponsesHref, isoToLocalInput, localInputToIso, matchedSensitiveWord, runInformationPublishFlow,
+  informationPublicPath, informationResponsesHref, mergeSettingsForm, isoToLocalInput, localInputToIso, matchedSensitiveWord, runInformationPublishFlow,
   type InformationFormApi,
 } from "@/components/registration-builder/information-mode";
 import { deriveFieldChips } from "@/components/registration-builder/field-chips";
@@ -40,9 +40,9 @@ describe("information mode addresses (#1149)", () => {
   it("titles the editor and responses pages", () => {
     expect(staffSubpageTitle("/admin/information-forms")).toBe("Information forms");
     expect(staffSubpageTitle("/admin/information-forms/f1")).toBe("Information form");
-    expect(staffSubpageTitle("/admin/information-forms/f1/responses")).toBe("Information form responses");
+    expect(staffSubpageTitle("/admin/information-forms/f1/responses")).toBe("Form responses");
     expect(staffSubpageTitle("/information-forms")).toBe("Information forms");
-    expect(staffSubpageTitle("/information-forms/responses")).toBe("Information form responses");
+    expect(staffSubpageTitle("/information-forms/responses")).toBe("Form responses");
   });
 });
 
@@ -137,6 +137,26 @@ describe("save then publish", () => {
     expect(result.ok).toBe(true);
     const calls = fetchImpl.mock.calls.map((call) => [call[0], call[1]?.method]);
     expect(calls).toEqual([["/api/admin/information-forms/form_1", "PATCH"], ["/api/admin/information-forms/form_1/publish", "POST"]]);
+    // Publish carries the saved draft's own updatedAt (version 2 in the saved form).
+    expect(JSON.parse(fetchImpl.mock.calls[1]![1].body)).toEqual({ expectedUpdatedAt: "2026-01-02T00:00:00.000Z" });
+  });
+
+  it("publishes an unedited draft with the draft's updatedAt the editor holds", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(json({ form: apiForm() }));
+    await runInformationPublishFlow({ config, formId: "form_1", saveFirst: false, definition, expectedUpdatedAt: "2026-01-05T00:00:00.000Z", fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchImpl.mock.calls[0]![1].body)).toEqual({ expectedUpdatedAt: "2026-01-05T00:00:00.000Z" });
+  });
+
+  it("a settings change keeps the editor's versions and so its stale-save token", () => {
+    const current = informationFormToView(apiForm());
+    const fresh = informationFormToView(apiForm({ status: "OPEN", fillAccess: "SIGNED_IN", updatedAt: new Date("2026-02-02T00:00:00Z"), versions: [
+      { id: "v2", versionNumber: 2, status: "DRAFT", definition: blankInformationFormDefinition("Synthetic survey"), publishedAt: null, createdAt: "2026-01-02T00:00:00.000Z", updatedAt: "2026-03-03T00:00:00.000Z" },
+    ] }));
+    const merged = mergeSettingsForm(current, fresh);
+    expect(merged.versions).toBe(current.versions);
+    expect(merged.activeVersion.updatedAt).toBe("2026-01-02T00:00:00.000Z");
+    expect(merged.information).toMatchObject({ status: "OPEN", fillAccess: "SIGNED_IN" });
   });
 
   it("publishes nothing when the save is refused", async () => {

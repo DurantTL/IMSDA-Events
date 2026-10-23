@@ -450,7 +450,10 @@ describe("launcher search and sidebar duplicates (#967)", () => {
   });
 
   it("says so when the desktop popover has nothing left after the sidebar duplicates are removed", () => {
-    const cards = cardsFor({ permissions: ["MANAGE_FORMS"], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    const allCards = cardsFor({ permissions: ["MANAGE_FORMS"], clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    // MANAGE_FORMS also opens the information forms card (#1149), which the sidebar does not list; this case is about the sidebar's own item.
+    const cards = allCards.filter((card) => card.key === "registration-builder");
+    expect(allCards.map((card) => card.key)).toContain("information-forms");
     const markup = renderToStaticMarkup(
       createElement(MoreLauncherPanel, { cards, sidebarHrefs: sidebarHrefsFor(["MANAGE_FORMS"]), isSystemAdmin: false, eventQuery: "?event=event_1", variant: "sidebar" }),
     );

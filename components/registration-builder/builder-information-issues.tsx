@@ -6,7 +6,7 @@ import { useBuilder } from "./builder-context";
 function IssueList({ messages, label }: { messages: string[]; label: string }) {
   if (messages.length === 0) return null;
   return (
-    <div className="fb-info-issues" role="alert" data-testid="information-issues">
+    <div className="fb-info-issues" data-testid="information-issues">
       <p className="fb-info-issues-title">{label}</p>
       <ul>{messages.map((message) => <li key={message}>{message}</li>)}</ul>
     </div>

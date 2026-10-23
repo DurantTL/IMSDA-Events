@@ -58,14 +58,14 @@ function SettingsFields() {
         </div>
         <p className="fb-hint">Times are in this browser&apos;s time zone. Leave a time empty for no limit. The form still has to be open (below) to accept answers.</p>
         {problem && <p className="form-error" role="alert">{problem}</p>}
-        <button className="fb-btn primary" type="button" disabled={!changed || busy !== null} onClick={save}>{busy === "settings" ? "Saving…" : "Save settings"}</button>
+        <button className="fb-btn outline" type="button" disabled={!changed || busy !== null} onClick={save}>{busy === "settings" ? "Saving…" : "Save settings"}</button>
       </section>
       <section className="panel fb-info-status" aria-labelledby="fb-info-status-title">
         <div className="section-heading"><div><p className="eyebrow">Open or close</p><h2 id="fb-info-status-title">Accepting answers</h2></div></div>
         <p className="fb-info-status-line" role="status"><strong>{statusText(current.status, Boolean(publishedVersion))}</strong></p>
         {current.status === "OPEN"
           ? <button className="fb-btn" type="button" disabled={busy !== null} onClick={() => setInformationStatus("CLOSED")}><Lock size={15} aria-hidden="true" /> {busy === "status" ? "Closing…" : "Close the form"}</button>
-          : <button className="fb-btn primary" type="button" disabled={busy !== null || !publishedVersion} title={publishedVersion ? undefined : "Publish this form first"} onClick={() => setInformationStatus("OPEN")}><LockOpen size={15} aria-hidden="true" /> {busy === "status" ? "Opening…" : current.status === "CLOSED" ? "Open the form again" : "Open for answers"}</button>}
+          : <button className="fb-btn outline" type="button" disabled={busy !== null || !publishedVersion} title={publishedVersion ? undefined : "Publish this form first"} onClick={() => setInformationStatus("OPEN")}><LockOpen size={15} aria-hidden="true" /> {busy === "status" ? "Opening…" : current.status === "CLOSED" ? "Open the form again" : "Open for answers"}</button>}
         <p className="fb-hint">Closing keeps every answer already received. Publishing a new version does not open or close the form.</p>
       </section>
       <section className="panel fb-info-link" aria-labelledby="fb-info-link-title">
@@ -88,6 +88,6 @@ export function BuilderInformationSettings() {
   const hydrated = useHydrated();
   // The times show in the browser's time zone, which the server cannot know: render them after hydration only.
   if (!hydrated) return null;
-  // Keyed by the form's own timestamp, so a saved change or a new status shows the stored values.
-  return <SettingsFields key={`${selectedForm.id}:${selectedForm.updatedAt}`} />;
+  // Keyed by the form id only, so saving the draft never discards half-typed settings.
+  return <SettingsFields key={selectedForm.id} />;
 }
