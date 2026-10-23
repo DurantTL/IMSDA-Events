@@ -29,7 +29,11 @@ import { inspectorAfterClose, inspectorAfterSelection } from "./phone-inspector"
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
 import { canRedo, canUndo } from "./edit-history";
 import { focusTargetAction, isSearchShortcut, undoRedoShortcut } from "./shell-keys";
-import { useEditorLayout, useHydrated } from "./use-editor-layout";
+import { useBuilderPhoneViewport, useEditorLayout, useHydrated } from "./use-editor-layout";
+import { BuilderPhoneCanvas } from "./builder-phone-canvas";
+import { PhoneMoveSheet } from "./builder-phone-move";
+import { usePhoneModal } from "./use-phone-modal";
+import { useKeyboardInset } from "./use-keyboard-inset";
 import { paletteRegistry, type PaletteEntry, type PaletteRegistry } from "./palette-registry";
 import { filterPaletteRegistry } from "./information-palette";
 import { useQuestionLibraryRegistry } from "./use-question-library";
@@ -54,7 +58,7 @@ function focusSelector(request: FocusRequest) {
     case "label": return `#${LABEL_INPUT_ID}`;
     case "search": return "#fb-palette-search";
     case "toolbar": return `[data-fb-action="${request.action}"][data-field-id="${request.fieldId}"]`;
-    case "field": return `.fb-field[data-field-id="${request.fieldId}"]`;
+    case "field": return `.fb-field[data-field-id="${request.fieldId}"], [data-fb-phone-edit="${request.fieldId}"]`;
     case "step-add": return `[data-fb-step-add="${request.sectionId}"]`;
     case "tab": return `#${sidebarTabId(request.tab)}`;
     case "settings-link": return '[data-fb-nav="settings"]';
@@ -113,6 +117,12 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   const [menuOpen, setMenuOpen] = useState(false);
   // Phone width only (#1139): whether Question settings covers the screen. The stylesheet decides whether that means anything.
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  // Phone width (#1071): a per-step question list, a sticky Save draft and Preview bar, and the Move screen.
+  const phone = useBuilderPhoneViewport();
+  const [phoneStepId, setPhoneStepId] = useState<string | null>(null);
+  const [moveFieldId, setMoveFieldId] = useState<string | null>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const phoneBarRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState<"editor" | "settings" | "notifications">("editor");
   const [focusRequest, setFocusRequest] = useState<{ request: FocusRequest; nonce: number } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -138,13 +148,43 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     setTab(tabAfterSelectionChange(tab, seenSelection, expandedFieldId));
     setInspectorOpen(inspectorAfterSelection(inspectorOpen, seenSelection, expandedFieldId));
   }
+  // A setup warning's link (#617) arrives with its question selected: at phone width its settings open as the full-screen sheet, once.
+  const [openedForTarget, setOpenedForTarget] = useState(false);
+  if (phone && !openedForTarget && focusTarget && focusTarget.formId === selectedFormId && expandedFieldId === focusTarget.fieldId) {
+    setOpenedForTarget(true);
+    setInspectorOpen(true);
+  }
+  // A question removed (or undone away) while its settings fill the phone screen leaves nothing to show: close the sheet.
+  if (inspectorOpen && tab === "settings" && !selection) setInspectorOpen(false);
 
   const targetIndexById = definition.sections.findIndex((section) => section.id === targetSectionId);
   const targetIndex = targetIndexById >= 0 ? targetIndexById : (selection?.sectionIndex ?? 0);
+  // The step the phone list shows: the one the person chose, else the one holding the selected question, else the first.
+  const phoneStepById = definition.sections.findIndex((section) => section.id === phoneStepId);
+  const phoneStepIndex = phoneStepById >= 0 ? phoneStepById : (selection?.sectionIndex ?? 0);
+
+  // Phone width: the full-screen sidebar traps focus and gives it back; the sticky bar lifts above the keyboard.
+  const sheetActive = phone && inspectorOpen && layout.sidebarVisible;
+  useKeyboardInset(phoneBarRef, phone);
 
   const request = useCallback((next: FocusRequest) => {
     setFocusRequest((current) => ({ request: next, nonce: (current?.nonce ?? 0) + 1 }));
   }, []);
+
+  // Declared before the focus-request effect below, so it notes what opened the sheet before a request moves focus into it.
+  usePhoneModal({
+    active: sheetActive,
+    ref: asideRef,
+    onClose: closeInspector,
+    // The control that opened the sheet is gone (a removed question, or a browser that does not focus a tapped button): the
+    // question's card, else the step's Add question button, else the top of the editor.
+    fallback: () => {
+      const target = (expandedFieldId ? document.querySelector<HTMLElement>(`[data-fb-phone-edit="${expandedFieldId}"]`) : null)
+        ?? document.querySelector<HTMLElement>("[data-fb-step-add]")
+        ?? document.getElementById("builder-editor");
+      target?.focus({ preventScroll: true });
+    },
+  });
 
   // Runs after the render a request came with, so the element it names exists. Only reads and moves focus.
   useEffect(() => {
@@ -163,6 +203,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     const action = focusTargetAction({ handled: handledFocusTarget.current, hydrated, selected: expandedFieldId === focusTarget.fieldId, settingsOpen: tab === "settings", sidebarVisible: layout.sidebarVisible });
     if (action === "skip") return;
     if (action === "reveal") { showSidebar(); return; }
+    // At phone width the settings fill the screen: wait for the sheet to open (see openedForTarget) and run again then.
+    if (phone && !inspectorOpen) return;
     const input = document.getElementById(`registration-fee-${focusTarget.fieldId}`);
     if (!input) { handledFocusTarget.current = true; return; }
     handledFocusTarget.current = true;
@@ -171,7 +213,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     }
     input.scrollIntoView({ block: "center" });
     input.focus();
-  }, [focusTarget, selectedFormId, expandedFieldId, tab, layout.sidebarVisible, showSidebar, hydrated]);
+  }, [focusTarget, selectedFormId, expandedFieldId, tab, layout.sidebarVisible, showSidebar, hydrated, phone, inspectorOpen]);
 
   // Remember where the selection was; if the question is then removed, focus goes to its step's add button instead of being lost.
   // Opening another form or version forgets it. The removal confirmation puts focus back itself when it closes, so this waits a
@@ -221,16 +263,22 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   function selectField(fieldId: string, sectionIndex: number) {
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);
     setActiveSection("editor");
+    setPhoneStepId(definition.sections[sectionIndex]?.id ?? null);
     setExpandedFieldId(fieldId);
     setTab("settings");
+    // At phone width the settings fill the screen; Edit on the question that is already selected must open them again too.
+    setInspectorOpen(true);
     // Selecting while the sidebar is hidden shows it, so the settings the selection opens can be seen.
     showSidebar();
   }
 
   function addToStep(sectionIndex: number) {
     setTargetSectionId(definition.sections[sectionIndex]?.id ?? null);
+    setPhoneStepId(definition.sections[sectionIndex]?.id ?? null);
     showSidebar();
     setTab("questions");
+    // At phone width the question search opens as its own sheet.
+    setInspectorOpen(true);
     request({ kind: "search" });
   }
 
@@ -243,18 +291,18 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   function onToolbarAction(action: ToolbarAction, sectionIndex: number, fieldIndex: number) {
     const field = definition.sections[sectionIndex]?.fields[fieldIndex];
     if (!field) return;
-    if (action === "settings") { setTab("settings"); showSidebar(); request({ kind: "label" }); return; }
+    if (action === "settings") { setTab("settings"); setInspectorOpen(true); showSidebar(); request({ kind: "label" }); return; }
     if (action === "up" || action === "down") { moveField(sectionIndex, fieldIndex, action === "up" ? -1 : 1); request({ kind: "toolbar", fieldId: field.id, action }); return; }
     // The copy is selected; put the cursor in its label, since the button just pressed leaves the page with the old selection.
     if (action === "duplicate") { duplicateField(sectionIndex, fieldIndex); request({ kind: "label" }); return; }
     openRemoveField(sectionIndex, fieldIndex);
   }
 
-  // Back and Done only close the inspector: the edits stay, nothing is saved, and "Unsaved changes" stays on. Focus returns to the question's card.
+  // Back, Done, Close and Escape only close the inspector: the edits stay, nothing is saved, and "Unsaved changes" stays on.
+  // Focus goes back to the control that opened it (usePhoneModal), which is the question's Edit button, the step's Add
+  // question button or the Settings & payment link.
   function closeInspector() {
     setInspectorOpen(inspectorAfterClose());
-    if (tab === "form-settings") request({ kind: "settings-link" });
-    else if (expandedFieldId) request({ kind: "field", fieldId: expandedFieldId });
   }
 
   // The "Settings & payment" link opens the Form settings tab (#1139), showing the sidebar first if it is hidden.
@@ -328,9 +376,11 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   ];
 
   const sidebarSide = layout.side;
+  // At phone width the notices sit just above the sticky bar, or inside the full-screen sheet while it covers the page.
+  const phoneNotices = <BuilderNotices />;
 
   return (
-    <div className="fb-shell" data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} data-inspector={inspectorOpen ? "open" : "closed"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
+    <div className="fb-shell" data-phone={phone ? "true" : undefined} data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} data-inspector={inspectorOpen ? "open" : "closed"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
       <header className="fb-topbar" ref={topbarRef}>
         <Link className="fb-icon-button" href={information ? informationListHref(information) : `/event-setup?event=${encodeURIComponent(eventId)}`} aria-label={information ? "Back to information forms" : "Back to event setup"}><ChevronLeft size={18} aria-hidden="true" /></Link>
         {forms.length > 1
@@ -345,11 +395,11 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
         </nav>
         <BuilderVersionChips />
         <BuilderUndoRedo />
-        <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> {information ? "Preview" : "Preview & test"}</button>
+        {!phone && <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> {information ? "Preview" : "Preview & test"}</button>}
         {/* Publish is the main button; with no Publish (a clean live or withdrawn version) Save is (#1137). */}
-        <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />
+        {!phone && <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />}
         <BuilderPublishButton className="fb-btn primary" />
-        <button
+        {!phone && <button
           ref={menuButtonRef}
           className="fb-icon-button"
           type="button"
@@ -357,9 +407,9 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           aria-expanded={menuOpen}
           aria-controls="fb-layout-menu"
           onClick={() => setMenuOpen((open) => !open)}
-        ><EllipsisVertical size={18} aria-hidden="true" /></button>
+        ><EllipsisVertical size={18} aria-hidden="true" /></button>}
       </header>
-      {menuOpen && (
+      {menuOpen && !phone && (
         <div
           className="fb-layout-menu"
           id="fb-layout-menu"
@@ -375,7 +425,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           <p className="fb-hint">You can also drag the sidebar&apos;s edge, or focus it and use the arrow keys. Your layout is remembered in this browser.</p>
         </div>
       )}
-      <BuilderNotices />
+      {!phone && <BuilderNotices />}
       <div className="fb-body" ref={bodyRef} style={{ ["--fb-sidebar-width" as string]: `${layout.width}px` }}>
         <div className="fb-main" id="builder-editor" tabIndex={-1}>
           <BuilderActionHints />
@@ -383,27 +433,48 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           <BuilderTemplateNotice />
           {canEdit && !information && <TemplateCleanupChecklistPanel key={selectedForm.id} formId={selectedForm.id} definition={definition} />}
           {!information && <p className="builder-draft-note"><small>{PUBLIC_DRAFT_STAFF_HELP}</small></p>}
-          <BuilderCanvas
-            paletteDrag={paletteDrag}
-            onSelect={selectField}
-            onAction={onToolbarAction}
-            onAddToStep={addToStep}
-            onDropPalette={(sectionIndex, index) => {
-              if (paletteDrag) addEntry(paletteDrag, sectionIndex, index);
-              setPaletteDrag(null);
-            }}
-          />
+          {phone
+            ? <BuilderPhoneCanvas
+              activeStepIndex={phoneStepIndex}
+              onStepChange={(index) => setPhoneStepId(definition.sections[index]?.id ?? null)}
+              onEdit={selectField}
+              onMove={setMoveFieldId}
+              onAddToStep={addToStep}
+              onAction={onToolbarAction}
+            />
+            : <BuilderCanvas
+              paletteDrag={paletteDrag}
+              onSelect={selectField}
+              onAction={onToolbarAction}
+              onAddToStep={addToStep}
+              onDropPalette={(sectionIndex, index) => {
+                if (paletteDrag) addEntry(paletteDrag, sectionIndex, index);
+                setPaletteDrag(null);
+              }}
+            />}
           {canEditNotifications && (
             <div className="fb-form-sections" id="builder-notifications" tabIndex={-1} aria-label="Notifications">
               <RegistrationFormNotificationsPanel key={selectedForm.id} eventId={eventId} formId={selectedForm.id} />
             </div>
           )}
           <div className="fb-preview-section"><BuilderPreview /></div>
+          {phone && <button className="fb-btn outline fb-phone-return" type="button" onClick={() => scrollToSection("editor")}>Back to the questions</button>}
         </div>
         {layout.sidebarVisible
-          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} inspector={{ title: tab === "form-settings" ? "Form settings" : selection ? selection.field.label || "Untitled question" : "Question settings", onBack: closeInspector, onDone: closeInspector }} />
+          ? <BuilderSidebar tabs={tabs} activeTab={tab} onTabChange={setTab} layout={layout} shownWidth={shownWidth} maxWidth={maxWidth} onResize={layoutControls.setWidth} containerRef={bodyRef} asideRef={asideRef} modal={sheetActive} inspector={{ title: tab === "form-settings" ? "Form settings" : tab === "questions" ? "Add a question" : selection ? selection.field.label || "Untitled question" : "Question settings", onBack: closeInspector, onDone: closeInspector, doneLabel: tab === "questions" ? "Close" : "Done", hideBack: tab === "questions", note: tab === "questions" ? undefined : "Done keeps your changes in this draft. They are saved with Save draft.", notices: phone && inspectorOpen ? phoneNotices : undefined }} />
           : <div className="fb-rail"><button className="fb-btn" type="button" onClick={layoutControls.toggleSidebar}>{sidebarSide === "left" ? <PanelLeft size={15} aria-hidden="true" /> : <PanelRight size={15} aria-hidden="true" />} Show sidebar</button><button className="fb-btn" type="button" onClick={() => addToStep(targetIndex)}><Plus size={15} aria-hidden="true" /> Add question</button></div>}
       </div>
+      {/* Phone width (#1071): Save draft and Preview stay at the bottom, above the keyboard and the safe area. Save is the one filled button unless Publish is showing (it is in the top bar). */}
+      {phone && (
+        <div className="fb-phone-bar" ref={phoneBarRef} role="group" aria-label="Draft actions">
+          {!inspectorOpen && <div className="fb-phone-bar-notices">{phoneNotices}</div>}
+          <div className="fb-phone-bar-actions">
+            <button className="fb-btn outline" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview</button>
+            <BuilderSaveDraftButton className={showsPublishButton({ status: selectedVersion.status, canEdit, editsCreateDraft, dirty }) ? "fb-btn outline" : "fb-btn primary"} />
+          </div>
+        </div>
+      )}
+      {phone && moveFieldId && <PhoneMoveSheet fieldId={moveFieldId} onClose={() => setMoveFieldId(null)} onMoved={setPhoneStepId} />}
     </div>
   );
 }

@@ -139,7 +139,7 @@ export type BuilderWorkspaceProps = {
   canEditNotifications?: boolean;
   /** System administrators only (#1065); the server checks it again on every save. */
   canSaveAsTemplate?: boolean;
-  /** For tests: the phone-width layout is otherwise picked by viewport, which a server render cannot vary. `classic` always uses the phone-width layout (form list, section cards, preview column); `auto` (the default) uses the editor shell (#1132) from 768px. */
+  /** For tests: `classic` uses the earlier layout (form list, section cards, preview column); `auto` (the default) uses the editor shell (#1132), which adapts to phone width (#1071). */
   layout?: "auto" | "classic";
   /** Information mode (#1149): the builder opens an information form instead of an event's registration form. Payment, roster, meals, attendee-type and pricing parts are left out, and every request goes to the information-forms API. */
   information?: InformationBuilderConfig;

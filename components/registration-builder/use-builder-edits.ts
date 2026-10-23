@@ -6,6 +6,7 @@ import { isPublicReviewSection } from "@/modules/forms/public-registration-steps
 import type { PaletteEntry } from "./palette-registry";
 import { planPaletteInsert } from "./palette-insert";
 import { planFieldDrop } from "./field-drop";
+import { dependencyOrderIssue, planAdjacentMove, planMoveToStep, type MovePlan } from "./phone-move";
 import { localId, defaultField, blankPreviewAttendees } from "./builder-types";
 import { isAtBaseline, recordEdit, redo as redoStep, singleValueEditKey, undo as undoStep } from "./edit-history";
 import type { BuilderState } from "./use-builder-state";
@@ -64,14 +65,24 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     updateField(sectionIndex, fieldIndex, { ageBounds: next.minimumAge === null && next.maximumAge === null ? undefined : next });
   }
 
+  // Move up, Move down and Move to step by question id (#1071), for the phone Move screen. They hand a refusal back to the
+  // caller instead of the page's error notice, so the screen can show it where the person is looking.
+  type MoveResult = { ok: true; unchanged?: boolean } | { ok: false; message: string };
+  function applyMovePlan(plan: MovePlan): MoveResult {
+    if (!definition || plan.kind === "nothing") return { ok: true, unchanged: true };
+    if (plan.kind === "refused") return { ok: false, message: plan.message };
+    replaceDefinition({ ...definition, sections: plan.sections });
+    return { ok: true };
+  }
+  const moveFieldBy = (fieldId: string, direction: -1 | 1): MoveResult => definition ? applyMovePlan(planAdjacentMove(definition.sections, fieldId, direction)) : { ok: true, unchanged: true };
+  const moveFieldToStep = (fieldId: string, targetSectionIndex: number): MoveResult => definition ? applyMovePlan(planMoveToStep(definition.sections, fieldId, targetSectionIndex)) : { ok: true, unchanged: true };
+
   function moveField(sectionIndex: number, fieldIndex: number, direction: -1 | 1) {
     if (!definition) return;
-    const nextIndex = fieldIndex + direction;
-    const section = definition.sections[sectionIndex];
-    if (nextIndex < 0 || nextIndex >= section.fields.length) return;
-    const fields = [...section.fields];
-    [fields[fieldIndex], fields[nextIndex]] = [fields[nextIndex], fields[fieldIndex]];
-    updateSection(sectionIndex, { fields });
+    const field = definition.sections[sectionIndex]?.fields[fieldIndex];
+    if (!field) return;
+    const result = moveFieldBy(field.id, direction);
+    if (!result.ok) setError(result.message);
   }
 
   function moveSection(sectionIndex: number, direction: -1 | 1) {
@@ -118,8 +129,13 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     if (!definition || dragging?.kind !== "field") return;
     const plan = planFieldDrop(definition.sections, { sectionIndex: dragging.sectionIndex, fieldIndex: dragging.fieldIndex }, { sectionIndex: targetSectionIndex, fieldIndex: targetFieldIndex });
     setDragging(null);
-    if (plan.kind === "error") setError(plan.message);
-    else if (plan.kind === "moved") replaceDefinition({ ...definition, sections: plan.sections });
+    if (plan.kind === "error") { setError(plan.message); return; }
+    if (plan.kind !== "moved") return;
+    // A question shown only when another is answered stays after it (#1071).
+    const movedId = definition.sections[dragging.sectionIndex]?.fields[dragging.fieldIndex]?.id;
+    const issue = movedId ? dependencyOrderIssue(plan.sections, movedId) : null;
+    if (issue) setError(issue);
+    else replaceDefinition({ ...definition, sections: plan.sections });
   }
 
   function showPreview() {
@@ -254,7 +270,7 @@ export function useBuilderEdits(state: BuilderState, derived: BuilderDerived) {
     closeModuleLibrary();
     replaceDefinition({ ...definition, sections });
   }
-  return { undoEdit, redoEdit, replaceDefinition, updateSection, updateField, updateNumberBounds, moveField, moveSection, dropSection, dropField, showPreview, removeField, duplicateField, addModule, addPaletteEntry, addSection, removeSection, setReviewSection };
+  return { undoEdit, redoEdit, replaceDefinition, updateSection, updateField, updateNumberBounds, moveField, moveFieldBy, moveFieldToStep, moveSection, dropSection, dropField, showPreview, removeField, duplicateField, addModule, addPaletteEntry, addSection, removeSection, setReviewSection };
 }
 
 export type BuilderEdits = ReturnType<typeof useBuilderEdits>;
