@@ -65,7 +65,7 @@ checkout of this repository (the app image is built by GitHub), so mounting the
 scripts from the repo is not possible without adding a manual copy step that
 drifts. `scripts/backup/Dockerfile` builds `postgres:16-alpine` + `aws-cli` +
 the scripts, and the existing image workflow publishes it as
-`ghcr.io/duranttl/imsda-events-backup:<sha>` on every merge to `main`, so it is
+`ghcr.io/duranttl/imsda-events-backup:<sha>` with each daily app image build, so it is
 versioned and rolled back exactly like the app. It holds no secrets.
 
 ## Where the status goes
