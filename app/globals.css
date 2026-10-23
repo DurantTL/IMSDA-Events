@@ -12401,6 +12401,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Kitchen counts (#1029). Phone first: one form per count, full-width inputs and 44px-tall buttons. */
 .kitchen-counts .served-split { display: block; margin-top: 2px; }
 .kitchen-counts .served-total > * { border-top: 2px solid var(--line, #d6dee2); }
+.closeout-exception-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.meal-closeout-page .secondary-button, .meal-closeout .secondary-button, .closeout-review-form .secondary-button, .closeout-review-form input { min-height: 44px; }
+.closeout-exception { border-top: 1px solid var(--line, #d6dee2); padding-top: 12px; }
 .kitchen-definitions { display: grid; gap: 4px; margin: 0 0 12px; }
 .kitchen-definitions dd { margin: 0; }
 .kitchen-history ul { padding-left: 18px; margin: 4px 0 12px; }

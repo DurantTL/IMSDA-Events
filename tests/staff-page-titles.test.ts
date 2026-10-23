@@ -116,7 +116,7 @@ describe("staff page names (#685)", () => {
 
   it("has every page's <title> read the shared constant", () => {
     const pages: Record<string, string> = {
-      overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", kitchenCounts: "more/kitchen-report/counts", payments: "finance", registrationForm: "registration-builder",
+      overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", kitchenCounts: "more/kitchen-report/counts", mealCloseout: "more/kitchen-report/closeout", payments: "finance", registrationForm: "registration-builder",
       emails: "communications", team: "staff", imports: "imports", systemManagement: "admin", checkIn: "check-in",
       more: "more", eventModules: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
       attendeeSetup: "more/attendee-configuration", tags: "more/tags", eventSettings: "more/event-settings",

@@ -1837,6 +1837,7 @@ model Event {
   mealImportBatches                   EventMealImportBatch[]
   mealRedemptions                     EventMealRedemption[]
   mealKitchenCounts                   EventMealKitchenCount[]
+  mealCloseoutReviews                 EventMealCloseoutReview[]
   mealSelectionChanges                EventMealSelectionChange[]
   mealLedgerEntries                   EventMealLedgerEntry[]
   lodgingWaitlistEntries              EventLodgingWaitlistEntry[]
@@ -10085,6 +10086,30 @@ model StaffInvitation {
   @@index([eventId, group])
   @@index([eventId, approval])
   @@index([lastMessageId])
+}
+
+enum MealCloseoutReviewStatus {
+  ACKNOWLEDGED
+  REOPENED
+}
+
+/// Append-only staff review of one meal closeout exception (#212). `exceptionKey` names the exception (a code and its scope);
+/// the latest row of a key is its current review. `detailDigest` is a hash of the exception's figures when it was reviewed,
+/// so an exception whose figures changed afterwards reads as open again. Records a decision only: nothing here moves money,
+/// edits a charge, a credit or a count, or issues a refund.
+model EventMealCloseoutReview {
+  id              String                     @id @default(cuid())
+  eventId         String
+  exceptionKey    String
+  status          MealCloseoutReviewStatus
+  detailDigest    String
+  note            String
+  reviewedByUserId String
+  createdAt       DateTime                   @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, exceptionKey, createdAt])
 }
 
 enum MealKitchenCountKind {
