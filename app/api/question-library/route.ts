@@ -21,8 +21,11 @@ async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const input = saveLibraryItemSchema.parse(await readQuestionLibraryJson(request));
-    const actor = await requireQuestionLibraryBuilder(input.eventId);
+    // Authorize first: only the event id is read from the body to know which permission to check; nothing else is parsed until the caller is let in.
+    const body = await readQuestionLibraryJson(request);
+    const claimedEventId = body && typeof body === "object" && typeof (body as { eventId?: unknown }).eventId === "string" ? (body as { eventId: string }).eventId.trim() : null;
+    const actor = await requireQuestionLibraryBuilder(claimedEventId || null);
+    const input = saveLibraryItemSchema.parse(body);
     const saved = await createLibraryItem({ name: input.name, description: input.description, fields: input.fields }, actor);
     return Response.json(saved, { status: 201, headers: questionLibraryNoStore });
   } catch (error) {

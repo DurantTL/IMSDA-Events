@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ACKNOWLEDGMENT_PLACEHOLDER_TEXT, formFieldSchema, isAgeFieldKey, type RegistrationFormField } from "@/modules/forms/definition";
 import { builderFieldModules, promoCodeBuilderModule } from "@/modules/forms/builder-modules";
-import { isHealthTypeField } from "@/modules/forms/field-flags";
+import { isHealthTypeField, resolveFieldOffer } from "@/modules/forms/field-flags";
 import { mealTicketBinding } from "@/modules/meals/domain";
 
 /**
@@ -85,7 +85,13 @@ export function prepareLibraryFragment(raw: unknown): { fragment: QuestionLibrar
     if (isHealthTypeField(next)) next.sensitive = true;
     return next;
   });
-  return { fragment: { fields }, replacedAcknowledgments };
+  // Restrictions never loosen: a sensitive question is never a filter, and a question wired (in either direction) to a
+  // sensitive question in this item is stored sensitive and not a filter. The form's own check decides, so there is no second rule.
+  const restricted = fields.map((candidate) => {
+    const offer = resolveFieldOffer(candidate, { allFields: fields, sectionTitleOf: () => "", paymentMethodFieldKey: null });
+    return offer.sensitive ? { ...candidate, sensitive: true, filterable: false } : candidate;
+  });
+  return { fragment: { fields: restricted }, replacedAcknowledgments };
 }
 
 /** Reads a stored fragment; null when it can no longer be read (a stored item is listed as unreadable, never inserted). */
@@ -102,8 +108,7 @@ export type QuestionLibraryItemView = {
   fields: RegistrationFormField[];
   createdAt: string;
   updatedAt: string;
-  createdBy: string | null;
 };
 
 /** What the administrator's management list shows. An unreadable item is listed and flagged, never hidden. */
-export type QuestionLibraryAdminRow = Omit<QuestionLibraryItemView, "fields"> & { fieldCount: number; fieldLabels: string[]; unreadable: boolean };
+export type QuestionLibraryAdminRow = Omit<QuestionLibraryItemView, "fields"> & { createdBy: string | null; fieldCount: number; fieldLabels: string[]; unreadable: boolean };

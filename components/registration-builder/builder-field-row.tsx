@@ -31,7 +31,7 @@ export function BuilderFieldRow({ section, field, sectionIndex, fieldIndex }: { 
               </ActionsMenu></div>}
             </div>
       {repair && (
-        <div className="inline-notice library-repair-notice" role="alert" data-library-repair={field.id}>
+        <div className="inline-notice library-repair-notice" role="status" data-library-repair={field.id}>
           <strong>Needs repair.</strong> {repair}
           <button className="secondary-button" type="button" onClick={() => setLibraryRepairs((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== field.id)))}>Mark as repaired</button>
         </div>

@@ -14,7 +14,7 @@ function field(patch: Partial<RegistrationFormField> = {}): RegistrationFormFiel
 }
 
 function item(fields: RegistrationFormField[], patch: Partial<QuestionLibraryItemView> = {}): QuestionLibraryItemView {
-  return { id: "lib-1", name: "Saved item", description: "", fields, createdAt: "2026-10-23T00:00:00.000Z", updatedAt: "2026-10-23T00:00:00.000Z", createdBy: "Synthetic Staff", ...patch };
+  return { id: "lib-1", name: "Saved item", description: "", fields, createdAt: "2026-10-23T00:00:00.000Z", updatedAt: "2026-10-23T00:00:00.000Z", ...patch };
 }
 
 function counter() {
@@ -65,6 +65,26 @@ describe("saving a question: what is stored", () => {
     ]);
     expect(replacedAcknowledgments).toEqual(["Waiver"]);
     expect(fragment.fields[0]!.acknowledgment).toMatchObject({ source: "TEXT" });
+  });
+});
+
+describe("saving restricts what is sensitive, on the server", () => {
+  it("stores a health-type question as sensitive and not a filter, whatever was sent", () => {
+    const { fragment } = prepareLibraryFragment([field({ key: "food_allergies", label: "Food allergies", type: "SELECT", options: ["Yes", "No"], filterable: true })]);
+    expect(fragment.fields[0]).toMatchObject({ sensitive: true, filterable: false });
+  });
+
+  it("stores a dependent of a sensitive question as sensitive and not a filter", () => {
+    const { fragment } = prepareLibraryFragment([
+      field({ id: "ctl_1", key: "food_allergies", label: "Food allergies", type: "RADIO", options: ["Yes", "No"] }),
+      field({ id: "dep_1", key: "shirt_style", label: "Shirt style", type: "SELECT", options: ["A", "B"], filterable: true, conditional: { fieldKey: "food_allergies", operator: "EQUALS", value: "Yes" } }),
+    ]);
+    expect(fragment.fields[1]).toMatchObject({ sensitive: true, filterable: false });
+  });
+
+  it("leaves a plain question's filter alone", () => {
+    const { fragment } = prepareLibraryFragment([field({ key: "tshirt", label: "T-shirt", type: "SELECT", options: ["S", "M"], filterable: true })]);
+    expect(fragment.fields[0]!.filterable).toBe(true);
   });
 });
 
@@ -156,6 +176,19 @@ describe("references between copied questions", () => {
     expect(copy.repairs[0]!.message).toContain("not part of this saved question");
     // The copy is a valid definition field again: no dangling reference.
     expect(copy.fields[0]!.conditional).toBeUndefined();
+  });
+
+  it("adds a question whose condition was removed as optional, and says so", () => {
+    const copy = instantiateLibraryFragment(item([dependent]), [], counter());
+    expect(dependent.required).toBe(true);
+    expect(copy.fields[0]!.required).toBe(false);
+    expect(copy.repairs[0]!.message).toContain("so it is now optional");
+    expect(copy.repairs[0]!.message).toContain("set it up again");
+  });
+
+  it("keeps a question's required flag when its condition is carried over", () => {
+    const copy = instantiateLibraryFragment(item([controller, dependent]), [], counter());
+    expect(copy.fields[1]!.required).toBe(true);
   });
 
   it("carries the repair through the palette insert, keyed by the inserted field's id", () => {

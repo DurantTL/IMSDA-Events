@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { QuestionLibraryAdminRow } from "@/modules/question-library/domain";
 
 /**
@@ -16,6 +16,9 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // The row that held focus disappears or changes, so focus goes back to the list heading.
+  const focusHeading = () => window.setTimeout(() => headingRef.current?.focus(), 0);
 
   async function call(id: string, method: "PATCH" | "DELETE", body?: unknown) {
     setBusy(true); setError("");
@@ -25,6 +28,7 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
       if (!response.ok) { setError(result.message ?? "The change could not be saved."); return; }
       setEditingId(null); setConfirmingId(null);
       router.refresh();
+      focusHeading();
     } catch {
       setError("The change could not be saved. Check your connection and try again.");
     } finally {
@@ -35,6 +39,7 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
   if (items.length === 0) return <p className="quiet-copy">Nothing is saved yet. In the form builder, open a question&apos;s actions menu and choose Save to library.</p>;
   return (
     <div className="form-stack">
+      <h2 ref={headingRef} tabIndex={-1}>Saved questions</h2>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <ul className="question-library-list">
         {items.map((item) => (
@@ -44,7 +49,7 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
                 <label>Name<input maxLength={120} required value={name} onChange={(event) => setName(event.target.value)} /></label>
                 <label>Note<textarea maxLength={500} rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
                 <div className="form-actions">
-                  <button className="secondary-button" type="button" disabled={busy} onClick={() => setEditingId(null)}>Cancel</button>
+                  <button className="secondary-button" type="button" disabled={busy} onClick={() => { setEditingId(null); focusHeading(); }}>Cancel</button>
                   <button className="primary-button" type="submit" disabled={busy || name.trim().length === 0}>{busy ? "Saving…" : "Save changes"}</button>
                 </div>
               </form>
@@ -59,14 +64,14 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
                   <small className="quiet-copy">{item.createdBy ? `Saved by ${item.createdBy}` : "Saved by a former user"}</small>
                 </div>
                 <div className="form-actions">
-                  <button className="secondary-button" type="button" disabled={busy} onClick={() => { setEditingId(item.id); setName(item.name); setDescription(item.description); setConfirmingId(null); }}>Rename</button>
+                  <button className="secondary-button" type="button" disabled={busy} aria-label={`Rename ${item.name}`} onClick={() => { setEditingId(item.id); setName(item.name); setDescription(item.description); setConfirmingId(null); }}>Rename</button>
                   {confirmingId === item.id ? (
                     <>
-                      <button className="secondary-button" type="button" disabled={busy} onClick={() => setConfirmingId(null)}>Keep it</button>
+                      <button className="secondary-button" type="button" disabled={busy} onClick={() => { setConfirmingId(null); focusHeading(); }}>Keep it</button>
                       <button className="primary-button lifecycle-danger-button" type="button" disabled={busy} onClick={() => void call(item.id, "DELETE")}>{busy ? "Deleting…" : `Delete ${item.name}`}</button>
                     </>
                   ) : (
-                    <button className="secondary-button" type="button" disabled={busy} onClick={() => setConfirmingId(item.id)}>Delete</button>
+                    <button className="secondary-button" type="button" disabled={busy} aria-label={`Delete ${item.name}`} onClick={() => setConfirmingId(item.id)}>Delete</button>
                   )}
                 </div>
                 {confirmingId === item.id && <p className="field-help">Deleting removes it from the library. Questions already added to forms are independent copies and stay as they are.</p>}

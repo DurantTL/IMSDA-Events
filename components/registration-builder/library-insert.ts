@@ -78,7 +78,10 @@ export function instantiateLibraryFragment(item: Pick<QuestionLibraryItemView, "
     if (!conditional) delete copy.conditional; else copy.conditional = conditional;
     if (!optionalWhen) delete copy.optionalWhen; else copy.optionalWhen = optionalWhen;
     if (notes.length > 0) {
-      repairs.push({ fieldId: copy.id, message: `${notes.join(". ")}. Choose what it depends on, or leave it always shown.` });
+      // A question whose condition was removed would otherwise become required for everyone, so it is added as optional.
+      const wasRequired = copy.required;
+      copy.required = false;
+      repairs.push({ fieldId: copy.id, message: `${notes.join(". ")}. Its condition was removed${wasRequired ? ", so it is now optional" : ""}: set it up again, or leave it always shown.` });
       // Its link to a controller is gone, so it must not become a filter by default.
       if (copy.filterable === undefined) copy.filterable = false;
     }

@@ -25,10 +25,9 @@ async function authorNames(userIds: readonly (string | null)[]) {
   return new Map(users.map((user) => [user.id, user.displayName]));
 }
 
-/** The items the palette offers: readable, not archived, by name. */
+/** The items the palette offers: readable, not archived, by name. Author names are left out: only the administrator's list shows who saved what. */
 export async function listLibraryItems(): Promise<QuestionLibraryItemView[]> {
   const rows = await getPrisma().questionLibraryItem.findMany({ where: { archivedAt: null }, orderBy: [{ name: "asc" }, { createdAt: "asc" }] });
-  const names = await authorNames(rows.map((row) => row.createdByUserId));
   const items: QuestionLibraryItemView[] = [];
   for (const row of rows) {
     const fragment = readLibraryFragment(row.definition);
@@ -36,7 +35,6 @@ export async function listLibraryItems(): Promise<QuestionLibraryItemView[]> {
     items.push({
       id: row.id, name: row.name, description: row.description, fields: fragment.fields,
       createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-      createdBy: row.createdByUserId ? names.get(row.createdByUserId) ?? null : null,
     });
   }
   return items;
