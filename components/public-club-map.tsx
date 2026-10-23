@@ -11,6 +11,7 @@ import {
   markerLabel,
   type ClubMapGroup,
 } from "@/components/public-club-map-content";
+import { nextTileStatus, type TileStatus } from "@/components/public-club-finder-logic";
 import styles from "./public-club-map.module.css";
 
 type Leaflet = typeof import("leaflet");
@@ -57,6 +58,7 @@ export function PublicClubMap({
   const onSelectRef = useRef(onSelect);
   const selectedIdRef = useRef(selectedId);
   const onStatusRef = useRef(onStatus);
+  const tileStatusRef = useRef<TileStatus>("ready");
   const lastBoundsRef = useRef<[number, number][] | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -83,8 +85,14 @@ export function PublicClubMap({
       }).setView(defaultCenter, defaultZoom);
       const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
       // Tile trouble is reported, never fatal: the pins and the list still work.
-      tiles.on("tileerror", () => onStatusRef.current?.("tiles-failed"));
-      tiles.on("tileload", () => onStatusRef.current?.("ready"));
+      // Sticky until Retry remounts the map, so the status cannot flap.
+      tiles.on("tileerror", () => {
+        const next = nextTileStatus(tileStatusRef.current, "tileerror");
+        if (next !== tileStatusRef.current) {
+          tileStatusRef.current = next;
+          onStatusRef.current?.(next);
+        }
+      });
       mapRef.current = map;
       layerRef.current = L.layerGroup().addTo(map);
       // On phones the map is hidden while the list shows; when it comes back
@@ -95,7 +103,12 @@ export function PublicClubMap({
           const width = containerRef.current?.clientWidth ?? 0;
           if (width > 0 && lastWidth === 0 && mapRef.current) {
             mapRef.current.invalidateSize();
-            if (lastBoundsRef.current) {
+            const pin = selectedIdRef.current
+              ? [...pinsRef.current.values()].find((entry) => entry.group.clubs.some((club) => club.id === selectedIdRef.current))
+              : undefined;
+            if (pin) {
+              mapRef.current.panTo(pin.marker.getLatLng());
+            } else if (lastBoundsRef.current) {
               mapRef.current.fitBounds(lastBoundsRef.current, { padding: [32, 32], maxZoom: 11 });
             }
           }
@@ -104,7 +117,7 @@ export function PublicClubMap({
         observer.observe(containerRef.current);
       }
       setReady(true);
-      onStatusRef.current?.("ready");
+      if (tileStatusRef.current === "ready") onStatusRef.current?.("ready");
     }).catch(() => {
       if (!cancelled) onStatusRef.current?.("unavailable");
     });
