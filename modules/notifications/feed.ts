@@ -93,15 +93,17 @@ export async function markAlertFeedItemRead(userId: string, itemId: string, now 
 }
 
 /**
- * Marks everything read that occurred at or before `cutoff` (captured when the person pressed the button, and never later
- * than now). Receipts are made only for rows that exist at that moment, so an alert that arrives, or commits, after the
- * press has no receipt and stays unread. Returns how many items were marked.
+ * Marks read exactly the items the administrator was shown (`ids`), and nothing else. A time cutoff cannot do this: a row's
+ * `occurredAt` is stamped when it is inserted, not when its transaction commits, so an older-stamped item can commit after the
+ * panel loaded. Ids that are not in this administrator's visible feed (gone, past 90 days, unknown) are ignored, and the list
+ * is capped. Returns how many items were newly marked.
  */
-export async function markAllAlertFeedRead(userId: string, cutoff: Date, now = new Date()): Promise<number> {
+export async function markAllAlertFeedRead(userId: string, ids: readonly string[], now = new Date()): Promise<number> {
+  const wanted = [...new Set(ids)].slice(0, ALERT_FEED_LIST_LIMIT);
+  if (wanted.length === 0) return 0;
   const prisma = getPrisma();
-  const through = cutoff.getTime() > now.getTime() ? now : cutoff;
   const unread = await prisma.adminAlertFeedItem.findMany({
-    where: { occurredAt: { gte: alertFeedCutoff(now), lte: through }, receipts: { none: { userId } } },
+    where: { id: { in: wanted }, occurredAt: { gte: alertFeedCutoff(now) }, receipts: { none: { userId } } },
     select: { id: true },
   });
   if (unread.length === 0) return 0;

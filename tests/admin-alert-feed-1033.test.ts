@@ -54,7 +54,7 @@ const DAY = 24 * 60 * 60_000;
 const NOW = new Date("2026-11-30T12:00:00.000Z");
 
 type Where = {
-  id?: string;
+  id?: string | { in: string[] };
   occurredAt?: { gte?: Date; lte?: Date; lt?: Date };
   receipts?: { none: { userId: string } };
 };
@@ -65,7 +65,8 @@ function fakeFeedDatabase() {
   const receipts = new Set<string>();
   let nextId = 1;
   const matches = (item: Item, where: Where) => {
-    if (where.id !== undefined && item.id !== where.id) return false;
+    if (typeof where.id === "string" && item.id !== where.id) return false;
+    if (typeof where.id === "object" && !where.id.in.includes(item.id)) return false;
     const range = where.occurredAt;
     if (range?.gte && item.occurredAt < range.gte) return false;
     if (range?.lte && item.occurredAt > range.lte) return false;
@@ -193,36 +194,33 @@ describe("read and unread per administrator (#1033)", () => {
     expect(await markAlertFeedItemRead("admin-1", "missing", NOW)).toBe(false);
   });
 
-  it("marks everything up to the captured cutoff, and an alert that arrives after the click stays unread", async () => {
+  it("marks only the items that were shown: one that arrived or committed since stays unread, even with an older timestamp", async () => {
     const db = fakeFeedDatabase();
     mocks.getPrisma.mockReturnValue(db.prisma);
-    db.seed("k1", new Date(NOW.getTime() - 3000));
-    db.seed("k2", new Date(NOW.getTime() - 2000));
-    const clickedAt = NOW;
-    // Arrives after the click was captured (a later clock), then the click is processed.
-    db.seed("late", new Date(NOW.getTime() + 500));
+    const shownOne = db.seed("k1", new Date(NOW.getTime() - 3000));
+    const shownTwo = db.seed("k2", new Date(NOW.getTime() - 2000));
+    // Stamped before the panel loaded but committed after it: older than the newest shown item, never shown.
+    const unseen = db.seed("slow-commit", new Date(NOW.getTime() - 2500));
 
-    const marked = await markAllAlertFeedRead("admin-1", clickedAt, new Date(NOW.getTime() + 1000));
+    const marked = await markAllAlertFeedRead("admin-1", [shownOne.id, shownTwo.id], NOW);
     expect(marked).toBe(2);
-    const after = await listAlertFeed("admin-1", new Date(NOW.getTime() + 1000));
+    const after = await listAlertFeed("admin-1", NOW);
     expect(after.unreadCount).toBe(1);
-    expect(after.items.find((item) => !item.read)?.summary).toBeDefined();
-    expect(await countUnreadAlertFeed("admin-2", new Date(NOW.getTime() + 1000))).toBe(3);
+    expect(after.items.find((item) => !item.read)?.id).toBe(unseen.id);
+    expect(await countUnreadAlertFeed("admin-2", NOW)).toBe(3);
   });
 
-  it("never lets a cutoff in the future mark an item that has not happened yet", async () => {
+  it("ignores ids that are unknown or past 90 days, and ids another administrator has no claim on", async () => {
     const db = fakeFeedDatabase();
     mocks.getPrisma.mockReturnValue(db.prisma);
-    db.seed("future", new Date(NOW.getTime() + 60_000));
-    expect(await markAllAlertFeedRead("admin-1", new Date(NOW.getTime() + 10 * DAY), NOW)).toBe(0);
-  });
-
-  it("marks again without error when everything is already read", async () => {
-    const db = fakeFeedDatabase();
-    mocks.getPrisma.mockReturnValue(db.prisma);
-    db.seed("k1", new Date(NOW.getTime() - 1000));
-    expect(await markAllAlertFeedRead("admin-1", NOW, NOW)).toBe(1);
-    expect(await markAllAlertFeedRead("admin-1", NOW, NOW)).toBe(0);
+    const expired = db.seed("expired", new Date(NOW.getTime() - 91 * DAY));
+    const live = db.seed("live", new Date(NOW.getTime() - 1000));
+    expect(await markAllAlertFeedRead("admin-1", ["missing", expired.id], NOW)).toBe(0);
+    expect(db.receipts.size).toBe(0);
+    expect(await markAllAlertFeedRead("admin-1", [live.id, live.id, expired.id], NOW)).toBe(1);
+    // Marking again is idempotent.
+    expect(await markAllAlertFeedRead("admin-1", [live.id], NOW)).toBe(0);
+    expect(await markAllAlertFeedRead("admin-1", [], NOW)).toBe(0);
   });
 });
 
@@ -261,14 +259,14 @@ describe("the feed API (#1033)", () => {
   ])("refuses %s on every method without touching the database", async (_name, user) => {
     mocks.getCurrentSession.mockResolvedValue({ user });
     expect((await GET(new Request("http://localhost/api/admin/alert-feed") as never)).status).toBe(403);
-    expect((await post({ action: "read-all" })).status).toBe(403);
+    expect((await post({ action: "read-all", ids: ["x"] })).status).toBe(403);
     expect((await post({ action: "read", id: "x" })).status).toBe(403);
     expect(mocks.getPrisma).not.toHaveBeenCalled();
   });
 
   it("refuses a cross-origin post before anything else", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });
-    const response = await post({ action: "read-all" }, { origin: "https://evil.example" });
+    const response = await post({ action: "read-all", ids: ["x"] }, { origin: "https://evil.example" });
     expect(response.status).toBe(403);
     expect(mocks.getPrisma).not.toHaveBeenCalled();
   });
@@ -288,7 +286,7 @@ describe("the feed API (#1033)", () => {
     const one = await (await post({ action: "read", id: first.id })).json();
     expect(one.feed.unreadCount).toBe(1);
 
-    const all = await (await post({ action: "read-all", cutoff: recent.toISOString() })).json();
+    const all = await (await post({ action: "read-all", ids: [first.id, "item-2"] })).json();
     expect(all.feed.unreadCount).toBe(0);
     expect(await countUnreadAlertFeed("admin-2")).toBe(2);
   });
@@ -298,7 +296,9 @@ describe("the feed API (#1033)", () => {
     mocks.getPrisma.mockReturnValue(db.prisma);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });
     expect((await post({ action: "read", id: "missing" })).status).toBe(404);
-    expect((await post({ action: "read-all", cutoff: "not a date" })).status).toBe(400);
+    expect((await post({ action: "read-all" })).status).toBe(400);
+    expect((await post({ action: "read-all", ids: [] })).status).toBe(400);
+    expect((await post({ action: "read-all", ids: Array.from({ length: 500 }, (_, index) => `id-${index}`) })).status).toBe(400);
     expect((await post({ action: "delete-everything" })).status).toBe(400);
     expect((await post({ action: "read", id: "x", extra: true })).status).toBe(400);
   });
@@ -441,11 +441,30 @@ describe("the bell with the feed (#1033)", () => {
     expect(markup).toContain("Needs attention");
     expect(markup).toContain("Recent alerts, 2 unread");
     expect(markup).toContain("New club application submitted");
-    expect(markup).toContain('aria-label="Mark read: New club application submitted"');
-    expect(markup).not.toContain('aria-label="Mark read: Event feature requested"');
-    expect(markup).toContain("Mark all read");
+    expect(markup).toContain('aria-label="Mark read: New club application submitted, A new club application was submitted and is waiting for a decision. (');
+    expect(markup).not.toContain('aria-label="Mark read: Event feature requested');
+    // A polite live region announces the result of marking read.
+    expect(markup).toContain('aria-live="polite"');
+    // Focus has a place to go when the pressed button disappears.
+    expect(markup).toMatch(/<h3[^>]*tabindex="-1"[^>]*>Recent alerts/);
+    // The feed says 2 unread but one is shown, so the button does not claim to mark all.
+    expect(markup).toContain("Mark these read");
     // An item with no link is plain text, not a link.
     expect(markup).toContain("Event feature requested");
+  });
+
+  it("gives every mark-read button its own name, even for two alerts of one kind", () => {
+    const twin = { ...feed.items[0]!, id: "i3", summary: "A new club application was submitted and is waiting for a decision.", occurredAt: new Date(NOW.getTime() - 3_600_000).toISOString() };
+    const markup = renderToStaticMarkup(createElement(AdminAttentionBell, { defaultOpen: true, initial: summary, initialFeed: { unreadCount: 3, items: [...feed.items, twin] } }));
+    const names = [...markup.matchAll(/aria-label="(Mark read: [^"]*)"/g)].map((match) => match[1]);
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+  });
+
+  it("keeps the plain bell name when the live counts could not be read, rather than saying nothing needs attention", () => {
+    const markup = renderToStaticMarkup(createElement(AdminAttentionBell, { initialFeed: { unreadCount: 0, items: [] } }));
+    expect(markup).toContain('aria-label="Notifications"');
+    expect(markup).not.toContain("nothing needs attention");
   });
 
   it("says so when the feed is empty, and shows no mark-all button", () => {

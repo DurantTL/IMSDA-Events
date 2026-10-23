@@ -594,7 +594,8 @@ type Notice = {
 };
 
 /** Queues plain-text notices in the event's outbox inside the caller's transaction. Returns the ids still waiting to be sent. */
-async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; notices: Notice[] }) {
+/** `pendingKinds` (optional) collects the kinds of notice that are waiting to leave (not suppressed), for the feed item (#1033). */
+export async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; notices: Notice[]; pendingKinds?: Set<string> }) {
   if (input.notices.length === 0) return [] as string[];
   const settings = await loadEventEmailSettings(tx, input.eventId);
   const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
@@ -617,6 +618,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
         } else if (waiting.status === "PENDING") {
           await tx.messageOutbox.update({ where: { id: waiting.id }, data: { subjectSnapshot: original.subject, bodyTextSnapshot: original.bodyText } });
           placed = true;
+          input.pendingKinds?.add(original.kind);
           notice = { ...original, idempotencyKey: "" };
         }
       }
@@ -646,6 +648,7 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
       },
       select: { id: true, status: true },
     });
+    if (message.status === "PENDING") input.pendingKinds?.add(notice.kind);
     // A digest waits for its time and is delivered by the outbox worker, never from this request.
     if (message.status === "PENDING" && !notice.digestUntil) ids.push(message.id);
   }
@@ -847,9 +850,11 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
     const reviewUrl = `${baseUrl().replace(/\/+$/, "")}/people/staff-invitations/approvals?event=${encodeURIComponent(event.id)}`;
     const window = officeDigestWindow(now);
     const windowEnd = new Date((window + 1) * OFFICE_DIGEST_WINDOW_MS);
+    const pendingKinds = new Set<string>();
     notices = await queueNotices(tx, {
       eventId: event.id,
       registrationId: registration.id,
+      pendingKinds,
       notices: [
         {
           kind: "RECEIVED",
@@ -872,7 +877,8 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
       ],
     });
     // The feed item (#1033) beside the office digest, in the same transaction: one per event per digest window.
-    if (staff.length > 0) {
+    // Only when a digest is actually waiting to leave: a paused event suppresses it, and then there is no alert.
+    if (pendingKinds.has("OFFICE_DIGEST")) {
       await recordAlertFeedItem(tx, {
         notificationKey: "STAFF_INVITATION_APPROVAL_DIGEST",
         occurrenceKey: `staff-invitation-digest:${event.id}:${window}`,

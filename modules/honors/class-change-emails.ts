@@ -9,6 +9,7 @@ import { suppressionNote } from "@/modules/communications/delivery-hold";
 import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import { processQueuedMessageIdsAfterCommit } from "@/modules/communications/messaging-repository";
 import { isNotificationEnabled } from "@/modules/notifications/settings";
+import { centralDateKey } from "@/modules/event-locations/waitlist-digest-domain";
 import { recordAlertFeedItem } from "@/modules/notifications/feed";
 import {
   CLASS_CHANGE_RETENTION_DAYS,
@@ -133,7 +134,7 @@ async function queueInstructorMessage(tx: Db, input: {
   subject: string;
   bodyText: string;
   metadata: Record<string, string | number>;
-  /** The day (YYYY-MM-DD) the emails belong to: the grain of the feed item. */
+  /** The Central-time day (YYYY-MM-DD) the emails belong to: the grain of the feed item. */
   day: string;
 }) {
   const holdNote = suppressionNote(input.settings);
@@ -275,7 +276,7 @@ export async function dispatchImmediateClassChangeEmails(now = new Date(), resul
               subject: content.subject,
               bodyText: content.bodyText,
               metadata: { honorClassChangeId: change.id },
-              day: now.toISOString().slice(0, 10),
+              day: centralDateKey(now),
             });
             if (id) ids.push(id);
           }
@@ -349,7 +350,7 @@ async function queueSummary(tx: Db, input: { instructor: SummaryInstructor; sett
     subject: content.subject,
     bodyText: content.bodyText,
     metadata: { summaryDate: input.summaryDate, changeCount: content.changes },
-    day: input.until.toISOString().slice(0, 10),
+    day: centralDateKey(input.until),
   });
   return { messageId, changes: content.changes };
 }

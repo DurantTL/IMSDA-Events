@@ -3,6 +3,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { ALERT_FEED_LIST_LIMIT } from "@/modules/notifications/feed-model";
 import { listAlertFeed, markAlertFeedItemRead, markAllAlertFeedRead } from "@/modules/notifications/feed";
 
 /**
@@ -27,8 +28,8 @@ function forbidden() {
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("read"), id: z.string().min(1).max(64) }).strict(),
-  /** `cutoff` is the time of the newest item the person was shown; without it the server's clock at the press is used. */
-  z.object({ action: z.literal("read-all"), cutoff: z.string().datetime().optional() }).strict(),
+  /** The ids of the unread items the person was shown. Only these are marked: nothing they never saw is. */
+  z.object({ action: z.literal("read-all"), ids: z.array(z.string().min(1).max(64)).min(1).max(ALERT_FEED_LIST_LIMIT) }).strict(),
 ]);
 
 async function getHandler() {
@@ -52,7 +53,7 @@ async function postHandler(request: Request) {
   if (!user) return forbidden();
   try {
     const body = bodySchema.parse(await request.json());
-    // One clock for the whole request: the cutoff is captured here, before anything is read.
+    // One clock for the whole request.
     const now = new Date();
     if (body.action === "read") {
       const found = await markAlertFeedItemRead(user.id, body.id, now);
@@ -63,7 +64,7 @@ async function postHandler(request: Request) {
         );
       }
     } else {
-      await markAllAlertFeedRead(user.id, body.cutoff ? new Date(body.cutoff) : now, now);
+      await markAllAlertFeedRead(user.id, body.ids, now);
     }
     return Response.json({ feed: await listAlertFeed(user.id, now) }, { headers: NO_STORE });
   } catch (error) {

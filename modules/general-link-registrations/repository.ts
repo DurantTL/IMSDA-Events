@@ -342,7 +342,8 @@ type Notice = {
  * Queues plain-text notices in the event's own outbox, inside the caller's transaction (sent after it commits). Delivery
  * follows the event's message settings like every other message: captured, sent, or suppressed when the event's delivery is off.
  */
-async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; submissionId: string; notices: Notice[] }) {
+/** `pendingKinds` (optional) collects the kinds of notice that are waiting to leave (not suppressed), for the feed item (#1033). */
+export async function queueNotices(tx: Tx, input: { eventId: string; registrationId: string | null; submissionId: string; notices: Notice[]; pendingKinds?: Set<string> }) {
   if (input.notices.length === 0) return [] as string[];
   const settings = await loadEventEmailSettings(tx, input.eventId);
   const deliveryMode = settings?.deliveryMode ?? "LOCAL_CAPTURE";
@@ -376,7 +377,10 @@ async function queueNotices(tx: Tx, input: { eventId: string; registrationId: st
       },
       select: { id: true, status: true },
     });
-    if (message.status === "PENDING") ids.push(message.id);
+    if (message.status === "PENDING") {
+      ids.push(message.id);
+      input.pendingKinds?.add(notice.kind);
+    }
   }
   return ids;
 }
@@ -882,10 +886,12 @@ async function createPending(input: {
         const waitingCount = await tx.generalLinkSubmission.count({ where: { eventId: input.event.id, status: "PENDING" } });
         const reviewUrl = `${getServerEnv().APP_BASE_URL.replace(/\/+$/, "")}/people/pending-teams?event=${encodeURIComponent(input.event.id)}`;
         const window = staffDigestWindow(input.now);
+        const pendingKinds = new Set<string>();
         noticeIds = await queueNotices(tx, {
           eventId: input.event.id,
           registrationId: null,
           submissionId,
+          pendingKinds,
           notices: [
             {
               kind: "PENDING",
@@ -907,7 +913,8 @@ async function createPending(input: {
         });
         // The feed item (#1033) beside the staff digest, in the same transaction: one per event per digest window, the
         // same grain as the digest email. Counts and a link only.
-        if (staff.length > 0) {
+        // Only when a digest row was queued to leave (not suppressed by a paused event).
+        if (pendingKinds.has("STAFF_PENDING_DIGEST")) {
           await recordAlertFeedItem(tx, {
             notificationKey: "GROUP_REGISTRATION_APPROVAL_DIGEST",
             occurrenceKey: `general-link-digest:${input.event.id}:${window}`,
