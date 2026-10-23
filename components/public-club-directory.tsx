@@ -1,34 +1,17 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { Component, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ComponentType } from "react";
 import { List, MapPin, Search, UsersRound, X } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 import type { PublicClubMapStatus } from "@/components/public-club-map";
+import { announcedCountText, createRetryableLoader, effectiveView, unmappedSentence } from "@/components/public-club-finder-logic";
 import { locationKey } from "@/components/public-club-map-content";
 import styles from "./public-club-directory.module.css";
 
-const PublicClubMap = dynamic(
-  () => import("@/components/public-club-map").then((mod) => mod.PublicClubMap),
-  { ssr: false, loading: () => <div className={styles.mapLoading}>Loading map…</div> },
-);
+type MapProps = ComponentProps<typeof import("@/components/public-club-map").PublicClubMap>;
 
-/** A failed map chunk must not take the working list down with it. */
-class MapBoundary extends Component<{ children: ReactNode; onFail: () => void }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  componentDidCatch() {
-    this.props.onFail();
-  }
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
-}
-
-const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
+const loadMap = createRetryableLoader(() => import("@/components/public-club-map").then((mod) => mod.PublicClubMap));
 
 export function matches(club: PublicClubListing, query: string) {
   if (!query) return true;
@@ -51,6 +34,8 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
   const [view, setView] = useState<"list" | "map">("list");
   const [mapStatus, setMapStatus] = useState<PublicClubMapStatus>("loading");
   const [mapAttempt, setMapAttempt] = useState(0);
+  const [MapComponent, setMapComponent] = useState<ComponentType<MapProps> | null>(null);
+  const [announced, setAnnounced] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
   const rowIdPrefix = useId();
   const searchId = `${rowIdPrefix}-search`;
@@ -69,6 +54,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
     : null;
   const unmappedShown = filtered.length - mappable.length;
   const mapProblem = mapStatus === "unavailable" || mapStatus === "tiles-failed";
+  const shownView = effectiveView(view, filtered.length, mapProblem);
   const selectedUnmapped = selected !== null && selectedPoint === null;
   const rowId = (id: string) => `${rowIdPrefix}-club-${id}`;
 
@@ -87,6 +73,24 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
     document.getElementById(`${rowIdPrefix}-club-${selection.id}`)?.scrollIntoView({ block: "nearest" });
   }, [selection, rowIdPrefix]);
 
+  // Load the map code; a failed load is retried by Retry, not cached.
+  useEffect(() => {
+    if (!anyMappable) return;
+    let cancelled = false;
+    loadMap().then(
+      (component) => { if (!cancelled) setMapComponent(() => component as ComponentType<MapProps>); },
+      () => { if (!cancelled) setMapStatus("unavailable"); },
+    );
+    return () => { cancelled = true; };
+  }, [anyMappable, mapAttempt]);
+
+  // The visible count updates at once; screen readers hear it once typing stops.
+  const countText = announcedCountText(filtered.length, mappable.length, !mapProblem);
+  useEffect(() => {
+    const timer = setTimeout(() => setAnnounced(countText), 600);
+    return () => clearTimeout(timer);
+  }, [countText]);
+
   function clearSearch() {
     setQuery("");
     searchRef.current?.focus();
@@ -95,6 +99,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
   function retryMap() {
     // Remounting the map only: the search and the selection live here.
     setMapStatus("loading");
+    setMapComponent(null);
     setMapAttempt((attempt) => attempt + 1);
   }
 
@@ -122,14 +127,11 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
 
       {clubs.length > 0 && (
         <div className={styles.status}>
-          <p aria-live="polite" className={styles.count} role="status">
-            {filtered.length} publicly listed {plural(filtered.length, "club", "clubs")} found · {mappable.length} shown on map
-            {unmappedShown > 0 && (
-              <small>
-                {" "}{unmappedShown} {plural(unmappedShown, "club has", "clubs have")} no map location and {plural(unmappedShown, "is", "are")} listed only.
-              </small>
-            )}
+          <p className={styles.count}>
+            {countText}
+            {unmappedShown > 0 && <small> {unmappedSentence(unmappedShown)}</small>}
           </p>
+          <p className="sr-only" role="status">{announced}</p>
           {mapProblem && (
             <p className={styles.mapProblem}>
               {mapStatus === "unavailable"
@@ -140,10 +142,10 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
           )}
           {anyMappable && (
             <div aria-label="Show results as" className={styles.viewToggle} role="group">
-              <button aria-pressed={view === "list"} onClick={() => setView("list")} type="button">
+              <button aria-pressed={shownView === "list"} onClick={() => setView("list")} type="button">
                 <List aria-hidden="true" size={16} /> List
               </button>
-              <button aria-pressed={view === "map"} onClick={() => setView("map")} type="button">
+              <button aria-pressed={shownView === "map"} onClick={() => setView("map")} type="button">
                 <MapPin aria-hidden="true" size={16} /> Map
               </button>
             </div>
@@ -154,12 +156,14 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
       {clubs.length === 0 ? (
         <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Check back soon.</EmptyState>
       ) : (
-        <div className={styles.content} data-view={view}>
+        <div className={styles.content} data-view={shownView}>
           {anyMappable && (
             <div className={styles.mapPane}>
-              <MapBoundary key={mapAttempt} onFail={() => setMapStatus("unavailable")}>
-                <PublicClubMap clubs={mappable} onSelect={selectFromMap} onStatus={setMapStatus} selectedId={selectedId} />
-              </MapBoundary>
+              {MapComponent ? (
+                <MapComponent clubs={mappable} key={mapAttempt} onSelect={selectFromMap} onStatus={setMapStatus} selectedId={selectedId} />
+              ) : (
+                <div className={styles.mapLoading}>{mapStatus === "unavailable" ? "Map unavailable" : "Loading map…"}</div>
+              )}
             </div>
           )}
 

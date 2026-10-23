@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PublicClubDirectory, matches } from "@/components/public-club-directory";
+import { announcedCountText, createRetryableLoader, effectiveView, nextTileStatus, unmappedSentence } from "@/components/public-club-finder-logic";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 
 function club(over: Partial<PublicClubListing>): PublicClubListing {
@@ -44,6 +45,40 @@ describe("find a club search and results (#1118)", () => {
     const empty = renderToStaticMarkup(createElement(PublicClubDirectory, { clubs: [] }));
     expect(empty).toContain("No clubs are listed publicly yet");
     expect(empty).not.toContain("publicly listed clubs found");
+  });
+});
+
+describe("find a club logic (#1118 review)", () => {
+  it("retries an import after a rejection instead of caching it", async () => {
+    let calls = 0;
+    const load = createRetryableLoader(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("chunk");
+      return "map";
+    });
+    await expect(load()).rejects.toThrow("chunk");
+    await expect(load()).resolves.toBe("map");
+    await load();
+    expect(calls).toBe(2);
+  });
+
+  it("keeps a tile failure until retry", () => {
+    expect(nextTileStatus("ready", "tileerror")).toBe("tiles-failed");
+    expect(nextTileStatus("tiles-failed", "tileload")).toBe("tiles-failed");
+  });
+
+  it("announces the count without the unmapped sentence, and not the map part when it is down", () => {
+    expect(announcedCountText(3, 2, true)).toBe("3 publicly listed clubs found · 2 shown on map");
+    expect(announcedCountText(1, 0, false)).toBe("1 publicly listed club found");
+    expect(unmappedSentence(0)).toBe("");
+    expect(unmappedSentence(1)).toContain("no map location");
+  });
+
+  it("falls back to the list when the phone map would be empty or broken", () => {
+    expect(effectiveView("map", 0, false)).toBe("list");
+    expect(effectiveView("map", 3, true)).toBe("list");
+    expect(effectiveView("map", 3, false)).toBe("map");
+    expect(effectiveView("list", 0, true)).toBe("list");
   });
 });
 
