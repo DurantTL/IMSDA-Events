@@ -53,8 +53,8 @@ function SettingsFields() {
           ))}
         </fieldset>
         <div className="roster-settings-grid fb-info-dates">
-          <label>Opens<input type="datetime-local" name="fb-info-opens-at" disabled={busy !== null} value={opens} onChange={(event) => setOpens(event.target.value)} /></label>
-          <label>Closes<input type="datetime-local" name="fb-info-closes-at" disabled={busy !== null} value={closes} onChange={(event) => setCloses(event.target.value)} /></label>
+          <label>Opens<input type="datetime-local" autoComplete="off" name="builder-info-opens-at" disabled={busy !== null} value={opens} onChange={(event) => setOpens(event.target.value)} /></label>
+          <label>Closes<input type="datetime-local" autoComplete="off" name="builder-info-closes-at" disabled={busy !== null} value={closes} onChange={(event) => setCloses(event.target.value)} /></label>
         </div>
         <p className="fb-hint">Times are in this browser&apos;s time zone. Leave a time empty for no limit. The form still has to be open (below) to accept answers.</p>
         {problem && <p className="form-error" role="alert">{problem}</p>}
