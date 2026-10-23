@@ -173,7 +173,9 @@ SES_SMTP_USERNAME=<SMTP username from step 1>
 SES_SMTP_PASSWORD=<SMTP password from step 1>
 ```
 
-Optional: `SES_CONFIGURATION_SET=<name>` to tag sends with a configuration set,
+Optional: `SES_CONFIGURATION_SET=<name>` to tag sends with a configuration set
+(recommended: it is how delivery, bounce and complaint reports are sent to the app,
+see "Bounces, complaints and deliveries from SES" below),
 and `SES_MAX_SEND_RATE=<messages per second>` (default `10`; keep it at or below
 the "maximum send rate" shown on the SES **Account dashboard**). `SES_SMTP_HOST`
 and `SES_SMTP_PORT` exist for tests and are left unset. `RESEND_API_KEY` is no
@@ -219,8 +221,126 @@ SMTP credentials and the verified sender together.
 **Switching back.** Set `EMAIL_PROVIDER=resend` (or remove the line) and
 redeploy. Resend then sends exactly as before, and `RESEND_API_KEY` is required
 again. Resend's delivery and bounce webhooks stay in place but receive nothing
-while SES is active. SES bounce and complaint reporting (through SNS) is not
-built yet, so the delivery status for SES mail stops at "accepted".
+while SES is active. The SES notification endpoint below stays in place but is
+idle while Resend is active.
+
+### Bounces, complaints and deliveries from SES (#863)
+
+Without this step SES mail stops at "accepted": the app never learns that a
+message was delivered, bounced or reported as spam. SES reports each of those
+to an **Amazon SNS topic**, and SNS posts them to
+`<APP_BASE_URL>/api/webhooks/ses`. **Setting this up in AWS is a human step**;
+the app side is already built and does nothing until both variables below are
+set.
+
+**What the app does with the reports**
+
+| SES reports | The app records |
+| --- | --- |
+| Delivery | The message moves from "accepted" to "delivered". |
+| Permanent (hard) bounce | The message is marked bounced, and **all email to that address stops** (confirmations and receipts included). |
+| Spam complaint | The message is marked as a complaint, and **all email to that address stops**. |
+| Transient or undetermined (soft) bounce, such as a full mailbox | Recorded only. Sending and retries carry on. |
+
+An address that is not being sent to shows **"Not sending: bounced"** or
+**"Not sending: complaint"** on the registration (the contact, and an
+attendee's own address) and under **System management > Email > Email health >
+Not sending**. A system administrator can **Re-enable** an address there; that
+is recorded with who did it and when. A new bounce or complaint after a re-enable
+stops the address again. Delivery is held at the moment of sending, so a message
+queued before the bounce is also held back (its delivery log row ends
+"suppressed" with the reason).
+
+**1. Create the SNS topic** (an AWS administrator, in `us-east-2`, the same
+region as SES):
+
+1. Open **Amazon SNS**, **Topics**, **Create topic**, type **Standard**, name it
+   `imsda-ses-events`. Leave encryption and the access policy at their defaults
+   (the default policy allows only your own account to publish).
+2. Copy the topic **ARN** (for example
+   `arn:aws:sns:us-east-2:123456789012:imsda-ses-events`) and note the 12-digit
+   **AWS account id** it contains.
+
+**2. Add the two environment variables** to the xCloud environment panel and
+redeploy (placeholders shown):
+
+```
+SES_SNS_TOPIC_ARN=arn:aws:sns:us-east-2:<account id>:imsda-ses-events
+SES_AWS_ACCOUNT_ID=<the same 12-digit account id>
+```
+
+`SES_SNS_TOPIC_ARN` is the **only** topic the app trusts, and
+`SES_AWS_ACCOUNT_ID` is the only AWS account whose mail it accepts reports for.
+The two must agree (the account id is inside the ARN) or the app refuses to
+start in a way that names the variable. Until both are set the endpoint answers
+503 and processes nothing. The app deploys and runs the same with them blank.
+
+**3. Create a configuration set and send events to the topic.** In the SES
+console (`us-east-2`):
+
+1. **Configuration sets**, **Create set**, named for example `imsda-events`.
+2. In that set, **Event destinations**, **Add destination**: choose the event
+   types **Delivery**, **Bounces** and **Complaints**, destination **Amazon
+   SNS**, and pick the `imsda-ses-events` topic.
+3. Set `SES_CONFIGURATION_SET=imsda-events` in the environment panel (the
+   optional variable described above) and redeploy, so every message the app
+   sends is tagged with the set.
+
+(Identity-level notifications, where each verified domain publishes bounces,
+complaints and deliveries to the topic, are also understood and work too. The
+configuration set is preferred because it covers exactly this app's mail.)
+
+**4. Subscribe the app's endpoint to the topic.** In SNS, on the topic,
+**Create subscription**: protocol **HTTPS**, endpoint
+`<APP_BASE_URL>/api/webhooks/ses`. Leave raw message delivery **off**. The app
+is reachable from the internet at that address (it is the same host as the
+site), so no extra firewall rule is needed.
+
+**Subscription confirmation is automatic and deliberately narrow.** SNS first
+sends a `SubscriptionConfirmation` message. The app confirms it only when all of
+these hold: the SNS signature verifies, the topic is exactly
+`SES_SNS_TOPIC_ARN`, and the message's own confirmation address is exactly
+`https://sns.us-east-2.amazonaws.com/` with the three query parameters
+`Action=ConfirmSubscription`, this topic and this message's token and nothing
+else. It makes one request to that address with no redirects. Any other
+confirmation, or any other address, is refused with a 4xx and nothing is
+fetched. In the SNS console the subscription should show **Confirmed** within a
+minute. If it stays **Pending confirmation**, check that the two variables are
+set and the site has been redeployed, then use **Request confirmation** on the
+subscription. An `UnsubscribeConfirmation` is acknowledged and never followed:
+re-subscribing is always this manual step.
+
+**What the endpoint checks** (so you know what a failure means). Every request
+must be signed by AWS (`SignatureVersion` 1 or 2, checked over the string AWS
+defines for the message type) with a certificate fetched only from
+`https://sns.<region>.amazonaws.com/` for the topic's own region; carry the
+topic in `SES_SNS_TOPIC_ARN`; and, for a notification, name the account in
+`SES_AWS_ACCOUNT_ID` as the sender. Responses: `200` recorded, a duplicate, or
+a notification the app does not act on; `400`/`403`/`413` the request is not
+valid or not allowed (SNS stops retrying it); `503` not configured, or AWS could
+not be reached to check the signature (SNS retries); `500` storing the report
+failed (SNS retries). Each report is stored once, keyed by the SNS message id,
+so redelivery is harmless, and a late or repeated report can never move a
+message out of a bounce or complaint.
+
+**5. Check it end to end.** From the SES console, **Send test email** with the
+scenario **Bounce**, then **Complaint**, then **Success**, to the SES mailbox
+simulator addresses (`bounce@simulator.amazonses.com`,
+`complaint@simulator.amazonses.com`, `success@simulator.amazonses.com`), using
+the configuration set. Each report appears in the app within seconds. A
+simulator address that bounced shows under **Email health > Not sending**; use
+**Re-enable** to clear it. The simulator never reaches a real person and does
+not count against your bounce rate.
+
+**Privacy.** Reports are stored with ids and counts only. The only place an
+address is kept is the "Not sending" list itself, in normalized (lower-case)
+form, because suppression needs it. Logs and audit entries hold ids and counts,
+never an address, and the real notification bodies are never stored.
+
+**To stop it**, delete the SNS subscription (or clear the two variables). Mail
+keeps sending; delivery status goes back to stopping at "accepted", and
+addresses already suppressed stay suppressed until an administrator re-enables
+them.
 
 ## xCloud site setup (current, October 2026)
 

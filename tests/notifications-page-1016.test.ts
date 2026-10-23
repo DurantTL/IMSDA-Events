@@ -38,6 +38,7 @@ vi.mock("@/modules/communications/effective-delivery", () => ({ isPlatformEmailC
 vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true }));
 vi.mock("@/integrations/email/provider", () => ({ getEmailAvailability: () => ({ deliveryConfigured: true, webhookConfigured: true }) }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: mocks.getAdminAttentionSummary }));
+vi.mock("@/modules/communications/email-suppression", () => ({ listActiveSuppressions: async () => ({ total: 0, rows: [] }) }));
 
 import EmailPage from "@/app/(workspace)/admin/email/page";
 import OldNotificationsPage from "@/app/(workspace)/admin/notifications/page";

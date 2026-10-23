@@ -781,6 +781,7 @@ model User {
   healthSnapshotHoldsLifted    HealthSnapshotHold[]        @relation("HealthSnapshotHoldLiftedBy")
   healthSnapshotBreakGlass     HealthSnapshotBreakGlass[]
   healthBreakGlassUses         HealthBreakGlassUse[]
+  emailSuppressionsReenabled EmailAddressSuppression[] @relation("EmailSuppressionReenabledBy")
   email         String            @unique
   displayName   String
   jobTitle      String?
@@ -4841,6 +4842,39 @@ model MessageProviderEvent {
   @@unique([provider, providerEventId])
   @@index([provider, providerMessageId, occurredAt])
   @@index([messageOutboxId, occurredAt])
+}
+
+/// Why an address is not being sent to (#863).
+enum EmailSuppressionReason {
+  /// SES reported a permanent (hard) bounce.
+  BOUNCE
+  /// The recipient reported a message as spam.
+  COMPLAINT
+}
+
+/// An address that receives no email at all (#863): a hard bounce or a spam complaint reported by SES through SNS stops
+/// confirmations, receipts and announcements alike, to protect the sending reputation. One row per normalized address.
+/// It is "active" while `reenabledAt` is null. A system administrator can re-enable it (audited, with who and when); a
+/// later bounce or complaint (one that happened after the re-enable) switches it back on. Only the normalized address is
+/// kept, which suppression needs; the provider payloads and audit entries hold ids and counts, never the address.
+model EmailAddressSuppression {
+  id                   String                 @id @default(cuid())
+  normalizedEmail      String                 @unique
+  reason               EmailSuppressionReason
+  provider             String
+  /// The SNS MessageId of the notification that suppressed it, for tracing. Not an address.
+  sourceProviderEventId String?
+  /// The outbox message that bounced, when the provider message id matched one.
+  sourceMessageOutboxId String?
+  suppressedAt         DateTime
+  reenabledAt          DateTime?
+  reenabledByUserId    String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  reenabledBy User? @relation("EmailSuppressionReenabledBy", fields: [reenabledByUserId], references: [id], onDelete: SetNull)
+
+  @@index([reenabledAt, suppressedAt])
 }
 
 model ProgramAssignmentRun {

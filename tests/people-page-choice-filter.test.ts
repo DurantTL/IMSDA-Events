@@ -15,6 +15,7 @@ vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: depend
 vi.mock("@/modules/event-locations/filter", () => ({ resolveLocationFilter: dependencies.resolveLocationFilter }));
 vi.mock("@/modules/background-checks/repository", () => ({ backgroundFlaggedAttendeeIds: vi.fn(async () => new Set<string>()) }));
 vi.mock("@/modules/communications/email-preferences-repository", () => ({ listEventAnnouncementOptOuts: vi.fn(async () => []) }));
+vi.mock("@/modules/communications/email-suppression", () => ({ listEventSuppressionMarks: vi.fn(async () => ({ registrations: {}, attendees: {} })) }));
 vi.mock("@/modules/guardian-authority/repository", () => ({ getResponsibleAdultsByAttendee: vi.fn(async () => new Map()) }));
 vi.mock("@/components/people-workspace", () => ({
   PeopleWorkspace: (props: Record<string, unknown>) => {

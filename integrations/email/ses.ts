@@ -49,8 +49,9 @@ export function getSesEmailAvailability() {
     deliveryConfigured: Boolean(
       env.SES_REGION?.trim() && env.SES_SMTP_USERNAME?.trim() && env.SES_SMTP_PASSWORD?.trim(),
     ),
-    // SES reports bounces and complaints through SNS, which is not built yet (see the follow-up issue).
-    webhookConfigured: false,
+    // SES reports bounces, complaints and deliveries through SNS (#863): the endpoint accepts nothing until the topic
+    // and the account that owns it are both configured.
+    webhookConfigured: Boolean(env.SES_SNS_TOPIC_ARN?.trim() && env.SES_AWS_ACCOUNT_ID?.trim()),
   };
 }
 
@@ -274,7 +275,18 @@ function createTransport(configuration: SesEmailConfiguration): SesTransport {
   });
 }
 
-function messageIdFromResponse(response: string | undefined, fallback: string | undefined) {
+/**
+ * The one form of an SES message id (#863). The adapter records the id from the SMTP reply (`250 Ok <id>`); SES reports
+ * the same id as `mail.messageId` in a bounce, complaint or delivery notification, and the `Message-ID` header SES adds
+ * is `<id@email.amazonses.com>`. All three normalize to the bare id, so the id stored on the outbox row is the key the
+ * notification is matched by. Anything that is not a plain id returns null, so it can never match a row.
+ */
+export function normalizeSesMessageId(value: string | null | undefined): string | null {
+  const bare = (value ?? "").trim().replace(/^<|>$/g, "").replace(/@(?:[a-z0-9-]+\.)*amazonses\.com$/i, "");
+  return /^[A-Za-z0-9._-]{1,200}$/.test(bare) ? bare : null;
+}
+
+export function messageIdFromResponse(response: string | undefined, fallback: string | undefined) {
   // SES answers `250 Ok <id>`.
   const match = /^250\s+Ok\s+([A-Za-z0-9._-]+)/i.exec(response?.trim() ?? "");
   return match?.[1] ?? fallback?.replace(/^<|>$/g, "") ?? null;

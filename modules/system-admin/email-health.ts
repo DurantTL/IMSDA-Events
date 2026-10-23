@@ -1,5 +1,6 @@
 import type { AttentionItem, AttentionSummary } from "@/modules/system-admin/attention-model";
 import { EMAIL_PROBLEM_WINDOW_DAYS } from "@/modules/system-admin/attention-model";
+import type { SuppressionSummary } from "@/modules/communications/email-suppression";
 
 /**
  * The Email health section of System management > Email (#1043). It reuses what the system administrator bell
@@ -21,13 +22,19 @@ export type EmailHealth = {
   partial: boolean;
   generatedAt: string;
   provider: { configured: boolean; webhookConfigured: boolean; accountEmailConfigured: boolean; centralSenderSet: boolean };
+  /** Addresses not being sent to after a hard bounce or a spam complaint (#863). */
+  suppressions: SuppressionSummary;
 };
 
-export function buildEmailHealth(summary: AttentionSummary, provider: EmailHealth["provider"]): EmailHealth {
+export function buildEmailHealth(
+  summary: AttentionSummary,
+  provider: EmailHealth["provider"],
+  suppressions: SuppressionSummary = { total: 0, rows: [] },
+): EmailHealth {
   const order = (key: string) => (EMAIL_HEALTH_KEYS as readonly string[]).indexOf(key);
   const problems = summary.groups
     .flatMap((group) => group.items)
     .filter((item) => order(item.key) >= 0)
     .sort((left, right) => order(left.key) - order(right.key));
-  return { windowDays: EMAIL_PROBLEM_WINDOW_DAYS, problems, partial: summary.partial, generatedAt: summary.generatedAt, provider };
+  return { windowDays: EMAIL_PROBLEM_WINDOW_DAYS, problems, partial: summary.partial, generatedAt: summary.generatedAt, provider, suppressions };
 }

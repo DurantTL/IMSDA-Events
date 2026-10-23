@@ -19,15 +19,17 @@ import {
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 import {
-  mapResendDeliveryEvent,
+  mapProviderDeliveryEvent,
   providerTransitionUpdate,
+  strongestTransition,
+  type ProviderDeliveryTransition,
 } from "@/modules/communications/provider-events";
 import {
   REGISTRATION_MANAGE_API_SENTINEL,
   REGISTRATION_MANAGE_LINK_SENTINEL,
 } from "@/modules/communications/manage-link";
 import { renderEmailHtmlDocument } from "@/modules/communications/email-html";
-import { loadEventEmailSettings } from "@/modules/communications/effective-delivery";
+import { checkRecipientDeliverable, loadEventEmailSettings } from "@/modules/communications/effective-delivery";
 import {
   AccountEmailNotConfiguredError,
   getAccountEmailSender,
@@ -96,7 +98,7 @@ export const PROVIDER_QUOTA_MESSAGE = "The email provider's sending limit was re
 type DeliveryPrisma = Pick<
   PrismaClient,
   "$transaction" | "eventMessageSettings" | "messageOutbox" | "auditLog" | "invoiceDeliveryRecipient"
-> & Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings">>;
+> & Partial<Pick<PrismaClient, "emailAnnouncementOptOut" | "emailUnsubscribeToken" | "announcement" | "platformSettings" | "emailAddressSuppression">>;
 
 export type ExternalEmailDeliveryDependencies = {
   prisma?: DeliveryPrisma;
@@ -520,6 +522,58 @@ async function suppressIfAnnouncementOptedOut(
 }
 
 /**
+ * Whether the recipient's address is suppressed (#863): a hard bounce or spam complaint stops ALL email to it, every kind
+ * of message, until a system administrator re-enables it. The decision is `checkRecipientDeliverable` in
+ * `effective-delivery.ts`; this is where the one delivery worker every send path ends in applies it, right before the
+ * provider call (and again after the body is prepared, in case a report arrived meanwhile). The row ends SUPPRESSED with
+ * the reason and the skip is audited (ids only, never the address).
+ *
+ * Fails closed like the opt-out check: if the lookup fails the message is retried later, never sent. The result values
+ * mean the same as `OptOutCheckResult`. A run whose `prisma` has no suppression table (a test double for another path)
+ * checks nothing, exactly as the opt-out check does.
+ */
+async function suppressIfAddressSuppressed(
+  prisma: DeliveryPrisma,
+  message: ClaimedMessage,
+  at: Date,
+): Promise<OptOutCheckResult> {
+  const table = prisma.emailAddressSuppression;
+  if (!table) return false;
+  let decision: Awaited<ReturnType<typeof checkRecipientDeliverable>>;
+  try {
+    decision = await checkRecipientDeliverable({ emailAddressSuppression: table }, message.recipientEmail);
+  } catch (error) {
+    logError("Unable to check whether an address is suppressed; the message will be retried.", error);
+    const outcome = await finalizeFailedAttempt(
+      prisma,
+      message,
+      { code: "ADDRESS_SUPPRESSION_CHECK_FAILED", message: "Could not confirm the address can receive email, so the message was not sent.", retryable: true },
+      at,
+      true,
+    );
+    return outcome.finalized ? "retry" : "lost";
+  }
+  if (decision.deliverable) return false;
+  const updated = await prisma.messageOutbox.updateMany({
+    where: { id: message.id, status: "PROCESSING", lockToken: message.lockToken },
+    data: { status: "SUPPRESSED", lockedAt: null, lockToken: null, lastError: decision.note },
+  });
+  if (updated.count !== 1) return "lost";
+  await prisma.auditLog.create({
+    data: {
+      eventId: message.eventId ?? undefined,
+      action: "EMAIL_SKIPPED_ADDRESS_SUPPRESSED",
+      entityType: "MessageOutbox",
+      entityId: message.id,
+      correlationId: randomUUID(),
+      summary: "Skipped an email because the address had a permanent bounce or a spam complaint.",
+      metadata: { messageId: message.id, reason: decision.suppression.reason },
+    },
+  });
+  return "suppressed";
+}
+
+/**
  * The unsubscribe links for an announcement: the page for the message body and the one-click endpoint for the header.
  * The token is opaque and recorded when it is issued. Gmail and Yahoo only honour an https one-click URL, so in
  * production a base URL that is not https omits the headers (and warns) rather than sending a link that cannot work.
@@ -824,21 +878,37 @@ async function finalizeSuccessfulAttempt(
       },
       data: { messageOutboxId: message.id },
     });
-    const latestEvent = await tx.messageProviderEvent.findFirst({
-      where: {
-        provider: provider,
-        providerMessageId,
-        mappedDeliveryStatus: { not: null },
-      },
-      orderBy: [{ occurredAt: "desc" }, { receivedAt: "desc" }],
-      select: {
-        eventType: true,
-        occurredAt: true,
-      },
-    });
-    const transition = latestEvent
-      ? mapResendDeliveryEvent(latestEvent.eventType, latestEvent.occurredAt)
-      : null;
+    const heldWhere = {
+      provider: provider,
+      providerMessageId,
+      mappedDeliveryStatus: { not: null },
+    } as const;
+    const heldOrder = [{ occurredAt: "desc" }, { receivedAt: "desc" }] as const;
+    let transition: ProviderDeliveryTransition | null;
+    if (provider === "SES") {
+      // SES events can arrive before the send is recorded (a delivery report racing the SMTP reply). The furthest stage
+      // wins, so a held DELIVERED never covers a held bounce (#863).
+      const heldEvents = await tx.messageProviderEvent.findMany({
+        where: heldWhere,
+        orderBy: [...heldOrder],
+        select: { eventType: true, occurredAt: true },
+      });
+      transition = strongestTransition(heldEvents
+        .map((event) => mapProviderDeliveryEvent(provider, event.eventType, event.occurredAt))
+        .filter((candidate): candidate is ProviderDeliveryTransition => candidate !== null));
+    } else {
+      const latestEvent = await tx.messageProviderEvent.findFirst({
+        where: heldWhere,
+        orderBy: [...heldOrder],
+        select: {
+          eventType: true,
+          occurredAt: true,
+        },
+      });
+      transition = latestEvent
+        ? mapProviderDeliveryEvent(provider, latestEvent.eventType, latestEvent.occurredAt)
+        : null;
+    }
     if (transition) {
       await tx.messageOutbox.update({
         where: { id: message.id },
@@ -935,6 +1005,31 @@ async function finalizeFailedAttempt(
     return true;
   });
   return { finalized, rescheduled: finalized && reschedule, quota: finalized && quota, gaveUp: finalized && gaveUp };
+}
+
+/** A message that will never arrive (failed for good, or held back for its address) must not leave its private link live (#610). */
+async function retireUndeliveredLinks(prisma: DeliveryPrisma, message: ClaimedMessage, at: Date) {
+  if (message.templateKey === CLUB_FORM_LINK_TEMPLATE_KEY) {
+    try {
+      await retireClubFormLinkForMessage(prisma as unknown as PrismaClient, message.id, at);
+    } catch (retireError) {
+      logError("Unable to withdraw a club form link after its email finally failed.", retireError);
+    }
+  }
+  if (message.templateKey === NEW_CLUB_APPLICATION_INVITE_TEMPLATE_KEY) {
+    try {
+      await retireNewClubInviteForMessage(prisma as unknown as PrismaClient, message.id, at);
+    } catch (retireError) {
+      logError("Unable to withdraw a new club application link after its email finally failed.", retireError);
+    }
+  }
+  if (message.templateKey === HEALTH_RECORD_LINK_TEMPLATE_KEY) {
+    try {
+      await retireHealthRecordLinkForMessage(prisma as unknown as PrismaClient, message.id, at);
+    } catch (retireError) {
+      logError("Unable to withdraw a health record link after its email finally failed.", retireError);
+    }
+  }
 }
 
 async function runDeliveryLoop(
@@ -1039,6 +1134,13 @@ async function runDeliveryLoop(
     if (await cancelIfInvoiceReplaced(prisma, message)) continue;
     if (await cancelIfLodgingStale(prisma, message, now())) continue;
     if (await suppressIfAnnouncementOptedOut(prisma, message, announcementPolicy, now())) continue;
+    // A suppressed address (hard bounce or complaint, #863) receives nothing, of any kind. Checked before the body is
+    // prepared so no private link is minted for a message that will not go.
+    const earlyAddressCheck = await suppressIfAddressSuppressed(prisma, message, now());
+    if (earlyAddressCheck) {
+      if (earlyAddressCheck === "suppressed") await retireUndeliveredLinks(prisma, message, now());
+      continue;
+    }
     let preparedBody: PreparedEmailBody | null = null;
     try {
       const prepareBodyText = dependencies.prepareBodyText
@@ -1083,6 +1185,17 @@ async function runDeliveryLoop(
           await preparedBody.revokeOnDefinitiveFailure?.().catch((revokeError: unknown) => {
             logError("Unable to revoke an unused private registration link after an announcement was skipped.", revokeError);
           });
+        }
+        continue;
+      }
+      // And the address once more (#863): a bounce or complaint may have been reported while the body was prepared.
+      const addressRecheck = await suppressIfAddressSuppressed(prisma, message, now());
+      if (addressRecheck) {
+        if (addressRecheck === "suppressed") {
+          await preparedBody.revokeOnDefinitiveFailure?.().catch((revokeError: unknown) => {
+            logError("Unable to revoke an unused private registration link after an address was found suppressed.", revokeError);
+          });
+          await retireUndeliveredLinks(prisma, message, now());
         }
         continue;
       }
@@ -1168,28 +1281,8 @@ async function runDeliveryLoop(
       const stopAfterThis = failure.gaveUp;
       if (!failure.rescheduled && failure.finalized) {
         result.failedIds.push(message.id);
-        // Out of retries or non-retryable: a club form link that never arrived must not stay live (#610).
-        if (message.templateKey === CLUB_FORM_LINK_TEMPLATE_KEY) {
-          try {
-            await retireClubFormLinkForMessage(prisma as unknown as PrismaClient, message.id, now());
-          } catch (retireError) {
-            logError("Unable to withdraw a club form link after its email finally failed.", retireError);
-          }
-        }
-        if (message.templateKey === NEW_CLUB_APPLICATION_INVITE_TEMPLATE_KEY) {
-          try {
-            await retireNewClubInviteForMessage(prisma as unknown as PrismaClient, message.id, now());
-          } catch (retireError) {
-            logError("Unable to withdraw a new club application link after its email finally failed.", retireError);
-          }
-        }
-        if (message.templateKey === HEALTH_RECORD_LINK_TEMPLATE_KEY) {
-          try {
-            await retireHealthRecordLinkForMessage(prisma as unknown as PrismaClient, message.id, now());
-          } catch (retireError) {
-            logError("Unable to withdraw a health record link after its email finally failed.", retireError);
-          }
-        }
+        // Out of retries or non-retryable: a link that never arrived must not stay live (#610).
+        await retireUndeliveredLinks(prisma, message, now());
       }
       if (stopAfterThis) break;
     }

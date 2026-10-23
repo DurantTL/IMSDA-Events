@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Activity } from "lucide-react";
 import type { EmailHealth } from "@/modules/system-admin/email-health";
 import { isSafeAttentionHref } from "@/modules/system-admin/attention-model";
+import { SuppressedAddressesPanel } from "@/components/suppressed-addresses-panel";
 
 /**
  * System management > Email > Email health (#1043). Reads what the bell (#1032) already computed. Three separate
@@ -46,6 +47,7 @@ export function EmailHealthSection({ health }: { health: EmailHealth }) {
           </span>
         </li>
       </ul>
+      <SuppressedAddressesPanel initial={health.suppressions} />
       <h3>Problems in the last {health.windowDays} days</h3>
       {health.partial && (
         <p className="inline-notice error" role="status">Some checks could not be read, so this list may be missing items.</p>

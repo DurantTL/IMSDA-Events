@@ -283,6 +283,7 @@ Never place real attendee exports, medical details, production identifiers, or c
 - `POST /api/public/events/:eventSlug/forms/:formSlug/promo-code` returns a same-origin, rate-limited, server-calculated display quote without consuming a use.
 - `GET|PATCH /api/public/manage/:token` resolves a hash-only, expiring private link and permits contact-only self-service changes.
 - `POST /api/webhooks/resend` verifies provider events and reconciles delivery status idempotently.
+- `POST /api/webhooks/ses` receives Amazon SNS reports for SES: verifies the SNS signature, the allowed topic and account, then records deliveries, bounces and complaints idempotently by SNS message id and suppresses hard-bounced or complained addresses (#863).
 
 The browser receives only a random opaque session token in an HttpOnly, SameSite cookie. The database stores its SHA-256 digest, expiry, and revocation state. Staff passwords use salted scrypt hashes; reset tokens are also stored only as digests. Mutation routes require a same-origin request in addition to authentication and event authorization.
 
