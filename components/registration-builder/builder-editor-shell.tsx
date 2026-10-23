@@ -267,8 +267,8 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
         <span className={`status-chip fb-version-chip ${status === "PUBLISHED" ? "green" : status === "DRAFT" ? "gold" : "purple"}`}>{statusLabel(status)} · version {selectedVersion.versionNumber}</span>
         {dirty && <span className="unsaved-dot">Unsaved changes</span>}
         <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview &amp; test</button>
-        <BuilderSaveDraftButton className="fb-btn primary" />
-        <BuilderPublishButton className="fb-btn outline" />
+        <BuilderSaveDraftButton className="fb-btn outline" />
+        <BuilderPublishButton className="fb-btn primary" />
         <button
           ref={menuButtonRef}
           className="fb-icon-button"
