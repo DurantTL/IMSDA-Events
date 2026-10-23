@@ -5,6 +5,7 @@ import type { RegistrationFormDefinition, RegistrationFormField } from "@/module
 import type { BuilderModuleDefinition } from "@/modules/forms/builder-modules";
 import type { PaletteEntry } from "./palette-registry";
 import { uniqueFieldKey } from "./field-keys";
+import { mapVisibilityConditions } from "@/modules/forms/visibility-rule";
 
 export const MAX_FIELDS_PER_STEP = 20;
 
@@ -35,9 +36,10 @@ export function avoidCollisions(fields: RegistrationFormField[], existing: reado
     return { ...field, id, key };
   });
   return copies.map((field) => {
-    const conditional = field.conditional && renamed.has(field.conditional.fieldKey) ? { ...field.conditional, fieldKey: renamed.get(field.conditional.fieldKey)! } : field.conditional;
+    // Every member of a show-when group follows a renamed key (#1072).
+    const retargeted = mapVisibilityConditions(field, (condition) => (renamed.has(condition.fieldKey) ? { ...condition, fieldKey: renamed.get(condition.fieldKey)! } : condition));
     const optionalWhen = field.optionalWhen && renamed.has(field.optionalWhen.fieldKey) ? { ...field.optionalWhen, fieldKey: renamed.get(field.optionalWhen.fieldKey)! } : field.optionalWhen;
-    return { ...field, conditional, optionalWhen };
+    return { ...retargeted, optionalWhen };
   });
 }
 

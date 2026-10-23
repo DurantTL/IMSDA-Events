@@ -28,6 +28,7 @@ import { resolveFieldFlags } from "@/modules/forms/field-flags";
 import { pluralizeAttendeeLabel } from "@/modules/forms/attendee-label";
 import { formatTypedDate } from "@/modules/forms/typed-date";
 import { perPersonPriceText, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
+import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /** Bump when the layout or the rules for what is shown change, so an old document is recognizably old. */
 export const REGISTRATION_PDF_GENERATOR_VERSION = 1;
@@ -150,7 +151,7 @@ export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<s
   for (let changed = true; changed;) {
     changed = false;
     for (const field of allFields) {
-      if (!excluded.has(field.key) && field.conditional && excluded.has(field.conditional.fieldKey)) {
+      if (!excluded.has(field.key) && visibilityControllerKeys(field).some((key) => excluded.has(key))) {
         excluded.add(field.key);
         changed = true;
       }

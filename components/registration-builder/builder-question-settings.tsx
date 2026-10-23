@@ -8,6 +8,7 @@ import type { ToolbarAction } from "./builder-canvas";
 import { BuilderFieldSettings, BuilderLabelInput, BuilderRequiredToggle, scopeChangePatch } from "./builder-field-settings";
 import { BuilderHelpTextInput, BuilderPlaceholderInput } from "./builder-field-advanced";
 import { useLoadedBuilder } from "./builder-context";
+import { BuilderShowWhen } from "./builder-show-when";
 import { InformationFieldIssues } from "./builder-information-issues";
 import type { RegistrationFormField } from "@/modules/forms/definition";
 
@@ -61,6 +62,7 @@ export function BuilderQuestionSettings({ selection, onAction }: { selection: Qu
           <button type="button" className="fb-tool danger" onClick={() => onAction("remove", sectionIndex, fieldIndex)}><Trash2 size={15} aria-hidden="true" /><span>Remove</span></button>
         </div>
       )}
+      <BuilderShowWhen field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />
       <details className="fb-advanced">
         <summary>Advanced</summary>
         <div className="fb-advanced-body">

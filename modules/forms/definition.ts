@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isInformationTemplateAudience } from "@/modules/forms/information-audience";
 import { bundledSeededFormTemplates } from "@/modules/forms/seeded-template-data";
 import { hasAddressValue, isPlainAddressObject, validateAddressValue } from "@/modules/forms/address";
+import { evaluateVisibilityRule, fieldVisibilityRule, hasVisibilityRule, visibilityRuleProblems } from "@/modules/forms/visibility-rule";
 import { isUnchangedFromStored, normalizePhoneAnswer, problemMessage, validateDate, validateEmail, validateNumber, validatePhone } from "@/lib/field-validation";
 
 export const formFieldTypes = ["TEXT", "LONG_TEXT", "EMAIL", "PHONE", "SELECT", "RADIO", "MULTISELECT", "RANKED_CHOICE", "CHECKBOX", "ACKNOWLEDGMENT", "DATE", "NUMBER", "CALCULATED", "ADDRESS"] as const;
@@ -144,6 +145,17 @@ export const formFieldSchema = z.object({
     choicePricesCents: z.record(z.string(), priceCentsSchema).optional(),
   }).optional(),
   conditional: z.object({ fieldKey: z.string().trim().min(2).max(60), operator: z.enum(conditionOperators), value: z.string().max(120).default("") }).optional(),
+  /**
+   * "Show this question when" with several conditions joined by All or Any
+   * (#1072), flat, never nested. Written only when a question has two or more
+   * conditions; one condition stays in `conditional`, which also keeps every
+   * form saved before this existed reading exactly as it did (see
+   * `modules/forms/visibility-rule.ts`). Never set together with `conditional`.
+   */
+  conditionalGroup: z.object({
+    match: z.enum(["ALL", "ANY"]),
+    conditions: z.array(z.object({ fieldKey: z.string().trim().min(2).max(60), operator: z.enum(conditionOperators), value: z.string().max(120).default("") })).min(1, "A show-when rule needs at least one condition.").max(10),
+  }).optional(),
   /**
    * A required field that becomes optional when this matches, e.g. seminar
    * rankings for Teens (WR26): shown with a note, answerable, never forced.
@@ -401,12 +413,13 @@ export const registrationFormDefinitionSchema = z.object({
     context.addIssue({ code: "custom", path: ["sections", reviewSectionIndexes[0], "isReviewStep"], message: "The review section must be the final section." });
   }
   definition.sections.forEach((section, sectionIndex) => section.fields.forEach((field, fieldIndex) => {
-    if (field.conditional && (!fieldKeys.has(field.conditional.fieldKey) || field.conditional.fieldKey === field.key)) context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "conditional"], message: "Conditional logic must reference another configured field." });
-    const controller = field.conditional
-      ? definition.sections.flatMap((candidate) => candidate.fields).find((candidate) => candidate.key === field.conditional?.fieldKey)
-      : null;
-    if (field.scope === "REGISTRATION" && controller?.scope === "ATTENDEE") {
-      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "conditional"], message: "A registration-level field cannot depend on an attendee answer." });
+    if (field.conditional && field.conditionalGroup) {
+      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "conditionalGroup"], message: "A question has one show-when rule: a single condition or a group, not both." });
+    }
+    // Every member of the rule is checked, not just the first. A single condition saved before groups existed
+    // keeps its original checks (not strict); a group is also checked for order, cycles and unfinished rows.
+    for (const problem of visibilityRuleProblems(field, definition.sections.flatMap((candidate) => candidate.fields), { strict: Boolean(field.conditionalGroup) })) {
+      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, field.conditionalGroup ? "conditionalGroup" : "conditional"], message: problem.message });
     }
     if (field.capUnitsAtAttendeeCount && !definition.attendeeRoster?.enabled) {
       context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "capUnitsAtAttendeeCount"], message: "Capping at the headcount requires a repeatable attendee roster." });
@@ -459,12 +472,12 @@ export const registrationFormDefinitionSchema = z.object({
     if (!hasSplitName && !hasFullName) {
       context.addIssue({ code: "custom", path: ["attendeeRoster"], message: "Repeatable rosters require attendee first/last name fields or a supported full-name field." });
     }
-    const hasRequiredSplitName = attendeeFields.some((field) => field.key === "first_name" && field.required && !field.conditional)
-      && attendeeFields.some((field) => field.key === "last_name" && field.required && !field.conditional);
+    const hasRequiredSplitName = attendeeFields.some((field) => field.key === "first_name" && field.required && !hasVisibilityRule(field))
+      && attendeeFields.some((field) => field.key === "last_name" && field.required && !hasVisibilityRule(field));
     const hasRequiredFullName = attendeeFields.some((field) => (
       attendeeNameKeys.includes(field.key as typeof attendeeNameKeys[number])
       && field.required
-      && !field.conditional
+      && !hasVisibilityRule(field)
     ));
     if ((hasSplitName || hasFullName) && !hasRequiredSplitName && !hasRequiredFullName) {
       context.addIssue({
@@ -1484,9 +1497,17 @@ export function conditionMatches(condition: FieldCondition, responses: Record<st
   return String(actual ?? "") === expected;
 }
 
+/**
+ * Whether the answers show the question. A single `conditional` is an All
+ * group of one, so a form saved before groups existed evaluates exactly as it
+ * did; Any needs one matching condition. Every caller (pricing, capacity,
+ * validation, preview, reports) goes through this, so a hidden question is
+ * hidden everywhere.
+ */
 export function isFieldVisible(field: RegistrationFormField, responses: Record<string, unknown>) {
-  if (!field.conditional) return true;
-  return conditionMatches(field.conditional, responses);
+  const rule = fieldVisibilityRule(field);
+  if (!rule) return true;
+  return evaluateVisibilityRule(rule, (condition) => conditionMatches(condition, responses));
 }
 
 /** Whether a required field has been made optional for this person by "optional when". */

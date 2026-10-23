@@ -3,6 +3,7 @@
 // Pure, so the rules are testable without a browser. Nothing here saves anything.
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import { planFieldDrop } from "./field-drop";
+import { conditionPhrase, fieldVisibilityRule, visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 type Sections = RegistrationFormDefinition["sections"];
 
@@ -38,9 +39,9 @@ function flatten(sections: Sections): RegistrationFormField[] {
   return sections.flatMap((section) => section.fields);
 }
 
-/** The keys a question's show-when and optional-when rules depend on. */
+/** The keys a question's show-when (every member of an All/Any group, #1072) and optional-when rules depend on. */
 function controllerKeys(field: RegistrationFormField): string[] {
-  return [field.conditional?.fieldKey, field.optionalWhen?.fieldKey].filter((key): key is string => Boolean(key));
+  return [...visibilityControllerKeys(field), field.optionalWhen?.fieldKey].filter((key): key is string => Boolean(key));
 }
 
 const name = (field: RegistrationFormField) => `"${field.label || "Untitled question"}"`;
@@ -104,13 +105,15 @@ export function planMoveToStep(sections: Sections, fieldId: string, targetSectio
   return { kind: "nothing" };
 }
 
-const OPERATOR_PHRASES = { EQUALS: "is", NOT_EQUALS: "is not", INCLUDES: "includes", NOT_EMPTY: "is answered" } as const;
-
-/** "Traveling by club bus is Yes": the show-when rule in words, for the question card. Null when the question always shows. */
+/**
+ * "Traveling by club bus is Yes": the show-when rule in words, for the question card. A group reads "All of: a; b" or
+ * "Any of: a; b" (#1072). Null when the question always shows.
+ */
 export function showWhenSummary(field: RegistrationFormField, all: readonly RegistrationFormField[]): string | null {
-  const rule = field.conditional;
+  const rule = fieldVisibilityRule(field);
   if (!rule) return null;
-  const controller = all.find((candidate) => candidate.key === rule.fieldKey);
-  const label = controller?.label || rule.fieldKey;
-  return rule.operator === "NOT_EMPTY" ? `${label} ${OPERATOR_PHRASES.NOT_EMPTY}` : `${label} ${OPERATOR_PHRASES[rule.operator]} ${rule.value}`;
+  const labelOf = (key: string) => all.find((candidate) => candidate.key === key)?.label;
+  const phrases = rule.conditions.map((condition) => conditionPhrase(condition, labelOf));
+  if (phrases.length === 1) return phrases[0]!;
+  return `${rule.match === "ANY" ? "Any" : "All"} of: ${phrases.join("; ")}`;
 }

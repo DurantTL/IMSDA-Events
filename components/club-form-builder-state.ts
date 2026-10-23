@@ -1,6 +1,7 @@
 import type { ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
 import { mappingWithRenamedKey, mappingWithoutKey, type RosterMapping } from "@/modules/club-forms/roster-mapping";
 import { isChoiceFieldType, type RegistrationFormField } from "@/modules/forms/definition";
+import { mapVisibilityConditions } from "@/modules/forms/visibility-rule";
 
 /**
  * Pure edits to a club form draft (#712), kept out of the builder component
@@ -155,7 +156,9 @@ export function renameFieldKey(spec: ClubFormDraftSpec, fieldId: string, newKey:
         ...section,
         fields: section.fields.map((field) => {
           const renamed = field.id === fieldId ? { ...field, key: newKey } : field;
-          return { ...renamed, conditional: retarget(renamed.conditional), optionalWhen: retarget(renamed.optionalWhen) };
+          // Every member of a show-when group follows the rename, not only a single condition (#1072).
+          const retargeted = mapVisibilityConditions(renamed, (condition) => retarget(condition));
+          return { ...retargeted, optionalWhen: retarget(renamed.optionalWhen) };
         }),
       })),
     },
@@ -220,8 +223,8 @@ export function removeField(spec: ClubFormDraftSpec, fieldId: string): ClubFormD
       fields: section.fields
         .filter((field) => field.id !== fieldId)
         .map((field) => ({
-          ...field,
-          conditional: field.conditional?.fieldKey === key ? undefined : field.conditional,
+          // A show-when condition that named the removed question goes, whichever member it was (#1072).
+          ...mapVisibilityConditions(field, (condition) => (condition.fieldKey === key ? null : condition)),
           optionalWhen: field.optionalWhen?.fieldKey === key ? undefined : field.optionalWhen,
         })),
     }))

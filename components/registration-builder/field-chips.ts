@@ -5,6 +5,7 @@ import type { RegistrationFormField } from "@/modules/forms/definition";
 import { resolveFieldFlags } from "@/modules/forms/field-flags";
 import { builderFieldModules } from "@/modules/forms/builder-modules";
 import { isMealTicketField } from "./module-owned-settings";
+import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 export type FieldChipKind = "scope" | "required" | "logic" | "price" | "capacity" | "sensitive" | "module";
 export type FieldChip = { kind: FieldChipKind; label: string };
@@ -37,12 +38,12 @@ export function deriveFieldChips(field: RegistrationFormField, sectionTitle = ""
   if (information) {
     const chips: FieldChip[] = [];
     if (field.required) chips.push({ kind: "required", label: "Required" });
-    if (field.conditional) chips.push({ kind: "logic", label: "Has logic" });
+    if (hasVisibilityRule(field)) chips.push({ kind: "logic", label: "Has logic" });
     return chips;
   }
   const chips: FieldChip[] = [{ kind: "scope", label: field.scope === "ATTENDEE" ? "Asked of each person" : "Asked once" }];
   if (field.required || field.optionSource === "ATTENDEE_TYPES") chips.push({ kind: "required", label: "Required" });
-  if (field.conditional) chips.push({ kind: "logic", label: "Has logic" });
+  if (hasVisibilityRule(field)) chips.push({ kind: "logic", label: "Has logic" });
   if (affectsPrice(field)) chips.push({ kind: "price", label: "Has price" });
   if (hasCapacity(field)) chips.push({ kind: "capacity", label: "Has capacity" });
   if (resolveFieldFlags(field, { sectionTitle }).sensitive) chips.push({ kind: "sensitive", label: "Sensitive" });

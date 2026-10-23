@@ -43,3 +43,5 @@ message origin, matches the sending frame by `contentWindow`, resizes multiple
 frames independently, and scrolls the correct frame into view after step
 changes, validation errors, or confirmation. The public registration request
 is stateless and does not depend on a third-party session or CSRF cookie.
+
+Show-when rules (single condition or flat All/Any group), how old single rules are read, validation, copy and disclosure: see [docs/FORM-VISIBILITY-RULES.md](../../docs/FORM-VISIBILITY-RULES.md).

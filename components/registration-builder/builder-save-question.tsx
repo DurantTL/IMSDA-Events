@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
 import { useBuilder } from "./builder-context";
 import { libraryFieldsFromForm } from "./library-insert";
+import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 type SaveResult = { id?: string; replacedAcknowledgments?: string[]; message?: string };
 
@@ -26,7 +27,7 @@ export function BuilderSaveQuestionDialog() {
   useEffect(() => { if (field) nameRef.current?.focus(); }, [field]);
   if (!libraryTarget || !field || !definition) return null;
   const close = () => { if (!saving) setLibraryTarget(null); };
-  const referencesOthers = Boolean(field.conditional || field.optionalWhen);
+  const referencesOthers = Boolean(hasVisibilityRule(field) || field.optionalWhen);
 
   async function save() {
     if (!field || !definition) return;

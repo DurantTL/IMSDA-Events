@@ -1,10 +1,10 @@
 // The sidebar's tabs (#1132): which exist, which opens when a question is selected,
 // and where arrow keys move. Pure, so the rules are testable without a browser.
 
-export type SidebarTab = "questions" | "settings" | "form-settings" | "history";
+export type SidebarTab = "questions" | "settings" | "rules" | "form-settings" | "history";
 // Every panel the sidebar can hold, in tab order. A new panel (Caleb wants to keep adding modules, #1139) is one more entry
 // here and one more `SidebarTabDefinition` in the shell; nothing else about the sidebar changes.
-export const sidebarTabOrder: readonly SidebarTab[] = ["questions", "settings", "form-settings", "history"];
+export const sidebarTabOrder: readonly SidebarTab[] = ["questions", "settings", "rules", "form-settings", "history"];
 
 /**
  * Selecting a question, by any route, opens Question settings. Clearing the selection leaves the tab alone,

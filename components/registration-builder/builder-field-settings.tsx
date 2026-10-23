@@ -13,16 +13,18 @@ import { BuilderChoiceSettings } from "./builder-choice-settings";
 import { BuilderFieldAdvanced } from "./builder-field-advanced";
 import { informationFieldTypeAllowed } from "./information-mode";
 import { useLoadedBuilder } from "./builder-context";
+import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 type FieldTarget = { field: RegistrationFormField; sectionIndex: number; fieldIndex: number };
 
 /** The patch for changing a field's scope: credits, conditions that would now cross scopes, and directory sources follow (#482). */
 export function scopeChangePatch(field: RegistrationFormField, scope: RegistrationFormField["scope"], allFields: RegistrationFormField[]): Partial<RegistrationFormField> {
-  const controller = field.conditional ? allFields.find((candidate) => candidate.key === field.conditional?.fieldKey) : null;
+  // A show-when rule that reaches an attendee answer from a registration-level question cannot work, whichever member does it (#1072).
+  const crossesScope = visibilityControllerKeys(field).some((key) => allFields.find((candidate) => candidate.key === key)?.scope === "ATTENDEE");
   return {
     scope,
     ...creditPatchForKindChange(field, { scope }),
-    conditional: scope === "REGISTRATION" && controller?.scope === "ATTENDEE" ? undefined : field.conditional,
+    ...(scope === "REGISTRATION" && crossesScope ? { conditional: undefined, conditionalGroup: undefined } : { conditional: field.conditional, conditionalGroup: field.conditionalGroup }),
     optionalWhen: scope === "REGISTRATION" && allFields.find((candidate) => candidate.key === field.optionalWhen?.fieldKey)?.scope === "ATTENDEE" ? undefined : field.optionalWhen,
     // Directory sources apply only to the whole registration (#482).
     ...(scope === "ATTENDEE" && isDirectoryOptionSource(field.optionSource) ? { optionSource: undefined, options: [] } : {}),

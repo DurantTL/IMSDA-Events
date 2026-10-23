@@ -1,5 +1,6 @@
 import { ACKNOWLEDGMENT_PLACEHOLDER_TEXT, DIRECTORY_NOT_LISTED_VALUE, localCalendarDate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { fullNameKeys, splitNameKeyPairs } from "@/modules/forms/public-domain";
+import { mapVisibilityConditions, visibilityConditions } from "@/modules/forms/visibility-rule";
 import { shirtSizeOptions } from "@/modules/merchandise/legacy-shirt-size-compat";
 
 export type BuilderModuleCategory = "Common" | "People" | "Housing" | "Group event";
@@ -265,13 +266,12 @@ export function instantiateModuleFields(
   return module.fields.map((source) => {
     const { coveredBy: _coveredBy, ...cloned } = structuredClone(source);
     void _coveredBy;
-    const conditional = cloned.conditional
-      ? { ...cloned.conditional, fieldKey: moduleKeys.get(cloned.conditional.fieldKey) ?? cloned.conditional.fieldKey }
-      : undefined;
+    // Every member of a show-when rule is remapped, not only a single condition (#1072).
+    const remapped = mapVisibilityConditions(cloned, (condition) => ({ ...condition, fieldKey: moduleKeys.get(condition.fieldKey) ?? condition.fieldKey }));
     const optionalWhen = cloned.optionalWhen
       ? { ...cloned.optionalWhen, fieldKey: moduleKeys.get(cloned.optionalWhen.fieldKey) ?? cloned.optionalWhen.fieldKey }
       : undefined;
-    return { ...cloned, id: makeFieldId(), key: moduleKeys.get(source.key)!, conditional, optionalWhen };
+    return { ...remapped, id: makeFieldId(), key: moduleKeys.get(source.key)!, optionalWhen };
   });
 }
 
@@ -322,15 +322,16 @@ function conditionWarnings(
 ): ModuleConditionWarning[] {
   const warnings: ModuleConditionWarning[] = [];
   for (const field of fields) {
-    const condition = field.conditional;
-    if (!condition || (condition.operator !== "EQUALS" && condition.operator !== "INCLUDES")) continue;
-    const controller = existingFields.find((candidate) => candidate.key === condition.fieldKey);
-    if (!controller) continue;
-    const satisfiable = !controller.optionSource && (controller.options ?? []).includes(condition.value);
-    if (satisfiable) continue;
-    const existing = warnings.find((warning) => warning.controllerLabel === controller.label && warning.value === condition.value);
-    if (existing) existing.dependentLabels.push(field.label);
-    else warnings.push({ controllerLabel: controller.label, value: condition.value, dependentLabels: [field.label] });
+    for (const condition of visibilityConditions(field)) {
+      if (condition.operator !== "EQUALS" && condition.operator !== "INCLUDES") continue;
+      const controller = existingFields.find((candidate) => candidate.key === condition.fieldKey);
+      if (!controller) continue;
+      const satisfiable = !controller.optionSource && (controller.options ?? []).includes(condition.value);
+      if (satisfiable) continue;
+      const existing = warnings.find((warning) => warning.controllerLabel === controller.label && warning.value === condition.value);
+      if (existing) existing.dependentLabels.push(field.label);
+      else warnings.push({ controllerLabel: controller.label, value: condition.value, dependentLabels: [field.label] });
+    }
   }
   return warnings;
 }

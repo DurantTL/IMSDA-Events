@@ -12603,6 +12603,34 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .fb-advanced-body { padding-bottom: 12px; }
 .fb-advanced-body .field-editor-body { margin: 0; border: 0; background: transparent; }
 .fb-advanced-body .field-advanced > summary { display: none; }
+/* Show this question when and the Rule summary (#1072). The All/Any toggle shows its state with a border and tint, not a second filled button. */
+.fb-rule { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 12px; }
+.fb-rule-heading, .fb-rule-summary-heading { margin: 0; color: var(--imsda-navy); font-size: 1.0625rem; }
+.fb-rule-heading:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.fb-rule-switch { min-height: var(--touch-target, 44px); }
+.fb-rule-match { display: flex; flex-wrap: wrap; align-self: start; width: fit-content; max-width: 100%; border: 1px solid var(--imsda-navy); border-radius: 10px; overflow: hidden; }
+.fb-rule-toggle { min-height: var(--touch-target, 44px); border: 0; background: var(--card); color: var(--ink); cursor: pointer; padding: 0 14px; font: inherit; font-size: 0.875rem; }
+.fb-rule-toggle[aria-pressed="true"] { background: var(--imsda-navy-soft); box-shadow: inset 0 -4px 0 var(--imsda-navy); color: var(--imsda-navy); font-weight: 700; }
+.fb-rule-toggle:disabled { cursor: not-allowed; opacity: 0.6; }
+.fb-rule-toggle:focus-visible, .fb-rule-link:focus-visible, .fb-rule-row select:focus-visible, .fb-rule-row input:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.fb-rule-rows, .fb-rule-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.fb-rule-row { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.fb-rule-row[data-invalid="true"] { border-color: var(--danger, #8f3a30); }
+.fb-rule-row label { color: var(--muted); font-size: 0.8125rem; font-weight: 700; }
+.fb-rule-row select, .fb-rule-row input { width: 100%; min-height: var(--touch-target, 44px); box-sizing: border-box; }
+.fb-rule-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.fb-rule-pair > div { display: grid; gap: 4px; }
+.fb-rule-remove { justify-self: end; }
+.fb-rule-add { justify-self: start; }
+.fb-rule-reads { margin: 0; border-radius: 8px; background: var(--imsda-navy-soft); padding: 10px; font-size: 0.875rem; overflow-wrap: anywhere; }
+.fb-rule-problem { margin: 0; color: var(--danger, #8f3a30); font-size: 0.875rem; font-weight: 700; }
+.fb-rule-summary { display: grid; gap: 10px; }
+.fb-rule-item { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 10px; }
+.fb-rule-item[data-needs-fix="true"] { border-color: #c9a227; background: #fff8e5; color: #243640; }
+.fb-rule-item-title { font-weight: 700; overflow-wrap: anywhere; }
+.fb-rule-item-text { font-size: 0.875rem; overflow-wrap: anywhere; }
+.fb-rule-fix-badge { justify-self: start; border-radius: 999px; background: #fdf0c4; color: #5c4600; padding: 2px 8px; font-size: 0.8125rem; }
+.fb-rule-link { display: inline-flex; align-items: center; justify-self: start; min-height: var(--touch-target, 44px); color: var(--imsda-navy); font-size: 0.875rem; font-weight: 700; text-decoration: underline; }
 .fb-sidebar .field-settings { grid-template-columns: minmax(0, 1fr); }
 .fb-sidebar .field-settings .field-wide { grid-column: auto; }
 .fb-sidebar .choice-limit-editor, .fb-sidebar .choice-description-editor { overflow-x: auto; }

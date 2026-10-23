@@ -7,6 +7,7 @@ import {
   type RegistrationFormDefinition,
   type RegistrationFormField,
 } from "@/modules/forms/definition";
+import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 const editableFieldTypes = new Set<RegistrationFormField["type"]>([
   "SELECT",
@@ -48,6 +49,11 @@ export type EditableAttendeeField = {
     fieldKey: string;
     operator: "EQUALS" | "NOT_EQUALS" | "INCLUDES" | "NOT_EMPTY";
     value: string;
+  } | null;
+  /** Several conditions joined by All or Any (#1072); null when the question has a single condition or none. */
+  conditionalGroup: {
+    match: "ALL" | "ANY";
+    conditions: Array<{ fieldKey: string; operator: "EQUALS" | "NOT_EQUALS" | "INCLUDES" | "NOT_EMPTY"; value: string }>;
   } | null;
 };
 
@@ -114,8 +120,9 @@ function tieredEditableFieldDefinitions(
       || (policy === "TIERED" && isTieredAttendeeFieldEditable(field))
     ));
   const candidateKeys = new Set(candidates.map((field) => field.key));
+  // Every member of a rule must be a controller the browser may see, or the question stays staff-managed.
   return candidates.filter((field) => (
-    !field.conditional || candidateKeys.has(field.conditional.fieldKey)
+    visibilityControllerKeys(field).every((key) => candidateKeys.has(key))
   ));
 }
 
@@ -138,6 +145,7 @@ export function editableAttendeeFields(
       minSelections: field.minSelections ?? null,
       maxSelections: field.maxSelections ?? null,
       conditional: field.conditional ?? null,
+      conditionalGroup: field.conditionalGroup ?? null,
     }));
 }
 

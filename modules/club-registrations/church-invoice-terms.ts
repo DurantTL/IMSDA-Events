@@ -1,6 +1,7 @@
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import { resolveResponsibleOrganization } from "@/modules/forms/definition";
 import { formatPerPersonAmount, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
+import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 /**
  * The wording a church-invoiced (DEFERRED_ORGANIZATION_INVOICE) registration
@@ -67,7 +68,7 @@ function soleFeeField(definition: RegistrationFormDefinition): RegistrationFormF
   if (priced.length !== 1) return null;
   const fee = priced[0];
   if (fee.type !== "CALCULATED" || !fee.priceCents || fee.choicePricesCents || fee.latePricing?.choicePricesCents) return null;
-  if (fee.conditional || fee.optionalWhen) return null;
+  if (hasVisibilityRule(fee) || fee.optionalWhen) return null;
   if (definition.attendeeRoster?.enabled && fee.scope !== "ATTENDEE") return null;
   return fee;
 }

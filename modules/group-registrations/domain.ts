@@ -4,6 +4,7 @@ import type { RegistrationFormDefinition, RegistrationFormField } from "@/module
 import { attendeeAgeKey, attendeeNameKeys, clubFormProblem, guestIsAdult } from "@/modules/club-registrations/domain";
 import { consumesClassSeat } from "@/modules/honors/enrollment-domain";
 import type { PickingAttendee } from "@/modules/honors/registration-picks";
+import { hasVisibilityRule, visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /**
  * "Group" registration on a club event (#650): people who are not in a club
@@ -44,7 +45,7 @@ const CHURCH_TEXT_LABEL = /^(sponsoring\s+)?(home\s+)?church(\s+name)?$/i;
 function asksForClubOrChurch(field: RegistrationFormField) {
   if (field.scope !== "REGISTRATION") return false;
   if (field.optionSource === "CLUBS_DIRECTORY" || field.optionSource === "CHURCHES_DIRECTORY") return true;
-  if (field.type !== "TEXT" || field.conditional) return false;
+  if (field.type !== "TEXT" || hasVisibilityRule(field)) return false;
   const label = field.label.trim();
   return CLUB_TEXT_KEYS.has(field.key) || CHURCH_TEXT_KEYS.has(field.key) || CLUB_TEXT_LABEL.test(label) || CHURCH_TEXT_LABEL.test(label);
 }
@@ -64,8 +65,9 @@ export function groupFormDefinition(definition: RegistrationFormDefinition): Reg
   for (let changed = true; changed;) {
     changed = false;
     for (const field of fields) {
-      if (removed.has(field.key) || !field.conditional) continue;
-      if (removed.has(field.conditional.fieldKey)) {
+      if (removed.has(field.key) || !hasVisibilityRule(field)) continue;
+      // Any member pointing at a removed question takes the question out (#1072): it could never be satisfied as written.
+      if (visibilityControllerKeys(field).some((key) => removed.has(key))) {
         removed.add(field.key);
         changed = true;
       }
@@ -119,7 +121,7 @@ export function groupFormProblem(definition: RegistrationFormDefinition) {
   const ageKey = attendeeAgeKey(definition);
   if (!ageKey) return "The event's form has no attendee age question, which group registration needs for class ages.";
   const ageField = definition.sections.flatMap((section) => section.fields).find((field) => field.scope === "ATTENDEE" && field.key === ageKey);
-  if (!ageField?.required || ageField.conditional) return "The event's attendee age question must be required and always shown, so every group member has an age for class rules.";
+  if (!ageField?.required || hasVisibilityRule(ageField)) return "The event's attendee age question must be required and always shown, so every group member has an age for class rules.";
   return null;
 }
 

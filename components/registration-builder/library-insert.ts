@@ -9,6 +9,7 @@ import { resolveFieldOffer } from "@/modules/forms/field-flags";
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 import { protectedFieldReason, type QuestionLibraryItemView } from "@/modules/question-library/domain";
 import { uniqueFieldKey } from "./field-keys";
+import { fieldVisibilityRule, visibilityConditions, visibilityRulePatch, type RuleCondition } from "@/modules/forms/visibility-rule";
 
 /**
  * The fields to save: copies of the chosen questions. A question the form treats as sensitive (by its flag, its wording or
@@ -35,7 +36,7 @@ export type LibraryRepair = { fieldId: string; message: string };
 
 export type LibraryInstance = { fields: RegistrationFormField[]; repairs: LibraryRepair[] };
 
-type Condition = NonNullable<RegistrationFormField["conditional"]>;
+type Condition = RuleCondition;
 
 function describe(condition: Condition) {
   return `"${condition.fieldKey}"${condition.value ? ` (${condition.operator.toLowerCase().replaceAll("_", " ")} "${condition.value}")` : ""}`;
@@ -44,9 +45,10 @@ function describe(condition: Condition) {
 /**
  * An independent copy of a saved question for a form that already has `existingFields`. The saved fields are never changed.
  * Every copy gets a fresh id and a key that is free on the form (a key another module reads by name is never reused). A
- * condition that points at another copied question follows that question's new key. A condition that points at a question
- * that is not part of the saved item is removed and reported in `repairs`: the question then shows (or is required) always
- * until someone chooses what it depends on, and the builder says so.
+ * condition that points at another copied question follows that question's new key, for every member of an All/Any group
+ * (#1072). If ANY condition points at a question that is not part of the saved item, the whole rule is removed and reported
+ * in `repairs`: the question then shows (or is required) always until someone chooses what it depends on, and the builder
+ * says so. Dropping only the missing member would change what All or Any means, so the rule is never half kept.
  */
 export function instantiateLibraryFragment(item: Pick<QuestionLibraryItemView, "fields">, existingFields: readonly { key: string }[], newId: () => string): LibraryInstance {
   const taken = new Set(existingFields.map((field) => field.key));
@@ -73,9 +75,18 @@ export function instantiateLibraryFragment(item: Pick<QuestionLibraryItemView, "
       notes.push(`${label} ${describe(condition)}, which is not part of this saved question`);
       return undefined;
     };
-    const conditional = follow(copy.conditional, "It was shown only when");
+    const shownWhen = visibilityConditions(copy);
+    const followed = shownWhen.map((condition) => follow(condition, "It was shown only when"));
     const optionalWhen = follow(copy.optionalWhen, "It was optional only when");
-    if (!conditional) delete copy.conditional; else copy.conditional = conditional;
+    if (followed.some((condition) => condition === undefined)) {
+      delete copy.conditional;
+      delete copy.conditionalGroup;
+    } else if (shownWhen.length > 0) {
+      const rule = fieldVisibilityRule(copy)!;
+      Object.assign(copy, visibilityRulePatch({ match: rule.match, conditions: followed as Condition[] }));
+      if (copy.conditional === undefined) delete copy.conditional;
+      if (copy.conditionalGroup === undefined) delete copy.conditionalGroup;
+    }
     if (!optionalWhen) delete copy.optionalWhen; else copy.optionalWhen = optionalWhen;
     if (notes.length > 0) {
       // A question whose condition was removed would otherwise become required for everyone, so it is added as optional.

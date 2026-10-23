@@ -3,6 +3,7 @@ import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, type RegistrationFormDefinit
 import { registrationClosedMessage } from "@/modules/events/lifecycle";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { fullNameKeys, splitNameKeyPairs, type PublicRegistrationIssue } from "@/modules/forms/public-domain";
+import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
 /**
  * Club registration (#358): how roster people map onto an event's published
@@ -427,7 +428,7 @@ export function clubDirectoryTextPrefill(
 ): Record<string, string> {
   const prefill: Record<string, string> = {};
   for (const field of registrationFields(definition)) {
-    if (field.type !== "TEXT" || field.optionSource || field.conditional) continue;
+    if (field.type !== "TEXT" || field.optionSource || hasVisibilityRule(field)) continue;
     const label = field.label.trim();
     if (identity.clubName && (CLUB_TEXT_KEYS.has(field.key) || CLUB_TEXT_LABEL.test(label))) prefill[field.key] = identity.clubName;
     else if (identity.churchName && (CHURCH_TEXT_KEYS.has(field.key) || CHURCH_TEXT_LABEL.test(label))) prefill[field.key] = identity.churchName;

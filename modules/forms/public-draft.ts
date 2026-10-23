@@ -1,5 +1,6 @@
 import { sensitiveFieldPattern } from "@/modules/forms/sensitive-fields";
 import { getAttendeeRosterConfig, isBirthDateField, isFieldVisible, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { hasVisibilityRule, visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /**
  * Browser-only drafts for public registration forms (#574).
@@ -152,7 +153,8 @@ export function draftExcludedKeys(definition: RegistrationFormDefinition) {
   while (changed) {
     changed = false;
     for (const field of fields) {
-      if (!excluded.has(field.key) && field.conditional && excluded.has(field.conditional.fieldKey)) {
+      // Any member whose controller is excluded keeps the question out too (#1072): the draft could not evaluate it.
+      if (!excluded.has(field.key) && visibilityControllerKeys(field).some((key) => excluded.has(key))) {
         excluded.add(field.key);
         changed = true;
       }
@@ -181,7 +183,7 @@ function pruneHidden(
   for (let pass = 0; pass < fields.size; pass += 1) {
     let removed = false;
     for (const field of fields.values()) {
-      if (field.conditional && field.key in next && !isFieldVisible(field, { ...shared, ...next })) {
+      if (hasVisibilityRule(field) && field.key in next && !isFieldVisible(field, { ...shared, ...next })) {
         delete next[field.key];
         removed = true;
       }
