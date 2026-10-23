@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { dependencyOrderIssue, ordinal, planAdjacentMove, planMoveToStep, positionStatus, showWhenSummary } from "@/components/registration-builder/phone-move";
+import { newOrderInversion, ordinal, planAdjacentMove, planMoveToStep, positionStatus, showWhenSummary } from "@/components/registration-builder/phone-move";
 import { KEYBOARD_MIN_INSET, keyboardInset } from "@/components/registration-builder/use-keyboard-inset";
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
 
@@ -72,12 +72,35 @@ describe("Move up and Move down (#1071)", () => {
     expect(plan.message).toContain("has to stay before it");
   });
 
-  it("also guard a rule that makes a required question optional", () => {
+  it("also guard an optional-when rule, but only across steps", () => {
     const list = sections();
     list[1]!.fields[0] = field("shirt", "Shirt size", { optionalWhen: { fieldKey: "club_name", operator: "NOT_EMPTY", value: "" } });
-    // Moving the shirt question before step 1's controller is a refusal; staying after it is fine.
-    expect(planMoveToStep(list, "club_name", 1).kind).toBe("refused");
+    expect(planMoveToStep(list, "club_name", 2).kind).toBe("refused");
     expect(planMoveToStep(list, "shirt", 0).kind).toBe("moved");
+    // Inside one step the order changes nothing, so it is free.
+    const same = sections();
+    same[0]!.fields[2] = field("late", "Late", { optionalWhen: { fieldKey: "club_name", operator: "NOT_EMPTY", value: "" } });
+    expect(planAdjacentMove(same, "club_name", 1).kind).toBe("moved");
+  });
+
+  it("lets a mutual optional-when pair (the club form's two guardian signatures) move freely", () => {
+    const list = sections();
+    list[1]!.fields = [
+      field("father", "Father signature", { optionalWhen: { fieldKey: "mother", operator: "NOT_EMPTY", value: "" } }),
+      field("mother", "Mother signature", { optionalWhen: { fieldKey: "father", operator: "NOT_EMPTY", value: "" } }),
+    ];
+    expect(planAdjacentMove(list, "father", 1).kind).toBe("moved");
+    expect(planAdjacentMove(list, "mother", -1).kind).toBe("moved");
+    expect(planMoveToStep(list, "father", 0).kind).toBe("moved");
+    expect(planMoveToStep(list, "mother", 0).kind).toBe("moved");
+  });
+
+  it("refuses a step move that would put a controller after its dependents, and allows one that does not", () => {
+    const list = sections();
+    list[1]!.fields.push(field("late_dep", "Late", { conditional: { fieldKey: "club_name", operator: "NOT_EMPTY", value: "" } }));
+    const swapped = [list[1]!, list[0]!, list[2]!];
+    expect(newOrderInversion(list, swapped)).toContain("depends on");
+    expect(newOrderInversion(list, list)).toBeNull();
   });
 });
 
@@ -121,12 +144,21 @@ describe("Move to step (#1071)", () => {
     expect(planMoveToStep(split, "by_bus", 2).kind).toBe("refused");
   });
 
-  it("leaves a form that already had an odd order tidy-able: only pairs with the moved question are checked", () => {
+  it("lets a form that is already out of order be repaired with Up and Down, and refuses only new inversions", () => {
     const odd = sections();
-    // bus_seats is first, ahead of its controller; moving an unrelated question is not refused.
+    // bus_seats is first, ahead of its controller by_bus.
     odd[0]!.fields = [odd[0]!.fields[2]!, odd[0]!.fields[0]!, odd[0]!.fields[1]!];
-    expect(dependencyOrderIssue(odd, "club_name")).toBeNull();
+    expect(newOrderInversion(odd, odd, "club_name")).toBeNull();
     expect(planAdjacentMove(odd, "club_name", 1).kind).toBe("moved");
+    // Moving the dependent question down toward its controller repairs the order.
+    expect(planAdjacentMove(odd, "bus_seats", 1).kind).toBe("moved");
+    // Once repaired, undoing the repair is a new inversion and is refused.
+    const fixed = planAdjacentMove(odd, "bus_seats", 1);
+    if (fixed.kind !== "moved") throw new Error("expected a move");
+    const repaired = planAdjacentMove(fixed.sections, "by_bus", -1);
+    expect(repaired.kind).toBe("moved");
+    if (repaired.kind !== "moved") return;
+    expect(planAdjacentMove(repaired.sections, "bus_seats", -1).kind).toBe("refused");
   });
 });
 
@@ -214,7 +246,7 @@ describe("the phone builder wiring (#1071)", () => {
   it("every move path refuses a dependency inversion: the buttons, the Move screen and the drag", () => {
     expect(edits).toContain("planAdjacentMove(definition.sections, fieldId, direction)");
     expect(edits).toContain("planMoveToStep(definition.sections, fieldId, targetSectionIndex)");
-    expect(edits).toContain("dependencyOrderIssue(plan.sections, movedId)");
+    expect(edits).toContain("newOrderInversion(definition.sections, plan.sections, movedId)");
     expect(edits).toContain("if (!result.ok) setError(result.message);");
   });
 

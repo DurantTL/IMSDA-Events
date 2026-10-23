@@ -34,41 +34,48 @@ export function positionStatus(sections: Sections, fieldId: string): string {
   return "";
 }
 
-function flatten(sections: Sections): RegistrationFormField[] {
-  return sections.flatMap((section) => section.fields);
-}
-
-/** The keys a question's show-when and optional-when rules depend on. */
-function controllerKeys(field: RegistrationFormField): string[] {
-  return [field.conditional?.fieldKey, field.optionalWhen?.fieldKey].filter((key): key is string => Boolean(key));
-}
-
 const name = (field: RegistrationFormField) => `"${field.label || "Untitled question"}"`;
 
+type Inversion = { id: string; dependent: RegistrationFormField; controller: RegistrationFormField };
+
 /**
- * The reason a move is refused, or null when it is fine. A question that is shown only when another is answered has to
- * stay after that other question, and a question other questions depend on has to stay before them, wherever they are.
- * Only pairs that involve the moved question are checked, so a form that already had an odd order can still be tidied.
+ * Every question that sits ahead of a question its rule depends on. A show-when rule (`conditional`) always counts; an
+ * optional-when rule counts only across steps, because order inside one step does not change what the form does.
  */
-export function dependencyOrderIssue(after: Sections, movedFieldId: string): string | null {
-  const order = flatten(after);
-  const movedAt = order.findIndex((field) => field.id === movedFieldId);
-  if (movedAt < 0) return null;
-  const moved = order[movedAt]!;
-  for (const key of controllerKeys(moved)) {
-    const controllerAt = order.findIndex((field) => field.key === key);
-    if (controllerAt > movedAt) {
-      const controller = order[controllerAt]!;
-      return `${name(moved)} is shown only when ${name(controller)} is answered, so it has to stay after that question. Move it somewhere below ${name(controller)} instead.`;
+function inversions(sections: Sections): Inversion[] {
+  const order: Array<{ field: RegistrationFormField; sectionIndex: number }> = sections.flatMap((section, sectionIndex) => section.fields.map((field) => ({ field, sectionIndex })));
+  const found: Inversion[] = [];
+  order.forEach(({ field, sectionIndex }, position) => {
+    const rules = [{ kind: "conditional", key: field.conditional?.fieldKey }, { kind: "optionalWhen", key: field.optionalWhen?.fieldKey }];
+    for (const rule of rules) {
+      if (!rule.key) continue;
+      const controllerAt = order.findIndex((entry) => entry.field.key === rule.key);
+      if (controllerAt <= position) continue;
+      if (rule.kind === "optionalWhen") {
+        const controller = order[controllerAt]!;
+        // Same step: order changes nothing. A mutual pair (each makes the other optional) cannot be ordered at all.
+        if (controller.sectionIndex === sectionIndex || controller.field.optionalWhen?.fieldKey === field.key) continue;
+      }
+      found.push({ id: `${field.id}|${rule.kind}|${rule.key}`, dependent: field, controller: order[controllerAt]!.field });
     }
-  }
-  for (let index = 0; index < movedAt; index += 1) {
-    const earlier = order[index]!;
-    if (controllerKeys(earlier).includes(moved.key)) {
-      return `${name(earlier)} is shown only when ${name(moved)} is answered, so ${name(moved)} has to stay before it. Move ${name(moved)} somewhere above ${name(earlier)} instead.`;
-    }
-  }
-  return null;
+  });
+  return found;
+}
+
+/**
+ * The reason a change of order is refused, or null when it is fine: the change must not create an ordering problem that
+ * was not there before, where a question appears ahead of the question its show-when (or, across steps, optional-when)
+ * rule depends on. A form that was already out of order can still be repaired, and questions that depend on each other
+ * can still move. `movedFieldId` only words the message; leave it out for a step move. Works for any change of order.
+ */
+export function newOrderInversion(before: Sections, after: Sections, movedFieldId?: string): string | null {
+  const known = new Set(inversions(before).map((entry) => entry.id));
+  const created = inversions(after).find((entry) => !known.has(entry.id));
+  if (!created) return null;
+  const { dependent, controller } = created;
+  if (movedFieldId === controller.id) return `${name(dependent)} is shown only when ${name(controller)} is answered, so ${name(controller)} has to stay before it. Move ${name(controller)} somewhere above ${name(dependent)} instead.`;
+  if (movedFieldId === dependent.id) return `${name(dependent)} is shown only when ${name(controller)} is answered, so it has to stay after that question. Move it somewhere below ${name(controller)} instead.`;
+  return `${name(dependent)} depends on ${name(controller)}, so that question has to stay before it. Keep the steps in an order where it does.`;
 }
 
 /** One place up or down inside its step. The same swap as the toolbar's Move up and Move down. */
@@ -81,7 +88,7 @@ export function planAdjacentMove(sections: Sections, fieldId: string, direction:
     const next = structuredClone(sections);
     const fields = next[sectionIndex]!.fields;
     [fields[fieldIndex], fields[nextIndex]] = [fields[nextIndex]!, fields[fieldIndex]!];
-    const issue = dependencyOrderIssue(next, fieldId);
+    const issue = newOrderInversion(sections, next, fieldId);
     return issue ? { kind: "refused", message: issue } : { kind: "moved", sections: next };
   }
   return { kind: "nothing" };
@@ -98,7 +105,7 @@ export function planMoveToStep(sections: Sections, fieldId: string, targetSectio
     const plan = planFieldDrop(sections, { sectionIndex, fieldIndex }, { sectionIndex: targetSectionIndex, fieldIndex: target.fields.length });
     if (plan.kind === "error") return { kind: "refused", message: plan.message };
     if (plan.kind === "nothing") return { kind: "nothing" };
-    const issue = dependencyOrderIssue(plan.sections, fieldId);
+    const issue = newOrderInversion(sections, plan.sections, fieldId);
     return issue ? { kind: "refused", message: issue } : { kind: "moved", sections: plan.sections };
   }
   return { kind: "nothing" };

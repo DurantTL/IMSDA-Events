@@ -23,16 +23,25 @@ export function useKeyboardInset(ref: RefObject<HTMLElement | null>, active: boo
     const target = element;
     const visual = viewport;
     function update() {
-      const inset = keyboardInset(window.innerHeight, visual);
+      // clientHeight is the layout viewport without scrollbars; innerHeight can include them.
+      const inset = keyboardInset(document.documentElement.clientHeight, visual);
       target.style.setProperty("--fb-keyboard-inset", `${inset}px`);
       if (inset >= KEYBOARD_MIN_INSET) target.setAttribute("data-keyboard", "open"); else target.removeAttribute("data-keyboard");
     }
+    // The bar's height, for the page's scroll padding, so a focused field is never left under it.
+    const root = document.documentElement;
+    function measure() { root.style.setProperty("--fb-phone-bar-height", `${Math.ceil(target.getBoundingClientRect().height)}px`); }
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(target);
+    measure();
     update();
     visual.addEventListener("resize", update);
     visual.addEventListener("scroll", update);
     return () => {
       visual.removeEventListener("resize", update);
       visual.removeEventListener("scroll", update);
+      observer?.disconnect();
+      root.style.removeProperty("--fb-phone-bar-height");
       target.style.removeProperty("--fb-keyboard-inset");
       target.removeAttribute("data-keyboard");
     };
