@@ -1003,3 +1003,28 @@ export async function checkAttendeeVerifyByAddressRateLimit(request: Request, em
     { policy: "attendee.verify-by-address.client-account", limit: 5, windowSeconds: fifteenMinutes, identifierHashes: [client, account] },
   ], configuration);
 }
+
+/**
+ * A public information form's fill page and submit route (#1150), per 15 minutes. `read` is opening the page,
+ * `submit` is sending answers. A venue or church Wi-Fi shares one client address across many phones, so the client
+ * budget is generous; the per-form budget stops a script flooding one form.
+ */
+const informationFormBudgets = {
+  read: { client: 120, form: 600 },
+  submit: { client: 40, form: 300 },
+} as const;
+
+export async function checkInformationFormRateLimit(
+  request: Request,
+  formKey: string,
+  operation: keyof typeof informationFormBudgets,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const form = hashRateLimitIdentifier("information-form", formKey, configuration);
+  const budget = informationFormBudgets[operation];
+  return evaluate([
+    { policy: `information-form.${operation}.client`, limit: budget.client, windowSeconds: fifteenMinutes, identifierHashes: [client] },
+    { policy: `information-form.${operation}.form`, limit: budget.form, windowSeconds: fifteenMinutes, identifierHashes: [form] },
+  ], configuration);
+}

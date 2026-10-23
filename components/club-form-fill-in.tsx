@@ -256,7 +256,7 @@ export function ClubFormFillIn(props: Props) {
   );
 }
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   answers,

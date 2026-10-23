@@ -12626,3 +12626,20 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (max-width: 1000px) {
   .fb-canvas { padding: 16px; }
 }
+
+/* Information forms (#1150): public fill page and staff responses view. */
+.information-form-fill input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+.information-form-fill select { min-height: 44px; }
+.information-form-fill textarea { min-height: 96px; }
+.information-form-fill .checkbox-label { min-height: 44px; align-items: center; }
+.information-form-fill .primary-button { min-height: 44px; }
+.information-form-notice .intro-actions { margin-top: 16px; }
+.information-form-action { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.information-form-done { padding: 16px; }
+.information-form-count { margin: 0 0 12px; font-size: 1.1rem; }
+.information-form-download { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.information-form-response-detail { display: grid; gap: 12px; margin-bottom: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
+.information-form-answers { display: grid; gap: 10px; margin: 0; }
+.information-form-answers dt { font-weight: 700; }
+.information-form-answers dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.information-form-table td { overflow-wrap: anywhere; }

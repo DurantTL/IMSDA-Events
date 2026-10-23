@@ -96,6 +96,14 @@ describe("attendeeReturnDestination", () => {
     expect(attendeeReturnDestination(undefined, "/account")).toBe("/account");
   });
 
+  it("carries a visitor back to an information form's fill page (#1150), and nothing broader", () => {
+    expect(attendeeReturnDestination("/forms/camp-survey", "/account")).toBe("/forms/camp-survey");
+    expect(attendeeReturnDestination("/events/sample-camporee/forms/camp-survey", "/account")).toBe("/events/sample-camporee/forms/camp-survey");
+    for (const bad of ["/forms", "/forms/a/b", "/events/sample-camporee", "/events/a/forms", "/events/a/b/forms/c", "/forms/%2e%2e/admin", "/forms/a//b"]) {
+      expect(attendeeReturnDestination(bad, "/account")).toBe("/account");
+    }
+  });
+
   it("never returns to a sign-in screen", () => {
     for (const loop of ["/account/sign-in", "/account/sign-in?next=%2Faccount", "/account/two-step", "/account/sign-up", "/profile/sign-in"]) {
       expect(attendeeReturnDestination(loop, "/account")).toBe("/account");
