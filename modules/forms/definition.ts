@@ -55,6 +55,32 @@ export function directorySourceNoun(source: DirectoryOptionSource) {
  */
 export const DIRECTORY_NOT_LISTED_VALUE = "Not listed";
 
+type CompanionCandidate = {
+  key: string;
+  conditional?: { fieldKey: string; operator: string; value: string } | undefined;
+  conditionalGroup?: { conditions: Array<{ fieldKey: string; operator: string; value: string }> } | undefined;
+};
+
+/**
+ * The free-text companions of a directory question: fields shown when it is answered "Not listed" (#1072). A field
+ * counts when ANY member of its show-when rule (a single `conditional` or a member of an All/Any group) is
+ * `controllerKey` EQUALS "Not listed". `anyOperator` keeps directory review's older leniency, where only the controller
+ * and the value were compared, so existing forms behave as before.
+ */
+export function notListedCompanions<T extends CompanionCandidate>(fields: readonly T[], controllerKey: string, options: { anyOperator?: boolean } = {}): T[] {
+  return fields.filter((candidate) => {
+    const conditions = candidate.conditionalGroup?.conditions ?? (candidate.conditional ? [candidate.conditional] : []);
+    return conditions.some((condition) => condition.fieldKey === controllerKey
+      && condition.value === DIRECTORY_NOT_LISTED_VALUE
+      && (options.anyOperator || condition.operator === "EQUALS"));
+  });
+}
+
+/** The first "Not listed" companion's key, or null. See `notListedCompanions`. */
+export function notListedCompanionKey(fields: readonly CompanionCandidate[], controllerKey: string, options: { anyOperator?: boolean } = {}): string | null {
+  return notListedCompanions(fields, controllerKey, options)[0]?.key ?? null;
+}
+
 /** The NUMBER field keys that hold an attendee's age (#483). */
 export const AGE_FIELD_KEYS = ["attendee_age", "age"] as const;
 
@@ -419,7 +445,8 @@ export const registrationFormDefinitionSchema = z.object({
     // Every member of the rule is checked, not just the first. A single condition saved before groups existed
     // keeps its original checks (not strict); a group is also checked for order, cycles and unfinished rows.
     for (const problem of visibilityRuleProblems(field, definition.sections.flatMap((candidate) => candidate.fields), { strict: Boolean(field.conditionalGroup) })) {
-      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, field.conditionalGroup ? "conditionalGroup" : "conditional"], message: problem.message });
+      // A group's issue names the question, so a form-level error list says which rule to fix (#1072).
+      context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, field.conditionalGroup ? "conditionalGroup" : "conditional"], message: field.conditionalGroup ? `${fieldDisplayLabel(field)}: ${problem.message}` : problem.message });
     }
     if (field.capUnitsAtAttendeeCount && !definition.attendeeRoster?.enabled) {
       context.addIssue({ code: "custom", path: ["sections", sectionIndex, "fields", fieldIndex, "capUnitsAtAttendeeCount"], message: "Capping at the headcount requires a repeatable attendee roster." });

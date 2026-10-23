@@ -23,6 +23,7 @@ import {
 import { ClubFormRosterMapping } from "@/components/club-form-roster-mapping";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { BuilderIssue, ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
+import { conditionPhrase } from "@/modules/forms/visibility-rule";
 import { conditionOperators, fieldDisplayLabel, formFieldTypes, isChoiceFieldType, type RegistrationFormField } from "@/modules/forms/definition";
 
 /**
@@ -466,10 +467,17 @@ function FieldEditor({
 
           <fieldset className="form-stack">
             <legend>Show only when</legend>
-            <div className="form-grid two-column">
+            {field.conditionalGroup && (
+              <div className="form-stack" data-testid="club-form-group-rule">
+                <p>{field.conditionalGroup.match === "ANY" ? "Shown when any of these is true" : "Shown when all of these are true"}: {field.conditionalGroup.conditions.map((condition) => conditionPhrase(condition, (key) => others.find((other) => other.key === key)?.label)).join("; ")}.</p>
+                <p className="fb-hint">This rule has several conditions, which are edited in the event form builder. You can remove it here.</p>
+                <button className="secondary-button" type="button" onClick={() => edit((s) => updateField(s, field.id, { conditional: undefined, conditionalGroup: undefined }))}>Remove rule</button>
+              </div>
+            )}
+            {!field.conditionalGroup && <div className="form-grid two-column">
               <label>Another question
                 <select
-                  onChange={(event) => edit((s) => updateField(s, field.id, { conditional: event.target.value ? { fieldKey: event.target.value, operator: field.conditional?.operator ?? "EQUALS", value: field.conditional?.value ?? "" } : undefined }))}
+                  onChange={(event) => edit((s) => updateField(s, field.id, { conditionalGroup: undefined, conditional: event.target.value ? { fieldKey: event.target.value, operator: field.conditional?.operator ?? "EQUALS", value: field.conditional?.value ?? "" } : undefined }))}
                   value={field.conditional?.fieldKey ?? ""}
                 >
                   <option value="">Always show</option>
@@ -493,7 +501,7 @@ function FieldEditor({
                   )}
                 </>
               )}
-            </div>
+            </div>}
           </fieldset>
 
           <fieldset className="form-stack">

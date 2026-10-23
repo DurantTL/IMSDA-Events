@@ -1,7 +1,7 @@
 import type { ClubFormDraftSpec } from "@/modules/club-forms/builder-domain";
 import { mappingWithRenamedKey, mappingWithoutKey, type RosterMapping } from "@/modules/club-forms/roster-mapping";
 import { isChoiceFieldType, type RegistrationFormField } from "@/modules/forms/definition";
-import { mapVisibilityConditions } from "@/modules/forms/visibility-rule";
+import { mapVisibilityConditions, visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /**
  * Pure edits to a club form draft (#712), kept out of the builder component
@@ -223,8 +223,10 @@ export function removeField(spec: ClubFormDraftSpec, fieldId: string): ClubFormD
       fields: section.fields
         .filter((field) => field.id !== fieldId)
         .map((field) => ({
-          // A show-when condition that named the removed question goes, whichever member it was (#1072).
-          ...mapVisibilityConditions(field, (condition) => (condition.fieldKey === key ? null : condition)),
+          // A show-when rule with any condition on the removed question goes whole, like a saved-question copy (#1072):
+          // keeping the other members would change what All or Any means.
+          ...field,
+          ...(visibilityControllerKeys(field).includes(key) ? { conditional: undefined, conditionalGroup: undefined } : {}),
           optionalWhen: field.optionalWhen?.fieldKey === key ? undefined : field.optionalWhen,
         })),
     }))

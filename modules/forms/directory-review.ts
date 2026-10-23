@@ -3,6 +3,7 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import {
   DIRECTORY_NOT_LISTED_VALUE,
+  notListedCompanionKey,
   isDirectoryOptionSource,
   registrationFormDefinitionSchema,
   type DirectoryOptionSource,
@@ -38,9 +39,8 @@ function directoryFields(definition: RegistrationFormDefinition): DirectoryField
       key: field.key,
       label: field.label,
       source: field.optionSource as DirectoryOptionSource,
-      companionKey: allFields.find((candidate) => (
-        candidate.conditional?.fieldKey === field.key && candidate.conditional.value === DIRECTORY_NOT_LISTED_VALUE
-      ))?.key ?? null,
+      // Any member of a grouped rule counts too; a single legacy rule keeps its original operator leniency (#1072).
+      companionKey: notListedCompanionKey(allFields, field.key, { anyOperator: true }),
     }));
 }
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { DIRECTORY_NOT_LISTED_VALUE, isAgeFieldKey, notListedCompanions, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { registrationClosedMessage } from "@/modules/events/lifecycle";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { fullNameKeys, splitNameKeyPairs, type PublicRegistrationIssue } from "@/modules/forms/public-domain";
@@ -398,14 +398,8 @@ export function clubDirectoryOwnedResponses(
     // directory match, so clear it rather than leaving a stale answer.
     // Only the free-text companion shown for "Not listed" — never another
     // field that merely depends on the club answer.
-    for (const companion of fields) {
-      if (
-        companion.conditional?.fieldKey === field.key
-        && companion.conditional.operator === "EQUALS"
-        && companion.conditional.value === DIRECTORY_NOT_LISTED_VALUE
-      ) {
-        responses[companion.key] = null;
-      }
+    for (const companion of notListedCompanions(fields, field.key)) {
+      responses[companion.key] = null;
     }
   }
   return responses;

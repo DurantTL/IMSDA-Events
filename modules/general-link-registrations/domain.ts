@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { REGISTRATION_MANAGE_API_SENTINEL, REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
 import { clubFormProblem, lockedClubDirectoryFieldKeys } from "@/modules/club-registrations/domain";
-import { DIRECTORY_NOT_LISTED_VALUE, type RegistrationFormDefinition } from "@/modules/forms/definition";
+import { DIRECTORY_NOT_LISTED_VALUE, notListedCompanionKey, type RegistrationFormDefinition } from "@/modules/forms/definition";
 
 /**
  * The general registration link (#931): one public link per club event where a club director with no account registers a
@@ -57,11 +57,7 @@ export function generalLinkClubFieldKey(definition: RegistrationFormDefinition):
 
 /** The "Not listed" companion text field of the club field, when the form has one. */
 export function generalLinkClubOtherKey(definition: RegistrationFormDefinition, clubKey: string): string | null {
-  return definition.sections.flatMap((section) => section.fields).find((field) => (
-    field.conditional?.fieldKey === clubKey
-    && field.conditional.operator === "EQUALS"
-    && field.conditional.value === DIRECTORY_NOT_LISTED_VALUE
-  ))?.key ?? null;
+  return notListedCompanionKey(definition.sections.flatMap((section) => section.fields), clubKey);
 }
 
 /** The line under the club menu on the public general link form (#1031). */

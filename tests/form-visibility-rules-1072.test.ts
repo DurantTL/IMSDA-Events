@@ -7,8 +7,12 @@ import { fieldVisibilityRule, mapVisibilityConditions, visibilityControllerKeys,
 import { avoidCollisions } from "@/components/registration-builder/palette-insert";
 import { instantiateLibraryFragment } from "@/components/registration-builder/library-insert";
 import { newOrderInversion, showWhenSummary } from "@/components/registration-builder/phone-move";
-import { ruleEditPatch, ruleSummary, readsAs, withAddedCondition, withoutCondition } from "@/components/registration-builder/rule-editor";
+import { ruleEditPatch, ruleSummary, readsAs, rowProblems, ruleProblems, withAddedCondition, withoutCondition } from "@/components/registration-builder/rule-editor";
 import { removeField, renameFieldKey } from "@/components/club-form-builder-state";
+import { fieldIsVisible as attendeeFieldIsVisible } from "@/components/attendee-registration-answers-form";
+import { excludedFieldKeys as pdfExcludedFieldKeys } from "@/modules/registration-pdf/model";
+import { questionsFromDefinition } from "@/modules/registrations/choice-answer-filter";
+import { isCheckInBookExtraField } from "@/modules/reporting/check-in-book";
 import { staffEventQuestions } from "@/modules/staff-invitations/event-questions";
 import { draftExcludedKeys } from "@/modules/forms/public-draft";
 import { groupFormDefinition } from "@/modules/group-registrations/domain";
@@ -26,6 +30,8 @@ function definition(fields: RegistrationFormField[], extra: Record<string, unkno
 }
 const parse = (fields: RegistrationFormField[], extra: Record<string, unknown> = {}) => registrationFormDefinitionSchema.safeParse(definition(fields, extra));
 const messages = (result: ReturnType<typeof parse>) => (result.success ? [] : result.error.issues.map((issue) => issue.message));
+// A group's issue names its question ("target: ..."), so the rule text is what follows.
+const bare = (result: ReturnType<typeof parse>) => messages(result).map((message) => message.replace(/^[^:]+: /, ""));
 
 describe("legacy single rules (#1072)", () => {
   const legacy = field("seats", { conditional: yes("bus") });
@@ -96,29 +102,29 @@ describe("validation of every member (#1072)", () => {
   });
 
   it("refuses a missing or deleted reference in the second member", () => {
-    expect(messages(parse([...base, group([yes("qa"), yes("gone")])]))).toContain("Conditional logic must reference another configured field.");
+    expect(bare(parse([...base, group([yes("qa"), yes("gone")])]))).toContain("Conditional logic must reference another configured field.");
   });
 
   it("refuses self reference in any member", () => {
-    expect(messages(parse([...base, group([yes("qa"), yes("target")])]))).toContain("Conditional logic must reference another configured field.");
+    expect(bare(parse([...base, group([yes("qa"), yes("target")])]))).toContain("Conditional logic must reference another configured field.");
   });
 
   it("refuses a registration-level question depending on an attendee answer through a later member", () => {
     const attendee = yesNo("rider", { scope: "ATTENDEE" });
     const result = parse([...base, attendee, group([yes("qa"), yes("rider")])], { attendeeRoster: { enabled: true, minAttendees: 1, maxAttendees: 5, attendeeLabel: "Attendee", addButtonLabel: "Add" } });
-    expect(messages(result)).toContain("A registration-level field cannot depend on an attendee answer.");
+    expect(bare(result)).toContain("A registration-level field cannot depend on an attendee answer.");
   });
 
   it("refuses a controller that comes later in the form, and a loop", () => {
-    expect(messages(parse([group([yes("qa"), yes("qb")]), ...base]))).toContain("A question that is shown only when another is answered has to stay after that question.");
+    expect(bare(parse([group([yes("qa"), yes("qb")]), ...base]))).toContain("A question that is shown only when another is answered has to stay after that question.");
     const loop = [yesNo("qa"), field("x", { conditionalGroup: { match: "ANY", conditions: [yes("qa"), yes("y")] } }), field("y", { conditional: yes("x") })];
-    expect(messages(parse(loop))).toContain("This rule depends on itself through other questions' rules.");
+    expect(bare(parse(loop))).toContain("This rule depends on itself through other questions' rules.");
   });
 
   it("refuses an address checked for a value, and an empty answer to match", () => {
     const address = field("home", { type: "ADDRESS" });
-    expect(messages(parse([...base, address, group([yes("qa"), yes("home")])]))).toContain("An address can only be checked as answered.");
-    expect(messages(parse([...base, group([yes("qa"), { fieldKey: "qb", operator: "EQUALS", value: "" }])]))).toContain("Choose or enter the answer this condition looks for.");
+    expect(bare(parse([...base, address, group([yes("qa"), yes("home")])]))).toContain("An address can only be checked as answered.");
+    expect(bare(parse([...base, group([yes("qa"), { fieldKey: "qb", operator: "EQUALS", value: "" }])]))).toContain("Choose or enter the answer this condition looks for.");
     expect(parse([...base, address, group([yes("qa"), { fieldKey: "home", operator: "NOT_EMPTY", value: "" }])]).success).toBe(true);
   });
 
@@ -209,8 +215,8 @@ describe("copy and remap (#1072)", () => {
     const renamed = renameFieldKey(spec, "id_b", "b2").definition.sections[0]!.fields[2]!;
     expect(visibilityControllerKeys(renamed)).toEqual(["a", "b2"]);
     const removed = removeField(spec, "id_a").definition.sections[0]!.fields.find((candidate) => candidate.key === "t")!;
-    // Down to one member, so it is a single rule again.
-    expect(removed.conditional).toEqual(yes("b"));
+    // Any member on the removed question drops the whole rule, as in a saved-question copy.
+    expect(removed.conditional).toBeUndefined();
     expect(removed.conditionalGroup).toBeUndefined();
     expect(mapVisibilityConditions(field("plain"), () => null)).toEqual(field("plain"));
   });
@@ -298,5 +304,81 @@ describe("rule summary, editor and move order (#1072)", () => {
     fields.splice(1, 0, seats!);
     expect(newOrderInversion(def.sections, sections, "id_seats")).toContain("Club size");
     expect(newOrderInversion(def.sections, def.sections, "id_seats")).toBeNull();
+  });
+});
+
+describe("review fixes (#1072)", () => {
+  const all = (...fields: RegistrationFormField[]) => fields;
+
+  it("names the question in a group's schema message", () => {
+    const result = parse([yesNo("qa"), field("target", { label: "Bus seats", conditionalGroup: { match: "ALL", conditions: [yes("qa"), yes("gone")] } })]);
+    expect(messages(result)).toContain("Bus seats: Conditional logic must reference another configured field.");
+  });
+
+  it("treats any problem on a group as a fix before saving, not a note", () => {
+    const later = definition([field("target", { label: "Seats", conditionalGroup: { match: "ALL", conditions: [yes("qa"), yes("qb")] } }), yesNo("qa"), yesNo("qb")]);
+    const entries = ruleSummary(later as unknown as RegistrationFormDefinition);
+    expect(entries[0]).toMatchObject({ needsFix: true, notes: [] });
+    expect(entries[0]!.fixMessage).toMatch(/^Fix before saving: /);
+    // A single legacy rule out of order is still only a note.
+    const legacyLater = definition([field("target", { label: "Seats", conditional: yes("qa") }), yesNo("qa")]);
+    expect(ruleSummary(legacyLater as unknown as RegistrationFormDefinition)[0]).toMatchObject({ needsFix: false });
+    expect(ruleSummary(legacyLater as unknown as RegistrationFormDefinition)[0]!.notes).toHaveLength(1);
+  });
+
+  it("does not add a row next to an unfinished one", () => {
+    const target = field("target", { conditionalGroup: { match: "ALL", conditions: [yes("qa"), { fieldKey: "qt", operator: "EQUALS", value: "" }] } });
+    const fields = all(yesNo("qa"), field("qt"), target);
+    expect(withAddedCondition(fieldVisibilityRule(target)!, target, fields)).toBeNull();
+    const done = field("target", { conditionalGroup: { match: "ALL", conditions: [yes("qa"), { fieldKey: "qt", operator: "EQUALS", value: "x" }] } });
+    expect(withAddedCondition(fieldVisibilityRule(done)!, done, fields)).not.toBeNull();
+  });
+
+  it("keeps Any when conditions go down to one and back to two", () => {
+    const fields = all(yesNo("qa"), yesNo("qb"), yesNo("qc"));
+    const start = field("target", { conditionalGroup: { match: "ANY", conditions: [yes("qa"), yes("qb")] } });
+    const one = { ...start, ...ruleEditPatch(withoutCondition(fieldVisibilityRule(start)!, 1)) };
+    // Stored as a single condition, which reads as All; the editor's remembered match brings Any back.
+    expect(fieldVisibilityRule(one)!.match).toBe("ALL");
+    const again = withAddedCondition(fieldVisibilityRule(one)!, one, fields, "ANY")!;
+    expect(again.match).toBe("ANY");
+    expect(ruleEditPatch(again).conditionalGroup?.match).toBe("ANY");
+  });
+
+  it("gives each problem its row, so two rows on one question are told apart", () => {
+    const target = field("target", { conditionalGroup: { match: "ALL", conditions: [{ fieldKey: "qa", operator: "EQUALS", value: "" }, { fieldKey: "qa", operator: "EQUALS", value: "Yes" }] } });
+    const fields = all(yesNo("qa"), target);
+    const problems = ruleProblems(target, fields);
+    const rule = fieldVisibilityRule(target)!;
+    expect(rowProblems(problems, rule, 0).map((problem) => problem.kind)).toEqual(["answer"]);
+    expect(rowProblems(problems, rule, 1)).toEqual([]);
+  });
+
+  it("keeps the attendee answer form's visibility in step with groups", () => {
+    const attendeeField = (conditionalGroup: { match: "ALL" | "ANY"; conditions: RuleCondition[] }) => ({ conditional: null, conditionalGroup }) as never;
+    const both = attendeeField({ match: "ALL", conditions: [yes("qa"), yes("qb")] });
+    const either = attendeeField({ match: "ANY", conditions: [yes("qa"), yes("qb")] });
+    expect(attendeeFieldIsVisible(both, { qa: "Yes", qb: "No" })).toBe(false);
+    expect(attendeeFieldIsVisible(either, { qa: "Yes", qb: "No" })).toBe(true);
+    expect(attendeeFieldIsVisible({ conditional: yes("qa"), conditionalGroup: null } as never, { qa: "Yes" })).toBe(true);
+    expect(attendeeFieldIsVisible({ conditional: null, conditionalGroup: null } as never, {})).toBe(true);
+  });
+
+  const sensitive = yesNo("medical_conditions", { label: "Medical conditions", scope: "ATTENDEE" });
+  const neutral = yesNo("tent", { scope: "ATTENDEE" });
+  const meal = field("meal_choice", { type: "SELECT", scope: "ATTENDEE", options: ["A", "B"], filterable: true, conditionalGroup: { match: "ANY", conditions: [yes("tent"), yes("medical_conditions")] } });
+
+  it("keeps a grouped question out of the PDF when any member's controller is excluded", () => {
+    const parsed = registrationFormDefinitionSchema.parse(definition([neutral, sensitive, meal])) as RegistrationFormDefinition;
+    expect(pdfExcludedFieldKeys(parsed).has("meal_choice")).toBe(true);
+  });
+
+  it("keeps a grouped question out of the answer filter for people without sensitive access, and out of the check-in book", () => {
+    const raw = definition([neutral, sensitive, meal]) as Record<string, unknown>;
+    const question = questionsFromDefinition(raw).get("ATTENDEE:meal_choice");
+    expect(question?.sensitive).toBe(true);
+    const parsed = registrationFormDefinitionSchema.parse(raw) as RegistrationFormDefinition;
+    const fields = parsed.sections.flatMap((section) => section.fields);
+    expect(isCheckInBookExtraField(fields.find((candidate) => candidate.key === "meal_choice")!, fields, { types: new Set(["SELECT"]) })).toBe(false);
   });
 });

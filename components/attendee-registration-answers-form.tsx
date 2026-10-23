@@ -16,7 +16,7 @@ type EditableAttendee = {
   lockedFieldKeys?: string[];
 };
 
-function fieldIsVisible(
+export function fieldIsVisible(
   field: EditableAttendeeField,
   responses: Record<string, unknown>,
 ) {

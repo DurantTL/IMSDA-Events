@@ -12614,7 +12614,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .fb-rule-toggle:disabled { cursor: not-allowed; opacity: 0.6; }
 .fb-rule-toggle:focus-visible, .fb-rule-link:focus-visible, .fb-rule-row select:focus-visible, .fb-rule-row input:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 .fb-rule-rows, .fb-rule-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.fb-rule-row { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.fb-rule-row { display: grid; gap: 8px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.fb-rule-row > legend { padding: 0 6px; color: var(--ink); font-size: 0.875rem; font-weight: 700; }
 .fb-rule-row[data-invalid="true"] { border-color: var(--danger, #8f3a30); }
 .fb-rule-row label { color: var(--muted); font-size: 0.8125rem; font-weight: 700; }
 .fb-rule-row select, .fb-rule-row input { width: 100%; min-height: var(--touch-target, 44px); box-sizing: border-box; }

@@ -38,14 +38,26 @@ export function ruleEditPatch(rule: VisibilityRule | null): Pick<RegistrationFor
   return visibilityRulePatch(rule);
 }
 
-/** Adds a row, looking at a question the rule does not use yet when there is one. Null when the rule is full or there is nothing to add. */
-export function withAddedCondition(rule: VisibilityRule, field: RegistrationFormField, allFields: readonly RegistrationFormField[]): VisibilityRule | null {
+/** A row that still needs its answer (Equals or Includes with nothing to look for). */
+export function conditionIncomplete(condition: RuleCondition): boolean {
+  return (condition.operator === "EQUALS" || condition.operator === "INCLUDES") && condition.value.trim() === "";
+}
+
+/**
+ * Adds a row, looking at a question the rule does not use yet when there is one. Null when the rule is full, there is
+ * nothing to add, or the last row is not finished (a new row is never added next to an incomplete one, so the rule is never
+ * saved in a state the form would refuse). `match` is the group's remembered All/Any: a single condition stores no match,
+ * so the editor passes the last one chosen and a rule that goes from one condition back to two keeps it.
+ */
+export function withAddedCondition(rule: VisibilityRule, field: RegistrationFormField, allFields: readonly RegistrationFormField[], match: RuleMatch = rule.match): VisibilityRule | null {
   if (rule.conditions.length >= MAX_RULE_CONDITIONS) return null;
+  const last = rule.conditions.at(-1);
+  if (last && conditionIncomplete(last)) return null;
   const choices = ruleControllerChoices(field, allFields);
   const used = new Set(rule.conditions.map((condition) => condition.fieldKey));
   const controller = choices.find((candidate) => !used.has(candidate.key)) ?? choices[0];
   if (!controller) return null;
-  return { ...rule, conditions: [...rule.conditions, newCondition(controller)] };
+  return { match, conditions: [...rule.conditions, newCondition(controller)] };
 }
 
 /** The rule without row `index`. Removing the last row removes the rule (the question then always shows). */
@@ -88,13 +100,13 @@ export function ruleProblems(field: RegistrationFormField, allFields: readonly R
 
 /** The problems that belong to row `index` (the ones that name its question), for the message under that row. */
 export function rowProblems(problems: readonly RuleProblem[], rule: VisibilityRule, index: number): RuleProblem[] {
-  const key = rule.conditions[index]?.fieldKey;
-  return problems.filter((problem) => problem.fieldKey !== undefined && problem.fieldKey === key);
+  void rule;
+  return problems.filter((problem) => problem.index === index);
 }
 
 /** Problems that name no row (an empty rule, a cycle). */
 export function ruleWideProblems(problems: readonly RuleProblem[]): RuleProblem[] {
-  return problems.filter((problem) => problem.fieldKey === undefined);
+  return problems.filter((problem) => problem.index === undefined);
 }
 
 export type RuleSummaryEntry = {
@@ -126,7 +138,9 @@ export function ruleSummary(definition: RegistrationFormDefinition): RuleSummary
       const rule = fieldVisibilityRule(field);
       if (!rule) continue;
       const problems = ruleProblems(field, all);
-      const broken = problems.filter((problem) => BROKEN_RULE_KINDS.has(problem.kind));
+      // A group the form would refuse to save (order, an unfinished answer) is a fix, not a note: the schema checks groups strictly.
+      const isGroup = Boolean(field.conditionalGroup);
+      const broken = problems.filter((problem) => isGroup || BROKEN_RULE_KINDS.has(problem.kind));
       const removed = broken.filter((problem) => problem.kind === "missing");
       const labelOf = (key: string) => all.find((candidate) => candidate.key === key)?.label;
       let fixMessage: string | null = null;
@@ -134,7 +148,7 @@ export function ruleSummary(definition: RegistrationFormDefinition): RuleSummary
         const names = [...new Set(removed.map((problem) => `“${problem.fieldKey}”`))];
         fixMessage = `Needs a fix: it depends on ${names.join(" and ")}, which ${names.length === 1 ? "was" : "were"} removed.`;
       } else if (broken.length > 0) {
-        fixMessage = `Needs a fix: ${broken[0]!.message}`;
+        fixMessage = `${BROKEN_RULE_KINDS.has(broken[0]!.kind) ? "Needs a fix" : "Fix before saving"}: ${broken[0]!.message}`;
       }
       entries.push({
         fieldId: field.id,
@@ -145,7 +159,7 @@ export function ruleSummary(definition: RegistrationFormDefinition): RuleSummary
         phrases: rule.conditions.map((condition) => conditionPhrase(condition, labelOf)),
         needsFix: broken.length > 0,
         fixMessage,
-        notes: problems.filter((problem) => !BROKEN_RULE_KINDS.has(problem.kind)).map((problem) => problem.message),
+        notes: problems.filter((problem) => !isGroup && !BROKEN_RULE_KINDS.has(problem.kind)).map((problem) => problem.message),
       });
     }
   });

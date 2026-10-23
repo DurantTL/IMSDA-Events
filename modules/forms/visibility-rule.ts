@@ -103,7 +103,8 @@ export type RuleField = RuleBearer & {
 
 export type RuleProblemKind = "empty" | "missing" | "self" | "scope" | "order" | "cycle" | "operator" | "answer";
 
-export type RuleProblem = { kind: RuleProblemKind; message: string; fieldKey?: string };
+/** `index` is the member (row) the problem belongs to; rule-wide problems (empty, cycle) have none. */
+export type RuleProblem = { kind: RuleProblemKind; message: string; fieldKey?: string; index?: number };
 
 const VALID_OPERATORS: ReadonlySet<string> = new Set<RuleOperator>(["EQUALS", "NOT_EQUALS", "INCLUDES", "NOT_EMPTY"]);
 
@@ -145,30 +146,30 @@ export function visibilityRuleProblems(field: RuleField, ordered: readonly RuleF
   const problems: RuleProblem[] = [];
   const byKey = new Map(ordered.map((candidate) => [candidate.key, candidate]));
   const ownIndex = ordered.findIndex((candidate) => candidate.key === field.key);
-  for (const condition of rule.conditions) {
+  for (const [index, condition] of rule.conditions.entries()) {
     if (condition.fieldKey === field.key) {
-      problems.push({ kind: "self", fieldKey: condition.fieldKey, message: "Conditional logic must reference another configured field." });
+      problems.push({ kind: "self", fieldKey: condition.fieldKey, index, message: "Conditional logic must reference another configured field." });
       continue;
     }
     const controller = byKey.get(condition.fieldKey);
     if (!controller) {
-      problems.push({ kind: "missing", fieldKey: condition.fieldKey, message: "Conditional logic must reference another configured field." });
+      problems.push({ kind: "missing", fieldKey: condition.fieldKey, index, message: "Conditional logic must reference another configured field." });
       continue;
     }
     if (field.scope === "REGISTRATION" && controller.scope === "ATTENDEE") {
-      problems.push({ kind: "scope", fieldKey: condition.fieldKey, message: "A registration-level field cannot depend on an attendee answer." });
+      problems.push({ kind: "scope", fieldKey: condition.fieldKey, index, message: "A registration-level field cannot depend on an attendee answer." });
     }
     if (!options.strict) continue;
     if (!VALID_OPERATORS.has(condition.operator)) {
-      problems.push({ kind: "operator", fieldKey: condition.fieldKey, message: "Choose a condition this form understands." });
+      problems.push({ kind: "operator", fieldKey: condition.fieldKey, index, message: "Choose a condition this form understands." });
     } else if (condition.operator !== "NOT_EMPTY" && controller.type && ANSWERED_ONLY_TYPES.has(controller.type)) {
-      problems.push({ kind: "operator", fieldKey: condition.fieldKey, message: `${controller.type === "ADDRESS" ? "An address" : "A calculated total"} can only be checked as answered.` });
+      problems.push({ kind: "operator", fieldKey: condition.fieldKey, index, message: `${controller.type === "ADDRESS" ? "An address" : "A calculated total"} can only be checked as answered.` });
     }
     if ((condition.operator === "EQUALS" || condition.operator === "INCLUDES") && condition.value.trim() === "") {
-      problems.push({ kind: "answer", fieldKey: condition.fieldKey, message: "Choose or enter the answer this condition looks for." });
+      problems.push({ kind: "answer", fieldKey: condition.fieldKey, index, message: "Choose or enter the answer this condition looks for." });
     }
     if (ownIndex >= 0 && ordered.indexOf(controller) > ownIndex) {
-      problems.push({ kind: "order", fieldKey: condition.fieldKey, message: "A question that is shown only when another is answered has to stay after that question." });
+      problems.push({ kind: "order", fieldKey: condition.fieldKey, index, message: "A question that is shown only when another is answered has to stay after that question." });
     }
   }
   if (options.strict && visibilityControllerKeys(field).some((key) => key !== field.key && reachesKey(key, field.key, byKey))) {
