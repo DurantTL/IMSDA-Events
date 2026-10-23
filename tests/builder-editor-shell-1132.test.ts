@@ -74,7 +74,7 @@ describe("the palette registry (#1132)", () => {
 
   it("has the six groups in the agreed order", () => {
     expect(snapshot.groups.map((group) => group.label)).toEqual([
-      "General questions", "People and directory", "Money", "Agreements", "Modules", "Saved questions",
+      "General questions", "People and directory", "Money", "Agreements", "Modules", "Question library",
     ]);
   });
 
@@ -159,7 +159,7 @@ describe("the palette registry (#1132)", () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps the Saved questions group, with its hint, until something is saved", () => {
+  it("keeps the Question library group, with its hint, until something is saved", () => {
     const groups = groupPalette(snapshot, snapshot.entries, false);
     const saved = groups.find((view) => view.group.id === "saved");
     expect(saved?.entries).toEqual([]);
@@ -338,15 +338,15 @@ describe("selection and tabs (#1132)", () => {
     expect(markup).toMatch(/<button type="button" class="fb-palette-group-toggle" aria-expanded="true" aria-controls="fb-palette-group-general"/);
     expect(markup).toMatch(/aria-expanded="false" aria-controls="fb-palette-group-money"/);
     expect(markup).toMatch(/<div id="fb-palette-group-money" hidden/);
-    expect(markup).toContain("Saved questions");
-    expect(markup).toContain("Questions you save to the library will appear here.");
+    expect(markup).toContain("Question library");
+    expect(markup).toContain("Questions saved to the library appear here.");
   });
 
   it("opens every group that has a match while searching, and says when nothing matches", () => {
     const snapshot = createDefaultPaletteRegistry().getSnapshot();
     const found = renderToStaticMarkup(createElement(PaletteList, { snapshot, query: "housing", openGroups: new Set<string>(), onToggleGroup: () => {}, onAdd: () => {} }));
     expect(found).toMatch(/aria-expanded="true" aria-controls="fb-palette-group-modules"/);
-    expect(found).not.toContain("Saved questions");
+    expect(found).not.toContain("Question library");
     const none = renderToStaticMarkup(createElement(PaletteList, { snapshot, query: "qqqq", openGroups: new Set<string>(), onToggleGroup: () => {}, onAdd: () => {} }));
     expect(none).toContain("No questions match");
   });

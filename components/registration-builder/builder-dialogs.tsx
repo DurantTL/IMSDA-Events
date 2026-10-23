@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormSlugDialog } from "@/components/form-slug-dialog";
 import { removalAnswerNote } from "@/modules/forms/field-answer-counts";
 import { useBuilder } from "./builder-context";
+import { BuilderSaveQuestionDialog } from "./builder-save-question";
 
 export function BuilderDialogs() {
   const { selectedForm, selectedVersion, busy, confirmingPublish, setConfirmingPublish, dirty, editsCreateDraft, confirmingUnpublish, setConfirmingUnpublish, draftTemplateTarget, setDraftTemplateTarget, templates, draftTemplateError, setDraftTemplateError, slugPrompt, setSlugPrompt, slugError, setSlugError, publishDialogRef, removeFieldTarget, setRemoveFieldTarget, removeSectionTarget, setRemoveSectionTarget, removalAnswerCounts, removalAnswerCountsLoading, resetRemovalAnswerCounts, confirmRemoveField, confirmRemoveSection, updateDraftFromTemplate, keepSlug, updateSlug, publish, unpublish, eventSlug, information } = useBuilder();
@@ -72,6 +73,7 @@ export function BuilderDialogs() {
           : removalAnswerNote("section", removeSectionTarget.section.fields.map((field) => field.key), removalAnswerCounts)}
       </p>}
     </ConfirmDialog>
+    <BuilderSaveQuestionDialog />
     </>
   );
 }

@@ -32,6 +32,7 @@ import { focusTargetAction, isSearchShortcut, undoRedoShortcut } from "./shell-k
 import { useEditorLayout, useHydrated } from "./use-editor-layout";
 import { paletteRegistry, type PaletteEntry, type PaletteRegistry } from "./palette-registry";
 import { filterPaletteRegistry } from "./information-palette";
+import { useQuestionLibraryRegistry } from "./use-question-library";
 import { informationListHref, informationResponsesHref } from "./information-mode";
 import { BuilderInformationSettings } from "./builder-information-settings";
 type FocusRequest =
@@ -94,11 +95,13 @@ function dialogIsOpen() {
 export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
     eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications: canEditRegistrationNotifications, information,
-    busy, history, undoEdit, redoEdit, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
+    busy, history, undoEdit, redoEdit, libraryRefresh, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
   // Information mode (#1149): no registration notifications, and the palette lists only what the information-form check allows.
   const canEditNotifications = canEditRegistrationNotifications && !information;
-  const paletteSource = useMemo(() => information ? filterPaletteRegistry(registry ?? paletteRegistry) : registry, [information, registry]);
+  // The question library (#1070) is layered over the registry; in information mode its entries pass the same refusal check as every other.
+  const libraryRegistry = useQuestionLibraryRegistry(registry ?? paletteRegistry, information ? information.eventId : eventId, libraryRefresh);
+  const paletteSource = useMemo(() => information ? filterPaletteRegistry(libraryRegistry) : libraryRegistry, [information, libraryRegistry]);
   const layoutControls = useEditorLayout();
   const hydrated = useHydrated();
   const { layout, showSidebar } = layoutControls;

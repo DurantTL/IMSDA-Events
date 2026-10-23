@@ -10154,3 +10154,23 @@ model RegistrationNotificationDelivery {
   @@unique([notificationId, registrationId])
   @@index([registrationId])
 }
+
+/// A saved question (#1070): reusable question configuration kept in the question library. `definition` is a
+/// fragment (`{ fields: [...] }`) validated with the form definition's own field schema; it holds configuration only,
+/// never answers, registrations, people or any other operational record. Adding one to a form inserts an independent
+/// copy with fresh ids and keys, so an edit or delete here never touches an inserted question or a published version.
+/// Anyone who can build forms may save and add; only system administrators rename, edit or delete (archive).
+model QuestionLibraryItem {
+  id          String    @id @default(cuid())
+  name        String
+  description String    @default("")
+  definition  Json
+  /// The user who saved it. A plain id (like SeededFormTemplateVersion's), so removing a user never blocks or erases the item.
+  createdByUserId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  /// Set when an administrator deletes the item: it leaves the library but the row stays for the audit trail.
+  archivedAt  DateTime?
+
+  @@index([archivedAt, name])
+}
