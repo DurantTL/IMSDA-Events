@@ -249,7 +249,7 @@ function statusLabel(record: RegistrationRecord) {
   return "Paid";
 }
 
-/** The server lists registrations by when they were submitted (modules/registrations/repository.ts), newest first. */
+/** The plain list: the server lists registrations by when they were submitted (modules/registrations/repository.ts), newest first. */
 const registrationListOrderText = sortOrderText("submitted date", "desc", "date");
 
 export function PeopleWorkspace({
@@ -271,6 +271,7 @@ export function PeopleWorkspace({
   matchingPersonFilter = false,
   pageScoped = false,
   openOnlyRegistration = null,
+  resultOrderText,
   pendingTeamCount = 0,
 }: {
   eventId: string;
@@ -300,9 +301,12 @@ export function PeopleWorkspace({
   pageScoped?: boolean;
   /** A registration opened by link (?registration=) that is not on this page of a search: it opens the detail and is never a row, a count or a selection. */
   openOnlyRegistration?: RegistrationRecord | null;
+  /** What a server search actually ordered by (describeSearchOrder). Omitted: the plain list. Null: no order to claim. */
+  resultOrderText?: string | null;
   /** Teams from the general registration link waiting for staff to confirm a club (#931): not registrations, so not in any count here. */
   pendingTeamCount?: number;
 }) {
+  const orderText = resultOrderText === undefined ? registrationListOrderText : resultOrderText;
   const initialSelected = findRegistrationToOpen(initialRegistrations, openOnlyRegistration, initialRegistrationId);
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [query, setQuery] = useState("");
@@ -790,7 +794,7 @@ export function PeopleWorkspace({
         </div>
       </div>
       <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
-      <SortOrderNote>{registrationListOrderText}</SortOrderNote>
+      {orderText && <SortOrderNote>{orderText}</SortOrderNote>}
       {/* Always shown, so "Select all" is findable before anything is ticked. */}
       {canEmail && (selectedIds.size > 0 || visible.length > 0) && (
         <div className="panel selection-bar">
