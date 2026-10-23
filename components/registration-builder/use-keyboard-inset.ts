@@ -34,6 +34,13 @@ export function useKeyboardInset(ref: RefObject<HTMLElement | null>, active: boo
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     observer?.observe(target);
     measure();
+    // The bar sits in the page flow while the page is at the very top, then sticks to the bottom once the person scrolls (or
+    // the keyboard opens). At first paint nothing of the page is under it; moving through the builder it follows them.
+    function engage() {
+      if (window.scrollY > 0) target.setAttribute("data-engaged", "true"); else target.removeAttribute("data-engaged");
+    }
+    window.addEventListener("scroll", engage, { passive: true });
+    engage();
     update();
     visual.addEventListener("resize", update);
     visual.addEventListener("scroll", update);
@@ -41,6 +48,8 @@ export function useKeyboardInset(ref: RefObject<HTMLElement | null>, active: boo
       visual.removeEventListener("resize", update);
       visual.removeEventListener("scroll", update);
       observer?.disconnect();
+      window.removeEventListener("scroll", engage);
+      target.removeAttribute("data-engaged");
       root.style.removeProperty("--fb-phone-bar-height");
       target.style.removeProperty("--fb-keyboard-inset");
       target.removeAttribute("data-keyboard");
