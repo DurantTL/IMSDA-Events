@@ -300,7 +300,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
         <nav className="fb-nav" aria-label="Form sections">
           <a href="#builder-editor" aria-current={activeSection === "editor" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
           <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>
-          {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
+          {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
         </nav>
         <BuilderVersionChips />
         <button className="fb-btn" type="button" onClick={showPreview}><Eye size={15} aria-hidden="true" /> Preview &amp; test</button>
