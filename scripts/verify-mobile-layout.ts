@@ -273,6 +273,8 @@ const pages: PageSpec[] = [
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
+  // Meal money closeout (#212): the money table, the exceptions and their review forms.
+  staff("kitchen-closeout", "/more/kitchen-report/closeout"),
   // Kitchen counts (#1029): the phone entry forms and the per-service table, with a long note and a correction in the history.
   staff("kitchen-counts", "/more/kitchen-report/counts"),
   // The same page as a Kitchen staff user (#1029): no event view, so the sidebar and phone tabs show only Kitchen counts.

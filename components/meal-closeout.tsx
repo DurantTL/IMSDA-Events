@@ -87,7 +87,7 @@ export function MealCloseout({ eventId, closeout, csvHref, exceptionsCsvHref }: 
           </div>
         </div>
         <dl className="kitchen-definitions field-help">
-          {closeoutDefinitions.map(([term, text]) => <div key={term}><dt className="sr-only">{term}</dt><dd><strong>{term}:</strong> {text}</dd></div>)}
+          {closeoutDefinitions.map(([term, text]) => <div key={term}><dt><strong>{term}</strong></dt><dd>{text}</dd></div>)}
         </dl>
         {rows.length === 0 ? (
           <p>This event has no meal orders, tickets or kitchen counts, so there is nothing to close out.</p>
@@ -129,7 +129,12 @@ export function MealCloseout({ eventId, closeout, csvHref, exceptionsCsvHref }: 
                 <p className="field-help">
                   {Object.entries(exception.detail).map(([name, value]) => `${name}: ${typeof value === "number" && name.endsWith("Cents") ? formatCents(value) : value}`).join(" · ")}
                 </p>
-                {exception.sourceIds.length > 0 && <p className="field-help">Source records: {exception.sourceIds.join(", ")}</p>}
+                {exception.sourceIds.length > 0 && (
+                  <p className="field-help">
+                    Source records: {exception.sourceIds.join(", ")}
+                    {exception.sourceIdsTotal > exception.sourceIds.length ? ` and ${exception.sourceIdsTotal - exception.sourceIds.length} more` : ""}
+                  </p>
+                )}
                 <p className="field-help">
                   {exception.state === "ACKNOWLEDGED" ? "Acknowledged" : exception.changedSinceReview ? "Open: its figures changed since it was acknowledged" : "Open"}
                   {exception.current ? ` · last review by ${exception.current.reviewedBy}, ${eventLocalDateTime(new Date(exception.current.reviewedAt), closeout.timeZone)}: ${exception.current.note}` : ""}

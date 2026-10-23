@@ -25,6 +25,8 @@ export type CloseoutSelection = {
   source: "REGISTRATION_FORM" | "STAFF" | "WALK_UP" | "PLAN_ASSIGNMENT";
   payer: MealPayerValue;
   status: "ACTIVE" | "CANCELLED";
+  /** False when the order belongs to a registration that is no longer submitted or confirmed (`isLiveRegistrationStatus`); true for a walk-up order. */
+  registrationLive: boolean;
   quantity: number;
   unitPriceCents: number;
   /** What the conference is billed per meal used, for a conference-paid selection; zero when no rate was on file. */
@@ -106,6 +108,8 @@ export type CloseoutException = {
   detailDigest: string;
   /** Source record ids (ledger entries, selections, adjustments, tickets) for the drilldown. Ids only, no names. */
   sourceIds: string[];
+  /** How many source ids there are in all; `sourceIds` is cut to the first few. */
+  sourceIdsTotal: number;
 };
 export type CloseoutProjection = {
   rows: CloseoutRow[];
@@ -145,8 +149,9 @@ function makeException(
   const ids = [...sourceIds].sort();
   return {
     key: `${code}:${scopeKey}`, code, category, scope, message, detail,
-    detailDigest: sha256Hex(JSON.stringify(Object.entries(detail).sort(([a], [b]) => a.localeCompare(b)))).slice(0, 32),
-    sourceIds: ids.slice(0, SOURCE_IDS_SHOWN),
+    // The digest covers the figures and every source id, not only the ids shown, so a change to any of them reopens a review.
+    detailDigest: sha256Hex(JSON.stringify([Object.entries(detail).sort(([a], [b]) => a.localeCompare(b)), ids])).slice(0, 32),
+    sourceIds: ids.slice(0, SOURCE_IDS_SHOWN), sourceIdsTotal: ids.length,
   };
 }
 
@@ -176,11 +181,29 @@ export function buildCloseout(input: CloseoutInput): CloseoutProjection {
     }
     ledgerBySelection.set(entry.selectionId, [...(ledgerBySelection.get(entry.selectionId) ?? []), entry]);
   }
+  const ticketsBySelection = new Map<string, number>();
+  for (const ticket of input.tickets) if (!ticket.cancelled) ticketsBySelection.set(ticket.selectionId, (ticketsBySelection.get(ticket.selectionId) ?? 0) + 1);
   for (const selection of input.selections) {
     const row = ensure(selection.serviceDate, selection.mealType);
     const entries = ledgerBySelection.get(selection.id) ?? [];
     const expected = selection.status === "ACTIVE" ? selection.quantity * selection.unitPriceCents : 0;
     const actual = entries.reduce((sum, entry) => sum + entry.amountCents, 0);
+    if (selection.status === "ACTIVE" && !selection.registrationLive) {
+      exceptions.push(makeException(
+        "ACTIVE_ORDER_ON_CANCELLED_REGISTRATION", "FINANCIAL", selection.id, label(row.serviceDate, row.mealType),
+        "A meal order is still active on a registration that is cancelled or waitlisted. Its tickets are treated as cancelled here and the amount still charged is not changed.",
+        { quantity: selection.quantity, stillChargedCents: actual }, [selection.id, ...entries.map((entry) => entry.id)],
+      ));
+    }
+    const liveTickets = ticketsBySelection.get(selection.id) ?? 0;
+    const wantedTickets = selection.status === "ACTIVE" ? selection.quantity : 0;
+    if (liveTickets !== wantedTickets) {
+      exceptions.push(makeException(
+        "TICKETS_MISMATCH", "CREDENTIAL", selection.id, label(row.serviceDate, row.mealType),
+        "The number of active café tickets differs from the order's quantity, so the money (by quantity) and the meal counts (by ticket) do not describe the same meals.",
+        { orderQuantity: wantedTickets, activeTickets: liveTickets }, [selection.id],
+      ));
+    }
     if (entries.length === 0 && expected !== 0) {
       exceptions.push(makeException(
         "LEDGER_MISSING", "FINANCIAL", selection.id, label(row.serviceDate, row.mealType),
@@ -236,7 +259,7 @@ export function buildCloseout(input: CloseoutInput): CloseoutProjection {
     if (!selection) continue;
     const row = ensure(selection.serviceDate, selection.mealType);
     const isServed = input.served.has(ticket.id);
-    const active = !ticket.cancelled && selection.status === "ACTIVE";
+    const active = !ticket.cancelled && selection.status === "ACTIVE" && selection.registrationLive;
     if (active) {
       const field = caseOf(selection);
       row.ordered[field] += 1;
@@ -353,10 +376,12 @@ export function buildCloseout(input: CloseoutInput): CloseoutProjection {
 /** A hash of the source records' ids and the fields the projection reads: the same source data always gives the same digest. */
 export function closeoutSourceDigest(input: CloseoutInput): string {
   const lines = [
-    ...input.selections.map((s) => `S|${s.id}|${s.status}|${s.quantity}|${s.unitPriceCents}|${s.conferenceRateCents}|${s.payer}|${s.source}`),
-    ...input.ledger.map((l) => `L|${l.id}|${l.kind}|${l.amountCents}|${l.payer}|${l.settlement}|${l.registrationAdjustmentId ?? ""}`),
+    `X|${input.anyImport ? 1 : 0}`,
+    ...input.selections.map((s) => `S|${s.id}|${s.serviceDate}|${s.mealType}|${s.status}|${s.registrationLive ? 1 : 0}|${s.quantity}|${s.unitPriceCents}|${s.conferenceRateCents}|${s.payer}|${s.source}`),
+    ...input.ledger.map((l) => `L|${l.id}|${l.selectionId}|${l.serviceDate}|${l.mealType}|${l.kind}|${l.amountCents}|${l.payer}|${l.settlement}|${l.registrationAdjustmentId ?? ""}`),
     ...input.adjustments.map((a) => `A|${a.id}|${a.amountCents}`),
-    ...input.tickets.map((t) => `T|${t.id}|${t.cancelled ? 1 : 0}|${input.served.has(t.id) ? 1 : 0}`),
+    ...input.tickets.map((t) => `T|${t.id}|${t.selectionId}|${t.cancelled ? 1 : 0}|${input.served.has(t.id) ? 1 : 0}`),
+    ...[...input.unredeemed].map((id) => `U|${id}`),
     ...input.kitchen.rows.map((r) => `K|${r.key}|${(["PREPARED", "WASTED", "DONATED", "TRANSFERRED"] as const).map((kind) => r.counts[kind]?.entryId ?? "").join(",")}`),
   ].sort();
   return sha256Hex(lines.join("\n"));

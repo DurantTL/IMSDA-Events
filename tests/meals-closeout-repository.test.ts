@@ -28,7 +28,7 @@ type Row = Record<string, unknown>;
 let reviews: Row[];
 let sequence: number;
 
-const lunch = { service: { serviceDate: "2026-10-15" } };
+const lunch = { service: { serviceDate: "2026-10-15" }, registration: { status: "CONFIRMED" } };
 function fakeDb(overrides: { ledger?: Row[] } = {}) {
   return {
     eventMealSelection: { findMany: vi.fn(async () => [{ id: "sel1", mealType: "LUNCH", source: "REGISTRATION_FORM", payer: "ATTENDEE", status: "ACTIVE", quantity: 2, unitPriceCents: 800, conferenceRateCents: 0, ...lunch }]) },

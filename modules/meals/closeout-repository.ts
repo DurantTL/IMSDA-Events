@@ -6,6 +6,7 @@ import {
   applyReviews, buildCloseout, openExceptionCount,
   type CloseoutAdjustment, type CloseoutInput, type CloseoutLedgerEntry, type CloseoutReview, type CloseoutReviewInput, type CloseoutSelection, type CloseoutTicket,
 } from "@/modules/meals/closeout";
+import { isLiveRegistrationStatus } from "@/modules/meals/domain";
 import { MealError } from "@/modules/meals/errors";
 import { loadKitchenCountsReport } from "@/modules/meals/kitchen-counts-repository";
 
@@ -20,7 +21,7 @@ async function loadCloseoutInput(eventId: string): Promise<{ input: CloseoutInpu
       where: { eventId }, orderBy: { id: "asc" },
       select: {
         id: true, mealType: true, source: true, payer: true, status: true, quantity: true, unitPriceCents: true, conferenceRateCents: true,
-        service: { select: { serviceDate: true } },
+        service: { select: { serviceDate: true } }, registration: { select: { status: true } },
       },
     }),
     prisma.eventMealLedgerEntry.findMany({
@@ -43,7 +44,7 @@ async function loadCloseoutInput(eventId: string): Promise<{ input: CloseoutInpu
   }
   const selections: CloseoutSelection[] = selectionRows.map((row) => ({
     id: row.id, mealType: row.mealType, serviceDate: row.service?.serviceDate ?? "", source: row.source, payer: row.payer, status: row.status,
-    quantity: row.quantity, unitPriceCents: row.unitPriceCents, conferenceRateCents: row.conferenceRateCents,
+    registrationLive: row.registration ? isLiveRegistrationStatus(row.registration.status) : true, quantity: row.quantity, unitPriceCents: row.unitPriceCents, conferenceRateCents: row.conferenceRateCents,
   }));
   const ledger: CloseoutLedgerEntry[] = ledgerRows.map((row) => ({
     id: row.id, selectionId: row.selectionId, mealType: row.mealType, serviceDate: row.selection.service?.serviceDate ?? "", kind: row.kind,

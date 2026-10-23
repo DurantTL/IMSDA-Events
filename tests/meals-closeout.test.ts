@@ -7,14 +7,14 @@ import {
   type CloseoutInput, type CloseoutLedgerEntry, type CloseoutReview, type CloseoutSelection, type CloseoutTicket,
 } from "@/modules/meals/closeout";
 import { buildKitchenCountsReport, type KitchenCountEntry } from "@/modules/meals/kitchen-counts";
-import { buildServedReport } from "@/modules/meals/served-report";
+import { buildServedReport, type ServedTicket } from "@/modules/meals/served-report";
 
 const DATE = "2026-10-15";
 let counter = 0;
 const id = (prefix: string) => `${prefix}${++counter}`;
 
 function selection(over: Partial<CloseoutSelection> = {}): CloseoutSelection {
-  return { id: id("sel"), mealType: "LUNCH", serviceDate: DATE, source: "REGISTRATION_FORM", payer: "ATTENDEE", status: "ACTIVE", quantity: 1, unitPriceCents: 800, conferenceRateCents: 0, ...over };
+  return { id: id("sel"), mealType: "LUNCH", serviceDate: DATE, source: "REGISTRATION_FORM", payer: "ATTENDEE", status: "ACTIVE", registrationLive: true, quantity: 1, unitPriceCents: 800, conferenceRateCents: 0, ...over };
 }
 function entry(sel: CloseoutSelection, over: Partial<CloseoutLedgerEntry> = {}): CloseoutLedgerEntry {
   const amount = over.kind === "CREDIT" ? -(sel.quantity * sel.unitPriceCents) : sel.quantity * sel.unitPriceCents;
@@ -132,7 +132,7 @@ describe("meal money closeout projection", () => {
   it("treats a selection with no ledger entries as missing source data, not as zero", () => {
     const sel = selection({ quantity: 3 });
     const free = selection({ unitPriceCents: 0 });
-    const projection = buildCloseout(input({ selections: [sel, free] }));
+    const projection = buildCloseout(input({ selections: [sel, free], tickets: [...tickets(sel), ...tickets(free)] }));
     expect(codes(projection)).toEqual(["LEDGER_MISSING"]);
     expect(projection.exceptions[0]!.detail).toMatchObject({ expectedCents: 2400, ledgerCents: 0 });
     expect(projection.rows[0]!.net).toBe(0);
@@ -258,5 +258,60 @@ describe("closeout CSV", () => {
     expect(csv).not.toContain('"=HYPERLINK');
     expect(csv).toContain("'=HYPERLINK");
     expect(closeoutCsv({ ...projection, totals: { ...projection.totals, credits: -800 } })).toContain('"-8"');
+  });
+});
+
+describe("registrations that are no longer live, and ticket counts", () => {
+  it("treats an order on a cancelled registration as not active and keeps its served meals apart, matching the served report", () => {
+    const live = selection({ quantity: 2 });
+    const dead = selection({ quantity: 2, registrationLive: false });
+    const liveTickets = tickets(live);
+    const deadTickets = tickets(dead);
+    const all = [...liveTickets, ...deadTickets];
+    const served = new Set([liveTickets[0]!.id, deadTickets[0]!.id, deadTickets[1]!.id]);
+    const projection = buildCloseout(input({ selections: [live, dead], ledger: [entry(live), entry(dead)], tickets: all, served }));
+    const row = projection.rows[0]!;
+    expect(row.ordered.paid).toBe(2);
+    expect(row.served.paid).toBe(1);
+    expect(row.servedOnCancelled).toBe(2);
+    const exception = projection.exceptions.find((e) => e.code === "ACTIVE_ORDER_ON_CANCELLED_REGISTRATION")!;
+    expect(exception).toMatchObject({ category: "FINANCIAL", detail: { stillChargedCents: 1600, quantity: 2 }, sourceIds: expect.arrayContaining([dead.id]) });
+    // Pinned to the served report, which treats a ticket on a non-live registration as cancelled.
+    const soldTickets: ServedTicket[] = all.map((t, index) => ({
+      id: t.id, number: index + 1, mealType: "LUNCH", serviceDate: DATE, payer: "ATTENDEE", cancelled: t.selectionId === dead.id,
+    }));
+    const report = buildServedReport(soldTickets, new Map([...served].map((ticketId) => [ticketId, new Date()])));
+    expect(row.ordered.paid).toBe(report.totals.sold.total);
+    expect(row.served.paid + row.servedOnCancelled).toBe(report.totals.served.total);
+    expect(row.servedOnCancelled).toBe(report.totals.servedOnCancelled.total);
+  });
+
+  it("flags active tickets that do not match the order quantity", () => {
+    const sel = selection({ quantity: 3 });
+    const projection = buildCloseout(input({ selections: [sel], ledger: [entry(sel)], tickets: tickets(sel, 2) }));
+    expect(projection.exceptions.find((e) => e.code === "TICKETS_MISMATCH")).toMatchObject({
+      key: `TICKETS_MISMATCH:${sel.id}`, category: "CREDENTIAL", detail: { orderQuantity: 3, activeTickets: 2 },
+    });
+    const gone = selection({ status: "CANCELLED" });
+    const ok = buildCloseout(input({ selections: [gone], ledger: [entry(gone), entry({ ...gone, status: "ACTIVE" }, { kind: "CREDIT" })], tickets: tickets(gone, 1, 0) }));
+    expect(codes(ok)).not.toContain("TICKETS_MISMATCH");
+  });
+
+  it("covers every source id in the digest, shows how many were cut, and covers more fields in the source digest", () => {
+    const sels = Array.from({ length: 30 }, () => selection({ quantity: 2 }));
+    const base = { selections: sels, ledger: sels.map((sel) => entry(sel, { amountCents: 1 })) };
+    const first = buildCloseout(input(base)).exceptions.find((e) => e.code === "RECEIPTS_NOT_ALLOCATED")!;
+    const walk = buildCloseout(input({ ...base, ledger: base.ledger.map((l) => ({ ...l, settlement: "AT_COUNTER" as const })) })).exceptions.find((e) => e.code === "WALK_UP_RECEIPTS_NOT_RECORDED")!;
+    expect(walk.sourceIds).toHaveLength(25);
+    expect(walk.sourceIdsTotal).toBe(30);
+    const changed = buildCloseout(input({ ...base, ledger: base.ledger.map((l, index) => (index === 29 ? { ...l, id: "zzz-last" } : l)).map((l) => ({ ...l, settlement: "AT_COUNTER" as const })) }))
+      .exceptions.find((e) => e.code === "WALK_UP_RECEIPTS_NOT_RECORDED")!;
+    expect(changed.sourceIds).toEqual(walk.sourceIds);
+    expect(changed.detailDigest).not.toBe(walk.detailDigest);
+    expect(first.sourceIdsTotal).toBe(0);
+    const a = buildCloseout(input({ ...base, anyImport: true })).sources.digest;
+    expect(buildCloseout(input({ ...base, anyImport: false })).sources.digest).not.toBe(a);
+    expect(buildCloseout(input({ ...base, unredeemed: new Set(["t"]) })).sources.digest).not.toBe(a);
+    expect(buildCloseout(input({ ...base, selections: [{ ...sels[0]!, mealType: "SUPPER" }, ...sels.slice(1)] })).sources.digest).not.toBe(a);
   });
 });
